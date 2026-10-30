@@ -5,11 +5,13 @@ description: "在OpenCode环境采集故障证据并执行faultaudit发布的模
 
 # 故障证据核验
 
-本 Skill 对应核心版本 0.1.1。通过 `scripts/run_audit.py` 调用本地核验核心，`FAULTAUDIT_HOME` 指向含 `run_faultaudit.py` 的核心目录。核心只导入、保存快照、发布任务及运行本地门禁；所有模型服务配置、实际执行及内网采集均在 OpenCode 环境完成。
+本 Skill 对应核心版本 0.1.3。通过 `scripts/run_audit.py` 调用本地核验核心。用核心的 `scripts/install_opencode.py --project <工作区>` 安装后，入口通过本地 `core-location.json` 定位核心，无需设置环境变量；同一磁盘优先保存相对路径，整个工作区与核心一起移动后仍可调用。跨磁盘安装保存本地绝对路径，迁移后可设置 FAULTAUDIT_HOME；如需重装，先保留并移走旧定位配置，安装器不会覆盖不同内容。可用 `FAULTAUDIT_HOME` 显式指定含 `run_faultaudit.py` 的核心目录，配置无效时直接报错，不回退到其他核心。核心只导入、保存快照、发布任务及运行本地门禁；所有模型服务配置、实际执行及内网采集均在 OpenCode 环境完成。
 
 DTS、Wiki、GitCode、GitHub、CodeHub 等目标网站访问统一由 OpenChamber 环境负责，使用其连接的 OpenCode 与现场工具执行。网站登录、搜索、正文/分页/附件/评论/Diff 读取及网络重试不进入 Codex 核心。`fetch-tasks` 仅导出清单，不能当作已经读取网页的证明。
 
 当前使用文件任务往返，不假设核心已直连 OpenCode 服务。现场可以接 SDK 或使用已配置的模型委派能力，但需先验证该能力及其实际 provider/model。
+
+本 Skill 默认执行 OpenCode 流程。核心另支持 Codex 会话，通过 `model-tasks/submit-model-results --executor codex` 和 `run --mode codex` 使用同一文件协议；Codex 的生产者使用 executor=codex 与 codex_version，不冒充 OpenCode 或 DeepSeek。精确模型/后台版本未知时明确标注 unreported。
 
 ## 操作
 

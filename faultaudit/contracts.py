@@ -49,7 +49,8 @@ class ReferenceOccurrence(Contract):
 
 RetrievalStatus = Literal[
     "COMPLETE", "PARTIAL", "AUTH_REQUIRED", "FORBIDDEN", "NOT_FOUND",
-    "TIMEOUT", "PARSE_FAILED", "UNSUPPORTED",
+    "TIMEOUT", "PARSE_FAILED", "UNSUPPORTED", "NOT_FETCHED",
+    "NETWORK_BLOCKED", "CONTENT_CAPTURED",
 ]
 
 
@@ -60,6 +61,10 @@ class EvidencePackage(Contract):
     text: str = ""
     status: RetrievalStatus = "COMPLETE"
     components: dict[str, str] = Field(default_factory=dict)
+    artifact_type: Literal["GENERIC", "WIKI", "DTS", "PR"] = "GENERIC"
+    required_components: list[str] = Field(default_factory=list)
+    expected_file_count: int | None = Field(default=None, ge=0, strict=True)
+    captured_file_count: int | None = Field(default=None, ge=0, strict=True)
     retrieved_by: str = "manual-import"
     retrieved_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     derived_from: list[str] = Field(default_factory=list)
@@ -158,3 +163,7 @@ class CatalogItem(Contract):
     source_file: str
     source_sha256: str
     source_location: str
+    catalog_scope: str = "UNSPECIFIED"
+    catalog_version: str = ""
+    sheet: str = ""
+    row: int | None = Field(default=None, ge=1)

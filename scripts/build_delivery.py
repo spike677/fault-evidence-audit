@@ -21,9 +21,10 @@ def build() -> Path:
         if directory.exists():
             paths.extend(p for p in directory.rglob("*") if p.is_file()
                          and "__pycache__" not in p.parts and p.suffix in extensions
+                         and ".scratch" not in p.relative_to(directory).parts
                          and not any(part.startswith("tmp") for part in p.relative_to(directory).parts[:-1]))
     paths.extend(root / name for name in ("README.md", "THIRD_PARTY_REFERENCES.md", "pyproject.toml",
-                                          "requirements.txt", "run_faultaudit.py", "VALIDATION.md") if (root / name).is_file())
+                                          "requirements.txt", "run_faultaudit.py", "VALIDATION.md", ".gitignore") if (root / name).is_file())
     unique = sorted(set(paths), key=lambda p: p.relative_to(root).as_posix())
     manifest = {p.relative_to(root).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest() for p in unique}
     text = json.dumps({"version": __version__, "files": manifest}, ensure_ascii=False, indent=2) + "\n"
@@ -37,4 +38,6 @@ def build() -> Path:
 
 
 if __name__ == "__main__":
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
     print(build())

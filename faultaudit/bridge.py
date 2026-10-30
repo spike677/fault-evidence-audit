@@ -1,4 +1,4 @@
-"""File task bridge: OpenCode owns every model service and credential.
+"""File task bridge: an external executor owns model execution and credentials.
 
 The core only emits immutable requests and validates imported results. Producer
 metadata is an executor's audit declaration, not proof of provider routing.
@@ -6,20 +6,29 @@ metadata is an executor's audit declaration, not proof of provider routing.
 from __future__ import annotations
 
 from . import contracts, gates, model, prompts
+from . import store as store_module
 from .contracts import EvidenceSummary
 from .model import PendingModelResult, validate_task_result
 from .store import AuditError, Store, digest
 from pathlib import Path
 
 SCHEMA_VERSION = "1.0"
+EXECUTORS = {"opencode", "codex"}
+
+
+def _executor(value: str) -> str:
+    if value not in EXECUTORS:
+        raise AuditError("Executor must be opencode or codex")
+    return value
 
 
 def policy_fingerprint() -> str:
-    return digest(b"".join(Path(module.__file__).read_bytes() for module in (contracts, gates, model, prompts))
+    return digest(b"".join(Path(module.__file__).read_bytes() for module in (contracts, gates, model, prompts, store_module))
                   + Path(__file__).read_bytes() + Path(__file__).with_name("pipeline.py").read_bytes())
 
 
 def _check_current(store: Store, run_id: str, task: dict) -> None:
+    executor = _executor(task.get("executor", "opencode"))
     if task["run_id"] != run_id or task["policy_hash"] != policy_fingerprint():
         raise AuditError("Model task belongs to another run or an obsolete core policy")
     unsigned = {key: value for key, value in task.items() if key != "request_hash"}
@@ -48,30 +57,32 @@ def _check_current(store: Store, run_id: str, task: dict) -> None:
         if digest(payload["items"]) != digest(store.records(run_id, "catalog")):
             raise AuditError("Model task catalog version is stale")
         from .pipeline import current_judgments
-        current = [j for j in current_judgments(store, run_id, mode="opencode", model_id="opencode-managed")
+        current = [j for j in current_judgments(store, run_id, mode=executor, model_id=executor + "-managed")
                    if j["case_id"] == case["case_id"] and j.get("review_status") != "REJECT"]
         if digest(current) != digest(payload["judgments"]):
             raise AuditError("Model task judgment/review dependencies are stale")
 
 
 class OpenCodeJudge:
-    """Create a request or consume an already verified OpenCode response."""
+    """Create a request or consume a verified response from this executor."""
+    executor = "opencode"
     model_id = "opencode-managed"
 
     def __init__(self, store: Store, run_id: str):
         self.store, self.run_id = store, run_id
         self.calls: list[dict] = []
         self.pipeline_task_id = ""
-        self.execution_signature = policy_fingerprint()
+        self.execution_signature = digest({"policy": policy_fingerprint(), "executor": self.executor})
 
     def _request(self, kind: str, payload: dict, instructions: str, expected_contract: str) -> dict:
         if not self.pipeline_task_id:
-            raise AuditError("OpenCode bridge needs a pipeline task context")
+            raise AuditError(self.executor + " bridge needs a pipeline task context")
         task = {"schema_version": SCHEMA_VERSION, "run_id": self.run_id, "kind": kind,
                 "pipeline_task_id": self.pipeline_task_id, "policy_hash": policy_fingerprint(),
                 "input_hash": digest(payload), "payload": payload, "instructions": instructions,
                 "expected_contract": expected_contract,
-                "model_service": "opencode", "model_role": "DeepSeek evidence judge; routing is configured by OpenCode"}
+                "executor": self.executor, "model_service": self.executor,
+                "model_role": "Evidence judge; actual provider/model is reported by the executing " + self.executor + " session"}
         task["task_id"] = "llm-" + digest(task)[:24]
         task["request_hash"] = digest(task)
         self.store.put(self.run_id, "model_tasks", task["task_id"], task)
@@ -79,7 +90,7 @@ class OpenCodeJudge:
         if not response:
             raise PendingModelResult(task_id=task["task_id"], operation=kind)
         _check_current(self.store, self.run_id, task)
-        self.calls.append({"executor": "opencode", "operation": kind, "task_id": task["task_id"],
+        self.calls.append({"executor": self.executor, "operation": kind, "task_id": task["task_id"],
                            "request_hash": task["request_hash"], "producer_reported": response["producer"],
                            "status": "IMPORTED_RESULT", "network_requested_by_core": False})
         return response["result"]
@@ -101,9 +112,18 @@ class OpenCodeJudge:
                              messages[0]["content"], "CatalogResponse")
 
 
-def export_model_tasks(store: Store, run_id: str) -> dict:
+class CodexJudge(OpenCodeJudge):
+    """The same file protocol, with Codex producer identity kept explicit."""
+    executor = "codex"
+    model_id = "codex-managed"
+
+
+def export_model_tasks(store: Store, run_id: str, *, executor: str = "opencode") -> dict:
+    executor = _executor(executor)
     tasks, stale = [], []
     for task in store.records(run_id, "model_tasks"):
+        if task.get("executor", "opencode") != executor:
+            continue
         if store.get(run_id, "model_results", task["task_id"]):
             continue
         try:
@@ -114,10 +134,12 @@ def export_model_tasks(store: Store, run_id: str) -> dict:
         tasks.append(task)
     return {"schema_version": SCHEMA_VERSION, "run_id": run_id, "tasks": tasks,
             "stale_tasks_excluded": stale,
-            "execution_owner": "OpenCode; no model endpoints or credentials are configured in this core"}
+            "executor": executor,
+            "execution_owner": executor + "; no model endpoints or credentials are configured in this core"}
 
 
-def submit_model_results(store: Store, run_id: str, envelopes: list[dict]) -> dict:
+def submit_model_results(store: Store, run_id: str, envelopes: list[dict], *, executor: str = "opencode") -> dict:
+    executor = _executor(executor)
     prepared, idempotent = [], 0
     for envelope in envelopes:
         if envelope.get("schema_version") != SCHEMA_VERSION or envelope.get("run_id") != run_id:
@@ -126,19 +148,22 @@ def submit_model_results(store: Store, run_id: str, envelopes: list[dict]) -> di
         task = store.get(run_id, "model_tasks", task_id)
         if not task or envelope.get("request_hash") != task["request_hash"]:
             raise AuditError("Unknown task or request_hash mismatch; use the core's exported request")
+        if task.get("executor", "opencode") != executor:
+            raise AuditError("Model task belongs to another executor")
         _check_current(store, run_id, task)
         producer = envelope.get("producer", {})
-        if not isinstance(producer, dict) or producer.get("executor") != "opencode" or any(
+        version_field = executor + "_version"
+        if not isinstance(producer, dict) or producer.get("executor") != executor or any(
             not isinstance(producer.get(k), str) or not producer[k].strip()
-            for k in ("opencode_version", "provider", "model", "session_id")
+            for k in (version_field, "provider", "model", "session_id")
         ):
-            raise AuditError("Producer must identify OpenCode version, reported provider/model and session")
+            raise AuditError("Producer must identify " + executor + " version, reported provider/model and session")
         result = envelope.get("result")
         if not isinstance(result, dict):
             raise AuditError("Model result must be a structured object")
-        if result.get("model_mode") not in {None, "opencode"} or result.get("model_id") not in {None, producer["model"]}:
-            raise AuditError("Result model metadata disagrees with its OpenCode producer")
-        value = {**result, "model_mode": "opencode", "model_id": producer["model"]}
+        if result.get("model_mode") not in {None, executor} or result.get("model_id") not in {None, producer["model"]}:
+            raise AuditError("Result model metadata disagrees with its " + executor + " producer")
+        value = {**result, "model_mode": executor, "model_id": producer["model"]}
         payload = task["payload"]
         checked = validate_task_result(task["kind"], value, snapshot=payload.get("snapshot"),
                                        case=payload.get("case"), judgments=payload.get("judgments"),
@@ -162,7 +187,7 @@ def submit_model_results(store: Store, run_id: str, envelopes: list[dict]) -> di
     # Validate the complete batch before committing any response.
     for value in prepared:
         store.put(run_id, "model_results", value["task_id"], value)
-        store.event(run_id, "opencode_result_received", {"task_id": value["task_id"],
+        store.event(run_id, executor + "_result_received", {"task_id": value["task_id"],
                                                         "request_hash": value["request_hash"],
                                                         "producer_reported": value["producer"]})
     return {"run_id": run_id, "accepted": len(prepared), "idempotent": idempotent}

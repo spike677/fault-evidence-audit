@@ -31,7 +31,10 @@
         "NOT_FOUND",
         "TIMEOUT",
         "PARSE_FAILED",
-        "UNSUPPORTED"
+        "UNSUPPORTED",
+        "NOT_FETCHED",
+        "NETWORK_BLOCKED",
+        "CONTENT_CAPTURED"
       ],
       "title": "Status",
       "type": "string"
@@ -42,6 +45,50 @@
       },
       "title": "Components",
       "type": "object"
+    },
+    "artifact_type": {
+      "default": "GENERIC",
+      "enum": [
+        "GENERIC",
+        "WIKI",
+        "DTS",
+        "PR"
+      ],
+      "title": "Artifact Type",
+      "type": "string"
+    },
+    "required_components": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Required Components",
+      "type": "array"
+    },
+    "expected_file_count": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Expected File Count"
+    },
+    "captured_file_count": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Captured File Count"
     },
     "retrieved_by": {
       "default": "manual-import",

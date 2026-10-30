@@ -14,10 +14,6 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 
 from . import __version__
-from .contracts import EvidencePackage, EvidenceSummary, Judgment
-from .importers import import_cases, import_catalog
-from .pipeline import execute, fetch_tasks, import_into, report_data, validate
-from .store import AuditError, Store
 
 
 def write_json(value, path: Path | None = None):
@@ -36,9 +32,13 @@ def doctor() -> dict:
             versions[package] = importlib.metadata.version(package)
         except importlib.metadata.PackageNotFoundError:
             versions[package] = None
+    core_ready = bool(versions["pydantic"] and versions["pydantic"].split(".")[0] == "2")
     return {"version": __version__, "python": sys.version.split()[0], "executable": sys.executable,
             "platform": platform.platform(), "dependencies": versions,
+            "core_ready": core_ready, "xlsx_import_ready": bool(versions["openpyxl"]),
+            "dependency_help": "Install requirements.txt with this Python executable" if not core_ready else None,
             "model_service": {"owner": "opencode", "transport": "file-task-bridge",
+                              "supported_executors": ["opencode", "codex"],
                               "credentials_in_core": False, "network_execution_in_core": False},
             "collection": "EvidencePackage import; live internal connectors must be supplied on site",
             "opencode": "Inspect the actual OpenChamber server; PATH version alone is insufficient",
@@ -47,6 +47,8 @@ def doctor() -> dict:
 
 def demo(store: Store, output: Path) -> dict:
     """Use synthetic documents, never purport to have fetched private resources."""
+    from .importers import import_cases, import_catalog
+    from .pipeline import execute, import_into, report_data
     from .model import MockJudge
     output.mkdir(parents=True, exist_ok=True)
     rows = [
@@ -102,6 +104,9 @@ def parser() -> argparse.ArgumentParser:
     imp.add_argument("--input", type=Path, required=True)
     imp.add_argument("--source-kind", choices=["LEGACY_TABLE", "ORIGINAL_WEEKLY", "ORIGINAL_OBP"], default="LEGACY_TABLE")
     imp.add_argument("--catalog", type=Path)
+    imp.add_argument("--catalog-sheet", action="append", help="Exact catalog sheet name; repeat to select multiple sheets")
+    imp.add_argument("--catalog-scope", default="UNSPECIFIED", help="Frozen catalog scope, for example INFERENCE or TRAINING")
+    imp.add_argument("--expected-catalog-count", type=int, help="Reject the import if the selected catalog size differs")
     imp.add_argument("--run", help="Append inputs to an existing run; same file rows are idempotent")
     evidence = sub.add_parser("ingest-evidence")
     evidence.add_argument("--run", default="latest")
@@ -109,9 +114,13 @@ def parser() -> argparse.ArgumentParser:
     fetch = sub.add_parser("fetch-tasks")
     fetch.add_argument("--run", default="latest")
     fetch.add_argument("--out", type=Path)
+    index = sub.add_parser("evidence-index", help="Show every case citing each URL and its individual judgment")
+    index.add_argument("--run", default="latest")
+    index.add_argument("--url", help="Optionally select one exact evidence URL")
+    index.add_argument("--out", type=Path)
     run = sub.add_parser("run")
     run.add_argument("--run", default="latest")
-    run.add_argument("--mode", choices=["mock", "opencode"], required=True)
+    run.add_argument("--mode", choices=["mock", "opencode", "codex"], required=True)
     run.add_argument("--retry-failed", action="store_true")
     run.add_argument("--resume", action="store_true", help="All runs already resume idempotently; retained for explicit operator intent")
     for name in ("status", "validate", "export", "review"):
@@ -123,7 +132,9 @@ def parser() -> argparse.ArgumentParser:
             cmd.add_argument("--out", type=Path, required=True)
             cmd.add_argument("--xlsx", action="store_true", help="Also run the optional artifact-tool Node exporter")
         elif name == "review":
-            cmd.add_argument("--judgment", required=True)
+            target = cmd.add_mutually_exclusive_group(required=True)
+            target.add_argument("--judgment")
+            target.add_argument("--mapping", help="Review a catalog mapping by its task_id")
             cmd.add_argument("--verdict", choices=["ACCEPT", "REJECT", "NEEDS_INFO"], required=True)
             cmd.add_argument("--reason", required=True)
             cmd.add_argument("--reviewer", required=True)
@@ -133,20 +144,34 @@ def parser() -> argparse.ArgumentParser:
     schema.add_argument("--out", type=Path, required=True)
     requests = sub.add_parser("model-tasks", help="Emit dependency-ready model tasks for OpenCode execution")
     requests.add_argument("--run", default="latest")
+    requests.add_argument("--executor", choices=["opencode", "codex"], default="opencode")
     requests.add_argument("--out", type=Path, required=True)
     results = sub.add_parser("submit-model-results", help="Verify returned OpenCode result envelopes")
     results.add_argument("--run", default="latest")
+    results.add_argument("--executor", choices=["opencode", "codex"], default="opencode")
     results.add_argument("--file", type=Path, required=True)
     return p
 
 
 def main(argv: list[str] | None = None) -> int:
+    # JSON files and stdout use the same UTF-8 protocol, including Windows pipes
+    # whose inherited ANSI encoding may not represent a Chinese workspace path.
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8")
     args = parser().parse_args(argv)
     store = None
     try:
         if args.command == "doctor":
             write_json(doctor())
             return 0
+        # Keep doctor and --version available even when third-party dependencies
+        # are absent, so a new environment can diagnose itself without a traceback.
+        from .contracts import EvidencePackage, EvidenceSummary, Judgment
+        from .importers import import_cases, import_catalog
+        from .pipeline import (check_catalog_import, evidence_index, execute, fetch_tasks,
+                               import_into, report_data, validate)
+        from .store import AuditError, Store
         if args.command == "schemas":
             for cls in (EvidencePackage, EvidenceSummary, Judgment):
                 write_json(cls.model_json_schema(), args.out / f"{cls.__name__}.schema.json")
@@ -157,13 +182,24 @@ def main(argv: list[str] | None = None) -> int:
             write_json(demo(store, args.out.resolve()))
             return 0
         if args.command == "import":
+            if not args.catalog and (args.catalog_sheet is not None or args.catalog_scope != "UNSPECIFIED"
+                                     or args.expected_catalog_count is not None):
+                raise AuditError("Catalog selection options require --catalog")
+            if args.expected_catalog_count is not None and args.expected_catalog_count < 1:
+                raise AuditError("--expected-catalog-count must be positive")
             imported = import_cases(args.input, source_kind=args.source_kind)
-            catalog = import_catalog(args.catalog) if args.catalog else None
-            run_id = store.run_info(args.run)["run_id"] if args.run else store.create_run()
+            catalog = import_catalog(args.catalog, sheets=args.catalog_sheet, scope=args.catalog_scope,
+                                     expected_count=args.expected_catalog_count) if args.catalog else None
+            run_id = store.run_info(args.run)["run_id"] if args.run else None
+            if catalog:
+                check_catalog_import(store, run_id, catalog)
+            run_id = run_id or store.create_run()
             counts = import_into(store, run_id, imported)
             if catalog:
                 import_into(store, run_id, catalog, catalog=True)
-            write_json({"run_id": run_id, "imported": counts, "validation": validate(store, run_id)})
+            write_json({"run_id": run_id, "imported": counts,
+                        "catalog_identity": catalog.get("catalog_identity") if catalog else None,
+                        "validation": validate(store, run_id)})
             return 0
         run_id = store.run_info(args.run)["run_id"]
         if args.command == "ingest-evidence":
@@ -176,27 +212,36 @@ def main(argv: list[str] | None = None) -> int:
             write_json(value, args.out)
             if args.out:
                 write_json({"run_id": run_id, "task_file": str(args.out.resolve()), "count": len(value["fetch_tasks"])})
+        elif args.command == "evidence-index":
+            value = evidence_index(store, run_id, args.url)
+            write_json(value, args.out)
+            if args.out:
+                write_json({"run_id": run_id, "index_file": str(args.out.resolve()),
+                            "count": len(value["evidence_index"]), "shared_evidence_count": value["shared_evidence_count"]})
         elif args.command == "run":
             from .model import MockJudge
-            from .bridge import OpenCodeJudge
+            from .bridge import OpenCodeJudge, CodexJudge
             if args.mode == "mock":
                 judge, model_id = MockJudge(), "mock-conservative-v1"
-            else:
+            elif args.mode == "opencode":
                 judge, model_id = OpenCodeJudge(store, run_id), "opencode-managed"
+            else:
+                judge, model_id = CodexJudge(store, run_id), "codex-managed"
             result = execute(store, run_id, judge, mode=args.mode, model_id=model_id, retry_failed=args.retry_failed)
             write_json(result)
             return 0 if result["valid"] else 2
         elif args.command in {"model-tasks", "submit-model-results"}:
-            from .bridge import OpenCodeJudge, export_model_tasks, submit_model_results
+            from .bridge import OpenCodeJudge, CodexJudge, export_model_tasks, submit_model_results
             accepted = None
             if args.command == "submit-model-results":
                 body = json.loads(args.file.read_text(encoding="utf-8-sig"))
                 envelopes = body if isinstance(body, list) else body.get("results", [body]) if isinstance(body, dict) else None
                 if not isinstance(envelopes, list):
                     raise AuditError("Results must be an envelope, a list, or an object with results")
-                accepted = submit_model_results(store, run_id, envelopes)
-            status = execute(store, run_id, OpenCodeJudge(store, run_id), mode="opencode", model_id="opencode-managed")
-            ready = export_model_tasks(store, run_id)
+                accepted = submit_model_results(store, run_id, envelopes, executor=args.executor)
+            judge = CodexJudge(store, run_id) if args.executor == "codex" else OpenCodeJudge(store, run_id)
+            status = execute(store, run_id, judge, mode=args.executor, model_id=args.executor + "-managed")
+            ready = export_model_tasks(store, run_id, executor=args.executor)
             if args.command == "model-tasks":
                 write_json(ready, args.out)
                 write_json({"run_id": run_id, "task_file": str(args.out.resolve()),
@@ -240,11 +285,19 @@ def main(argv: list[str] | None = None) -> int:
                     output["xlsx_runtime_warning"] = f"Runtime exited {process.returncode}; fresh saved ZIP and sheet count verified. Check previews before use."
             write_json({"run_id": run_id, "outputs": output, "validation": validate(store, run_id)})
         elif args.command == "review":
-            if not store.get(run_id, "judgments", args.judgment):
-                raise AuditError("Judgment not found in this run")
-            store.event(run_id, "review", {"judgment_id": args.judgment, "verdict": args.verdict,
+            record_id = args.mapping or args.judgment
+            kind = "mappings" if args.mapping else "judgments"
+            if not store.get(run_id, kind, record_id):
+                raise AuditError("Review target not found in this run")
+            key = "mapping_id" if args.mapping else "judgment_id"
+            store.event(run_id, "review", {key: record_id, "record_kind": kind, "verdict": args.verdict,
                                            "reason": args.reason, "reviewer": args.reviewer})
-            write_json({"run_id": run_id, "review_saved": args.judgment, "verdict": args.verdict})
+            if kind == "judgments":
+                case_id = store.get(run_id, kind, record_id)["case_id"]
+                for task in store.tasks(run_id):
+                    if task["kind"] == "catalog" and task["target_id"] == case_id and task["status"] != "STALE":
+                        store.task_status(run_id, task["task_id"], "STALE", "Judgment review changed; catalog requires revalidation")
+            write_json({"run_id": run_id, "review_saved": record_id, "record_kind": kind, "verdict": args.verdict})
         return 0
     except Exception as exc:
         # The core never initializes a live model client or reads model secrets.

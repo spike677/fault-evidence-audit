@@ -1,6 +1,8 @@
 # 现场采集合同
 
-对应核心版本 0.1.1。内网采集与所有模型执行都由OpenCode现场完成，核心只接收文件、保存快照及运行本地校验。
+本文件描述默认OpenCode现场流程。核心0.1.3另支持Codex会话执行模型文件任务：导出和提交时加 `--executor codex`，推进时用 `run --mode codex`；producer使用executor=codex、codex_version及实际provider/model/session_id，未知精确版本写unreported。内网采集仍需现场获准工具，Codex入口不自动获取登录态。
+
+对应核心版本 0.1.3。内网采集与所有模型执行都由OpenCode现场完成，核心只接收文件、保存快照及运行本地校验。
 
 ## 网站访问的执行归属
 
@@ -12,7 +14,11 @@ DTS、Wiki、GitCode、GitHub、CodeHub 等所有目标网站均由 OpenChamber 
 
 `url` 是待核验引用的 URL；`requested_url` 与 `final_url` 分别保留请求和落地地址。不能因 WIKI 编号相同就替换域路径。`text` 是工具实际读取的正文，保存章节与多个子问题；原始响应可另存为同目录文件，通过 `raw_file` 引用。
 
-`status` 为 COMPLETE、PARTIAL、AUTH_REQUIRED、FORBIDDEN、NOT_FOUND、TIMEOUT、PARSE_FAILED 或 UNSUPPORTED。COMPLETE 必须有非空正文和 `components.body=COMPLETE`。正文、评论、附件、Diff 各自记录状态；登录页不是故障正文。
+`status` 为 COMPLETE、PARTIAL、CONTENT_CAPTURED、NOT_FETCHED、NETWORK_BLOCKED、AUTH_REQUIRED、FORBIDDEN、NOT_FOUND、TIMEOUT、PARSE_FAILED 或 UNSUPPORTED。CONTENT_CAPTURED 表示取得正文但完整性未验收，可初步摘要，不能确认归属或直接支持。COMPLETE 必须有非空正文和 `components.body=COMPLETE`；其他已声明组件必须为 COMPLETE 或 NOT_APPLICABLE。正文、章节、评论、附件、子页面、Diff 各自记录状态；用 `required_components` 显式列出需要核验的组件，无法确认时保持部分状态。Wiki/DTS 的站点清单仍需现场定义；generic body-only 兼容包不能证明全页面完整。登录页不是故障正文。
+
+`artifact_type` 可为 GENERIC、WIKI、DTS、PR。显式 PR 或常见 PR 路径的 COMPLETE 包必须包含 `components.file_list=COMPLETE`、`components.diff=COMPLETE`，以及相等的 `expected_file_count` 和 `captured_file_count`（非负整数）。这些是对采集声明的一致性校验，现场仍须核对远端文件列表及实际 Diff 覆盖。只有描述、缺 Diff 时使用 PARTIAL。新字段都可在 schema 中查看。
+
+导入故障库时使用 `--catalog-sheet <精确名称> --catalog-scope INFERENCE --expected-catalog-count 98`，训练库单独 run；文件 Hash、Sheet 和作用域共同冻结。`evidence-index --run <id> --out <文件>` 输出资料的所有引用者及各自判断，供共享 Wiki/DTS/PR 的交叉检查，不据此合并故障。
 
 搜索新链接填 `case_ids`、`record_discovery=true`、`origin=SEARCH_DISCOVERED`、`discovery_query`。追链填父资料 `discovered_from_url`。同 URL 的不同发现来源不能丢失，重复提交同一发现应幂等。
 

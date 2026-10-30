@@ -28,8 +28,9 @@ def main():
                "tests_run": result.testsRun, "successful": result.wasSuccessful(),
                "failures": [str(t) for t, _ in result.failures], "errors": [str(t) for t, _ in result.errors],
                "skipped": [str(t) for t, _ in result.skipped],
-               "network_scope": "No network and no model services; OpenCode task/result protocol only",
-               "model_execution_owner": "opencode",
+               "network_scope": "No network or model service clients; synthetic OpenCode/Codex file-protocol regression",
+               "model_execution_owner": "external executor",
+               "supported_executors": ["opencode", "codex"],
                "live_deepseek_tested": False, "internal_collectors_tested": False,
                "actual_98_item_catalog_tested": False}
     args.out.parent.mkdir(parents=True, exist_ok=True)

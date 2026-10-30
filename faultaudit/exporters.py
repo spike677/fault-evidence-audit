@@ -46,6 +46,7 @@ _TABLES = [
     ("原始记录", "cases"), ("引用来历", "references"), ("资料快照", "snapshots"),
     ("资料摘要", "summaries"), ("关联判断", "judgments"), ("故障库", "catalog"),
     ("库映射", "mappings"), ("任务台账", "tasks"), ("人工复核", "review_events"),
+    ("证据反查", "evidence_index"), ("库选择基准", "catalog_selections"),
 ]
 
 

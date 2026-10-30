@@ -26,7 +26,8 @@ def _messages(task: str, data: dict[str, Any]) -> list[dict[str, str]]:
 
 def snapshot_data(snapshot: dict[str, Any]) -> dict[str, Any]:
     """Keep extraction independent of the case the caller hopes to prove."""
-    keys = ("snapshot_id", "url", "title", "text", "status", "segments", "components")
+    keys = ("snapshot_id", "url", "title", "text", "status", "segments", "components",
+            "artifact_type", "required_components", "expected_file_count", "captured_file_count")
     return {key: snapshot.get(key) for key in keys}
 
 

@@ -8,7 +8,7 @@ from .contracts import EvidenceSummary, Judgment
 from .gates import event_anchor_errors
 from .store import AuditError, Store, canonical_url, digest
 
-RULE_VERSION = "nightly-0.1.1"
+RULE_VERSION = "nightly-0.1.3"
 
 
 def cited_refs(summary: dict):
@@ -56,13 +56,42 @@ def gate_judgment(case: dict, snapshot: dict, value: dict) -> dict:
     return result
 
 
+def check_catalog_import(store: Store, run_id: str | None, result: dict) -> dict:
+    """Validate the whole selection before writing cases or catalog records."""
+    items = result.get("items", [])
+    hashes = {item["source_sha256"] for item in items}
+    if len(hashes) != 1:
+        raise AuditError("Catalog must contain items from exactly one source file")
+    item_ids = [item["item_id"] for item in items]
+    if len(set(item_ids)) != len(item_ids):
+        raise AuditError("Duplicate catalog item IDs; select one scope or fix the catalog")
+    identity = result.get("catalog_identity") or {
+        "source_sha256": next(iter(hashes)),
+        "sheets": sorted({item.get("sheet", "") for item in items}),
+        "scope": "UNSPECIFIED",
+    }
+    if identity.get("source_sha256") != next(iter(hashes)):
+        raise AuditError("Catalog selection does not match its source hash")
+    if run_id is None:
+        return identity
+    old = store.records(run_id, "catalog")
+    frozen = store.get(run_id, "catalog_selections", "frozen")
+    if old and not frozen:
+        raise AuditError("Existing catalog predates selection metadata; use a new run for catalog import")
+    if frozen and frozen != identity:
+        raise AuditError("Catalog file, sheets and scope are frozen within a run; use a new run for another selection")
+    if old and {item["item_id"] for item in old} != set(item_ids):
+        raise AuditError("Catalog item set is frozen within a run; use a new run")
+    for item in items:
+        existing = store.get(run_id, "catalog", item["item_id"])
+        if existing is not None and existing != item:
+            raise AuditError("Immutable catalog item differs; use a new run")
+    return identity
+
+
 def import_into(store: Store, run_id: str, result: dict, catalog: bool = False) -> dict:
     counts = {}
-    if catalog:
-        old_hashes = {i["source_sha256"] for i in store.records(run_id, "catalog")}
-        new_hashes = {i["source_sha256"] for i in result.get("items", [])}
-        if len(new_hashes) != 1 or (old_hashes and old_hashes != new_hashes):
-            raise AuditError("Catalog version is frozen within a run; use a new run for another catalog file")
+    identity = check_catalog_import(store, run_id, result) if catalog else None
     keys = {"cases": "cases", "references": "references", "exclusions": "exclusions",
             "documents": "documents", "items": "catalog"}
     for source, kind in keys.items():
@@ -79,6 +108,8 @@ def import_into(store: Store, run_id: str, result: dict, catalog: bool = False) 
             store.put(run_id, kind, key, value)
     for warning in result.get("warnings", []):
         store.event(run_id, "import_warning", {"warning": warning})
+    if identity is not None:
+        store.put(run_id, "catalog_selections", "frozen", identity)
     store.event(run_id, "catalog_imported" if catalog else "cases_imported", {"counts": counts})
     return counts
 
@@ -126,17 +157,48 @@ def fetch_tasks(store: Store, run_id: str) -> dict:
             "note": "Call existing site tools, preserve text and return EvidencePackage JSON. Search discoveries require explicit case_ids."}
 
 
+def evidence_index(store: Store, run_id: str, url: str | None = None) -> dict:
+    """Expose every citing case and its individual verdict without merging cases."""
+    target = canonical_url(url) if url else None
+    cases = {case["case_id"]: case for case in store.records(run_id, "cases")}
+    judgments = current_judgments(store, run_id)
+    snapshots = store.records(run_id, "snapshots")
+    plan = fetch_tasks(store, run_id)
+    entries = []
+    for group in plan["fetch_tasks"]:
+        if target and group["url"] != target:
+            continue
+        associations = []
+        for case_id in sorted(group["case_ids"]):
+            case = cases.get(case_id, {})
+            associations.append({
+                "case_id": case_id, "external_id": case.get("external_id", ""),
+                "source_file": case.get("source_file"), "sheet": case.get("sheet"), "row": case.get("row"),
+                "references": [ref for ref in group["references"] if ref["case_id"] == case_id],
+                "judgments": [j for j in judgments if j["case_id"] == case_id
+                              and j["snapshot_id"] == group.get("snapshot_id")],
+            })
+        entries.append({**group, "shared_by_multiple_cases": len(associations) > 1,
+                        "associations": associations,
+                        "snapshot_versions": [s["snapshot_id"] for s in snapshots if s["url"] == group["url"]]})
+    return {"run_id": run_id, "evidence_index": entries,
+            "shared_evidence_count": sum(entry["shared_by_multiple_cases"] for entry in entries),
+            "malformed_references": plan["malformed_references"],
+            "note": "Shared evidence identifies records to cross-check; it does not establish a shared event or root cause."}
+
+
 def _task_allowed(task: dict, retry_failed: bool):
     return task["status"] in {"PENDING", "BLOCKED", "RUNNING"} or (retry_failed and task["status"] == "FAILED")
 
 
 def execute(store: Store, run_id: str, judge, *, mode: str, model_id: str, retry_failed: bool = False) -> dict:
     from . import prompts, gates, contracts, model
+    from . import store as store_module
     signature = {"mode": mode, "model_id": model_id, "rules": RULE_VERSION,
                  "prompt_version": prompts.PROMPT_VERSION,
                  "prompt_hash": digest(Path(prompts.__file__).read_bytes()),
                  "engine_hash": digest(b"".join(Path(module.__file__).read_bytes() for module in
-                                                 (gates, contracts, model)) + Path(__file__).read_bytes()),
+                                                 (gates, contracts, model, store_module)) + Path(__file__).read_bytes()),
                  "executor_signature": getattr(judge, "execution_signature", "local-validation")}
     pairs, missing = associations(store, run_id)
     active = {s["snapshot_id"]: s for _, s in pairs}
@@ -152,7 +214,7 @@ def execute(store: Store, run_id: str, judge, *, mode: str, model_id: str, retry
         task = store.task(run_id, "summarize", sid, [sid, signature])
         if not _task_allowed(task, retry_failed):
             continue
-        if snapshot["status"] not in {"COMPLETE", "PARTIAL"} or not snapshot["text"].strip():
+        if snapshot["status"] not in {"COMPLETE", "PARTIAL", "CONTENT_CAPTURED"} or not snapshot["text"].strip():
             store.task_status(run_id, task["task_id"], "BLOCKED", "Evidence body unavailable: " + snapshot["status"])
             continue
         store.task_status(run_id, task["task_id"], "RUNNING")
@@ -192,7 +254,7 @@ def execute(store: Store, run_id: str, judge, *, mode: str, model_id: str, retry
             store.put(run_id, "summaries", task["task_id"], value)
             store.task_status(run_id, task["task_id"], "SUCCEEDED")
         except model.PendingModelResult as exc:
-            store.task_status(run_id, task["task_id"], "PENDING", "Awaiting OpenCode result: " + exc.task_id)
+            store.task_status(run_id, task["task_id"], "PENDING", "Awaiting model executor result: " + exc.task_id)
         except Exception as exc:
             store.task_status(run_id, task["task_id"], "FAILED", str(exc))
     summaries = {s["snapshot_id"]: s for s in store.records(run_id, "summaries")
@@ -225,7 +287,7 @@ def execute(store: Store, run_id: str, judge, *, mode: str, model_id: str, retry
             store.put(run_id, "judgments", task["task_id"], value)
             store.task_status(run_id, task["task_id"], "SUCCEEDED")
         except model.PendingModelResult as exc:
-            store.task_status(run_id, task["task_id"], "PENDING", "Awaiting OpenCode result: " + exc.task_id)
+            store.task_status(run_id, task["task_id"], "PENDING", "Awaiting model executor result: " + exc.task_id)
         except Exception as exc:
             store.task_status(run_id, task["task_id"], "FAILED", str(exc))
     items = store.records(run_id, "catalog")
@@ -237,7 +299,7 @@ def execute(store: Store, run_id: str, judge, *, mode: str, model_id: str, retry
             task = store.task(run_id, "catalog", case["case_id"], [case, js, items, signature])
             if not _task_allowed(task, retry_failed):
                 continue
-            if mode == "opencode":
+            if mode in {"opencode", "codex"}:
                 needed = {(c["case_id"], s["snapshot_id"]) for c, s in pairs if c["case_id"] == case["case_id"]}
                 ready = {(j["case_id"], j["snapshot_id"]) for j in case_judgments}
                 if not needed or not needed.issubset(ready) or any(r["case_id"] == case["case_id"] for r in missing):
@@ -272,7 +334,7 @@ def execute(store: Store, run_id: str, judge, *, mode: str, model_id: str, retry
                 store.put(run_id, "mappings", task["task_id"], result)
                 store.task_status(run_id, task["task_id"], "SUCCEEDED")
             except model.PendingModelResult as exc:
-                store.task_status(run_id, task["task_id"], "PENDING", "Awaiting OpenCode result: " + exc.task_id)
+                store.task_status(run_id, task["task_id"], "PENDING", "Awaiting model executor result: " + exc.task_id)
             except Exception as exc:
                 store.task_status(run_id, task["task_id"], "FAILED", str(exc))
     for call in getattr(judge, "calls", []):
@@ -290,10 +352,22 @@ def current_judgments(store: Store, run_id: str, *, mode: str | None = None, mod
               and (not model_id or j.get("requested_model_id", j["model_id"]) == model_id)]
     reviews = {}
     for event in store.events(run_id, "review"):
-        reviews[event["judgment_id"]] = event
+        if event.get("judgment_id"):
+            reviews[event["judgment_id"]] = event
     for value in values:
         if value["judgment_id"] in reviews:
             value["review_status"] = reviews[value["judgment_id"]]["verdict"]
+    return values
+
+
+def current_mappings(store: Store, run_id: str) -> list[dict]:
+    statuses = {task["task_id"]: task["status"] for task in store.tasks(run_id)}
+    reviews = {event["mapping_id"]: event["verdict"] for event in store.events(run_id, "review")
+               if event.get("mapping_id")}
+    values = [mapping for mapping in store.records(run_id, "mappings")
+              if statuses.get(mapping["task_id"]) == "SUCCEEDED"]
+    for value in values:
+        value["review_status"] = reviews.get(value["task_id"], value.get("review_status", "NEEDS_REVIEW"))
     return values
 
 
@@ -359,10 +433,15 @@ def validate(store: Store, run_id: str) -> dict:
     if not catalog:
         pending.append("No frozen catalog imported; 98-item coverage not evaluated")
     statuses = {t["task_id"]: t["status"] for t in tasks}
-    current_maps = [m for m in store.records(run_id, "mappings") if statuses.get(m["task_id"]) == "SUCCEEDED"]
+    current_maps = current_mappings(store, run_id)
     for mapping in current_maps:
         if mapping["overall"] == "UNDETERMINED":
             pending.append(f"{mapping['case_id']}: catalog coverage undetermined")
+        unknown_count = sum(item.get("result") == "UNDETERMINED" for item in mapping.get("catalog_results", []))
+        if unknown_count:
+            pending.append(f"{mapping['case_id']}: {unknown_count} catalog items undetermined")
+        if mapping.get("review_status") != "ACCEPT":
+            pending.append(f"{mapping['task_id']}: catalog human review {mapping.get('review_status')}")
     if catalog:
         mapped = {m["case_id"] for m in current_maps}
         pending.extend(f"{c['case_id']}: catalog comparison missing" for c in cases if c["case_id"] not in mapped)
@@ -391,7 +470,10 @@ def report_data(store: Store, run_id: str) -> dict:
     for value in data["mappings"]:
         value["is_stale"] = statuses.get(value["task_id"]) != "SUCCEEDED"
     current_ids = {j["judgment_id"] for j in current_judgments(store, run_id)}
-    reviews = {e["judgment_id"]: e["verdict"] for e in store.events(run_id, "review")}
+    reviews = {e["judgment_id"]: e["verdict"] for e in store.events(run_id, "review") if e.get("judgment_id")}
+    mapping_reviews = {e["mapping_id"]: e["verdict"] for e in store.events(run_id, "review") if e.get("mapping_id")}
+    for value in data["mappings"]:
+        value["review_status"] = mapping_reviews.get(value["task_id"], value.get("review_status", "NEEDS_REVIEW"))
     for value in data["judgments"]:
         value["is_stale"] = value["judgment_id"] not in current_ids
         value["review_status"] = reviews.get(value["judgment_id"], value.get("review_status", "NEEDS_REVIEW"))
@@ -409,5 +491,7 @@ def report_data(store: Store, run_id: str) -> dict:
             gaps.append("没有资料引用，需要补搜或补充证据")
         case["missing_information"] = gaps
     data.update({"run": store.run_info(run_id), "tasks": task_values,
+                 "evidence_index": evidence_index(store, run_id)["evidence_index"],
+                 "catalog_selections": store.records(run_id, "catalog_selections"),
                  "review_events": store.events(run_id, "review"), "validation": validate(store, run_id)})
     return data

@@ -125,6 +125,106 @@ class ImporterTests(unittest.TestCase):
         path.write_text(json.dumps([{"description": "x", "priority": "high"}]), encoding="utf-8")
         self.assertEqual(import_cases(path)["references"], [])
 
+    def test_site_root_cause_progress_header_preserves_origin_and_raw(self):
+        for header in ("根因/进展", "根因／进展"):
+            with self.subTest(header=header):
+                path = self.directory / "site.csv"
+                original = f"统一ID,问题描述,{header}\nWB-1,合成问题,仍在定位，待验证\n".encode("utf-8")
+                path.write_bytes(original)
+                imported = import_cases(path, "LEGACY_TABLE")
+                case = imported["cases"][0]
+                self.assertEqual(case["root_cause_raw"], "仍在定位，待验证")
+                self.assertEqual(case["raw"][header], "仍在定位，待验证")
+                self.assertEqual(case["root_cause_origin"], "LEGACY_DERIVED_UNKNOWN")
+                self.assertEqual(path.read_bytes(), original)
+
+    def catalog_workbook(self):
+        from openpyxl import Workbook
+
+        path = self.directory / "catalog.xlsx"
+        workbook = Workbook()
+        inference = workbook.active
+        inference.title = "推理汇总"
+        inference.append(["合成故障模式库，仅用于测试"])
+        inference.append([])
+        inference.append(["编号", "模式名称", "故障原因"])
+        inference.append([])
+        inference.append([1, "推理模式", "推理机理"])
+        training = workbook.create_sheet("训练汇总")
+        training.append(["编号", "模式名称", "故障原因"])
+        training.append([1, "训练模式", "训练机理"])
+        workbook.create_sheet("空表")
+        workbook.save(path)
+        workbook.close()
+        return path
+
+    def test_catalog_sheet_selection_keeps_scope_location_and_source(self):
+        path = self.catalog_workbook()
+        original = path.read_bytes()
+        data = import_catalog(path, sheets=["推理汇总"], scope="INFERENCE", expected_count=1)
+        self.assertEqual(len(data["items"]), 1)
+        item = data["items"][0]
+        self.assertEqual(item["item_id"], "1")
+        self.assertEqual(item["description"], "推理模式")
+        self.assertEqual(item["mechanism"], "推理机理")
+        self.assertEqual(item["sheet"], "推理汇总")
+        self.assertEqual(item["row"], 5)
+        self.assertIn("A5,B5,C5", item["source_location"])
+        self.assertEqual(item["catalog_scope"], "INFERENCE")
+        sha256 = hashlib.sha256(original).hexdigest()
+        self.assertEqual(item["catalog_version"], sha256)
+        identity = {"source_sha256": sha256, "sheets": ["推理汇总"], "scope": "INFERENCE"}
+        self.assertEqual(data["catalog_identity"], identity)
+        self.assertEqual(data["documents"][0]["catalog_identity"], identity)
+        self.assertFalse(any("duplicate catalog" in warning for warning in data["warnings"]))
+        self.assertEqual(path.read_bytes(), original)
+
+    def test_catalog_default_retains_all_sheets_and_duplicate_ids(self):
+        path = self.catalog_workbook()
+        data = import_catalog(path)
+        self.assertEqual(len(data["items"]), 2)
+        self.assertEqual({item["sheet"] for item in data["items"]}, {"推理汇总", "训练汇总"})
+        self.assertEqual(data["catalog_identity"]["sheets"], sorted(["推理汇总", "训练汇总", "空表"]))
+        self.assertEqual(data["catalog_identity"]["scope"], "UNSPECIFIED")
+        self.assertTrue(any("duplicate catalog" in warning for warning in data["warnings"]))
+
+    def test_catalog_invalid_or_empty_sheet_selection_is_explicit(self):
+        path = self.catalog_workbook()
+        original = path.read_bytes()
+        for sheets, message in ((["不存在"], "Unknown sheet"), (["空表"], "contain no items"),
+                                ([], "at least one"), (["推理汇总 "], "Unknown sheet")):
+            with self.subTest(sheets=sheets):
+                with self.assertRaisesRegex(ValueError, message):
+                    import_catalog(path, sheets=sheets)
+        self.assertEqual(path.read_bytes(), original)
+
+    def test_catalog_expected_count_cannot_hide_a_scope_mismatch(self):
+        path = self.catalog_workbook()
+        with self.assertRaisesRegex(ValueError, "expected 1, got 2"):
+            import_catalog(path, expected_count=1)
+        with self.assertRaisesRegex(ValueError, "expected 2, got 1"):
+            import_catalog(path, sheets=["推理汇总"], expected_count=2)
+
+    def test_catalog_json_sheet_selection_and_canonical_identity(self):
+        path = self.directory / "catalog.json"
+        path.write_text(json.dumps({"sheets": {
+            "training": [{"item_id": "1", "description": "training"}],
+            "inference": [{"item_id": "1", "description": "inference"}],
+            "empty": []}}, ensure_ascii=False), encoding="utf-8")
+        data = import_catalog(path, sheets=["inference", "empty", "inference"], scope="INFERENCE", expected_count=1)
+        self.assertEqual(data["items"][0]["description"], "inference")
+        self.assertEqual(data["catalog_identity"]["sheets"], ["empty", "inference"])
+        with self.assertRaisesRegex(ValueError, "Unknown sheet"):
+            import_catalog(path, sheets=["Inference"])
+
+    def test_catalog_csv_sheet_selection_uses_file_name(self):
+        path = self.directory / "catalog.csv"
+        path.write_text("编号,模式名称\n1,合成模式\n", encoding="utf-8")
+        data = import_catalog(path, sheets=[path.name], expected_count=1)
+        self.assertEqual(data["catalog_identity"]["sheets"], [path.name])
+        with self.assertRaisesRegex(ValueError, "Unknown sheet"):
+            import_catalog(path, sheets=["JSON"])
+
 
 if __name__ == "__main__":
     unittest.main()

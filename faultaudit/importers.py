@@ -19,7 +19,7 @@ _ALIASES = {
     "description": ("问题描述", "故障描述", "故障现象", "问题现象", "description", "symptom", "问题", "描述", "故障模式描述", "故障名称", "故障模式名称", "模式名称", "故障模式"),
     "customer_model": ("客户/模型", "客户／模型", "客户模型", "customer_model", "模型", "客户"),
     "operator": ("算子", "operator", "operator_raw", "涉及算子", "故障算子", "作用点"),
-    "root_cause": ("根因", "root_cause_raw", "root_cause", "根因原文", "原因", "故障根因"),
+    "root_cause": ("根因", "根因/进展", "根因／进展", "root_cause_raw", "root_cause", "根因原文", "原因", "故障根因"),
     "item_id": ("item_id", "故障模式ID", "故障模式编号", "故障编号", "ID", "id", "编号", "序号", "统一ID"),
     "mechanism": ("mechanism", "失效机理", "故障机理", "机理", "根因", "故障模式", "故障原因"),
     "trigger": ("trigger", "触发条件", "触发", "适用条件", "条件"),
@@ -79,17 +79,31 @@ def _normalise_json_rows(data: Any) -> list[tuple[str, list[Any]]]:
     raise ValueError("JSON object must contain cases, rows, items, records, data or sheets")
 
 
-def _read(path: Path, warnings: list[str]) -> list[tuple[str, int, dict[str, str], dict[str, str], dict[str, str]]]:
-    """Return (sheet,row,raw,header->cell coordinate,header->hyperlink target)."""
+def _select_sheets(available: list[str], sheets: list[str] | None) -> list[str]:
+    if sheets is None:
+        return available
+    if not sheets:
+        raise ValueError("Sheet selection must contain at least one sheet name")
+    missing = sorted(set(sheets) - set(available))
+    if missing:
+        raise ValueError(f"Unknown sheet(s): {', '.join(missing)}; available: {', '.join(available)}")
+    selected = set(sheets)
+    return [name for name in available if name in selected]
+
+
+def _read_source(path: Path, warnings: list[str], *, sheets: list[str] | None = None
+                 ) -> tuple[list[tuple[str, int, dict[str, str], dict[str, str], dict[str, str]]], list[str]]:
+    """Return source rows and selected sheet names, including empty sheets."""
     suffix = path.suffix.casefold()
     records = []
     if suffix in {".csv", ".tsv"}:
+        selected_sheets = _select_sheets([path.name], sheets)
         with path.open("r", encoding="utf-8-sig", newline="") as handle:
             reader = csv.reader(handle, delimiter="\t" if suffix == ".tsv" else ",")
             try:
                 head = _headers(next(reader), warnings, path.name)
             except StopIteration:
-                return []
+                return [], selected_sheets
             for rownum, values in enumerate(reader, start=2):
                 if len(values) > len(head):
                     warnings.append(f"{path.name}:{rownum}: values exceed header width; extra values retained")
@@ -97,10 +111,14 @@ def _read(path: Path, warnings: list[str]) -> list[tuple[str, int, dict[str, str
                 raw = {name: _text(values[i]) if i < len(values) else "" for i, name in enumerate(names)}
                 coordinates = {name: f"column:{i + 1}" for i, name in enumerate(names)}
                 records.append((path.name, rownum, raw, coordinates, {}))
-        return records
+        return records, selected_sheets
     if suffix == ".json":
         data = json.loads(path.read_text(encoding="utf-8-sig"))
-        for sheet, rows in _normalise_json_rows(data):
+        tables = _normalise_json_rows(data)
+        selected_sheets = _select_sheets([name for name, _ in tables], sheets)
+        for sheet, rows in tables:
+            if sheet not in selected_sheets:
+                continue
             if not isinstance(rows, list):
                 raise ValueError(f"JSON sheet {sheet!r} must contain a list")
             for index, entry in enumerate(rows, start=1):
@@ -110,15 +128,18 @@ def _read(path: Path, warnings: list[str]) -> list[tuple[str, int, dict[str, str
                 raw = {str(key): _text(value) for key, value in source.items()}
                 coordinates = {name: f"/{sheet}/{index - 1}/{name}" for name in raw}
                 records.append((sheet, index, raw, coordinates, {}))
-        return records
+        return records, selected_sheets
     if suffix in {".xlsx", ".xlsm"}:
         from openpyxl import load_workbook
 
         # Normal read mode retains hyperlink targets. This module never saves workbooks.
         workbook = load_workbook(path, read_only=False, data_only=False, keep_links=False)
         try:
+            selected_sheets = _select_sheets(workbook.sheetnames, sheets)
             known = {name.casefold() for aliases in _ALIASES.values() for name in aliases}
             for sheet in workbook.worksheets:
+                if sheet.title not in selected_sheets:
+                    continue
                 rows = sheet.iter_rows()
                 nonempty = []
                 for cells in rows:
@@ -148,8 +169,14 @@ def _read(path: Path, warnings: list[str]) -> list[tuple[str, int, dict[str, str
                     warnings.append(f"{sheet.title}: hidden rows included: {','.join(hidden)}")
         finally:
             workbook.close()
-        return records
+        return records, selected_sheets
     raise ValueError(f"Unsupported input extension {suffix!r}; use xlsx, csv, tsv or json")
+
+
+def _read(path: Path, warnings: list[str], *, sheets: list[str] | None = None
+          ) -> list[tuple[str, int, dict[str, str], dict[str, str], dict[str, str]]]:
+    """Return (sheet,row,raw,header->cell coordinate,header->hyperlink target)."""
+    return _read_source(path, warnings, sheets=sheets)[0]
 
 
 def extract_urls(raw: str) -> list[str]:
@@ -241,13 +268,15 @@ def import_cases(path: str | Path, source_kind: str = "LEGACY_TABLE") -> dict[st
             "warnings": warnings, "documents": [document]}
 
 
-def import_catalog(path: str | Path) -> dict[str, Any]:
+def import_catalog(path: str | Path, *, sheets: list[str] | None = None,
+                   scope: str = "UNSPECIFIED", expected_count: int | None = None) -> dict[str, Any]:
     path = Path(path).resolve()
     sha256 = hashlib.sha256(path.read_bytes()).hexdigest()
     warnings: list[str] = []
     items = []
     seen_ids: set[str] = set()
-    for sheet, row, raw, locations, _ in _read(path, warnings):
+    records, selected_sheets = _read_source(path, warnings, sheets=sheets)
+    for sheet, row, raw, locations, _ in records:
         if not any(value.strip() for value in raw.values()):
             continue
         item_id = _pick(raw, "item_id") or _stable("catalog", sha256, sheet, row)
@@ -259,6 +288,13 @@ def import_catalog(path: str | Path) -> dict[str, Any]:
             mechanism=_pick(raw, "mechanism"), trigger=_pick(raw, "trigger"), raw=raw,
             source_file=str(path), source_sha256=sha256,
             source_location=f"{sheet}!row:{row}; cells={','.join(locations.values())}",
+            catalog_scope=scope, catalog_version=sha256, sheet=sheet, row=row,
         ).model_dump())
-    return {"items": items, "warnings": warnings,
-            "documents": [_document(path, sha256, "CATALOG")]}
+    if sheets is not None and not items:
+        raise ValueError("Selected catalog sheets contain no items")
+    if expected_count is not None and len(items) != expected_count:
+        raise ValueError(f"Catalog item count mismatch: expected {expected_count}, got {len(items)}")
+    identity = {"source_sha256": sha256, "sheets": sorted(selected_sheets), "scope": scope}
+    document = {**_document(path, sha256, "CATALOG"), "catalog_identity": identity}
+    return {"items": items, "warnings": warnings, "catalog_identity": identity,
+            "documents": [document]}

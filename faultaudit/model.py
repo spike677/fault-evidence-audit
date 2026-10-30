@@ -59,7 +59,7 @@ def _sha(value: Any) -> str:
 
 
 def _readable(snapshot: dict[str, Any]) -> bool:
-    return snapshot.get("status") in {"COMPLETE", "PARTIAL"} and bool(str(snapshot.get("text", "")).strip())
+    return snapshot.get("status") in {"COMPLETE", "PARTIAL", "CONTENT_CAPTURED"} and bool(str(snapshot.get("text", "")).strip())
 
 
 def _segments(snapshot: dict[str, Any]) -> dict[str, str]:
@@ -133,6 +133,8 @@ def _validate_judgment(value: dict[str, Any], case: dict[str, Any], snapshot: di
             raise ModelError("; ".join(anchor_errors), "unverified_event_anchor")
     if result["support_level"] == "DIRECT" and result["conflicting_dimensions"]:
         raise ModelError("存在冲突时不能给出直接支持", "conflicting_support")
+    if result["case_attribution"] == "CONFIRMED" and snapshot.get("status") != "COMPLETE":
+        raise ModelError("确认归属要求完整快照", "ungrounded_direct_support")
     if result["support_level"] == "DIRECT" and (result["case_attribution"] != "CONFIRMED"
             or result["event_relation"] != "SAME_EVENT" or snapshot.get("status") != "COMPLETE"):
         raise ModelError("直接支持要求完整快照及已确认的同一事件", "ungrounded_direct_support")

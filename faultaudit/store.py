@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import sqlite3
 import uuid
 from datetime import datetime, timezone
@@ -53,6 +54,73 @@ def segments_for(text: str, snapshot_id: str, size: int = 6000) -> list[dict]:
                          "start": start, "end": end, "text": text[start:end]})
         start = end
     return segments
+
+
+def evidence_completeness_errors(package: dict) -> list[str]:
+    """Check a collector's completeness declaration without fetching anything.
+
+    Legacy generic packages still require only body=COMPLETE. Explicit required
+    components and recognizable PRs add mechanical requirements; an untyped
+    body-only package does not establish whole-site completeness for Wiki/DTS.
+    """
+    if package["status"] != "COMPLETE":
+        return []
+    errors = []
+    components = package["components"]
+    if not package["text"].strip():
+        errors.append("COMPLETE evidence must include nonempty extracted text")
+    if components.get("body") != "COMPLETE":
+        errors.append("COMPLETE evidence must declare components.body=COMPLETE")
+    incomplete = sorted(name for name, status in components.items()
+                        if status not in {"COMPLETE", "NOT_APPLICABLE"})
+    if incomplete:
+        errors.append("COMPLETE evidence declares incomplete components: " + ", ".join(incomplete))
+    for name in package["required_components"]:
+        if not name.strip() or components.get(name) not in {"COMPLETE", "NOT_APPLICABLE"}:
+            errors.append("Required evidence component is missing or incomplete: " + repr(name))
+    urls = (package["url"], package.get("requested_url"), package.get("final_url"))
+    is_pr = package["artifact_type"] == "PR" or any(
+        url and re.search(r"/(?:pull|pulls|pull_requests|merge_requests|pr)/\d+(?:/|$)",
+                          urlsplit(url).path, re.IGNORECASE) for url in urls
+    )
+    if is_pr:
+        for name in ("file_list", "diff"):
+            if components.get(name) != "COMPLETE":
+                errors.append("COMPLETE PR evidence requires components." + name + "=COMPLETE")
+        expected, captured = package["expected_file_count"], package["captured_file_count"]
+        if expected is None or captured is None:
+            errors.append("COMPLETE PR evidence requires expected_file_count and captured_file_count")
+        elif expected != captured:
+            errors.append("PR changed-file count does not match captured-file count")
+    return errors
+
+
+def authentication_page(package: dict) -> bool:
+    """Reject explicit authentication redirects and unmistakable login forms.
+
+    A sentence quoting a login prompt inside technical documentation is not
+    sufficient. URL redirects are assessed separately from text length.
+    """
+    requested = urlsplit(package.get("requested_url") or package["url"])
+    final = urlsplit(package.get("final_url") or package["url"])
+    auth_path = re.search(r"/(?:login|signin|sign-in|sso|oauth2?/authorize)(?:[/.]|$)",
+                          final.path, re.IGNORECASE)
+    auth_host = (final.hostname or "").lower().startswith(("login.", "signin.", "sso.", "auth."))
+    redirected = (requested.hostname, requested.path) != (final.hostname, final.path)
+    if redirected and (auth_host or auth_path):
+        return True
+    text = package["text"].lower().strip()
+    html_page = re.match(r"(?:<!doctype html[^>]*>\s*)?<html(?:\s|>)", text) is not None
+    html_form = bool(html_page and re.search(r"<form\b", text) and re.search(
+        r"<input\b[^>]*\btype\s*=\s*['\"]?password\b", text))
+    login_prompt = any(token in text for token in
+                       ("please sign in", "sign in to continue", "请登录后", "统一身份认证登录"))
+    if html_form and login_prompt:
+        return True
+    # Preserve rejection of small extracted login screens, but not documents
+    # that merely mention authentication in an otherwise substantive body.
+    return len(text) < 400 and any(text.startswith(token) for token in
+                                  ("please sign in", "sign in to continue", "请登录后", "统一身份认证登录"))
 
 
 class Store:
@@ -183,18 +251,19 @@ class Store:
                 raise AuditError("raw_file must name an existing file inside the evidence package directory")
             raw_bytes = target.read_bytes()
         text = pkg["text"]
-        if pkg["status"] == "COMPLETE" and not text.strip():
-            raise AuditError("COMPLETE evidence must include nonempty extracted text")
-        if pkg["status"] == "COMPLETE" and pkg["components"].get("body") != "COMPLETE":
-            raise AuditError("COMPLETE evidence must declare components.body=COMPLETE")
-        if pkg["status"] in {"COMPLETE", "PARTIAL"}:
-            lower = text.lower().strip()
-            if len(text) < 2500 and any(token in lower for token in
-                                        ("please sign in", "sign in to continue", "请登录后", "统一身份认证登录")):
-                raise AuditError("Evidence resembles a login page; submit AUTH_REQUIRED instead")
+        problems = evidence_completeness_errors(pkg)
+        if problems:
+            raise AuditError("; ".join(problems))
+        if pkg["status"] in {"COMPLETE", "PARTIAL", "CONTENT_CAPTURED"} and authentication_page(pkg):
+            raise AuditError("Evidence resembles a login page; submit AUTH_REQUIRED instead")
         artifact_id = "artifact-" + digest(url)[:24]
         raw_hash = hashlib.sha256(raw_bytes).hexdigest() if raw_bytes is not None else None
         content = {k: pkg[k] for k in ("title", "text", "status", "components", "derived_from", "is_synthetic")}
+        # Omit new default fields to retain snapshot IDs for legacy 1.0 packages.
+        for key, default in (("artifact_type", "GENERIC"), ("required_components", []),
+                             ("expected_file_count", None), ("captured_file_count", None)):
+            if pkg[key] != default:
+                content[key] = pkg[key]
         content["requested_url"] = pkg.get("requested_url") or pkg["url"]
         content["final_url"] = pkg.get("final_url") or pkg["url"]
         canonical_url(content["requested_url"])
@@ -251,6 +320,14 @@ class Store:
 
     def verify_snapshot(self, snapshot: dict) -> list[str]:
         errors = []
+        try:
+            package = EvidencePackage.model_validate({key: snapshot[key] for key in EvidencePackage.model_fields
+                                                      if key in snapshot}).model_dump()
+            errors.extend(evidence_completeness_errors(package))
+            if package["status"] in {"COMPLETE", "PARTIAL", "CONTENT_CAPTURED"} and authentication_page(package):
+                errors.append("Snapshot resembles an authentication page")
+        except ValueError as exc:
+            errors.append("Snapshot evidence contract is invalid: " + str(exc))
         path = Path(snapshot["text_path"])
         if not path.is_relative_to(self.root) or not path.is_file():
             return ["Snapshot text file missing or outside state directory"]
