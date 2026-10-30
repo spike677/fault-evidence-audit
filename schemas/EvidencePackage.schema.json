@@ -1,0 +1,143 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "1.0",
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "url": {
+      "title": "Url",
+      "type": "string"
+    },
+    "title": {
+      "default": "",
+      "title": "Title",
+      "type": "string"
+    },
+    "text": {
+      "default": "",
+      "title": "Text",
+      "type": "string"
+    },
+    "status": {
+      "default": "COMPLETE",
+      "enum": [
+        "COMPLETE",
+        "PARTIAL",
+        "AUTH_REQUIRED",
+        "FORBIDDEN",
+        "NOT_FOUND",
+        "TIMEOUT",
+        "PARSE_FAILED",
+        "UNSUPPORTED"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "components": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "title": "Components",
+      "type": "object"
+    },
+    "retrieved_by": {
+      "default": "manual-import",
+      "title": "Retrieved By",
+      "type": "string"
+    },
+    "retrieved_at": {
+      "title": "Retrieved At",
+      "type": "string"
+    },
+    "derived_from": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Derived From",
+      "type": "array"
+    },
+    "is_synthetic": {
+      "default": false,
+      "title": "Is Synthetic",
+      "type": "boolean"
+    },
+    "case_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Case Ids",
+      "type": "array"
+    },
+    "origin": {
+      "default": "HUMAN_ADDED",
+      "title": "Origin",
+      "type": "string"
+    },
+    "raw_file": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Raw File"
+    },
+    "requested_url": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Requested Url"
+    },
+    "final_url": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Final Url"
+    },
+    "record_discovery": {
+      "default": false,
+      "title": "Record Discovery",
+      "type": "boolean"
+    },
+    "discovery_query": {
+      "default": "",
+      "title": "Discovery Query",
+      "type": "string"
+    },
+    "discovered_from_url": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Discovered From Url"
+    }
+  },
+  "required": [
+    "url"
+  ],
+  "title": "EvidencePackage",
+  "type": "object"
+}

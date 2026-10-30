@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fault-evidence-audit"
+version = "0.1.1"
+description = "Auditable fault evidence ingestion and conservative semantic judgment"
+requires-python = ">=3.10"
+dependencies = ["pydantic>=2.8,<3"]
+
+[project.optional-dependencies]
+excel = ["openpyxl>=3.1,<4"]
+
+[project.scripts]
+faultaudit = "faultaudit.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["faultaudit*"]

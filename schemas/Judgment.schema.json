@@ -1,0 +1,156 @@
+{
+  "$defs": {
+    "EvidenceRef": {
+      "additionalProperties": false,
+      "properties": {
+        "segment_id": {
+          "minLength": 1,
+          "title": "Segment Id",
+          "type": "string"
+        },
+        "quote": {
+          "minLength": 1,
+          "title": "Quote",
+          "type": "string"
+        }
+      },
+      "required": [
+        "segment_id",
+        "quote"
+      ],
+      "title": "EvidenceRef",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "case_id": {
+      "title": "Case Id",
+      "type": "string"
+    },
+    "snapshot_id": {
+      "title": "Snapshot Id",
+      "type": "string"
+    },
+    "case_attribution": {
+      "enum": [
+        "CONFIRMED",
+        "PARTIAL",
+        "UNKNOWN",
+        "MISMATCH"
+      ],
+      "title": "Case Attribution",
+      "type": "string"
+    },
+    "event_relation": {
+      "enum": [
+        "SAME_EVENT",
+        "DIFFERENT_EVENT",
+        "UNDETERMINED"
+      ],
+      "title": "Event Relation",
+      "type": "string"
+    },
+    "pattern_relation": {
+      "enum": [
+        "SAME_PATTERN",
+        "DIFFERENT_PATTERN",
+        "POSSIBLY_RELATED",
+        "UNDETERMINED"
+      ],
+      "title": "Pattern Relation",
+      "type": "string"
+    },
+    "support_level": {
+      "enum": [
+        "DIRECT",
+        "PARTIAL",
+        "INDIRECT",
+        "NONE",
+        "PENDING",
+        "CONFLICT"
+      ],
+      "title": "Support Level",
+      "type": "string"
+    },
+    "claim_support": {
+      "additionalProperties": {
+        "enum": [
+          "SUPPORTED",
+          "PARTIAL",
+          "CONTRADICTED",
+          "NOT_MENTIONED",
+          "UNKNOWN"
+        ],
+        "type": "string"
+      },
+      "title": "Claim Support",
+      "type": "object"
+    },
+    "matched_dimensions": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Matched Dimensions",
+      "type": "array"
+    },
+    "conflicting_dimensions": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Conflicting Dimensions",
+      "type": "array"
+    },
+    "unknown_dimensions": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Unknown Dimensions",
+      "type": "array"
+    },
+    "evidence": {
+      "items": {
+        "$ref": "#/$defs/EvidenceRef"
+      },
+      "title": "Evidence",
+      "type": "array"
+    },
+    "event_anchor": {
+      "default": "",
+      "title": "Event Anchor",
+      "type": "string"
+    },
+    "short_reason": {
+      "title": "Short Reason",
+      "type": "string"
+    },
+    "missing_information": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Missing Information",
+      "type": "array"
+    },
+    "model_mode": {
+      "title": "Model Mode",
+      "type": "string"
+    },
+    "model_id": {
+      "title": "Model Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "case_id",
+    "snapshot_id",
+    "case_attribution",
+    "event_relation",
+    "pattern_relation",
+    "support_level",
+    "short_reason",
+    "model_mode",
+    "model_id"
+  ],
+  "title": "Judgment",
+  "type": "object"
+}

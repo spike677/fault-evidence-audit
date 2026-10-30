@@ -1,0 +1,168 @@
+"""File task bridge: OpenCode owns every model service and credential.
+
+The core only emits immutable requests and validates imported results. Producer
+metadata is an executor's audit declaration, not proof of provider routing.
+"""
+from __future__ import annotations
+
+from . import contracts, gates, model, prompts
+from .contracts import EvidenceSummary
+from .model import PendingModelResult, validate_task_result
+from .store import AuditError, Store, digest
+from pathlib import Path
+
+SCHEMA_VERSION = "1.0"
+
+
+def policy_fingerprint() -> str:
+    return digest(b"".join(Path(module.__file__).read_bytes() for module in (contracts, gates, model, prompts))
+                  + Path(__file__).read_bytes() + Path(__file__).with_name("pipeline.py").read_bytes())
+
+
+def _check_current(store: Store, run_id: str, task: dict) -> None:
+    if task["run_id"] != run_id or task["policy_hash"] != policy_fingerprint():
+        raise AuditError("Model task belongs to another run or an obsolete core policy")
+    unsigned = {key: value for key, value in task.items() if key != "request_hash"}
+    if digest(unsigned) != task["request_hash"] or digest(task["payload"]) != task["input_hash"]:
+        raise AuditError("Stored model request integrity mismatch")
+    parent = next((t for t in store.tasks(run_id) if t["task_id"] == task["pipeline_task_id"]), None)
+    if not parent or parent["status"] == "STALE":
+        raise AuditError("Model task is stale or its pipeline dependency is missing")
+    payload = task["payload"]
+    snapshot = payload.get("snapshot")
+    if snapshot:
+        active = {s["snapshot_id"]: s for s in store.active_snapshots(run_id)}
+        saved = active.get(snapshot["snapshot_id"])
+        if not saved:
+            raise AuditError("Model task refers to an obsolete snapshot")
+        problems = store.verify_snapshot(saved)
+        if problems:
+            raise AuditError("; ".join(problems))
+        original_segments = {s["segment_id"]: s["text"] for s in saved["segments"]}
+        if any(original_segments.get(s["segment_id"]) != s["text"] for s in snapshot["segments"]):
+            raise AuditError("Task segment does not match its saved snapshot")
+    case = payload.get("case")
+    if case and store.get(run_id, "cases", case["case_id"]) != case:
+        raise AuditError("Model task source case no longer matches the immutable input")
+    if task["kind"] == "catalog":
+        if digest(payload["items"]) != digest(store.records(run_id, "catalog")):
+            raise AuditError("Model task catalog version is stale")
+        from .pipeline import current_judgments
+        current = [j for j in current_judgments(store, run_id, mode="opencode", model_id="opencode-managed")
+                   if j["case_id"] == case["case_id"] and j.get("review_status") != "REJECT"]
+        if digest(current) != digest(payload["judgments"]):
+            raise AuditError("Model task judgment/review dependencies are stale")
+
+
+class OpenCodeJudge:
+    """Create a request or consume an already verified OpenCode response."""
+    model_id = "opencode-managed"
+
+    def __init__(self, store: Store, run_id: str):
+        self.store, self.run_id = store, run_id
+        self.calls: list[dict] = []
+        self.pipeline_task_id = ""
+        self.execution_signature = policy_fingerprint()
+
+    def _request(self, kind: str, payload: dict, instructions: str, expected_contract: str) -> dict:
+        if not self.pipeline_task_id:
+            raise AuditError("OpenCode bridge needs a pipeline task context")
+        task = {"schema_version": SCHEMA_VERSION, "run_id": self.run_id, "kind": kind,
+                "pipeline_task_id": self.pipeline_task_id, "policy_hash": policy_fingerprint(),
+                "input_hash": digest(payload), "payload": payload, "instructions": instructions,
+                "expected_contract": expected_contract,
+                "model_service": "opencode", "model_role": "DeepSeek evidence judge; routing is configured by OpenCode"}
+        task["task_id"] = "llm-" + digest(task)[:24]
+        task["request_hash"] = digest(task)
+        self.store.put(self.run_id, "model_tasks", task["task_id"], task)
+        response = self.store.get(self.run_id, "model_results", task["task_id"])
+        if not response:
+            raise PendingModelResult(task_id=task["task_id"], operation=kind)
+        _check_current(self.store, self.run_id, task)
+        self.calls.append({"executor": "opencode", "operation": kind, "task_id": task["task_id"],
+                           "request_hash": task["request_hash"], "producer_reported": response["producer"],
+                           "status": "IMPORTED_RESULT", "network_requested_by_core": False})
+        return response["result"]
+
+    def summarize(self, snapshot: dict) -> dict:
+        messages = prompts.summary_messages(snapshot)
+        return self._request("summarize", {"snapshot": prompts.snapshot_data(snapshot)},
+                             messages[0]["content"], "EvidenceSummary")
+
+    def compare(self, case: dict, snapshot: dict, summary: dict) -> dict:
+        summary = {key: summary[key] for key in EvidenceSummary.model_fields}
+        messages = prompts.comparison_messages(case, snapshot, summary)
+        return self._request("compare", {"case": case, "snapshot": prompts.snapshot_data(snapshot), "summary": summary},
+                             messages[0]["content"], "Judgment")
+
+    def map_catalog(self, case: dict, judgments: list[dict], items: list[dict]) -> dict:
+        messages = prompts.catalog_messages(case, judgments, items)
+        return self._request("catalog", {"case": case, "judgments": judgments, "items": items},
+                             messages[0]["content"], "CatalogResponse")
+
+
+def export_model_tasks(store: Store, run_id: str) -> dict:
+    tasks, stale = [], []
+    for task in store.records(run_id, "model_tasks"):
+        if store.get(run_id, "model_results", task["task_id"]):
+            continue
+        try:
+            _check_current(store, run_id, task)
+        except AuditError:
+            stale.append(task["task_id"])
+            continue
+        tasks.append(task)
+    return {"schema_version": SCHEMA_VERSION, "run_id": run_id, "tasks": tasks,
+            "stale_tasks_excluded": stale,
+            "execution_owner": "OpenCode; no model endpoints or credentials are configured in this core"}
+
+
+def submit_model_results(store: Store, run_id: str, envelopes: list[dict]) -> dict:
+    prepared, idempotent = [], 0
+    for envelope in envelopes:
+        if envelope.get("schema_version") != SCHEMA_VERSION or envelope.get("run_id") != run_id:
+            raise AuditError("Model result schema_version or run_id mismatch")
+        task_id = envelope.get("task_id", "")
+        task = store.get(run_id, "model_tasks", task_id)
+        if not task or envelope.get("request_hash") != task["request_hash"]:
+            raise AuditError("Unknown task or request_hash mismatch; use the core's exported request")
+        _check_current(store, run_id, task)
+        producer = envelope.get("producer", {})
+        if not isinstance(producer, dict) or producer.get("executor") != "opencode" or any(
+            not isinstance(producer.get(k), str) or not producer[k].strip()
+            for k in ("opencode_version", "provider", "model", "session_id")
+        ):
+            raise AuditError("Producer must identify OpenCode version, reported provider/model and session")
+        result = envelope.get("result")
+        if not isinstance(result, dict):
+            raise AuditError("Model result must be a structured object")
+        if result.get("model_mode") not in {None, "opencode"} or result.get("model_id") not in {None, producer["model"]}:
+            raise AuditError("Result model metadata disagrees with its OpenCode producer")
+        value = {**result, "model_mode": "opencode", "model_id": producer["model"]}
+        payload = task["payload"]
+        checked = validate_task_result(task["kind"], value, snapshot=payload.get("snapshot"),
+                                       case=payload.get("case"), judgments=payload.get("judgments"),
+                                       items=payload.get("items"))
+        if task["kind"] == "compare":
+            from .pipeline import gate_judgment
+            saved_snapshot = store.get(run_id, "snapshots", payload["snapshot"]["snapshot_id"])
+            gate_judgment(payload["case"], saved_snapshot, checked)
+        saved = {"schema_version": SCHEMA_VERSION, "run_id": run_id, "task_id": task_id,
+                 "request_hash": task["request_hash"], "producer": producer, "result": checked}
+        existing = store.get(run_id, "model_results", task_id)
+        if existing:
+            if existing != saved:
+                raise AuditError("A different result already exists; preserve the first response and use a new run for rejudgment")
+            idempotent += 1
+        else:
+            if any(p["task_id"] == task_id and p != saved for p in prepared):
+                raise AuditError("Batch contains conflicting results for the same task")
+            if not any(p["task_id"] == task_id for p in prepared):
+                prepared.append(saved)
+    # Validate the complete batch before committing any response.
+    for value in prepared:
+        store.put(run_id, "model_results", value["task_id"], value)
+        store.event(run_id, "opencode_result_received", {"task_id": value["task_id"],
+                                                        "request_hash": value["request_hash"],
+                                                        "producer_reported": value["producer"]})
+    return {"run_id": run_id, "accepted": len(prepared), "idempotent": idempotent}
