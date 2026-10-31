@@ -2,7 +2,7 @@
 
 故障证据核验核心。所有示例均为虚构数据，不包含客户故障记录或内部网页内容。
 
-版本 0.1.3，2026 年 10 月 30 日。核心负责导入故障表、保存原文与引用来源、生成采集和模型任务、检查返回结果并生成复核报告。模型任务可由 OpenCode 或 Codex 会话执行，内网采集仍由具备授权与登录态的现场环境完成。当前使用文件任务往返，不包含直连模型服务的网络客户端。
+版本 0.1.4，2026 年 10 月 31 日。核心负责导入故障表、保存原文与引用来源、生成采集和模型任务、检查返回结果并生成复核报告。模型任务可由 OpenCode 或 Codex 会话执行，内网采集仍由具备授权与登录态的现场环境完成。当前使用文件任务往返，不包含直连模型服务的网络客户端。
 
 目标网站包括 DTS、Wiki、GitCode、GitHub、CodeHub。真实资料由具备授权与登录态的现场工具采集；现有现场方案使用 OpenChamber/OpenCode。登录认证、搜索、正文读取、分页、附件、评论、Diff、网络重试和权限故障处理均在采集环境完成。核验核心不访问这些网站，也不保存其认证凭据；选择 Codex 执行模型任务不会自动获得这些站点的访问能力。
 
@@ -252,7 +252,13 @@ Codex 使用相同 envelope，仅将 `producer` 换成以下对象，并填写�
 
 以上是补充字段，需与 URL、正文、状态等基本字段一起提交。文件计数须为实际非负整数且相等；Diff 不完整时提交 `PARTIAL`。计数核对的是采集器声明的一致性，仍需现场验证采集内容覆盖了远端实际文件及 Diff。认证重定向或明确登录页不能作为正文；失败状态可正常留档。
 
-运行 `schemas --out schemas` 可导出本版 JSON schema。超长正文按片段完成独立提取；任何阶段无法覆盖请求中提供的内容时明确报告受阻，不静默截掉后半段。实际执行会话的大资料处理能力需在目标环境联调。
+运行 `schemas --out schemas` 可导出本版 JSON schema。摘要可按保留原文覆盖的片段处理。输入超过核心任务上限，或 OpenCode 会话无法完整处理时，保留原始请求并报告 `BLOCKED` 与具体原因；不能删除段落、缩短 payload、漏掉库条目后提交为完整结果。具体上限与阻塞记录以当前任务和核心诊断为准，实际执行会话的大资料处理能力仍需在目标环境联调。
+
+0.1.4 默认上限为 48,000 个字符，可用正整数环境变量 `FAULTAUDIT_MAX_INPUT_CHARS` 配置。计量对象是整个请求的 canonical JSON 字符数，包括 instructions、payload、作用域、Hash 和预算元数据，不是 token 数或仅正文长度。已导出任务的 `input_budget` 保存 `chars`、`budget` 和 `scope=WHOLE_MODEL_TASK`。超限时父任务记录 `BLOCKED`/`INPUT_TOO_LARGE`，`model_input_blocked` 事件保存测量详情；核心不生成删减版任务。
+
+执行者自身容量不足时，向操作者报告原 task ID 和阻塞原因，不提交模型结果；协议没有新增可当作成功答案提交的 blocked envelope。提高本地字符上限不证明远端模型能完整处理，调整前须核实现场能力，调整后重新导出当前任务。
+
+`PARTIAL` 描述采集资料的真实组件缺口，不表示已取得的正文不存在。必须保留并提交已经抓到的全部正文，同时记录缺失评论、附件或 Diff；执行者的上下文不足不能通过改标 `PARTIAL`、替换正文或只选摘要片段来解决。未在可见内容中读到某事实，也不能声称完整原文没有该事实。
 
 ## 判断边界
 
@@ -347,7 +353,30 @@ $LASTEXITCODE
 
 安装到父工作区后，Skill 内的 `scripts/run_audit.py` 按环境变量、安装定位配置、源码祖先依次定位同一核心。通常无需设置 `FAULTAUDIT_HOME`；显式设置时它优先，无效值直接报错。同盘配置使用相对路径，整个工作区一起迁移仍可调用；跨盘定位使用本机绝对路径，迁移后需重新配置。该脚本只运行本地核心，不负责建立模型服务连接。OpenChamber 2.5.2 可能连接其内置 OpenCode 2.1.4；PATH 的 2.2.0 不代表实际后端。命令加载、Skill 加载、模型任务执行及采集工具须在目标服务上分别验收，当前未完成现场联调。
 
-## 0.1.1 升级说明
+## 升级到 0.1.4 并继续既有 run
+
+0.1.4 的否定判断须提供 `negative_basis.other_event` 或 `negative_basis.attribution_mismatch`，包含积极身份、原文上下文、有效身份维度和精确引用。程序检查结构及引用是否存在，语义是否足以排除关联仍须人工复核；技术差异、资料编号不同或未出现字段不能独立成立 `DIFFERENT_EVENT` / `MISMATCH`。根因冲突单独保留，未解决冲突时不能给 `DIRECT`。`observation_scope` 默认为当前已采集内容，选段和部分资料不能声称核验了全文。
+
+先暂停对现场 state 的写入，关闭正在使用该 SQLite 的程序，备份整个 state 目录及该批次的原始请求、结果和输入。不要只复制数据库而漏掉快照；备份完成前不替换现场文件。本包升级不要求清空台账。
+
+安装新版代码后，优先使用原有 state 与显式保存的同一 `run_id` 续跑，保留原始证据、原答案及人工裁决历史。不要为普通升级重新导入一份记录，也不要使用 `latest` 猜测正式批次。示意命令中的路径和 ID 由现场填写：
+
+```powershell
+$AuditState = '既有state目录'
+$AuditRunId = '原有run_id'
+& $PythonExe run_faultaudit.py --version
+& $PythonExe run_faultaudit.py doctor
+& $PythonExe run_faultaudit.py --state $AuditState run --run $AuditRunId --mode opencode --resume --retry-failed
+& $PythonExe run_faultaudit.py --state $AuditState model-tasks --executor opencode --run $AuditRunId --out work/requests_014_01.json
+```
+
+然后由现场执行新导出的任务并按原 `task_id`、`request_hash` 提交，再继续下一阶段。旧请求和旧结果不改写、不删除；策略或依赖变化后它们只作为历史记录，过期结果不能继续作为当前关联、覆盖结论或已完成计数。任何模型建议，包括确认归属与正向覆盖，仍需真实人工复核，不自动 ACCEPT。
+
+若核心或执行者报告输入超限/无法完整处理，保留 `BLOCKED`，先按错误记录处理任务规模；不能删减该任务后复用原 Hash 提交。该升级流程尚未在真实现场 state 或 Python 3.14.3 环境验证，应先在独立合成 state 检查本机环境，再对已备份的原 state、原路径以同 run ID 续跑。
+
+快照台账保存绝对文件路径，备份用于恢复到原路径；把 state 复制到另一目录后直接续跑会触发路径校验。本次升级不包含 state 路径迁移。Skill 入口随工作区迁移后仍可定位核心，也不等于既有 state 路径已经迁移。
+
+### 旧版兼容边界
 
 证据包 `schema_version` 保持 `1.0`，新增字段均有默认值；旧 generic 包的快照身份保持兼容。旧 SQLite 无需破坏性迁移即可读取。完整性规则也会重查已保存快照，不符合新规则的 PR/组件声明需补采或重新提交部分状态。策略指纹变化会使旧模型请求失效，应重新导出任务，不能改写旧请求 Hash。
 
@@ -363,4 +392,4 @@ $LASTEXITCODE
 & $PythonExe scripts/build_delivery.py
 ```
 
-0.1.3 的回归测试使用合成任务和结果文件，不运行模型 HTTP 客户端，也不调用外部模型。当前已通过 138 项回归，机器可读记录为 [examples/validation_result.json](examples/validation_result.json)；由 Codex 会话实际执行的 [合成模拟验证摘要](examples/codex_pilot_validation.json) 单独保存，与 mock/单元测试分开。交接包排除凭据、SQLite 运行数据、原始证据和依赖运行库，包含 `.gitignore` 及逐文件 SHA-256 清单。
+0.1.4 的回归测试使用合成任务和结果文件，不运行模型 HTTP 客户端，也不调用外部模型。本轮实际环境、测试数量与结果以 [examples/validation_result.json](examples/validation_result.json) 和 [验收记录](VALIDATION.md) 为准。2026 年 10 月 30 日由 Codex 会话执行的 [合成模拟验证摘要](examples/codex_pilot_validation.json) 是单独的历史基线，与本版回归、mock 和现场验证分开。交接包排除凭据、SQLite 运行数据、原始证据和依赖运行库，包含 `.gitignore` 及逐文件 SHA-256 清单。

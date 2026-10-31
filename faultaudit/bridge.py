@@ -5,7 +5,7 @@ metadata is an executor's audit declaration, not proof of provider routing.
 """
 from __future__ import annotations
 
-from . import contracts, gates, model, prompts
+from . import contracts, gates, model, prompts, input_budget
 from . import store as store_module
 from .contracts import EvidenceSummary
 from .model import PendingModelResult, validate_task_result
@@ -23,8 +23,24 @@ def _executor(value: str) -> str:
 
 
 def policy_fingerprint() -> str:
-    return digest(b"".join(Path(module.__file__).read_bytes() for module in (contracts, gates, model, prompts, store_module))
-                  + Path(__file__).read_bytes() + Path(__file__).with_name("pipeline.py").read_bytes())
+    from .pipeline import RULE_VERSION
+    source_hash = digest(b"".join(Path(module.__file__).read_bytes() for module in
+                                  (contracts, gates, model, prompts, store_module, input_budget))
+                         + Path(__file__).read_bytes() + Path(__file__).with_name("pipeline.py").read_bytes())
+    return digest({"source_hash": source_hash, "input_budget_policy": input_budget.budget_policy(),
+                   "prompt_version": prompts.PROMPT_VERSION, "rule_version": RULE_VERSION})
+
+
+def _snapshot_input_scope(snapshot: dict) -> dict:
+    declared = snapshot.get("input_scope")
+    if isinstance(declared, dict):
+        return dict(declared)
+    return {"scope": "UNSPECIFIED", "provided_segment_ids": [s["segment_id"] for s in snapshot.get("segments", [])],
+            "provided_chars": len(snapshot.get("text", "")), "retrieval_status": snapshot.get("status")}
+
+
+def _snapshot_payload(snapshot: dict) -> dict:
+    return {**prompts.snapshot_data(snapshot), "input_scope": _snapshot_input_scope(snapshot)}
 
 
 def _check_current(store: Store, run_id: str, task: dict) -> None:
@@ -35,8 +51,15 @@ def _check_current(store: Store, run_id: str, task: dict) -> None:
     if digest(unsigned) != task["request_hash"] or digest(task["payload"]) != task["input_hash"]:
         raise AuditError("Stored model request integrity mismatch")
     parent = next((t for t in store.tasks(run_id) if t["task_id"] == task["pipeline_task_id"]), None)
-    if not parent or parent["status"] == "STALE":
-        raise AuditError("Model task is stale or its pipeline dependency is missing")
+    if not parent or parent["status"] in {"STALE", "BLOCKED"}:
+        raise AuditError("Model task is stale, blocked, or its pipeline dependency is missing")
+    try:
+        measurement = input_budget.check_input_budget(task)
+    except model.ModelError as exc:
+        raise AuditError(str(exc)) from exc
+    recorded = task.get("input_budget", {})
+    if any(recorded.get(key) != measurement[key] for key in ("chars", "budget", "scope", "serialization")):
+        raise AuditError("Model task input budget metadata does not match its complete serialized request")
     payload = task["payload"]
     snapshot = payload.get("snapshot")
     if snapshot:
@@ -53,6 +76,14 @@ def _check_current(store: Store, run_id: str, task: dict) -> None:
     case = payload.get("case")
     if case and store.get(run_id, "cases", case["case_id"]) != case:
         raise AuditError("Model task source case no longer matches the immutable input")
+    if task["kind"] == "compare":
+        from .pipeline import current_summaries
+        current = [summary for summary in current_summaries(store, run_id)
+                   if summary["snapshot_id"] == snapshot["snapshot_id"] and summary["model_mode"] == executor
+                   and summary.get("requested_model_id", summary["model_id"]) == executor + "-managed"]
+        summary_hash = digest(payload["summary"])
+        if len(current) != 1 or digest({key: current[0][key] for key in EvidenceSummary.model_fields}) != summary_hash:
+            raise AuditError("Model task independent summary dependency is stale")
     if task["kind"] == "catalog":
         if digest(payload["items"]) != digest(store.records(run_id, "catalog")):
             raise AuditError("Model task catalog version is stale")
@@ -83,8 +114,7 @@ class OpenCodeJudge:
                 "expected_contract": expected_contract,
                 "executor": self.executor, "model_service": self.executor,
                 "model_role": "Evidence judge; actual provider/model is reported by the executing " + self.executor + " session"}
-        task["task_id"] = "llm-" + digest(task)[:24]
-        task["request_hash"] = digest(task)
+        task = input_budget.finalize_model_task(task)
         self.store.put(self.run_id, "model_tasks", task["task_id"], task)
         response = self.store.get(self.run_id, "model_results", task["task_id"])
         if not response:
@@ -97,18 +127,23 @@ class OpenCodeJudge:
 
     def summarize(self, snapshot: dict) -> dict:
         messages = prompts.summary_messages(snapshot)
-        return self._request("summarize", {"snapshot": prompts.snapshot_data(snapshot)},
+        return self._request("summarize", {"snapshot": _snapshot_payload(snapshot),
+                                          "input_scope": _snapshot_input_scope(snapshot)},
                              messages[0]["content"], "EvidenceSummary")
 
     def compare(self, case: dict, snapshot: dict, summary: dict) -> dict:
         summary = {key: summary[key] for key in EvidenceSummary.model_fields}
         messages = prompts.comparison_messages(case, snapshot, summary)
-        return self._request("compare", {"case": case, "snapshot": prompts.snapshot_data(snapshot), "summary": summary},
+        return self._request("compare", {"case": case, "snapshot": _snapshot_payload(snapshot), "summary": summary,
+                                        "input_scope": _snapshot_input_scope(snapshot)},
                              messages[0]["content"], "Judgment")
 
     def map_catalog(self, case: dict, judgments: list[dict], items: list[dict]) -> dict:
         messages = prompts.catalog_messages(case, judgments, items)
-        return self._request("catalog", {"case": case, "judgments": judgments, "items": items},
+        return self._request("catalog", {"case": case, "judgments": judgments, "items": items,
+                                        "input_scope": {"scope": "FULL_CATALOG", "catalog_item_count": len(items),
+                                                        "provided_item_ids": [item["item_id"] for item in items],
+                                                        "catalog_hash": digest(items)}},
                              messages[0]["content"], "CatalogResponse")
 
 
@@ -165,13 +200,18 @@ def submit_model_results(store: Store, run_id: str, envelopes: list[dict], *, ex
             raise AuditError("Result model metadata disagrees with its " + executor + " producer")
         value = {**result, "model_mode": executor, "model_id": producer["model"]}
         payload = task["payload"]
-        checked = validate_task_result(task["kind"], value, snapshot=payload.get("snapshot"),
+        snapshot_view = payload.get("snapshot")
+        if snapshot_view is not None:
+            snapshot_view = {**snapshot_view, "input_scope": payload.get("input_scope", snapshot_view.get("input_scope", {}))}
+        checked = validate_task_result(task["kind"], value, snapshot=snapshot_view,
                                        case=payload.get("case"), judgments=payload.get("judgments"),
                                        items=payload.get("items"))
         if task["kind"] == "compare":
             from .pipeline import gate_judgment
             saved_snapshot = store.get(run_id, "snapshots", payload["snapshot"]["snapshot_id"])
-            gate_judgment(payload["case"], saved_snapshot, checked)
+            actual_view = {**saved_snapshot, "text": snapshot_view["text"], "segments": snapshot_view["segments"],
+                           "input_scope": snapshot_view["input_scope"]}
+            gate_judgment(payload["case"], actual_view, checked)
         saved = {"schema_version": SCHEMA_VERSION, "run_id": run_id, "task_id": task_id,
                  "request_hash": task["request_hash"], "producer": producer, "result": checked}
         existing = store.get(run_id, "model_results", task_id)

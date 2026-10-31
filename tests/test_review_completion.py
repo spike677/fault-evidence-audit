@@ -9,8 +9,9 @@ import unittest
 
 from faultaudit.importers import import_cases, import_catalog
 from faultaudit.exporters import export_report
-from faultaudit.pipeline import gate_judgment, import_into, report_data, validate
-from faultaudit.store import Store
+from faultaudit.pipeline import current_judgments, gate_judgment, import_into, report_data, validate
+from faultaudit.bridge import policy_fingerprint
+from faultaudit.store import Store, digest
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -35,6 +36,12 @@ class MappingReviewTests(unittest.TestCase):
             "text": "SYN-101 synthetic rounding verified by synthetic fixture.", "status": "COMPLETE",
             "components": {"body": "COMPLETE"}, "is_synthetic": True})
         refs = [{"segment_id": snapshot["segments"][0]["segment_id"], "quote": snapshot["text"]}]
+        summary_task = self.store.task(self.run_id, "summarize", snapshot["snapshot_id"], [])
+        summary = {"task_id": summary_task["task_id"], "snapshot_id": snapshot["snapshot_id"],
+                   "issues": [], "unknown_fields": [], "model_mode": "codex", "model_id": "synthetic-fixture",
+                   "policy_hash": policy_fingerprint()}
+        self.store.put(self.run_id, "summaries", summary_task["task_id"], summary)
+        self.store.task_status(self.run_id, summary_task["task_id"], "SUCCEEDED")
         task = self.store.task(self.run_id, "compare", self.case["case_id"] + "|" + snapshot["snapshot_id"], [])
         result = gate_judgment(self.case, snapshot, {"case_id": self.case["case_id"], "snapshot_id": snapshot["snapshot_id"],
             "case_attribution": "CONFIRMED", "event_relation": "SAME_EVENT", "pattern_relation": "SAME_PATTERN",
@@ -42,7 +49,9 @@ class MappingReviewTests(unittest.TestCase):
                 "fix": "UNKNOWN", "verification": "UNKNOWN"}, "event_anchor": "SYN-101", "evidence": refs,
             "short_reason": "Synthetic review fixture only", "model_mode": "codex", "model_id": "synthetic-fixture"})
         self.judgment_id = task["task_id"]
-        result.update(task_id=self.judgment_id, judgment_id=self.judgment_id)
+        result.update(task_id=self.judgment_id, judgment_id=self.judgment_id,
+                      policy_hash=policy_fingerprint(), case_hash=digest(self.case),
+                      summary_task_id=summary_task["task_id"], summary_hash=digest(summary))
         self.store.put(self.run_id, "judgments", self.judgment_id, result)
         self.store.task_status(self.run_id, self.judgment_id, "SUCCEEDED")
         self.store.event(self.run_id, "review", {"judgment_id": self.judgment_id, "verdict": "ACCEPT",
@@ -52,7 +61,10 @@ class MappingReviewTests(unittest.TestCase):
         self.store.put(self.run_id, "mappings", self.mapping_id, {"task_id": self.mapping_id, "case_id": self.case["case_id"],
             "overall": "COVERED", "scope": "FULL_CATALOG", "catalog_results": [{"item_id": "F-001", "result": "COVERED",
             "reason": "Synthetic mapping", "evidence": refs}, {"item_id": "F-002", "result": "NOT_COVERED",
-            "reason": "Different synthetic mechanism", "evidence": []}], "review_status": "NEEDS_REVIEW", "model_mode": "codex"})
+            "reason": "Different synthetic mechanism", "evidence": []}], "review_status": "NEEDS_REVIEW", "model_mode": "codex",
+            "model_id": "synthetic-fixture", "policy_hash": policy_fingerprint(), "case_hash": digest(self.case),
+            "catalog_hash": digest(self.store.records(self.run_id, "catalog")),
+            "judgments_hash": digest(current_judgments(self.store, self.run_id))})
         self.store.task_status(self.run_id, self.mapping_id, "SUCCEEDED")
 
     def tearDown(self):

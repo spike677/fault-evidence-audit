@@ -20,6 +20,82 @@
       ],
       "title": "EvidenceRef",
       "type": "object"
+    },
+    "NegativeBasis": {
+      "additionalProperties": false,
+      "properties": {
+        "other_event": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/NegativeIdentityBasis"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "attribution_mismatch": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/NegativeIdentityBasis"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "title": "NegativeBasis",
+      "type": "object"
+    },
+    "NegativeIdentityBasis": {
+      "additionalProperties": false,
+      "description": "A producer-declared positive identity statement, never an inferred gap.\n\nThe gate checks structure and exact source grounding. Human review still\ndecides whether the declared identity/ownership semantics are justified.",
+      "properties": {
+        "positive_identity": {
+          "minLength": 1,
+          "title": "Positive Identity",
+          "type": "string"
+        },
+        "context": {
+          "minLength": 16,
+          "title": "Context",
+          "type": "string"
+        },
+        "dimensions": {
+          "items": {
+            "enum": [
+              "event_identity",
+              "ownership",
+              "symptom",
+              "occurrence_context",
+              "explicit_exclusion"
+            ],
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Dimensions",
+          "type": "array"
+        },
+        "evidence": {
+          "items": {
+            "$ref": "#/$defs/EvidenceRef"
+          },
+          "minItems": 1,
+          "title": "Evidence",
+          "type": "array"
+        }
+      },
+      "required": [
+        "positive_identity",
+        "context",
+        "dimensions",
+        "evidence"
+      ],
+      "title": "NegativeIdentityBasis",
+      "type": "object"
     }
   },
   "additionalProperties": false,
@@ -118,6 +194,26 @@
     "event_anchor": {
       "default": "",
       "title": "Event Anchor",
+      "type": "string"
+    },
+    "negative_basis": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/NegativeBasis"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "observation_scope": {
+      "default": "CAPTURED_CONTENT",
+      "enum": [
+        "CAPTURED_CONTENT",
+        "FULL_DOCUMENT"
+      ],
+      "title": "Observation Scope",
       "type": "string"
     },
     "short_reason": {

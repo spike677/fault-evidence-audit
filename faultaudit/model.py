@@ -13,7 +13,7 @@ from typing import Any, Literal, Protocol
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from .contracts import EvidenceRef, EvidenceSummary, Judgment
-from .gates import event_anchor_errors
+from .gates import event_anchor_errors, judgment_semantic_errors
 
 MAX_INPUT_CHARS = 48000
 
@@ -119,6 +119,9 @@ def _validate_judgment(value: dict[str, Any], case: dict[str, Any], snapshot: di
     if result["case_id"] != case["case_id"] or result["snapshot_id"] != snapshot["snapshot_id"]:
         raise ModelError("模型判断绑定了其他故障或资料", "identity_mismatch")
     _check_refs(result["evidence"], snapshot)
+    semantic_errors = judgment_semantic_errors(case, snapshot, result)
+    if semantic_errors:
+        raise ModelError("; ".join(semantic_errors), "invalid_judgment_basis")
     substantive = (result["case_attribution"] != "UNKNOWN" or result["event_relation"] != "UNDETERMINED"
                    or result["pattern_relation"] != "UNDETERMINED" or result["support_level"] != "PENDING"
                    or result["matched_dimensions"] or result["conflicting_dimensions"])

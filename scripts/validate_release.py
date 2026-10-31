@@ -22,7 +22,9 @@ def main():
     result = unittest.TextTestRunner(verbosity=2).run(suite)
     from faultaudit import __version__
     payload = {"version": __version__, "tested_at_utc": datetime.now(timezone.utc).isoformat(),
-               "python": platform.python_version(), "platform": platform.system(),
+               "python": platform.python_version(), "python_executable": sys.executable,
+               "python_3_14_3_tested": sys.version_info[:3] == (3, 14, 3),
+               "platform": platform.system(),
                "pydantic": importlib.metadata.version("pydantic"),
                "openpyxl": importlib.metadata.version("openpyxl"),
                "tests_run": result.testsRun, "successful": result.wasSuccessful(),
@@ -32,7 +34,7 @@ def main():
                "model_execution_owner": "external executor",
                "supported_executors": ["opencode", "codex"],
                "live_deepseek_tested": False, "internal_collectors_tested": False,
-               "actual_98_item_catalog_tested": False}
+               "actual_98_item_catalog_tested": False, "live_field_state_tested": False}
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(json.dumps(payload, ensure_ascii=False))

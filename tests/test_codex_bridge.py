@@ -9,6 +9,7 @@ import unittest
 
 from faultaudit.bridge import CodexJudge, OpenCodeJudge, export_model_tasks, submit_model_results
 from faultaudit.importers import import_cases, import_catalog
+from faultaudit.input_budget import finalize_model_task
 from faultaudit.model import ModelError
 from faultaudit.pipeline import execute, import_into, report_data
 from faultaudit.store import AuditError, Store, digest
@@ -169,9 +170,8 @@ class CodexBridgeTests(unittest.TestCase):
         execute(self.store, self.run_id, OpenCodeJudge(self.store, self.run_id),
                 mode="opencode", model_id="opencode-managed")
         task = export_model_tasks(self.store, self.run_id)["tasks"][0]
-        legacy = {key: value for key, value in task.items() if key not in {"executor", "task_id", "request_hash"}}
-        legacy["task_id"] = "llm-" + digest(legacy)[:24]
-        legacy["request_hash"] = digest(legacy)
+        legacy = finalize_model_task({key: value for key, value in task.items()
+                                      if key not in {"executor", "task_id", "request_hash", "input_budget"}})
         self.store.put(self.run_id, "model_tasks", legacy["task_id"], legacy)
         envelope = self.envelope(legacy)
         envelope["producer"] = {"executor": "opencode", "opencode_version": "unreported",

@@ -5,10 +5,10 @@ from collections import Counter
 from pathlib import Path
 
 from .contracts import EvidenceSummary, Judgment
-from .gates import event_anchor_errors
+from .gates import event_anchor_errors, judgment_semantic_errors
 from .store import AuditError, Store, canonical_url, digest
 
-RULE_VERSION = "nightly-0.1.3"
+RULE_VERSION = "nightly-0.1.4"
 
 
 def cited_refs(summary: dict):
@@ -36,6 +36,7 @@ def gate_judgment(case: dict, snapshot: dict, value: dict) -> dict:
     if result["case_id"] != case["case_id"] or result["snapshot_id"] != snapshot["snapshot_id"]:
         errors.append("Model returned a different case_id or snapshot_id")
     errors.extend(check_citations(result["evidence"], snapshot))
+    errors.extend(judgment_semantic_errors(case, snapshot, result))
     positive = result["case_attribution"] == "CONFIRMED" or result["support_level"] == "DIRECT"
     if any(v in {"SUPPORTED", "PARTIAL", "CONTRADICTED"} for v in result.get("claim_support", {}).values()) and not result["evidence"]:
         errors.append("Claim support requires cited text")
@@ -191,10 +192,31 @@ def _task_allowed(task: dict, retry_failed: bool):
     return task["status"] in {"PENDING", "BLOCKED", "RUNNING"} or (retry_failed and task["status"] == "FAILED")
 
 
+def input_scope(snapshot: dict, segments: list[dict], *, group: bool = False) -> dict:
+    """Describe exactly which captured text is supplied, including partial captures."""
+    full_ids = [segment["segment_id"] for segment in snapshot["segments"]]
+    selected_ids = [segment["segment_id"] for segment in segments]
+    return {"scope": "SUMMARY_GROUP" if group else "FULL_CAPTURED_SNAPSHOT" if selected_ids == full_ids else "SELECTED_SEGMENTS",
+            "retrieval_status": snapshot["status"], "snapshot_segment_count": len(full_ids),
+            "provided_segment_ids": selected_ids, "total_chars": len(snapshot["text"]),
+            "provided_chars": sum(len(segment["text"]) for segment in segments)}
+
+
+def _model_failure(store: Store, run_id: str, task: dict, exc: Exception) -> None:
+    if getattr(exc, "code", None) == "INPUT_TOO_LARGE":
+        store.task_status(run_id, task["task_id"], "BLOCKED", "INPUT_TOO_LARGE: " + str(exc))
+        store.event(run_id, "model_input_blocked", {"task_id": task["task_id"],
+                                                   **getattr(exc, "details", {})})
+    else:
+        store.task_status(run_id, task["task_id"], "FAILED", str(exc))
+
+
 def execute(store: Store, run_id: str, judge, *, mode: str, model_id: str, retry_failed: bool = False) -> dict:
+    from .bridge import policy_fingerprint
     from . import prompts, gates, contracts, model
     from . import store as store_module
     signature = {"mode": mode, "model_id": model_id, "rules": RULE_VERSION,
+                 "policy_hash": policy_fingerprint(),
                  "prompt_version": prompts.PROMPT_VERSION,
                  "prompt_hash": digest(Path(prompts.__file__).read_bytes()),
                  "engine_hash": digest(b"".join(Path(module.__file__).read_bytes() for module in
@@ -233,7 +255,8 @@ def execute(store: Store, run_id: str, judge, *, mode: str, model_id: str, retry
             if current:
                 groups.append(current)
             for group in groups:
-                view = {**snapshot, "segments": group, "text": "".join(s["text"] for s in group)}
+                view = {**snapshot, "segments": group, "text": "".join(s["text"] for s in group),
+                        "input_scope": input_scope(snapshot, group, group=len(groups) > 1)}
                 judge.pipeline_task_id = task["task_id"]
                 response = EvidenceSummary.model_validate(judge.summarize(view)).model_dump()
                 if response["snapshot_id"] != sid:
@@ -250,16 +273,16 @@ def execute(store: Store, run_id: str, judge, *, mode: str, model_id: str, retry
             value = {"snapshot_id": sid, "issues": issues, "unknown_fields": sorted(set(unknown)),
                      "model_mode": mode, "model_id": actual_models[0], "requested_model_id": model_id,
                      "blocks_processed": len(groups),
-                     "segments_processed": len(snapshot["segments"]), "task_id": task["task_id"]}
+                     "segments_processed": len(snapshot["segments"]), "task_id": task["task_id"],
+                     "policy_hash": signature["policy_hash"]}
             store.put(run_id, "summaries", task["task_id"], value)
             store.task_status(run_id, task["task_id"], "SUCCEEDED")
         except model.PendingModelResult as exc:
             store.task_status(run_id, task["task_id"], "PENDING", "Awaiting model executor result: " + exc.task_id)
         except Exception as exc:
-            store.task_status(run_id, task["task_id"], "FAILED", str(exc))
-    summaries = {s["snapshot_id"]: s for s in store.records(run_id, "summaries")
-                 if any(t["task_id"] == s["task_id"] and t["status"] == "SUCCEEDED" for t in store.tasks(run_id))
-                 and s["model_mode"] == mode and s.get("requested_model_id", s["model_id"]) == model_id}
+            _model_failure(store, run_id, task, exc)
+    summaries = {s["snapshot_id"]: s for s in current_summaries(store, run_id)
+                 if s["model_mode"] == mode and s.get("requested_model_id", s["model_id"]) == model_id}
     for case, snapshot in pairs:
         sid = snapshot["snapshot_id"]
         summary = summaries.get(sid)
@@ -278,18 +301,22 @@ def execute(store: Store, run_id: str, judge, *, mode: str, model_id: str, retry
             view = {**snapshot, "segments": [s for s in snapshot["segments"] if s["segment_id"] in quoted_ids
                                             or len(snapshot["text"]) <= 16000]}
             view["text"] = "".join(s["text"] for s in view["segments"])
+            view["input_scope"] = input_scope(snapshot, view["segments"])
             summary_input = {key: summary[key] for key in EvidenceSummary.model_fields}
             judge.pipeline_task_id = task["task_id"]
-            value = gate_judgment(case, snapshot, judge.compare(case, view, summary_input))
+            value = gate_judgment(case, view, judge.compare(case, view, summary_input))
             value["judgment_id"] = task["task_id"]
             value["task_id"] = task["task_id"]
             value["requested_model_id"] = model_id
+            value.update(policy_hash=signature["policy_hash"], case_hash=digest(case),
+                         summary_task_id=summary["task_id"], summary_hash=digest(summary),
+                         input_scope=view["input_scope"])
             store.put(run_id, "judgments", task["task_id"], value)
             store.task_status(run_id, task["task_id"], "SUCCEEDED")
         except model.PendingModelResult as exc:
             store.task_status(run_id, task["task_id"], "PENDING", "Awaiting model executor result: " + exc.task_id)
         except Exception as exc:
-            store.task_status(run_id, task["task_id"], "FAILED", str(exc))
+            _model_failure(store, run_id, task, exc)
     items = store.records(run_id, "catalog")
     if items:
         for case in store.records(run_id, "cases"):
@@ -330,24 +357,42 @@ def execute(store: Store, run_id: str, judge, *, mode: str, model_id: str, retry
                 if not confirmed and result["overall"] != "UNDETERMINED":
                     raise AuditError("Unconfirmed incident cannot establish overall catalog coverage")
                 result.update({"task_id": task["task_id"], "catalog_hash": digest(items), "model_mode": mode,
-                               "requested_model_id": model_id, "catalog_count": len(items), "review_status": "NEEDS_REVIEW"})
+                               "requested_model_id": model_id, "catalog_count": len(items), "review_status": "NEEDS_REVIEW",
+                               "policy_hash": signature["policy_hash"], "case_hash": digest(case),
+                               "judgments_hash": digest(js)})
                 store.put(run_id, "mappings", task["task_id"], result)
                 store.task_status(run_id, task["task_id"], "SUCCEEDED")
             except model.PendingModelResult as exc:
                 store.task_status(run_id, task["task_id"], "PENDING", "Awaiting model executor result: " + exc.task_id)
             except Exception as exc:
-                store.task_status(run_id, task["task_id"], "FAILED", str(exc))
+                _model_failure(store, run_id, task, exc)
     for call in getattr(judge, "calls", []):
         store.event(run_id, "model_bridge_event", call)
     store.event(run_id, "execution", {"mode": mode, "model_id": model_id, "rules": RULE_VERSION})
     return validate(store, run_id)
 
 
+def current_summaries(store: Store, run_id: str) -> list[dict]:
+    from .bridge import policy_fingerprint
+    policy = policy_fingerprint()
+    active = {s["snapshot_id"] for s in store.active_snapshots(run_id) if not store.verify_snapshot(s)}
+    statuses = {t["task_id"]: t["status"] for t in store.tasks(run_id)}
+    return [s for s in store.records(run_id, "summaries") if s["snapshot_id"] in active
+            and statuses.get(s["task_id"]) == "SUCCEEDED" and s.get("policy_hash") == policy]
+
+
 def current_judgments(store: Store, run_id: str, *, mode: str | None = None, model_id: str | None = None) -> list[dict]:
+    from .bridge import policy_fingerprint
+    policy = policy_fingerprint()
     active = {s["snapshot_id"] for s in store.active_snapshots(run_id)}
     statuses = {t["task_id"]: t["status"] for t in store.tasks(run_id)}
+    cases = {case["case_id"]: digest(case) for case in store.records(run_id, "cases")}
+    summaries = {s["task_id"]: digest(s) for s in current_summaries(store, run_id)}
     values = [j for j in store.records(run_id, "judgments") if j["snapshot_id"] in active
               and statuses.get(j["task_id"]) == "SUCCEEDED"
+              and j.get("policy_hash") == policy and j.get("case_hash") == cases.get(j["case_id"])
+              and j.get("summary_hash") == summaries.get(j.get("summary_task_id"))
+              and j.get("summary_task_id") in summaries
               and (not mode or j["model_mode"] == mode)
               and (not model_id or j.get("requested_model_id", j["model_id"]) == model_id)]
     reviews = {}
@@ -361,11 +406,31 @@ def current_judgments(store: Store, run_id: str, *, mode: str | None = None, mod
 
 
 def current_mappings(store: Store, run_id: str) -> list[dict]:
+    from .bridge import policy_fingerprint
+    policy = policy_fingerprint()
     statuses = {task["task_id"]: task["status"] for task in store.tasks(run_id)}
+    cases = {case["case_id"]: digest(case) for case in store.records(run_id, "cases")}
+    catalog_hash = digest(store.records(run_id, "catalog"))
+    judgments = current_judgments(store, run_id)
     reviews = {event["mapping_id"]: event["verdict"] for event in store.events(run_id, "review")
                if event.get("mapping_id")}
-    values = [mapping for mapping in store.records(run_id, "mappings")
-              if statuses.get(mapping["task_id"]) == "SUCCEEDED"]
+    pairs, missing = associations(store, run_id)
+    values = []
+    for mapping in store.records(run_id, "mappings"):
+        case_id = mapping["case_id"]
+        js = [j for j in judgments if j["case_id"] == case_id
+              and j["model_mode"] == mapping["model_mode"]
+              and j.get("requested_model_id", j["model_id"]) == mapping.get("requested_model_id", mapping.get("model_id"))]
+        needed = {(c["case_id"], s["snapshot_id"]) for c, s in pairs if c["case_id"] == case_id}
+        ready = {(j["case_id"], j["snapshot_id"]) for j in js}
+        if (statuses.get(mapping["task_id"]) != "SUCCEEDED" or mapping.get("policy_hash") != policy
+                or mapping.get("case_hash") != cases.get(case_id) or mapping.get("catalog_hash") != catalog_hash
+                or mapping.get("judgments_hash") != digest([j for j in js if j.get("review_status") != "REJECT"])):
+            continue
+        if mapping["model_mode"] in {"opencode", "codex"} and (not needed or not needed.issubset(ready)
+                or any(ref["case_id"] == case_id for ref in missing)):
+            continue
+        values.append(mapping)
     for value in values:
         value["review_status"] = reviews.get(value["task_id"], value.get("review_status", "NEEDS_REVIEW"))
     return values
@@ -409,7 +474,13 @@ def validate(store: Store, run_id: str) -> dict:
     for j in js:
         stripped = {key: j[key] for key in Judgment.model_fields}
         try:
-            gate_judgment(case_by_id[j["case_id"]], snap_by_id[j["snapshot_id"]], stripped)
+            saved_snapshot = snap_by_id[j["snapshot_id"]]
+            scope = j.get("input_scope", {})
+            selected = set(scope.get("provided_segment_ids", []))
+            view_segments = [segment for segment in saved_snapshot["segments"] if segment["segment_id"] in selected]
+            view = {**saved_snapshot, "input_scope": scope,
+                    "segments": view_segments, "text": "".join(segment["text"] for segment in view_segments)} if scope else saved_snapshot
+            gate_judgment(case_by_id[j["case_id"]], view, stripped)
         except Exception as exc:
             errors.append(str(exc))
         if j["model_mode"] == "mock":
@@ -470,9 +541,14 @@ def report_data(store: Store, run_id: str) -> dict:
     for value in data["mappings"]:
         value["is_stale"] = statuses.get(value["task_id"]) != "SUCCEEDED"
     current_ids = {j["judgment_id"] for j in current_judgments(store, run_id)}
+    summary_ids = {s["task_id"] for s in current_summaries(store, run_id)}
+    mapping_ids = {m["task_id"] for m in current_mappings(store, run_id)}
+    for value in data["summaries"]:
+        value["is_stale"] = value["task_id"] not in summary_ids
     reviews = {e["judgment_id"]: e["verdict"] for e in store.events(run_id, "review") if e.get("judgment_id")}
     mapping_reviews = {e["mapping_id"]: e["verdict"] for e in store.events(run_id, "review") if e.get("mapping_id")}
     for value in data["mappings"]:
+        value["is_stale"] = value["task_id"] not in mapping_ids
         value["review_status"] = mapping_reviews.get(value["task_id"], value.get("review_status", "NEEDS_REVIEW"))
     for value in data["judgments"]:
         value["is_stale"] = value["judgment_id"] not in current_ids

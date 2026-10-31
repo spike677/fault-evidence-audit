@@ -123,6 +123,25 @@ class EvidenceSummary(Contract):
         return self
 
 
+class NegativeIdentityBasis(Contract):
+    """A producer-declared positive identity statement, never an inferred gap.
+
+    The gate checks structure and exact source grounding. Human review still
+    decides whether the declared identity/ownership semantics are justified.
+    """
+    positive_identity: str = Field(min_length=1)
+    context: str = Field(min_length=16)
+    dimensions: list[Literal[
+        "event_identity", "ownership", "symptom", "occurrence_context", "explicit_exclusion",
+    ]] = Field(min_length=1)
+    evidence: list[EvidenceRef] = Field(min_length=1)
+
+
+class NegativeBasis(Contract):
+    other_event: NegativeIdentityBasis | None = None
+    attribution_mismatch: NegativeIdentityBasis | None = None
+
+
 class Judgment(Contract):
     case_id: str
     snapshot_id: str
@@ -136,6 +155,8 @@ class Judgment(Contract):
     unknown_dimensions: list[str] = Field(default_factory=list)
     evidence: list[EvidenceRef] = Field(default_factory=list)
     event_anchor: str = ""
+    negative_basis: NegativeBasis | None = None
+    observation_scope: Literal["CAPTURED_CONTENT", "FULL_DOCUMENT"] = "CAPTURED_CONTENT"
     short_reason: str
     missing_information: list[str] = Field(default_factory=list)
     model_mode: str
@@ -146,6 +167,10 @@ class Judgment(Contract):
         invalid_claim_keys = set(self.claim_support) - {"symptom", "root_cause", "fix", "verification"}
         if invalid_claim_keys:
             raise ValueError(f"unsupported claim_support keys: {sorted(invalid_claim_keys)}")
+        if self.event_relation == "DIFFERENT_EVENT" and (self.negative_basis is None or self.negative_basis.other_event is None):
+            raise ValueError("DIFFERENT_EVENT requires positive other-event identity evidence")
+        if self.case_attribution == "MISMATCH" and (self.negative_basis is None or self.negative_basis.attribution_mismatch is None):
+            raise ValueError("MISMATCH requires positive attribution/exclusion evidence")
         if (self.support_level == "DIRECT" or self.case_attribution == "CONFIRMED") and not self.evidence:
             raise ValueError("direct or confirmed judgments require evidence")
         if self.event_relation == "SAME_EVENT" and not self.event_anchor.strip():
