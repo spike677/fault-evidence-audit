@@ -57,6 +57,51 @@ def check(value, snap):
 
 
 class NegativeJudgmentGatesTests(unittest.TestCase):
+    def test_negative_material_cannot_support_original_case_root_cause(self):
+        for status in ("COMPLETE", "PARTIAL", "CONTENT_CAPTURED"):
+            for conclusion, kind in (({"event_relation": "DIFFERENT_EVENT"}, "other_event"),
+                                     ({"case_attribution": "MISMATCH"}, "attribution_mismatch")):
+                snap = snapshot(OTHER_CONTEXT if kind == "other_event" else OWNERSHIP_CONTEXT, status=status)
+                for claim in ("SUPPORTED", "PARTIAL"):
+                    with self.subTest(status=status, kind=kind, claim=claim):
+                        value = judgment(snap, negative_basis=basis(snap, kind=kind), **conclusion)
+                        value["claim_support"]["root_cause"] = claim
+                        before = copy.deepcopy(value)
+                        self.assertTrue(judgment_semantic_errors(source_case(), snap, value))
+                        with self.assertRaises(ModelError):
+                            check(value, snap)
+                        with self.assertRaises(AuditError):
+                            gate_judgment(source_case(), snap, value)
+                        self.assertEqual(value, before)
+
+    def test_independent_events_can_share_mechanism_and_still_need_review(self):
+        context = ("乙客户的独立事件EVT-B002于周二TP16推理首token乱码，机制也是all_reduce舍入精度问题；"
+                   "甲客户EVT-A001于周一另一环境发生，已核对发生情境与关联记录，并非同一事件的多工单。")
+        for status in ("COMPLETE", "PARTIAL", "CONTENT_CAPTURED"):
+            with self.subTest(status=status):
+                snap = snapshot(context, status=status)
+                value = judgment(snap, event_relation="DIFFERENT_EVENT", pattern_relation="SAME_PATTERN",
+                                 matched_dimensions=["operator", "mechanism"], negative_basis=basis(snap))
+                value["claim_support"]["root_cause"] = "UNKNOWN"
+                proposed = check(value, snap)
+                result = gate_judgment(source_case(), snap, proposed)
+                self.assertEqual(result["event_relation"], "DIFFERENT_EVENT")
+                self.assertEqual(result["pattern_relation"], "SAME_PATTERN")
+                self.assertEqual(result["claim_support"]["root_cause"], "UNKNOWN")
+                self.assertEqual(result["review_status"], "NEEDS_REVIEW")
+
+    def test_another_events_technical_root_cause_remains_in_independent_summary(self):
+        technical_fact = "all_reduce舍入精度问题"
+        snap = snapshot(OTHER_CONTEXT + "定位结论：" + technical_fact + "。")
+        refs = [{"segment_id": "segment-a", "quote": snap["text"]}]
+        summary = {"snapshot_id": snap["snapshot_id"], "issues": [{"label": "另一事件的独立技术事实", "facts": [
+            {"field": "root_cause", "value": technical_fact, "evidence": refs}]}],
+            "unknown_fields": [], "model_mode": "opencode", "model_id": "external-model"}
+        saved = validate_task_result("summarize", summary, snapshot=snap)
+        proposed = check(judgment(snap, event_relation="DIFFERENT_EVENT", negative_basis=basis(snap)), snap)
+        self.assertEqual(saved["issues"][0]["facts"][0]["value"], technical_fact)
+        self.assertEqual(proposed["claim_support"]["root_cause"], "UNKNOWN")
+
     def test_schema_requires_positive_basis_without_source_context(self):
         snap = snapshot()
         for updates in ({"event_relation": "DIFFERENT_EVENT"}, {"case_attribution": "MISMATCH"}):
@@ -300,6 +345,30 @@ class NegativeBridgeGatesTests(unittest.TestCase):
         with self.assertRaises((ModelError, AuditError, ValidationError)):
             submit_model_results(self.fixture.store, self.fixture.run_id, [returned])
         self.assertEqual(len(self.fixture.store.records(self.fixture.run_id, "model_results")), count_before)
+
+    def test_bridge_rejects_negative_root_cause_support_without_saving_result(self):
+        from faultaudit.bridge import submit_model_results
+        self.fixture.store.ingest_evidence(self.fixture.run_id, {**self.fixture.package, "text": OTHER_CONTEXT + OWNERSHIP_CONTEXT})
+        tasks = self.fixture.summary_done()
+        original = self.fixture.envelope(tasks[0])
+        segment = tasks[0]["payload"]["snapshot"]["segments"][0]
+        ref = {"segment_id": segment["segment_id"], "quote": segment["text"]}
+        count_before = len(self.fixture.store.records(self.fixture.run_id, "model_results"))
+        for conclusion, kind, context in (({"event_relation": "DIFFERENT_EVENT"}, "other_event", OTHER_CONTEXT),
+                                         ({"case_attribution": "MISMATCH"}, "attribution_mismatch", OWNERSHIP_CONTEXT)):
+            dimensions = ["event_identity", "symptom", "occurrence_context"] if kind == "other_event" else ["ownership", "explicit_exclusion"]
+            for claim in ("SUPPORTED", "PARTIAL"):
+                with self.subTest(kind=kind, claim=claim):
+                    returned = copy.deepcopy(original)
+                    returned["result"].update(support_level="PARTIAL", evidence=[ref], **conclusion,
+                        negative_basis={kind: {"positive_identity": "EVT-B002", "context": context,
+                                              "dimensions": dimensions, "evidence": [ref]}})
+                    returned["result"]["claim_support"]["root_cause"] = claim
+                    with self.assertRaises(ModelError):
+                        submit_model_results(self.fixture.store, self.fixture.run_id, [returned])
+                    self.assertEqual(len(self.fixture.store.records(self.fixture.run_id, "model_results")), count_before)
+                    self.assertEqual(self.fixture.store.records(self.fixture.run_id, "judgments"), [])
+                    self.assertEqual(self.fixture.store.events(self.fixture.run_id, "review"), [])
 
     def test_bridge_rejects_original_event_as_other_event_without_saving_result(self):
         from faultaudit.bridge import submit_model_results

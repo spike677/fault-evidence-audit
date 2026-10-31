@@ -2,7 +2,7 @@
 
 故障证据核验核心。所有示例均为虚构数据，不包含客户故障记录或内部网页内容。
 
-版本 0.1.4，2026 年 10 月 31 日。核心负责导入故障表、保存原文与引用来源、生成采集和模型任务、检查返回结果并生成复核报告。模型任务可由 OpenCode 或 Codex 会话执行，内网采集仍由具备授权与登录态的现场环境完成。当前使用文件任务往返，不包含直连模型服务的网络客户端。
+版本 0.1.5，2026 年 10 月 31 日。核心负责导入故障表、保存原文与引用来源、生成采集和模型任务、检查返回结果并生成复核报告。模型任务可由 OpenCode 或 Codex 会话执行，内网采集仍由具备授权与登录态的现场环境完成。当前使用文件任务往返，不包含直连模型服务的网络客户端。
 
 目标网站包括 DTS、Wiki、GitCode、GitHub、CodeHub。真实资料由具备授权与登录态的现场工具采集；现有现场方案使用 OpenChamber/OpenCode。登录认证、搜索、正文读取、分页、附件、评论、Diff、网络重试和权限故障处理均在采集环境完成。核验核心不访问这些网站，也不保存其认证凭据；选择 Codex 执行模型任务不会自动获得这些站点的访问能力。
 
@@ -353,7 +353,7 @@ $LASTEXITCODE
 
 安装到父工作区后，Skill 内的 `scripts/run_audit.py` 按环境变量、安装定位配置、源码祖先依次定位同一核心。通常无需设置 `FAULTAUDIT_HOME`；显式设置时它优先，无效值直接报错。同盘配置使用相对路径，整个工作区一起迁移仍可调用；跨盘定位使用本机绝对路径，迁移后需重新配置。该脚本只运行本地核心，不负责建立模型服务连接。OpenChamber 2.5.2 可能连接其内置 OpenCode 2.1.4；PATH 的 2.2.0 不代表实际后端。命令加载、Skill 加载、模型任务执行及采集工具须在目标服务上分别验收，当前未完成现场联调。
 
-## 升级到 0.1.4 并继续既有 run
+## 升级并继续既有 run
 
 0.1.4 的否定判断须提供 `negative_basis.other_event` 或 `negative_basis.attribution_mismatch`，包含积极身份、原文上下文、有效身份维度和精确引用。程序检查结构及引用是否存在，语义是否足以排除关联仍须人工复核；技术差异、资料编号不同或未出现字段不能独立成立 `DIFFERENT_EVENT` / `MISMATCH`。根因冲突单独保留，未解决冲突时不能给 `DIRECT`。`observation_scope` 默认为当前已采集内容，选段和部分资料不能声称核验了全文。
 
@@ -392,4 +392,52 @@ $AuditRunId = '原有run_id'
 & $PythonExe scripts/build_delivery.py
 ```
 
-0.1.4 的回归测试使用合成任务和结果文件，不运行模型 HTTP 客户端，也不调用外部模型。本轮实际环境、测试数量与结果以 [examples/validation_result.json](examples/validation_result.json) 和 [验收记录](VALIDATION.md) 为准。2026 年 10 月 30 日由 Codex 会话执行的 [合成模拟验证摘要](examples/codex_pilot_validation.json) 是单独的历史基线，与本版回归、mock 和现场验证分开。交接包排除凭据、SQLite 运行数据、原始证据和依赖运行库，包含 `.gitignore` 及逐文件 SHA-256 清单。
+0.1.5 的回归测试使用合成任务和结果文件，不运行模型 HTTP 客户端，也不调用外部模型。本轮实际环境、测试数量与结果以 [examples/validation_result.json](examples/validation_result.json) 和 [验收记录](VALIDATION.md) 为准。2026 年 10 月 30 日由 Codex 会话执行的 [合成模拟验证摘要](examples/codex_pilot_validation.json) 是单独的历史基线，与本版回归、mock 和现场验证分开。交接包排除凭据、SQLite 运行数据、原始证据和依赖运行库，包含 `.gitignore` 及逐文件 SHA-256 清单。
+
+## 0.1.5 统计与现场只读对账
+
+本轮统计修复只从已有记录生成统计与差异报告，不重新提取事实、修改证据、生成业务判断或推进模型任务。网站认证、采集及实际模型执行仍由 OpenChamber/OpenCode 现场环境负责，沿用已有工具与流程。0.1.4 已有的长正文分块、整请求预算、输入作用域和策略失效机制保留，不为统计目的重写。
+
+独立统计命令只读 JSON，在初始化任何 Store 之前执行，不打开 SQLite。先经现场既有流程取得完整的 `report.json`，再运行：
+
+```powershell
+& $PythonExe run_faultaudit.py reconcile-report --input '现场已有/report.json' --baseline '上一轮/report.json' --round-manifest '本轮清单.json' --out 'statistics.json'
+```
+
+只有本轮报告时可省略 `--baseline` 和 `--round-manifest`；此时可以统计文件内已见记录，但轮次增量为 `UNKNOWN`、相应数量为 null，不能把它解释为零变化或对账完成。基线必须是同一 run 的完整 `report_json`，不能用手填数量或 TSV 汇总代替。
+
+本轮清单使用以下结构，ID 应来自实际记录；示例占位内容不能直接提交：
+
+```json
+{
+  "run_id": "<与两份报告相同的run_id>",
+  "judgment_ids": ["<本轮判断ID>"],
+  "mapping_ids": ["<本轮映射ID>"],
+  "snapshot_ids": ["<本轮快照ID>"]
+}
+```
+
+没有新增项时对应列表为空。也可用 `pipeline_task_ids` 替代判断与映射 ID 列表，须填写实际父流水线任务 ID。工具按基线与本轮报告的完整差集核对清单，漏列或不一致时输出 `RECONCILIATION_FAILED` 并退出 `2`；重复的清单 ID 去重计一次并给出警告，不能重复增加数量。不能只列有利案例。缺基线或清单产生的轮次 `UNKNOWN` 与这种对账失败不同。
+
+对账须区分以下单位，不能将其中一种数量当作另一种数量加减：
+
+| 单位 | 去重键 | 用途 |
+| --- | --- | --- |
+| 关联判断 | judgment_id | 一次具体故障与资料关联的判断记录 |
+| 原始故障记录 | case_id | 判断涉及了多少条来源记录 |
+| 资料快照 | snapshot_id | 判断涉及了多少个内容版本 |
+| 待办理由条目 | counts.pending_reason_entries | validate 的理由字符串条目数，不是独立故障或任务数量 |
+
+“当前有效”依据输入报告导出时的 `is_stale` 与流水线任务状态，离线命令不重查今天的数据库或新版策略。真实当前数据需 OpenCode 先通过既有工具只读核对 SQLite 的记录与任务元数据，不能把老报告当作 live DB 验证。新导出的报告会由 `report_data` 按现行策略标记过期，但常规导出仍不是专门的 SQLite 只读入口。
+
+人工 REJECT 关联保留在原账与历史中；统计同时给出当前判断包含与排除 REJECT 的两种口径，不能混成一个总数。分类可能交叉，同一判断或故障可能进入多个类别，类别计数之和不必等于唯一判断总数；以明确列出的 ID 集合核对。待办理由也可能属于同一故障或同一任务，不能把理由条目数当成待处理故障数。
+
+`confirmed_accepted` 在该报告的当前口径内，还要求 CONFIRMED、SAME_EVENT、DIRECT、人工 ACCEPT、对应快照 COMPLETE，且没有维度冲突或 claim CONTRADICTED。它是满足这些记录条件的数量，不代表离线统计重新证明了原文语义。
+
+若报告缺少必要的过期标记、任务状态或分类元数据，当前统计也可以为 UNKNOWN/null；缺失信息不补成零，也不以旧汇总数字代填。
+
+每轮增量要用上一轮基线报告与本轮清单共同核对。同 ID 的裁决变化、变为过期或仅重新导出不按新增判断计数。本轮新增历史记录包含本轮新增后又变为过期的项，当前仍有效的新增项另计，不能混合。`new_case_count` 指新增判断涉及的不同 case 数，不是新导入原始故障数。缺少基线时，累计已见记录可以展示，但本轮增量数量保持 `UNKNOWN`，不能将累计数量冒充本轮增量。
+
+现场 OpenCode 做只读对账时，只读取指定 run 的现有 SQLite、报告与轮次清单，并另存派生报告；不调用导入、采集提交、模型结果提交或人工裁决来“修正”数量。记录所用文件 Hash、生成时间与口径。没有现场 SQLite 时，不猜其真实总量；若只能读到已有 JSON 报告，统计只描述该文件所含记录，不能声称已完成数据库全量核对。单凭聊天列出的数量与案例名称不足以纠正现场计数。
+
+常规 `export` 也接受 `--baseline`、`--round-manifest`，可把统计附于 `report.statistics`。它仍走常规 Store 导出路径，不应称为对 SQLite 的绝对只读命令；现场纯对账优先使用已有 JSON 与独立 `reconcile-report`。

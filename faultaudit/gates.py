@@ -93,6 +93,9 @@ def judgment_semantic_errors(case: dict, snapshot: dict, judgment: dict) -> list
         errors.append("DIFFERENT_EVENT requires cited positive evidence identifying another event; missing fields or technical differences are insufficient")
     if judgment.get("case_attribution") == "MISMATCH" and not attribution:
         errors.append("MISMATCH requires cited positive ownership/exclusion evidence; missing fields or root-cause conflicts are insufficient")
+    negative_material = judgment.get("event_relation") == "DIFFERENT_EVENT" or judgment.get("case_attribution") == "MISMATCH"
+    if negative_material and (judgment.get("claim_support") or {}).get("root_cause") in {"SUPPORTED", "PARTIAL"}:
+        errors.append("Different-event or mismatched material cannot support the original case's root cause; retain its technical facts in the independent summary")
     for name, basis in (("other_event", other_event), ("attribution_mismatch", attribution)):
         if basis is not None:
             errors.extend(_negative_basis_errors(name, basis, snapshot, judgment, case))

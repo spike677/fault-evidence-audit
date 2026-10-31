@@ -131,6 +131,8 @@ def parser() -> argparse.ArgumentParser:
         elif name == "export":
             cmd.add_argument("--out", type=Path, required=True)
             cmd.add_argument("--xlsx", action="store_true", help="Also run the optional artifact-tool Node exporter")
+            cmd.add_argument("--baseline", type=Path, help="Complete pre-round report.json from the same run")
+            cmd.add_argument("--round-manifest", type=Path, help="Explicit result/snapshot ID manifest for this round")
         elif name == "review":
             target = cmd.add_mutually_exclusive_group(required=True)
             target.add_argument("--judgment")
@@ -150,6 +152,11 @@ def parser() -> argparse.ArgumentParser:
     results.add_argument("--run", default="latest")
     results.add_argument("--executor", choices=["opencode", "codex"], default="opencode")
     results.add_argument("--file", type=Path, required=True)
+    reconciliation = sub.add_parser("reconcile-report", help="Reconcile exported JSON only; never opens SQLite")
+    reconciliation.add_argument("--input", type=Path, required=True)
+    reconciliation.add_argument("--baseline", type=Path)
+    reconciliation.add_argument("--round-manifest", type=Path)
+    reconciliation.add_argument("--out", type=Path, required=True)
     return p
 
 
@@ -165,6 +172,15 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "doctor":
             write_json(doctor())
             return 0
+        if args.command == "reconcile-report":
+            from .statistics import report_statistics
+            load = lambda path: json.loads(path.read_text(encoding="utf-8-sig")) if path else None
+            result = report_statistics(load(args.input), baseline=load(args.baseline),
+                                       round_manifest=load(args.round_manifest))
+            write_json(result, args.out)
+            write_json({"statistics": str(args.out.resolve()), "status": result["status"],
+                        "round_status": result["round"]["status"], "sqlite_opened": False})
+            return 2 if result["status"] == "RECONCILIATION_FAILED" else 0
         # Keep doctor and --version available even when third-party dependencies
         # are absent, so a new environment can diagnose itself without a traceback.
         from .contracts import EvidencePackage, EvidenceSummary, Judgment
@@ -254,7 +270,9 @@ def main(argv: list[str] | None = None) -> int:
             return 2 if not result["valid"] or (getattr(args, "strict", False) and not result["complete"]) else 0
         elif args.command == "export":
             from .exporters import export_report
-            output = export_report(report_data(store, run_id), args.out.resolve())
+            load = lambda path: json.loads(path.read_text(encoding="utf-8-sig")) if path else None
+            data = report_data(store, run_id, baseline=load(args.baseline), round_manifest=load(args.round_manifest))
+            output = export_report(data, args.out.resolve())
             if args.xlsx:
                 node = os.getenv("FAULTAUDIT_NODE", "node")
                 script = Path(__file__).resolve().parents[1] / "scripts" / "export_xlsx.mjs"
@@ -283,7 +301,11 @@ def main(argv: list[str] | None = None) -> int:
                 output["xlsx"] = str(target)
                 if process.returncode:
                     output["xlsx_runtime_warning"] = f"Runtime exited {process.returncode}; fresh saved ZIP and sheet count verified. Check previews before use."
-            write_json({"run_id": run_id, "outputs": output, "validation": validate(store, run_id)})
+            write_json({"run_id": run_id, "outputs": output, "validation": validate(store, run_id),
+                        "statistics_status": data["statistics"]["status"],
+                        "round_statistics_status": data["statistics"]["round"]["status"]})
+            if data["statistics"]["status"] == "RECONCILIATION_FAILED":
+                return 2
         elif args.command == "review":
             record_id = args.mapping or args.judgment
             kind = "mappings" if args.mapping else "judgments"

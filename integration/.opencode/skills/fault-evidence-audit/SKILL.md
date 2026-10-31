@@ -1,11 +1,11 @@
 ---
 name: fault-evidence-audit
-description: "在OpenCode环境采集故障证据并执行faultaudit发布的模型任务，逐份总结和逐关联判断，提交可追溯结果并生成复核报告。适用于周报、Wiki、DTS、代码证据及故障库映射，不用于普通Excel排版。"
+description: "在OpenCode环境采集故障证据并执行faultaudit模型任务，逐份总结、逐关联判断，或只读核对判断数量与轮次增量。适用于周报、Wiki、DTS、代码证据及故障库映射，不用于普通Excel排版。"
 ---
 
 # 故障证据核验
 
-本 Skill 对应核心版本 0.1.4。通过 `scripts/run_audit.py` 调用本地核验核心。用核心的 `scripts/install_opencode.py --project <工作区>` 安装后，入口通过本地 `core-location.json` 定位核心，无需设置环境变量；同一磁盘优先保存相对路径，整个工作区与核心一起移动后仍可调用。跨磁盘安装保存本地绝对路径，迁移后可设置 FAULTAUDIT_HOME；如需重装，先保留并移走旧定位配置，安装器不会覆盖不同内容。可用 `FAULTAUDIT_HOME` 显式指定含 `run_faultaudit.py` 的核心目录，配置无效时直接报错，不回退到其他核心。核心只导入、保存快照、发布任务及运行本地门禁；本 Skill 的模型执行及内网采集在 OpenCode 环境完成。
+本 Skill 对应核心版本 0.1.5。通过 `scripts/run_audit.py` 调用本地核验核心。用核心的 `scripts/install_opencode.py --project <工作区>` 安装后，入口通过本地 `core-location.json` 定位核心，无需设置环境变量；同一磁盘优先保存相对路径，整个工作区与核心一起移动后仍可调用。跨磁盘安装保存本地绝对路径，迁移后可设置 FAULTAUDIT_HOME；如需重装，先保留并移走旧定位配置，安装器不会覆盖不同内容。可用 `FAULTAUDIT_HOME` 显式指定含 `run_faultaudit.py` 的核心目录，配置无效时直接报错，不回退到其他核心。核心只导入、保存快照、发布任务及运行本地门禁；本 Skill 的模型执行及内网采集在 OpenCode 环境完成。
 
 DTS、Wiki、GitCode、GitHub、CodeHub 等目标网站访问统一由 OpenChamber 环境负责，使用其连接的 OpenCode 与现场工具执行。网站登录、搜索、正文/分页/附件/评论/Diff 读取及网络重试不进入 Codex 核心。`fetch-tasks` 仅导出清单，不能当作已经读取网页的证明。
 
@@ -40,3 +40,18 @@ DTS、Wiki、GitCode、GitHub、CodeHub 等目标网站访问统一由 OpenChamb
 - 完成报告同时给出输入行数、链接数、比较数、失败与待处理数、run ID 和产物路径。所有任务执行成功也可能仍有语义待核验项。
 
 若用户要求真实核验而缺少内网读取权限，应继续完成导入、清单和可执行任务，明确受阻项，不猜测页面内容。核心命令的完整用法在核心目录 README；这里不复制一份实现说明。
+
+## 只读统计对账
+
+只读对账时读取指定 run 的既有 SQLite、报告、基线和本轮清单，另存统计结果；不运行导入、证据或模型结果提交、人工裁决等写入流程。
+
+优先以现场已有完整report JSON执行核心`reconcile-report --input <报告> --baseline <同run基线报告> --round-manifest <本轮清单> --out <统计文件>`。该命令不初始化Store或打开SQLite。常规export可附带统计参数，但不是对SQLite绝对只读的命令。
+
+- judgment_id、case_id、snapshot_id 分别去重，明确统计单位；不拿案例数加减判断数。
+- “当前有效”只按输入报告导出时的is_stale和task状态，离线工具不重查今天数据库或新版策略。真实当前数须先用现场工具只读核对SQLite元数据，不把老报告当live DB验证；新导出由report_data按现行策略标记过期。
+- 当前记录排除过期项，明确是否包含 REJECT。拒绝关联保留历史，分类可交叉，类别加总不自动等于总数。
+- 本轮增量须由基线报告和本轮清单核对；缺基线为 UNKNOWN，不用累计数代替。
+- 清单使用run_id及judgment_ids、mapping_ids、snapshot_ids列表，也可用pipeline_task_ids代判断/映射列表；按完整差集核对。缺输入时轮次数量UNKNOWN/null，清单不一致则RECONCILIATION_FAILED/退出2。
+- 新增历史记录与current_new分开；new_case_count只指新增判断涉及的case，pending_reason_entries是理由条目，不是独立故障或任务数。
+- 没有现场 SQLite，不猜真实数量。若只有 JSON 报告，只说明其中记录与该文件口径，不冒称数据库全量对账。
+- 复用现场既有网关和工具流程；网站访问、采集及实际模型执行仍由 OpenChamber/OpenCode 负责。

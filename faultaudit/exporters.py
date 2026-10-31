@@ -231,7 +231,8 @@ def _html_value(value: Any) -> str:
 def _html_report(data: dict, tables: list[dict]) -> str:
     run = _flat(data.get("run", {}))
     identity = _text(run.get("run_id", run.get("id", "")))
-    status = _text(data.get("validation", {}).get("status", run.get("status", "UNKNOWN")))
+    validation = data.get("validation", {})
+    status = _text(validation.get("batch_status", validation.get("status", run.get("status", "UNKNOWN"))))
     nav = " ".join(f'<a href="#table-{i}">{html.escape(table["name"])}</a>' for i, table in enumerate(tables))
     sections = []
     for i, table in enumerate(tables):
@@ -252,6 +253,27 @@ def _write(path: Path, content: str, encoding: str = "utf-8") -> None:
     temporary = path.with_name(path.name + ".tmp")
     temporary.write_text(content, encoding=encoding)
     temporary.replace(path)
+
+
+def _statistics_rows(statistics: dict) -> list[dict]:
+    """Small count/definition table; ID-level reconciliation stays in JSON."""
+    current = statistics.get("current", {})
+    rows = [{"范围": "current", "指标": key, "值": current.get(key)}
+            for key in ("status", "snapshot_count", "mapping_count")]
+    for scope in ("including_rejected", "excluding_rejected", "rejected", "confirmed_accepted"):
+        for key, value in (current.get(scope) or {}).items():
+            rows.append({"范围": "current/" + scope, "指标": key, "值": value})
+    for axis, categories in (current.get("classifications") or {}).items():
+        for category, counts in categories.items():
+            rows.append({"范围": "current/" + axis, "指标": category, "值": counts})
+    for key, value in statistics.get("round", {}).items():
+        if key in {"status", "reason"} or key.endswith("_count"):
+            rows.append({"范围": "round", "指标": key, "值": value})
+    for key, value in statistics.get("definitions", {}).items():
+        rows.append({"范围": "口径", "指标": key, "值": value})
+    if statistics.get("errors"):
+        rows.append({"范围": "对账", "指标": "errors", "值": statistics["errors"]})
+    return rows
 
 
 def export_report(data: dict, output_dir: Path) -> dict:
@@ -275,12 +297,18 @@ def export_report(data: dict, output_dir: Path) -> dict:
     validation = data.get("validation", {})
     tables.append(_table("运行对账", [{"类别": "run", **_flat(data.get("run", {}))},
                                    {"类别": "validation", **(validation if isinstance(validation, dict) else {"value": validation})}]))
+    statistics = data.get("statistics")
+    if isinstance(statistics, dict):
+        tables.append(_table("统计口径", _statistics_rows(statistics)))
     files = {
         "report_json": str(output_dir / "report.json"),
         "report_html": str(output_dir / "report.html"),
         "summary_tsv": str(output_dir / "summary.tsv"),
         "workbook_data": str(output_dir / "workbook_data.json"),
     }
+    if isinstance(statistics, dict):
+        files["statistics_json"] = str(output_dir / "statistics.json")
+        _write(Path(files["statistics_json"]), json.dumps(statistics, ensure_ascii=False, indent=2) + "\n")
     _write(Path(files["report_json"]), json.dumps(data, ensure_ascii=False, indent=2, default=str) + "\n")
     _write(Path(files["report_html"]), _html_report(data, tables))
     _write(Path(files["summary_tsv"]), _tsv(tables[0]), "utf-8-sig")

@@ -1,8 +1,8 @@
 # 现场采集合同
 
-本文件描述默认OpenCode现场流程。核心0.1.4另支持Codex会话执行模型文件任务：导出和提交时加 `--executor codex`，推进时用 `run --mode codex`；producer使用executor=codex、codex_version及实际provider/model/session_id，未知精确版本写unreported。内网采集仍需现场获准工具，Codex入口不自动获取登录态。
+本文件描述默认OpenCode现场流程。核心0.1.5另支持Codex会话执行模型文件任务：导出和提交时加 `--executor codex`，推进时用 `run --mode codex`；producer使用executor=codex、codex_version及实际provider/model/session_id，未知精确版本写unreported。内网采集仍需现场获准工具，Codex入口不自动获取登录态。
 
-对应核心版本 0.1.4。本默认流程的内网采集与模型执行由OpenCode现场完成，核心只接收文件、保存快照及运行本地校验。
+对应核心版本 0.1.5。本默认流程的内网采集与模型执行由OpenCode现场完成，核心只接收文件、保存快照及运行本地校验。
 
 ## 网站访问的执行归属
 
@@ -70,3 +70,17 @@ DTS、Wiki、GitCode、GitHub、CodeHub 等所有目标网站均由 OpenChamber 
 输入超过核心限制，或OpenCode无法完整处理原请求时，报告`BLOCKED`并保留任务标识和具体原因。核心可能已在任务台账记录阻塞；执行方尚未完成的任务不得编写成功result。不要自行裁剪payload、段落或库条目后提交到原任务，也不要用PARTIAL采集状态掩盖容量问题。所有模型建议仍待人工审核。真实现场和Python 3.14.3尚未验证。
 
 核心默认整请求预算为48,000个canonical JSON字符，配置项为`FAULTAUDIT_MAX_INPUT_CHARS`。请求`input_budget`含`chars`、`budget`和`scope=WHOLE_MODEL_TASK`；该数量包含说明、数据、Hash及预算元数据，不是模型token上限。超限父任务为`BLOCKED`，错误`INPUT_TOO_LARGE`，事件`model_input_blocked`保留详情。执行者容量不足时只向操作者报告原任务及原因，保持待处理；当前协议没有新增可提交的blocked结果envelope。
+
+## 现场只读统计
+
+只读对账读取既有SQLite、派生报告、上一轮基线和本轮清单，不补采网站或执行模型任务，不改写state。分别按judgment_id、case_id、snapshot_id去重，current排除过期记录；REJECT是否计入必须明确。类别可交叉，不能将各类case数量相加当作judgment总数。
+
+轮次增量由基线与本轮清单共同核对，缺基线保持UNKNOWN。没有现场SQLite时不判断真实总量；如果只有报告，只限定为该报告中的记录与口径。记录输入文件Hash及统计范围，结果另存，沿用现场已有工具与数据保护流程。
+
+对已有完整JSON运行`reconcile-report --input <报告> --baseline <同run基线报告> --round-manifest <本轮清单> --out <统计文件>`。命令在任何Store初始化前执行，不打开SQLite；常规export虽可附两项统计参数，仍不能称为SQLite绝对只读入口。
+
+基线为同run完整report_json。manifest含run_id与judgment_ids、mapping_ids、snapshot_ids三个列表；也可用pipeline_task_ids替代判断/映射列表。按报告差集全量核对，不能只列选定案例。缺基线或清单时轮次数量为UNKNOWN/null，差集不一致为RECONCILIATION_FAILED/退出2。
+
+current含与不含人工REJECT两种口径分别呈现，仅按输入报告导出时的is_stale及task状态；离线工具不重查今天数据库或新版策略。真实当前数需OpenCode先用现有工具只读核对SQLite元数据，不能把老报告当live DB验证。新报告由report_data按现行策略标记过期。
+
+confirmed_accepted要求CONFIRMED、SAME_EVENT、DIRECT、人工ACCEPT、对应快照COMPLETE，且无维度或claim冲突。新增历史项包括本轮新增后又过期的记录，current_new另计；new_case_count指新增判断涉及的case数，pending_reason_entries是validate理由条目数，不是新增故障数或独立待处理任务数。

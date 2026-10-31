@@ -8,7 +8,7 @@ from .contracts import EvidenceSummary, Judgment
 from .gates import event_anchor_errors, judgment_semantic_errors
 from .store import AuditError, Store, canonical_url, digest
 
-RULE_VERSION = "nightly-0.1.4"
+RULE_VERSION = "nightly-0.1.5"
 
 
 def cited_refs(summary: dict):
@@ -523,12 +523,16 @@ def validate(store: Store, run_id: str) -> dict:
                        "excluded_records": len(exclusions),
                        "all_snapshots": len(store.records(run_id, "snapshots")), "planned_associations": len(pair_keys),
                        "judged_associations": len(judged_keys), "catalog_items": len(catalog),
+                       "current_judgment_ids_including_rejected": len({j["judgment_id"] for j in js}),
+                       "current_case_ids_with_judgments_including_rejected": len({j["case_id"] for j in js}),
+                       "pending_reason_entries": len(pending),
                        "catalog_versions": len({i['source_sha256'] for i in catalog}),
                        "tasks": len(tasks), "task_states": dict(Counter(t["status"] for t in tasks))},
             "errors": list(dict.fromkeys(errors)), "pending": pending, "rule_version": RULE_VERSION}
 
 
-def report_data(store: Store, run_id: str) -> dict:
+def report_data(store: Store, run_id: str, *, baseline: dict | None = None,
+                round_manifest: dict | None = None) -> dict:
     data = {kind: store.records(run_id, kind) for kind in
             ("cases", "references", "snapshots", "summaries", "judgments", "catalog", "mappings", "exclusions", "documents",
              "model_tasks", "model_results")}
@@ -570,4 +574,6 @@ def report_data(store: Store, run_id: str) -> dict:
                  "evidence_index": evidence_index(store, run_id)["evidence_index"],
                  "catalog_selections": store.records(run_id, "catalog_selections"),
                  "review_events": store.events(run_id, "review"), "validation": validate(store, run_id)})
+    from .statistics import report_statistics
+    data["statistics"] = report_statistics(data, baseline=baseline, round_manifest=round_manifest)
     return data
