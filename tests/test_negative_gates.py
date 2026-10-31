@@ -118,6 +118,40 @@ class NegativeJudgmentGatesTests(unittest.TestCase):
         self.assertNotEqual(result.get("review_status"), "ACCEPT")
         self.assertEqual(judgment_semantic_errors(source_case(), snap, result), [])
 
+    def test_source_event_identity_cannot_be_used_as_another_event_basis(self):
+        snap = snapshot("资料明确描述事件EVT-A001，属于原记录的同一次故障，发生于甲客户周一推理首token乱码。")
+        value = judgment(snap, event_relation="DIFFERENT_EVENT", negative_basis=basis(snap, identity=" EVT-A001 "))
+        for field in ("事件编号", "事件ID", "故障编号", "incident_id", "event_id"):
+            with self.subTest(source_field=field):
+                case = source_case()
+                case["raw"].pop("事件编号")
+                case["raw"][field] = " EVT-A001 "
+                before = copy.deepcopy(value)
+                self.assertTrue(judgment_semantic_errors(case, snap, value))
+                with self.assertRaises(ModelError):
+                    validate_task_result("compare", value, case=case, snapshot=snap)
+                with self.assertRaises(AuditError):
+                    gate_judgment(case, snap, value)
+                self.assertEqual(value, before)
+
+    def test_record_and_artifact_ids_are_not_compared_as_source_event_ids(self):
+        snap = snapshot()
+        case = source_case()
+        case.update(external_id="EVT-B002")
+        case["raw"].update({"统一ID": "EVT-B002", "DTS": "EVT-B002", "PR": "EVT-B002", "wiki": "EVT-B002"})
+        value = judgment(snap, event_relation="DIFFERENT_EVENT", negative_basis=basis(snap))
+        result = validate_task_result("compare", value, case=case, snapshot=snap)
+        self.assertEqual(result["event_relation"], "DIFFERENT_EVENT")
+        self.assertEqual(gate_judgment(case, snap, value)["review_status"], "NEEDS_REVIEW")
+
+    def test_source_event_identity_is_not_inferred_from_description_mentions(self):
+        snap = snapshot()
+        case = source_case()
+        case["raw"].pop("事件编号")
+        case["raw"]["问题描述"] += "，另外参考了事件EVT-B002的资料。"
+        value = judgment(snap, event_relation="DIFFERENT_EVENT", negative_basis=basis(snap))
+        self.assertEqual(judgment_semantic_errors(case, snap, value), [])
+
     def test_explicit_ownership_exclusion_can_propose_mismatch(self):
         snap = snapshot(OWNERSHIP_CONTEXT)
         value = judgment(snap, case_attribution="MISMATCH", negative_basis=basis(snap, kind="attribution_mismatch"))
@@ -266,6 +300,25 @@ class NegativeBridgeGatesTests(unittest.TestCase):
         with self.assertRaises((ModelError, AuditError, ValidationError)):
             submit_model_results(self.fixture.store, self.fixture.run_id, [returned])
         self.assertEqual(len(self.fixture.store.records(self.fixture.run_id, "model_results")), count_before)
+
+    def test_bridge_rejects_original_event_as_other_event_without_saving_result(self):
+        from faultaudit.bridge import submit_model_results
+        identity = self.fixture.case["raw"]["事件编号"]
+        context = f"资料明确描述事件{identity}，属于原记录同一次故障，甲客户周一推理首token乱码。"
+        self.fixture.store.ingest_evidence(self.fixture.run_id, {**self.fixture.package, "text": context})
+        tasks = self.fixture.summary_done()
+        returned = self.fixture.envelope(tasks[0])
+        segment = tasks[0]["payload"]["snapshot"]["segments"][0]
+        ref = {"segment_id": segment["segment_id"], "quote": segment["text"]}
+        returned["result"].update(event_relation="DIFFERENT_EVENT", support_level="PARTIAL", evidence=[ref],
+            negative_basis={"other_event": {"positive_identity": identity, "context": context,
+                            "dimensions": ["event_identity", "symptom", "occurrence_context"], "evidence": [ref]}})
+        count_before = len(self.fixture.store.records(self.fixture.run_id, "model_results"))
+        with self.assertRaises(ModelError):
+            submit_model_results(self.fixture.store, self.fixture.run_id, [returned])
+        self.assertEqual(len(self.fixture.store.records(self.fixture.run_id, "model_results")), count_before)
+        self.assertEqual(self.fixture.store.records(self.fixture.run_id, "judgments"), [])
+        self.assertEqual(self.fixture.store.events(self.fixture.run_id, "review"), [])
 
     def test_bridge_positive_other_event_remains_review_proposal(self):
         from faultaudit.bridge import submit_model_results

@@ -2,6 +2,15 @@
 from __future__ import annotations
 
 
+def _source_event_identities(case: dict) -> set[str]:
+    """Use explicit event/incident fields only, excluding record and artifact IDs."""
+    raw = case.get("raw", {})
+    identities = {str(raw.get(key, "")).strip() for key in
+                  ("事件编号", "事件ID", "故障编号", "incident_id", "event_id")}
+    identities.discard("")
+    return identities
+
+
 def event_anchor_errors(case: dict, snapshot: dict, judgment: dict) -> list[str]:
     """An anchor establishes traceability; a human still reviews the proposal.
 
@@ -18,9 +27,7 @@ def event_anchor_errors(case: dict, snapshot: dict, judgment: dict) -> list[str]
         anchor in ref.get("quote", "") for ref in refs
     ):
         errors.append("Same-event anchor must occur in source raw cells, snapshot and cited evidence")
-    explicit = {str(raw.get(key, "")).strip() for key in
-                ("事件编号", "事件ID", "故障编号", "incident_id", "event_id")}
-    explicit.discard("")
+    explicit = _source_event_identities(case)
     if anchor not in explicit:
         dims = set(judgment.get("matched_dimensions", []))
         description = str(case.get("description", ""))
@@ -34,10 +41,12 @@ def event_anchor_errors(case: dict, snapshot: dict, judgment: dict) -> list[str]
     return errors
 
 
-def _negative_basis_errors(name: str, basis: dict, snapshot: dict, judgment: dict) -> list[str]:
+def _negative_basis_errors(name: str, basis: dict, snapshot: dict, judgment: dict, case: dict) -> list[str]:
     """Check declared positive context and citations without classifying prose."""
     errors = []
     identity = str(basis.get("positive_identity", "")).strip()
+    if name == "other_event" and identity in _source_event_identities(case):
+        errors.append("other_event positive_identity matches the source event identity; it cannot identify another event. Keep the event relation UNDETERMINED or report the unresolved conflict")
     context = str(basis.get("context", "")).strip()
     dimensions = set(basis.get("dimensions", []))
     allowed = {"event_identity", "ownership", "symptom", "occurrence_context", "explicit_exclusion"}
@@ -86,7 +95,7 @@ def judgment_semantic_errors(case: dict, snapshot: dict, judgment: dict) -> list
         errors.append("MISMATCH requires cited positive ownership/exclusion evidence; missing fields or root-cause conflicts are insufficient")
     for name, basis in (("other_event", other_event), ("attribution_mismatch", attribution)):
         if basis is not None:
-            errors.extend(_negative_basis_errors(name, basis, snapshot, judgment))
+            errors.extend(_negative_basis_errors(name, basis, snapshot, judgment, case))
     if judgment.get("observation_scope", "CAPTURED_CONTENT") == "FULL_DOCUMENT":
         input_scope = snapshot.get("input_scope") or {}
         if snapshot.get("status") != "COMPLETE" or input_scope.get("scope") != "FULL_CAPTURED_SNAPSHOT":
