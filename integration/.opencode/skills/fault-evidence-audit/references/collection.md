@@ -1,12 +1,16 @@
 # 现场采集合同
 
-本文件描述默认OpenCode现场流程。核心0.1.6另支持Codex会话执行模型文件任务：导出和提交时加 `--executor codex`，推进时用 `run --mode codex`；producer使用executor=codex、codex_version及实际provider/model/session_id，未知精确版本写unreported。内网采集仍需现场获准工具，Codex入口不自动获取登录态。
+本文件描述默认OpenCode现场流程。核心0.1.7另支持Codex会话执行模型文件任务：导出和提交时加 `--executor codex`，推进时用 `run --mode codex`；producer使用executor=codex、codex_version及实际provider/model/session_id，未知精确版本写unreported。内网采集仍需现场获准工具，Codex入口不自动获取登录态。
 
-对应核心版本 0.1.6。本默认流程的内网采集与模型执行由OpenCode现场完成，核心只接收文件、保存快照、规划必要证据及运行本地校验。
+对应核心版本 0.1.7。本默认流程的内网采集与模型执行由OpenCode现场完成，核心只接收文件、保存快照、规划必要证据及运行本地校验。
 
 ## 先预览必要证据
 
-先运行`--state <既有state> evidence-plan --run <id> --out preview.json`。该命令使用SQLite mode=ro/query_only，不创建state或登记关系。按cases中的path、selected_ref_ids、selected_snapshot_ids、required_actions、stop_reason执行必要动作：原链/已确认资料有可用内容就提事实，不为补齐证据类型继续搜索。原链失败登记真实异常，PARTIAL已取得正文继续保留并处理；没有适用资料时才搜索。
+先运行`--state <既有state> evidence-plan --run <id> --out preview.json`。该命令使用SQLite mode=ro/query_only，不创建state或登记关系。按cases中的path、selected_ref_ids、selected_snapshot_ids、required_actions、stop_reason整理全部已有原表/旧汇总引用及显式确认资料，不只选首份。相同URL共享抓取不合并来源；已有可用内容先提事实，不为补齐证据类型继续新增搜索，这不取消其余已有引用。原链失败保留真实状态，PARTIAL已取得正文继续处理；没有适用资料时才搜索。
+
+来源等级SOURCE_CELL_LINKED证明原始周报/OBP单元格来源，LEGACY_TABLE_LINKED只证明旧汇总表单元格来源，SEARCH_DISCOVERED保留搜索/追链来历，PROVENANCE_PENDING待Agent先恢复来源。user_confirmed与这些等级独立，不能用确认把旧表链接变成周报原链；legacy_relation只留历史。缺少来源链不默认成为人工EXCEPTION。
+
+work_items的work_id含issue_scope，相同case/snapshot的不同issue工作严格分开；fetch_work_items按URL共享抓取，case/ref及source_grades分别保留。模型不生成或改写work_id，按请求metadata和payload.processing_context执行。逐引用整理中的user_confirmed是引用自身状态，work_user_confirmed是共享工作的状态，不互相覆盖。
 
 未选引用和旧判断保留，但不计必要任务/待办。`register-event-group --run <id> --case-ids <id1> <id2> --user-confirmed --confirmed-by <确认记录者> --reason <已有依据>`与`confirm-evidence --run <id> --case-id <id> --ref-id <id> --user-confirmed --confirmed-by <确认记录者> --reason <已有依据>`是写入登记命令；后者也可用--snapshot-id和可重复--issue。它们只落实用户已有明确确认，不作为只读预览，不要求重复确认，也不按症状自行合并。
 
@@ -84,6 +88,8 @@ DTS、Wiki、GitCode、GitHub、CodeHub 等所有目标网站均由 OpenChamber 
 ## 现场只读统计
 
 只读对账读取既有SQLite、派生报告、上一轮基线和本轮清单，不补采网站或执行模型任务，不改写state。分别按judgment_id、case_id、snapshot_id去重，current只计必要、非过期判断及映射；REJECT是否计入必须明确。共享judgment计一次，case计数包含member_case_ids。snapshot_count保留active摄取全集，selected_snapshot_count另计；未选引用和AUTO/PENDING/EXCEPTION另列。类别可交叉，不能将各类case数量相加当作judgment总数。
+
+planned_work_count/current_work_count按work_id计，current_case_snapshot_pair_count单列case/snapshot二元组数量；不同issue共享同一pair不折叠为一个work。0.1.7 validate的planned_associations/judged_associations是兼容字段名，实际association_identity为work_id，并列planned_work_ids/judged_work_ids。逐引用表重复展示共享结果不增加judgment_count，旧报告缺work元数据时work数量unknown。
 
 轮次增量由基线与本轮清单共同核对，缺基线保持UNKNOWN。没有现场SQLite时不判断真实总量；如果只有报告，只限定为该报告中的记录与口径。记录输入文件Hash及统计范围，结果另存，沿用现场已有工具与数据保护流程。
 

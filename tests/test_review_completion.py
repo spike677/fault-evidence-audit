@@ -9,7 +9,7 @@ import unittest
 
 from faultaudit.importers import import_cases, import_catalog
 from faultaudit.exporters import export_report
-from faultaudit.pipeline import current_judgments, gate_judgment, import_into, report_data, validate
+from faultaudit.pipeline import current_judgments, evidence_plan, gate_judgment, import_into, report_data, validate
 from faultaudit.bridge import policy_fingerprint
 from faultaudit.store import Store, digest
 
@@ -42,7 +42,8 @@ class MappingReviewTests(unittest.TestCase):
                    "policy_hash": policy_fingerprint()}
         self.store.put(self.run_id, "summaries", summary_task["task_id"], summary)
         self.store.task_status(self.run_id, summary_task["task_id"], "SUCCEEDED")
-        task = self.store.task(self.run_id, "compare", self.case["case_id"] + "|" + snapshot["snapshot_id"], [])
+        work = evidence_plan(self.store, self.run_id)["work_items"][0]
+        task = self.store.task(self.run_id, "compare", work["work_id"], [])
         result = gate_judgment(self.case, snapshot, {"case_id": self.case["case_id"], "snapshot_id": snapshot["snapshot_id"],
             "case_attribution": "CONFIRMED", "event_relation": "SAME_EVENT", "pattern_relation": "SAME_PATTERN",
             "support_level": "DIRECT", "claim_support": {"symptom": "SUPPORTED", "root_cause": "SUPPORTED",
@@ -50,6 +51,7 @@ class MappingReviewTests(unittest.TestCase):
             "short_reason": "Synthetic review fixture only", "model_mode": "codex", "model_id": "synthetic-fixture"})
         self.judgment_id = task["task_id"]
         result.update(task_id=self.judgment_id, judgment_id=self.judgment_id,
+                      work_id=work["work_id"],
                       policy_hash=policy_fingerprint(), case_hash=digest(self.case),
                       summary_task_id=summary_task["task_id"], summary_hash=digest(summary))
         self.store.put(self.run_id, "judgments", self.judgment_id, result)

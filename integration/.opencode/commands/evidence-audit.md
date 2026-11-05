@@ -5,8 +5,9 @@ description: "通过OpenCode采集证据并执行模型任务，回传本地核�
 使用 fault-evidence-audit Skill 处理以下任务：$ARGUMENTS
 
 通过 Skill 的 scripts/run_audit.py 调用核心 CLI，使用现有 run ID 继续任务。
-核心版本0.1.6管理导入、快照、证据计划、文件任务协议、本地门禁及只读统计；本命令的模型provider/model与实际执行由OpenCode环境负责。
-先以--state <state> evidence-plan --run <id> --out preview.json只读预览。优先原链和已确认资料，已有可用内容就提事实并停止补链；未选引用留档，不增加必要任务或待办。
+核心版本0.1.7管理导入、快照、证据计划、文件任务协议、本地门禁及只读统计；本命令的模型provider/model与实际执行由OpenCode环境负责。
+先以--state <state> evidence-plan --run <id> --out preview.json只读预览。整理全部已有原表/旧汇总引用及显式确认资料，不只选一份；已有可用内容就提事实并停止新增补链，不取消其他已有引用。未选搜索候选留档。
+来源分级SOURCE_CELL_LINKED/LEGACY_TABLE_LINKED/SEARCH_DISCOVERED/PROVENANCE_PENDING与user_confirmed独立，旧表引用不升级为周报原链；来源待恢复由Agent先处理。同case/snapshot多issue按work_id分开，逐引用和逐子问题完整展示，不改任务work标识或跨issue复用结果。
 register-event-group和confirm-evidence是写入登记命令，只登记已有用户确认并保留依据，不作为只读预览调用，也不要求用户重复确认已有关系。
 采集并提交必要正文后，model-tasks导出就绪任务，按instructions/payload/expected_contract执行，
 以原run/task/request hash及实际producer信息提交submit-model-results，再run --mode opencode继续。

@@ -27,13 +27,14 @@ class EvidencePlanTests(unittest.TestCase):
         self.assertTrue(self.directory.is_relative_to(self.test_root))
         self.temp.cleanup()
 
-    def rows(self, count=1, *, link=True, kind="ORIGINAL_WEEKLY", different_root=False):
+    def rows(self, count=1, *, link=True, kind="ORIGINAL_WEEKLY", different_root=False, additional_links=None):
         rows = []
         for index in range(count):
             row = {"统一ID": f"SYNTHETIC-{index}", "来源": f"synthetic batch {index}", "问题描述": "garbled during restore",
                    "客户/模型": "Model-X", "算子": "cache_op", "根因": "different cause" if different_root and index else "cache failure"}
             if link:
                 row["wiki"] = "https://example.invalid/wiki/one"
+            row.update(additional_links or {})
             rows.append(row)
         path = self.directory / "cases.json"
         path.write_text(json.dumps(rows, ensure_ascii=False), encoding="utf-8")
@@ -90,7 +91,8 @@ class EvidencePlanTests(unittest.TestCase):
         case = self.rows()[0]
         ref = self.store.records(self.run_id, "references")[0]
         relation = source_relation(case, ref)
-        self.assertEqual(relation["relation"], "SOURCE_LINKED")
+        self.assertEqual(relation["relation"], "SOURCE_CELL_LINKED")
+        self.assertEqual(relation["legacy_relation"], "SOURCE_LINKED")
         self.assertTrue(relation["trace"]["reference_location"])
         before = self.store.conn.total_changes
         plan = self.plan()
@@ -105,16 +107,20 @@ class EvidencePlanTests(unittest.TestCase):
         ref = self.store.records(self.run_id, "references")[0]
         self.store.put(self.run_id, "references", ref["ref_id"], {**ref, "origin": "LEGACY_TABLE"}, mutable=True)
         planned = self.first(self.plan())
-        self.assertEqual(planned["path"], "EXCEPTION")
-        self.assertEqual(planned["stop_reason"], "REFERENCE_PROVENANCE_PENDING")
+        self.assertEqual(planned["path"], "PROVENANCE_RECOVERY")
+        self.assertEqual(planned["stop_reason"], "AGENT_RECOVERS_SOURCE_BEFORE_REPORTING_GAP")
+        recovery = next(action for action in planned["required_actions"] if action["action"] == "RECOVER_PROVENANCE")
+        self.assertEqual(recovery["actor"], "AGENT")
+        self.assertEqual(recovery["on_failure"], "REPORT_PROVENANCE_GAP")
         self.assertNotIn("SEARCH", [action["action"] for action in planned["required_actions"]])
 
     def test_old_root_and_source_metadata_are_not_promoted_to_original(self):
         case = self.rows(kind="LEGACY_TABLE")[0]
         ref = self.store.records(self.run_id, "references")[0]
-        self.assertEqual(source_relation(case, ref)["relation"], "PROVENANCE_PENDING")
+        self.assertEqual(source_relation(case, ref)["relation"], "LEGACY_TABLE_LINKED")
         self.snapshot()
-        self.assertEqual(self.first(self.plan())["path"], "EXCEPTION")
+        self.assertEqual(self.first(self.plan())["path"], "LEGACY_TABLE_LINKED")
+        self.assertNotEqual(self.first(self.plan())["relation"], "SOURCE_CELL_LINKED")
         self.assertEqual(self.store.get(self.run_id, "cases", case["case_id"])["root_cause_origin"], "LEGACY_DERIVED_UNKNOWN")
 
     def test_partial_is_usable_and_capture_completion_is_optional(self):
@@ -122,7 +128,7 @@ class EvidencePlanTests(unittest.TestCase):
         snapshot = self.snapshot(status="PARTIAL")
         plan = self.plan()
         case = self.first(plan)
-        self.assertEqual(case["relation"], "SOURCE_LINKED")
+        self.assertEqual(case["relation"], "SOURCE_CELL_LINKED")
         self.assertEqual(case["selected_snapshot_ids"], [snapshot["snapshot_id"]])
         self.assertEqual([action["action"] for action in case["required_actions"]], ["EXTRACT_FACTS"])
         self.assertFalse(case["optional_actions"][0]["blocking"])
@@ -132,8 +138,9 @@ class EvidencePlanTests(unittest.TestCase):
         self.rows()
         self.snapshot(status="AUTH_REQUIRED")
         case = self.first(self.plan())
-        self.assertEqual(case["path"], "EXCEPTION")
+        self.assertEqual(case["path"], "CAPTURE_GAPS")
         self.assertEqual(case["required_actions"][0]["action"], "RESOLVE_CAPTURE_FAILURE")
+        self.assertEqual(case["required_actions"][0]["actor"], "AGENT")
         self.assertEqual(self.plan()["work_items"], [])
 
     def test_explicit_confirmed_association_does_not_require_old_event_confirmation(self):
@@ -143,7 +150,8 @@ class EvidencePlanTests(unittest.TestCase):
         association = register_evidence_association(self.store, self.run_id, case_id=case["case_id"], ref_id=ref["ref_id"],
             snapshot_id=snapshot["snapshot_id"], user_confirmed=True, confirmed_by="synthetic-user", reason="Explicit synthetic association")
         plan = self.first(self.plan())
-        self.assertEqual(plan["relation"], "USER_CONFIRMED")
+        self.assertEqual(plan["relation"], "LEGACY_TABLE_LINKED")
+        self.assertTrue(plan["user_confirmed"])
         self.assertEqual(plan["association_ids"], [association["association_id"]])
         self.assertEqual(plan["selected_snapshot_ids"], [snapshot["snapshot_id"]])
 
@@ -155,14 +163,14 @@ class EvidencePlanTests(unittest.TestCase):
         useful = self.useful_search(case, snapshot)
         after = self.plan([useful])
         self.assertEqual(self.first(after)["path"], "VERIFIED_SEARCH")
-        self.assertEqual(self.first(after)["relation"], "SEARCH_CANDIDATE")
+        self.assertEqual(self.first(after)["relation"], "SEARCH_DISCOVERED")
         self.assertEqual(self.first(before)["routing_hash"], self.first(after)["routing_hash"])
         self.assertEqual(before["plan_hash"], after["plan_hash"])
         self.assertNotIn("SEARCH", [action["action"] for action in self.first(after)["required_actions"]])
         del useful["fact_comparisons"]
         self.assertEqual(self.first(self.plan([useful]))["path"], "SEARCH_CANDIDATE")
 
-    def test_known_conflict_keeps_both_captured_sources_without_fetching_unread_links(self):
+    def test_known_conflict_keeps_captured_sources_and_all_supplied_table_references(self):
         case = self.rows()[0]
         first = self.snapshot()
         second = self.snapshot([case["case_id"]], url="https://example.invalid/wiki/two", text="Different synthetic conclusion")
@@ -173,8 +181,8 @@ class EvidencePlanTests(unittest.TestCase):
         planned = self.first(self.plan([conflict]))
         self.assertEqual(planned["path"], "EXCEPTION")
         self.assertEqual(set(planned["selected_snapshot_ids"]), {first["snapshot_id"], second["snapshot_id"]})
-        self.assertNotIn("unread-ref", planned["selected_ref_ids"])
-        self.assertNotIn("FETCH", [action["action"] for action in planned["required_actions"]])
+        self.assertIn("unread-ref", planned["selected_ref_ids"])
+        self.assertIn("FETCH", [action["action"] for action in planned["required_actions"]])
 
     def test_shared_url_does_not_register_or_merge_event_groups(self):
         cases = self.rows(count=2)
@@ -207,7 +215,8 @@ class EvidencePlanTests(unittest.TestCase):
             confirmed_by="synthetic-user", reason="Explicit same event")
         planned = self.plan()
         inherited = next(case for case in planned["cases"] if case["case_id"] == cases[1]["case_id"])
-        self.assertEqual(inherited["relation"], "USER_CONFIRMED")
+        self.assertEqual(inherited["relation"], "SOURCE_CELL_LINKED")
+        self.assertTrue(inherited["user_confirmed"])
         self.assertEqual(inherited["provenance"][0]["inherited_from_case_id"], cases[0]["case_id"])
         self.assertEqual(len(planned["work_items"]), 1)
 
@@ -258,6 +267,124 @@ class EvidencePlanTests(unittest.TestCase):
         self.assertEqual(planned["path"], "SEARCH_REQUIRED")
         self.assertEqual(planned["required_actions"][0]["action"], "SEARCH")
         self.assertEqual(planned["selected_snapshot_ids"], [])
+
+    def test_all_original_table_references_are_selected_and_fetch_is_shared_by_url(self):
+        cases = self.rows(count=2, additional_links={"DTS": "https://example.invalid/dts/one", "PR": "https://example.invalid/code/one"})
+        planned = self.plan()
+        self.assertEqual(len(self.store.records(self.run_id, "references")), 6)
+        self.assertEqual([len(row["selected_ref_ids"]) for row in planned["cases"]], [3, 3])
+        self.assertEqual(len(planned["fetch_work_items"]), 3)
+        self.assertTrue(all(fetch["required"] for fetch in planned["fetch_work_items"]))
+        self.assertTrue(all(len(fetch["ref_ids"]) == 2 and set(fetch["case_ids"]) == {case["case_id"] for case in cases}
+                            for fetch in planned["fetch_work_items"]))
+        for url in ("https://example.invalid/wiki/one", "https://example.invalid/dts/one", "https://example.invalid/code/one"):
+            self.snapshot(url=url)
+        captured = self.plan()
+        self.assertEqual(len(captured["work_items"]), 6, "Collection sharing must not merge unconfirmed cases")
+        self.assertTrue(all(not fetch["required"] for fetch in captured["fetch_work_items"]))
+
+    def test_same_case_two_cells_same_url_and_scope_share_one_fact_work(self):
+        self.rows(additional_links={"DTS": "https://example.invalid/wiki/one"})
+        self.snapshot()
+        planned = self.plan()
+        self.assertEqual(len(self.first(planned)["selected_ref_ids"]), 2)
+        self.assertEqual(len(planned["work_items"]), 1)
+        self.assertEqual(len(planned["work_items"][0]["ref_ids"]), 2)
+        self.assertEqual(len(planned["fetch_work_items"]), 1)
+        self.assertEqual(planned["work_items"][0]["source_grades"], ["SOURCE_CELL_LINKED"])
+
+    def test_same_case_same_snapshot_distinct_explicit_issues_replace_default_full_scope(self):
+        case = self.rows()[0]
+        snapshot = self.snapshot()
+        for label in ("ISSUE-A", "ISSUE-B"):
+            register_evidence_association(self.store, self.run_id, case_id=case["case_id"], snapshot_id=snapshot["snapshot_id"],
+                applicable_issue_ids=[label], user_confirmed=True, confirmed_by="synthetic-user", reason="Explicit scope")
+        planned = self.plan()
+        self.assertEqual(len(planned["work_items"]), 2)
+        self.assertEqual({tuple(work["issue_scope"]["applicable_issue_ids"]) for work in planned["work_items"]},
+                         {("ISSUE-A",), ("ISSUE-B",)})
+        self.assertTrue(all(work["issue_scope"]["scope"] == "ISSUES" for work in planned["work_items"]))
+        self.assertEqual(len(planned["fetch_work_items"]), 1)
+
+    def test_confirmation_is_independent_of_legacy_and_search_source_grades(self):
+        case = self.rows(kind="LEGACY_TABLE")[0]
+        snapshot = self.snapshot()
+        register_evidence_association(self.store, self.run_id, case_id=case["case_id"], snapshot_id=snapshot["snapshot_id"],
+            user_confirmed=True, confirmed_by="synthetic-user", reason="Confirm applicability only")
+        planned = self.plan()
+        self.assertEqual(len(planned["work_items"]), 1, "Confirmation must not create another FULL_SNAPSHOT work")
+        work = planned["work_items"][0]
+        self.assertTrue(work["user_confirmed"])
+        self.assertEqual(work["relation"], "LEGACY_TABLE_LINKED")
+        self.assertEqual(work["source_grades"], ["LEGACY_TABLE_LINKED"])
+        self.assertEqual(self.store.get(self.run_id, "cases", case["case_id"])["root_cause_origin"], "LEGACY_DERIVED_UNKNOWN")
+
+    def test_unselected_unknown_origin_is_visible_as_agent_recovery_alongside_known_source(self):
+        case = self.rows()[0]
+        ref = self.store.records(self.run_id, "references")[0]
+        unknown = {**ref, "ref_id": "unknown-origin", "origin": "UNKNOWN", "discovered_by": "unrestored-import",
+                   "location": "unknown-origin", "url": "https://example.invalid/unrestored"}
+        self.store.put(self.run_id, "references", unknown["ref_id"], unknown)
+        self.snapshot()
+        planned = self.first(self.plan())
+        self.assertEqual(planned["relation"], "SOURCE_CELL_LINKED")
+        recovery = [action for action in planned["optional_actions"] if action["action"] == "RECOVER_PROVENANCE"]
+        self.assertEqual(len(recovery), 1)
+        self.assertEqual(recovery[0]["ref_id"], "unknown-origin")
+        self.assertEqual(recovery[0]["actor"], "AGENT")
+        self.assertFalse(recovery[0]["blocking"])
+        self.assertTrue(any(issue["code"] == "UNRESOLVED_REFERENCE_PROVENANCE" for issue in planned["issues"]))
+        self.assertNotEqual(planned["path"], "EXCEPTION")
+        self.assertNotIn("SEARCH", [action["action"] for action in planned["required_actions"]])
+
+    def test_replaced_full_snapshot_conflict_does_not_pollute_new_explicit_issue_scope(self):
+        case = self.rows()[0]
+        snapshot = self.snapshot()
+        old_work = self.plan()["work_items"][0]["work_id"]
+        old_conflict = {"judgment_id": "OLD-FULL-CONFLICT", "case_id": case["case_id"], "snapshot_id": snapshot["snapshot_id"],
+            "work_id": old_work, "review_status": "NEEDS_REVIEW", "support_level": "CONFLICT",
+            "claim_support": {"root_cause": "CONTRADICTED"}, "conflicting_dimensions": ["root_cause"]}
+        self.assertEqual(self.first(self.plan([old_conflict]))["path"], "EXCEPTION")
+        register_evidence_association(self.store, self.run_id, case_id=case["case_id"], snapshot_id=snapshot["snapshot_id"],
+            applicable_issue_ids=["GOOD-ISSUE"], user_confirmed=True, confirmed_by="synthetic-user", reason="Replace the old broad scope")
+        planned = self.plan([old_conflict])
+        self.assertNotEqual(self.first(planned)["path"], "EXCEPTION")
+        self.assertNotIn(old_work, self.first(planned)["work_ids"])
+        self.assertNotIn("RECONCILE_CONFLICT", [action["action"] for action in self.first(planned)["required_actions"]])
+        self.assertEqual(planned["work_items"][0]["issue_scope"]["applicable_issue_ids"], ["GOOD-ISSUE"])
+
+    def test_unselected_negative_search_work_stays_candidate_bound_and_is_not_retried(self):
+        case = self.rows(link=False)[0]
+        first = self.snapshot([case["case_id"]], text="OtherTenant owns OTHER-EVENT, a separate garbled during restore incident due to cache failure.")
+        old_work = self.plan()["work_items"][0]["work_id"]
+        negative = {**self.excluded_search(case, first), "work_id": old_work}
+        second = self.snapshot([case["case_id"]], url="https://example.invalid/wiki/two")
+        for _ in range(2):
+            planned = self.first(self.plan([negative]))
+            self.assertEqual(planned["selected_snapshot_ids"], [second["snapshot_id"]])
+            self.assertNotIn(old_work, planned["work_ids"])
+            self.assertIn(negative["judgment_id"], planned["excluded_candidate_judgment_ids"])
+
+    def test_group_scope_change_filters_prior_shared_conflict_for_only_changed_member(self):
+        cases = self.rows(count=2)
+        snapshot = self.snapshot()
+        register_event_group(self.store, self.run_id, case_ids=[case["case_id"] for case in cases],
+            user_confirmed=True, confirmed_by="synthetic-user", reason="Same synthetic event")
+        old = self.plan()["work_items"][0]
+        prior = {"judgment_id": "OLD-SHARED-CONFLICT", "case_id": old["representative_case_id"],
+            "member_case_ids": old["case_ids"], "snapshot_id": snapshot["snapshot_id"], "work_id": old["work_id"],
+            "review_status": "NEEDS_REVIEW", "support_level": "CONFLICT", "conflicting_dimensions": ["root_cause"]}
+        changed = next(case for case in cases if case["case_id"] != old["representative_case_id"])
+        register_evidence_association(self.store, self.run_id, case_id=changed["case_id"], snapshot_id=snapshot["snapshot_id"],
+            applicable_issue_ids=["GOOD-ISSUE"], user_confirmed=True, confirmed_by="synthetic-user", reason="Scope one member independently")
+        planned = self.plan([prior])
+        original = next(row for row in planned["cases"] if row["case_id"] == old["representative_case_id"])
+        changed_row = next(row for row in planned["cases"] if row["case_id"] == changed["case_id"])
+        self.assertEqual(original["path"], "EXCEPTION")
+        self.assertIn(old["work_id"], original["work_ids"])
+        self.assertNotEqual(changed_row["path"], "EXCEPTION")
+        self.assertNotIn(old["work_id"], changed_row["work_ids"])
+        self.assertNotIn("RECONCILE_CONFLICT", [action["action"] for action in changed_row["required_actions"]])
 
 
 if __name__ == "__main__":

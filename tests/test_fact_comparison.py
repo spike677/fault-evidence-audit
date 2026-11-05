@@ -319,7 +319,7 @@ class FactComparisonTests(unittest.TestCase):
     def test_prompt_contains_bounded_facts_and_source_context(self):
         case, snap, value = fixture()
         messages = comparison_messages(case, snap, {}, context={"source_relation": "SOURCE_LINKED"})
-        self.assertEqual(PROMPT_VERSION, "faultaudit-1.5")
+        self.assertEqual(PROMPT_VERSION, "faultaudit-1.6")
         self.assertIn("source_cell", messages[0]["content"])
         self.assertIn("self_check", messages[0]["content"])
         self.assertIn("SOURCE_LINKED", messages[1]["content"])
@@ -340,7 +340,7 @@ class FactComparisonTests(unittest.TestCase):
         _, requests = workflow.drive()
         self.assertEqual([task["kind"] for task in requests], ["compare"])
         task = requests[0]
-        self.assertEqual(task["payload"]["processing_context"]["processing_version"], "evidence-first-0.1.6")
+        self.assertEqual(task["payload"]["processing_context"]["processing_version"], "evidence-first-0.1.7")
         completed = workflow.envelope(task)
         before = workflow.store.records(workflow.run_id, "model_results")
         for variant in ("no_facts", "unfinished_check", "no_issue", "unknown_without_reason", "no_source_trace"):

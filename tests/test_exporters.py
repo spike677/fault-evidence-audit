@@ -224,6 +224,59 @@ class ExportReportTests(unittest.TestCase):
         self.assertEqual(comparison["relation"], "CONFLICT")
         self.assertIn("s-1#001", comparison["evidence"])
 
+    def test_all_reference_sources_and_multiple_issue_works_remain_visible(self):
+        data = self.sample()
+        data["tasks"] = []
+        data["references"] = [
+            {"ref_id": "R-legacy", "case_id": "case-1", "url": "https://example.org/evidence/1", "origin": "LEGACY_TABLE",
+             "source_relation": {"relation": "LEGACY_TABLE_LINKED"}, "user_confirmed": True},
+            {"ref_id": "R-source", "case_id": "case-1", "url": "https://example.org/evidence/2", "origin": "ORIGINAL_WEEKLY",
+             "source_relation": {"relation": "SOURCE_CELL_LINKED"}, "user_confirmed": False},
+            {"ref_id": "R-search", "case_id": "case-1", "url": "https://example.org/evidence/1", "origin": "SEARCH_DISCOVERED",
+             "source_relation": {"relation": "SEARCH_DISCOVERED"}, "user_confirmed": False},
+            {"ref_id": "R-unread", "case_id": "case-1", "url": "https://example.org/evidence/3", "origin": "LEGACY_TABLE",
+             "source_relation": {"relation": "PROVENANCE_PENDING"}, "user_confirmed": False}]
+        data["evidence_plans"] = {"cases": [{"case_id": "case-1", "path": "EXISTING_REFERENCES",
+            "selected_ref_ids": ["R-legacy", "R-source", "R-unread"], "selected_snapshot_ids": ["s-1", "s-2"],
+            "source_grades": ["LEGACY_TABLE_LINKED", "SOURCE_CELL_LINKED", "PROVENANCE_PENDING"], "user_confirmed": True}],
+            "work_items": []}
+        data["snapshots"] = [{"snapshot_id": sid, "url": url, "status": "COMPLETE", "is_stale": False}
+            for sid, url in (("s-1", "https://example.org/evidence/1"), ("s-2", "https://example.org/evidence/2"))]
+        data["summaries"] = [{"snapshot_id": "s-1", "task_id": "summary-1", "is_stale": False,
+                              "issues": [{"label": "issue-a", "facts": [{"field": "operator", "value": "operator-a"}]},
+                                         {"label": "issue-b", "facts": [{"field": "operator", "value": "operator-b"}]}]},
+                             {"snapshot_id": "s-2", "task_id": "summary-2", "is_stale": False,
+                              "issues": [{"label": "issue-c", "facts": [{"field": "operator", "value": "operator-c"}]}]}]
+        data["judgments"] = [{"case_id": "case-1", "judgment_id": "J-" + label, "snapshot_id": sid,
+            "work_id": "W-" + label, "is_stale": False, "required": True, "short_reason": "shared wording",
+            "processing_status": "AUTO_PROCESSED", "review_required": False, "review_status": "NOT_REQUIRED",
+            "processing_context": {"work_id": "W-" + label, "applicable_issue": {"scope": "ISSUES", "applicable_issue_ids": [label]},
+                "source_grades": [grade], "user_confirmed": confirmed, "selected_ref_ids": [ref]},
+            "fact_comparisons": [{"category": "TERM", "source_field": "算子", "source_quote": "operator",
+                                  "source_meaning": label, "relation": "MATCH", "evidence": []}]}
+            for label, sid, grade, confirmed, ref in (("issue-a", "s-1", "LEGACY_TABLE_LINKED", True, "R-legacy"),
+                ("issue-b", "s-1", "LEGACY_TABLE_LINKED", True, "R-legacy"),
+                ("issue-c", "s-2", "SOURCE_CELL_LINKED", False, "R-source"))]
+        original = copy.deepcopy(data)
+        tables = self.workbook(data)
+        summary = tables["汇总"][0]
+        self.assertEqual(summary["必要引用数"], 3)
+        self.assertIn("W-issue-a", summary["证据判断"])
+        self.assertIn("W-issue-b", summary["证据判断"])
+        self.assertIn("W-issue-c", summary["工作ID"])
+        self.assertEqual({row["work_id"] for row in tables["事实对照"]}, {"W-issue-a", "W-issue-b", "W-issue-c"})
+        self.assertEqual({row["issue_label"] for row in tables["逐资料子问题"]}, {"issue-a", "issue-b", "issue-c"})
+        reference_rows = tables["逐引用整理"]
+        self.assertEqual({row["ref_id"] for row in reference_rows}, {"R-legacy", "R-source", "R-search", "R-unread"})
+        legacy = next(row for row in reference_rows if row["ref_id"] == "R-legacy")
+        self.assertEqual((legacy["source_grade"], legacy["user_confirmed"]), ("LEGACY_TABLE_LINKED", True))
+        searched = next(row for row in reference_rows if row["ref_id"] == "R-search")
+        self.assertEqual((searched["source_grade"], searched["user_confirmed"]), ("SEARCH_DISCOVERED", False))
+        self.assertTrue(searched["work_user_confirmed"])
+        self.assertFalse(searched["reference_used_by_judgment"])
+        self.assertEqual(next(row for row in reference_rows if row["ref_id"] == "R-unread")["capture_status"], "NOT_FETCHED")
+        self.assertEqual(data, original)
+
 
 if __name__ == "__main__":
     unittest.main()

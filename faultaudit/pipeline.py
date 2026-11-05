@@ -8,7 +8,7 @@ from .contracts import EvidenceSummary, Judgment
 from .gates import event_anchor_errors, judgment_semantic_errors, processing_decision
 from .store import AuditError, Store, canonical_url, digest
 
-RULE_VERSION = "nightly-0.1.6"
+RULE_VERSION = "nightly-0.1.7"
 
 
 def cited_refs(summary: dict):
@@ -151,37 +151,55 @@ def evidence_plan(store: Store, run_id: str) -> dict:
     for row in plan["cases"]:
         row["reusable_summary_ids"] = [summaries[sid] for sid in row["selected_snapshot_ids"] if sid in summaries]
         applicable = [j for j in judgments if row["case_id"] in j.get("member_case_ids", [j["case_id"]])
-                      and j.get("work_id") in row["work_ids"]]
+                      and j.get("work_id") in row["work_ids"]
+                      and (not j.get("processing_context") or digest(j["processing_context"]) == digest(
+                          work_context(store, run_id, j["work_id"], plan)))]
         processed = {j.get("work_id") for j in applicable if j.get("processing_status") == "AUTO_PROCESSED" and j.get("review_status") != "REJECT"}
         row["processing_status"] = "AUTO_PROCESSED" if row["work_ids"] and set(row["work_ids"]).issubset(processed) else "EXCEPTION" if row["path"] == "EXCEPTION" else "PENDING"
-        if row["processing_status"] == "AUTO_PROCESSED":
+        if row["processing_status"] == "AUTO_PROCESSED" and not any(
+                action["action"] not in {"EXTRACT_FACTS", "REUSE_PROCESSED_FACTS"} for action in row["required_actions"]):
             row["required_actions"] = [{"action": "REUSE_PROCESSED_FACTS", "judgment_ids": [j["judgment_id"] for j in applicable]}]
     return plan
 
 
-def planned_associations(store: Store, run_id: str, plan: dict | None = None) -> tuple[list[tuple[dict, dict]], list[dict]]:
+def planned_work(store: Store, run_id: str, plan: dict | None = None) -> tuple[list[dict], list[dict]]:
+    """Keep the precise work identity, including applicable subproblem scope."""
     plan = plan or evidence_plan(store, run_id)
-    cases = {c["case_id"]: c for c in store.records(run_id, "cases")}
     snapshots = {s["snapshot_id"]: s for s in store.active_snapshots(run_id)}
-    pairs = [(cases[item["representative_case_id"]], snapshots[item["snapshot_id"]]) for item in plan["work_items"]
-             if item.get("snapshot_id") in snapshots]
+    work = [item for item in plan["work_items"] if item.get("snapshot_id") in snapshots]
     selected = {ref_id for item in plan["cases"] for ref_id in item["selected_ref_ids"]}
     available = {s["url"] for s in snapshots.values() if s["status"] in {"COMPLETE", "PARTIAL", "CONTENT_CAPTURED"} and s["text"].strip()}
     missing = [r for r in store.records(run_id, "references") if r["ref_id"] in selected
                and (r.get("status") != "PARSED" or not r.get("url") or canonical_url(r["url"]) not in available)]
-    return pairs, missing
+    return work, missing
 
 
-def work_context(store: Store, run_id: str, case_id: str, snapshot_id: str, plan: dict) -> dict:
-    work = next(item for item in plan["work_items"] if item["representative_case_id"] == case_id and item.get("snapshot_id") == snapshot_id)
+def planned_associations(store: Store, run_id: str, plan: dict | None = None) -> tuple[list[tuple[dict, dict]], list[dict]]:
+    """Compatibility view for callers; execution always uses planned_work."""
+    work, missing = planned_work(store, run_id, plan)
+    cases = {case["case_id"]: case for case in store.records(run_id, "cases")}
+    snapshots = {snapshot["snapshot_id"]: snapshot for snapshot in store.active_snapshots(run_id)}
+    return [(cases[item["representative_case_id"]], snapshots[item["snapshot_id"]]) for item in work], missing
+
+
+def work_context(store: Store, run_id: str, work_id: str, plan: dict) -> dict:
+    matches = [item for item in plan["work_items"] if item["work_id"] == work_id]
+    if len(matches) != 1:
+        raise AuditError("Evidence work is absent or ambiguous in the current plan: " + work_id)
+    work = matches[0]
     refs = [ref for ref in store.records(run_id, "references") if ref["ref_id"] in work["ref_ids"]]
     cases = [case for case in store.records(run_id, "cases") if case["case_id"] in work["case_ids"]]
     # Routing identity excludes completion/stop wording so consuming a result does not create another task.
-    return {"source_relation": work["relation"], "selected_ref_ids": work["ref_ids"],
+    return {"source_relation": work["relation"], "source_grades": work.get("source_grades", [work["relation"]]),
+            "user_confirmed": work.get("user_confirmed", False), "selected_ref_ids": work["ref_ids"],
+            "association_ids": work.get("association_ids", []), "group_confirmation": work.get("group_confirmation"),
+            "member_source_grades": work.get("member_source_grades", {}),
+            "member_user_confirmed": work.get("member_user_confirmed", {}),
+            "source_trace": work.get("provenance", []),
             "provenance": refs, "source_records": cases, "member_case_ids": work["case_ids"],
             "group_id": work.get("group_id"),
             "applicable_issue": work.get("issue_scope", {}), "work_id": work["work_id"],
-            "plan_hash": work["work_id"], "processing_version": "evidence-first-0.1.6"}
+            "plan_hash": work["work_id"], "processing_version": "evidence-first-0.1.7"}
 
 
 def task_views(store: Store, run_id: str, plan: dict | None = None) -> list[dict]:
@@ -189,12 +207,14 @@ def task_views(store: Store, run_id: str, plan: dict | None = None) -> list[dict
     plan = plan or evidence_plan(store, run_id)
     selected_sids = {sid for item in plan["cases"] for sid in item["selected_snapshot_ids"]}
     selected_refs = {rid for item in plan["cases"] for rid in item["selected_ref_ids"]}
-    compare_targets = {item["representative_case_id"] + "|" + item["snapshot_id"] for item in plan["work_items"] if item.get("snapshot_id")}
+    fetch_targets = {fetch_resource_id(ref["url"]) for ref in store.records(run_id, "references")
+                     if ref["ref_id"] in selected_refs and ref.get("status") == "PARSED" and ref.get("url")}
+    compare_targets = {item["work_id"] for item in plan["work_items"] if item.get("snapshot_id")}
     representatives = {item["representative_case_id"] for item in plan["work_items"]}
     values = [{**task, "required": task["status"] != "STALE" and (
         task["target_id"] in selected_sids if task["kind"] == "summarize" else
         task["target_id"] in compare_targets if task["kind"] == "compare" else
-        task["target_id"] in selected_refs if task["kind"] == "fetch" else
+        task["target_id"] in fetch_targets if task["kind"] == "fetch" else
         task["target_id"] in representatives if task["kind"] == "catalog" else False)} for task in store.tasks(run_id)]
     policy = policy_fingerprint()
     requests = store.records(run_id, "model_tasks")
@@ -204,17 +224,23 @@ def task_views(store: Store, run_id: str, plan: dict | None = None) -> list[dict
         if bound and not any(request["policy_hash"] == policy for request in bound):
             task["required"] = False
         if task["kind"] == "compare" and bound and not any(
-                not request["payload"].get("processing_context") or request["payload"]["processing_context"].get("work_id") in work_ids for request in bound):
+                request["policy_hash"] == policy and request["payload"].get("processing_context", {}).get("work_id") in work_ids
+                and digest(request["payload"]["processing_context"]) == digest(work_context(
+                    store, run_id, request["payload"]["processing_context"]["work_id"], plan)) for request in bound):
             task["required"] = False
     return values
+
+
+def fetch_resource_id(url: str) -> str:
+    return "resource-" + digest(canonical_url(url))[:24]
 
 
 def necessary_judgments(store: Store, run_id: str, plan: dict | None = None, **filters) -> list[dict]:
     plan = plan or evidence_plan(store, run_id)
     work_ids = {item["work_id"] for item in plan["work_items"]}
-    targets = {(item["representative_case_id"], item.get("snapshot_id")) for item in plan["work_items"]}
     return [j for j in current_judgments(store, run_id, **filters)
-            if (j["case_id"], j["snapshot_id"]) in targets and (not j.get("work_id") or j["work_id"] in work_ids)]
+            if j.get("work_id") in work_ids and (not j.get("processing_context") or
+                digest(j["processing_context"]) == digest(work_context(store, run_id, j["work_id"], plan)))]
 
 
 def fetch_tasks(store: Store, run_id: str, *, include_unselected: bool = False) -> dict:
@@ -254,7 +280,7 @@ def evidence_index(store: Store, run_id: str, url: str | None = None) -> dict:
     """Expose every citing case and its individual verdict without merging cases."""
     target = canonical_url(url) if url else None
     cases = {case["case_id"]: case for case in store.records(run_id, "cases")}
-    judgments = current_judgments(store, run_id)
+    judgments = necessary_judgments(store, run_id)
     snapshots = store.records(run_id, "snapshots")
     plan = fetch_tasks(store, run_id, include_unselected=True)
     entries = []
@@ -315,16 +341,25 @@ def execute(store: Store, run_id: str, judge, *, mode: str, model_id: str, retry
                                                  (gates, contracts, model, store_module)) + Path(__file__).read_bytes()),
                  "executor_signature": getattr(judge, "execution_signature", "local-validation")}
     plan = evidence_plan(store, run_id)
-    pairs, missing = planned_associations(store, run_id, plan)
-    active = {s["snapshot_id"]: s for _, s in pairs}
+    work, missing = planned_work(store, run_id, plan)
+    cases_by_id = {case["case_id"]: case for case in store.records(run_id, "cases")}
+    snapshots_by_id = {snapshot["snapshot_id"]: snapshot for snapshot in store.active_snapshots(run_id)}
+    active = {item["snapshot_id"]: snapshots_by_id[item["snapshot_id"]] for item in work}
+    missing_resources = {}
     for ref in missing:
-        t = store.task(run_id, "fetch", ref["ref_id"], ref)
+        if ref.get("url") and ref.get("status") == "PARSED":
+            target = fetch_resource_id(ref["url"])
+        else:
+            target = ref["ref_id"]
+        missing_resources.setdefault(target, []).append(ref)
+    for target, refs in missing_resources.items():
+        t = store.task(run_id, "fetch", target, sorted(refs, key=lambda ref: ref["ref_id"]))
         store.task_status(run_id, t["task_id"], "BLOCKED", "Missing snapshot or malformed URL")
     # Mark previously missing references resolved as soon as evidence is supplied.
-    missing_ids = {r["ref_id"] for r in missing}
+    missing_ids = set(missing_resources)
     selected_ref_ids = {rid for row in plan["cases"] for rid in row["selected_ref_ids"]}
     readable_urls = {s["url"] for s in store.active_snapshots(run_id) if s["status"] in {"COMPLETE", "PARTIAL", "CONTENT_CAPTURED"} and s["text"].strip()}
-    captured_refs = {r["ref_id"] for r in store.records(run_id, "references") if r["ref_id"] in selected_ref_ids and r.get("status") == "PARSED" and r.get("url") and canonical_url(r["url"]) in readable_urls}
+    captured_refs = {fetch_resource_id(r["url"]) for r in store.records(run_id, "references") if r["ref_id"] in selected_ref_ids and r.get("status") == "PARSED" and r.get("url") and canonical_url(r["url"]) in readable_urls}
     for task in store.tasks(run_id):
         if task["kind"] == "fetch" and task["target_id"] not in missing_ids and task["target_id"] in captured_refs:
             store.task_status(run_id, task["task_id"], "SUCCEEDED")
@@ -379,11 +414,13 @@ def execute(store: Store, run_id: str, judge, *, mode: str, model_id: str, retry
             _model_failure(store, run_id, task, exc)
     summaries = {s["snapshot_id"]: s for s in current_summaries(store, run_id)
                  if s["model_mode"] == mode and s.get("requested_model_id", s["model_id"]) == model_id}
-    for case, snapshot in pairs:
+    for item in work:
+        case = cases_by_id[item["representative_case_id"]]
+        snapshot = active[item["snapshot_id"]]
         sid = snapshot["snapshot_id"]
         summary = summaries.get(sid)
-        context = work_context(store, run_id, case["case_id"], sid, plan)
-        task = store.task(run_id, "compare", case["case_id"] + "|" + sid,
+        context = work_context(store, run_id, item["work_id"], plan)
+        task = store.task(run_id, "compare", item["work_id"],
                           [case, sid, digest(summary) if summary else None, signature, context])
         if not _task_allowed(task, retry_failed):
             continue
@@ -428,8 +465,8 @@ def execute(store: Store, run_id: str, judge, *, mode: str, model_id: str, retry
             if not _task_allowed(task, retry_failed):
                 continue
             if mode in {"opencode", "codex"}:
-                needed = {(c["case_id"], s["snapshot_id"]) for c, s in pairs if c["case_id"] == case["case_id"]}
-                ready = {(j["case_id"], j["snapshot_id"]) for j in case_judgments}
+                needed = {item["work_id"] for item in work if item["representative_case_id"] == case["case_id"]}
+                ready = {j.get("work_id") for j in case_judgments}
                 if not needed or not needed.issubset(ready) or any(r["case_id"] == case["case_id"] for r in missing):
                     store.task_status(run_id, task["task_id"], "BLOCKED", "Catalog waits for complete per-artifact judgments")
                     continue
@@ -519,15 +556,15 @@ def current_mappings(store: Store, run_id: str) -> list[dict]:
     judgments = necessary_judgments(store, run_id, plan)
     reviews = {event["mapping_id"]: event["verdict"] for event in store.events(run_id, "review")
                if event.get("mapping_id")}
-    pairs, missing = planned_associations(store, run_id, plan)
+    work, missing = planned_work(store, run_id, plan)
     values = []
     for mapping in store.records(run_id, "mappings"):
         case_id = mapping["case_id"]
         js = [j for j in judgments if j["case_id"] == case_id
               and j["model_mode"] == mapping["model_mode"]
               and j.get("requested_model_id", j["model_id"]) == mapping.get("requested_model_id", mapping.get("model_id"))]
-        needed = {(c["case_id"], s["snapshot_id"]) for c, s in pairs if c["case_id"] == case_id}
-        ready = {(j["case_id"], j["snapshot_id"]) for j in js}
+        needed = {item["work_id"] for item in work if item["representative_case_id"] == case_id}
+        ready = {j.get("work_id") for j in js}
         if (statuses.get(mapping["task_id"]) != "SUCCEEDED" or mapping.get("policy_hash") != policy
                 or mapping.get("case_hash") != cases.get(case_id) or mapping.get("catalog_hash") != catalog_hash
                 or mapping.get("judgments_hash") != digest([j for j in js if j.get("review_status") != "REJECT"])):
@@ -575,7 +612,7 @@ def validate(store: Store, run_id: str) -> dict:
     for ref in refs:
         if ref["case_id"] not in case_by_id:
             errors.append("Reference belongs to a missing case")
-    pairs, missing = planned_associations(store, run_id, plan)
+    work, missing = planned_work(store, run_id, plan)
     pending.extend(f"No snapshot for reference {r['ref_id']}" for r in missing)
     js = necessary_judgments(store, run_id, plan)
     for j in js:
@@ -596,15 +633,19 @@ def validate(store: Store, run_id: str) -> dict:
             pending.append(f"{j['judgment_id']}: Agent fact comparison {j.get('processing_status', 'PENDING')}")
         if j.get("review_required", True) and j.get("review_status") != "ACCEPT":
             pending.append(f"{j['judgment_id']}: human review {j.get('review_status')}")
-    pair_keys = {(c["case_id"], s["snapshot_id"]) for c, s in pairs}
-    judged_keys = {(j["case_id"], j["snapshot_id"]) for j in js}
-    pending.extend(f"Unjudged association {cid}|{sid}" for cid, sid in sorted(pair_keys - judged_keys))
+    pair_keys = {item["work_id"] for item in work}
+    judged_keys = {j["work_id"] for j in js}
+    pending.extend(f"Unjudged work {work_id}" for work_id in sorted(pair_keys - judged_keys))
     for case in cases:
         row = next(p for p in plan["cases"] if p["case_id"] == case["case_id"])
         if row["path"] == "SEARCH_REQUIRED":
             pending.append(f"{case['case_id']}: no references or usable evidence; search required")
         if row["path"] == "EXCEPTION":
             pending.append(f"{case['case_id']}: evidence exception {row['issues']}")
+        for action in row["required_actions"]:
+            if action["action"] in {"RECOVER_PROVENANCE", "RESTORE_PROVENANCE", "RESTORE_REFERENCE",
+                                    "RECONFIRM_SNAPSHOT", "RESOLVE_CAPTURE_FAILURE"}:
+                pending.append(f"{case['case_id']}: Agent {action['action']} pending; collection/provenance gap")
     for task in tasks:
         if task["required"] and task["status"] in {"PENDING", "BLOCKED", "FAILED", "RUNNING"}:
             pending.append(f"{task['task_id']}: {task['status']} {task['error']}")
@@ -627,7 +668,10 @@ def validate(store: Store, run_id: str) -> dict:
         selected_case_ids = {cid for item in plan["work_items"] for cid in item["case_ids"]}
         pending.extend(f"{cid}: catalog comparison missing" for cid in sorted(selected_case_ids - mapped))
     pending = list(dict.fromkeys(pending))
-    facts_complete = bool(cases) and not errors and all(row.get("processing_status") == "AUTO_PROCESSED" for row in plan["cases"])
+    facts_complete = bool(cases) and not errors and not missing and all(
+        row.get("processing_status") == "AUTO_PROCESSED" and not any(action["action"] in {
+            "RECOVER_PROVENANCE", "RESTORE_PROVENANCE", "RESTORE_REFERENCE", "RECONFIRM_SNAPSHOT", "RESOLVE_CAPTURE_FAILURE"}
+            for action in row["required_actions"]) for row in plan["cases"])
     return {"run_id": run_id, "valid": not errors, "complete": not errors and not pending,
             "fact_organization_complete": facts_complete,
             "batch_status": "FAILED" if errors else "COMPLETE_WITH_PENDING" if pending else "COMPLETE",
@@ -635,6 +679,8 @@ def validate(store: Store, run_id: str) -> dict:
                        "excluded_records": len(exclusions),
                        "all_snapshots": len(store.records(run_id, "snapshots")), "planned_associations": len(pair_keys),
                        "judged_associations": len(judged_keys), "catalog_items": len(catalog),
+                       "association_identity": "work_id", "planned_work_ids": len(pair_keys),
+                       "judged_work_ids": len(judged_keys),
                        "current_judgment_ids_including_rejected": len({j["judgment_id"] for j in js}),
                        "current_case_ids_with_judgments_including_rejected": len({j["case_id"] for j in js}),
                        "pending_reason_entries": len(pending),
@@ -649,7 +695,7 @@ def report_data(store: Store, run_id: str, *, baseline: dict | None = None,
                 round_manifest: dict | None = None) -> dict:
     data = {kind: store.records(run_id, kind) for kind in
             ("cases", "references", "snapshots", "summaries", "judgments", "catalog", "mappings", "exclusions", "documents",
-             "model_tasks", "model_results")}
+             "model_tasks", "model_results", "evidence_associations")}
     active = {s["snapshot_id"] for s in store.active_snapshots(run_id)}
     statuses = {t["task_id"]: t["status"] for t in store.tasks(run_id)}
     for key in ("snapshots", "summaries", "judgments"):
@@ -681,11 +727,22 @@ def report_data(store: Store, run_id: str, *, baseline: dict | None = None,
     for ref in data["references"]:
         case = next(c for c in data["cases"] if c["case_id"] == ref["case_id"])
         ref["source_relation"] = source_relation(case, ref)
+        snapshot_ids = {snapshot["snapshot_id"] for snapshot in data["snapshots"]
+                        if ref.get("status") == "PARSED" and ref.get("url") and canonical_url(ref["url"]) == snapshot["url"]}
+        confirmed = [association for association in data["evidence_associations"]
+                     if association["case_id"] == ref["case_id"] and association.get("user_confirmed") is True
+                     and (association.get("ref_id") == ref["ref_id"] or association.get("snapshot_id") in snapshot_ids)]
+        ref["user_confirmed"] = bool(confirmed)
+        ref["association_ids"] = sorted(association["association_id"] for association in confirmed)
         ref["required"] = ref["ref_id"] in selected_refs
     for snapshot in data["snapshots"]:
         snapshot["required"] = snapshot["snapshot_id"] in selected_sids
     task_values = task_views(store, run_id, plan)
+    work_by_id = {work["work_id"]: work for work in plan["work_items"]}
     for task in task_values:
+        if task["kind"] == "compare" and task["target_id"] in work_by_id:
+            task["work_id"] = task["target_id"]
+            task["case_id"] = work_by_id[task["target_id"]]["representative_case_id"]
         cid = task["target_id"].split("|", 1)[0]
         if cid in case_ids:
             task["case_id"] = cid

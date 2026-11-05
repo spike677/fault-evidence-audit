@@ -2,8 +2,9 @@
 
 相关任务通过 fault-evidence-audit Skill 调用独立 faultaudit 核心，实际状态以 SQLite 和 run ID 为准。
 目标网站访问由具备授权与登录态的现场工具执行；模型任务可由OpenCode或Codex会话执行。核心仅导出任务、接收资料与结果并本地校验，不维护网站登录或远程客户端。
-0.1.6核心处理导入、原文快照、证据计划、文件任务协议、本地校验、报告和只读统计；默认执行者为OpenCode，Codex使用model-tasks/submit-model-results --executor codex及run --mode codex，分别保留生产者身份。核心不配置模型服务地址、密钥或网络客户端。
-先用--state <state> evidence-plan --run <id> --out preview.json只读预览（mode=ro/query_only，不建state）。只处理选定必要资料，优先原链和已确认资料，已有可用内容便提事实并停止补链；未选引用和旧结果留档，不增加必要待办。
+0.1.7核心处理导入、原文快照、证据计划、文件任务协议、本地校验、报告和只读统计；默认执行者为OpenCode，Codex使用model-tasks/submit-model-results --executor codex及run --mode codex，分别保留生产者身份。核心不配置模型服务地址、密钥或网络客户端。
+先用--state <state> evidence-plan --run <id> --out preview.json只读预览（mode=ro/query_only，不建state）。整理全部已有原表/旧汇总引用和显式确认资料，不只选首份；同URL共享抓取/摘要但来历不合并。已有适用资料停止新增搜索，不取消其他已有引用；未选搜索候选和旧结果留档。
+SOURCE_CELL_LINKED、LEGACY_TABLE_LINKED、SEARCH_DISCOVERED、PROVENANCE_PENDING保留来源等级，user_confirmed单列；确认旧表链接不使其成为原周报原链，legacy_relation只留历史。来源恢复先由Agent处理，不默认推成人工异常。不同issue范围按work_id隔离，同case/snapshot仍可有多个work；模型不改work标识，报告逐引用/逐子问题保留，统计不把展示行数当判断数量。
 register-event-group、confirm-evidence为写入登记，仅将已有明确用户确认落到实际case_id并记录依据，不作为只读调用，不重复索要已有确认。事件组不合并原始case；同技术输入可共享工作，不同根因/场景继续各自判断并保留冲突。
 使用model-tasks发布依赖就绪请求，由OpenCode按instructions/payload/expected_contract执行，再用submit-model-results提交保留原run/task/request hash的结果及实际producer元数据。run --mode opencode推进摘要、逐关联和全库阶段，任务空时仍检查受阻状态。
 指定DeepSeek时确认实际provider/model；当前聊天或委派模型不同，不得声称已使用DeepSeek。当前桥接使用文件任务往返，不将其描述为已经直连OpenCode服务。

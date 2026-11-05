@@ -21,7 +21,8 @@ COMPAT_COLUMNS = [
     "wiki", "DTS", "PR", "库覆盖（98条）", "证据强度", "训练/推理/无法确定", "证据来源", "证据判断",
 ]
 EXTRA_COLUMNS = ["case_id", "run_id", "根因来源", "缺口", "模型模式", "处理状态", "需人工", "处理原因",
-                 "事件组", "证据路径", "未选引用数", "关联判断ID", "引文来源case_id"]
+                 "事件组", "证据路径", "未选引用数", "关联判断ID", "引文来源case_id", "来源分级", "已有用户确认",
+                 "工作ID", "子问题范围", "必要引用数"]
 
 _ALIASES = {
     "序号": ("sequence", "display_id"),
@@ -49,6 +50,7 @@ _TABLES = [
     ("库映射", "mappings"), ("任务台账", "tasks"), ("人工复核", "review_events"),
     ("证据反查", "evidence_index"), ("库选择基准", "catalog_selections"),
     ("事件组成员", "event_groups"),
+    ("资料关联确认", "evidence_associations"),
 ]
 
 _DONE_TASK_STATES = {"COMPLETE", "COMPLETED", "SUCCEEDED", "DONE", "SUCCESS", "SKIPPED", "STALE", "UNUSED"}
@@ -164,10 +166,27 @@ def _case_plans(data: dict) -> dict[str, dict]:
     return {_case_id(entry): entry for entry in entries if isinstance(entry, dict) and _case_id(entry)}
 
 
+def _source_grade(record: dict) -> str:
+    relation = record.get("source_relation")
+    if isinstance(relation, dict):
+        return _text(relation.get("relation", "UNCLASSIFIED"))
+    return _text(record.get("source_grade", relation or "UNCLASSIFIED"))
+
+
+def _work_metadata(record: dict) -> dict:
+    context = record.get("processing_context")
+    context = context if isinstance(context, dict) else {}
+    return {"work_id": record.get("work_id", context.get("work_id")),
+            "issue_scope": record.get("issue_scope", context.get("issue_scope", context.get("applicable_issue"))),
+            "source_grades": record.get("source_grades", context.get("source_grades", [])),
+            "user_confirmed": record.get("user_confirmed", context.get("user_confirmed"))}
+
+
 def _reference_rows(data: dict) -> list[dict]:
     plans = _case_plans(data)
     rows = []
     for record in _records(data, "references"):
+        record = {**record, "source_grade": _source_grade(record), "user_confirmed": record.get("user_confirmed")}
         plan = plans.get(_case_id(record))
         if plan is not None:
             selected = record.get("ref_id") in set(plan.get("selected_ref_ids", []))
@@ -175,6 +194,51 @@ def _reference_rows(data: dict) -> list[dict]:
                       "plan_path": plan.get("path", "")}
         rows.append(record)
     return rows
+
+
+def _reference_audit_rows(data: dict) -> list[dict]:
+    """Display every reference; shared content/results are linked, never counted here."""
+    snapshots = _records(data, "snapshots")
+    summaries = _records(data, "summaries")
+    judgments = _records(data, "judgments")
+    rows = []
+    for reference in _reference_rows(data):
+        base = {key: reference.get(key) for key in ("ref_id", "case_id", "url", "origin", "location", "source_grade", "user_confirmed", "required")}
+        matched = [snapshot for snapshot in snapshots if reference.get("url") and snapshot.get("url") == reference["url"]]
+        if not matched:
+            rows.append({**base, "capture_status": "NOT_FETCHED", "summary_status": "NO_SUMMARY", "judgment_status": "NO_JUDGMENT"})
+        for snapshot in matched:
+            sid = snapshot.get("snapshot_id")
+            snapshot_summaries = [summary for summary in summaries if summary.get("snapshot_id") == sid and not summary.get("is_stale")]
+            related = [judgment for judgment in judgments if judgment.get("snapshot_id") == sid and _involves_case(judgment, _case_id(reference))]
+            detail = {**base, "snapshot_id": sid, "snapshot_is_stale": snapshot.get("is_stale"),
+                      "capture_status": snapshot.get("status", snapshot.get("retrieval_status", "UNKNOWN")),
+                      "summary_status": "AVAILABLE" if snapshot_summaries else "NO_CURRENT_SUMMARY",
+                      "summary_task_ids": [summary.get("task_id") for summary in snapshot_summaries],
+                      "summary_issues": [issue for summary in snapshot_summaries for issue in summary.get("issues", [])]}
+            if not related:
+                rows.append({**detail, "judgment_status": "NO_JUDGMENT"})
+            for judgment in related:
+                work = _work_metadata(judgment)
+                context = judgment.get("processing_context") or {}
+                judgment_ref_ids = context.get("selected_ref_ids") if isinstance(context, dict) else None
+                rows.append({**detail, "work_id": work["work_id"], "issue_scope": work["issue_scope"],
+                             "work_source_grades": work["source_grades"], "work_user_confirmed": work["user_confirmed"],
+                             "judgment_ref_ids": judgment_ref_ids,
+                             "reference_used_by_judgment": reference.get("ref_id") in judgment_ref_ids if isinstance(judgment_ref_ids, list) else None,
+                             "judgment_id": judgment.get("judgment_id"),
+                             "source_case_id": _case_id(judgment), "judgment_is_stale": judgment.get("is_stale"),
+                             "judgment_required": judgment.get("required"), "processing_status": judgment.get("processing_status"),
+                             "review_status": judgment.get("review_status"), "applicable_issue": judgment.get("applicable_issue"),
+                             "short_reason": judgment.get("short_reason"), "evidence": judgment.get("evidence", []),
+                             "judgment_status": "HISTORY" if judgment.get("is_stale") else "AVAILABLE"})
+    return rows
+
+
+def _summary_issue_rows(data: dict) -> list[dict]:
+    return [{"snapshot_id": summary.get("snapshot_id"), "summary_task_id": summary.get("task_id"),
+             "is_stale": summary.get("is_stale"), "issue_label": issue.get("label"), "facts": issue.get("facts", [])}
+            for summary in _records(data, "summaries") for issue in summary.get("issues", []) if isinstance(issue, dict)]
 
 
 def _case_processing(records: list[dict], pending: list[dict]) -> tuple[str, str, str]:
@@ -241,6 +305,9 @@ def _summary_rows(data: dict) -> list[dict]:
                     reason = "证据不足，Agent待完善：" + _text(reason)
                 elif status != "ACCEPT" and (judgment.get("support_level") == "DIRECT" or judgment.get("case_attribution") == "CONFIRMED"):
                     reason = "模型建议，待复核：" + _text(reason)
+                work = _work_metadata(judgment)
+                if work["work_id"]:
+                    reason = f"[{work['work_id']}；{_text(work['issue_scope'])}] " + _text(reason)
                 reasons.append(reason)
             if reasons:
                 row["证据判断"] = "\n".join(_text(reason) for reason in reasons)
@@ -277,6 +344,11 @@ def _summary_rows(data: dict) -> list[dict]:
             "未选引用数": sum(ref.get("required") is False for ref in refs) if identity in plans else None,
             "关联判断ID": "；".join(dict.fromkeys(_text(j.get("judgment_id")) for j in related)),
             "引文来源case_id": "；".join(dict.fromkeys(_case_id(j) for j in related)),
+            "来源分级": "；".join(sorted({_source_grade(ref) for ref in refs} | set(plan.get("source_grades", [])))),
+            "已有用户确认": plan.get("user_confirmed"),
+            "工作ID": "；".join(dict.fromkeys(_text(_work_metadata(j)["work_id"]) for j in related if _work_metadata(j)["work_id"])),
+            "子问题范围": [_work_metadata(j) for j in related],
+            "必要引用数": sum(ref.get("required") is True for ref in refs) if identity in plans else None,
         })
         rows.append(row)
     return rows
@@ -291,6 +363,7 @@ def _fact_comparison_rows(data: dict) -> list[dict]:
             rows.append({"source_case_id": _case_id(judgment), "member_case_ids": judgment.get("member_case_ids", []),
                 "source_scope": "引文与单元格属于source_case_id；事件组成员不改写该原文来源",
                 "judgment_id": judgment.get("judgment_id"),
+                **_work_metadata(judgment),
                 "snapshot_id": judgment.get("snapshot_id"), "required": judgment.get("required"),
                 "is_stale": judgment.get("is_stale"), "processing_status": judgment.get("processing_status"),
                 **{key: fact.get(key) for key in ("category", "source_field", "source_cell", "source_quote", "source_value",
@@ -313,6 +386,7 @@ def _event_conclusion_rows(data: dict, summaries: list[dict]) -> list[dict]:
         selected_judgments = [j for j in judgments if _required(j, tasks) and not j.get("is_stale")
                               and any(_involves_case(j, case_id) for case_id in members)]
         conclusions = [{"judgment_id": j.get("judgment_id"), "source_case_id": _case_id(j),
+                        **_work_metadata(j),
                         "member_case_ids": j.get("member_case_ids", [_case_id(j)]), "snapshot_id": j.get("snapshot_id"),
                         "applicable_issue": j.get("applicable_issue"), "short_reason": j.get("short_reason", ""),
                         "processing_status": j.get("processing_status"), "review_status": j.get("review_status"),
@@ -399,7 +473,7 @@ def _html_report(data: dict, tables: list[dict]) -> str:
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src 'none'; base-uri 'none'; form-action 'none'">
 <title>故障证据核验报告 {html.escape(identity)}</title>
 <style>body{{font-family:system-ui,'Microsoft YaHei',sans-serif;margin:24px;color:#172b4d;background:#f7f9fc}}h1{{font-size:24px}}h2{{font-size:18px}}nav{{line-height:2.2;position:sticky;top:0;background:#fff;padding:8px}}nav a{{margin-right:16px}}section{{margin:28px 0}}.scroll{{overflow:auto;background:#fff;border:1px solid #dae1e9}}table{{border-collapse:collapse;min-width:100%;font-size:13px}}th{{position:sticky;top:0;background:#223f62;color:white;text-align:left;white-space:nowrap}}td,th{{padding:9px 12px;border-bottom:1px solid #e4e9ef;vertical-align:top}}td{{min-width:100px;max-width:560px;white-space:pre-wrap;overflow-wrap:anywhere}}tbody tr:nth-child(even){{background:#f5f7fa}}small{{font-size:12px;font-weight:normal}}a{{color:#1550a1}}.meta{{line-height:1.8}}</style></head>
-<body><h1>故障证据核验报告</h1><p class="meta">运行：{html.escape(identity)}<br>状态：{html.escape(status)}<br>正常 AUTO_PROCESSED 为自动处理；PENDING 由 Agent 补充；EXCEPTION 需人工处理。自动处理不会写成人工 ACCEPT。<br>根因列保留原始值。未选引用、拒绝关联及历史任务保留明细；待办只列必要任务。</p><nav>{nav}</nav>{''.join(sections)}</body></html>'''
+<body><h1>故障证据核验报告</h1><p class="meta">运行：{html.escape(identity)}<br>状态：{html.escape(status)}<br>正常 AUTO_PROCESSED 为自动处理；PENDING 由 Agent 补充；EXCEPTION 需人工处理。自动处理不会写成人工 ACCEPT。<br>根因列保留原始值。来源等级与用户确认分别展示，旧表引用不升级为周报原链。已有引用逐项列出，多子问题按 work_id 分开；逐引用表可能重复展示共享结果，不作为判断数量。未选引用、拒绝关联及历史任务保留明细；待办只列必要任务。</p><nav>{nav}</nav>{''.join(sections)}</body></html>'''
 
 
 def _write(path: Path, content: str, encoding: str = "utf-8") -> None:
@@ -412,7 +486,8 @@ def _statistics_rows(statistics: dict) -> list[dict]:
     """Small count/definition table; ID-level reconciliation stays in JSON."""
     current = statistics.get("current", {})
     rows = [{"范围": "current", "指标": key, "值": current.get(key)}
-            for key in ("status", "snapshot_count", "selected_snapshot_count", "mapping_count", "unused_reference_count",
+            for key in ("status", "snapshot_count", "selected_snapshot_count", "planned_work_count", "current_work_count",
+                        "current_case_snapshot_pair_count", "mapping_count", "unused_reference_count",
                         "required_reference_count", "event_group_count", "auto_processed_count", "human_exception_count",
                         "pending_human_exception_count", "agent_pending_count",
                         "mapping_auto_processed_count", "mapping_human_exception_count", "mapping_agent_pending_count")]
@@ -448,7 +523,9 @@ def export_report(data: dict, output_dir: Path) -> dict:
     summary_rows = _summary_rows(data)
     tables = [_table("汇总", summary_rows, COMPAT_COLUMNS + EXTRA_COLUMNS),
               _table("事件组结论", _event_conclusion_rows(data, summary_rows)),
-              _table("事实对照", _fact_comparison_rows(data))]
+              _table("事实对照", _fact_comparison_rows(data)),
+              _table("逐引用整理", _reference_audit_rows(data)),
+              _table("逐资料子问题", _summary_issue_rows(data))]
     tables.extend(_table(name, _reference_rows(data) if key == "references" else _records(data, key)) for name, key in _TABLES)
     plans = data.get("evidence_plans")
     if isinstance(plans, dict):

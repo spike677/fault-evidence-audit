@@ -81,6 +81,12 @@ def processing_decision(case: dict, snapshot: dict, judgment: dict, source_relat
     """Decide whether fact organization is done; never grant human ACCEPT."""
     context = source_relation if isinstance(source_relation, dict) else {"source_relation": source_relation}
     relation = context.get("source_relation", "PROVENANCE_PENDING")
+    # Source grade records where a link came from. User confirmation is separate
+    # and never rewrites provenance or promotes the historical root-cause column.
+    linked = relation in {"SOURCE_CELL_LINKED", "LEGACY_TABLE_LINKED", "SOURCE_LINKED"}
+    confirmed = context.get("user_confirmed") is True and relation in {
+        "SOURCE_CELL_LINKED", "LEGACY_TABLE_LINKED", "SEARCH_DISCOVERED", "SEARCH_CANDIDATE", "VERIFIED_SEARCH"}
+    trusted = linked or confirmed
     def decision(status: str, reasons: list[str]) -> dict:
         return {"processing_status": status, "review_required": status == "EXCEPTION", "review_reasons": reasons}
     if judgment.get("model_mode") == "mock":
@@ -88,7 +94,7 @@ def processing_decision(case: dict, snapshot: dict, judgment: dict, source_relat
     if (judgment.get("conflicting_dimensions") or judgment.get("claim_support", {}).get("root_cause") == "CONTRADICTED"
             or judgment.get("support_level") == "CONFLICT"):
         return decision("EXCEPTION", ["Known factual/root-cause contradictions require resolution even while fact comparisons are incomplete"])
-    if relation in {"SOURCE_LINKED", "USER_CONFIRMED"} and (
+    if trusted and (
             judgment.get("case_attribution") == "MISMATCH" or judgment.get("event_relation") == "DIFFERENT_EVENT"):
         return decision("EXCEPTION", ["Trusted source linkage conflicts with the artifact's proposed attribution"])
     facts, check = judgment.get("fact_comparisons", []), judgment.get("self_check") or {}
@@ -114,9 +120,9 @@ def processing_decision(case: dict, snapshot: dict, judgment: dict, source_relat
         return decision("PENDING", ["Unknown dimensions need an explicit scoped explanation"])
     if not any(fact.get("source_field") and fact.get("source_quote") and fact.get("source_cell") and fact.get("evidence") for fact in facts):
         return decision("PENDING", ["At least one comparison needs original-cell and evidence traceability"])
-    if relation in {"SOURCE_LINKED", "USER_CONFIRMED"}:
+    if trusted:
         return decision("AUTO_PROCESSED", [])
-    if relation in {"SEARCH_CANDIDATE", "VERIFIED_SEARCH"}:
+    if relation in {"SEARCH_DISCOVERED", "SEARCH_CANDIDATE", "VERIFIED_SEARCH"}:
         if judgment.get("case_attribution") == "MISMATCH" or judgment.get("event_relation") == "DIFFERENT_EVENT":
             return decision("AUTO_PROCESSED", [])
         matched = {fact.get("source_meaning", "").strip().casefold() for fact in facts

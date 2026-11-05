@@ -14,6 +14,7 @@ from pathlib import Path
 
 SCHEMA_VERSION = "1.0"
 EXECUTORS = {"opencode", "codex"}
+FACT_PROCESSING_VERSIONS = {"evidence-first-0.1.6", "evidence-first-0.1.7"}
 
 
 def _executor(value: str) -> str:
@@ -67,7 +68,16 @@ def _check_current(store: Store, run_id: str, task: dict) -> None:
         if not any(t["task_id"] == parent["task_id"] and t["required"] for t in task_views(store, run_id, plan)):
             raise AuditError("Model work is no longer selected by the evidence plan")
         payload = task["payload"]
-        current_context = work_context(store, run_id, payload["case"]["case_id"], payload["snapshot"]["snapshot_id"], plan)
+        context = payload["processing_context"]
+        work_id = context.get("work_id")
+        if (task["kind"] != "compare" or not isinstance(work_id, str) or not work_id.strip()
+                or parent["kind"] != "compare" or parent["target_id"] != work_id or task.get("work_id") != work_id):
+            raise AuditError("Model task and pipeline dependency must bind the exact evidence work_id")
+        selected = [work for work in plan["work_items"] if work["work_id"] == work_id]
+        if (len(selected) != 1 or selected[0]["representative_case_id"] != payload["case"]["case_id"]
+                or selected[0]["snapshot_id"] != payload["snapshot"]["snapshot_id"]):
+            raise AuditError("Model payload case and snapshot must belong to this exact evidence work_id")
+        current_context = work_context(store, run_id, work_id, plan)
         if digest(current_context) != digest(payload["processing_context"]):
             raise AuditError("Model work source relationship, group or applicable issue scope changed")
     try:
@@ -131,12 +141,20 @@ class OpenCodeJudge:
                 "expected_contract": expected_contract,
                 "executor": self.executor, "model_service": self.executor,
                 "model_role": "Evidence judge; actual provider/model is reported by the executing " + self.executor + " session"}
+        context = payload.get("processing_context") or {}
+        if context:
+            work_id = context.get("work_id")
+            if kind != "compare" or not isinstance(work_id, str) or not work_id.strip():
+                raise AuditError("A factual comparison must bind a nonempty evidence work_id")
+            task["work_id"] = work_id
         task = input_budget.finalize_model_task(task)
         self.store.put(self.run_id, "model_tasks", task["task_id"], task)
         response = self.store.get(self.run_id, "model_results", task["task_id"])
         if not response:
             raise PendingModelResult(task_id=task["task_id"], operation=kind)
         _check_current(self.store, self.run_id, task)
+        if task.get("work_id") and response.get("work_id") != task["work_id"]:
+            raise AuditError("Imported result does not belong to this evidence work_id")
         self.calls.append({"executor": self.executor, "operation": kind, "task_id": task["task_id"],
                            "request_hash": task["request_hash"], "producer_reported": response["producer"],
                            "status": "IMPORTED_RESULT", "network_requested_by_core": False})
@@ -205,6 +223,8 @@ def submit_model_results(store: Store, run_id: str, envelopes: list[dict], *, ex
         if task.get("executor", "opencode") != executor:
             raise AuditError("Model task belongs to another executor")
         _check_current(store, run_id, task)
+        if "work_id" in envelope and envelope["work_id"] != task.get("work_id"):
+            raise AuditError("Model result envelope belongs to another evidence work_id")
         producer = envelope.get("producer", {})
         version_field = executor + "_version"
         if not isinstance(producer, dict) or producer.get("executor") != executor or any(
@@ -226,7 +246,7 @@ def submit_model_results(store: Store, run_id: str, envelopes: list[dict], *, ex
                                        case=payload.get("case"), judgments=payload.get("judgments"),
                                        items=payload.get("items"))
         if task["kind"] == "compare":
-            if payload.get("processing_context", {}).get("processing_version") == "evidence-first-0.1.6":
+            if payload.get("processing_context", {}).get("processing_version") in FACT_PROCESSING_VERSIONS:
                 categories = {fact["category"] for fact in checked.get("fact_comparisons", [])}
                 check = checked.get("self_check") or {}
                 fields = ("numeric_meaning_checked", "citations_checked", "counterevidence_checked", "issue_scope_checked", "event_vs_technical_checked")
@@ -238,7 +258,7 @@ def submit_model_results(store: Store, run_id: str, envelopes: list[dict], *, ex
                            "input_scope": snapshot_view["input_scope"],
                            "summary_issue_labels": [issue["label"] for issue in payload["summary"]["issues"]]}
             decision = gate_judgment(payload["case"], actual_view, checked, context=payload.get("processing_context"))
-            if (payload.get("processing_context", {}).get("processing_version") == "evidence-first-0.1.6"
+            if (payload.get("processing_context", {}).get("processing_version") in FACT_PROCESSING_VERSIONS
                     and decision["processing_status"] == "PENDING"):
                 facts, self_check = checked.get("fact_comparisons", []), checked.get("self_check") or {}
                 incomplete = (self_check.get("passed") is not True and not self_check.get("issues")) or not checked.get("applicable_issue")
@@ -248,6 +268,8 @@ def submit_model_results(store: Store, run_id: str, envelopes: list[dict], *, ex
                     raise AuditError("Agent response is incomplete; finish the issue scope, sourced comparisons and self-check before resubmitting this same task. No result was saved")
         saved = {"schema_version": SCHEMA_VERSION, "run_id": run_id, "task_id": task_id,
                  "request_hash": task["request_hash"], "producer": producer, "result": checked}
+        if task.get("work_id"):
+            saved["work_id"] = task["work_id"]
         existing = store.get(run_id, "model_results", task_id)
         if existing:
             if existing != saved:

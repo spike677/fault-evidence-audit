@@ -117,7 +117,7 @@ def _processing(records: list[dict], *, mapping: bool = False) -> dict:
 
 def _selection_statistics(data: dict, current_snapshots: list[dict]) -> dict:
     result = {"selected_snapshot_count": None, "unused_reference_count": None, "required_reference_count": None,
-              "event_group_count": None}
+              "event_group_count": None, "planned_work_count": None}
     plans = data.get("evidence_plans")
     if isinstance(plans, dict) and isinstance(plans.get("cases"), list):
         entries = plans["cases"]
@@ -133,6 +133,9 @@ def _selection_statistics(data: dict, current_snapshots: list[dict]) -> dict:
             selected_refs = {identity for value in entries for identity in value.get("selected_ref_ids", [])}
             result["unused_reference_count"] = len(reference_ids - selected_refs)
             result["required_reference_count"] = len(reference_ids & selected_refs)
+        work = plans.get("work_items")
+        if isinstance(work, list) and all(isinstance(item, dict) and isinstance(item.get("work_id"), str) and item["work_id"].strip() for item in work):
+            result["planned_work_count"] = len({item["work_id"] for item in work})
     groups = data.get("event_groups")
     if isinstance(groups, list) and all(isinstance(group, dict) and isinstance(group.get("group_id"), str) for group in groups):
         result["event_group_count"] = len({group["group_id"] for group in groups})
@@ -150,7 +153,8 @@ def _empty_current(status: str) -> dict:
             "human_exception_count": None, "pending_human_exception_count": None, "agent_pending_count": None,
             "mapping_auto_processed_count": None, "mapping_human_exception_count": None,
             "mapping_agent_pending_count": None, "selected_snapshot_count": None,
-            "unused_reference_count": None, "required_reference_count": None, "event_group_count": None}
+            "unused_reference_count": None, "required_reference_count": None, "event_group_count": None,
+            "planned_work_count": None, "current_work_count": None, "current_case_snapshot_pair_count": None}
 
 
 def _current(indexes: dict, present: dict, errors: list, warnings: list, data: dict | None = None) -> dict:
@@ -209,6 +213,15 @@ def _current(indexes: dict, present: dict, errors: list, warnings: list, data: d
                     warnings.append(_issue("CURRENT_PROCESSING_UNKNOWN", "Processing metadata is incomplete or invalid",
                                            collection=name, record_id=identity))
             output.append(record)
+    work_results = defaultdict(list)
+    for judgment in current["judgments"]:
+        work_id = judgment.get("work_id")
+        if isinstance(work_id, str) and work_id.strip():
+            work_results[work_id].append(judgment["judgment_id"])
+    for work_id, judgment_ids in work_results.items():
+        if len(judgment_ids) > 1:
+            errors.append(_issue("CURRENT_WORK_ID_CONFLICT", "One evidence work has multiple current judgment IDs; no result is silently selected",
+                                 work_id=work_id, judgment_ids=sorted(judgment_ids)))
     if len(errors) > initial_errors:
         return _empty_current("RECONCILIATION_FAILED")
     if unknown:
@@ -237,6 +250,8 @@ def _current(indexes: dict, present: dict, errors: list, warnings: list, data: d
             "mapping_auto_processed_count": mapping_processing["AUTO_PROCESSED"]["mapping_count"],
             "mapping_human_exception_count": mapping_processing["EXCEPTION"]["mapping_count"],
             "mapping_agent_pending_count": mapping_processing["PENDING"]["mapping_count"],
+            "current_work_count": len(work_results) if len(work_results) == len(js) else None,
+            "current_case_snapshot_pair_count": len({(cid, j["snapshot_id"]) for j in js for cid in _record_case_ids(j)}),
             **_selection_statistics(data or {}, current["snapshots"])}
 
 
@@ -281,6 +296,13 @@ def _result_proof(record: dict, kind: str, indexes: dict, run_id: str, errors: l
         if kind == "compare":
             identifiers_match = identifiers_match and (payload.get("snapshot", {}).get("snapshot_id")
                 == record.get("snapshot_id") == result.get("snapshot_id"))
+            if record.get("work_id"):
+                context = payload.get("processing_context", {})
+                if (not isinstance(context, dict) or context.get("work_id") != record["work_id"]
+                        or any(value.get("work_id", record["work_id"]) != record["work_id"] for value in (model_task, response))):
+                    errors.append(_issue("ROUND_WORK_SCOPE_CONFLICT", "Accepted model request does not identify this exact work/issue scope",
+                                         pipeline_task_id=task_id, work_id=record["work_id"]))
+                    continue
         if not identifiers_match:
             errors.append(_issue("ROUND_RESULT_ID_CONFLICT", "Returned result does not match its recorded case/snapshot", pipeline_task_id=task_id))
             continue
@@ -387,7 +409,7 @@ def report_statistics(data: dict, baseline: dict | None = None, round_manifest: 
     current_new_* counts exclude them. No source files or database are opened.
     """
     definitions = {"judgment_identity": "unique judgment_id", "case_identity": "unique case_id",
-        "association_identity": "validate planned_associations/judged_associations count unique (case_id, snapshot_id) pairs, not judgment IDs",
+        "association_identity": "Current validate planned_associations/judged_associations aliases count unique work_id including issue scope; older reports may declare legacy case/snapshot pairs. The report validation association_identity and ID lists define its scope",
         "snapshot_identity": "unique snapshot_id; an ingested snapshot does not require a completed model task",
         "event_group_identity": "Shared explicit event work counts once by judgment_id; involved case counts include unique case_id and member_case_ids, without merging original case records",
         "mapping_identity": "mapping.task_id", "current_scope": "Current as of this input report's exported is_stale flags and task states, not a fresh database/policy query; required is not false, is_stale=false and SUCCEEDED, with REJECT counted separately; legacy reports default to required",
@@ -399,6 +421,8 @@ def report_statistics(data: dict, baseline: dict | None = None, round_manifest: 
         "round_new_scope": "All IDs added after baseline, including results made stale or unused later in the round",
         "snapshot_count": "All active ingested snapshots, including unused evidence; selected_snapshot_count is separate",
         "selection_counts": "Derived from evidence_plans selected IDs; missing plan metadata is unknown rather than zero",
+        "work_counts": "planned_work_count deduplicates evidence_plans.work_items by work_id; current_work_count counts necessary current judgment work IDs, unknown when legacy records lack work_id. Different issue scopes of one case/snapshot remain separate work; multiple current judgments for the same work fail reconciliation",
+        "current_case_snapshot_pair_count": "Unique (member case_id, snapshot_id) pairs; multiple issue works can share one pair, so pair counts must not replace work/judgment counts",
         "auto_processed_count": "Required current judgments with AUTO_PROCESSED, review_required=false and review_status=NOT_REQUIRED; no human ACCEPT is synthesized",
         "human_exception_count": "Required current EXCEPTION judgment records, including already reviewed exceptions; pending_human_exception_count excludes human ACCEPT/REJECT",
         "agent_pending_count": "Required current PENDING judgment records for agent completion; not human exceptions",

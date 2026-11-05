@@ -299,6 +299,49 @@ class StatisticsTests(unittest.TestCase):
         self.assertIsNone(result["current"]["selected_snapshot_count"])
         self.assertIsNone(result["current"]["unused_reference_count"])
 
+    def test_distinct_issue_work_counts_do_not_collapse_to_one_case_snapshot_pair(self):
+        data, _, _ = fixture()
+        data["judgments"][2]["snapshot_id"] = "S-1"
+        for judgment, work_id in zip(data["judgments"][1:3], ("W-issue-a", "W-issue-b")):
+            judgment["work_id"] = work_id
+        data["judgments"][3]["required"] = False
+        data["evidence_plans"] = {"cases": [{"case_id": "case-1", "selected_ref_ids": [], "selected_snapshot_ids": ["S-1"]}],
+                                  "work_items": [{"work_id": "W-issue-a"}, {"work_id": "W-issue-b"}, {"work_id": "W-issue-a"}]}
+        result = report_statistics(data)
+        self.assertEqual(result["status"], "OK", result)
+        self.assertEqual(result["current"]["including_rejected"], {"judgment_count": 2, "case_count": 1})
+        self.assertEqual((result["current"]["current_work_count"], result["current"]["planned_work_count"]), (2, 2))
+        self.assertEqual(result["current"]["current_case_snapshot_pair_count"], 1)
+        self.assertEqual(result["current"]["selected_snapshot_count"], 1)
+        self.assertEqual(result["current"]["snapshot_count"], 3)
+
+    def test_two_current_judgments_of_same_work_fail_instead_of_choosing_one(self):
+        data, _, _ = fixture()
+        data["judgments"][1]["work_id"] = data["judgments"][2]["work_id"] = "W-same"
+        result = report_statistics(data)
+        self.assertEqual(result["status"], "RECONCILIATION_FAILED")
+        self.assertIsNone(result["current"]["including_rejected"]["judgment_count"])
+        self.assertTrue(any(error["code"] == "CURRENT_WORK_ID_CONFLICT" for error in result["errors"]))
+
+    def test_round_result_requires_the_exact_issue_work_request_binding(self):
+        data, baseline, manifest = fixture()
+        for judgment in data["judgments"][1:]:
+            work_id = "W-" + judgment["judgment_id"]
+            judgment["work_id"] = work_id
+            request = next(value for value in data["model_tasks"] if value["pipeline_task_id"] == judgment["task_id"])
+            response = next(value for value in data["model_results"] if value["task_id"] == request["task_id"])
+            request["work_id"] = response["work_id"] = work_id
+            request["payload"]["processing_context"] = {"work_id": work_id, "applicable_issue": {"scope": "ISSUES", "applicable_issue_ids": [work_id]}}
+        self.assertEqual(report_statistics(data, baseline, manifest)["round"]["status"], "KNOWN")
+        request = next(value for value in data["model_tasks"] if value["pipeline_task_id"] == "J-1")
+        request["payload"]["processing_context"]["work_id"] = "another-issue-work"
+        failed = report_statistics(data, baseline, manifest)
+        self.assertEqual(failed["round"]["status"], "RECONCILIATION_FAILED")
+        self.assertTrue(any(error["code"] == "ROUND_WORK_SCOPE_CONFLICT" for error in failed["errors"]))
+        request["payload"]["processing_context"]["work_id"] = "W-J-1"
+        next(value for value in data["model_results"] if value["task_id"] == request["task_id"])["work_id"] = "another-issue-work"
+        self.assertEqual(report_statistics(data, baseline, manifest)["round"]["status"], "RECONCILIATION_FAILED")
+
 
 if __name__ == "__main__":
     unittest.main()
