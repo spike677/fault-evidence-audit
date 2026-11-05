@@ -157,6 +157,23 @@ def parser() -> argparse.ArgumentParser:
     reconciliation.add_argument("--baseline", type=Path)
     reconciliation.add_argument("--round-manifest", type=Path)
     reconciliation.add_argument("--out", type=Path, required=True)
+    plan = sub.add_parser("evidence-plan", help="Read-only preview of selected evidence, search stops and necessary work")
+    plan.add_argument("--run", default="latest")
+    plan.add_argument("--out", type=Path)
+    group = sub.add_parser("register-event-group", help="Register only a user-confirmed event relationship")
+    group.add_argument("--run", default="latest")
+    group.add_argument("--case-ids", nargs="+", required=True)
+    group.add_argument("--group-id")
+    association = sub.add_parser("confirm-evidence", help="Record an explicit user-confirmed evidence relationship")
+    association.add_argument("--run", default="latest")
+    association.add_argument("--case-id", required=True)
+    association.add_argument("--ref-id")
+    association.add_argument("--snapshot-id")
+    association.add_argument("--issue", action="append", default=[])
+    for registration in (group, association):
+        registration.add_argument("--user-confirmed", action="store_true", required=True)
+        registration.add_argument("--confirmed-by", required=True)
+        registration.add_argument("--reason", required=True)
     return p
 
 
@@ -193,7 +210,7 @@ def main(argv: list[str] | None = None) -> int:
                 write_json(cls.model_json_schema(), args.out / f"{cls.__name__}.schema.json")
             write_json({"schemas": str(args.out.resolve())})
             return 0
-        store = Store(args.state)
+        store = Store(args.state, read_only=args.command == "evidence-plan")
         if args.command == "demo":
             write_json(demo(store, args.out.resolve()))
             return 0
@@ -218,6 +235,20 @@ def main(argv: list[str] | None = None) -> int:
                         "validation": validate(store, run_id)})
             return 0
         run_id = store.run_info(args.run)["run_id"]
+        if args.command == "evidence-plan":
+            from .pipeline import evidence_plan
+            write_json(evidence_plan(store, run_id), args.out)
+            return 0
+        if args.command in {"register-event-group", "confirm-evidence"}:
+            from .evidence_plan import register_event_group, register_evidence_association
+            common = {"user_confirmed": args.user_confirmed, "confirmed_by": args.confirmed_by, "reason": args.reason}
+            if args.command == "register-event-group":
+                result = register_event_group(store, run_id, case_ids=args.case_ids, group_id=args.group_id, **common)
+            else:
+                result = register_evidence_association(store, run_id, case_id=args.case_id, ref_id=args.ref_id,
+                    snapshot_id=args.snapshot_id, applicable_issue_ids=args.issue, **common)
+            write_json(result)
+            return 0
         if args.command == "ingest-evidence":
             body = json.loads(args.package.read_text(encoding="utf-8-sig"))
             packages = body if isinstance(body, list) else [body]

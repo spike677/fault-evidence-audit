@@ -124,8 +124,13 @@ def authentication_page(package: dict) -> bool:
 
 
 class Store:
-    def __init__(self, root: str | Path):
+    def __init__(self, root: str | Path, *, read_only: bool = False):
         self.root = Path(root).resolve()
+        if read_only:
+            self.conn = sqlite3.connect((self.root / "audit.sqlite3").as_uri() + "?mode=ro", uri=True, timeout=30)
+            self.conn.row_factory = sqlite3.Row
+            self.conn.execute("PRAGMA query_only=ON")
+            return
         self.root.mkdir(parents=True, exist_ok=True)
         self.conn = sqlite3.connect(self.root / "audit.sqlite3", timeout=30)
         self.conn.row_factory = sqlite3.Row

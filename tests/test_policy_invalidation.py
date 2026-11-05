@@ -83,7 +83,8 @@ class PolicyInvalidationTests(unittest.TestCase):
             self.finish()
             new = current_judgments(self.store, self.run_id)[0]
             self.assertNotEqual(new["judgment_id"], old["judgment_id"])
-            self.assertEqual(new["review_status"], "NEEDS_REVIEW")
+            self.assertEqual(new["review_status"], "NOT_REQUIRED")
+            self.assertNotEqual(new["review_status"], "ACCEPT")
             self.assertEqual(len(self.store.records(self.run_id, "judgments")), 2)
 
     def test_input_change_immediately_invalidates_judgments_and_mappings(self):

@@ -2,7 +2,7 @@
 
 故障证据核验核心。所有示例均为虚构数据，不包含客户故障记录或内部网页内容。
 
-版本 0.1.5，2026 年 10 月 31 日。核心负责导入故障表、保存原文与引用来源、生成采集和模型任务、检查返回结果并生成复核报告。模型任务可由 OpenCode 或 Codex 会话执行，内网采集仍由具备授权与登录态的现场环境完成。当前使用文件任务往返，不包含直连模型服务的网络客户端。
+版本 0.1.6，2026 年 11 月 5 日。核心负责导入故障表、保存原文与引用来源、规划必要证据、生成采集和模型任务、检查返回结果并生成复核报告。模型任务可由 OpenCode 或 Codex 会话执行，内网采集仍由具备授权与登录态的现场环境完成。当前使用文件任务往返，不包含直连模型服务的网络客户端。
 
 目标网站包括 DTS、Wiki、GitCode、GitHub、CodeHub。真实资料由具备授权与登录态的现场工具采集；现有现场方案使用 OpenChamber/OpenCode。登录认证、搜索、正文读取、分页、附件、评论、Diff、网络重试和权限故障处理均在采集环境完成。核验核心不访问这些网站，也不保存其认证凭据；选择 Codex 执行模型任务不会自动获得这些站点的访问能力。
 
@@ -13,10 +13,13 @@
 - XLSX、CSV、TSV、JSON 导入；保留原文、文件 hash、sheet、行和单元格。
 - Catalog 按工作表选择并核对预期数量，文件 Hash、工作表与作用域在同一 run 内冻结；识别“根因/进展”表头。
 - 原始引用、搜索发现和人工补充分别登记；相同资料的不同引用来历保留。
+- 先规划必要证据路径，已有可用原链或已确认资料时停止补链；未选引用和旧结果留档。
+- 显式登记用户已确认的事件组；相同技术输入共享工作，不同根因或场景分别处理，原始 case 不合并。
 - SQLite 台账、资料版本、任务依赖及请求 hash；输入变化后旧结果失效，支持恢复任务。
 - 按依赖生成资料摘要、逐关联比较和全库映射任务，由 OpenCode 或 Codex 会话执行后提交结果。
 - 本地结构、原文引用和业务校验；生产者元数据记录执行者、对应版本、provider、model 和会话。
 - 原文引文、跨快照引用、同事件锚点、根因冲突、冻结库版本等门禁。
+- 对数字、术语、场景及技术结论逐项列原单元格、原文、资料引文与含义；模型自查后区分正常自动处理、Agent 补充和人工异常。
 - 组件完整性矛盾与 PR 文件计数门禁；未验收正文和网络阻塞状态分别保存。
 - `evidence-index` 反查共享资料的所有引用者、各自判断及历史版本。
 - 全库逐项比较合同；未确认事件与缺失机理不标为已覆盖或未覆盖。
@@ -25,7 +28,7 @@
 
 核心不配置模型服务地址、凭据或模型网络客户端。OpenCode 的 provider/model、实际服务、委派工具及认证由现场配置；Codex 可直接读取导出的任务并提交文件结果。文件协议不会自动启动模型会话。`mock` 仅用于离线流程演示。
 
-本版不自动合并故障，不包含内网采集器或已认证 MCP，不自动恢复旧表根因来源，也不执行跨资料联合最终裁决。逐资料判断和冲突线索均保留，争议交人工复核。原 98 条库和原始周报需现场提供；内置 mock 演示库只有两条合成模式，另有可重建的 98 条合成模拟库，两者均不冒充真实故障库。
+本版不自动合并故障，不包含内网采集器或已认证 MCP，也不自动恢复旧表根因来源。事件组只汇集明确登记的成员和选定证据，不掩盖成员间不同根因或场景；争议交人工处理。原 98 条库和原始周报需现场提供；内置 mock 演示库只有两条合成模式，另有可重建的 98 条合成模拟库，两者均不冒充真实故障库。
 
 ## 从源码开始
 
@@ -88,13 +91,32 @@ $AuditRunId
 
 `--catalog-sheet` 使用精确工作表名，可重复指定；未知名称、空选择或 `--expected-catalog-count` 不符会拒绝导入。省略工作表参数时仍会全表导入，因此正式 98 条核验应显式选择推理汇总。一次 run 只使用一个 Catalog 选择，文件 Hash、所选工作表（含空表）和 `--catalog-scope` 一起冻结；错误选择会在追加故障记录之前拒绝。训练 43 条使用另一个 run，不能加入推理 98 条分母。库条目保存版本、作用域、Sheet 和物理行号。
 
-### 2. 导出采集清单并提交原文
+### 2. 先预览证据计划，再采集必要原文
+
+现场升级后先运行只读预览，不提交资料或结果：
+
+```powershell
+& $PythonExe run_faultaudit.py --state $AuditState evidence-plan --run $AuditRunId --out work/evidence_plan_preview.json
+```
+
+该入口使用 SQLite 只读连接，不创建 state。逐 case 的 `path`、`selected_ref_ids`、`selected_snapshot_ids`、`required_actions` 与 `stop_reason` 说明下一步和停止原因。原始周报中可追溯的原链优先；已有可用原文时先提事实，不为凑齐 Wiki/DTS/PR 类型继续搜索。`PARTIAL` 中已取得的正文可以处理，真实缺少的组件另记；访问失败是异常，不能冒称没有证据而改成无目标搜索。
+
+只有现有引用均不适用或确实无资料时才搜索，已有适用资料就停止补链。未选引用不删除，也不增加必要任务或待办数。
+
+需要恢复已确认的事件关系时，由现场把用户已有确认转成具体 `case_id` 注册；不要求用户重复确认。下面仅示意两条合成记录，不能直接用于真实 WB：
+
+```powershell
+& $PythonExe run_faultaudit.py --state $AuditState register-event-group --run $AuditRunId --case-ids 'synthetic-case-a' 'synthetic-case-b' --group-id 'synthetic-group' --user-confirmed --confirmed-by '已有用户确认的记录者' --reason '引用已有确认的具体依据'
+& $PythonExe run_faultaudit.py --state $AuditState confirm-evidence --run $AuditRunId --case-id 'synthetic-case-a' --snapshot-id 'synthetic-snapshot' --issue '具体子问题标签' --user-confirmed --confirmed-by '已有用户确认的记录者' --reason '引用已有资料关联确认的依据'
+```
+
+这两个是写入登记命令，不是只读预览步骤；没有既有确认时不能加 `--user-confirmed` 冒充确认。`confirm-evidence` 可指定 `--ref-id` 或 `--snapshot-id`，可重复 `--issue` 限定多问题资料中实际适用的部分。确认事件组不等于确认所有成员根因相同：不同技术输入继续各自判断。
 
 ```powershell
 & $PythonExe run_faultaudit.py --state $AuditState fetch-tasks --run $AuditRunId --out work/fetch_tasks.json
 ```
 
-现场工具按清单采集实际正文，保存原文、时间、落地 URL 和组件缺口，生成 `work/evidence.json`。该文件可以是单个证据包或证据包数组，字段见“采集证据包”。登录页、搜索摘要或模型摘要不能充当正文。访问失败也应提交准确状态。
+现场工具按清单采集选定的必要正文，保存原文、时间、落地 URL 和组件缺口，生成 `work/evidence.json`。该文件可以是单个证据包或证据包数组，字段见“采集证据包”。登录页、搜索摘要或模型摘要不能充当正文。访问失败也应提交准确状态。
 
 ```powershell
 & $PythonExe run_faultaudit.py --state $AuditState ingest-evidence --run $AuditRunId --package work/evidence.json
@@ -137,9 +159,9 @@ $AuditExecutor = 'codex'
 & $PythonExe run_faultaudit.py --state $AuditState export --run $AuditRunId --out work/report
 ```
 
-反查保留原始链接、搜索补链、人工补链及每条故障各自的当前判断；共享链接只提示需要交叉核查，不证明同一事件。可加 `--url '实际证据URL'` 查询一份资料。JSON、HTML 和表格数据中保留“证据反查”“库选择基准”、拒绝关联与待办。
+反查保留原始链接、搜索补链、人工补链及每条故障各自的当前判断；共享链接只提示需要交叉核查，不证明同一事件。可加 `--url '实际证据URL'` 查询一份资料。报告保留“证据反查”“库选择基准”“证据计划”“未选引用留档”“事实对照”及“事件组结论”。事实对照注明引文所属 `source_case_id`，共享判断也不把代表行的原单元格冒充其他成员的原文。
 
-先在 `report.json` 或 `report.html` 读取具体关联的 `judgment_id` 和库映射的 `task_id`，由实际复核人填写结论、理由和姓名；复核示例见“判断边界”。先处理关联判断，再处理依赖它的库映射。修改关联裁决会使相关映射失效，需要重新推进、执行并复核。
+只把 `EXCEPTION` 中待人工处理的项交复核人；`PENDING` 先由 Agent 补充，`AUTO_PROCESSED` 不要求例行人工 ACCEPT。人工处理时读取具体关联的 `judgment_id` 和库映射的 `task_id`，填写结论、理由和姓名；示例见“判断边界”。修改关联裁决会使相关映射失效，需要重新推进并检查结果。
 
 ```powershell
 & $PythonExe run_faultaudit.py --state $AuditState validate --run $AuditRunId --strict
@@ -152,7 +174,7 @@ $LASTEXITCODE
 | `2` | `validate` 发现无效记录，或严格模式仍有缺口／待复核项；查看 `errors` 与 `pending` |
 | `1` | 命令执行或输入校验失败，查看输出的 `error` 与 `message` |
 
-部分 PR、未知映射或待人工复核会让严格验收保持 `2`，不能靠批量 ACCEPT 清空真实缺口。完成复核后重新导出报告，保留原始文件和旧版本产物。
+必要证据不足、未知映射或未解决异常会让严格验收保持 `2`，不能靠批量 ACCEPT 清空真实缺口。未选引用和不阻塞的可选采集不增加必要待办。处理后重新导出报告，保留原始文件和旧版本产物。
 
 ### 模型任务协议
 
@@ -264,7 +286,19 @@ Codex 使用相同 envelope，仅将 `producer` 换成以下对象，并填写�
 
 同一事件需明确事件编号，或源故障描述中足够具体、在证据引文中逐字出现的事件签名，同时匹配症状、机理及触发/修复/构建特征。共享链接和同算子不能作为事件身份。原文定位只是必要条件，不能证明语义正确。
 
-所有模型结果均为建议，等待人工复核。`case_attribution=CONFIRMED` 表示模型按当前证据提出确认归属建议，仍可同时处于 `review_status=NEEDS_REVIEW`；它不是人工 `ACCEPT`。库映射也可基于有效的确认归属判断提出覆盖建议，随后独立复核，不能因“待人审”就假装原文证据不存在，也不能据此自动通过终审。
+0.1.6 将处理状态与人工裁决分开。模型需填写 `fact_comparisons`：数字、术语、场景和技术结论都要核对含义，不能只因数字或名称相同就写 MATCH。多问题资料注明 `applicable_issue`，完成一次 `self_check`；引文和单元格仍由本地门禁核对。
+
+新文件协议的比较结果必须提交完整四类对照和一次五项自检。缺少这些结构时，核心拒收且不保存该答案，Agent可以在原任务ID及Hash下补齐后重新提交；不以空答案占住不可变响应。自检发现真实冲突时可以 `passed=false` 并保留 `issues`，进入异常队列。历史结果仍保留。
+
+`validate.fact_organization_complete` 单独表示所有必要事实整理已完成；库覆盖未知仍保留在总体 `complete` 和严格验收缺口中。事实整理完成不等于库覆盖已确认，也不要求为了消除库覆盖待定而继续搜索。
+
+| 处理状态 | 后续责任 | review_status |
+| --- | --- | --- |
+| AUTO_PROCESSED | 事实与引文门禁通过的普通结果，自动进入后续处理 | NOT_REQUIRED，review_required=false |
+| PENDING | 资料或事实不足，由 Agent 补充 | PENDING_AGENT，review_required=false |
+| EXCEPTION | 明确矛盾或异常，由人工处理 | NEEDS_REVIEW，review_required=true |
+
+`CONFIRMED`、`DIRECT` 与覆盖是业务判断字段，不是人工 `ACCEPT`。自动处理始终不伪造人工裁决；人工可按实际证据另行复核。旧记录缺少新状态时沿用旧复核口径，不把旧建议直接升级为自动处理。
 
 下面命令须由实际复核人在阅读证据后执行，将 ID、理由与姓名替换成真实值。`ACCEPT`、`REJECT`、`NEEDS_INFO` 是可选裁决；示例使用 `NEEDS_INFO`，不代替实际判断：
 
@@ -273,11 +307,15 @@ Codex 使用相同 envelope，仅将 `producer` 换成以下对象，并填写�
 & $PythonExe run_faultaudit.py --state $AuditState review --run $AuditRunId --mapping '待复核映射的task_id' --verdict NEEDS_INFO --reason '填写模式匹配依据或缺口' --reviewer '实际复核人'
 ```
 
-裁决以追加记录保存，不改写原文或自动合并事件。未复核的映射、逐项未知及部分证据会使严格验收保持待处理。修改关联判断的裁决后，对应库映射立即失效，需重新推进任务，避免导出旧覆盖结论。
+裁决以追加记录保存，不改写原文或自动合并事件。必要项中的未知或未解决异常会使严格验收保持待处理。修改关联判断的裁决后，对应库映射立即失效，需重新推进任务，避免导出旧覆盖结论。
 
-原文引文存在只是出处校验，不能机械证明结论含义正确。把真实引文错误地关联到另一个模式，仍可能通过结构校验；模式机理、触发条件和否定语境需要模型及人工语义复核。
+原文引文存在只是出处校验，不能机械证明结论含义正确。模型须核对模式机理、触发条件、计量含义和否定语境，并保留反证；明确冲突交人工。自动处理不意味着程序已证明所有语义正确。
 
-## Codex 合成模拟：完整复现步骤
+## 历史 Codex 合成模拟：输入与执行步骤
+
+以下保留2026-10-30的合成模拟输入和历史验收口径。0.1.6按必要证据计划选择任务，实际任务数及处理状态应以新请求和validate为准，不能要求每轮仍有7个比较或复制历史数量充当本次验证。
+
+`verify_codex_pilot.py` 保留历史固定任务数和 Codex 执行者的验收预期，不作为 0.1.6 或 OpenCode 现场通过的证明。0.1.6 使用完整回归、只读证据计划、真实文件协议结果及轮次对账验收。
 
 先完成“从源码开始”的 Python 依赖检查。为每次模拟选择独立目录，避免覆盖既有请求和结果。下例使用 `work/codex_pilot_new`；目录变量会贯穿整个流程。
 
@@ -317,7 +355,7 @@ if (-not $PilotRunId) { throw '模拟导入未成功返回 run_id，请先查看
 
 ### 3. 完成五轮全库比较并独立验收
 
-让 Codex 读取 `03_requests.json`，对 5 条记录各比较全部 98 个模式，写入 `$PilotRoot/03_results.json`，合计 490 项。每项 ID 必须唯一且不漏项；引用只能复用该任务有效 judgment 中相同的 `segment_id + quote` 对。模型提出的覆盖建议仍待人工复核，机制未确认的事件保持待定。
+让 Codex 读取 `03_requests.json`，对 5 条记录各比较全部 98 个模式，写入 `$PilotRoot/03_results.json`，合计 490 项。每项 ID 必须唯一且不漏项；引用只能复用该任务有效 judgment 中相同的 `segment_id + quote` 对。历史覆盖建议按当时口径待人工复核；0.1.6按处理状态分工，机制未确认的事件仍保持待定。
 
 ```powershell
 & $PythonExe run_faultaudit.py --state $PilotState submit-model-results --executor codex --run $PilotRunId --file "$PilotRoot/03_results.json"
@@ -366,11 +404,12 @@ $AuditState = '既有state目录'
 $AuditRunId = '原有run_id'
 & $PythonExe run_faultaudit.py --version
 & $PythonExe run_faultaudit.py doctor
+& $PythonExe run_faultaudit.py --state $AuditState evidence-plan --run $AuditRunId --out work/evidence_plan_016_preview.json
 & $PythonExe run_faultaudit.py --state $AuditState run --run $AuditRunId --mode opencode --resume --retry-failed
-& $PythonExe run_faultaudit.py --state $AuditState model-tasks --executor opencode --run $AuditRunId --out work/requests_014_01.json
+& $PythonExe run_faultaudit.py --state $AuditState model-tasks --executor opencode --run $AuditRunId --out work/requests_016_01.json
 ```
 
-然后由现场执行新导出的任务并按原 `task_id`、`request_hash` 提交，再继续下一阶段。旧请求和旧结果不改写、不删除；策略或依赖变化后它们只作为历史记录，过期结果不能继续作为当前关联、覆盖结论或已完成计数。任何模型建议，包括确认归属与正向覆盖，仍需真实人工复核，不自动 ACCEPT。
+先检查只读预览，再由现场执行新导出的必要任务并按原 `task_id`、`request_hash` 提交，继续下一阶段。旧请求和旧结果不改写、不删除；策略或依赖变化后只作为历史记录，过期或未选结果不能继续作为当前必要关联、覆盖结论或已完成计数。正常结果自动处理、证据不足由 Agent 补充、异常交人工；不自动 ACCEPT。
 
 若核心或执行者报告输入超限/无法完整处理，保留 `BLOCKED`，先按错误记录处理任务规模；不能删减该任务后复用原 Hash 提交。该升级流程尚未在真实现场 state 或 Python 3.14.3 环境验证，应先在独立合成 state 检查本机环境，再对已备份的原 state、原路径以同 run ID 续跑。
 
@@ -392,11 +431,11 @@ $AuditRunId = '原有run_id'
 & $PythonExe scripts/build_delivery.py
 ```
 
-0.1.5 的回归测试使用合成任务和结果文件，不运行模型 HTTP 客户端，也不调用外部模型。本轮实际环境、测试数量与结果以 [examples/validation_result.json](examples/validation_result.json) 和 [验收记录](VALIDATION.md) 为准。2026 年 10 月 30 日由 Codex 会话执行的 [合成模拟验证摘要](examples/codex_pilot_validation.json) 是单独的历史基线，与本版回归、mock 和现场验证分开。交接包排除凭据、SQLite 运行数据、原始证据和依赖运行库，包含 `.gitignore` 及逐文件 SHA-256 清单。
+0.1.6 的回归测试使用合成任务和结果文件，不运行模型 HTTP 客户端，也不调用外部模型。本轮实际环境、测试数量与结果以 [examples/validation_result.json](examples/validation_result.json) 和 [验收记录](VALIDATION.md) 为准。2026 年 10 月 30 日由 Codex 会话执行的 [合成模拟验证摘要](examples/codex_pilot_validation.json) 是单独的历史基线，与本版回归、mock 和现场验证分开。交接包排除凭据、SQLite 运行数据、原始证据和依赖运行库，包含 `.gitignore` 及逐文件 SHA-256 清单。
 
-## 0.1.5 统计与现场只读对账
+## 0.1.6 统计与现场只读对账
 
-本轮统计修复只从已有记录生成统计与差异报告，不重新提取事实、修改证据、生成业务判断或推进模型任务。网站认证、采集及实际模型执行仍由 OpenChamber/OpenCode 现场环境负责，沿用已有工具与流程。0.1.4 已有的长正文分块、整请求预算、输入作用域和策略失效机制保留，不为统计目的重写。
+统计入口只从已有记录生成统计与差异报告，不重新提取事实、修改证据、生成业务判断或推进模型任务。网站认证、采集及实际模型执行仍由 OpenChamber/OpenCode 现场环境负责，沿用已有工具与流程。已有长正文分块、整请求预算、输入作用域和策略失效机制保留。
 
 独立统计命令只读 JSON，在初始化任何 Store 之前执行，不打开 SQLite。先经现场既有流程取得完整的 `report.json`，再运行：
 
@@ -429,6 +468,10 @@ $AuditRunId = '原有run_id'
 | 待办理由条目 | counts.pending_reason_entries | validate 的理由字符串条目数，不是独立故障或任务数量 |
 
 “当前有效”依据输入报告导出时的 `is_stale` 与流水线任务状态，离线命令不重查今天的数据库或新版策略。真实当前数据需 OpenCode 先通过既有工具只读核对 SQLite 的记录与任务元数据，不能把老报告当作 live DB 验证。新导出的报告会由 `report_data` 按现行策略标记过期，但常规导出仍不是专门的 SQLite 只读入口。
+
+0.1.6 的 current 判断及映射只纳入必要结果（记录和任务均未显式标为 `required=false`）；旧报告没有 required 元数据时沿用原口径。`snapshot_count` 仍为 active 摄取快照全集，`selected_snapshot_count` 单列计划选定快照，`unused_reference_count` 为未选引用数。缺少计划元数据时选择数量为 null，不假定为零。事件组共享一个 judgment_id 就计一次判断，涉及 case 数按该判断的 case_id 与 member_case_ids 去重，不合并原始记录。
+
+`auto_processed_count`、`human_exception_count`、`agent_pending_count` 按当前必要判断分别计数，映射另有独立计数；前者不写成人工 ACCEPT。human_exception_count 包含已复核的异常记录，`pending_human_exception_count` 才是尚未 ACCEPT/REJECT 的人工异常。它们是判断记录数，不能加成唯一 case 数。
 
 人工 REJECT 关联保留在原账与历史中；统计同时给出当前判断包含与排除 REJECT 的两种口径，不能混成一个总数。分类可能交叉，同一判断或故障可能进入多个类别，类别计数之和不必等于唯一判断总数；以明确列出的 ID 集合核对。待办理由也可能属于同一故障或同一任务，不能把理由条目数当成待处理故障数。
 

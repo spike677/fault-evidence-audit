@@ -142,6 +142,37 @@ class NegativeBasis(Contract):
     attribution_mismatch: NegativeIdentityBasis | None = None
 
 
+class FactComparison(Contract):
+    category: Literal["NUMBER", "TERM", "SCENARIO", "TECHNICAL_CONCLUSION"]
+    source_field: str = ""
+    source_quote: str = ""
+    source_cell: str = ""
+    source_value: str = ""
+    evidence_value: str = ""
+    source_meaning: str = ""
+    evidence_meaning: str = ""
+    evidence: list[EvidenceRef] = Field(default_factory=list)
+    relation: Literal["MATCH", "CONFLICT", "UNKNOWN", "NAME_ONLY", "DIFFERENT"]
+    reason: str = ""
+
+
+class ApplicableIssue(Contract):
+    label: str = Field(min_length=1)
+    evidence: list[EvidenceRef] = Field(min_length=1)
+    selection_reason: str = Field(min_length=1)
+
+
+class SelfCheck(Contract):
+    attempt: int = Field(ge=1, le=1, strict=True)
+    numeric_meaning_checked: bool = Field(strict=True)
+    citations_checked: bool = Field(strict=True)
+    counterevidence_checked: bool = Field(strict=True)
+    issue_scope_checked: bool = Field(strict=True)
+    event_vs_technical_checked: bool = Field(strict=True)
+    passed: bool = Field(strict=True)
+    issues: list[str] = Field(default_factory=list)
+
+
 class Judgment(Contract):
     case_id: str
     snapshot_id: str
@@ -157,6 +188,9 @@ class Judgment(Contract):
     event_anchor: str = ""
     negative_basis: NegativeBasis | None = None
     observation_scope: Literal["CAPTURED_CONTENT", "FULL_DOCUMENT"] = "CAPTURED_CONTENT"
+    fact_comparisons: list[FactComparison] = Field(default_factory=list)
+    applicable_issue: ApplicableIssue | None = None
+    self_check: SelfCheck | None = None
     short_reason: str
     missing_information: list[str] = Field(default_factory=list)
     model_mode: str

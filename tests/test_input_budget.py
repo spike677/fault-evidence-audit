@@ -76,7 +76,7 @@ class BridgeBudgetTests(unittest.TestCase):
         self.run_id = self.store.create_run({"is_synthetic": True})
         self.case = SourceCase(case_id="synthetic-case", source_file="synthetic.json", source_sha256="synthetic-hash",
             sheet="JSON", row=1, source_kind="ORIGINAL_WEEKLY", raw={"问题描述": "合成异常"},
-            description="合成异常", root_cause_origin="SOURCE_RAW").model_dump()
+            description="合成异常", cell_locations={"问题描述": "A1"}, root_cause_origin="SOURCE_RAW").model_dump()
         self.store.put(self.run_id, "cases", self.case["case_id"], self.case)
         self.snapshot = self.add_snapshot("Synthetic observed failure.")
 
@@ -114,6 +114,7 @@ class BridgeBudgetTests(unittest.TestCase):
                          "model": "synthetic-model", "session_id": "offline-budget-test"}}
 
     def comparison_envelope(self, task, *, observation_scope="FULL_DOCUMENT"):
+        from tests.fact_fixtures import with_fact_audit
         envelope = self.envelope(task)
         envelope["result"] = {"case_id": self.case["case_id"],
             "snapshot_id": task["payload"]["snapshot"]["snapshot_id"],
@@ -122,6 +123,7 @@ class BridgeBudgetTests(unittest.TestCase):
                 ("symptom", "root_cause", "fix", "verification")}, "matched_dimensions": [],
             "conflicting_dimensions": [], "unknown_dimensions": ["event"], "evidence": [],
             "short_reason": "Synthetic scope validation", "observation_scope": observation_scope}
+        envelope["result"] = with_fact_audit(envelope["result"], task)
         return envelope
 
     def add_catalog(self, width=20):

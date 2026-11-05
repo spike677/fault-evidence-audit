@@ -186,7 +186,8 @@ class OfflineOptimizationTests(unittest.TestCase):
             result = execute(store, run_id, MockJudge(), mode="mock", model_id="synthetic")
             self.assertEqual(len(store.records(run_id, "summaries")), 1)
             self.assertFalse(result["complete"])
-            self.assertTrue(any("CONTENT_CAPTURED" in item for item in result["pending"]))
+            self.assertEqual(snapshot["status"], "CONTENT_CAPTURED")
+            self.assertFalse(any("CONTENT_CAPTURED" in item for item in result["pending"]), "Capture gaps do not force extra search/review")
             judgment = store.records(run_id, "judgments")[0]
             proposed = {key: judgment[key] for key in Judgment.model_fields}
             proposed.update(case_attribution="CONFIRMED", support_level="DIRECT", event_relation="SAME_EVENT",

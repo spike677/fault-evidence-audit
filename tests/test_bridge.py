@@ -51,6 +51,7 @@ class BridgeTests(unittest.TestCase):
         return status, export_model_tasks(self.store, run_id)["tasks"]
 
     def envelope(self, task, result=None):
+        from tests.fact_fixtures import with_fact_audit
         payload = task["payload"]
         if result is None and task["kind"] == "summarize":
             snapshot = payload["snapshot"]
@@ -69,6 +70,7 @@ class BridgeTests(unittest.TestCase):
             result = {"case_id": payload["case"]["case_id"], "scope": "FULL_CATALOG", "overall": "UNDETERMINED",
                 "catalog_results": [{"item_id": item["item_id"], "result": "UNDETERMINED", "reason": "Unconfirmed synthetic case", "evidence": []}
                                     for item in payload["items"]]}
+        result = with_fact_audit(result, task)
         return {"schema_version": "1.0", "run_id": task["run_id"], "task_id": task["task_id"],
             "request_hash": task["request_hash"], "result": result,
             "producer": {"executor": "opencode", "opencode_version": "2.2.0", "provider": "synthetic-protocol-test",
@@ -176,7 +178,11 @@ class BridgeTests(unittest.TestCase):
             submit_model_results(self.store, self.run_id, [false_citation])
 
     def test_batch_is_checked_before_any_result_is_saved(self):
-        self.store.ingest_evidence(self.run_id, {**self.package, "url": "https://example.invalid/wiki/two", "record_discovery": True})
+        second = self.directory / "second.json"
+        second.write_text(json.dumps([{"问题描述": "Second independent synthetic case", "wiki": "https://example.invalid/wiki/two"}]), encoding="utf-8")
+        imported = import_cases(second, "ORIGINAL_WEEKLY")
+        import_into(self.store, self.run_id, imported)
+        self.store.ingest_evidence(self.run_id, {**self.package, "url": "https://example.invalid/wiki/two", "case_ids": [imported["cases"][0]["case_id"]]})
         _, tasks = self.drive()
         self.assertEqual(len(tasks), 2)
         valid, invalid = (self.envelope(task) for task in tasks)
@@ -212,7 +218,8 @@ class BridgeTests(unittest.TestCase):
         self.assertEqual(judgment["case_attribution"], "CONFIRMED")
         self.assertEqual(judgment["model_mode"], "opencode")
         self.assertEqual(judgment["model_id"], envelope["producer"]["model"])
-        self.assertEqual(judgment["review_status"], "NEEDS_REVIEW")
+        self.assertEqual(judgment["review_status"], "NOT_REQUIRED")
+        self.assertFalse(judgment["review_required"])
         self.assertFalse(status["complete"])
         self.assertTrue(data["snapshots"][0]["is_synthetic"])
 

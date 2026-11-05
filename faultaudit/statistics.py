@@ -70,8 +70,17 @@ def _index(data: dict, collection: str, errors: list, warnings: list, *, context
     return indexed, True
 
 
+def _record_case_ids(record: dict) -> set[str]:
+    """A shared event result is one judgment involving every explicit member."""
+    members = record.get("member_case_ids", [])
+    result = {record["case_id"]}
+    if isinstance(members, list):
+        result.update(value for value in members if isinstance(value, str))
+    return result
+
+
 def _counts(judgments: list[dict]) -> dict:
-    return {"judgment_count": len(judgments), "case_count": len({j["case_id"] for j in judgments})}
+    return {"judgment_count": len(judgments), "case_count": len(set().union(*(_record_case_ids(j) for j in judgments)))}
 
 
 def _axes(judgments: list[dict]) -> dict:
@@ -84,22 +93,75 @@ def _axes(judgments: list[dict]) -> dict:
     return result
 
 
+def _required_result(record: dict, indexes: dict) -> bool:
+    """Explicitly unused work is history; older reports default to required."""
+    task = indexes["tasks"].get(record.get("task_id"), {})
+    return record.get("required") is not False and task.get("required") is not False
+
+
+def _processing(records: list[dict], *, mapping: bool = False) -> dict:
+    buckets = {status: [] for status in ("AUTO_PROCESSED", "PENDING", "EXCEPTION", "LEGACY_REVIEW")}
+    for record in records:
+        status = record.get("processing_status")
+        if status == "AUTO_PROCESSED" and record.get("review_required") is False and record.get("review_status") == "NOT_REQUIRED":
+            buckets[status].append(record)
+        elif status in {"PENDING", "EXCEPTION"}:
+            buckets[status].append(record)
+        elif status is None and record.get("review_status") not in {"ACCEPT", "REJECT"}:
+            buckets["LEGACY_REVIEW"].append(record)
+    if mapping:
+        return {status: {"mapping_count": len(values), "case_count": len(set().union(*(_record_case_ids(v) for v in values)))}
+                for status, values in buckets.items()}
+    return {status: _counts(values) for status, values in buckets.items()}
+
+
+def _selection_statistics(data: dict, current_snapshots: list[dict]) -> dict:
+    result = {"selected_snapshot_count": None, "unused_reference_count": None, "required_reference_count": None,
+              "event_group_count": None}
+    plans = data.get("evidence_plans")
+    if isinstance(plans, dict) and isinstance(plans.get("cases"), list):
+        entries = plans["cases"]
+        if any(not isinstance(value, dict) or any(not isinstance(value.get(key), list)
+                or any(not isinstance(identity, str) or not identity.strip() for identity in value[key])
+                for key in ("selected_ref_ids", "selected_snapshot_ids")) for value in entries):
+            return result
+        selected_sids = {identity for value in entries for identity in value.get("selected_snapshot_ids", [])}
+        result["selected_snapshot_count"] = len(selected_sids & {s["snapshot_id"] for s in current_snapshots})
+        references = data.get("references")
+        if isinstance(references, list) and all(isinstance(ref, dict) and isinstance(ref.get("ref_id"), str) for ref in references):
+            reference_ids = {ref["ref_id"] for ref in references}
+            selected_refs = {identity for value in entries for identity in value.get("selected_ref_ids", [])}
+            result["unused_reference_count"] = len(reference_ids - selected_refs)
+            result["required_reference_count"] = len(reference_ids & selected_refs)
+    groups = data.get("event_groups")
+    if isinstance(groups, list) and all(isinstance(group, dict) and isinstance(group.get("group_id"), str) for group in groups):
+        result["event_group_count"] = len({group["group_id"] for group in groups})
+    return result
+
+
 def _empty_current(status: str) -> dict:
     return {"status": status, "including_rejected": {"judgment_count": None, "case_count": None},
             "excluding_rejected": {"judgment_count": None, "case_count": None},
             "rejected": {"judgment_count": None, "case_count": None},
             "confirmed_accepted": {"judgment_count": None, "case_count": None},
             "snapshot_count": None, "mapping_count": None, "mapping_count_excluding_rejected": None,
-            "classifications": None, "classifications_excluding_rejected": None}
+            "classifications": None, "classifications_excluding_rejected": None,
+            "processing": None, "mapping_processing": None, "auto_processed_count": None,
+            "human_exception_count": None, "pending_human_exception_count": None, "agent_pending_count": None,
+            "mapping_auto_processed_count": None, "mapping_human_exception_count": None,
+            "mapping_agent_pending_count": None, "selected_snapshot_count": None,
+            "unused_reference_count": None, "required_reference_count": None, "event_group_count": None}
 
 
-def _current(indexes: dict, present: dict, errors: list, warnings: list) -> dict:
+def _current(indexes: dict, present: dict, errors: list, warnings: list, data: dict | None = None) -> dict:
     initial_errors = len(errors)
     required = ("cases", "snapshots", "judgments", "mappings", "tasks")
     unknown = not all(present[name] for name in required)
     current = {name: [] for name in ("snapshots", "judgments", "mappings")}
     for name, output in current.items():
         for identity, record in indexes[name].items():
+            if name in {"judgments", "mappings"} and not _required_result(record, indexes):
+                continue
             if not isinstance(record.get("is_stale"), bool):
                 unknown = True
                 warnings.append(_issue("CURRENT_SCOPE_UNKNOWN", "is_stale metadata is missing or invalid; current totals are unknown",
@@ -118,6 +180,13 @@ def _current(indexes: dict, present: dict, errors: list, warnings: list) -> dict
                 if present["cases"] and case_id not in indexes["cases"]:
                     errors.append(_issue("MISSING_CASE", "A current result references an absent case",
                                          collection=name, record_id=identity, case_id=case_id))
+                members = record.get("member_case_ids", [])
+                if not isinstance(members, list) or any(not isinstance(value, str) or not value.strip() for value in members):
+                    errors.append(_issue("INVALID_GROUP_MEMBERS", "Shared result member_case_ids must contain valid case IDs",
+                                         collection=name, record_id=identity))
+                elif present["cases"] and set(members) - set(indexes["cases"]):
+                    errors.append(_issue("MISSING_GROUP_CASE", "Shared result references absent member cases",
+                                         collection=name, record_id=identity, case_ids=sorted(set(members) - set(indexes["cases"]))))
                 if task.get("status") != "SUCCEEDED":
                     errors.append(_issue("CURRENT_TASK_STATE_CONFLICT", "Non-stale result does not have a succeeded pipeline task",
                                          collection=name, record_id=identity, task_status=task.get("status")))
@@ -134,6 +203,11 @@ def _current(indexes: dict, present: dict, errors: list, warnings: list) -> dict
                 elif not isinstance(record.get("review_status"), str):
                     unknown = True
                     warnings.append(_issue("CURRENT_REVIEW_UNKNOWN", "Mapping review metadata is incomplete", record_id=identity))
+                if record.get("processing_status") is not None and (record["processing_status"] not in {"AUTO_PROCESSED", "PENDING", "EXCEPTION"}
+                        or not isinstance(record.get("review_required"), bool)):
+                    unknown = True
+                    warnings.append(_issue("CURRENT_PROCESSING_UNKNOWN", "Processing metadata is incomplete or invalid",
+                                           collection=name, record_id=identity))
             output.append(record)
     if len(errors) > initial_errors:
         return _empty_current("RECONCILIATION_FAILED")
@@ -146,12 +220,24 @@ def _current(indexes: dict, present: dict, errors: list, warnings: list) -> dict
                  and indexes["snapshots"][j["snapshot_id"]].get("status") == "COMPLETE"
                  and not j.get("conflicting_dimensions")
                  and "CONTRADICTED" not in (j.get("claim_support") or {}).values()]
+    processing = _processing(js)
+    mapping_processing = _processing(current["mappings"], mapping=True)
     return {"status": "OK", "including_rejected": _counts(js), "excluding_rejected": _counts(non_rejected),
             "rejected": _counts([j for j in js if j["review_status"] == "REJECT"]),
             "confirmed_accepted": _counts(confirmed), "snapshot_count": len(current["snapshots"]),
             "mapping_count": len(current["mappings"]),
             "mapping_count_excluding_rejected": sum(m["review_status"] != "REJECT" for m in current["mappings"]),
-            "classifications": _axes(js), "classifications_excluding_rejected": _axes(non_rejected)}
+            "classifications": _axes(js), "classifications_excluding_rejected": _axes(non_rejected),
+            "processing": processing, "mapping_processing": mapping_processing,
+            "auto_processed_count": processing["AUTO_PROCESSED"]["judgment_count"],
+            "human_exception_count": processing["EXCEPTION"]["judgment_count"],
+            "pending_human_exception_count": sum(j.get("processing_status") == "EXCEPTION" and j.get("review_required") is True
+                                                 and j["review_status"] not in {"ACCEPT", "REJECT"} for j in js),
+            "agent_pending_count": processing["PENDING"]["judgment_count"],
+            "mapping_auto_processed_count": mapping_processing["AUTO_PROCESSED"]["mapping_count"],
+            "mapping_human_exception_count": mapping_processing["EXCEPTION"]["mapping_count"],
+            "mapping_agent_pending_count": mapping_processing["PENDING"]["mapping_count"],
+            **_selection_statistics(data or {}, current["snapshots"])}
 
 
 def _manifest_ids(manifest: dict, key: str, errors: list, warnings: list, *, required: bool) -> set[str] | None:
@@ -237,7 +323,7 @@ def _round(data: dict, indexes: dict, baseline: dict | None, manifest: dict | No
         if removed:
             errors.append(_issue("BASELINE_HISTORY_MISSING", "After-report dropped baseline IDs", collection=name, ids=sorted(removed)))
         for identity in set(before[name]) & set(indexes[name]):
-            mutable = {"is_stale", "review_status"}
+            mutable = {"is_stale", "review_status", "required"}
             old = {key: value for key, value in before[name][identity].items() if key not in mutable}
             new = {key: value for key, value in indexes[name][identity].items() if key not in mutable}
             if old != new:
@@ -278,15 +364,16 @@ def _round(data: dict, indexes: dict, baseline: dict | None, manifest: dict | No
         return output
     new_js = [indexes["judgments"][identity] for identity in jids or set()]
     output = _empty_round("KNOWN", "Manifest reconciled against retained before/after ID history and accepted results")
-    output.update(new_judgment_count=len(new_js), new_case_count=len({j["case_id"] for j in new_js}),
+    output.update(new_judgment_count=len(new_js), new_case_count=_counts(new_js)["case_count"],
                   new_snapshot_count=len(sids or set()), new_mapping_count=len(mids or set()))
     if all(isinstance(j.get("review_status"), str) for j in new_js):
         output["new_judgment_count_excluding_rejected"] = sum(j["review_status"] != "REJECT" for j in new_js)
     if current_ok:
-        current_js = [j for j in new_js if j["is_stale"] is False]
-        output.update(current_new_judgment_count=len(current_js), current_new_case_count=len({j["case_id"] for j in current_js}),
+        current_js = [j for j in new_js if j.get("is_stale") is False and _required_result(j, indexes)]
+        output.update(current_new_judgment_count=len(current_js), current_new_case_count=_counts(current_js)["case_count"],
                       current_new_snapshot_count=sum(indexes["snapshots"][identity]["is_stale"] is False for identity in sids or set()),
-                      current_new_mapping_count=sum(indexes["mappings"][identity]["is_stale"] is False for identity in mids or set()),
+                      current_new_mapping_count=sum(indexes["mappings"][identity].get("is_stale") is False
+                                                    and _required_result(indexes["mappings"][identity], indexes) for identity in mids or set()),
                       current_new_judgment_count_excluding_rejected=sum(j["review_status"] != "REJECT" for j in current_js))
     return output
 
@@ -302,13 +389,20 @@ def report_statistics(data: dict, baseline: dict | None = None, round_manifest: 
     definitions = {"judgment_identity": "unique judgment_id", "case_identity": "unique case_id",
         "association_identity": "validate planned_associations/judged_associations count unique (case_id, snapshot_id) pairs, not judgment IDs",
         "snapshot_identity": "unique snapshot_id; an ingested snapshot does not require a completed model task",
-        "mapping_identity": "mapping.task_id", "current_scope": "Current as of this input report's exported is_stale flags and task states, not a fresh database/policy query; is_stale=false and SUCCEEDED, with REJECT counted separately",
+        "event_group_identity": "Shared explicit event work counts once by judgment_id; involved case counts include unique case_id and member_case_ids, without merging original case records",
+        "mapping_identity": "mapping.task_id", "current_scope": "Current as of this input report's exported is_stale flags and task states, not a fresh database/policy query; required is not false, is_stale=false and SUCCEEDED, with REJECT counted separately; legacy reports default to required",
         "classifications_scope": "Current non-stale judgments including REJECT; excluding-REJECT axes are separately provided",
         "classifications_overlap": True,
         "classification_warning": "Axes overlap. Case counts and counts across different axes must not be summed or substituted for judgment counts.",
         "confirmed_accepted": "COMPLETE snapshot + CONFIRMED + SAME_EVENT + DIRECT + human review ACCEPT, without conflicting dimensions or CONTRADICTED claims",
         "new_case_count": "Unique cases involved in new judgments; not newly imported cases",
-        "round_new_scope": "All IDs added after baseline, including results made stale later in the round"}
+        "round_new_scope": "All IDs added after baseline, including results made stale or unused later in the round",
+        "snapshot_count": "All active ingested snapshots, including unused evidence; selected_snapshot_count is separate",
+        "selection_counts": "Derived from evidence_plans selected IDs; missing plan metadata is unknown rather than zero",
+        "auto_processed_count": "Required current judgments with AUTO_PROCESSED, review_required=false and review_status=NOT_REQUIRED; no human ACCEPT is synthesized",
+        "human_exception_count": "Required current EXCEPTION judgment records, including already reviewed exceptions; pending_human_exception_count excludes human ACCEPT/REJECT",
+        "agent_pending_count": "Required current PENDING judgment records for agent completion; not human exceptions",
+        "mapping_processing_counts": "Mapping records counted separately from judgment records; case counts are not merged across explicit event groups"}
     errors, warnings = [], []
     if not isinstance(data, dict):
         return {"schema_version": "1.0", "run_id": None, "status": "RECONCILIATION_FAILED",
@@ -320,7 +414,7 @@ def report_statistics(data: dict, baseline: dict | None = None, round_manifest: 
         indexes[name], present[name] = _index(data, name, errors, warnings, context="report")
     if not run_id:
         warnings.append(_issue("REPORT_RUN_UNKNOWN", "Report does not identify its run"))
-    current = _current(indexes, present, errors, warnings)
+    current = _current(indexes, present, errors, warnings, data)
     if errors:
         current = _empty_current("RECONCILIATION_FAILED")
     elif not run_id:

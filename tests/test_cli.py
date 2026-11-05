@@ -99,7 +99,7 @@ class CLITests(unittest.TestCase):
         self.assertEqual(len(ingested["snapshots"]), 1)
         self.assertEqual(ingested["snapshots"][0]["status"], "COMPLETE")
         current_tasks = self.run_cli("fetch-tasks", "--run", run_id)["fetch_tasks"]
-        self.assertEqual(current_tasks[0]["retrieval_status"], "COMPLETE")
+        self.assertEqual(current_tasks, [], "Captured evidence needs no repeated collection task")
 
         result = self.run_cli("run", "--run", run_id, "--mode", "mock", "--resume")
         self.assertTrue(result["valid"], result)

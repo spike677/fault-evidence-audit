@@ -48,6 +48,7 @@ class CodexBridgeTests(unittest.TestCase):
         return status, export_model_tasks(self.store, self.run_id, executor="codex")["tasks"]
 
     def envelope(self, task):
+        from tests.fact_fixtures import with_fact_audit
         payload = task["payload"]
         if task["kind"] == "summarize":
             segment = payload["snapshot"]["segments"][0]
@@ -68,6 +69,7 @@ class CodexBridgeTests(unittest.TestCase):
                       "catalog_results": [{"item_id": item["item_id"], "result": "UNDETERMINED",
                                            "reason": "Synthetic event remains unconfirmed.", "evidence": []}
                                           for item in payload["items"]]}
+        result = with_fact_audit(result, task)
         return {"schema_version": "1.0", "run_id": self.run_id, "task_id": task["task_id"],
                 "request_hash": task["request_hash"], "result": result,
                 "producer": {"executor": "codex", "codex_version": "unreported",

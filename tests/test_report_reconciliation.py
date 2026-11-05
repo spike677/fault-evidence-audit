@@ -46,8 +46,8 @@ class ReportReconciliationTests(unittest.TestCase):
         reconciled = report_data(self.store, self.run_id, baseline=baseline, round_manifest=manifest)
         stats = reconciled["statistics"]
         self.assertEqual(stats["status"], "OK", stats)
-        self.assertEqual(stats["current"]["including_rejected"], {"judgment_count": 2, "case_count": 1})
-        self.assertEqual(stats["round"]["new_judgment_count"], 2)
+        self.assertEqual(stats["current"]["including_rejected"], {"judgment_count": 1, "case_count": 1})
+        self.assertEqual(stats["round"]["new_judgment_count"], 1)
         self.assertEqual(stats["round"]["new_case_count"], 1)
         self.assertEqual(stats["round"]["new_snapshot_count"], 2)
         duplicated = copy.deepcopy(reconciled)
@@ -57,7 +57,7 @@ class ReportReconciliationTests(unittest.TestCase):
         self.assertEqual(json.loads(Path(outputs["statistics_json"]).read_text(encoding="utf-8")), stats)
         self.assertIn("统计口径", Path(outputs["report_html"]).read_text(encoding="utf-8"))
         state = validate(self.store, self.run_id)
-        self.assertEqual(state["counts"]["current_judgment_ids_including_rejected"], 2)
+        self.assertEqual(state["counts"]["current_judgment_ids_including_rejected"], 1)
         self.assertEqual(state["counts"]["current_case_ids_with_judgments_including_rejected"], 1)
         self.assertEqual(state["counts"]["pending_reason_entries"], len(state["pending"]))
 

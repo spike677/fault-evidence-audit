@@ -5,7 +5,7 @@ metadata is an executor's audit declaration, not proof of provider routing.
 """
 from __future__ import annotations
 
-from . import contracts, gates, model, prompts, input_budget
+from . import contracts, gates, model, prompts, input_budget, evidence_plan
 from . import store as store_module
 from .contracts import EvidenceSummary
 from .model import PendingModelResult, validate_task_result
@@ -25,7 +25,7 @@ def _executor(value: str) -> str:
 def policy_fingerprint() -> str:
     from .pipeline import RULE_VERSION
     source_hash = digest(b"".join(Path(module.__file__).read_bytes() for module in
-                                  (contracts, gates, model, prompts, store_module, input_budget))
+                                  (contracts, gates, model, prompts, store_module, input_budget, evidence_plan))
                          + Path(__file__).read_bytes() + Path(__file__).with_name("pipeline.py").read_bytes())
     return digest({"source_hash": source_hash, "input_budget_policy": input_budget.budget_policy(),
                    "prompt_version": prompts.PROMPT_VERSION, "rule_version": RULE_VERSION})
@@ -40,7 +40,8 @@ def _snapshot_input_scope(snapshot: dict) -> dict:
 
 
 def _snapshot_payload(snapshot: dict) -> dict:
-    return {**prompts.snapshot_data(snapshot), "input_scope": _snapshot_input_scope(snapshot)}
+    return {**prompts.snapshot_data(snapshot), "input_scope": _snapshot_input_scope(snapshot),
+            "summary_issue_labels": snapshot.get("summary_issue_labels", [])}
 
 
 def _check_current(store: Store, run_id: str, task: dict) -> None:
@@ -53,6 +54,22 @@ def _check_current(store: Store, run_id: str, task: dict) -> None:
     parent = next((t for t in store.tasks(run_id) if t["task_id"] == task["pipeline_task_id"]), None)
     if not parent or parent["status"] in {"STALE", "BLOCKED"}:
         raise AuditError("Model task is stale, blocked, or its pipeline dependency is missing")
+    payload = task["payload"]
+    real_summary = task["kind"] == "summarize" and parent["target_id"] == (payload.get("snapshot") or {}).get("snapshot_id")
+    real_catalog = task["kind"] == "catalog" and parent["target_id"] == (payload.get("case") or {}).get("case_id")
+    if real_summary or real_catalog:
+        from .pipeline import task_views
+        if not any(t["task_id"] == parent["task_id"] and t["required"] for t in task_views(store, run_id)):
+            raise AuditError("Model task is not necessary under the current evidence plan")
+    if task["payload"].get("processing_context"):
+        from .pipeline import task_views, evidence_plan as current_plan, work_context
+        plan = current_plan(store, run_id)
+        if not any(t["task_id"] == parent["task_id"] and t["required"] for t in task_views(store, run_id, plan)):
+            raise AuditError("Model work is no longer selected by the evidence plan")
+        payload = task["payload"]
+        current_context = work_context(store, run_id, payload["case"]["case_id"], payload["snapshot"]["snapshot_id"], plan)
+        if digest(current_context) != digest(payload["processing_context"]):
+            raise AuditError("Model work source relationship, group or applicable issue scope changed")
     try:
         measurement = input_budget.check_input_budget(task)
     except model.ModelError as exc:
@@ -87,8 +104,8 @@ def _check_current(store: Store, run_id: str, task: dict) -> None:
     if task["kind"] == "catalog":
         if digest(payload["items"]) != digest(store.records(run_id, "catalog")):
             raise AuditError("Model task catalog version is stale")
-        from .pipeline import current_judgments
-        current = [j for j in current_judgments(store, run_id, mode=executor, model_id=executor + "-managed")
+        from .pipeline import necessary_judgments
+        current = [j for j in necessary_judgments(store, run_id, mode=executor, model_id=executor + "-managed")
                    if j["case_id"] == case["case_id"] and j.get("review_status") != "REJECT"]
         if digest(current) != digest(payload["judgments"]):
             raise AuditError("Model task judgment/review dependencies are stale")
@@ -133,8 +150,10 @@ class OpenCodeJudge:
 
     def compare(self, case: dict, snapshot: dict, summary: dict) -> dict:
         summary = {key: summary[key] for key in EvidenceSummary.model_fields}
-        messages = prompts.comparison_messages(case, snapshot, summary)
+        context = getattr(self, "processing_context", {})
+        messages = prompts.comparison_messages(case, snapshot, summary, context=context)
         return self._request("compare", {"case": case, "snapshot": _snapshot_payload(snapshot), "summary": summary,
+                                        "processing_context": context,
                                         "input_scope": _snapshot_input_scope(snapshot)},
                              messages[0]["content"], "Judgment")
 
@@ -207,11 +226,26 @@ def submit_model_results(store: Store, run_id: str, envelopes: list[dict], *, ex
                                        case=payload.get("case"), judgments=payload.get("judgments"),
                                        items=payload.get("items"))
         if task["kind"] == "compare":
+            if payload.get("processing_context", {}).get("processing_version") == "evidence-first-0.1.6":
+                categories = {fact["category"] for fact in checked.get("fact_comparisons", [])}
+                check = checked.get("self_check") or {}
+                fields = ("numeric_meaning_checked", "citations_checked", "counterevidence_checked", "issue_scope_checked", "event_vs_technical_checked")
+                if categories != {"NUMBER", "TERM", "SCENARIO", "TECHNICAL_CONCLUSION"} or check.get("attempt") != 1 or any(check.get(key) is not True for key in fields):
+                    raise AuditError("Complete fact comparisons in all four categories and one bounded self-check before submitting; no result was saved")
             from .pipeline import gate_judgment
             saved_snapshot = store.get(run_id, "snapshots", payload["snapshot"]["snapshot_id"])
             actual_view = {**saved_snapshot, "text": snapshot_view["text"], "segments": snapshot_view["segments"],
-                           "input_scope": snapshot_view["input_scope"]}
-            gate_judgment(payload["case"], actual_view, checked)
+                           "input_scope": snapshot_view["input_scope"],
+                           "summary_issue_labels": [issue["label"] for issue in payload["summary"]["issues"]]}
+            decision = gate_judgment(payload["case"], actual_view, checked, context=payload.get("processing_context"))
+            if (payload.get("processing_context", {}).get("processing_version") == "evidence-first-0.1.6"
+                    and decision["processing_status"] == "PENDING"):
+                facts, self_check = checked.get("fact_comparisons", []), checked.get("self_check") or {}
+                incomplete = (self_check.get("passed") is not True and not self_check.get("issues")) or not checked.get("applicable_issue")
+                incomplete = incomplete or any(fact["relation"] == "UNKNOWN" and not fact.get("reason", "").strip() for fact in facts)
+                incomplete = incomplete or not any(fact.get("source_field") and fact.get("source_quote") and fact.get("source_cell") and fact.get("evidence") for fact in facts)
+                if incomplete:
+                    raise AuditError("Agent response is incomplete; finish the issue scope, sourced comparisons and self-check before resubmitting this same task. No result was saved")
         saved = {"schema_version": SCHEMA_VERSION, "run_id": run_id, "task_id": task_id,
                  "request_hash": task["request_hash"], "producer": producer, "result": checked}
         existing = store.get(run_id, "model_results", task_id)

@@ -1,5 +1,35 @@
 {
   "$defs": {
+    "ApplicableIssue": {
+      "additionalProperties": false,
+      "properties": {
+        "label": {
+          "minLength": 1,
+          "title": "Label",
+          "type": "string"
+        },
+        "evidence": {
+          "items": {
+            "$ref": "#/$defs/EvidenceRef"
+          },
+          "minItems": 1,
+          "title": "Evidence",
+          "type": "array"
+        },
+        "selection_reason": {
+          "minLength": 1,
+          "title": "Selection Reason",
+          "type": "string"
+        }
+      },
+      "required": [
+        "label",
+        "evidence",
+        "selection_reason"
+      ],
+      "title": "ApplicableIssue",
+      "type": "object"
+    },
     "EvidenceRef": {
       "additionalProperties": false,
       "properties": {
@@ -19,6 +49,85 @@
         "quote"
       ],
       "title": "EvidenceRef",
+      "type": "object"
+    },
+    "FactComparison": {
+      "additionalProperties": false,
+      "properties": {
+        "category": {
+          "enum": [
+            "NUMBER",
+            "TERM",
+            "SCENARIO",
+            "TECHNICAL_CONCLUSION"
+          ],
+          "title": "Category",
+          "type": "string"
+        },
+        "source_field": {
+          "default": "",
+          "title": "Source Field",
+          "type": "string"
+        },
+        "source_quote": {
+          "default": "",
+          "title": "Source Quote",
+          "type": "string"
+        },
+        "source_cell": {
+          "default": "",
+          "title": "Source Cell",
+          "type": "string"
+        },
+        "source_value": {
+          "default": "",
+          "title": "Source Value",
+          "type": "string"
+        },
+        "evidence_value": {
+          "default": "",
+          "title": "Evidence Value",
+          "type": "string"
+        },
+        "source_meaning": {
+          "default": "",
+          "title": "Source Meaning",
+          "type": "string"
+        },
+        "evidence_meaning": {
+          "default": "",
+          "title": "Evidence Meaning",
+          "type": "string"
+        },
+        "evidence": {
+          "items": {
+            "$ref": "#/$defs/EvidenceRef"
+          },
+          "title": "Evidence",
+          "type": "array"
+        },
+        "relation": {
+          "enum": [
+            "MATCH",
+            "CONFLICT",
+            "UNKNOWN",
+            "NAME_ONLY",
+            "DIFFERENT"
+          ],
+          "title": "Relation",
+          "type": "string"
+        },
+        "reason": {
+          "default": "",
+          "title": "Reason",
+          "type": "string"
+        }
+      },
+      "required": [
+        "category",
+        "relation"
+      ],
+      "title": "FactComparison",
       "type": "object"
     },
     "NegativeBasis": {
@@ -95,6 +204,59 @@
         "evidence"
       ],
       "title": "NegativeIdentityBasis",
+      "type": "object"
+    },
+    "SelfCheck": {
+      "additionalProperties": false,
+      "properties": {
+        "attempt": {
+          "maximum": 1,
+          "minimum": 1,
+          "title": "Attempt",
+          "type": "integer"
+        },
+        "numeric_meaning_checked": {
+          "title": "Numeric Meaning Checked",
+          "type": "boolean"
+        },
+        "citations_checked": {
+          "title": "Citations Checked",
+          "type": "boolean"
+        },
+        "counterevidence_checked": {
+          "title": "Counterevidence Checked",
+          "type": "boolean"
+        },
+        "issue_scope_checked": {
+          "title": "Issue Scope Checked",
+          "type": "boolean"
+        },
+        "event_vs_technical_checked": {
+          "title": "Event Vs Technical Checked",
+          "type": "boolean"
+        },
+        "passed": {
+          "title": "Passed",
+          "type": "boolean"
+        },
+        "issues": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Issues",
+          "type": "array"
+        }
+      },
+      "required": [
+        "attempt",
+        "numeric_meaning_checked",
+        "citations_checked",
+        "counterevidence_checked",
+        "issue_scope_checked",
+        "event_vs_technical_checked",
+        "passed"
+      ],
+      "title": "SelfCheck",
       "type": "object"
     }
   },
@@ -215,6 +377,35 @@
       ],
       "title": "Observation Scope",
       "type": "string"
+    },
+    "fact_comparisons": {
+      "items": {
+        "$ref": "#/$defs/FactComparison"
+      },
+      "title": "Fact Comparisons",
+      "type": "array"
+    },
+    "applicable_issue": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ApplicableIssue"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "self_check": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/SelfCheck"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
     },
     "short_reason": {
       "title": "Short Reason",

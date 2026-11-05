@@ -142,6 +142,88 @@ class ExportReportTests(unittest.TestCase):
             row = dict(zip(columns, workbook["sheets"][0]["rows"][0]))
             self.assertEqual(row["库覆盖（98条）"], "COVERED")
 
+    def workbook(self, data):
+        with tempfile.TemporaryDirectory(dir=Path(__file__).resolve().parent) as directory:
+            paths = export_report(data, Path(directory))
+            workbook = json.loads(Path(paths["workbook_data"]).read_text(encoding="utf-8"))
+        return {sheet["name"]: [dict(zip(sheet["columns"], row)) for row in sheet["rows"]]
+                for sheet in workbook["sheets"]}
+
+    def test_processing_statuses_do_not_create_human_accept_or_blanket_review(self):
+        data = self.sample()
+        data["tasks"] = []
+        judgment = data["judgments"][0]
+        judgment.update(support_level="DIRECT", case_attribution="CONFIRMED", processing_status="AUTO_PROCESSED",
+                        review_required=False, review_status="NOT_REQUIRED", missing_information=[])
+        data["mappings"] = [{"case_id": "case-1", "overall": "COVERED", "processing_status": "AUTO_PROCESSED",
+                            "review_required": False, "review_status": "NOT_REQUIRED"}]
+        row = self.workbook(data)["汇总"][0]
+        self.assertEqual(row["处理状态"], "AUTO_PROCESSED")
+        self.assertEqual(row["需人工"], "否")
+        self.assertEqual(row["证据强度"], "DIRECT（自动处理）")
+        self.assertEqual(row["库覆盖（98条）"], "COVERED（自动处理）")
+        self.assertNotIn("待复核", row["证据判断"])
+        self.assertEqual(judgment["review_status"], "NOT_REQUIRED")
+        data["mappings"] = []
+        for processing, required, review, human in (("PENDING", False, "PENDING_AGENT", "否"),
+                                                   ("EXCEPTION", True, "NEEDS_REVIEW", "是")):
+            judgment.update(processing_status=processing, review_required=required, review_status=review,
+                            review_reasons=["合成处理原因"])
+            row = self.workbook(data)["汇总"][0]
+            self.assertEqual((row["处理状态"], row["需人工"], row["处理原因"]), (processing, human, "合成处理原因"))
+
+    def test_unused_work_is_retained_without_becoming_pending(self):
+        data = self.sample()
+        data["references"] = [{"ref_id": "R-used", "case_id": "case-1", "origin": "ORIGINAL_WEEKLY"},
+                              {"ref_id": "R-unused", "case_id": "case-1", "origin": "SEARCH_DISCOVERED"}]
+        data["evidence_plans"] = {"cases": [{"case_id": "case-1", "path": "CONFIRMED_ORIGINAL",
+            "selected_ref_ids": ["R-used"], "selected_snapshot_ids": ["s-1"]}], "work_items": []}
+        data["judgments"][0].update(task_id="used", judgment_id="J-used", processing_status="AUTO_PROCESSED",
+            review_required=False, review_status="NOT_REQUIRED", missing_information=[], support_level="DIRECT")
+        data["judgments"].append({"case_id": "case-1", "task_id": "unused", "judgment_id": "J-unused",
+            "is_stale": True, "short_reason": "unused old failure", "missing_information": ["不必要缺口"]})
+        data["tasks"] = [{"task_id": "used", "case_id": "case-1", "status": "SUCCEEDED", "required": True},
+                         {"task_id": "unused", "case_id": "case-1", "status": "FAILED", "required": False}]
+        tables = self.workbook(data)
+        self.assertEqual(len(tables["关联判断"]), 2)
+        self.assertEqual(len(tables["任务台账"]), 2)
+        self.assertEqual(len(tables["未选引用留档"]), 1)
+        self.assertEqual(tables["失败与待办"], [])
+        self.assertEqual(tables["汇总"][0]["处理状态"], "AUTO_PROCESSED")
+        self.assertEqual(tables["汇总"][0]["缺口"], "")
+        self.assertEqual(tables["汇总"][0]["未选引用数"], 1)
+
+    def test_group_judgment_is_shared_without_changing_source_cells_or_merging_cases(self):
+        data = self.sample()
+        data["tasks"] = []
+        data["cases"][1]["raw"]["根因"] = "另一条根因原文"
+        data["evidence_plans"] = {"cases": [{"case_id": case_id, "group_id": "G-1", "path": "EXPLICIT_GROUP",
+            "selected_ref_ids": ["R-1"], "selected_snapshot_ids": ["s-1"]} for case_id in ("case-1", "case-2")]}
+        data["event_groups"] = [{"group_id": "G-1", "case_ids": ["case-1", "case-2"]}]
+        data["event_conclusions"] = [{"group_id": "G-1", "case_ids": ["case-1", "case-2"],
+            "selected_snapshot_ids": ["s-1"], "judgment_ids": ["J-group"], "conflicts": ["根因不同"]}]
+        data["judgments"][0].update(judgment_id="J-group", member_case_ids=["case-1", "case-2"],
+            processing_status="EXCEPTION", review_required=True, review_status="NEEDS_REVIEW", fact_comparisons=[{
+                "category": "NUMBER", "source_field": "问题描述", "source_cell": "F2", "source_quote": "58%",
+                "source_value": "58%", "source_meaning": "回答差异比例", "evidence_value": "58%",
+                "evidence_meaning": "不同含义的精度比例", "relation": "CONFLICT", "reason": "数字相同但含义不同",
+                "evidence": [{"segment_id": "s-1#001", "quote": "58%精度比例"}]}])
+        tables = self.workbook(data)
+        self.assertEqual(len(tables["汇总"]), 2)
+        self.assertEqual([row["关联判断ID"] for row in tables["汇总"]], ["J-group", "J-group"])
+        self.assertEqual([row["引文来源case_id"] for row in tables["汇总"]], ["case-1", "case-1"])
+        self.assertEqual([row["根因"] for row in tables["汇总"]], ["原始AllReduce", "另一条根因原文"])
+        self.assertEqual(len(tables["事件组结论"]), 1)
+        self.assertIn("根因不同", tables["事件组结论"][0]["conflicts"])
+        self.assertIn("另一条根因原文", tables["事件组结论"][0]["成员根因原文"])
+        self.assertTrue(tables["事件组结论"][0]["成员根因原文是否不同"])
+        self.assertIn("J-group", tables["事件组结论"][0]["事件组事实结论"])
+        comparison = tables["事实对照"][0]
+        self.assertEqual(comparison["source_case_id"], "case-1")
+        self.assertEqual((comparison["source_field"], comparison["source_cell"], comparison["source_quote"]), ("问题描述", "F2", "58%"))
+        self.assertEqual(comparison["relation"], "CONFLICT")
+        self.assertIn("s-1#001", comparison["evidence"])
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -221,6 +221,84 @@ class StatisticsTests(unittest.TestCase):
             report_statistics(data, baseline, manifest)
         self.assertEqual((data, baseline, manifest), before)
 
+    def test_processing_and_selected_scope_are_separate_from_ingested_snapshots(self):
+        data, _, _ = fixture()
+        for judgment, status, required, review in zip(data["judgments"][1:],
+                ("AUTO_PROCESSED", "EXCEPTION", "PENDING"), (False, True, False),
+                ("NOT_REQUIRED", "NEEDS_REVIEW", "PENDING_AGENT")):
+            judgment.update(processing_status=status, review_required=required, review_status=review)
+        data["mappings"][0].update(processing_status="AUTO_PROCESSED", review_required=False, review_status="NOT_REQUIRED")
+        data["references"] = [{"ref_id": "R-1"}, {"ref_id": "R-2"}, {"ref_id": "R-unused"}]
+        data["evidence_plans"] = {"cases": [{"case_id": "case-1", "selected_ref_ids": ["R-1", "R-2"],
+                                              "selected_snapshot_ids": ["S-1", "S-2"]}]}
+        data["event_groups"] = [{"group_id": "G-1", "case_ids": ["case-1", "case-2"]}]
+        result = report_statistics(data)
+        current = result["current"]
+        self.assertEqual(current["status"], "OK", result)
+        self.assertEqual((current["snapshot_count"], current["selected_snapshot_count"]), (3, 2))
+        self.assertEqual((current["unused_reference_count"], current["required_reference_count"]), (1, 2))
+        self.assertEqual(current["event_group_count"], 1)
+        self.assertEqual((current["auto_processed_count"], current["human_exception_count"], current["agent_pending_count"]), (1, 1, 1))
+        self.assertEqual(current["pending_human_exception_count"], 1)
+        self.assertEqual(current["mapping_auto_processed_count"], 1)
+        self.assertEqual(current["confirmed_accepted"]["judgment_count"], 0)
+        self.assertEqual(data["judgments"][1]["review_status"], "NOT_REQUIRED")
+
+    def test_unused_results_are_history_even_when_task_is_failed(self):
+        data, _, _ = fixture()
+        unused = data["judgments"][2]
+        unused["required"] = False
+        unused.pop("is_stale")
+        next(task for task in data["tasks"] if task["task_id"] == unused["task_id"]).update(required=False, status="FAILED")
+        data["mappings"][0]["required"] = False
+        result = report_statistics(data)
+        self.assertEqual(result["current"]["status"], "OK", result)
+        self.assertEqual(result["current"]["including_rejected"], {"judgment_count": 2, "case_count": 2})
+        self.assertEqual(result["current"]["mapping_count"], 0)
+        self.assertEqual(result["current"]["snapshot_count"], 3)
+        self.assertIsNone(result["current"]["selected_snapshot_count"])
+        self.assertEqual(len(data["judgments"]), 4)
+
+    def test_group_one_judgment_involves_distinct_member_cases(self):
+        data, baseline, manifest = fixture()
+        shared = data["judgments"][1]
+        shared["member_case_ids"] = ["case-1", "case-2", "case-2"]
+        # Keep proof exact: explicit membership is part of the accepted result.
+        next(value for value in data["model_results"] if value["task_id"] == "MODEL-J-1")["result"]["member_case_ids"] = shared["member_case_ids"]
+        for judgment in data["judgments"][2:]:
+            judgment["required"] = False
+        result = report_statistics(data, baseline, manifest)
+        self.assertEqual(result["status"], "OK", result)
+        self.assertEqual(result["current"]["including_rejected"], {"judgment_count": 1, "case_count": 2})
+        self.assertEqual(result["current"]["classifications"]["case_attribution"]["CONFIRMED"]["case_count"], 2)
+        self.assertEqual(result["round"]["new_judgment_count"], 3)
+        self.assertEqual(result["round"]["new_case_count"], 2)
+        self.assertEqual(result["round"]["current_new_judgment_count"], 1)
+        self.assertEqual(result["round"]["current_new_case_count"], 2)
+
+    def test_selection_metadata_can_change_but_round_history_proof_is_still_required(self):
+        data, baseline, manifest = fixture()
+        data["judgments"][0]["required"] = False
+        data["snapshots"][0]["required"] = False
+        data["judgments"][2]["required"] = False
+        result = report_statistics(data, baseline, manifest)
+        self.assertEqual(result["round"]["status"], "KNOWN", result)
+        self.assertEqual(result["round"]["new_judgment_count"], 3)
+        self.assertEqual(result["round"]["current_new_judgment_count"], 2)
+        # Unselected new judgments are still part of the full historical delta.
+        bad = {**manifest, "judgment_ids": ["J-1", "J-3"]}
+        self.assertEqual(report_statistics(data, baseline, bad)["round"]["status"], "RECONCILIATION_FAILED")
+        data["judgments"][0]["short_reason"] = "history tampering"
+        self.assertEqual(report_statistics(data, baseline, manifest)["round"]["status"], "RECONCILIATION_FAILED")
+
+    def test_malformed_optional_selection_is_unknown_not_fabricated_zero(self):
+        data, _, _ = fixture()
+        data["evidence_plans"] = {"cases": [{"selected_ref_ids": None, "selected_snapshot_ids": {"S-1": True}}]}
+        result = report_statistics(data)
+        self.assertEqual(result["current"]["status"], "OK")
+        self.assertIsNone(result["current"]["selected_snapshot_count"])
+        self.assertIsNone(result["current"]["unused_reference_count"])
+
 
 if __name__ == "__main__":
     unittest.main()

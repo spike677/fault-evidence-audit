@@ -88,7 +88,9 @@ class NegativeJudgmentGatesTests(unittest.TestCase):
                 self.assertEqual(result["event_relation"], "DIFFERENT_EVENT")
                 self.assertEqual(result["pattern_relation"], "SAME_PATTERN")
                 self.assertEqual(result["claim_support"]["root_cause"], "UNKNOWN")
-                self.assertEqual(result["review_status"], "NEEDS_REVIEW")
+                self.assertEqual(result["processing_status"], "PENDING")
+                self.assertFalse(result["review_required"])
+                self.assertEqual(result["review_status"], "PENDING_AGENT")
 
     def test_another_events_technical_root_cause_remains_in_independent_summary(self):
         technical_fact = "all_reduce舍入精度问题"
@@ -187,7 +189,9 @@ class NegativeJudgmentGatesTests(unittest.TestCase):
         value = judgment(snap, event_relation="DIFFERENT_EVENT", negative_basis=basis(snap))
         result = validate_task_result("compare", value, case=case, snapshot=snap)
         self.assertEqual(result["event_relation"], "DIFFERENT_EVENT")
-        self.assertEqual(gate_judgment(case, snap, value)["review_status"], "NEEDS_REVIEW")
+        proposed = gate_judgment(case, snap, value)
+        self.assertEqual(proposed["processing_status"], "PENDING")
+        self.assertNotEqual(proposed["review_status"], "ACCEPT")
 
     def test_source_event_identity_is_not_inferred_from_description_mentions(self):
         snap = snapshot()
@@ -304,7 +308,9 @@ class NegativeJudgmentGatesTests(unittest.TestCase):
     def test_pipeline_positive_other_event_stays_needs_review(self):
         snap = snapshot()
         result = gate_judgment(source_case(), snap, judgment(snap, event_relation="DIFFERENT_EVENT", negative_basis=basis(snap)))
-        self.assertEqual(result["review_status"], "NEEDS_REVIEW")
+        self.assertEqual(result["processing_status"], "PENDING")
+        self.assertFalse(result["review_required"])
+        self.assertNotEqual(result["review_status"], "ACCEPT")
 
     def test_pipeline_rejects_direct_with_root_claim_contradiction(self):
         snap = snapshot("事件EVT-A001为甲客户周一的首token乱码，定位与原始归因存在待确认冲突。")
@@ -405,7 +411,9 @@ class NegativeBridgeGatesTests(unittest.TestCase):
         self.fixture.drive()
         values = report_data(self.fixture.store, self.fixture.run_id)["judgments"]
         self.assertEqual(values[0]["event_relation"], "DIFFERENT_EVENT")
-        self.assertEqual(values[0]["review_status"], "NEEDS_REVIEW")
+        self.assertEqual(values[0]["processing_status"], "EXCEPTION")
+        self.assertTrue(values[0]["review_required"])
+        self.assertNotEqual(values[0]["review_status"], "ACCEPT")
 
 
 if __name__ == "__main__":
