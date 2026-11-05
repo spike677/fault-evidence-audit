@@ -10,7 +10,7 @@ import unittest
 from pathlib import Path
 
 from faultaudit.bridge import OpenCodeJudge, export_model_tasks, submit_model_results
-from faultaudit.evidence_plan import register_event_group, register_evidence_association
+from faultaudit.evidence_plan import register_event_group, register_evidence_association, register_search_policy
 from faultaudit.importers import import_cases, import_catalog
 from faultaudit.pipeline import evidence_plan, execute, fetch_tasks, import_into, report_data
 from faultaudit.store import AuditError, Store
@@ -228,6 +228,38 @@ class EvidenceWorkflowTests(unittest.TestCase):
         self.assertEqual(current["review_status"], "NOT_REQUIRED")
         self.assertEqual(next(j for j in data["judgments"] if j["judgment_id"] == old["judgment_id"])["review_status"], "ACCEPT")
         self.assertTrue(any(result["result"].get("case_id") == case["case_id"] for result in data["model_results"]))
+
+    def test_explicit_gitcode_goal_uses_candidate_then_stops_without_new_tasks(self):
+        case = self.load()[0]
+        self.capture()
+        self.finish()
+        self.store.ingest_evidence(self.run_id, {"url": "https://gitcode.com/synthetic/evidence/pull/1", "text": TEXT,
+            "status": "PARTIAL", "is_synthetic": True, "origin": "LINK_DISCOVERED", "case_ids": [case["case_id"]],
+            "record_discovery": True, "discovered_from_url": "https://example.invalid/main"})
+        # An unsolicited candidate does not restart default search or processing.
+        before = self.store.records(self.run_id, "model_tasks")
+        self.finish()
+        self.assertEqual(self.store.records(self.run_id, "model_tasks"), before)
+        register_search_policy(self.store, self.run_id, {"required_sources": ["GITCODE"]})
+        pending = evidence_plan(self.store, self.run_id)["cases"][0]
+        self.assertFalse(pending["search_control"]["satisfied"])
+        self.assertEqual(pending["search_control"]["status"], "CANDIDATE_PENDING")
+        self.finish()
+        data = report_data(self.store, self.run_id)
+        control = data["evidence_plans"]["cases"][0]["search_control"]
+        self.assertTrue(control["satisfied"])
+        self.assertFalse(control["search_allowed"])
+        self.assertEqual(control["usable_sources"], ["GITCODE", "WIKI"])
+        selected = [judgment for judgment in data["judgments"] if judgment["required"]]
+        self.assertEqual(len(selected), 2)
+        self.assertTrue(all(not judgment["review_required"] and judgment["review_status"] == "NOT_REQUIRED" for judgment in selected))
+        self.assertEqual(self.store.events(self.run_id, "review"), [])
+        self.assertTrue(data["validation"]["search_goals_satisfied"])
+        self.assertTrue(data["validation"]["fact_organization_complete"])
+        self.assertFalse(data["validation"]["complete"], "Unknown catalog coverage is independent of search completion")
+        before = self.store.records(self.run_id, "model_tasks")
+        self.finish()
+        self.assertEqual(self.store.records(self.run_id, "model_tasks"), before)
 
     def test_same_case_snapshot_two_issue_scopes_keep_separate_work_through_submission(self):
         case = self.load()[0]

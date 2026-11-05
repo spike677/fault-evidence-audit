@@ -342,6 +342,27 @@ class StatisticsTests(unittest.TestCase):
         next(value for value in data["model_results"] if value["task_id"] == request["task_id"])["work_id"] = "another-issue-work"
         self.assertEqual(report_statistics(data, baseline, manifest)["round"]["status"], "RECONCILIATION_FAILED")
 
+    def test_search_goal_counts_are_case_scoped_and_separate_from_confirmation(self):
+        data, _, _ = fixture()
+        for judgment in data["judgments"]:
+            judgment["review_status"] = "NOT_REQUIRED"
+        data["evidence_plans"] = {"cases": [
+            {"case_id": "case-1", "selected_ref_ids": [], "selected_snapshot_ids": ["S-1"],
+             "search_control": {"satisfied": True, "search_allowed": False}},
+            {"case_id": "case-2", "selected_ref_ids": [], "selected_snapshot_ids": ["S-3"],
+             "search_control": {"satisfied": False, "search_allowed": True}}]}
+        result = report_statistics(data)
+        self.assertEqual(result["current"]["including_rejected"]["judgment_count"], 3)
+        self.assertEqual(result["current"]["search_goal_satisfied_case_count"], 1)
+        self.assertEqual(result["current"]["search_goal_unsatisfied_case_count"], 1)
+        self.assertEqual(result["current"]["confirmed_accepted"]["judgment_count"], 0)
+        data["evidence_plans"]["cases"].append(copy.deepcopy(data["evidence_plans"]["cases"][0]))
+        self.assertEqual(report_statistics(data)["current"]["search_goal_satisfied_case_count"], 1)
+        data["evidence_plans"]["cases"][-1]["search_control"]["satisfied"] = False
+        self.assertIsNone(report_statistics(data)["current"]["search_goal_satisfied_case_count"])
+        del data["evidence_plans"]
+        self.assertIsNone(report_statistics(data)["current"]["search_goal_unsatisfied_case_count"])
+
 
 if __name__ == "__main__":
     unittest.main()

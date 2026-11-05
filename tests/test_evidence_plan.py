@@ -8,7 +8,8 @@ import unittest
 from pathlib import Path
 
 from faultaudit.evidence_plan import (build_evidence_plan, register_event_group, register_evidence_association,
-                                     semantic_input_hash, source_relation)
+                                     semantic_input_hash, source_relation, register_search_policy, get_search_policy,
+                                     normalize_search_policy, resource_kind)
 from faultaudit.importers import import_cases
 from faultaudit.pipeline import import_into
 from faultaudit.store import AuditError, Store
@@ -385,6 +386,218 @@ class EvidencePlanTests(unittest.TestCase):
         self.assertNotEqual(changed_row["path"], "EXCEPTION")
         self.assertNotIn(old["work_id"], changed_row["work_ids"])
         self.assertNotIn("RECONCILE_CONFLICT", [action["action"] for action in changed_row["required_actions"]])
+
+    def test_default_any_existing_source_stops_search_including_dts(self):
+        sources = {"WIKI": "https://wiki.example.invalid/main", "DTS": "https://dts.example.invalid/ticket/DTS2026110500001",
+                   "GITCODE": "https://gitcode.com/synthetic/example/pull/1", "GITHUB": "https://github.com/synthetic/example/pull/1",
+                   "CODEHUB": "https://codehub-dg.example.invalid/project/merge_requests/1"}
+        for expected, url in sources.items():
+            with self.subTest(source=expected):
+                self.run_id = self.store.create_run({"is_synthetic": True})
+                self.rows(link=False, additional_links={"链接": url})
+                before = self.first(self.plan())
+                self.assertFalse(before["search_control"]["search_allowed"])
+                self.assertNotIn("SEARCH", [action["action"] for action in before["required_actions"]])
+                self.snapshot(url=url, status="PARTIAL")
+                after = self.first(self.plan())
+                self.assertTrue(after["search_control"]["satisfied"])
+                self.assertEqual(after["search_control"]["usable_sources"], [expected])
+                self.assertEqual(after["search_control"]["usable_evidence_count"], 1)
+
+    def test_policy_append_history_case_override_and_read_only_lookup(self):
+        cases = self.rows(count=2)
+        initial = get_search_policy(self.store, self.run_id, cases[0]["case_id"])
+        self.assertEqual(initial["scope"], "DEFAULT")
+        first = register_search_policy(self.store, self.run_id, {"required_sources": ["GITCODE"]})
+        again = register_search_policy(self.store, self.run_id, {"required_sources": ["GITCODE", "GITCODE"]})
+        self.assertEqual(first, again)
+        second = register_search_policy(self.store, self.run_id, {"min_usable_evidence": 2})
+        override = register_search_policy(self.store, self.run_id, {"required_any_sources": ["GITHUB", "GITCODE"]}, cases[0]["case_id"])
+        self.assertEqual(len(self.store.records(self.run_id, "search_policies")), 3)
+        self.assertEqual(first["revision"], 1)
+        self.assertEqual(second["revision"], 2)
+        self.assertEqual(get_search_policy(self.store, self.run_id, cases[0]["case_id"])["policy_record_id"], override["policy_record_id"])
+        self.assertEqual(get_search_policy(self.store, self.run_id, cases[1]["case_id"])["policy_record_id"], second["policy_record_id"])
+        changes = self.store.conn.total_changes
+        self.plan()
+        self.assertEqual(self.store.conn.total_changes, changes)
+        reverted = register_search_policy(self.store, self.run_id, {"required_sources": ["GITCODE"]})
+        self.assertEqual(reverted["revision"], 3)
+        self.assertNotEqual(reverted["policy_record_id"], first["policy_record_id"])
+        self.assertEqual(reverted["policy_hash"], first["policy_hash"])
+
+    def test_policy_rejects_invalid_counts_sources_and_unknown_case(self):
+        self.rows()
+        for policy in ({"min_usable_evidence": True}, {"min_usable_evidence": 0}, {"min_usable_evidence": "2"},
+                       {"required_sources": "WIKI"}, {"required_sources": ["CODE"]}, {"required_any_sources": [None]}, {"unknown": 1}):
+            with self.subTest(policy=policy), self.assertRaises(AuditError):
+                normalize_search_policy(policy)
+        with self.assertRaises(AuditError):
+            register_search_policy(self.store, self.run_id, {}, "outside-run")
+
+    def test_explicit_source_policy_selects_discovered_support_and_keeps_it_after_goal(self):
+        case = self.rows()[0]
+        original = self.snapshot()
+        support = self.snapshot([case["case_id"]], url="https://gitcode.com/synthetic/example/pull/1", status="PARTIAL")
+        default = self.first(self.plan())
+        self.assertEqual(default["selected_snapshot_ids"], [original["snapshot_id"]])
+        register_search_policy(self.store, self.run_id, {"required_sources": ["GITCODE"]})
+        pending = self.first(self.plan())
+        self.assertEqual(set(pending["selected_snapshot_ids"]), {original["snapshot_id"], support["snapshot_id"]})
+        self.assertEqual(pending["search_control"]["status"], "CANDIDATE_PENDING")
+        self.assertFalse(pending["search_control"]["search_allowed"])
+        self.assertFalse(pending["search_control"]["satisfied"])
+        complete = self.first(self.plan([self.useful_search(case, support)]))
+        self.assertTrue(complete["search_control"]["satisfied"])
+        self.assertEqual(complete["selected_snapshot_ids"], pending["selected_snapshot_ids"])
+        self.assertEqual(complete["routing_hash"], pending["routing_hash"])
+        self.assertFalse(complete["search_control"]["search_allowed"])
+        self.assertFalse(complete["user_confirmed"])
+
+    def test_source_requirements_are_and_with_separate_any_source_or(self):
+        case = self.rows()[0]
+        self.snapshot()
+        register_search_policy(self.store, self.run_id, {"required_sources": ["WIKI", "DTS"],
+            "required_any_sources": ["GITCODE", "GITHUB"]})
+        missing = self.first(self.plan())
+        self.assertEqual(missing["search_control"]["missing_sources"], ["DTS"])
+        self.assertEqual(missing["search_control"]["missing_any_sources"], ["GITCODE", "GITHUB"])
+        action = next(action for action in missing["required_actions"] if action["action"] == "SEARCH_SUPPORT")
+        self.assertEqual(action["target_sources"], ["DTS", "GITCODE", "GITHUB"])
+        dts = self.snapshot([case["case_id"]], url="https://dts.example.invalid/ticket/DTS2026110500001")
+        github = self.snapshot([case["case_id"]], url="https://github.com/synthetic/example/pull/1", status="PARTIAL")
+        useful = [self.useful_search(case, dts), {**self.useful_search(case, github), "judgment_id": "second-search"}]
+        done = self.first(self.plan(useful))
+        self.assertTrue(done["search_control"]["satisfied"])
+        self.assertEqual(done["search_control"]["usable_sources"], ["DTS", "GITHUB", "WIKI"])
+        self.assertEqual(len(done["selected_snapshot_ids"]), 3)
+
+    def test_minimum_counts_unique_snapshots_not_occurrences_and_policy_changes_routing(self):
+        case = self.rows(additional_links={"DTS": "https://example.invalid/wiki/one"})[0]
+        self.snapshot()
+        before = self.first(self.plan())
+        register_search_policy(self.store, self.run_id, {"min_usable_evidence": 2})
+        required = self.first(self.plan())
+        self.assertEqual(required["search_control"]["usable_evidence_count"], 1)
+        self.assertTrue(required["search_control"]["search_allowed"])
+        self.assertNotEqual(before["routing_hash"], required["routing_hash"])
+        support = self.snapshot([case["case_id"]], url="https://github.com/synthetic/example/pull/1", status="PARTIAL")
+        self.assertFalse(self.first(self.plan())["search_control"]["satisfied"])
+        done = self.first(self.plan([self.useful_search(case, support)]))
+        self.assertTrue(done["search_control"]["satisfied"])
+        self.assertEqual(done["search_control"]["usable_evidence_count"], 2)
+
+    def test_blocked_first_policy_candidate_does_not_jump_to_later_readable_one(self):
+        case = self.rows()[0]
+        self.snapshot()
+        register_search_policy(self.store, self.run_id, {"required_sources": ["GITCODE"]})
+        failed = self.snapshot([case["case_id"]], url="https://gitcode.com/synthetic/first/pull/1", status="AUTH_REQUIRED")
+        later = self.snapshot([case["case_id"]], url="https://gitcode.com/synthetic/later/pull/2", status="PARTIAL")
+        planned = self.first(self.plan())
+        self.assertIn(failed["snapshot_id"], planned["selected_snapshot_ids"])
+        self.assertNotIn(later["snapshot_id"], planned["selected_snapshot_ids"])
+        self.assertEqual(planned["search_control"]["status"], "CAPTURE_GAP")
+        self.assertFalse(planned["search_control"]["search_allowed"])
+        self.assertIn("RESOLVE_CAPTURE_FAILURE", [action["action"] for action in planned["required_actions"]])
+
+    def test_negative_policy_candidate_is_not_counted_then_searches_next(self):
+        case = self.rows()[0]
+        self.snapshot()
+        register_search_policy(self.store, self.run_id, {"required_sources": ["GITCODE"]})
+        other = self.snapshot([case["case_id"]], url="https://gitcode.com/synthetic/other/pull/1", status="PARTIAL",
+            text="OtherTenant owns OTHER-EVENT, a separate garbled during restore incident due to cache failure.")
+        pending_work = next(work for work in self.plan()["work_items"] if work["snapshot_id"] == other["snapshot_id"])
+        negative = {**self.excluded_search(case, other), "work_id": pending_work["work_id"]}
+        planned = self.first(self.plan([negative]))
+        self.assertTrue(planned["search_control"]["search_allowed"])
+        self.assertFalse(planned["search_control"]["satisfied"])
+        self.assertEqual(planned["search_control"]["usable_sources"], ["WIKI"])
+        self.assertNotIn(other["snapshot_id"], planned["selected_snapshot_ids"])
+        self.assertEqual(planned["path"], "SEARCH_REQUIRED")
+
+    def test_existing_source_capture_failure_is_processed_before_explicit_search(self):
+        self.rows()
+        self.snapshot(status="AUTH_REQUIRED")
+        register_search_policy(self.store, self.run_id, {"required_sources": ["GITCODE"]})
+        planned = self.first(self.plan())
+        self.assertFalse(planned["search_control"]["search_allowed"])
+        self.assertEqual(planned["search_control"]["status"], "CAPTURE_GAP")
+        self.assertNotIn("SEARCH_SUPPORT", [action["action"] for action in planned["required_actions"]])
+
+    def test_generic_source_type_under_explicit_source_goal_is_recovered_before_search(self):
+        self.rows(link=False, additional_links={"链接": "https://example.invalid/unknown"})
+        self.snapshot(url="https://example.invalid/unknown")
+        register_search_policy(self.store, self.run_id, {"required_sources": ["GITHUB"]})
+        planned = self.first(self.plan())
+        self.assertEqual(planned["search_control"]["status"], "SOURCE_UNKNOWN")
+        self.assertFalse(planned["search_control"]["search_allowed"])
+        self.assertIn("RECOVER_RESOURCE_KIND", [action["action"] for action in planned["required_actions"]])
+
+    def test_resource_classifier_honors_actual_url_and_exact_header_over_generic_artifact(self):
+        case = self.rows(additional_links={"DTS": "https://github.com/synthetic/example/pull/1"})[0]
+        refs = self.store.records(self.run_id, "references")
+        wiki = next(ref for ref in refs if "/wiki/" in ref["url"])
+        github = next(ref for ref in refs if "github.com" in ref["url"])
+        self.assertEqual(resource_kind(github, {"artifact_type": "GENERIC"}, case), "GITHUB")
+        self.assertEqual(resource_kind({**wiki, "url": "https://example.invalid/main"}, {"artifact_type": "GENERIC"}, case), "WIKI")
+        self.assertEqual(resource_kind({"url": "https://example.invalid/main", "location": "wiki-discovery"}), "UNKNOWN")
+        self.assertEqual(resource_kind({"url": "https://github.evil.invalid/project/pull/1"}), "UNKNOWN")
+        self.assertEqual(resource_kind({"url": "https://gitcode.evil.invalid/project/pull/1"}), "UNKNOWN")
+
+    def test_seven_description_only_rows_generate_independent_search_plans(self):
+        path = self.directory / "blind.json"
+        path.write_text(json.dumps([{"问题描述": f"Synthetic independent fault description {index}"} for index in range(7)]), encoding="utf-8")
+        import_into(self.store, self.run_id, import_cases(path, "ORIGINAL_WEEKLY"))
+        planned = self.plan()
+        self.assertEqual(len(planned["cases"]), 7)
+        self.assertEqual(planned["work_items"], [])
+        self.assertTrue(all(case["search_control"]["search_allowed"] for case in planned["cases"]))
+        self.assertTrue(all([action["action"] for action in case["required_actions"]] == ["SEARCH"] for case in planned["cases"]))
+
+    def test_complete_but_weak_candidate_allows_next_or_search_without_false_negative(self):
+        case = self.rows()[0]
+        self.snapshot()
+        register_search_policy(self.store, self.run_id, {"required_sources": ["GITCODE"]})
+        weak_snapshot = self.snapshot([case["case_id"]], url="https://gitcode.com/synthetic/weak/pull/1", status="PARTIAL")
+        work = next(work for work in self.plan()["work_items"] if work["snapshot_id"] == weak_snapshot["snapshot_id"])
+        weak = {**self.useful_search(case, weak_snapshot), "work_id": work["work_id"]}
+        next(fact for fact in weak["fact_comparisons"] if fact["category"] == "TECHNICAL_CONCLUSION").update(
+            relation="NAME_ONLY", reason="Only a generic mechanism name; no specific technical support")
+        planned = self.first(self.plan([weak]))
+        self.assertEqual(planned["insufficient_candidate_judgment_ids"], [weak["judgment_id"]])
+        self.assertTrue(planned["search_control"]["search_allowed"])
+        self.assertFalse(planned["search_control"]["satisfied"])
+        self.assertNotIn(weak_snapshot["snapshot_id"], planned["selected_snapshot_ids"])
+        self.assertEqual(weak["event_relation"], "UNDETERMINED")
+        self.assertEqual(len(self.store.records(self.run_id, "references")), 2)
+        next_snapshot = self.snapshot([case["case_id"]], url="https://gitcode.com/synthetic/next/pull/2", status="PARTIAL")
+        planned = self.first(self.plan([weak]))
+        self.assertIn(next_snapshot["snapshot_id"], planned["selected_snapshot_ids"])
+        self.assertNotIn(weak_snapshot["snapshot_id"], planned["selected_snapshot_ids"])
+        self.assertFalse(planned["search_control"]["search_allowed"])
+
+    def test_incomplete_or_mock_weak_candidate_stays_pending_instead_of_being_skipped(self):
+        case = self.rows(link=False)[0]
+        snapshot = self.snapshot([case["case_id"]])
+        incomplete = self.useful_search(case, snapshot)
+        incomplete["self_check"]["passed"] = False
+        for judgment in (incomplete, {**self.useful_search(case, snapshot), "model_mode": "mock"}):
+            with self.subTest(mock=judgment.get("model_mode") == "mock"):
+                planned = self.first(self.plan([judgment]))
+                self.assertEqual(planned["insufficient_candidate_judgment_ids"], [])
+                self.assertEqual(planned["selected_snapshot_ids"], [snapshot["snapshot_id"]])
+                self.assertFalse(planned["search_control"]["search_allowed"])
+
+    def test_explicit_source_target_does_not_select_unneeded_positive_discovery(self):
+        case = self.rows(link=False)[0]
+        wiki = self.snapshot([case["case_id"]])
+        gitcode = self.snapshot([case["case_id"]], url="https://gitcode.com/synthetic/target/pull/1", status="PARTIAL")
+        register_search_policy(self.store, self.run_id, {"required_sources": ["GITCODE"]})
+        judgments = [self.useful_search(case, wiki), {**self.useful_search(case, gitcode), "judgment_id": "target"}]
+        planned = self.first(self.plan(judgments))
+        self.assertTrue(planned["search_control"]["satisfied"])
+        self.assertEqual(planned["selected_snapshot_ids"], [gitcode["snapshot_id"]])
+        self.assertEqual(planned["search_control"]["usable_evidence_count"], 1)
 
 
 if __name__ == "__main__":

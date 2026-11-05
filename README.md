@@ -2,7 +2,7 @@
 
 故障证据核验核心。所有示例均为虚构数据，不包含客户故障记录或内部网页内容。
 
-版本 0.1.7，2026 年 11 月 5 日。核心负责导入故障表、保存原文与引用来源、规划必要证据、生成采集和模型任务、检查返回结果并生成复核报告。模型任务可由 OpenCode 或 Codex 会话执行，内网采集仍由具备授权与登录态的现场环境完成。当前使用文件任务往返，不包含直连模型服务的网络客户端。
+版本 0.1.8，2026 年 11 月 5 日。核心负责导入故障表、保存原文与引用来源、规划必要证据、生成采集和模型任务、检查返回结果并生成复核报告。模型任务可由 OpenCode 或 Codex 会话执行，内网采集仍由具备授权与登录态的现场环境完成。当前使用文件任务往返，不包含直连模型服务的网络客户端。
 
 目标网站包括 DTS、Wiki、GitCode、GitHub、CodeHub。真实资料由具备授权与登录态的现场工具采集；现有现场方案使用 OpenChamber/OpenCode。登录认证、搜索、正文读取、分页、附件、评论、Diff、网络重试和权限故障处理均在采集环境完成。核验核心不访问这些网站，也不保存其认证凭据；选择 Codex 执行模型任务不会自动获得这些站点的访问能力。
 
@@ -44,6 +44,8 @@ $PythonExe = 'python'
 ```
 
 确认 `doctor` 的 `core_ready=true`；需要 XLSX 导入时还应有 `xlsx_import_ready=true`。如果 Windows 的 `python` 指向商店占位程序，或另一套缺依赖的 Python，请将 `$PythonExe` 改为实际可执行文件的绝对路径。机器上的具体路径不写入可移植代码。
+
+`doctor`只检查本地解释器与依赖，不验证OpenChamber连接、OpenCode登录态、Wiki/DTS权限或DeepSeek实际调用。现场安装、合成执行及真实服务验收见[OpenChamber/OpenCode接入步骤](integration/OPENCODE_HANDOFF.md)。
 
 需要先确认本地流程时，可运行不调用模型的 mock 演示：
 
@@ -99,9 +101,29 @@ $AuditRunId
 & $PythonExe run_faultaudit.py --state $AuditState evidence-plan --run $AuditRunId --out work/evidence_plan_preview.json
 ```
 
-该入口使用 SQLite 只读连接，不创建 state。逐 case 的 `path`、`selected_ref_ids`、`selected_snapshot_ids`、`required_actions` 与 `stop_reason` 说明下一步和停止原因。0.1.7整理原始表、旧汇总表及已确认关系中的全部已有引用，不只选首份；同URL可共享抓取和摘要，各来源仍分别保留。已有可用原文时先提事实，不为凑齐 Wiki/DTS/PR 类型继续搜索。`PARTIAL` 中已取得的正文可以处理，真实缺少的组件另记；访问失败保留真实状态，不能冒称没有证据而改成无目标搜索。
+该入口使用 SQLite 只读连接，不创建 state。逐 case 的 `path`、`selected_ref_ids`、`selected_snapshot_ids`、`required_actions` 与 `stop_reason` 说明下一步和停止原因。0.1.8整理原始表、旧汇总表及已确认关系中的全部已有引用，不只选首份；同URL可共享抓取和摘要，各来源仍分别保留。已有可用原文时先提事实，不为凑齐 Wiki/DTS/PR 类型继续搜索。`PARTIAL` 中已取得的正文可以处理，真实缺少的组件另记；访问失败保留真实状态，不能冒称没有证据而改成无目标搜索。
 
-只有现有引用均不适用或确实无资料时才搜索，已有适用资料就停止新增补链；这个停止条件不取消其他已有引用的整理。未选搜索候选不删除，也不增加必要任务或待办数。
+默认策略为`min_usable_evidence=1`、无强制来源。原表或旧表已有Wiki、GitCode、GitHub、CodeHub/PR或DTS任一可用资料即停止新增搜索；DTS不触发额外补Wiki或代码的默认规则。已有引用尚未读取或访问失败时，先采集或处理真实缺口，不当作无证据盲搜。所有已有引用继续整理，停止的是新增搜索。未选搜索候选不删除，也不增加必要任务或待办数。
+
+### 按数量与来源配置搜索目标
+
+仅在需要额外数量或指定来源时配置。以下都是写入策略的命令，不是只读预览；默认不需要运行。来源枚举为WIKI、DTS、GITCODE、GITHUB、CODEHUB。
+
+```powershell
+# 至少一份GitCode或GitHub资料；二者满足其一即可
+& $PythonExe run_faultaudit.py --state $AuditState set-search-policy --run $AuditRunId --min-evidence 1 --require-any-source GITCODE GITHUB
+
+# 至少两份资料，并且Wiki与DTS都要有
+& $PythonExe run_faultaudit.py --state $AuditState set-search-policy --run $AuditRunId --min-evidence 2 --require-source WIKI --require-source DTS
+
+# 重置run级策略为默认；已有case级覆盖继续以其自身策略为准
+& $PythonExe run_faultaudit.py --state $AuditState set-search-policy --run $AuditRunId
+& $PythonExe run_faultaudit.py --state $AuditState evidence-plan --run $AuditRunId --out work/evidence_plan_policy.json
+```
+
+`required_sources`是AND，全部指定来源都要满足；`required_any_sources`是OR，列表中满足一种即可。两组都设置时，两组条件与最少数量共同生效。一满足就停止新增搜索，不补齐未要求的资料类型。加`--case-id <实际case_id>`可设置单条记录的完整覆盖策略，不与run级字段逐项合并。也可用`--file policy.json`提交完整对象`{"min_usable_evidence":1,"required_sources":[],"required_any_sources":[]}`；文件与策略flags不能混用。
+
+每条计划的`search_control`记录实际policy、scope、satisfied、search_allowed、status、reasons、可用数量/来源及缺少条件。数量单位以`counting_basis`为准，不把同URL的多个出处重复凑数。`satisfied=true`只说明搜索目标已满足，不代表根因已确认、故障库已覆盖或整条任务完成。现有资料仍须独立摘要、逐work比较和库映射；新增候选也须按这些门禁判断适用性。来源追溯与用户确认仍分别保存，不为满足策略伪造`user_confirmed`。
 
 来源分级与用户确认相互独立：
 
@@ -137,10 +159,10 @@ $AuditRunId
 
 ### 3. 按依赖执行模型任务
 
-以下设置为 Codex；现场使用 OpenCode 时改为 `opencode`，其余参数保持一致。
+以下使用默认的OpenCode执行者；在OpenChamber连接的实际OpenCode会话执行这些任务即可，无需另由Codex代做。核心也兼容显式选择Codex的文件协议。
 
 ```powershell
-$AuditExecutor = 'codex'
+$AuditExecutor = 'opencode'
 & $PythonExe run_faultaudit.py --state $AuditState model-tasks --executor $AuditExecutor --run $AuditRunId --out work/requests_01.json
 ```
 
@@ -175,6 +197,8 @@ $AuditExecutor = 'codex'
 反查保留原始链接、旧表链接、搜索补链、人工补链及各条记录的当前判断；共享链接只提示交叉核查，不证明同一事件。可加 `--url '实际证据URL'` 查询资料。报告的“逐引用整理”列出全部引用的来源分级、独立用户确认、采集/摘要状态和逐work结论；“逐资料子问题”展开各份摘要中的全部issues。未抓到的链接也会列出缺口。共享结果可在多个引用行重复展示，这些展示行不当作新增判断数量。
 
 报告还保留“证据反查”“库选择基准”“证据计划”“未选引用留档”“事实对照”及“事件组结论”。事实对照同时注明work_id、issue范围和引文所属source_case_id；共享判断不把代表行的原单元格冒充其他成员原文。每个引用的user_confirmed与共享work的work_user_confirmed分列，不互相覆盖。
+
+“搜索控制”单独展示每条记录的目标、缺口与停止原因；搜索目标已满足也不会改写证据强度或库覆盖。统计的search_goal_satisfied_case_count/search_goal_unsatisfied_case_count只是按case去重的采集目标状态，不能加到判断数或冒充覆盖完成数。
 
 只把 `EXCEPTION` 中待人工处理的项交复核人；`PENDING` 先由 Agent 补充，`AUTO_PROCESSED` 不要求例行人工 ACCEPT。人工处理时读取具体关联的 `judgment_id` 和库映射的 `task_id`，填写结论、理由和姓名；示例见“判断边界”。修改关联裁决会使相关映射失效，需要重新推进并检查结果。
 
@@ -398,6 +422,8 @@ $LASTEXITCODE
 
 ## OpenCode V2 与交接
 
+OpenChamber可作为现场前端，由它连接的OpenCode完成采集和模型执行，替代Codex执行任务；本包的接入是已有文件任务桥接，不包含启动OpenChamber或直连其服务的客户端。逐步命令与合成验收清单见[现场接入手册](integration/OPENCODE_HANDOFF.md)。
+
 ```powershell
 & $PythonExe scripts/install_opencode.py --project '实际工作区根目录'
 ```
@@ -419,9 +445,9 @@ $AuditState = '既有state目录'
 $AuditRunId = '原有run_id'
 & $PythonExe run_faultaudit.py --version
 & $PythonExe run_faultaudit.py doctor
-& $PythonExe run_faultaudit.py --state $AuditState evidence-plan --run $AuditRunId --out work/evidence_plan_017_preview.json
+& $PythonExe run_faultaudit.py --state $AuditState evidence-plan --run $AuditRunId --out work/evidence_plan_018_preview.json
 & $PythonExe run_faultaudit.py --state $AuditState run --run $AuditRunId --mode opencode --resume --retry-failed
-& $PythonExe run_faultaudit.py --state $AuditState model-tasks --executor opencode --run $AuditRunId --out work/requests_017_01.json
+& $PythonExe run_faultaudit.py --state $AuditState model-tasks --executor opencode --run $AuditRunId --out work/requests_018_01.json
 ```
 
 先检查只读预览，再由现场执行新导出的必要任务并按原 `task_id`、`request_hash` 提交，继续下一阶段。旧请求和旧结果不改写、不删除；策略或依赖变化后只作为历史记录，过期或未选结果不能继续作为当前必要关联、覆盖结论或已完成计数。正常结果自动处理、证据不足由 Agent 补充、异常交人工；不自动 ACCEPT。
@@ -446,9 +472,9 @@ $AuditRunId = '原有run_id'
 & $PythonExe scripts/build_delivery.py
 ```
 
-0.1.7 的回归测试使用合成任务和结果文件，不运行模型 HTTP 客户端，也不调用外部模型。本轮实际环境、测试数量与结果以 [examples/validation_result.json](examples/validation_result.json) 和 [验收记录](VALIDATION.md) 为准。2026 年 10 月 30 日由 Codex 会话执行的 [合成模拟验证摘要](examples/codex_pilot_validation.json) 是单独的历史基线，与本版回归、mock 和现场验证分开。交接包排除凭据、SQLite 运行数据、原始证据和依赖运行库，包含 `.gitignore` 及逐文件 SHA-256 清单。
+0.1.8 的回归测试使用合成任务和结果文件，不运行模型 HTTP 客户端，也不调用外部模型。本轮实际环境、测试数量与结果以 [examples/validation_result.json](examples/validation_result.json) 和 [验收记录](VALIDATION.md) 为准。2026 年 10 月 30 日由 Codex 会话执行的 [合成模拟验证摘要](examples/codex_pilot_validation.json) 是单独的历史基线，与本版回归、mock 和现场验证分开。交接包排除凭据、SQLite 运行数据、原始证据和依赖运行库，包含 `.gitignore` 及逐文件 SHA-256 清单。
 
-## 0.1.7 统计与现场只读对账
+## 0.1.8 统计与现场只读对账
 
 统计入口只从已有记录生成统计与差异报告，不重新提取事实、修改证据、生成业务判断或推进模型任务。网站认证、采集及实际模型执行仍由 OpenChamber/OpenCode 现场环境负责，沿用已有工具与流程。已有长正文分块、整请求预算、输入作用域和策略失效机制保留。
 
@@ -484,7 +510,7 @@ $AuditRunId = '原有run_id'
 
 “当前有效”依据输入报告导出时的 `is_stale` 与流水线任务状态，离线命令不重查今天的数据库或新版策略。真实当前数据需 OpenCode 先通过既有工具只读核对 SQLite 的记录与任务元数据，不能把老报告当作 live DB 验证。新导出的报告会由 `report_data` 按现行策略标记过期，但常规导出仍不是专门的 SQLite 只读入口。
 
-0.1.7 的 current 判断及映射只纳入必要结果（记录和任务均未显式标为 `required=false`）；旧报告没有 required 元数据时沿用原口径。`snapshot_count` 仍为 active 摄取快照全集，`selected_snapshot_count` 单列计划选定快照，`unused_reference_count` 为未选引用数。缺少计划元数据时选择数量为 null，不假定为零。事件组共享一个 judgment_id 就计一次判断，涉及 case 数按该判断的 case_id 与 member_case_ids 去重，不合并原始记录。
+0.1.8 的 current 判断及映射只纳入必要结果（记录和任务均未显式标为 `required=false`）；旧报告没有 required 元数据时沿用原口径。`snapshot_count` 仍为 active 摄取快照全集，`selected_snapshot_count` 单列计划选定快照，`unused_reference_count` 为未选引用数。缺少计划元数据时选择数量为 null，不假定为零。事件组共享一个 judgment_id 就计一次判断，涉及 case 数按该判断的 case_id 与 member_case_ids 去重，不合并原始记录。
 
 `planned_work_count`按计划work_id去重，`current_work_count`按当前必要判断的work_id计量；旧判断缺少work_id时该数量为null。`current_case_snapshot_pair_count`另列case/snapshot二元组数，不能替代work数：一个资料的两个issue可以是同一对case/snapshot、两个work和两个判断。相同work出现多个当前judgment_id时对账失败，不悄悄任选一个。validate的planned_associations/judged_associations保留旧字段名，0.1.7口径为work_id，配套planned_work_ids/judged_work_ids列出具体集合。
 

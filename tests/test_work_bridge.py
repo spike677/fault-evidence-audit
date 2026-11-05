@@ -110,7 +110,7 @@ class WorkBridgeTests(unittest.TestCase):
         workflow, task = self.ready()
         context = task["payload"]["processing_context"]
         self.assertEqual(task["work_id"], context["work_id"])
-        self.assertEqual(context["processing_version"], "evidence-first-0.1.7")
+        self.assertEqual(context["processing_version"], "evidence-first-0.1.8")
         parent = next(item for item in workflow.store.tasks(workflow.run_id) if item["task_id"] == task["pipeline_task_id"])
         self.assertEqual(parent["target_id"], task["work_id"])
         returned = workflow.envelope(task)

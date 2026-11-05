@@ -160,6 +160,15 @@ def parser() -> argparse.ArgumentParser:
     plan = sub.add_parser("evidence-plan", help="Read-only preview of selected evidence, search stops and necessary work")
     plan.add_argument("--run", default="latest")
     plan.add_argument("--out", type=Path)
+    search_policy = sub.add_parser("set-search-policy", help="Set a run default or case search stopping requirement")
+    search_policy.add_argument("--run", default="latest")
+    search_policy.add_argument("--case-id")
+    search_policy.add_argument("--file", type=Path, help="Complete policy JSON; cannot be combined with policy flags")
+    search_policy.add_argument("--min-evidence", type=int)
+    search_policy.add_argument("--require-source", action="append", default=None,
+                               choices=["WIKI", "DTS", "GITCODE", "GITHUB", "CODEHUB"])
+    search_policy.add_argument("--require-any-source", nargs="+", default=None,
+                               choices=["WIKI", "DTS", "GITCODE", "GITHUB", "CODEHUB"])
     group = sub.add_parser("register-event-group", help="Register only a user-confirmed event relationship")
     group.add_argument("--run", default="latest")
     group.add_argument("--case-ids", nargs="+", required=True)
@@ -238,6 +247,17 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "evidence-plan":
             from .pipeline import evidence_plan
             write_json(evidence_plan(store, run_id), args.out)
+            return 0
+        if args.command == "set-search-policy":
+            from .evidence_plan import register_search_policy
+            if args.file and any(value is not None for value in (args.min_evidence, args.require_source, args.require_any_source)):
+                raise AuditError("--file cannot be combined with search policy flags")
+            policy = json.loads(args.file.read_text(encoding="utf-8-sig")) if args.file else {
+                "min_usable_evidence": args.min_evidence if args.min_evidence is not None else 1,
+                "required_sources": args.require_source or [],
+                "required_any_sources": args.require_any_source or [],
+            }
+            write_json(register_search_policy(store, run_id, policy, case_id=args.case_id))
             return 0
         if args.command in {"register-event-group", "confirm-evidence"}:
             from .evidence_plan import register_event_group, register_evidence_association

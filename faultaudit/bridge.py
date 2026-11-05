@@ -14,7 +14,7 @@ from pathlib import Path
 
 SCHEMA_VERSION = "1.0"
 EXECUTORS = {"opencode", "codex"}
-FACT_PROCESSING_VERSIONS = {"evidence-first-0.1.6", "evidence-first-0.1.7"}
+FACT_PROCESSING_VERSIONS = {"evidence-first-0.1.6", "evidence-first-0.1.7", "evidence-first-0.1.8"}
 
 
 def _executor(value: str) -> str:

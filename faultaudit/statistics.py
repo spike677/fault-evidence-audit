@@ -117,7 +117,8 @@ def _processing(records: list[dict], *, mapping: bool = False) -> dict:
 
 def _selection_statistics(data: dict, current_snapshots: list[dict]) -> dict:
     result = {"selected_snapshot_count": None, "unused_reference_count": None, "required_reference_count": None,
-              "event_group_count": None, "planned_work_count": None}
+              "event_group_count": None, "planned_work_count": None, "search_goal_satisfied_case_count": None,
+              "search_goal_unsatisfied_case_count": None}
     plans = data.get("evidence_plans")
     if isinstance(plans, dict) and isinstance(plans.get("cases"), list):
         entries = plans["cases"]
@@ -136,6 +137,14 @@ def _selection_statistics(data: dict, current_snapshots: list[dict]) -> dict:
         work = plans.get("work_items")
         if isinstance(work, list) and all(isinstance(item, dict) and isinstance(item.get("work_id"), str) and item["work_id"].strip() for item in work):
             result["planned_work_count"] = len({item["work_id"] for item in work})
+        if all(isinstance(item.get("case_id"), str) and isinstance(item.get("search_control"), dict)
+               and isinstance(item["search_control"].get("satisfied"), bool) for item in entries):
+            goals = {}
+            for item in entries:
+                goals.setdefault(item["case_id"], set()).add(item["search_control"]["satisfied"])
+            if all(len(values) == 1 for values in goals.values()):
+                result["search_goal_satisfied_case_count"] = sum(True in values for values in goals.values())
+                result["search_goal_unsatisfied_case_count"] = sum(False in values for values in goals.values())
     groups = data.get("event_groups")
     if isinstance(groups, list) and all(isinstance(group, dict) and isinstance(group.get("group_id"), str) for group in groups):
         result["event_group_count"] = len({group["group_id"] for group in groups})
@@ -154,7 +163,8 @@ def _empty_current(status: str) -> dict:
             "mapping_auto_processed_count": None, "mapping_human_exception_count": None,
             "mapping_agent_pending_count": None, "selected_snapshot_count": None,
             "unused_reference_count": None, "required_reference_count": None, "event_group_count": None,
-            "planned_work_count": None, "current_work_count": None, "current_case_snapshot_pair_count": None}
+            "planned_work_count": None, "current_work_count": None, "current_case_snapshot_pair_count": None,
+            "search_goal_satisfied_case_count": None, "search_goal_unsatisfied_case_count": None}
 
 
 def _current(indexes: dict, present: dict, errors: list, warnings: list, data: dict | None = None) -> dict:
@@ -423,6 +433,7 @@ def report_statistics(data: dict, baseline: dict | None = None, round_manifest: 
         "selection_counts": "Derived from evidence_plans selected IDs; missing plan metadata is unknown rather than zero",
         "work_counts": "planned_work_count deduplicates evidence_plans.work_items by work_id; current_work_count counts necessary current judgment work IDs, unknown when legacy records lack work_id. Different issue scopes of one case/snapshot remain separate work; multiple current judgments for the same work fail reconciliation",
         "current_case_snapshot_pair_count": "Unique (member case_id, snapshot_id) pairs; multiple issue works can share one pair, so pair counts must not replace work/judgment counts",
+        "search_goal_counts": "Distinct planned case_id counts by exported search_control.satisfied. A search stop/goal is evidence collection control, not case attribution, catalog coverage, human acceptance or overall completion. Missing/conflicting goal metadata is unknown; these counts must not be added to work/judgment counts",
         "auto_processed_count": "Required current judgments with AUTO_PROCESSED, review_required=false and review_status=NOT_REQUIRED; no human ACCEPT is synthesized",
         "human_exception_count": "Required current EXCEPTION judgment records, including already reviewed exceptions; pending_human_exception_count excludes human ACCEPT/REJECT",
         "agent_pending_count": "Required current PENDING judgment records for agent completion; not human exceptions",

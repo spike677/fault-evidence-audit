@@ -22,7 +22,7 @@ COMPAT_COLUMNS = [
 ]
 EXTRA_COLUMNS = ["case_id", "run_id", "根因来源", "缺口", "模型模式", "处理状态", "需人工", "处理原因",
                  "事件组", "证据路径", "未选引用数", "关联判断ID", "引文来源case_id", "来源分级", "已有用户确认",
-                 "工作ID", "子问题范围", "必要引用数"]
+                 "工作ID", "子问题范围", "必要引用数", "搜索目标已满足", "搜索控制", "搜索策略"]
 
 _ALIASES = {
     "序号": ("sequence", "display_id"),
@@ -333,6 +333,7 @@ def _summary_rows(data: dict) -> list[dict]:
         if plan.get("path") == "EXCEPTION":
             processing, human = "EXCEPTION", "是"
             processing_reasons = "；".join(value for value in (processing_reasons, _text(plan.get("issues") or plan.get("stop_reason"))) if value)
+        search_control = plan.get("search_control") or {}
         row.update({
             "case_id": identity,
             "run_id": source.get("run_id", run_id),
@@ -349,6 +350,8 @@ def _summary_rows(data: dict) -> list[dict]:
             "工作ID": "；".join(dict.fromkeys(_text(_work_metadata(j)["work_id"]) for j in related if _work_metadata(j)["work_id"])),
             "子问题范围": [_work_metadata(j) for j in related],
             "必要引用数": sum(ref.get("required") is True for ref in refs) if identity in plans else None,
+            "搜索目标已满足": search_control.get("satisfied"), "搜索控制": search_control,
+            "搜索策略": search_control.get("policy", (data.get("evidence_plans") or {}).get("search_policy")),
         })
         rows.append(row)
     return rows
@@ -489,7 +492,8 @@ def _statistics_rows(statistics: dict) -> list[dict]:
             for key in ("status", "snapshot_count", "selected_snapshot_count", "planned_work_count", "current_work_count",
                         "current_case_snapshot_pair_count", "mapping_count", "unused_reference_count",
                         "required_reference_count", "event_group_count", "auto_processed_count", "human_exception_count",
-                        "pending_human_exception_count", "agent_pending_count",
+                        "pending_human_exception_count", "agent_pending_count", "search_goal_satisfied_case_count",
+                        "search_goal_unsatisfied_case_count",
                         "mapping_auto_processed_count", "mapping_human_exception_count", "mapping_agent_pending_count")]
     for scope in ("including_rejected", "excluding_rejected", "rejected", "confirmed_accepted"):
         for key, value in (current.get(scope) or {}).items():
@@ -530,6 +534,8 @@ def export_report(data: dict, output_dir: Path) -> dict:
     plans = data.get("evidence_plans")
     if isinstance(plans, dict):
         tables.append(_table("证据计划", [_flat(value) for value in plans.get("cases", [])]))
+        tables.append(_table("搜索控制", [{"case_id": value.get("case_id"), "path": value.get("path"),
+            **value["search_control"]} for value in plans.get("cases", []) if isinstance(value.get("search_control"), dict)]))
         tables.append(_table("必要工作项", [_flat(value) for value in plans.get("work_items", [])]))
         tables.append(_table("未选引用留档", [ref for ref in _reference_rows(data) if ref.get("required") is False]))
     for name, key in (("源文档", "documents"), ("排除记录", "exclusions")):

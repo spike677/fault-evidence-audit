@@ -277,6 +277,27 @@ class ExportReportTests(unittest.TestCase):
         self.assertEqual(next(row for row in reference_rows if row["ref_id"] == "R-unread")["capture_status"], "NOT_FETCHED")
         self.assertEqual(data, original)
 
+    def test_search_goal_is_visible_without_creating_coverage_or_user_confirmation(self):
+        data = self.sample()
+        data["tasks"] = []
+        data["judgments"][0].update(processing_status="AUTO_PROCESSED", review_required=False,
+                                   review_status="NOT_REQUIRED", missing_information=[])
+        policy = {"min_usable_evidence": 1, "required_sources": [], "required_any_sources": []}
+        data["evidence_plans"] = {"cases": [{"case_id": "case-1", "path": "EXISTING_REFERENCES",
+            "selected_ref_ids": [], "selected_snapshot_ids": ["s-1"], "user_confirmed": False,
+            "search_control": {"policy": policy, "satisfied": True, "search_allowed": False,
+                "status": "SATISFIED", "reasons": ["one existing DTS is usable"], "usable_sources": ["DTS"]}}]}
+        original = copy.deepcopy(data)
+        tables = self.workbook(data)
+        summary = tables["汇总"][0]
+        self.assertTrue(summary["搜索目标已满足"])
+        self.assertIn('"required_sources": []', summary["搜索策略"])
+        self.assertEqual(summary["库覆盖（98条）"], "待核验")
+        self.assertFalse(summary["已有用户确认"])
+        self.assertTrue(tables["搜索控制"][0]["satisfied"])
+        self.assertFalse(tables["搜索控制"][0]["search_allowed"])
+        self.assertEqual(data, original)
+
 
 if __name__ == "__main__":
     unittest.main()

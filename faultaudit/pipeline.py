@@ -8,7 +8,7 @@ from .contracts import EvidenceSummary, Judgment
 from .gates import event_anchor_errors, judgment_semantic_errors, processing_decision
 from .store import AuditError, Store, canonical_url, digest
 
-RULE_VERSION = "nightly-0.1.7"
+RULE_VERSION = "nightly-0.1.8"
 
 
 def cited_refs(summary: dict):
@@ -183,12 +183,17 @@ def planned_associations(store: Store, run_id: str, plan: dict | None = None) ->
 
 
 def work_context(store: Store, run_id: str, work_id: str, plan: dict) -> dict:
+    from .evidence_plan import get_search_policy
     matches = [item for item in plan["work_items"] if item["work_id"] == work_id]
     if len(matches) != 1:
         raise AuditError("Evidence work is absent or ambiguous in the current plan: " + work_id)
     work = matches[0]
     refs = [ref for ref in store.records(run_id, "references") if ref["ref_id"] in work["ref_ids"]]
     cases = [case for case in store.records(run_id, "cases") if case["case_id"] in work["case_ids"]]
+    search_policies = {}
+    for case in cases:
+        policy = get_search_policy(store, run_id, case["case_id"])
+        search_policies[case["case_id"]] = {"policy": policy["policy"], "policy_hash": policy["policy_hash"]}
     # Routing identity excludes completion/stop wording so consuming a result does not create another task.
     return {"source_relation": work["relation"], "source_grades": work.get("source_grades", [work["relation"]]),
             "user_confirmed": work.get("user_confirmed", False), "selected_ref_ids": work["ref_ids"],
@@ -198,8 +203,9 @@ def work_context(store: Store, run_id: str, work_id: str, plan: dict) -> dict:
             "source_trace": work.get("provenance", []),
             "provenance": refs, "source_records": cases, "member_case_ids": work["case_ids"],
             "group_id": work.get("group_id"),
+            "search_policies": search_policies,
             "applicable_issue": work.get("issue_scope", {}), "work_id": work["work_id"],
-            "plan_hash": work["work_id"], "processing_version": "evidence-first-0.1.7"}
+            "plan_hash": work["work_id"], "processing_version": "evidence-first-0.1.8"}
 
 
 def task_views(store: Store, run_id: str, plan: dict | None = None) -> list[dict]:
@@ -638,6 +644,10 @@ def validate(store: Store, run_id: str) -> dict:
     pending.extend(f"Unjudged work {work_id}" for work_id in sorted(pair_keys - judged_keys))
     for case in cases:
         row = next(p for p in plan["cases"] if p["case_id"] == case["case_id"])
+        control = row.get("search_control", {})
+        if control and not control.get("satisfied", False):
+            pending.append(f"{case['case_id']}: evidence search requirement pending ({control.get('status', 'UNKNOWN')}); "
+                           + "; ".join(control.get("reasons", [])))
         if row["path"] == "SEARCH_REQUIRED":
             pending.append(f"{case['case_id']}: no references or usable evidence; search required")
         if row["path"] == "EXCEPTION":
@@ -668,12 +678,14 @@ def validate(store: Store, run_id: str) -> dict:
         selected_case_ids = {cid for item in plan["work_items"] for cid in item["case_ids"]}
         pending.extend(f"{cid}: catalog comparison missing" for cid in sorted(selected_case_ids - mapped))
     pending = list(dict.fromkeys(pending))
-    facts_complete = bool(cases) and not errors and not missing and all(
+    search_goals_satisfied = bool(cases) and all(row.get("search_control", {}).get("satisfied", True) for row in plan["cases"])
+    facts_complete = bool(cases) and search_goals_satisfied and not errors and not missing and all(
         row.get("processing_status") == "AUTO_PROCESSED" and not any(action["action"] in {
             "RECOVER_PROVENANCE", "RESTORE_PROVENANCE", "RESTORE_REFERENCE", "RECONFIRM_SNAPSHOT", "RESOLVE_CAPTURE_FAILURE"}
             for action in row["required_actions"]) for row in plan["cases"])
     return {"run_id": run_id, "valid": not errors, "complete": not errors and not pending,
             "fact_organization_complete": facts_complete,
+            "search_goals_satisfied": search_goals_satisfied,
             "batch_status": "FAILED" if errors else "COMPLETE_WITH_PENDING" if pending else "COMPLETE",
             "counts": {"cases": len(cases), "reference_occurrences": len(refs), "active_snapshots": len(snapshots),
                        "excluded_records": len(exclusions),
@@ -687,6 +699,8 @@ def validate(store: Store, run_id: str) -> dict:
                        "catalog_versions": len({i['source_sha256'] for i in catalog}),
                        "tasks": len(tasks), "required_tasks": sum(t["required"] for t in tasks),
                        "human_exceptions": sum(j.get("review_required", True) for j in js),
+                       "satisfied_search_goals": sum(row.get("search_control", {}).get("satisfied", False) for row in plan["cases"]),
+                       "search_allowed_cases": sum(row.get("search_control", {}).get("search_allowed", False) for row in plan["cases"]),
                        "task_states": dict(Counter(t["status"] for t in tasks if t["required"]))},
             "errors": list(dict.fromkeys(errors)), "pending": pending, "rule_version": RULE_VERSION}
 
@@ -695,7 +709,7 @@ def report_data(store: Store, run_id: str, *, baseline: dict | None = None,
                 round_manifest: dict | None = None) -> dict:
     data = {kind: store.records(run_id, kind) for kind in
             ("cases", "references", "snapshots", "summaries", "judgments", "catalog", "mappings", "exclusions", "documents",
-             "model_tasks", "model_results", "evidence_associations")}
+             "model_tasks", "model_results", "evidence_associations", "search_policies")}
     active = {s["snapshot_id"] for s in store.active_snapshots(run_id)}
     statuses = {t["task_id"]: t["status"] for t in store.tasks(run_id)}
     for key in ("snapshots", "summaries", "judgments"):

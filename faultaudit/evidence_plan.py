@@ -5,9 +5,14 @@ infers event groups. Task progress is excluded from stable routing identities.
 """
 from __future__ import annotations
 
+import re
+from urllib.parse import urlsplit
+
 from .store import AuditError, Store, canonical_url, digest, now
 
-POLICY_VERSION = "evidence-first-0.1.7"
+POLICY_VERSION = "evidence-first-0.1.8"
+SEARCH_SOURCES = {"WIKI", "DTS", "GITCODE", "GITHUB", "CODEHUB"}
+DEFAULT_SEARCH_POLICY = {"min_usable_evidence": 1, "required_sources": [], "required_any_sources": []}
 ORIGINAL_KINDS = {"ORIGINAL_WEEKLY", "ORIGINAL_OBP", "SOURCE_WEEKLY_REPORT", "SOURCE_OBP"}
 TABLE_GRADES = {"SOURCE_CELL_LINKED", "LEGACY_TABLE_LINKED"}
 GRADE_PRIORITY = {"SOURCE_CELL_LINKED": 0, "LEGACY_TABLE_LINKED": 1, "SEARCH_DISCOVERED": 2, "PROVENANCE_PENDING": 3}
@@ -23,6 +28,88 @@ def _url(value: str | None) -> str | None:
         return canonical_url(value) if value else None
     except (ValueError, TypeError):
         return None
+
+
+def normalize_search_policy(policy: dict) -> dict:
+    """Validate a complete, small search stopping policy, without coercion."""
+    if not isinstance(policy, dict) or set(policy) - set(DEFAULT_SEARCH_POLICY):
+        raise AuditError("Search policy has unsupported fields")
+    minimum = policy.get("min_usable_evidence", 1)
+    if type(minimum) is not int or minimum < 1:
+        raise AuditError("min_usable_evidence must be a positive integer")
+    result = {"min_usable_evidence": minimum}
+    for field in ("required_sources", "required_any_sources"):
+        values = policy.get(field, [])
+        if not isinstance(values, list) or any(not isinstance(value, str) or value not in SEARCH_SOURCES for value in values):
+            raise AuditError(f"{field} must contain only {', '.join(sorted(SEARCH_SOURCES))}")
+        result[field] = sorted(set(values))
+    return result
+
+
+def register_search_policy(store: Store, run_id: str, policy: dict, case_id: str | None = None) -> dict:
+    """Append a run policy or full case override; previous revisions remain."""
+    store.run_info(run_id)
+    if case_id is not None and not store.get(run_id, "cases", case_id):
+        raise AuditError("Search policy case is outside this run")
+    normalized = normalize_search_policy(policy)
+    previous = [record for record in store.records(run_id, "search_policies") if record.get("case_id") == case_id]
+    latest = max(previous, key=lambda record: record["revision"], default=None)
+    if latest and latest["policy"] == normalized:
+        return latest
+    revision = max((record["revision"] for record in previous), default=0) + 1
+    identity = {"case_id": case_id, "revision": revision, "policy": normalized}
+    record = {"policy_record_id": "search-policy-" + digest(identity)[:24], **identity,
+              "policy_hash": digest(normalized), "registered_at": now()}
+    store.put(run_id, "search_policies", record["policy_record_id"], record)
+    store.event(run_id, "search_policy_registered", record)
+    return record
+
+
+def get_search_policy(store: Store, run_id: str, case_id: str | None = None) -> dict:
+    records = store.records(run_id, "search_policies")
+    own = [record for record in records if case_id is not None and record.get("case_id") == case_id]
+    run = [record for record in records if record.get("case_id") is None]
+    record = max(own or run, key=lambda item: item["revision"], default=None)
+    if record:
+        policy = normalize_search_policy(record["policy"])
+        return {"policy": policy, "policy_hash": digest(policy), "policy_record_id": record["policy_record_id"],
+                "scope": "CASE" if own else "RUN"}
+    policy = normalize_search_policy({})
+    return {"policy": policy, "policy_hash": digest(policy), "policy_record_id": None, "scope": "DEFAULT"}
+
+
+def resource_kind(ref: dict | None = None, snapshot: dict | None = None, case: dict | None = None) -> str:
+    """Classify navigation resources, never fault identity or root-cause truth."""
+    ref, snapshot = ref or {}, snapshot or {}
+    for value in (ref.get("url"), snapshot.get("url")):
+        if not _url(value):
+            continue
+        parsed = urlsplit(value)
+        host, path = (parsed.hostname or "").casefold(), parsed.path.casefold()
+        if host == "github.com" or host.endswith(".github.com"):
+            return "GITHUB"
+        if host == "gitcode.com" or host.endswith(".gitcode.com"):
+            return "GITCODE"
+        if host.startswith(("codehub.", "codehub-")) or "codehub" in host.split("."):
+            return "CODEHUB"
+        if host.startswith("wiki.") or re.search(r"/(?:wiki|wikis)(?:/|$)", path):
+            return "WIKI"
+        if host.startswith(("dts.", "dts-")) or re.search(r"/(?:dts|dtsportal)(?:/|$)", path):
+            return "DTS"
+    # Only an exact imported source cell supplies a header hint. The word wiki
+    # in an arbitrary discovery location is not evidence of the resource type.
+    if case:
+        for header, location in (case.get("cell_locations") or {}).items():
+            if ref.get("location") != f"{case.get('sheet')}!{location} (row {case.get('row')})":
+                continue
+            key = header.strip().casefold()
+            for word, kind in (("wiki", "WIKI"), ("dts", "DTS"), ("gitcode", "GITCODE"),
+                               ("github", "GITHUB"), ("codehub", "CODEHUB")):
+                if word in key:
+                    if kind in {"GITCODE", "GITHUB"} and (ref.get("url") or snapshot.get("url")):
+                        continue
+                    return kind
+    return {"WIKI": "WIKI", "DTS": "DTS"}.get(snapshot.get("artifact_type"), "UNKNOWN")
 
 
 def source_relation(case: dict, ref: dict) -> dict:
@@ -179,6 +266,20 @@ def _search_usable(case: dict, snapshot: dict, judgments: list[dict], cases: dic
                and _search_decision(case, snapshot, judgment, cases) == "AUTO_PROCESSED" for judgment in judgments)
 
 
+def _search_insufficient(case: dict, snapshot: dict, judgment: dict, cases: dict) -> bool:
+    """A completed, weak comparison is not an unfinished model task forever."""
+    from .gates import FACT_CATEGORIES, SELF_CHECK_FIELDS
+    check, facts = judgment.get("self_check") or {}, judgment.get("fact_comparisons") or []
+    return (judgment.get("model_mode") != "mock" and judgment.get("review_status") != "REJECT"
+            and snapshot.get("status") in {"COMPLETE", "PARTIAL", "CONTENT_CAPTURED"} and bool(snapshot.get("text", "").strip())
+            and {fact.get("category") for fact in facts} == FACT_CATEGORIES
+            and check.get("attempt") == 1 and check.get("passed") is True and not check.get("issues")
+            and all(check.get(field) is True for field in SELF_CHECK_FIELDS)
+            and bool((judgment.get("applicable_issue") or {}).get("evidence"))
+            and any(fact.get("source_field") and fact.get("source_quote") and fact.get("source_cell") and fact.get("evidence") for fact in facts)
+            and _search_decision(case, snapshot, judgment, cases) == "PENDING")
+
+
 def _readable(option: dict, active: dict) -> bool:
     snapshot = option["snapshot"]
     return bool(snapshot and snapshot["snapshot_id"] in active and snapshot.get("text", "").strip()
@@ -188,6 +289,24 @@ def _readable(option: dict, active: dict) -> bool:
 def _rank(option: dict, active: dict):
     return (not _readable(option, active), GRADE_PRIORITY[option["relation"]], (option["ref"] or {}).get("location", ""),
             (option["ref"] or {}).get("ref_id", ""), (option["snapshot"] or {}).get("snapshot_id", ""))
+
+
+def _search_rank(option: dict):
+    # Keep the first candidate pending until resolved or positively excluded;
+    # a later readable result must not hide an earlier authentication failure.
+    ref = option["ref"] or {}
+    return (ref.get("discovered_at") or "", ref.get("location", ""), ref.get("ref_id", ""),
+            (option["snapshot"] or {}).get("snapshot_id", ""))
+
+
+def _goal(policy: dict, usable: list[dict], kind) -> dict:
+    unique = {option["snapshot"]["snapshot_id"]: option for option in usable}
+    sources = sorted({kind(option) for option in unique.values()} - {"UNKNOWN"})
+    missing = sorted(set(policy["required_sources"]) - set(sources))
+    missing_any = policy["required_any_sources"] if policy["required_any_sources"] and not set(policy["required_any_sources"]) & set(sources) else []
+    return {"usable_evidence_count": len(unique), "usable_sources": sources,
+            "missing_sources": missing, "missing_any_sources": missing_any,
+            "satisfied": len(unique) >= policy["min_usable_evidence"] and not missing and not missing_any}
 
 
 def _candidate(ref: dict | None, snapshot: dict | None, relation: str, provenance: dict,
@@ -231,7 +350,8 @@ def build_evidence_plan(store: Store, run_id: str, *, judgments: list[dict] | No
             if ref["case_id"] != case_id or ref["ref_id"] in associated_refs or _url(ref.get("url")) in scoped_urls:
                 continue
             provenance = source_relation(case, ref)
-            options.append(_candidate(ref, by_url.get(_url(ref.get("url"))), provenance["relation"], provenance))
+            snapshot = by_url.get(_url(ref.get("url")))
+            options.append(_candidate(ref, snapshot, provenance["relation"], provenance))
         for association in registered:
             snapshot = snapshots.get(association.get("snapshot_id")) if association.get("snapshot_id") else None
             ref = refs.get(association.get("ref_id"))
@@ -318,9 +438,21 @@ def build_evidence_plan(store: Store, run_id: str, *, judgments: list[dict] | No
             and (judgment.get("case_attribution") == "MISMATCH" or judgment.get("event_relation") == "DIFFERENT_EVENT")
             and judgment.get("review_status") != "REJECT" and judgment.get("snapshot_id") in active
             and _search_decision(case, active[judgment["snapshot_id"]], judgment, cases) == "AUTO_PROCESSED"]
-        excluded_ids = {judgment["snapshot_id"] for judgment in excluded}
+        insufficient = [judgment for judgment in case_judgments if _applies(judgment, case_id)
+            and judgment.get("snapshot_id") in active and _search_insufficient(case, active[judgment["snapshot_id"]], judgment, cases)]
+
+        def option_judged(option, judgment):
+            if not option["snapshot"] or option["snapshot"]["snapshot_id"] != judgment.get("snapshot_id"):
+                return False
+            if not judgment.get("work_id"):
+                return True
+            key = {"group_or_case_id": group["group_id"] if group else case_id,
+                   "snapshot_id": option["snapshot"]["snapshot_id"], "issue_scope": option["issue_scope"],
+                   "input_hash": semantic_input_hash(case)}
+            return judgment["work_id"] == "work-" + digest(key)[:24]
+
         options = [option for option in all_options if not (option["relation"] == "SEARCH_DISCOVERED"
-            and not option["user_confirmed"] and option["snapshot"] and option["snapshot"]["snapshot_id"] in excluded_ids)]
+            and not option["user_confirmed"] and any(option_judged(option, judgment) for judgment in excluded + insufficient))]
         supplied = [option for option in options if option["relation"] in TABLE_GRADES or option["user_confirmed"]]
         supplied_snapshot_ids = {option["snapshot"]["snapshot_id"] for option in supplied if option["snapshot"]}
         conflicts = [judgment for judgment in case_judgments if _applies(judgment, case_id) and (_conflicting(judgment) or
@@ -330,19 +462,85 @@ def build_evidence_plan(store: Store, run_id: str, *, judgments: list[dict] | No
         usable = [option for option in search if option["snapshot"] and _search_usable(case, option["snapshot"], case_judgments, cases)]
         unresolved = [option for option in options if option["relation"] == "PROVENANCE_PENDING" and not option["user_confirmed"]]
         selected, required, optional, issues = [], [], [], []
-        if supplied:
-            selected = sorted(supplied, key=lambda option: _rank(option, active))
-            path, stop_reason = "TABLE_REFERENCES", "ALL_SUPPLIED_REFERENCES_SELECTED_NO_SEARCH"
-        elif usable or search:
-            selected = [sorted(usable or search, key=lambda option: _rank(option, active))[0]]
-            path = "VERIFIED_SEARCH" if usable else "SEARCH_CANDIDATE"
-            stop_reason = "USABLE_SEARCH_EVIDENCE_FOUND" if usable else "EXISTING_CANDIDATE_NEEDS_FACT_COMPARISON"
-        elif unresolved:
-            selected = sorted(unresolved, key=lambda option: _rank(option, active))
-            path, stop_reason = "PROVENANCE_RECOVERY", "AGENT_RECOVERS_SOURCE_BEFORE_REPORTING_GAP"
-        else:
-            path, stop_reason = "SEARCH_REQUIRED", "EXISTING_CANDIDATES_EXCLUDED_NO_APPLICABLE_EVIDENCE" if excluded else "NO_EVIDENCE_SEARCH_REQUIRED"
-            required.append({"action": "SEARCH", "actor": "AGENT", "case_id": case_id, "description": case.get("description", "")})
+        policy_info = get_search_policy(store, run_id, case_id)
+        policy = policy_info["policy"]
+        kind = lambda option: resource_kind(option["ref"], option["snapshot"],
+            cases.get((option["ref"] or {}).get("case_id"), case))
+        selected = sorted(supplied, key=lambda option: _rank(option, active))
+        conflict_ids = {judgment.get("snapshot_id") for judgment in conflicts}
+        counted = [option for option in supplied if _readable(option, active)
+                   and option["snapshot"]["snapshot_id"] not in conflict_ids]
+
+        def helps(option, goal):
+            if goal["missing_sources"] or goal["missing_any_sources"]:
+                return kind(option) in goal["missing_sources"] or kind(option) in goal["missing_any_sources"]
+            return goal["usable_evidence_count"] < policy["min_usable_evidence"]
+
+        # Validated discoveries supplement supplied material only while a declared
+        # condition is unmet. Stop as soon as the complete AND/OR goal is satisfied.
+        remaining_usable = list(usable)
+        while remaining_usable:
+            goal = _goal(policy, counted, kind)
+            if goal["satisfied"]:
+                break
+            helpful = [option for option in remaining_usable if helps(option, goal)]
+            if not helpful:
+                break
+            option = sorted(helpful, key=_search_rank)[0]
+            remaining_usable.remove(option)
+            selected.append(option)
+            counted.append(option)
+        goal = _goal(policy, counted, kind)
+        policy_reasons = []
+        if goal["usable_evidence_count"] < policy["min_usable_evidence"]:
+            policy_reasons.append("MIN_USABLE_EVIDENCE_NOT_MET")
+        if goal["missing_sources"]:
+            policy_reasons.append("REQUIRED_SOURCES_NOT_MET")
+        if goal["missing_any_sources"]:
+            policy_reasons.append("REQUIRED_ANY_SOURCE_NOT_MET")
+        control_status = "SATISFIED" if goal["satisfied"] else "SEARCH_REQUIRED"
+        path, stop_reason = ("TABLE_REFERENCES", "ALL_SUPPLIED_REFERENCES_SELECTED_NO_SEARCH") if supplied else (
+            ("VERIFIED_SEARCH", "USABLE_SEARCH_EVIDENCE_FOUND") if goal["satisfied"] else
+            ("SEARCH_REQUIRED", "EXISTING_CANDIDATES_EXCLUDED_NO_APPLICABLE_EVIDENCE" if excluded else "NO_EVIDENCE_SEARCH_REQUIRED"))
+        if not goal["satisfied"] and not conflicts:
+            pending_supplied = [option for option in supplied if not _readable(option, active)]
+            unknown_sources = [option for option in supplied if kind(option) == "UNKNOWN"] if (
+                goal["missing_sources"] or goal["missing_any_sources"]) else []
+            remaining = [option for option in search if option not in selected and option not in usable and helps(option, goal)]
+            if pending_supplied:
+                control_status = "CAPTURE_GAP" if any(option["snapshot"] and option["snapshot"].get("status") in UNREADABLE
+                    or (option["ref"] and not option["ref"].get("url")) for option in pending_supplied) else "PROCESS_EXISTING"
+            elif unresolved:
+                control_status = "PROVENANCE_PENDING"
+                if not supplied:
+                    selected.extend(sorted(unresolved, key=lambda option: _rank(option, active)))
+                    path, stop_reason = "PROVENANCE_RECOVERY", "AGENT_RECOVERS_SOURCE_BEFORE_REPORTING_GAP"
+                else:
+                    required.extend({"action": "RECOVER_PROVENANCE", "actor": "AGENT", "ref_id": (option["ref"] or {}).get("ref_id"),
+                                     "on_failure": "REPORT_PROVENANCE_GAP"} for option in unresolved)
+            elif unknown_sources:
+                control_status = "SOURCE_UNKNOWN"
+                required.extend({"action": "RECOVER_RESOURCE_KIND", "actor": "AGENT", "ref_id": (option["ref"] or {}).get("ref_id"),
+                                 "snapshot_id": (option["snapshot"] or {}).get("snapshot_id")} for option in unknown_sources)
+            elif remaining:
+                candidate = sorted(remaining, key=_search_rank)[0]
+                selected.append(candidate)
+                control_status = "CAPTURE_GAP" if candidate["snapshot"] and candidate["snapshot"].get("status") in UNREADABLE else "CANDIDATE_PENDING"
+                path, stop_reason = "SEARCH_CANDIDATE", "EXISTING_CANDIDATE_NEEDS_FACT_COMPARISON"
+            else:
+                required.append({"action": "SEARCH_SUPPORT" if policy != DEFAULT_SEARCH_POLICY else "SEARCH", "actor": "AGENT",
+                    "case_id": case_id, "description": case.get("description", ""), "policy_hash": policy_info["policy_hash"],
+                    "target_sources": sorted(set(goal["missing_sources"]) | set(goal["missing_any_sources"])),
+                    "min_additional_evidence": max(0, policy["min_usable_evidence"] - goal["usable_evidence_count"])})
+        chosen_discoveries = [option for option in selected if option in search]
+        search_control = {**policy_info, **goal, "search_allowed": control_status == "SEARCH_REQUIRED" and not conflicts,
+            "status": "CONFLICT" if conflicts else control_status, "reasons": policy_reasons,
+            "selected_candidate_ref_ids": sorted({option["ref"]["ref_id"] for option in chosen_discoveries if option["ref"]}),
+            "selected_candidate_snapshot_ids": sorted({option["snapshot"]["snapshot_id"] for option in chosen_discoveries if option["snapshot"]}),
+            "counting_basis": "UNIQUE_READABLE_SUPPLIED_SNAPSHOT_OR_FACT_VALIDATED_DISCOVERY;_NOT_FAULT_CONFIRMATION"}
+        if conflicts:
+            search_control["satisfied"] = False
+            search_control["reasons"].append("KNOWN_CONFLICT")
         if conflicts:
             conflict_ids = {judgment.get("snapshot_id") for judgment in conflicts}
             for option in options:
@@ -377,6 +575,12 @@ def build_evidence_plan(store: Store, run_id: str, *, judgments: list[dict] | No
                 grades = {option["relation"] for option in selected}
                 path = next(iter(grades)) if len(grades) == 1 else "TABLE_REFERENCES"
                 stop_reason = "ALL_SUPPLIED_REFERENCES_AVAILABLE_NO_SEARCH"
+        if not conflicts and search_control["search_allowed"]:
+            path = "SEARCH_REQUIRED"
+            if policy != DEFAULT_SEARCH_POLICY:
+                stop_reason = "EXPLICIT_SEARCH_POLICY_UNMET"
+        elif not conflicts and chosen_discoveries and not goal["satisfied"] and not any(states):
+            path, stop_reason = "SEARCH_CANDIDATE", "EXISTING_CANDIDATE_NEEDS_FACT_COMPARISON"
         selected_ref_ids = sorted({option["ref"]["ref_id"] for option in selected if option["ref"]})
         selected_snapshot_ids = sorted({option["snapshot"]["snapshot_id"] for option in selected if option["snapshot"]})
         grades = sorted({option["relation"] for option in selected}, key=lambda grade: GRADE_PRIORITY[grade])
@@ -385,14 +589,17 @@ def build_evidence_plan(store: Store, run_id: str, *, judgments: list[dict] | No
         scopes = sorted((option["issue_scope"] for option in selected), key=digest)
         routing = {"case_id": case_id, "group_id": group["group_id"] if group else None, "relation": relation,
             "source_grades": grades, "user_confirmed": confirmed, "selected_ref_ids": selected_ref_ids,
-            "selected_snapshot_ids": selected_snapshot_ids, "issue_scopes": scopes}
+            "selected_snapshot_ids": selected_snapshot_ids, "issue_scopes": scopes, "search_policy_hash": policy_info["policy_hash"]}
         plan = {**routing, "external_id": case.get("external_id", ""), "source_file": case.get("source_file"),
             "sheet": case.get("sheet"), "row": case.get("row"),
             "source_grade": relation, "path": path, "routing_hash": digest(routing),
+            "search_control": search_control,
             "required_actions": required, "optional_actions": optional, "stop_reason": stop_reason, "issues": issues,
             "association_ids": sorted({option["association_id"] for option in selected if option["association_id"]}),
             "group_confirmation": group["group_id"] if group else None,
             "excluded_candidate_judgment_ids": sorted(j.get("judgment_id", "") for j in excluded),
+            "insufficient_candidate_judgment_ids": sorted(j.get("judgment_id", "") for j in insufficient
+                if any(option["relation"] == "SEARCH_DISCOVERED" and not option["user_confirmed"] and option_judged(option, j) for option in all_options)),
             "provenance": [option["provenance"] for option in selected], "work_ids": []}
         for option in selected:
             if not _readable(option, active):
