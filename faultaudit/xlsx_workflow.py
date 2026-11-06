@@ -15,7 +15,7 @@ from .catalog_drafts import prepare_draft, validate_draft
 from .evidence_plan import register_search_policy, resource_kind, collection_source_policy
 from .importers import import_cases, import_catalog
 from .input_budget import InputTooLarge, finalize_model_task
-from .pipeline import evidence_plan, execute, fetch_tasks, import_into, report_data
+from .pipeline import evidence_plan, execute, fetch_tasks, import_into, report_data, require_catalog_mapping
 from .store import AuditError, Store, canonical_url, digest
 from .wiki_checks import record_wiki_check, wiki_plan
 from .capture_quality import capture_quality, collection_observation_instructions
@@ -133,6 +133,19 @@ def next_tasks(store: Store, run_id: str) -> dict:
     cfg = config(store, run_id)
     trigger_mode = cfg.get("purpose", "").startswith("TRIGGER_")
     cases = store.records(run_id, "cases")
+    if cfg.get("purpose") == "TRIGGER_INIT" and cfg.get("init_basis") == "SOURCE_DEFINITIONS":
+        from .trigger_workflow import classification_payloads
+        from .trigger_assessment import instructions as trigger_instructions
+        tasks, blocks = [], []
+        for payload in classification_payloads(store, run_id):
+            value = _request(store, run_id, cfg, "trigger_classify", payload, trigger_instructions(), 4)
+            if value and value.get("blocked"):
+                blocks.append(value["block_id"])
+            elif value:
+                tasks.append(value)
+        checks = {case["case_id"]: {"status": "NOT_REQUESTED",
+            "reason": "Explicit source-definition initialization; webpage evidence was not requested"} for case in cases}
+        return _finish_tasks(store, run_id, cfg, tasks, blocks, checks)
     checks = {case["case_id"]: wiki_plan(store, run_id, case) for case in cases}
     source_policy = collection_source_policy(store, run_id)
     # A bounded NO_MATCH fulfills checking, not finding. Release only this
@@ -264,7 +277,7 @@ def next_tasks(store: Store, run_id: str) -> dict:
                 + guidance["instructions"] + " " + collection_observation_instructions(), 2)
     judge = CodexJudge(store, run_id) if cfg["executor"] == "codex" else OpenCodeJudge(store, run_id)
     execute(store, run_id, judge, mode=cfg["executor"], model_id=cfg["executor"] + "-managed",
-            summarize_only=cfg.get("purpose") == "TRIGGER_INIT")
+            summarize_only=cfg.get("purpose") == "TRIGGER_INIT", map_catalog=require_catalog_mapping(store, run_id))
     for task in export_model_tasks(store, run_id, executor=cfg["executor"])["tasks"]:
         add("model", {"task": task},
             "Execute the complete enclosed model task using its instructions and expected_contract. Return its "
@@ -304,6 +317,10 @@ def next_tasks(store: Store, run_id: str) -> dict:
                 "Execute the enclosed catalog draft request. Decide ADD/REFINE/APPEND_CASE/NO_CHANGE and quantity "
                 "from facts and the complete original library. Return CATALOG_DRAFT with the INNER request_hash "
                 "and actual producer; keep source attribution/unknowns distinct from verified root causes.", 4)
+    return _finish_tasks(store, run_id, cfg, tasks, blocks, checks)
+
+
+def _finish_tasks(store, run_id, cfg, tasks, blocks, checks):
     tasks = list({task["task_id"]: task for task in tasks}.values())
     tasks.sort(key=lambda task: (task["priority"], task["task_id"]))
     for task in tasks:

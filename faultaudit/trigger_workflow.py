@@ -34,11 +34,13 @@ def _catalog(store, run_id):
 
 def start_init(store: Store, modes: Path, taxonomy: Path, work_root: Path, *,
                executor="opencode", branch_source=None, user_branches=True,
-               catalog_scope="ORIGINAL_MECHANISM_LIBRARY") -> dict:
+               catalog_scope="ORIGINAL_MECHANISM_LIBRARY", basis="HISTORICAL_EVIDENCE") -> dict:
     from .evidence_plan import register_search_policy
     from .pipeline import import_into
     if executor not in {"opencode", "codex"}:
         raise AuditError("Executor must be opencode or codex")
+    if basis not in {"HISTORICAL_EVIDENCE", "SOURCE_DEFINITIONS"}:
+        raise AuditError("Init basis must be HISTORICAL_EVIDENCE or SOURCE_DEFINITIONS")
     library = import_catalog(modes, scope=catalog_scope)
     if not library["items"] or len({i["item_id"] for i in library["items"]}) != len(library["items"]):
         raise AuditError("Initialization requires a nonempty library with unique original mode IDs")
@@ -68,10 +70,11 @@ def start_init(store: Store, modes: Path, taxonomy: Path, work_root: Path, *,
     cfg = {"run_id": run_id, "directory": str(directory), "executor": executor,
         "source_hash": imported["documents"][0]["source_sha256"], "rule_version": RULE_VERSION,
         "purpose": "TRIGGER_INIT", "selected_case_ids": selected, "scope_hash": digest(selected),
-        "capture_quality_required": True, "max_search_rounds": 3, "capture_attempts_per_resource": 3}
+        "capture_quality_required": True, "max_search_rounds": 3, "capture_attempts_per_resource": 3,
+        "init_basis": basis}
     store.put(run_id, "xlsx_workflow", "config", cfg)
     store.put(run_id, "trigger_config", "config", {"phase": "INIT", "taxonomy_id": frozen["taxonomy_id"],
-        "catalog_hash": digest(_catalog(store, run_id)), "rule_version": RULE_VERSION})
+        "catalog_hash": digest(_catalog(store, run_id)), "rule_version": RULE_VERSION, "basis": basis})
     register_search_policy(store, run_id, {"required_sources": ["WIKI"]})
     return {**cfg, "mode_count": len(subjects), "trigger_count": len(frozen["items"]),
         "branch_categories": [c["id"] for b in frozen["branches"] for c in b.get("categories", [])]}
@@ -99,6 +102,23 @@ def _model_taxonomy(frozen):
         "included": "All definitions, local/family Requires/Skip and global scope/applicability",
         "excluded": "Duplicate item source_quote copies; generator N-allocation/execution instructions outside historical classification"}
     return value
+
+
+def _model_catalog(items):
+    """Complete comparison definitions, separate from a full source-document audit.
+
+    The original raw records remain immutable in Store. Normalized definition
+    fields and all boundary/category/example fields are copied in full; repeated
+    source chapters and quote bundles are not part of this comparison view.
+    """
+    result = []
+    for item in items:
+        raw = item.get("raw", {})
+        value = {k: item[k] for k in ("item_id", "description", "operator", "mechanism", "trigger",
+            "source_file", "source_sha256", "source_location", "sheet", "row") if k in item}
+        value["raw"] = {key: raw[key] for key in ("三级", "四级", "边界", "未知", "代表子案例") if key in raw}
+        result.append(value)
+    return result
 
 
 def _linked_snapshots(store, run_id, case_id):
@@ -164,6 +184,10 @@ def _basis(store, run_id, subject, snapshot_id=None):
     from .evidence_plan import collection_source_policy
     cid = subject["case_id"]
     settings = _settings(store, run_id)
+    if settings["phase"] == "INIT" and settings.get("basis") == "SOURCE_DEFINITIONS":
+        return digest({"subject": subject, "source": store.get(run_id, "cases", cid),
+            "taxonomy": _taxonomy(store, run_id), "catalog": _catalog(store, run_id),
+            "assessment_basis": "SOURCE_DEFINITIONS"})
     snapshots = _linked_snapshots(store, run_id, cid)
     if snapshot_id:
         snapshots = {sid: s for sid, s in snapshots.items() if sid == snapshot_id}
@@ -175,7 +199,8 @@ def _basis(store, run_id, subject, snapshot_id=None):
         "snapshots": sorted(snapshots),
         "summaries": sorted([digest(s) for s in current_summaries(store, run_id) if s["snapshot_id"] in snapshots]),
         "baseline": settings.get("baseline_id"),
-        "collection_policy": collection_source_policy(store, run_id)["policy_hash"]}
+        "collection_policy": collection_source_policy(store, run_id)["policy_hash"],
+        "assessment_basis": settings.get("basis", "HISTORICAL_EVIDENCE")}
     if not snapshot_id:
         base["wiki_checks"] = sorted(digest(c) for c in store.records(run_id, "wiki_checks") if c["case_id"] == cid)
     if settings["phase"] == "INCREMENTAL":
@@ -230,11 +255,23 @@ def classification_payloads(store, run_id):
     from .pipeline import current_judgments, current_mappings
     settings, taxonomy = _settings(store, run_id), _model_taxonomy(_taxonomy(store, run_id))
     baseline = store.get(run_id, "trigger_baseline_refs", "baseline")
+    if baseline:
+        # Gaps, source policy and assessment indexes are bookkeeping, not additional
+        # semantic input. Keep the complete frozen mechanism/detail definitions.
+        baseline = {k: baseline[k] for k in ("baseline_id", "run_id", "status", "index_hash", "mode_ids",
+            "catalog_scope", "coverage_kind", "coverage_details", "declared_details", "execution_verified") if k in baseline}
+        if baseline.get("declared_details"):
+            # Original partial trigger rationales are retained in state; the
+            # complete mechanism/condition definitions and source anchors below
+            # are the semantic baseline for this independent comparison axis.
+            baseline["declared_details"] = [{k: v for k, v in detail.items() if k != "trigger_assessments"}
+                for detail in baseline["declared_details"]]
     catalog = _catalog(store, run_id)
+    definition_init = settings["phase"] == "INIT" and settings.get("basis") == "SOURCE_DEFINITIONS"
     assessments = current_assessments(store, run_id)
     for subject in sorted(store.records(run_id, "trigger_subjects"), key=lambda s: s["subject_id"]):
         cid = subject["case_id"]
-        issues = _issues(store, run_id, cid) or [None]
+        issues = ([None] if definition_init else _issues(store, run_id, cid) or [None])
         for issue in issues:
             key = (subject["subject_id"], (issue or {}).get("snapshot_id"), (issue or {}).get("summary_task_id"), (issue or {}).get("issue_index"))
             if any((a["subject_id"], a.get("snapshot_id"), a.get("summary_task_id"), a.get("issue_index")) == key for a in assessments):
@@ -246,11 +283,26 @@ def classification_payloads(store, run_id):
                     and j["snapshot_id"] == sid and (j.get("applicable_issue") or {}).get("label") == label]
                 mappings = [m for m in current_mappings(store, run_id) if m["case_id"] == cid]
             yield {"phase": settings["phase"], "subject": {**subject, "source_case": store.get(run_id, "cases", cid)},
+                "assessment_basis": settings.get("basis", "HISTORICAL_EVIDENCE"),
                 "taxonomy": taxonomy, "source_issue": issue,
                 "wiki_check": {"records": [c for c in store.records(run_id, "wiki_checks") if c["case_id"] == cid],
-                    "rule": "Wiki first; blocked access is a collection gap, not a negative mechanism judgment"},
-                "mechanism_catalog": [c for c in catalog if settings["phase"] != "INIT" or c["item_id"] == subject["mode_id"]],
+                    "rule": ("Not requested: explicit source-definition Init; no webpage verification claimed" if definition_init
+                        else "Wiki first; blocked access is a collection gap, not a negative mechanism judgment")},
+                "mechanism_catalog": ([{"item_id": subject["mode_id"], "definition_source": "subject.source_case.raw"}]
+                    if settings["phase"] == "INIT" else _model_catalog(catalog)),
                 "baseline": baseline, "judgments": judgments, "mappings": mappings,
+                "input_scope": {"catalog_mode_ids": [subject["mode_id"]] if settings["phase"] == "INIT"
+                    else [item["item_id"] for item in catalog], "catalog_definitions_complete": True,
+                    "declared_detail_count": len((baseline or {}).get("declared_details", [])),
+                    "definition_init_only": definition_init,
+                    "catalog_view": "ORIGINAL_SUBJECT_RAW" if settings["phase"] == "INIT"
+                        else "COMPLETE_DEFINITION_COMPARISON_PROJECTION",
+                    "catalog_included_fields": ["item_id", "description", "operator", "mechanism", "trigger",
+                        "三级", "四级", "边界", "未知", "代表子案例", "source_file", "source_sha256", "source_location", "sheet", "row"],
+                    "subject_original_raw_complete": settings["phase"] == "INIT",
+                    "full_source_document_audit": False,
+                    "full_original_records_frozen_in_store": True,
+                    "comparison_projection_excludes": "Repeated raw source chapters/quote bundles and prior trigger rationales; all definitions and mechanism detail fields are retained in full"},
                 "basis_hash": _basis(store, run_id, subject, (issue or {}).get("snapshot_id")),
                 "case_ids": [cid], "response_schema": response_schema()}
 
@@ -258,6 +310,10 @@ def classification_payloads(store, run_id):
 def accept_assessment(store, run_id, request, response):
     from .xlsx_workflow import _policy, config
     payload = request["payload"]
+    settings = _settings(store, run_id)
+    if (payload.get("phase") != settings["phase"]
+            or payload.get("assessment_basis", "HISTORICAL_EVIDENCE") != settings.get("basis", "HISTORICAL_EVIDENCE")):
+        raise AuditError("Classification phase/basis differs from the frozen workflow configuration")
     subject = store.get(run_id, "trigger_subjects", payload["subject"]["subject_id"])
     if not subject or payload["basis_hash"] != _basis(store, run_id, subject, (payload.get("source_issue") or {}).get("snapshot_id")):
         raise AuditError("Classification input/baseline changed; request a fresh task")
@@ -329,19 +385,21 @@ def _projection(store, run_id):
     from .evidence_plan import collection_source_policy, resource_kind
     policy = collection_source_policy(store, run_id)
     cfg = _settings(store, run_id)
+    definition_init = cfg["phase"] == "INIT" and cfg.get("basis") == "SOURCE_DEFINITIONS"
     assessments = current_assessments(store, run_id)
     subjects = [{**s, "source_case": store.get(run_id, "cases", s["case_id"])}
                 for s in store.records(run_id, "trigger_subjects")]
-    checks = {s["case_id"]: wiki_plan(store, run_id, s["source_case"]) for s in subjects}
+    checks = {s["case_id"]: ({"status": "NOT_REQUESTED", "reason": "Explicit source-definition initialization"}
+        if definition_init else wiki_plan(store, run_id, s["source_case"])) for s in subjects}
     gaps = []
     for subject in subjects:
         cid = subject["case_id"]
-        if checks[cid]["status"] not in {"FOUND", "NO_MATCH"}:
+        if not definition_init and checks[cid]["status"] not in {"FOUND", "NO_MATCH"}:
             gaps.append({"case_id": cid, "kind": "WIKI_" + checks[cid]["status"], "reason": checks[cid].get("reason", "Wiki check pending")})
         values = [a for a in assessments if a["subject_id"] == subject["subject_id"]]
         if not values:
             gaps.append({"case_id": cid, "kind": "UNASSESSED", "reason": "No current classification result"})
-        for issue in _issues(store, run_id, cid):
+        for issue in ([] if definition_init else _issues(store, run_id, cid)):
             if not any(a.get("snapshot_id") == issue["snapshot_id"] and a.get("summary_task_id") == issue["summary_task_id"]
                        and a.get("issue_index") == issue["issue_index"] for a in values):
                 gaps.append({"case_id": cid, "kind": "ISSUE_UNASSESSED",
@@ -349,7 +407,7 @@ def _projection(store, run_id):
         for a in values:
             same_material_match = any(v.get("snapshot_id") == a.get("snapshot_id")
                 and v["result"]["source_relation"] == "MATCH" for v in values)
-            if a["result"]["source_relation"] != "MATCH" and not (
+            if not definition_init and a["result"]["source_relation"] != "MATCH" and not (
                     a["result"]["source_relation"] == "NOT_RELATED" and same_material_match):
                 gaps.append({"case_id": cid, "kind": "SOURCE_" + a["result"]["source_relation"],
                     "reason": "Current material does not establish this mode's concrete mechanism"})
@@ -357,12 +415,12 @@ def _projection(store, run_id):
                 gaps.append({"case_id": cid, "kind": "FACT_CONFLICT", "reason": "; ".join(a["result"]["review_reasons"])})
             if any(r["relation"] in {"UNKNOWN", "PARTIAL"} for r in a["result"]["rows"]):
                 gaps.append({"case_id": cid, "kind": "TRIGGER_UNKNOWNS", "reason": "Classification completed with explicit unknown/partial predicates"})
-        for snapshot in _linked_snapshots(store, run_id, cid).values():
+        for snapshot in ([] if definition_init else _linked_snapshots(store, run_id, cid).values()):
             if snapshot["status"] != "COMPLETE":
                 gaps.append({"case_id": cid, "kind": "CAPTURE_" + snapshot["status"], "reason": snapshot["url"]})
             if not any(i["snapshot_id"] == snapshot["snapshot_id"] for i in _issues(store, run_id, cid)):
                 gaps.append({"case_id": cid, "kind": "SUMMARY_MISSING", "reason": snapshot["url"]})
-        for ref in store.records(run_id, "references"):
+        for ref in ([] if definition_init else store.records(run_id, "references")):
             if ref["case_id"] != cid:
                 continue
             if policy["explicit_override"] and resource_kind(ref, case=subject["source_case"]) not in policy["collection_sources"]:
@@ -390,7 +448,7 @@ def _projection(store, run_id):
     for ref in store.records(run_id, "references"):
         snapshot = active.get(resource_key(ref["url"])) if ref.get("url") else None
         resources.append({**ref, "snapshot_id": (snapshot or {}).get("snapshot_id"),
-            "capture_status": (snapshot or {}).get("status", "NOT_FETCHED"),
+            "capture_status": "NOT_REQUESTED" if definition_init else (snapshot or {}).get("status", "NOT_FETCHED"),
             "source_relation": relations.get((ref["case_id"], (snapshot or {}).get("snapshot_id")), "UNASSESSED")})
     baseline = store.get(run_id, "trigger_baseline_refs", "baseline")
     if cfg["phase"] == "INIT":
@@ -402,7 +460,8 @@ def _projection(store, run_id):
             baseline = {**baseline, "status": "STALE"}
             gaps.append({"case_id": "", "kind": "BASELINE_STALE", "reason": "Maintain initialization before incremental decisions"})
     gaps = list({digest(g): g for g in gaps}.values())
-    return {"run_id": run_id, "phase": cfg["phase"], "taxonomy": _taxonomy(store, run_id), "subjects": subjects,
+    return {"run_id": run_id, "phase": cfg["phase"], "coverage_kind": cfg.get("basis", "HISTORICAL_EVIDENCE"),
+        "taxonomy": _taxonomy(store, run_id), "subjects": subjects,
         "assessments": assessments, "wiki_checks": checks, "resources": resources,
         "gaps": gaps, "baseline": baseline}
 
@@ -414,7 +473,7 @@ def status(store, run_id):
         "assessment_count": len(values), "assessed_subject_count": len({a["subject_id"] for a in values}),
         "trigger_count": len(data["taxonomy"]["items"]), "gap_count": len(data["gaps"]),
         "gaps": data["gaps"], "review_count": sum(a["result"]["review_required"] for a in values),
-        "coverage_kind": "HISTORICAL_EVIDENCE", "execution_verified": False}
+        "coverage_kind": data["coverage_kind"], "execution_verified": False}
 
 
 def _index_identity(store, run_id):
@@ -438,8 +497,18 @@ def finalize(store, run_id, *, allow_pending=False):
     blocking = [g for g in data["gaps"] if g["kind"] not in informational]
     if blocking and not allow_pending:
         raise AuditError("Initialization has explicit gaps; finish them or finalize a provisional baseline with --allow-pending")
-    details = []
+    details, declared_details = [], []
+    definition_init = _settings(store, run_id).get("basis") == "SOURCE_DEFINITIONS"
     for a in data["assessments"]:
+        if definition_init:
+            for detail in a["result"]["details"]:
+                if detail["evidence_basis"] == "SOURCE_DEFINITION":
+                    labels = [r for r in a["result"]["rows"] if r["trigger_id"] in detail["trigger_ids"]]
+                    declared_details.append({**detail, "trigger_assessments": labels,
+                        "detail_id": a["assessment_id"] + ":" + detail["detail_id"],
+                        "assessment_id": a["assessment_id"], "source_case_id": a["case_id"],
+                        "coverage_kind": "SOURCE_DEFINITIONS", "execution_verified": False})
+            continue
         if a["result"]["source_relation"] != "MATCH" or a["result"]["review_required"]:
             continue
         for detail in a["result"]["details"]:
@@ -455,7 +524,8 @@ def finalize(store, run_id, *, allow_pending=False):
         "catalog_scope": store.get(run_id, "catalog_selections", "frozen"),
         "collection_source_policy": collection_source_policy(store, run_id),
         "assessment_ids": [a["assessment_id"] for a in data["assessments"]], "coverage_details": details,
-        "gaps": data["gaps"], "coverage_kind": "HISTORICAL_EVIDENCE", "execution_verified": False}
+        "declared_details": declared_details,
+        "gaps": data["gaps"], "coverage_kind": data["coverage_kind"], "execution_verified": False}
     store.put(run_id, "trigger_baselines", baseline["baseline_id"], baseline)
     store.put(run_id, "trigger_baseline_heads", "current", {"baseline_id": baseline["baseline_id"]}, mutable=True)
     return baseline
@@ -514,7 +584,8 @@ def start_incremental(store, source, baseline_run, work_root, *, executor="openc
     store.put(run_id, "trigger_baseline_refs", "baseline", baseline)
     store.put(run_id, "trigger_config", "config", {"phase": "INCREMENTAL", "taxonomy_id": frozen["taxonomy_id"],
         "baseline_run": baseline_run, "baseline_id": baseline["baseline_id"], "allow_pending_baseline": allow_pending_baseline,
-        "catalog_hash": digest(catalog), "rule_version": RULE_VERSION})
+        "catalog_hash": digest(catalog), "rule_version": RULE_VERSION, "basis": "HISTORICAL_EVIDENCE",
+        "baseline_basis": baseline.get("coverage_kind", "HISTORICAL_EVIDENCE")})
     for case in store.records(run_id, "cases"):
         subject = {"subject_id": "case-subject-" + digest(case["case_id"])[:24],
             "case_id": case["case_id"], "subject_kind": "FAULT_CASE"}
@@ -538,6 +609,6 @@ def export(store, run_id):
         result = export_workbook_xlsx(source, Path(scratch) / name)
         Path(result["xlsx"]).replace(output / name)
     result.update(xlsx=str(output / name), status="COMPLETE_WITH_PENDING" if data["gaps"] else "COMPLETE",
-                  gap_count=len(data["gaps"]), coverage_kind="HISTORICAL_EVIDENCE", execution_verified=False)
+                  gap_count=len(data["gaps"]), coverage_kind=data["coverage_kind"], execution_verified=False)
     store.event(run_id, "trigger_export", result)
     return result

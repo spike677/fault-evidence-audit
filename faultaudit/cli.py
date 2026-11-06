@@ -191,6 +191,8 @@ def parser() -> argparse.ArgumentParser:
     init.add_argument("--modes", type=Path, required=True)
     init.add_argument("--taxonomy", type=Path, required=True)
     init.add_argument("--catalog-scope", default="ORIGINAL_MECHANISM_LIBRARY")
+    init.add_argument("--basis", choices=["HISTORICAL_EVIDENCE", "SOURCE_DEFINITIONS"],
+                      default="HISTORICAL_EVIDENCE", help="Initialize from verified webpages or explicit source definitions only")
     init.add_argument("--branch-source", type=Path)
     init.add_argument("--user-branches", action="store_true", default=True,
                       help="Use the user's explicit Branch 2/3 definitions (default)")
@@ -294,7 +296,7 @@ def main(argv: list[str] | None = None) -> int:
             if operation == "init":
                 result = trigger_workflow.start_init(store, args.modes, args.taxonomy, args.work_root,
                     executor=args.executor, branch_source=args.branch_source, user_branches=args.user_branches,
-                    catalog_scope=args.catalog_scope)
+                    catalog_scope=args.catalog_scope, basis=args.basis)
             elif operation == "classify":
                 result = trigger_workflow.start_incremental(store, args.input, args.baseline_run, args.work_root,
                     executor=args.executor, baseline_id=args.baseline_id, allow_pending_baseline=args.allow_pending_baseline)

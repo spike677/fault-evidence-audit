@@ -118,17 +118,55 @@ class TriggerAssessmentTests(unittest.TestCase):
             with self.subTest(dimension=dimension), self.assertRaisesRegex(AuditError, "without unresolved fact conflicts"):
                 validate_assessment(payload, response, HASH)
 
-    def test_partial_or_unknown_cannot_omit_observed_fact_conflicts(self):
-        for relation in ("PARTIAL", "UNKNOWN"):
-            payload, response = fixture(); source_match(response)
-            response["source_relation"] = relation
-            response["source_alignment"][0]["relation"] = "DIFFERENT"
-            with self.subTest(relation=relation), self.assertRaisesRegex(AuditError, "require grounded fact_conflicts"):
-                validate_assessment(payload, response, HASH)
-            response["fact_conflicts"] = [{"reason": "需核对明确的事实差异。", "evidence": [REF], "source_cells": [CELL]}]
-            result = validate_assessment(payload, response, HASH)
-            self.assertTrue(result["review_required"])
-            self.assertEqual(result["processing_status"], "EXCEPTION")
+    def test_partial_cannot_omit_observed_fact_conflicts(self):
+        payload, response = fixture(); source_match(response)
+        response["source_relation"] = "PARTIAL"
+        response["source_alignment"][0]["relation"] = "DIFFERENT"
+        with self.assertRaisesRegex(AuditError, "require grounded fact_conflicts"):
+            validate_assessment(payload, response, HASH)
+        response["fact_conflicts"] = [{"reason": "需核对明确的事实差异。", "evidence": [REF], "source_cells": [CELL]}]
+        result = validate_assessment(payload, response, HASH)
+        self.assertTrue(result["review_required"])
+        self.assertEqual(result["processing_status"], "EXCEPTION")
+
+    def test_unbound_candidate_context_difference_stays_pending_without_conflict(self):
+        source_context = {"field": "运行场景", "cell": "C2", "quote": "原记录发生于训练反向传播阶段"}
+        candidate_context = {"segment_id": "S:s1", "quote": "候选问题发生于推理Prefill阶段"}
+        for phase in ("INIT", "INCREMENTAL"):
+            payload, response = fixture(phase)
+            payload["subject"]["source_case"]["raw"][source_context["field"]] = source_context["quote"]
+            payload["subject"]["source_case"]["cell_locations"][source_context["field"]] = source_context["cell"]
+            payload["source_issue"]["snapshot"]["segments"][0]["text"] += candidate_context["quote"]
+            payload["source_issue"]["facts"].append({"fact_id": "F2", "field": "context",
+                "value": candidate_context["quote"], "evidence": [candidate_context]})
+            response.update(source_relation="UNKNOWN", fact_conflicts=[], source_alignment=[{
+                "dimension": "context", "relation": "DIFFERENT", "source_cells": [source_context],
+                "evidence": [candidate_context], "reason": "候选的推理场景不同于原训练记录，尚未建立来源对应关系。"}])
+            with self.subTest(phase=phase):
+                result = validate_assessment(payload, response, HASH)
+                self.assertEqual(result["source_relation"], "UNKNOWN")
+                self.assertEqual(result["source_alignment"], response["source_alignment"])
+                self.assertEqual(result["fact_conflicts"], [])
+                self.assertEqual(result["processing_status"], "PENDING")
+                self.assertFalse(result["review_required"])
+                self.assertEqual(result["review_reasons"], [])
+
+    def test_grounded_fact_conflict_requires_review_even_for_unknown_source(self):
+        payload, response = fixture()
+        opposing = {"segment_id": "S:s1", "quote": "Foo在维长65时尾块地址步长没有错误"}
+        payload["source_issue"]["snapshot"]["segments"][0]["text"] = opposing["quote"]
+        payload["source_issue"]["facts"][0]["evidence"] = [opposing]
+        reason = "同一故障记录的尾块步长是否错误存在明确事实矛盾。"
+        response.update(source_relation="UNKNOWN", source_alignment=[{
+            "dimension": "mechanism", "relation": "DIFFERENT", "reason": reason,
+            "evidence": [opposing], "source_cells": [CELL]}], fact_conflicts=[{
+                "reason": reason, "evidence": [opposing], "source_cells": [CELL]}])
+        result = validate_assessment(payload, response, HASH)
+        self.assertEqual(result["source_relation"], "UNKNOWN")
+        self.assertEqual(result["fact_conflicts"], response["fact_conflicts"])
+        self.assertEqual(result["processing_status"], "EXCEPTION")
+        self.assertTrue(result["review_required"])
+        self.assertEqual(result["review_reasons"], [reason])
 
     def test_match_requires_complete_grounded_met_predicates(self):
         for change in ("unknown", "not_met", "no_checks", "cell_only", "no_source_match"):

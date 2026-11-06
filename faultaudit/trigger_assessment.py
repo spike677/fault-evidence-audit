@@ -15,6 +15,7 @@ from .store import AuditError
 
 
 Basis = Literal["SOURCE_DEFINITION", "SOURCE_REPORTED", "CODE_INFERENCE", "UNKNOWN"]
+CoverageKind = Literal["HISTORICAL_EVIDENCE", "SOURCE_DEFINITIONS"]
 
 
 class SourceCell(Contract):
@@ -54,7 +55,7 @@ class Detail(Grounded):
     trigger_ids: list[str] = Field(default_factory=list)
     evidence_basis: Basis
     unknowns: list[str] = Field(default_factory=list)
-    coverage_kind: Literal["HISTORICAL_EVIDENCE"] = "HISTORICAL_EVIDENCE"
+    coverage_kind: CoverageKind = "HISTORICAL_EVIDENCE"
     execution_verified: Literal[False] = False
 
 
@@ -82,6 +83,31 @@ class Decision(Contract):
     reason: str = Field(min_length=1)
 
 
+class DeclaredComparisonRow(Grounded):
+    mode_id: str = Field(min_length=1)
+    result: Literal["COVERED", "PARTIALLY_COVERED", "NOT_COVERED", "UNKNOWN"]
+    mechanism_relation: Literal["SAME", "PARTIAL", "DIFFERENT", "UNKNOWN"]
+    baseline_detail_ids: list[str] = Field(default_factory=list)
+    reason: str = Field(min_length=1)
+
+
+class DeclaredDecision(Contract):
+    action: Literal["CLASSIFY_DECLARED", "EXTEND_DECLARED", "PROPOSE_DECLARED_MODE", "UNDETERMINED"]
+    target_mode_ids: list[str] = Field(default_factory=list)
+    target_detail_ids: list[str] = Field(default_factory=list)
+    reason: str = Field(min_length=1)
+
+
+class DeclaredComparison(Contract):
+    basis: Literal["SOURCE_DEFINITIONS"] = "SOURCE_DEFINITIONS"
+    scope_relation: Literal["IN_SCOPE", "OUT_OF_SCOPE", "UNKNOWN"] = "UNKNOWN"
+    scope_reason: str = Field(min_length=1)
+    rows: list[DeclaredComparisonRow]
+    decision: DeclaredDecision
+    adoption_status: Literal["SUGGESTION_ONLY"] = "SUGGESTION_ONLY"
+    case_confirmation: Literal["NOT_ESTABLISHED"] = "NOT_ESTABLISHED"
+
+
 class TriggerAssessment(Contract):
     schema_version: Literal["1.0"] = "1.0"
     request_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
@@ -94,9 +120,10 @@ class TriggerAssessment(Contract):
     details: list[Detail] = Field(default_factory=list)
     external_branches: list[OutsideBranch]
     decision: Decision
+    declared_comparison: DeclaredComparison | None = None
     fact_conflicts: list[FactConflict] = Field(default_factory=list)
     self_check: SelfCheck
-    coverage_kind: Literal["HISTORICAL_EVIDENCE"] = "HISTORICAL_EVIDENCE"
+    coverage_kind: CoverageKind = "HISTORICAL_EVIDENCE"
     execution_verified: Literal[False] = False
 
 
@@ -152,6 +179,32 @@ revision, version and collection unknowns from grounded fact_conflicts. Unknowns
 human ACCEPT. Perform the five self-checks once, retaining exact quotes and unresolved facts.
 Read the complete request. If it exceeds execution capacity, report transport blocking instead
 of returning a successful truncated classification.
+When assessment_basis is SOURCE_DEFINITIONS and phase INIT, read only the frozen original
+definition and supplied chat/source cells. No search, webpage capture, SAME_EVENT, or incident
+confirmation is part of this initialization. Keep source_relation UNKNOWN, all 42 trigger rows
+PARTIAL or UNKNOWN, and retain at least one concrete SOURCE_DEFINITION detail for this mode.
+Do not omit the definition's mechanism because it lacks webpage verification. Mark coverage_kind
+SOURCE_DEFINITIONS; execution_verified remains false. Exact source_cells also anchor chat fields.
+An incremental baseline may separately contain declared_details. If so, declared_comparison is
+required: semantically compare the new case/current issue against EVERY original mode exactly once,
+reading each complete frozen definition and declared detail. The mechanism_catalog comparison view
+includes every mode's full description/operator/mechanism/trigger plus category/boundary/unknown/
+representative-example fields and provenance. Repeated original chapters and quote bundles remain
+frozen in Store; this task is not a full source-document audit. This is a second, declared-definition
+axis, independent of the 42 trigger rows and the evidence-gated decision above. COVERED requires
+mechanism_relation SAME, PARTIALLY_COVERED requires SAME/PARTIAL, and NOT_COVERED requires a positive
+DIFFERENT mechanism; absent information is UNKNOWN. For any non-UNKNOWN comparison cite the relevant
+baseline_detail_ids and exact new-case source_cells or current issue evidence. Generic operator,
+symptom or trigger overlap alone never proves mechanism coverage. All current issue evidence remains
+scoped and NOT_RELATED material cannot support the comparison. CLASSIFY_DECLARED uses known declared
+details under COVERED modes. EXTEND_DECLARED uses new grounded details under COVERED/PARTIALLY_COVERED
+modes. PROPOSE_DECLARED_MODE requires every original definition positively NOT_COVERED and a concrete
+new grounded detail. Such a proposal is only relative to the declared catalog_scope: an inference
+library excludes training mechanisms by scope, so a training-only case outside that library uses
+UNDETERMINED with the scope gap in its reason rather than proposing a new inference mode.
+Declared suggestions have adoption_status SUGGESTION_ONLY and case_confirmation NOT_ESTABLISHED;
+they never authorize formal ADD, source MATCH, SAME_EVENT or bypass the original decision's gates.
+If there are no declared_details, leave declared_comparison null.
 """
 
 
@@ -178,6 +231,13 @@ def validate_assessment(payload: dict, response: dict, request_hash: str) -> dic
     phase = payload.get("phase")
     if phase not in {"INIT", "INCREMENTAL"}:
         raise AuditError("Trigger classification phase must be INIT or INCREMENTAL")
+    assessment_basis = payload.get("assessment_basis", "HISTORICAL_EVIDENCE")
+    if assessment_basis not in {"HISTORICAL_EVIDENCE", "SOURCE_DEFINITIONS"}:
+        raise AuditError("Unknown trigger assessment basis")
+    definition_init = phase == "INIT" and assessment_basis == "SOURCE_DEFINITIONS"
+    if definition_init and (payload.get("source_issue") or result.source_relation != "UNKNOWN"
+            or any(r.relation not in {"UNKNOWN", "PARTIAL"} for r in result.rows)):
+        raise AuditError("Source-definition Init has no webpage alignment and only PARTIAL/UNKNOWN trigger rows")
     items = payload["taxonomy"]["items"]
     expected = [item["id"] for item in items]
     if len(expected) != 42 or len(set(expected)) != 42:
@@ -224,7 +284,8 @@ def validate_assessment(payload: dict, response: dict, request_hash: str) -> dic
         raise AuditError("Source MATCH requires a grounded mechanism alignment without unresolved fact conflicts")
     if result.source_relation == "NOT_RELATED" and not any(a.relation == "DIFFERENT" for a in mechanisms):
         raise AuditError("NOT_RELATED requires positive grounded mechanism difference, not missing information")
-    if differences and result.source_relation != "NOT_RELATED" and not result.fact_conflicts:
+    # An unbound candidate's differences need not contradict the original facts.
+    if differences and result.source_relation not in {"UNKNOWN", "NOT_RELATED"} and not result.fact_conflicts:
         raise AuditError("Unresolved DIFFERENT source alignments require grounded fact_conflicts")
     rows = {row.trigger_id: row for row in result.rows}
     definitions = {item["id"]: item for item in items}
@@ -273,8 +334,10 @@ def validate_assessment(payload: dict, response: dict, request_hash: str) -> dic
     catalog_ids = {item["item_id"] for item in payload.get("mechanism_catalog", [])}
     baseline = payload.get("baseline") or {}
     known_details = {d["detail_id"]: d for d in baseline.get("coverage_details", [])}
+    declared_details = {d["detail_id"]: d for d in baseline.get("declared_details", [])}
+    linkable_details = {**known_details, **declared_details}
     detail_ids = _unique([d.detail_id for d in result.details], "Proposed detail IDs")
-    if detail_ids.intersection(known_details):
+    if detail_ids.intersection(linkable_details):
         raise AuditError("Existing detail IDs are referenced from the baseline, not rewritten as new details")
     for detail in result.details:
         grounded(detail, "Mechanism detail", needed=detail.evidence_basis != "UNKNOWN")
@@ -291,11 +354,15 @@ def validate_assessment(payload: dict, response: dict, request_hash: str) -> dic
         if (result.source_relation == "NOT_RELATED"
                 and detail.evidence_basis in {"SOURCE_REPORTED", "CODE_INFERENCE"}):
             raise AuditError("Unrelated material cannot supply a mechanism detail for the subject")
+        if definition_init and detail.evidence_basis != "SOURCE_DEFINITION":
+            raise AuditError("Source-definition Init details require SOURCE_DEFINITION and exact source cells")
+    if definition_init and not result.details:
+        raise AuditError("Source-definition Init must retain at least one original mechanism detail")
     for row in result.rows:
-        if not set(row.detail_ids) <= detail_ids | set(known_details):
+        if not set(row.detail_ids) <= detail_ids | set(linkable_details):
             raise AuditError("Row refers to an unknown detail ID")
         for did in row.detail_ids:
-            detail = next((d.model_dump() for d in result.details if d.detail_id == did), known_details.get(did))
+            detail = next((d.model_dump() for d in result.details if d.detail_id == did), linkable_details.get(did))
             if row.trigger_id not in detail.get("trigger_ids", []):
                 raise AuditError("Row/detail trigger links must agree")
 
@@ -381,7 +448,63 @@ def validate_assessment(payload: dict, response: dict, request_hash: str) -> dic
                     or d.evidence_basis not in {"SOURCE_REPORTED", "CODE_INFERENCE"}
                     for d in result.details if d.detail_id in targets):
                 raise AuditError("A new mode requires grounded proposed details, not an existing mode identity")
+    comparison = result.declared_comparison
+    if phase == "INCREMENTAL" and declared_details:
+        if not comparison:
+            raise AuditError("A declared-definition baseline requires a complete declared_comparison")
+        if (_unique([r.mode_id for r in comparison.rows], "Declared comparison mode IDs") != catalog_ids
+                or not catalog_ids <= set(baseline.get("mode_ids", []))):
+            raise AuditError("Declared comparison must assess every frozen original mode exactly once")
+        compared = {r.mode_id: r for r in comparison.rows}
+        for row in comparison.rows:
+            grounded(row, "Declared comparison", needed=row.result != "UNKNOWN")
+            referenced = _unique(row.baseline_detail_ids, "Declared baseline detail IDs")
+            if not referenced <= set(declared_details) or any(
+                    declared_details[did].get("mode_id") != row.mode_id for did in referenced):
+                raise AuditError("Declared comparison references unknown details or another parent mode")
+            if row.result != "UNKNOWN" and not referenced:
+                raise AuditError("A decided declared comparison needs the original mode's declared details")
+            allowed_relation = {"COVERED": {"SAME"}, "PARTIALLY_COVERED": {"SAME", "PARTIAL"},
+                                "NOT_COVERED": {"DIFFERENT"}, "UNKNOWN": {"UNKNOWN", "PARTIAL"}}
+            if row.mechanism_relation not in allowed_relation[row.result]:
+                raise AuditError("Declared coverage requires an explicit consistent mechanism relation")
+            if row.evidence and result.source_relation == "NOT_RELATED":
+                raise AuditError("Unrelated webpage material cannot support a declared comparison")
+        proposed = comparison.decision
+        if result.fact_conflicts and proposed.action != "UNDETERMINED":
+            raise AuditError("Unresolved fact conflicts require an UNDETERMINED declared suggestion")
+        parent_ids = _unique(proposed.target_mode_ids, "Declared target mode IDs")
+        target_ids = _unique(proposed.target_detail_ids, "Declared target detail IDs")
+        if not parent_ids <= catalog_ids or not target_ids <= detail_ids | set(declared_details):
+            raise AuditError("Declared decision targets must use known original modes and declared/proposed details")
+        if proposed.action == "CLASSIFY_DECLARED":
+            if (not parent_ids or not target_ids or not target_ids <= set(declared_details)
+                    or any(compared[mid].result != "COVERED" for mid in parent_ids)
+                    or any(declared_details[did].get("mode_id") not in parent_ids for did in target_ids)):
+                raise AuditError("CLASSIFY_DECLARED requires COVERED parents and their known declared details")
+        elif proposed.action in {"EXTEND_DECLARED", "PROPOSE_DECLARED_MODE"}:
+            new_details = [d for d in result.details if d.detail_id in target_ids]
+            if not target_ids or not target_ids <= detail_ids or len(new_details) != len(target_ids):
+                raise AuditError("A declared extension/proposal needs new proposed mechanism details")
+            if any(d.evidence_basis == "UNKNOWN" or not (d.evidence or d.source_cells) for d in new_details):
+                raise AuditError("Declared proposed details need exact source cells or current issue evidence")
+            if proposed.action == "EXTEND_DECLARED":
+                if (not parent_ids or any(compared[mid].result not in {"COVERED", "PARTIALLY_COVERED"}
+                        for mid in parent_ids) or any(d.mode_id not in parent_ids for d in new_details)):
+                    raise AuditError("EXTEND_DECLARED requires covered/partial parents and their new details")
+            elif (comparison.scope_relation != "IN_SCOPE" or parent_ids
+                    or any(row.result != "NOT_COVERED" for row in comparison.rows)
+                    or any(d.mode_id is not None for d in new_details)):
+                raise AuditError("PROPOSE_DECLARED_MODE requires an in-scope case and every original definition NOT_COVERED")
+    elif comparison is not None:
+        raise AuditError("Declared comparison requires an incremental baseline with frozen declared details")
     output = result.model_dump()
+    output["coverage_kind"] = assessment_basis
+    for value in output["details"]:
+        value["coverage_kind"] = ("SOURCE_DEFINITIONS" if value["evidence_basis"] == "SOURCE_DEFINITION"
+                                  else "HISTORICAL_EVIDENCE")
+    output["declared_processing_status"] = ("AUTO_PROCESSED" if comparison
+        and comparison.decision.action != "UNDETERMINED" and not result.fact_conflicts else "PENDING")
     output.update(processing_status="EXCEPTION" if result.fact_conflicts else "PENDING"
         if decision.action == "UNDETERMINED" or all(r.relation == "UNKNOWN" for r in result.rows) else "AUTO_PROCESSED",
         review_required=bool(result.fact_conflicts),

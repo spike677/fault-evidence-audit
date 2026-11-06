@@ -9,7 +9,14 @@ from .gates import event_anchor_errors, judgment_semantic_errors, processing_dec
 from .store import AuditError, Store, canonical_url, digest
 from .resource_identity import resource_key, resource_url, snapshot_index, same_resource
 
-RULE_VERSION = "nightly-0.1.12"
+RULE_VERSION = "nightly-0.1.13"
+
+
+def require_catalog_mapping(store: Store, run_id: str) -> bool:
+    """Use the frozen workflow scope for formal mapping necessity everywhere."""
+    config = store.get(run_id, "trigger_config", "config") or {}
+    return not (config.get("phase") == "INCREMENTAL"
+                and config.get("baseline_basis") == "SOURCE_DEFINITIONS")
 
 
 def cited_refs(summary: dict):
@@ -218,11 +225,12 @@ def task_views(store: Store, run_id: str, plan: dict | None = None) -> list[dict
                      if ref["ref_id"] in selected_refs and ref.get("status") == "PARSED" and ref.get("url")}
     compare_targets = {item["work_id"] for item in plan["work_items"] if item.get("snapshot_id")}
     representatives = {item["representative_case_id"] for item in plan["work_items"]}
+    catalog_required = require_catalog_mapping(store, run_id)
     values = [{**task, "required": task["status"] != "STALE" and (
         task["target_id"] in selected_sids if task["kind"] == "summarize" else
         task["target_id"] in compare_targets if task["kind"] == "compare" else
         task["target_id"] in fetch_targets if task["kind"] == "fetch" else
-        task["target_id"] in representatives if task["kind"] == "catalog" else False)} for task in store.tasks(run_id)]
+        catalog_required and task["target_id"] in representatives if task["kind"] == "catalog" else False)} for task in store.tasks(run_id)]
     policy = policy_fingerprint()
     requests = store.records(run_id, "model_tasks")
     work_ids = {item["work_id"] for item in plan["work_items"]}
@@ -343,10 +351,11 @@ def _model_failure(store: Store, run_id: str, task: dict, exc: Exception) -> Non
 
 
 def execute(store: Store, run_id: str, judge, *, mode: str, model_id: str, retry_failed: bool = False,
-            summarize_only: bool = False) -> dict:
+            summarize_only: bool = False, map_catalog: bool = True) -> dict:
     from .bridge import policy_fingerprint
     from . import prompts, gates, contracts, model
     from . import store as store_module
+    map_catalog = map_catalog and require_catalog_mapping(store, run_id)
     signature = {"mode": mode, "model_id": model_id, "rules": RULE_VERSION,
                  "policy_hash": policy_fingerprint(),
                  "prompt_version": prompts.PROMPT_VERSION,
@@ -493,7 +502,7 @@ def execute(store: Store, run_id: str, judge, *, mode: str, model_id: str, retry
         except Exception as exc:
             _model_failure(store, run_id, task, exc)
     items = store.records(run_id, "catalog")
-    if items:
+    if items and map_catalog:
         representatives = {item["representative_case_id"] for item in plan["work_items"]}
         for case in [c for c in store.records(run_id, "cases") if c["case_id"] in representatives]:
             js = necessary_judgments(store, run_id, plan, mode=mode, model_id=model_id)
@@ -547,8 +556,12 @@ def execute(store: Store, run_id: str, judge, *, mode: str, model_id: str, retry
                 _model_failure(store, run_id, task, exc)
     for call in getattr(judge, "calls", []):
         store.event(run_id, "model_bridge_event", call)
-    store.event(run_id, "execution", {"mode": mode, "model_id": model_id, "rules": RULE_VERSION})
-    return validate(store, run_id)
+    mapping_scope = {"catalog_mapping_required": map_catalog}
+    if not map_catalog:
+        mapping_scope.update(catalog_mapping_status="NOT_REQUIRED",
+            catalog_mapping_reason="Formal catalog mapping is not required in this workflow; complete declared-definition comparison is dispatched separately. No formal mapping was executed or confirmed.")
+    store.event(run_id, "execution", {"mode": mode, "model_id": model_id, "rules": RULE_VERSION, **mapping_scope})
+    return {**validate(store, run_id), **mapping_scope}
 
 
 def current_summaries(store: Store, run_id: str) -> list[dict]:
@@ -621,6 +634,7 @@ def validate(store: Store, run_id: str) -> dict:
     plan = evidence_plan(store, run_id)
     snapshots = store.active_snapshots(run_id)
     tasks = task_views(store, run_id, plan)
+    catalog_required = require_catalog_mapping(store, run_id)
     required_sids = {sid for row in plan["cases"] for sid in row["selected_snapshot_ids"]}
     case_by_id = {c["case_id"]: c for c in cases}
     snap_by_id = {s["snapshot_id"]: s for s in snapshots}
@@ -700,7 +714,7 @@ def validate(store: Store, run_id: str) -> dict:
     if not catalog:
         pending.append("No frozen catalog imported; 98-item coverage not evaluated")
     statuses = {t["task_id"]: t["status"] for t in tasks}
-    current_maps = current_mappings(store, run_id)
+    current_maps = current_mappings(store, run_id) if catalog_required else []
     for mapping in current_maps:
         if mapping["overall"] == "UNDETERMINED":
             pending.append(f"{mapping['case_id']}: catalog coverage undetermined")
@@ -709,7 +723,7 @@ def validate(store: Store, run_id: str) -> dict:
             pending.append(f"{mapping['case_id']}: {unknown_count} catalog items undetermined")
         if mapping.get("review_required", True) and mapping.get("review_status") != "ACCEPT":
             pending.append(f"{mapping['task_id']}: catalog human review {mapping.get('review_status')}")
-    if catalog:
+    if catalog and catalog_required:
         mapped = {m["case_id"] for m in current_maps}
         mapped.update(cid for m in current_maps for cid in m.get("member_case_ids", []))
         selected_case_ids = {cid for item in plan["work_items"] for cid in item["case_ids"]}
@@ -721,6 +735,7 @@ def validate(store: Store, run_id: str) -> dict:
             "RECOVER_PROVENANCE", "RESTORE_PROVENANCE", "RESTORE_REFERENCE", "RECONFIRM_SNAPSHOT", "RESOLVE_CAPTURE_FAILURE"}
             for action in row["required_actions"]) for row in plan["cases"])
     return {"run_id": run_id, "valid": not errors, "complete": not errors and not pending,
+            "catalog_mapping_required": catalog_required,
             "fact_organization_complete": facts_complete,
             "search_goals_satisfied": search_goals_satisfied,
             "batch_status": "FAILED" if errors else "COMPLETE_WITH_PENDING" if pending else "COMPLETE",
@@ -761,13 +776,14 @@ def report_data(store: Store, run_id: str, *, baseline: dict | None = None,
     selected_refs = {rid for row in plan["cases"] for rid in row["selected_ref_ids"]}
     summary_ids = {s["task_id"] for s in current_summaries(store, run_id)}
     mapping_ids = {m["task_id"] for m in current_mappings(store, run_id)}
+    catalog_required = require_catalog_mapping(store, run_id)
     for value in data["summaries"]:
         value["is_stale"] = value["task_id"] not in summary_ids
     reviews = {e["judgment_id"]: e["verdict"] for e in store.events(run_id, "review") if e.get("judgment_id")}
     mapping_reviews = {e["mapping_id"]: e["verdict"] for e in store.events(run_id, "review") if e.get("mapping_id")}
     for value in data["mappings"]:
         value["is_stale"] = value["task_id"] not in mapping_ids
-        value["required"] = value["task_id"] in mapping_ids
+        value["required"] = catalog_required and value["task_id"] in mapping_ids
         value["review_status"] = mapping_reviews.get(value["task_id"], value.get("review_status", "NEEDS_REVIEW"))
     for value in data["judgments"]:
         value["is_stale"] = value["judgment_id"] not in current_ids
