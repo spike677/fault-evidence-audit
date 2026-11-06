@@ -9,6 +9,7 @@ import re
 from urllib.parse import urlsplit
 
 from .importers import is_empty_link_value
+from .resource_identity import resource_key, same_resource, snapshot_index
 from .store import AuditError, Store, canonical_url, digest, now
 
 POLICY_VERSION = "evidence-first-0.1.8"
@@ -29,6 +30,11 @@ def _url(value: str | None) -> str | None:
         return canonical_url(value) if value else None
     except (ValueError, TypeError):
         return None
+
+
+def _resource(value: str | None) -> str | None:
+    url = _url(value)
+    return resource_key(url) if url else None
 
 
 def normalize_search_policy(policy: dict) -> dict:
@@ -215,7 +221,7 @@ def register_evidence_association(store: Store, run_id: str, *, case_id: str, us
         raise AuditError("Evidence association reference must belong to this original case")
     if snapshot_id and not snapshot:
         raise AuditError("Evidence association snapshot is outside this run")
-    if ref and snapshot and _url(ref.get("url")) != _url(snapshot.get("url")):
+    if ref and snapshot and not same_resource(ref.get("url"), snapshot.get("url")):
         raise AuditError("Reference and snapshot identify different resources; register the actual evidence reference")
     if applicable_issue_ids is not None and (not isinstance(applicable_issue_ids, list) or any(
             not isinstance(value, str) or not value.strip() for value in applicable_issue_ids)):
@@ -284,9 +290,11 @@ def _search_insufficient(case: dict, snapshot: dict, judgment: dict, cases: dict
 
 
 def _readable(option: dict, active: dict) -> bool:
+    from .capture_quality import capture_quality
     snapshot = option["snapshot"]
     return bool(snapshot and snapshot["snapshot_id"] in active and snapshot.get("text", "").strip()
-                and snapshot.get("status") in {"COMPLETE", "PARTIAL", "CONTENT_CAPTURED"})
+                and snapshot.get("status") in {"COMPLETE", "PARTIAL", "CONTENT_CAPTURED"}
+                and capture_quality(snapshot)["usable_body"])
 
 
 def _rank(option: dict, active: dict):
@@ -334,7 +342,7 @@ def build_evidence_plan(store: Store, run_id: str, *, judgments: list[dict] | No
     refs = {ref["ref_id"]: ref for ref in all_refs if ref["ref_id"] not in ignored_empty_refs}
     snapshots = {snapshot["snapshot_id"]: snapshot for snapshot in store.records(run_id, "snapshots")}
     active = {snapshot["snapshot_id"]: snapshot for snapshot in store.active_snapshots(run_id)}
-    by_url = {_url(snapshot["url"]): snapshot for snapshot in active.values()}
+    by_resource = snapshot_index(list(active.values()))
     associations = [record for record in store.records(run_id, "evidence_associations") if record.get("user_confirmed") is True
                     and (record.get("ref_id") not in ignored_empty_refs or record.get("snapshot_id"))]
     groups = [group for group in store.records(run_id, "event_groups") if group.get("user_confirmed") is True]
@@ -345,7 +353,7 @@ def build_evidence_plan(store: Store, run_id: str, *, judgments: list[dict] | No
     def resource_url(association):
         snapshot = snapshots.get(association.get("snapshot_id"))
         ref = refs.get(association.get("ref_id"))
-        return _url((snapshot or ref or {}).get("url"))
+        return _resource((snapshot or ref or {}).get("url"))
 
     for case_id, case in cases.items():
         options = []
@@ -354,22 +362,22 @@ def build_evidence_plan(store: Store, run_id: str, *, judgments: list[dict] | No
                        if association.get("scope") == "ISSUES" or association.get("applicable_issue_ids")}
         associated_refs = {association.get("ref_id") for association in registered}
         for ref in refs.values():
-            if ref["case_id"] != case_id or ref["ref_id"] in associated_refs or _url(ref.get("url")) in scoped_urls:
+            if ref["case_id"] != case_id or ref["ref_id"] in associated_refs or _resource(ref.get("url")) in scoped_urls:
                 continue
             provenance = source_relation(case, ref)
-            snapshot = by_url.get(_url(ref.get("url")))
+            snapshot = by_resource.get(_resource(ref.get("url")))
             options.append(_candidate(ref, snapshot, provenance["relation"], provenance))
         for association in registered:
             snapshot = snapshots.get(association.get("snapshot_id")) if association.get("snapshot_id") else None
             ref = refs.get(association.get("ref_id"))
             url = resource_url(association)
-            matching = [value for value in refs.values() if value["case_id"] == case_id and _url(value.get("url")) == url]
+            matching = [value for value in refs.values() if value["case_id"] == case_id and _resource(value.get("url")) == url]
             if ref is not None:
                 matching = [ref]
             # An explicit scope also retains the original same-URL occurrence trace.
             matching = matching or [None]
             for actual_ref in matching:
-                actual_snapshot = snapshot or by_url.get(_url((actual_ref or {}).get("url")))
+                actual_snapshot = snapshot or by_resource.get(_resource((actual_ref or {}).get("url")))
                 provenance = source_relation(case, actual_ref) if actual_ref else {
                     "relation": "PROVENANCE_PENDING", "source_grade": "PROVENANCE_PENDING",
                     "reason": "Snapshot origin is not upgraded by user confirmation", "trace": {"case_id": case_id}}
@@ -654,12 +662,15 @@ def build_evidence_plan(store: Store, run_id: str, *, judgments: list[dict] | No
         url = _url(ref.get("url"))
         if ref.get("status") != "PARSED" or not url:
             continue
-        snapshot = by_url.get(url)
+        key = resource_key(url)
+        snapshot = by_resource.get(key)
         readable = bool(snapshot and snapshot.get("status") in {"COMPLETE", "PARTIAL", "CONTENT_CAPTURED"} and snapshot.get("text", "").strip())
-        item = collection.setdefault(url, {"fetch_id": "resource-" + digest(url)[:24], "url": url, "ref_ids": [],
+        item = collection.setdefault(key, {"fetch_id": "resource-" + digest(key)[:24], "url": key,
+            "resource_key": key, "original_urls": [], "ref_ids": [],
             "case_ids": [], "required": not readable, "retrieval_status": snapshot["status"] if snapshot else "NOT_FETCHED",
             "snapshot_id": snapshot["snapshot_id"] if snapshot else None, "action": "FETCH", "actor": "AGENT"})
         item["ref_ids"].append(ref_id)
+        item["original_urls"] = sorted(set(item["original_urls"]) | {url})
         citing = {plan["case_id"] for plan in plans if ref_id in plan["selected_ref_ids"]}
         item["case_ids"] = sorted(set(item["case_ids"]) | citing)
     return {"schema_version": "1.0", "run_id": run_id, "policy_version": POLICY_VERSION,

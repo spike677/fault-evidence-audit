@@ -69,7 +69,7 @@ class SearchPolicyBridgeTests(unittest.TestCase):
                     for item in payload["items"]]}
         else:
             snap = payload["snapshot"]
-            self.assertEqual(snap["text"], TEXT)
+            self.assertEqual("".join(segment["text"] for segment in snap["segments"]), TEXT)
             ref = {"segment_id": snap["segments"][0]["segment_id"], "quote": TEXT}
             if task["kind"] == "summarize":
                 result = {"snapshot_id": snap["snapshot_id"], "issues": [{"label": "synthetic-precision", "facts": [

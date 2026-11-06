@@ -16,7 +16,7 @@ from .investigation import ROOT_FIELDS, investigation_plan
 from .pipeline import current_mappings
 from .store import AuditError, Store, canonical_url, digest
 
-RULE_VERSION = "catalog-draft-1.1"
+RULE_VERSION = "catalog-draft-1.2"
 COLUMNS = dict(zip(CatalogDraftRow.model_fields, [
     "一级（架构层次）", "二级（物理实体）", "三级（部件、功能模块）", "四级（部件、功能模块）",
     "模式名称", "故障原因", "故障影响", "参考业务场景", "精度故障类型", "检查机制", "模块处理建议",
@@ -38,6 +38,14 @@ and injection are proposals, NOT_EXECUTED; do not claim local reproduction. Self
 meaning, citations, counterevidence, issue scope and event-vs-technical identity once. Keep
 unresolved conflicts explicit. Use current search_control; do not expand searches to fill fields.
 If unable to read the complete request, report blocking instead of submitting a complete draft.
+The compact payload keeps source_case as the complete original record and
+independent_technical_facts as the complete fact registry. Root-cause candidates
+reference those fact_ids; resolve their values and exact quotes there. Repeated
+task queues, summary-card indexes and source copies are omitted, never evidence.
+Preserve author statements versus code inference, source actors, scope and every
+counterfact. A robot summary is not independent root-cause evidence.
+Current mapping rows retain every item/result/reason; their evidence_ref_ids
+resolve exact citations in mapping_evidence rather than repeating them per row.
 """
 
 
@@ -46,6 +54,92 @@ def draft_policy_fingerprint() -> str:
     from . import investigation
     return digest({"core": policy_fingerprint(), "rule": RULE_VERSION,
                    "sources": digest(Path(__file__).read_bytes() + Path(investigation.__file__).read_bytes())})
+
+
+def compact_draft_context(context: dict) -> dict:
+    """Remove redundant projections, never library entries or cited facts.
+
+    Original records and all independent facts remain authoritative and intact.
+    Candidate references retain their decision/scope fields while their text and
+    quotes live once in the fact registry. Unknown future fields are preserved.
+    """
+    sources = {case["case_id"]: case["source_case"] for case in context["cases"]}
+    facts = {fact["fact_id"]: fact for fact in context["independent_technical_facts"]}
+    provenance = {digest(entry) for case in context["cases"] for entry in case.get("provenance", [])}
+
+    def candidate_refs(candidates):
+        result = []
+        for candidate in candidates:
+            fact = facts.get(candidate.get("fact_id"))
+            value = dict(candidate)
+            if fact:
+                # Only remove exact duplicates. Unusual/future candidate fields
+                # and any different text are retained rather than normalized.
+                for key in ("value", "evidence", "url", "snapshot_id", "issue_label"):
+                    if key in value and value[key] == fact.get(key):
+                        value.pop(key)
+            result.append(value)
+        return result
+
+    cases = []
+    for case in context["cases"]:
+        value = {key: item for key, item in case.items() if key not in {
+            "required_actions", "optional_actions", "agent_next_steps", "reusable_summary_ids",
+            "priority_repository_urls", "routing_hash"}}
+        source = case["source_case"]
+        for key in ("external_id", "source_file", "sheet", "row"):
+            if key in value and value[key] == source.get(key):
+                value.pop(key)
+        if "root_cause_candidates" in value:
+            value["root_cause_candidates"] = candidate_refs(value["root_cause_candidates"])
+        cases.append(value)
+
+    works = []
+    for work in context["work_items"]:
+        value = {key: item for key, item in work.items() if key not in {"actions", "resource_summary_card_ids"}}
+        if "source_records" in value:
+            records = [record for record in value["source_records"]
+                       if record.get("case_id") not in sources or not all(
+                           sources[record["case_id"]].get(key) == item for key, item in record.items())]
+            if records:
+                value["source_records"] = records
+            else:
+                value.pop("source_records")
+        if "provenance" in value:
+            unique = [entry for entry in value["provenance"] if digest(entry) not in provenance]
+            if unique:
+                value["provenance"] = unique
+            else:
+                value.pop("provenance")
+        if "root_cause_candidates" in value:
+            value["root_cause_candidates"] = candidate_refs(value["root_cause_candidates"])
+        works.append(value)
+
+    resources = [{key: value for key, value in resource.items() if key not in {
+        "summary_requirements", "summary_task_ids", "resource_summary_card_ids", "independent_fact_ids",
+        "read_priority", "action"}} for resource in context["resources"]]
+    mapping_evidence, mappings = dict(context.get("mapping_evidence", {})), []
+    for mapping in context.get("current_mappings", []):
+        value = dict(mapping)
+        rows = []
+        for row in mapping.get("catalog_results", []):
+            item = dict(row)
+            if item.get("evidence"):
+                ids = []
+                for ref in item.pop("evidence"):
+                    ref_id = "mapping-ref-" + digest(ref)[:24]
+                    if ref_id in mapping_evidence and mapping_evidence[ref_id] != ref:
+                        raise AuditError("Mapping evidence identity collision")
+                    mapping_evidence[ref_id] = ref
+                    ids.append(ref_id)
+                item["evidence_ref_ids"] = ids
+            rows.append(item)
+        if "catalog_results" in value:
+            value["catalog_results"] = rows
+        mappings.append(value)
+    return {**context, "context_projection": "catalog-fact-registry-1", "cases": cases,
+            "work_items": works, "resources": resources, "current_mappings": mappings,
+            "mapping_evidence": mapping_evidence}
 
 
 def draft_context(store: Store, run_id: str, case_ids: list[str], expected_additions: int | None = None) -> dict:
@@ -70,13 +164,13 @@ def draft_context(store: Store, run_id: str, case_ids: list[str], expected_addit
         raise AuditError("Catalog rows do not match the frozen source identity")
     catalog = sorted(catalog, key=lambda item: (item.get("sheet", ""), item.get("row") or 0, item["item_id"]))
     # Retain the complete frozen library and selected inputs; never truncate.
-    return {"run_id": run_id, "selected_case_ids": sorted(selected), "expected_additions": expected_additions,
+    return compact_draft_context({"run_id": run_id, "selected_case_ids": sorted(selected), "expected_additions": expected_additions,
             "baseline_identity": identity, "baseline_hash": digest(catalog), "catalog": catalog,
             "cases": cases, "work_items": works,
             "resources": [r for r in plan["resources"] if selected.intersection(r["case_ids"])],
             "independent_technical_facts": [f for f in plan["independent_technical_facts"] if f["snapshot_id"] in sids],
             "current_mappings": [m for m in current_mappings(store, run_id) if m["case_id"] in selected],
-            "input_scope": "COMPLETE_FROZEN_CATALOG_AND_SELECTED_CASES; CAPTURED_EVIDENCE_ONLY"}
+            "input_scope": "COMPLETE_FROZEN_CATALOG_AND_SELECTED_CASES; CAPTURED_EVIDENCE_ONLY"})
 
 
 def prepare_draft(store: Store, run_id: str, case_ids: list[str], expected_additions: int | None = None) -> dict:

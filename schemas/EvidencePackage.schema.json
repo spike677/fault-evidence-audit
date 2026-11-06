@@ -1,4 +1,78 @@
 {
+  "$defs": {
+    "PageObservation": {
+      "additionalProperties": false,
+      "description": "Collector observations; page quality is not inferred from text length.",
+      "properties": {
+        "page_kind": {
+          "enum": [
+            "BODY",
+            "INDEX",
+            "TITLE_ONLY",
+            "LOGIN",
+            "FORBIDDEN",
+            "RENDER_PENDING",
+            "EXTRACTION_FAILED",
+            "UNRELATED"
+          ],
+          "title": "Page Kind",
+          "type": "string"
+        },
+        "requested_url": {
+          "minLength": 1,
+          "title": "Requested Url",
+          "type": "string"
+        },
+        "final_url": {
+          "minLength": 1,
+          "title": "Final Url",
+          "type": "string"
+        },
+        "title": {
+          "default": "",
+          "title": "Title",
+          "type": "string"
+        },
+        "body_locator": {
+          "default": "",
+          "title": "Body Locator",
+          "type": "string"
+        },
+        "body_quotes": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Body Quotes",
+          "type": "array"
+        },
+        "observed_by": {
+          "minLength": 1,
+          "title": "Observed By",
+          "type": "string"
+        },
+        "observed_at": {
+          "minLength": 1,
+          "title": "Observed At",
+          "type": "string"
+        },
+        "tool_observation": {
+          "minLength": 1,
+          "title": "Tool Observation",
+          "type": "string"
+        }
+      },
+      "required": [
+        "page_kind",
+        "requested_url",
+        "final_url",
+        "observed_by",
+        "observed_at",
+        "tool_observation"
+      ],
+      "title": "PageObservation",
+      "type": "object"
+    }
+  },
   "additionalProperties": false,
   "properties": {
     "schema_version": {
@@ -180,6 +254,17 @@
       ],
       "default": null,
       "title": "Discovered From Url"
+    },
+    "capture_observation": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/PageObservation"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
     }
   },
   "required": [

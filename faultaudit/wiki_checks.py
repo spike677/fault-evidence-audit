@@ -7,11 +7,18 @@ from __future__ import annotations
 
 from datetime import datetime
 
+from .capture_quality import capture_quality
 from .evidence_plan import TABLE_GRADES, _search_usable, resource_kind, source_relation
+from .resource_identity import resource_key, snapshot_index
 from .store import AuditError, Store, canonical_url, digest, now
 
-RULE_VERSION = "wiki-check-1"
+RULE_VERSION = "wiki-check-2"
 READABLE = {"COMPLETE", "PARTIAL", "CONTENT_CAPTURED"}
+
+
+def requires_body_observation(store: Store, run_id: str) -> bool:
+    config = store.get(run_id, "xlsx_workflow", "config")
+    return bool(config and config.get("capture_quality_required", True))
 
 
 def _inputs(store: Store, run_id: str, case: dict | str) -> tuple[dict, dict, list[dict], list[dict]]:
@@ -27,7 +34,8 @@ def _inputs(store: Store, run_id: str, case: dict | str) -> tuple[dict, dict, li
                 or source_relation(cases[r["case_id"]], r)["relation"] in TABLE_GRADES]
     associations = [a for a in store.records(run_id, "evidence_associations") if a["case_id"] in members]
     identity = {"rule_version": RULE_VERSION, "cases": cases, "supplied_references": supplied,
-                "groups": groups, "associations": associations}
+                "groups": groups, "associations": associations,
+                "capture_quality_required": requires_body_observation(store, run_id)}
     return source, {"input_hash": digest(identity), "cases": cases, "associations": associations}, refs, supplied
 
 
@@ -35,7 +43,7 @@ def _materials(store: Store, run_id: str, source: dict, context: dict, refs: lis
     from .pipeline import current_judgments
 
     active = {snap["snapshot_id"]: snap for snap in store.active_snapshots(run_id)}
-    by_url = {snap["url"]: snap for snap in active.values()}
+    by_url = snapshot_index(list(active.values()))
     original_ids = {ref["ref_id"] for ref in supplied}
     associations = context["associations"]
     judgments = current_judgments(store, run_id)
@@ -45,8 +53,8 @@ def _materials(store: Store, run_id: str, source: dict, context: dict, refs: lis
         if resource_kind(ref, case=all_cases[ref["case_id"]]) != "WIKI":
             continue
         url = canonical_url(ref["url"]) if ref.get("url") else None
-        snapshot = by_url.get(url)
-        key = url or ref["ref_id"]
+        key = resource_key(url) if url else ref["ref_id"]
+        snapshot = by_url.get(key)
         item = materials.setdefault(key, {"url": url, "ref_ids": [], "snapshot": snapshot, "supplied": False,
             "confirmed": False, "usable": False, "excluded": False})
         item["ref_ids"].append(ref["ref_id"])
@@ -57,13 +65,16 @@ def _materials(store: Store, run_id: str, source: dict, context: dict, refs: lis
     for association in associations:
         snapshot = active.get(association.get("snapshot_id"))
         if snapshot and resource_kind(snapshot=snapshot) == "WIKI":
-            item = materials.setdefault(snapshot["url"], {"url": snapshot["url"], "ref_ids": [],
+            item = materials.setdefault(resource_key(snapshot["url"]), {"url": snapshot["url"], "ref_ids": [],
                 "snapshot": snapshot, "supplied": False, "confirmed": False, "usable": False, "excluded": False})
             item["confirmed"] = True
     for item in materials.values():
         snapshot = item["snapshot"]
-        item["readable"] = bool(snapshot and snapshot["status"] in READABLE and snapshot["text"].strip()
-                                and not store.verify_snapshot(snapshot))
+        item["capture_readable"] = bool(snapshot and snapshot["status"] in READABLE and snapshot["text"].strip()
+                                        and not store.verify_snapshot(snapshot))
+        quality = capture_quality(snapshot, require_observation=requires_body_observation(store, run_id)) if snapshot else None
+        item["capture_quality"] = quality
+        item["readable"] = bool(item["capture_readable"] and quality["usable_body"])
         if snapshot:
             relevant = [j for j in judgments if j["snapshot_id"] == snapshot["snapshot_id"]
                         and source["case_id"] in j.get("member_case_ids", [j["case_id"]])
@@ -88,10 +99,17 @@ def wiki_plan(store: Store, run_id: str, case: dict | str) -> dict:
     if usable:
         status, reason = "FOUND", "Existing readable supplied/confirmed Wiki or currently verified discovery; no additional Wiki search"
     elif pending:
+        repair = [item for item in pending if item["capture_readable"] and not item["readable"]
+                  and item["capture_quality"]["needs_repair"]]
         broken = [item for item in pending if item["snapshot"] and (
             item["snapshot"]["status"] not in READABLE or not item["readable"])]
         unread = [item for item in pending if not item["snapshot"]]
-        if broken:
+        if repair:
+            status, reason = "FETCH_REQUIRED", "Wiki body quality is unconfirmed; repair the original capture/navigation before searching"
+            actions = [{"action": "REPAIR_WIKI_CAPTURE", "url": item["url"], "ref_ids": item["ref_ids"],
+                        "snapshot_id": item["snapshot"]["snapshot_id"], "page_kind": item["capture_quality"]["status"]}
+                       for item in repair]
+        elif broken:
             status, reason = "BLOCKED", "Wiki capture is blocked or invalid; retain the gap and continue other materials"
         elif unread:
             status, reason = "FETCH_REQUIRED", "Read the supplied/existing Wiki before searching for more"
@@ -104,7 +122,7 @@ def wiki_plan(store: Store, run_id: str, case: dict | str) -> dict:
     else:
         status, reason = "SEARCH_REQUIRED", "No applicable Wiki; execute a bounded Wiki search even when other sources exist"
         actions = [{"action": "SEARCH_WIKI", "case_id": source["case_id"],
-                    "query": source.get("description", ""), "scope": "WIKI"}]
+                    "scope": "WIKI", "query_planning": "AGENT_SOURCE_GROUNDED_FACETS"}]
     snapshots = sorted({item["snapshot"]["snapshot_id"] for item in materials if item["snapshot"] and not item["excluded"]})
     return {"case_id": source["case_id"], "status": status, "checked": status in {"FOUND", "NO_MATCH"},
             "search_allowed": status == "SEARCH_REQUIRED", "input_hash": context["input_hash"],
@@ -114,6 +132,9 @@ def wiki_plan(store: Store, run_id: str, case: dict | str) -> dict:
             "wiki_snapshot_ids": snapshots, "check_id": latest.get("check_id"), "reason": reason,
             "query": latest.get("query", ""), "scope": latest.get("scope", ""),
             "checked_at": latest.get("checked_at", ""), "executed_by": latest.get("executed_by", ""),
+            "capture_quality_gaps": [{"url": item["url"], "snapshot_id": item["snapshot"]["snapshot_id"],
+                "page_kind": item["capture_quality"]["status"], "needs_repair": item["capture_quality"]["needs_repair"],
+                "errors": item["capture_quality"]["errors"]} for item in pending if item["snapshot"] and not item["readable"]],
             "case_root_cause_confirmed": False}
 
 

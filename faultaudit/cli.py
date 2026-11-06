@@ -184,6 +184,7 @@ def parser() -> argparse.ArgumentParser:
     start.add_argument("--catalog-sheet", action="append")
     start.add_argument("--catalog-scope", default="UNSPECIFIED")
     start.add_argument("--expected-catalog-count", type=int)
+    start.add_argument("--case-ids-file", type=Path, help="Optional JSON array of target case IDs; frozen for this workflow")
     for operation in ("next", "submit", "drive", "export", "retry"):
         cmd = flow.add_parser(operation)
         cmd.add_argument("--run", default="latest")
@@ -194,6 +195,10 @@ def parser() -> argparse.ArgumentParser:
         if operation == "drive":
             cmd.add_argument("--agent-command-file", type=Path, required=True, help="JSON argv with {request}/{response}")
             cmd.add_argument("--max-rounds", type=int, default=32)
+            cmd.add_argument("--workers", type=int, default=2)
+            cmd.add_argument("--max-attempts", type=int, default=2)
+            cmd.add_argument("--timeout", type=float, default=300)
+            cmd.add_argument("--browser-timeout", type=float)
     search_policy = sub.add_parser("set-search-policy", help="Set a run default or case search stopping requirement")
     search_policy.add_argument("--run", default="latest")
     search_policy.add_argument("--case-id")
@@ -259,7 +264,8 @@ def main(argv: list[str] | None = None) -> int:
             if args.flow_command == "start":
                 result = workflow.start(store, args.input, args.catalog, args.work_root, executor=args.executor,
                     source_kind=args.source_kind, catalog_sheets=args.catalog_sheet,
-                    expected_catalog_count=args.expected_catalog_count, catalog_scope=args.catalog_scope, run_id=args.run)
+                    expected_catalog_count=args.expected_catalog_count, catalog_scope=args.catalog_scope, run_id=args.run,
+                    case_ids=json.loads(args.case_ids_file.read_text(encoding="utf-8-sig")) if args.case_ids_file else None)
             else:
                 selected_run = store.run_info(args.run)["run_id"]
                 if args.flow_command == "next":
@@ -271,7 +277,9 @@ def main(argv: list[str] | None = None) -> int:
                     result = workflow.retry(store, selected_run, args.task_id)
                 elif args.flow_command == "drive":
                     result = workflow.drive(store, selected_run,
-                        json.loads(args.agent_command_file.read_text(encoding="utf-8-sig")), max_rounds=args.max_rounds)
+                        json.loads(args.agent_command_file.read_text(encoding="utf-8-sig")), max_rounds=args.max_rounds,
+                        workers=args.workers, max_attempts=args.max_attempts, timeout=args.timeout,
+                        browser_timeout=args.browser_timeout)
                 else:
                     result = workflow.export(store, selected_run)
             write_json(result)
@@ -300,6 +308,8 @@ def main(argv: list[str] | None = None) -> int:
                         "validation": validate(store, run_id)})
             return 0
         run_id = store.run_info(args.run)["run_id"]
+        from .workflow_scope import scoped_store
+        store = scoped_store(store, run_id)
         if args.command == "catalog-draft":
             from .catalog_drafts import prepare_draft, validate_draft, export_draft, write_new_json
             if args.out and args.out.resolve().is_relative_to(store.root):

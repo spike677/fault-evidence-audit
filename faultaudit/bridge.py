@@ -25,8 +25,10 @@ def _executor(value: str) -> str:
 
 def policy_fingerprint() -> str:
     from .pipeline import RULE_VERSION
+    from . import capture_quality, resource_identity, workflow_scope
     source_hash = digest(b"".join(Path(module.__file__).read_bytes() for module in
-                                  (contracts, gates, model, prompts, store_module, input_budget, evidence_plan, importers))
+                                  (contracts, gates, model, prompts, store_module, input_budget, evidence_plan, importers,
+                                   capture_quality, resource_identity, workflow_scope))
                          + Path(__file__).read_bytes() + Path(__file__).with_name("pipeline.py").read_bytes())
     return digest({"source_hash": source_hash, "input_budget_policy": input_budget.budget_policy(),
                    "prompt_version": prompts.PROMPT_VERSION, "rule_version": RULE_VERSION})
@@ -41,7 +43,12 @@ def _snapshot_input_scope(snapshot: dict) -> dict:
 
 
 def _snapshot_payload(snapshot: dict) -> dict:
-    return {**prompts.snapshot_data(snapshot), "input_scope": _snapshot_input_scope(snapshot),
+    data = prompts.snapshot_data(snapshot)
+    # Every supplied character remains in segments[].text. Avoid serializing
+    # the same body a second time as snapshot.text in every external task.
+    data.pop("text", None)
+    return {**data, "text_representation": "CONCATENATE_PROVIDED_SEGMENTS",
+            "input_scope": _snapshot_input_scope(snapshot),
             "summary_issue_labels": snapshot.get("summary_issue_labels", [])}
 
 
@@ -241,7 +248,9 @@ def submit_model_results(store: Store, run_id: str, envelopes: list[dict], *, ex
         payload = task["payload"]
         snapshot_view = payload.get("snapshot")
         if snapshot_view is not None:
-            snapshot_view = {**snapshot_view, "input_scope": payload.get("input_scope", snapshot_view.get("input_scope", {}))}
+            snapshot_view = {**snapshot_view,
+                             "text": "".join(s["text"] for s in snapshot_view["segments"]),
+                             "input_scope": payload.get("input_scope", snapshot_view.get("input_scope", {}))}
         checked = validate_task_result(task["kind"], value, snapshot=snapshot_view,
                                        case=payload.get("case"), judgments=payload.get("judgments"),
                                        items=payload.get("items"))

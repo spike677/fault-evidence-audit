@@ -237,10 +237,26 @@ class Store:
                                                       (run_id,))]
 
     def stale_tasks(self, run_id: str, snapshot_id: str) -> None:
+        from .resource_identity import same_resource
+        snapshot = self.get(run_id, "snapshots", snapshot_id)
+        cases = {r["case_id"] for r in self.records(run_id, "references")
+                 if snapshot and r.get("url") and r.get("status") == "PARSED"
+                 and same_resource(r["url"], snapshot["url"])}
+        affected = {j["task_id"] for j in self.records(run_id, "judgments") if j["snapshot_id"] == snapshot_id}
+        for request in self.records(run_id, "model_tasks"):
+            payload = request.get("payload", {})
+            if ((payload.get("snapshot") or {}).get("snapshot_id") == snapshot_id
+                    or any(j.get("snapshot_id") == snapshot_id for j in payload.get("judgments", []))):
+                affected.add(request["pipeline_task_id"])
+        for group in self.records(run_id, "event_groups"):
+            if group.get("user_confirmed") and cases.intersection(group["case_ids"]):
+                cases.update(group["case_ids"])
+        affected.update(task["task_id"] for task in self.tasks(run_id)
+                        if task["target_id"] == snapshot_id or task["target_id"].endswith("|" + snapshot_id)
+                        or task["kind"] == "catalog" and task["target_id"] in cases)
         with self.conn:
-            self.conn.execute("UPDATE tasks SET status='STALE',updated_at=? "
-                              "WHERE run_id=? AND (target_id=? OR target_id LIKE ? OR kind='catalog')",
-                              (now(), run_id, snapshot_id, "%|" + snapshot_id))
+            self.conn.executemany("UPDATE tasks SET status='STALE',updated_at=? WHERE run_id=? AND task_id=?",
+                                  [(now(), run_id, task_id) for task_id in affected])
 
     def ingest_evidence(self, run_id: str, package: dict, base_dir: Path | None = None) -> dict:
         pkg = EvidencePackage.model_validate(package).model_dump()
@@ -257,6 +273,8 @@ class Store:
             raw_bytes = target.read_bytes()
         text = pkg["text"]
         problems = evidence_completeness_errors(pkg)
+        from .capture_quality import capture_quality_errors
+        problems.extend(capture_quality_errors(pkg))
         if problems:
             raise AuditError("; ".join(problems))
         if pkg["status"] in {"COMPLETE", "PARTIAL", "CONTENT_CAPTURED"} and authentication_page(pkg):
@@ -266,14 +284,23 @@ class Store:
         content = {k: pkg[k] for k in ("title", "text", "status", "components", "derived_from", "is_synthetic")}
         # Omit new default fields to retain snapshot IDs for legacy 1.0 packages.
         for key, default in (("artifact_type", "GENERIC"), ("required_components", []),
-                             ("expected_file_count", None), ("captured_file_count", None)):
+                             ("expected_file_count", None), ("captured_file_count", None),
+                             ("capture_observation", None)):
             if pkg[key] != default:
                 content[key] = pkg[key]
         content["requested_url"] = pkg.get("requested_url") or pkg["url"]
         content["final_url"] = pkg.get("final_url") or pkg["url"]
         canonical_url(content["requested_url"])
         canonical_url(content["final_url"])
-        snapshot_id = "snapshot-" + digest([url, raw_hash, content])[:24]
+        identity_content = content
+        if content.get("capture_observation"):
+            # Collection actors/times are observations of the same content,
+            # not new body versions. Retain their full history in ingestion
+            # events and the first immutable snapshot observation below.
+            identity_content = {**content, "capture_observation": {
+                key: value for key, value in content["capture_observation"].items()
+                if key not in {"observed_at", "observed_by", "tool_observation"}}}
+        snapshot_id = "snapshot-" + digest([url, raw_hash, identity_content])[:24]
         snapdir = self.root / "snapshots" / snapshot_id
         snapdir.mkdir(parents=True, exist_ok=True)
         text_path = snapdir / "text.txt"
@@ -291,18 +318,31 @@ class Store:
         if self.get(run_id, "snapshots", snapshot_id) is None:
             self.put(run_id, "snapshots", snapshot_id, snapshot)
         head = self.get(run_id, "heads", artifact_id)
+        from .resource_identity import same_resource
+        previous = next((s for s in self.active_snapshots(run_id) if same_resource(s["url"], url)), None)
+        if previous:
+            head = {"snapshot_id": previous["snapshot_id"]}
         if head and head["snapshot_id"] != snapshot_id:
             self.stale_tasks(run_id, head["snapshot_id"])
             self.event(run_id, "snapshot_superseded", {"old": head["snapshot_id"], "new": snapshot_id})
         self.put(run_id, "heads", artifact_id, {"artifact_id": artifact_id, "snapshot_id": snapshot_id}, mutable=True)
+        # An identical body can be recaptured after an alias failed. All aliases
+        # must follow this latest observation, even when it reuses an older
+        # immutable snapshot whose retrieved_at is earlier than that failure.
+        for alias_head in self.records(run_id, "heads"):
+            alias_snapshot = self.get(run_id, "snapshots", alias_head["snapshot_id"])
+            if alias_snapshot and same_resource(alias_snapshot["url"], url) and alias_head["snapshot_id"] != snapshot_id:
+                self.put(run_id, "heads", alias_head["artifact_id"],
+                         {**alias_head, "snapshot_id": snapshot_id}, mutable=True)
         refs = self.records(run_id, "references")
+        from .resource_identity import same_resource
         for case_id in pkg["case_ids"]:
             existing = []
             for ref in refs:
                 if ref["case_id"] != case_id or not ref.get("url") or ref.get("status") != "PARSED":
                     continue
                 try:
-                    if canonical_url(ref["url"]) == url:
+                    if same_resource(ref["url"], url):
                         existing.append(ref)
                 except AuditError:
                     continue
@@ -315,13 +355,17 @@ class Store:
                                       parent_url=pkg["discovered_from_url"], discovered_at=pkg["retrieved_at"]).model_dump()
             if self.get(run_id, "references", ref_id) is None:
                 self.put(run_id, "references", ref_id, ref)
-        self.event(run_id, "evidence_ingested", {"snapshot_id": snapshot_id, "retrieved_at": pkg["retrieved_at"],
-                                               "case_ids": pkg["case_ids"], "origin": pkg["origin"]})
+        ingestion = {"snapshot_id": snapshot_id, "retrieved_at": pkg["retrieved_at"],
+                     "case_ids": pkg["case_ids"], "origin": pkg["origin"]}
+        if pkg["capture_observation"] is not None:
+            ingestion["capture_observation"] = pkg["capture_observation"]
+        self.event(run_id, "evidence_ingested", ingestion)
         return self.get(run_id, "snapshots", snapshot_id)
 
     def active_snapshots(self, run_id: str) -> list[dict]:
+        from .resource_identity import snapshot_index
         ids = {h["snapshot_id"] for h in self.records(run_id, "heads")}
-        return [s for s in self.records(run_id, "snapshots") if s["snapshot_id"] in ids]
+        return list(snapshot_index([s for s in self.records(run_id, "snapshots") if s["snapshot_id"] in ids]).values())
 
     def verify_snapshot(self, snapshot: dict) -> list[str]:
         errors = []
@@ -329,6 +373,8 @@ class Store:
             package = EvidencePackage.model_validate({key: snapshot[key] for key in EvidencePackage.model_fields
                                                       if key in snapshot}).model_dump()
             errors.extend(evidence_completeness_errors(package))
+            from .capture_quality import capture_quality_errors
+            errors.extend(capture_quality_errors(package))
             if package["status"] in {"COMPLETE", "PARTIAL", "CONTENT_CAPTURED"} and authentication_page(package):
                 errors.append("Snapshot resembles an authentication page")
         except ValueError as exc:

@@ -1,8 +1,53 @@
 # OpenChamber / OpenCode 接入与验收
 
-对应核心0.1.10，以下保留底层文件协议验收步骤。结构化XLSX的当前默认入口是README中的xlsx-workflow；Word/PPT、任意布局XLSX和时间范围收集为TODO。OpenChamber是现场前端，文件任务由它连接的OpenCode执行；OpenCode可完成采集与模型判断，无需Codex再代做一遍。本包只安装项目模板、发布文件任务、接收结果并运行本地门禁，不启动OpenChamber，也不包含OpenChamber/OpenCode服务客户端。
+对应核心0.1.11，以下保留底层文件协议验收步骤。结构化XLSX的当前默认入口是README中的xlsx-workflow；Word/PPT、任意布局XLSX和时间范围收集为TODO。OpenChamber是现场前端，文件任务由它连接的OpenCode执行；OpenCode可完成采集与模型判断，无需Codex再代做一遍。本包只安装项目模板、发布文件任务、接收结果并运行本地门禁，不启动OpenChamber，也不包含OpenChamber/OpenCode服务客户端。
 
 以下步骤是执行手册，尚不代表真实OpenChamber 2.5.2、OpenCode 2.1.4/2.2.0、内网登录或DeepSeek已联调。`doctor`通过只证明本地依赖可用。
+
+## 0.1.11 默认：原生子 Agent 或真实 CLI 适配，整批持续推进
+
+OpenChamber/OpenCode **支持原生子 Agent 和 Agent 搜索**，不是只能由用户逐条取证。OpenChamber 2.5.2 的[发布记录](https://github.com/openchamber/openchamber/releases/tag/v2.5.2)列出子 Agent 会话；OpenCode 的 [Agents](https://opencode.ai/v2/docs/agents/) 和 [Tools](https://opencode.ai/v2/docs/tools/) 文档说明独立子会话、搜索及工具权限。现场实际服务版本和工具目录仍须确认，不能把功能存在等同于本项目已接通。
+
+两种执行路线选一条，使用同一套核心任务和门禁：
+
+1. **OpenChamber 原生路线**：主会话循环调用 `xlsx-workflow next`，只持有任务 ID/状态/文件路径。以现场可用的 `subagent`/Task 工具启动 `fault-audit-worker` 新子会话，给一项 request 路径、指定 response 路径与完整处理要求；不要传整批正文，也不要继续另一任务 session。子会话完整读资料、实际搜索/采集或判断后写响应，返回 ID、状态和路径，由主协调器 submit。语义并发 2，Edge 采集串行 1。已有整批授权不每 10 条询问继续；登录按站点集中交接，真实争议保留异常。持续至所有目标已处理或明确阻塞且没有可执行工作，最后 export。
+2. **CLI driver 路线**：下面的适配器真实执行 `opencode run`，一项任务新建一次 CLI 会话，不使用 `--continue`、`--session` 或 `--fork`。程序调用 CLI，模型服务、搜索和浏览器仍由 OpenCode 管理，不另建 HTTP/模型客户端。任务出错只隔离该项，子任务不写 SQLite。
+
+先用原安装器安装包含 `.opencode/agents/fault-audit-worker.md` 的项目模板。其 mode=all 可作为原生子 Agent，也可由 CLI 选择；不硬编码 provider/model，不改变全局权限。旧模板有改动时安装器仍保留冲突并拒绝覆盖，先合并本项目模板，不能靠删除现场 state 解决。
+
+### CLI 预检与命令配置
+
+`$PythonExe`、`$CoreRoot`、`$ProjectRoot`、`$OpenCodeExe` 必须是实际后端可访问的解释器、核心、项目和 CLI 路径。`$AuditState`、`$AuditRunId` 使用原现场明确运行或独立试验运行，先备份再升级。
+
+```powershell
+& $PythonExe (Join-Path $CoreRoot 'scripts/run_opencode_agent.py') `
+  --project $ProjectRoot --opencode $OpenCodeExe --preflight
+
+$AgentArgv = @($PythonExe, (Join-Path $CoreRoot 'scripts/run_opencode_agent.py'),
+  '--opencode', $OpenCodeExe, '--project', $ProjectRoot,
+  '--request', '{request}', '--response', '{response}', '--timeout', '900')
+$AgentCommandFile = Join-Path $ProjectRoot 'work/opencode-agent-command.json'
+New-Item -ItemType Directory -Force -Path (Split-Path $AgentCommandFile) | Out-Null
+$AgentArgv | ConvertTo-Json | Set-Content -LiteralPath $AgentCommandFile -Encoding utf8
+& $PythonExe (Join-Path $CoreRoot 'run_faultaudit.py') --state $AuditState `
+  xlsx-workflow drive --run $AuditRunId --agent-command-file $AgentCommandFile `
+  --workers 2 --max-attempts 2 --timeout 1000 --browser-timeout 1000
+```
+
+适配器先检查实际 CLI 的 `--version`、`run --help` 和 `--help`，确认文件、JSON 输出及 Agent 参数后才启动任务。需要连接 OpenChamber 已运行的同机服务时，可在适配器 argv 增加 `--server-url <实际无凭据服务地址>`；根据现场 help 选择受支持的 attach/server 选项，不猜版本。项目 cwd 始终显式；若服务在别机，服务目录和文件路径必须另行核验。CLI 版本不冒充所连后端版本；预检中的 Edge、搜索、子 Agent 工具及实际模型均为 NOT_PROBED。认证沿用既有 OpenCode 环境，不把密钥放进命令文件。
+
+### 现场必须完成的能力验收
+
+- 当前后端能读取一个完整请求并写指定响应；实际新 session 与生产者信息可追溯，不把其他模型标成 DeepSeek。
+- 主会话能启动独立子 Agent，或 CLI 每次新 run 确实不继承另一案例聊天；单条失败后其他任务继续，中断续跑不重复派发。
+- 附加到已有 OpenCode 后端时，实际验证超时/取消能停止对应远端子会话及 Edge 操作；本机进程超时测试只证明本地命令退出。后端未确认停止前不要重试该浏览器任务，避免遗留操作与新任务争用页面。
+- 配置的 Agent 搜索工具实际可用。由原单元格抽取 `search_facets`，依据结果有限调整查询，记录 `search_attempts`；不能只列一套未执行的搜索词。
+- 既有 Edge 工具能读取登录后的 Wiki 正文。用户手动登录；同站点集中交接一次，恢复相关任务。官方 [Browser 说明](https://opencode.ai/v2/docs/tools/#browser)不保证自动附加任意现有 Edge 会话，必须使用现场已有连接验收。
+- Wiki 目录、仅标题、登录、未渲染、提取失败都有实际 `capture_observation`，不会被当成完整正文或查无匹配；相关目录子页能定向读取。
+- 读工具可能限制整页大小及单行长度。原 JSON 的长字符串必须完整读取；必要时通过本地工具/Python/Node 按字符切片补读，不能误把翻页当成恢复被截短的一行。输入读不全则阻塞，不静默删段或库条目。
+- 同资源链接别名只抓一次、同快照摘要共享，但不同适用子问题仍独立执行；目标范围和冻结库完整唯一。
+
+当前 Codex 回归与公开资料实机不能代替上述内网/真实模型现场验收。最终只交付一个排名 XLSX，保留真实阻塞；`COMPLETE_WITH_PENDING` 或严格校验退出 2 不等于程序崩溃。下面为旧版本底层接口的兼容验收，不覆盖本节默认入口。
 
 ## 1. 在实际工具执行端安装
 

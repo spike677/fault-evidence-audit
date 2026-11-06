@@ -2,10 +2,12 @@
 from __future__ import annotations
 
 import json
+import os
 import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from faultaudit.agent_adapter import run_agent
 from faultaudit.store import AuditError
@@ -53,6 +55,30 @@ class AgentAdapterTests(unittest.TestCase):
         response = run_agent(command, self.request, self.response)
         self.assertEqual(response["literal"], "literal && not-a-shell-command")
         self.assertTrue(response["read"])
+
+    def test_process_receives_only_the_explicit_fresh_task_context_contract(self):
+        command = self.command(
+            "import os\n"
+            "response = pathlib.Path(sys.argv[2])\n"
+            "response.write_text(json.dumps({'context':os.environ['FAULTAUDIT_CONTEXT_MODE'],"
+            "'request':os.environ['FAULTAUDIT_REQUEST_PATH'],'response':os.environ['FAULTAUDIT_RESPONSE_PATH']}),encoding='utf-8')\n")
+        result = run_agent(command, self.request, self.response)
+        self.assertEqual(result, {"context": "fresh-task", "request": str(self.request.resolve()),
+                                  "response": str(self.response.resolve())})
+
+    def test_feedback_uses_a_per_process_environment_without_mutating_parent(self):
+        command = self.command(
+            "import os\n"
+            "pathlib.Path(sys.argv[2]).write_text(json.dumps({'feedback':os.environ['FAULTAUDIT_ATTEMPT_FEEDBACK']}),encoding='utf-8')\n")
+        with patch.dict(os.environ, {"FAULTAUDIT_ATTEMPT_FEEDBACK": "unrelated-parent-task"}):
+            result = run_agent(command, self.request, self.response, feedback="same-task-diagnostic " + "R" * 3000)
+            self.assertEqual(len(result["feedback"]), 2000)
+            self.assertTrue(result["feedback"].startswith("same-task-diagnostic "))
+            self.assertEqual(os.environ["FAULTAUDIT_ATTEMPT_FEEDBACK"], "unrelated-parent-task")
+        self.response.unlink()
+        with patch.dict(os.environ, {"FAULTAUDIT_ATTEMPT_FEEDBACK": "unrelated-parent-task"}):
+            self.assertEqual(run_agent(command, self.request, self.response)["feedback"], "")
+            self.assertEqual(os.environ["FAULTAUDIT_ATTEMPT_FEEDBACK"], "unrelated-parent-task")
 
     def test_existing_response_is_preserved_without_running_command(self):
         self.response.parent.mkdir()

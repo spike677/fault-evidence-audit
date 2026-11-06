@@ -29,10 +29,14 @@ class WorkflowWikiRetryTests(unittest.TestCase):
         return next(task for task in workflow.next_tasks(self.store, self.run)["tasks"] if task["kind"] == "wiki_check")
 
     def wiki_package(self, url):
-        return {"url": url, "title": "Synthetic Wiki", "text":
-                "Issue A: Event EVT-OTHER belongs to OtherTenant scanning before deployment; buffer reused before completion.\n"
-                "Issue B: offset calculation error.",
-                "status": "CONTENT_CAPTURED", "components": {"body": "COMPLETE"}, "is_synthetic": True}
+        text = ("Issue A: Event EVT-OTHER belongs to OtherTenant scanning before deployment; buffer reused before completion.\n"
+                "Issue B: offset calculation error.")
+        return {"url": url, "title": "Synthetic Wiki", "text": text,
+                "status": "CONTENT_CAPTURED", "components": {"body": "COMPLETE"}, "is_synthetic": True,
+                "capture_observation": {"page_kind": "BODY", "requested_url": url, "final_url": url,
+                    "title": "Synthetic Wiki", "body_locator": "synthetic-fixture-body", "body_quotes": [text],
+                    "observed_by": "offline-synthetic-fixture", "observed_at": "2026-11-06T10:00:00+08:00",
+                    "tool_observation": "Synthetic fixture body and its two issue sections; no network access"}}
 
     def current_comparison(self, snapshot):
         helper = investigation_tests.InvestigationTests()

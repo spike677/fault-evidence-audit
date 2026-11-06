@@ -4,9 +4,11 @@ description: "通过OpenCode采集证据并执行模型任务，回传本地核�
 
 使用 fault-evidence-audit Skill 处理以下任务：$ARGUMENTS
 
+0.1.11整批执行：OpenChamber/OpenCode可使用原生子agent与Agent搜索。一次授权后持续推进，不每10条请示。主会话仅协调任务ID/状态/文件；以fault-audit-worker新子会话完整执行一项不可变request并写独立response，不传整批累计聊天、不继续另一任务session。语义worker默认2，Edge队列1；主协调器唯一提交。若使用已配置CLI适配器则由xlsx-workflow drive持有该run，不再并行另起聊天协调器。单条失败仅阻塞依赖，其他继续；登录按站点集中交接用户。capture_observation区分正文/目录/标题/登录/渲染/提取，Agent按原单元格提取search_facets、执行并记录有限search_attempts。原生能力支持不等于现场Edge和搜索权限已验证，先按OPENCODE_HANDOFF预检。下面兼容说明不得覆盖本段与Skill的0.1.11流程。
+
 通过 Skill 的 scripts/run_audit.py 调用核心 CLI，使用现有 run ID 继续任务。
 本轮仅支持结构化XLSX完整流程。用xlsx-workflow start导入明确的故障表和原始库，next取得带准确request/response路径的任务。按kind调用现场工具或模型，写响应后submit，再next推进到READY_TO_EXPORT；export默认只交付一个带来源编号的故障排名XLSX。已有外部Agent命令适配器可用drive自动循环。Word/PPT、任意布局XLSX、时间范围收集只列TODO，不生成额外说明文档。下面底层命令保留为兼容调试入口。
-核心版本0.1.10管理导入、快照、证据计划、文件任务协议、本地门禁及只读统计；本命令的模型provider/model与实际执行由OpenCode环境负责。
+核心版本0.1.11管理导入、快照、证据计划、文件任务协议、本地门禁及只读统计；本命令的模型provider/model与实际执行由OpenCode环境负责。
 从文档整理故障时Wiki为第一优先级：已有Wiki先读并核对，默认不另搜Wiki；没有Wiki时，即使已有其他站点证据，也必须先做有范围的Wiki补证检查。查无匹配记录查询范围与NO_MATCH；登录失败记录BLOCKED，不能算检查完成，其他资料继续整理。已有原链保留，最终核对发现错挂/冲突才定向补证。不把required_sources=WIKI当成“检查过Wiki”的替代，也不无限寻找。0.1.10 的 xlsx-workflow 已实现该前置检查，不能跳过 NO_MATCH/BLOCKED 记录。
 新流水线文件命名与位置以docs/catalog-engineering-plan.md“固定存放位置与最少文件”为准：复用原state；任务只保留必要request.json及按尝试保存的response.json，最终交付一个故障整理及模式库建议.xlsx。不要额外撰写逐条Markdown/HTML总结或多版交付物；xlsx-workflow 默认只交付一份工作簿；旧通用export仅保留调试兼容，不作为本轮默认入口。
 模式库草案使用 catalog-draft prepare --run <id> --case-id <内部caseID> [--expected-additions <可选数量>] --out <新目录>。完整读取request.json，按schema填写新response.json并如实声明producer；草案走catalog-draft validate/export，不能交给submit-model-results。只读状态、保留完整冻结库，旧表陈述不升级为已验证根因，不修改正式库或生成ACCEPT；操作说明见docs/catalog-draft.md。超限或读不全即阻塞，不删减任务。

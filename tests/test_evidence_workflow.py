@@ -59,16 +59,20 @@ class EvidenceWorkflowTests(unittest.TestCase):
         payload = task["payload"]
         if task["kind"] == "summarize":
             snap = payload["snapshot"]
-            ref = {"segment_id": snap["segments"][0]["segment_id"], "quote": snap["text"]}
+            text = "".join(segment["text"] for segment in snap["segments"])
+            self.assertEqual(len(text), payload["input_scope"]["provided_chars"])
+            ref = {"segment_id": snap["segments"][0]["segment_id"], "quote": text}
             result = {"snapshot_id": snap["snapshot_id"], "issues": [{"label": "main", "facts": [
-                {"field": "observation", "value": snap["text"], "evidence": [ref]}]}], "unknown_fields": ["fix_version"]}
+                {"field": "observation", "value": text, "evidence": [ref]}]}], "unknown_fields": ["fix_version"]}
         elif task["kind"] == "catalog":
             result = {"case_id": payload["case"]["case_id"], "scope": "FULL_CATALOG", "overall": "UNDETERMINED",
                 "catalog_results": [{"item_id": item["item_id"], "result": "UNDETERMINED", "reason": "Event remains unconfirmed", "evidence": []}
                                     for item in payload["items"]]}
         else:
             case, snap = payload["case"], payload["snapshot"]
-            ref = {"segment_id": snap["segments"][0]["segment_id"], "quote": snap["text"]}
+            text = "".join(segment["text"] for segment in snap["segments"])
+            self.assertEqual(len(text), payload["input_scope"]["provided_chars"])
+            ref = {"segment_id": snap["segments"][0]["segment_id"], "quote": text}
             def fact(category, field, meaning, value):
                 return {"category": category, "source_field": field, "source_quote": case["raw"][field],
                     "source_cell": case["cell_locations"][field], "source_meaning": meaning, "evidence_meaning": meaning,

@@ -5,7 +5,21 @@ description: "在OpenCode环境按必要证据计划采集并执行faultaudit模
 
 # 故障证据核验
 
-本 Skill 对应核心版本 0.1.10。通过 `scripts/run_audit.py` 调用本地核验核心。用核心的 `scripts/install_opencode.py --project <工作区>` 安装后，入口通过本地 `core-location.json` 定位核心，无需设置环境变量；同一磁盘优先保存相对路径，整个工作区与核心一起移动后仍可调用。跨磁盘安装保存本地绝对路径，迁移后可设置 FAULTAUDIT_HOME；如需重装，先保留并移走旧定位配置，安装器不会覆盖不同内容。可用 `FAULTAUDIT_HOME` 显式指定含 `run_faultaudit.py` 的核心目录，配置无效时直接报错，不回退到其他核心。核心只导入、保存快照、规划证据、发布任务及运行本地门禁；本 Skill 的模型执行及内网采集在 OpenCode 环境完成。
+## 0.1.11：整批持续执行与独立子 Agent（本节优先）
+
+OpenChamber 通过 OpenCode 支持原生子 Agent 和 Agent 搜索；不要解释成“工具只能记账，必须用户逐条取证判断”。在已授权批次内持续执行，不每 10 条申请继续。主会话只保留任务 ID、状态和路径，单项 request/response 交给 `.opencode/agents/fault-audit-worker.md` 的新上下文；使用实际版本的原生 `subagent`/Task 工具，不复用其他任务的 sessionID。语义任务可并发 2，Edge 采集队列保持 1，由协调器唯一提交 SQLite。不要同时启动 CLI driver 和聊天协调器抢同一 run。
+
+默认用 `xlsx-workflow`，不是下面兼容调试步骤中的旧通用导出。已安装真实 CLI 时可用核心 `scripts/run_opencode_agent.py --project <实际后端项目> --preflight` 检查可用命令；配置 argv 后 `xlsx-workflow drive` 持续派发、隔离失败和保留尝试。具体命令见 `integration/OPENCODE_HANDOFF.md`。预检不会调用模型，不能证明服务端版本、子 Agent 权限、Agent 搜索或现有 Edge 登录态已经可用。
+
+采集先区分正文、目录、仅标题、登录页、未渲染和提取失败，提交 `capture_observation`。仅标题/目录不能冒充完整 Wiki 正文；目录定向读适用子页并保留来源。用户在 Edge 手动登录；同站点集中交接一次，受影响任务等待，其他站点及纯文本任务继续。
+
+搜索由 Agent 提取带原单元格引文的模型、完整算子名、症状、条件、框架/版本及历史根因假设，按实际结果有限扩展；保存 `search_facets` 与 `search_attempts`，不在程序中编固定搜索词，不强搜旧归因。已有适用 Wiki 不再补搜；没有 Wiki 时先完成有范围检查。正常事实处理和库映射不要求人工 ACCEPT，也不以事件组确认作为独立 case 的前置条件。
+
+同资源别名/快照/工作优先复用，保留原 URL、子问题和每条来源，不把同链接自动合成同事件。所有组齐备才汇总，但一份资源就绪可立即比较，不必等待整个批次摘要完成。按任务检查完整输入；读工具可能逐行或整页截短，必要时用本地原文字符切片补读。无法完整处理则报告执行阻塞，不裁剪段落或库条目，不改旧结果哈希，不直接写 store。
+
+最终只交付 `work/runs/<run_id>/output/故障整理及模式库建议.xlsx`。暂停/升级前备份，优先原 state、原 run 续跑；未就绪、权限和冲突保持真实待办。以下保留底层文件协议的兼容操作，不能覆盖本节的默认入口、Wiki 优先与单工作簿约定。
+
+本 Skill 对应核心版本 0.1.11。通过 `scripts/run_audit.py` 调用本地核验核心。用核心的 `scripts/install_opencode.py --project <工作区>` 安装后，入口通过本地 `core-location.json` 定位核心，无需设置环境变量；同一磁盘优先保存相对路径，整个工作区与核心一起移动后仍可调用。跨磁盘安装保存本地绝对路径，迁移后可设置 FAULTAUDIT_HOME；如需重装，先保留并移走旧定位配置，安装器不会覆盖不同内容。可用 `FAULTAUDIT_HOME` 显式指定含 `run_faultaudit.py` 的核心目录，配置无效时直接报错，不回退到其他核心。核心只导入、保存快照、规划证据、发布任务及运行本地门禁；本 Skill 的模型执行及内网采集在 OpenCode 环境完成。
 
 DTS、Wiki、GitCode、GitHub、CodeHub 等目标网站访问统一由 OpenChamber 环境负责，使用其连接的 OpenCode 与现场工具执行。网站登录、搜索、正文/分页/附件/评论/Diff 读取及网络重试不进入 Codex 核心。`fetch-tasks` 仅导出清单，不能当作已经读取网页的证明。
 

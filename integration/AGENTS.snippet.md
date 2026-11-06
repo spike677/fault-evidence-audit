@@ -1,5 +1,7 @@
 ## 故障证据核验
 
+0.1.11默认使用xlsx-workflow整批推进，一次授权后不每10条申请继续。OpenChamber/OpenCode支持原生子agent和Agent搜索：主会话只调度ID/状态/路径，fault-audit-worker以新上下文完整读一项request、写独立response，语义并发2、Edge串行1；仅协调器提交SQLite。CLI适配器scripts/run_opencode_agent.py与原生子agent路线二选一，不同时控制同一run。实际服务/子agent工具权限、搜索和现有Edge登录态须现场预检，用户手动完成登录，同站点集中交接。Wiki仅标题/目录/未渲染不算完整正文；使用capture_observation及带原单元格依据的search_facets/search_attempts。正常来源/事实和库映射不例行要求ACCEPT，已有链接和工作复用不等于自动事件合并。最终仅交付一个排名XLSX；以下为兼容底层接口说明，不能覆盖本段Wiki优先和新默认入口。
+
 相关任务通过 fault-evidence-audit Skill 调用独立 faultaudit 核心，实际状态以 SQLite 和 run ID 为准。
 目标网站访问由具备授权与登录态的现场工具执行；模型任务可由OpenCode或Codex会话执行。核心仅导出任务、接收资料与结果并本地校验，不维护网站登录或远程客户端。
 0.1.8核心处理导入、原文快照、证据计划、文件任务协议、本地校验、报告和只读统计；默认执行者为OpenCode，Codex使用model-tasks/submit-model-results --executor codex及run --mode codex，分别保留生产者身份。核心不配置模型服务地址、密钥或网络客户端。

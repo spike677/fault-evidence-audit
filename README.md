@@ -2,7 +2,7 @@
 
 故障证据核验核心。核心测试与 `examples/` 使用合成数据；用户指定发布的模式库草案单独存放在 [`catalog/drafts/`](catalog/drafts/README.md)，与测试数据及正式库分开。
 
-版本 0.1.10，2026 年 11 月 6 日。核心负责导入故障表、保存原文与引用来源、规划必要证据、生成采集和模型任务、检查返回结果并生成复核报告。模型任务可由 OpenCode 或 Codex 会话执行，内网采集仍由具备授权与登录态的现场环境完成。支持文件交接及外部 Agent 命令适配，不包含直连模型或网站的网络客户端。
+版本 0.1.11，2026 年 11 月 6 日。核心负责导入故障表、保存原文与引用来源、规划必要证据、生成采集和模型任务、检查返回结果并生成复核报告。模型任务可由 OpenCode 或 Codex 会话执行，内网采集仍由具备授权与登录态的现场环境完成。支持文件交接及外部 Agent 命令适配，不包含直连模型或网站的网络客户端。
 
 ## 结构化 XLSX 全流程（本轮默认入口）
 
@@ -21,7 +21,7 @@ $PythonExe = 'python' # 使用具备 requirements.txt 依赖的实际解释器
 
 来源类型沿用导入器的 `LEGACY_TABLE` 默认；确为原始周报/OBP 时显式指定 `--source-kind ORIGINAL_WEEKLY` 或 `ORIGINAL_OBP`。三类已有链接都直接进入整理，不将普通汇总表自动标成原始周报。
 
-工作流处理指定 run 的全部记录；新批次默认创建新 run，`--run` 用于同批续跑，不作为既有多来源运行的子集筛选参数。
+工作流冻结本次输入的 case 集合。已有混合 run 可在首次 start 时传 `--run RUN_ID --case-ids-file '目标case_id数组.json'`，目标范围贯穿计划、抓取、模型、校验与导出；历史记录留在原账本。范围确定后同批续跑不能改为另一个集合，换范围或不兼容的冻结库时建立明确关联的后续 run。空数组会拒绝，不会扩展为全库。
 
 ```powershell
 & $PythonExe run_faultaudit.py --state .faultaudit xlsx-workflow submit --run RUN_ID `
@@ -34,10 +34,19 @@ $PythonExe = 'python' # 使用具备 requirements.txt 依赖的实际解释器
 
 ```powershell
 & $PythonExe run_faultaudit.py --state .faultaudit xlsx-workflow drive --run RUN_ID `
-  --agent-command-file '实际Agent命令配置.json'
+  --agent-command-file '实际Agent命令配置.json' --workers 2 --max-attempts 2 `
+  --timeout 1000 --browser-timeout 1000
 ```
 
 配置是 argv JSON 数组，例如 `["实际解释器绝对路径", "现场适配脚本绝对路径", "{request}", "{response}"]`。程序以 `shell=False` 替换两个绝对文件路径，适配器按请求类型调用现场工具/模型并写响应；不是声称 OpenCode 原生命令支持这些参数。也可由 OpenChamber 会话直接循环调用 `next/submit`，无需进程适配器。
+
+0.1.11 提供实际的 [OpenCode CLI 适配脚本](scripts/run_opencode_agent.py) 和项目 `fault-audit-worker` Agent；安装方式、预检及命令配置见[现场接入说明](integration/OPENCODE_HANDOFF.md)。OpenChamber/OpenCode 支持原生子 Agent 与 Agent 搜索：可由现场主会话按任务启动独立子 Agent，或由驱动每次调用新 OpenCode run。主会话只接收 ID/状态/响应路径，不积累全部正文。具体工具与 Edge 登录态仍须现场验证。
+
+驱动连续处理整批，无每十条确认边界。默认两个语义 worker（可设 1–4），浏览器单队列；只有协调器写 SQLite。单项失败有限重试，其他任务继续；同站点登录等待集中交接，用户手动完成 Edge 登录后对对应 collection task 执行 `retry` 再续跑。文件、旧尝试和历史结果保留，OS 运行锁防止同 run 被两个驱动并发执行。
+
+页面采集使用 `capture_observation` 保留请求/最终 URL、页面类型、正文位置和精确引文。标题、目录、登录或未渲染页面不能声明完整正文；目录可在 `linked_packages` 返回带父页导航引文及适用 case IDs 的子页，保留 `LINK_DISCOVERED` 来源并单独核验。补读有上限，明确网络阻塞不会自动反复抓取。搜索由 Agent 提取原单元格事实并按实际结果扩展，`search_facets/search_attempts` 留存来源、查询及轮次；不在核心生成固定搜索词。
+
+每组摘要及每个 `work_id` 独立上下文。同快照/同策略共享摘要，支持所有分组同时就绪，全部组齐备才有完整摘要。模型请求正文只序列化一次为 `segments[].text`；草案的重复引文按身份引用，完整冻结库及独立事实仍保留。整请求预算默认 48,000 字符，现场按真实模型容量显式设置 `FAULTAUDIT_MAX_INPUT_CHARS`；字符数不等于 token 数，不能自动抬预算或删条目。执行者读不全时返回外层哈希绑定的 `BLOCKED/EXECUTOR_CONTEXT_LIMIT`，不产生模型成功记录；改善执行容量后可显式 `retry`。策略或语义输入改变则重发新任务，不能重绑旧答案。
 
 原 Wiki 优先读取、不再重复补搜；没有 Wiki 时，即使已有 PR 也必须执行有范围的 Wiki 检查。`NO_MATCH` 留存查询后允许处理其他证据；登录失败保持 `BLOCKED`。已有引用全部整理，默认一份可用证据满足后停止新增搜索。需要重试访问时用 `xlsx-workflow retry --run RUN_ID --task-id TASK_ID`，保留旧响应。
 

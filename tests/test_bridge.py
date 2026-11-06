@@ -89,7 +89,8 @@ class BridgeTests(unittest.TestCase):
         with patch.dict(os.environ, environment, clear=True), patch("urllib.request.urlopen", side_effect=AssertionError("core must never call a model")) as network:
             _, tasks = self.drive()
             self.assertEqual([task["kind"] for task in tasks], ["summarize"])
-            self.assertIn("text", tasks[0]["payload"]["snapshot"])
+            self.assertEqual("".join(segment["text"] for segment in tasks[0]["payload"]["snapshot"]["segments"]), self.snapshot["text"])
+            self.assertEqual(tasks[0]["payload"]["snapshot"]["text_representation"], "CONCATENATE_PROVIDED_SEGMENTS")
             self.assertIn("segments", tasks[0]["payload"]["snapshot"])
             for expected_kind in ("summarize", "compare", "catalog"):
                 self.assertEqual([task["kind"] for task in tasks], [expected_kind])

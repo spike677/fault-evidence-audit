@@ -8,6 +8,7 @@ from __future__ import annotations
 import json
 import tempfile
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from .bridge import CodexJudge, OpenCodeJudge, export_model_tasks, policy_fingerprint, submit_model_results
 from .catalog_drafts import prepare_draft, validate_draft
@@ -17,8 +18,13 @@ from .input_budget import InputTooLarge, finalize_model_task
 from .pipeline import evidence_plan, execute, fetch_tasks, import_into, report_data
 from .store import AuditError, Store, canonical_url, digest
 from .wiki_checks import record_wiki_check, wiki_plan
+from .capture_quality import capture_quality, collection_observation_instructions
+from .resource_identity import resource_key, same_resource
+from .search_guidance import search_guidance, validate_search_trace
+from .workflow_scope import scoped_store
+from .contracts import EvidencePackage
 
-RULE_VERSION = "structured-xlsx-1"
+RULE_VERSION = "structured-xlsx-2"
 WORKBOOK_NAME = "故障整理及模式库建议.xlsx"
 
 
@@ -31,7 +37,7 @@ def config(store: Store, run_id: str) -> dict:
 
 def start(store: Store, source: Path, catalog: Path, work_root: Path, *, executor="opencode",
           source_kind="LEGACY_TABLE", catalog_sheets=None, expected_catalog_count=None,
-          catalog_scope="UNSPECIFIED", run_id=None) -> dict:
+          catalog_scope="UNSPECIFIED", run_id=None, case_ids=None) -> dict:
     if source.suffix.lower() not in {".xlsx", ".xlsm"}:
         raise AuditError("This workflow supports structured XLSX only; Word/PPT/arbitrary layouts are TODO")
     if executor not in {"opencode", "codex"}:
@@ -45,23 +51,40 @@ def start(store: Store, source: Path, catalog: Path, work_root: Path, *, executo
     if old:
         if old["source_hash"] != cases["documents"][0]["source_sha256"] or old["executor"] != executor:
             raise AuditError("Resume with the original source and executor or start a new run")
-    import_into(store, run_id, cases)
-    import_into(store, run_id, items, catalog=True)
+    if case_ids is not None and (not isinstance(case_ids, list) or not case_ids or not all(isinstance(key, str) for key in case_ids)):
+        raise AuditError("case_ids must be a nonempty JSON array of case IDs")
+    selected = sorted(case_ids if case_ids is not None else (old or {}).get("selected_case_ids") or [case["case_id"] for case in cases["cases"]])
+    known = {case["case_id"] for case in store.records(run_id, "cases")} | {case["case_id"] for case in cases["cases"]}
+    if not selected or len(selected) != len(set(selected)) or set(selected) - known:
+        raise AuditError("Workflow scope must contain unique case IDs from this run")
+    if old and old.get("selected_case_ids") and selected != old["selected_case_ids"]:
+        raise AuditError("Workflow case scope is frozen; retain this run and use a linked follow-up run for another scope")
     directory = (work_root / run_id).resolve()
     if directory.is_relative_to(store.root):
         raise AuditError("Workflow files must be outside state")
+    from .pipeline import check_catalog_import
+    check_catalog_import(store, run_id, items)
+    import_into(store, run_id, cases)
+    import_into(store, run_id, items, catalog=True)
     value = old or {"run_id": run_id, "directory": str(directory), "executor": executor,
                     "source_hash": cases["documents"][0]["source_sha256"], "rule_version": RULE_VERSION}
+    value = {**value, "selected_case_ids": selected, "scope_hash": digest(selected),
+             "capture_quality_required": True, "max_search_rounds": 3,
+             "capture_attempts_per_resource": 3, "rule_version": RULE_VERSION}
+    if old != value:
+        store.put(run_id, "xlsx_workflow", "config", value, mutable=bool(old))
+        if old:
+            store.event(run_id, "workflow_config_upgraded", {"previous": old, "current": value})
     if not old:
-        store.put(run_id, "xlsx_workflow", "config", value)
         register_search_policy(store, run_id, {"required_sources": ["WIKI"]})
-    return {**value, "case_count": len(cases["cases"]), "catalog_count": len(items["items"])}
+    return {**value, "case_count": len(selected), "catalog_count": len(items["items"])}
 
 
 def _policy() -> str:
-    from . import wiki_checks
+    from . import wiki_checks, capture_quality, search_guidance, resource_identity, workflow_scope
     return digest({"core": policy_fingerprint(), "workflow": digest(Path(__file__).read_bytes()),
-                   "wiki": digest(Path(wiki_checks.__file__).read_bytes())})
+                   "helpers": digest(b"".join(Path(module.__file__).read_bytes() for module in
+                       (wiki_checks, capture_quality, search_guidance, resource_identity, workflow_scope)))})
 
 
 def _json(path: Path, value: dict) -> None:
@@ -73,7 +96,10 @@ def _json(path: Path, value: dict) -> None:
 def _request(store, run_id, cfg, kind, payload, instructions, priority) -> dict | None:
     try:
         request = finalize_model_task({"kind": kind, "run_id": run_id, "policy_hash": _policy(),
-            "instructions": instructions, "payload": payload})
+            "instructions": instructions, "payload": payload,
+            "execution_context": {"new_session_required": True, "history": "THIS_TASK_ONLY",
+                "role": "browser" if kind in {"fetch", "wiki_check", "search"} else "semantic",
+                "scope_hash": cfg.get("scope_hash", "")}})
     except InputTooLarge as exc:
         block = {"kind": kind, "case_ids": payload.get("case_ids", []), "reason": "INPUT_TOO_LARGE",
                  "input_budget": exc.details, "policy_hash": _policy()}
@@ -83,6 +109,16 @@ def _request(store, run_id, cfg, kind, payload, instructions, priority) -> dict 
     store.put(run_id, "workflow_requests", task_id, request)
     path = Path(cfg["directory"]) / "tasks" / task_id / "request.json"
     _json(path, request)
+    execution = store.get(run_id, "workflow_execution", task_id) or {}
+    site = urlsplit(payload.get("url", "https://wiki.huawei.com/" if kind == "wiki_check" else "")).netloc.lower()
+    auth = store.get(run_id, "workflow_auth", site) if site and kind in {"fetch", "wiki_check", "search"} else None
+    if execution.get("blocked_code") == "EXECUTOR_CONTEXT_LIMIT" or auth and auth.get("status") == "WAITING_AUTH":
+        code = "EXECUTOR_CONTEXT_LIMIT" if execution.get("blocked_code") == "EXECUTOR_CONTEXT_LIMIT" else "WAITING_AUTH"
+        block = {"kind": kind, "case_ids": payload.get("case_ids", []), "reason": code,
+                 "details": {"task_id": task_id, "site": site, "error": execution.get("error", (auth or {}).get("reason", ""))},
+                 "policy_hash": _policy()}
+        store.put(run_id, "workflow_blocks", digest(block), block)
+        return {"blocked": True, "block_id": digest(block), **block}
     done = store.get(run_id, "workflow_results", task_id)
     if done and not done.get("retry"):
         return None
@@ -90,6 +126,7 @@ def _request(store, run_id, cfg, kind, payload, instructions, priority) -> dict 
 
 
 def next_tasks(store: Store, run_id: str) -> dict:
+    store = scoped_store(store, run_id)
     cfg = config(store, run_id)
     cases = store.records(run_id, "cases")
     checks = {case["case_id"]: wiki_plan(store, run_id, case) for case in cases}
@@ -105,31 +142,84 @@ def next_tasks(store: Store, run_id: str) -> dict:
             blocks.append(value["block_id"])
         elif value:
             tasks.append(value)
+    retry_resources = set()
     for done in store.records(run_id, "workflow_results"):
         if not done.get("retry"):
             continue
         old = store.get(run_id, "workflow_requests", done["task_id"])
         if old and old["policy_hash"] == _policy():
+            if set(old["payload"].get("case_ids", [])) - {c["case_id"] for c in cases}:
+                continue
             case = old["payload"].get("case")
             if old["kind"] == "wiki_check" and old["payload"]["wiki_input_hash"] != checks[case["case_id"]]["input_hash"]:
                 continue
             path = Path(cfg["directory"]) / "tasks" / old["task_id"] / "request.json"
             tasks.append({"task_id": old["task_id"], "kind": old["kind"], "priority": 0, "request": str(path)})
+            if old["kind"] == "fetch":
+                retry_resources.add(resource_key(old["payload"]["url"]))
     for case in cases:
         check = checks[case["case_id"]]
         if check["status"] == "SEARCH_REQUIRED":
+            guidance = search_guidance(case, max_rounds=cfg.get("max_search_rounds", 3))
             add("wiki_check", {"case": case, "case_ids": [case["case_id"]], "wiki_input_hash": check["input_hash"],
-                               "wiki_task_id": check["task_id"]},
+                               "wiki_task_id": check["task_id"], "search_guidance": guidance},
                 "Search Wiki first within a stated scope. Return {request_hash, outcome: FOUND|NO_MATCH|BLOCKED, "
                 "executed:true, query, scope, checked_at (ISO timezone), executed_by, reason, packages:[]}. "
                 "FOUND requires actual captured Wiki EvidencePackage(s); they remain candidates until comparison. "
-                "NO_MATCH describes only this bounded search; auth failure is BLOCKED. Never invent a login or search.", 0)
+                "NO_MATCH describes only this bounded search; auth failure is BLOCKED. Never invent a login or search. "
+                + guidance["instructions"] + " " + collection_observation_instructions(), 0)
     for item in fetch_tasks(store, run_id)["fetch_tasks"]:
+        if resource_key(item["url"]) in retry_resources:
+            continue
         relevant = [case for case in cases if case["case_id"] in item["case_ids"]]
-        add("fetch", {"url": item["url"], "case_ids": item["case_ids"], "references": item["references"], "cases": relevant},
+        from .pipeline import current_judgments
+        from .resource_identity import snapshot_index
+        active = snapshot_index(store.active_snapshots(run_id))
+        children = [ref for ref in store.records(run_id, "references") if ref.get("parent_url")
+                    and same_resource(ref["parent_url"], item["url"])]
+        child_coverage = set()
+        current = current_judgments(store, run_id)
+        for child in children:
+            snapshot = active.get(resource_key(child["url"]))
+            if not snapshot or not capture_quality(snapshot, require_observation=True)["usable_body"]:
+                continue
+            js = [j for j in current if j["snapshot_id"] == snapshot["snapshot_id"] and j["case_id"] == child["case_id"]]
+            if not js or any(j.get("processing_status") == "AUTO_PROCESSED" and j["case_attribution"] != "MISMATCH"
+                             and j["event_relation"] != "DIFFERENT_EVENT" for j in js):
+                child_coverage.add(child["case_id"])
+        if set(item["case_ids"]) <= child_coverage:
+            continue  # Existing navigation candidates are processed before rereading the index.
+        previous = [value for value in store.records(run_id, "workflow_results")
+                    if not value.get("retry") and (request := store.get(run_id, "workflow_requests", value["task_id"]))
+                    and request["kind"] == "fetch" and same_resource(request["payload"]["url"], item["url"])]
+        if len(previous) >= cfg.get("capture_attempts_per_resource", 3):
+            block = {"kind": "fetch", "case_ids": item["case_ids"], "reason": "PAGE_BODY_UNAVAILABLE",
+                     "details": {"url": item["url"], "attempts": len(previous)}, "policy_hash": _policy()}
+            store.put(run_id, "workflow_blocks", digest(block), block)
+            blocks.append(digest(block))
+            continue
+        # Capture is independent of the hoped-for case conclusion. Keep all
+        # occurrence identities, without repeating hundreds of source rows.
+        payload = {"url": item["url"], "case_ids": item["case_ids"],
+                   "reference_ids": [ref["ref_id"] for ref in item["references"]]}
+        if item.get("snapshot_id") and capture_quality(store.get(run_id, "snapshots", item["snapshot_id"]),
+                                                       require_observation=True)["needs_repair"]:
+            snapshot = store.get(run_id, "snapshots", item["snapshot_id"])
+            payload["repair_capture"] = {"snapshot_id": item["snapshot_id"],
+                                         "quality": capture_quality(snapshot, require_observation=True),
+                                         "previous_attempts": len(previous)}
+            payload["navigation_targets"] = [{"case_id": c["case_id"], "description": c["description"],
+                "operator": c["operator_raw"], "customer_model": c["customer_model"],
+                "sheet": c["sheet"], "row": c["row"], "cell_locations": c["cell_locations"]} for c in relevant]
+            payload["previous_children"] = [{"url": ref["url"], "case_id": ref["case_id"]} for ref in children]
+        add("fetch", payload,
             "Read this supplied URL using the site's actual tools. Return {request_hash, outcome: CAPTURED|BLOCKED, "
             "packages:[EvidencePackage]}. Preserve body, comments, applicable issue and needed Diff, exact capture "
-            "scope and access failures. Use the requested URL; no expansion to fill evidence types.",
+            "scope and access failures. Use the requested URL; no expansion to fill evidence types. "
+            "For an index, retain its package and return related child captures in linked_packages "
+            "[{package:EvidencePackage,case_ids:[applicable target IDs],navigation_quote:exact parent passage containing child URL}]. "
+            "Use navigation_targets to select subpages; child linkage remains a candidate, not confirmed. "
+            + collection_observation_instructions(),
             0 if resource_kind({"url": item["url"]}) == "WIKI" else 2)
     plan = evidence_plan(store, run_id)
     for row in plan["cases"]:
@@ -140,13 +230,16 @@ def next_tasks(store: Store, run_id: str) -> dict:
             prior = [{"judgment_id": j["judgment_id"],
                       "url": store.get(run_id, "snapshots", j["snapshot_id"])["url"], "reason": j["short_reason"]}
                      for j in store.records(run_id, "judgments") if j["judgment_id"] in prior_ids]
+            guidance = search_guidance(case, max_rounds=cfg.get("max_search_rounds", 3))
             add("search", {"case": case, "case_ids": [case["case_id"]], "search_policy": row["search_control"]["policy"],
+                "search_guidance": guidance,
                 "excluded_candidate_judgment_ids": row["excluded_candidate_judgment_ids"],
                 "insufficient_candidate_judgment_ids": row["insufficient_candidate_judgment_ids"], "previous_candidates": prior},
                 "Search for evidence of this specific fault, GitHub then GitCode/Gitee/CodeHub/DTS as applicable. "
                 "Stop after one adequate candidate; do not fill all source types. Return {request_hash, "
                 "outcome: FOUND|NO_MATCH|BLOCKED, executed:true, query, scope, checked_at, executed_by, reason, "
-                "packages:[captured EvidencePackage]}. Keyword matches are not confirmed incidents.", 2)
+                "packages:[captured EvidencePackage]}. Keyword matches are not confirmed incidents. "
+                + guidance["instructions"] + " " + collection_observation_instructions(), 2)
     judge = CodexJudge(store, run_id) if cfg["executor"] == "codex" else OpenCodeJudge(store, run_id)
     execute(store, run_id, judge, mode=cfg["executor"], model_id=cfg["executor"] + "-managed")
     for task in export_model_tasks(store, run_id, executor=cfg["executor"])["tasks"]:
@@ -154,8 +247,20 @@ def next_tasks(store: Store, run_id: str) -> dict:
             "Execute the complete enclosed model task using its instructions and expected_contract. Return its "
             "standard result envelope with original run/task/request hash and actual producer metadata. "
             "The inner task, not this dispatch wrapper, supplies the response identity. Do not invent ACCEPT.", 3)
-    if not tasks:
-        for case in cases:
+    # A ready case does not wait for unrelated cases' fetch/summary tasks.
+    pending_cases = set()
+    for task in tasks:
+        payload = store.get(run_id, "workflow_requests", task["task_id"])["payload"]
+        pending_cases.update(payload.get("case_ids", []))
+        inner = payload.get("task", {})
+        pending_cases.update(inner.get("payload", {}).get("processing_context", {}).get("member_case_ids", []))
+        if inner.get("payload", {}).get("case"):
+            pending_cases.add(inner["payload"]["case"]["case_id"])
+        if inner.get("kind") == "summarize":
+            sid = inner["payload"]["snapshot"]["snapshot_id"]
+            pending_cases.update(row["case_id"] for row in plan["cases"] if sid in row["selected_snapshot_ids"])
+    for case in cases:
+        if case["case_id"] not in pending_cases:
             prepared = prepare_draft(store, run_id, [case["case_id"]])
             if prepared["status"] == "BLOCKED":
                 block = {"kind": "catalog_draft", "case_ids": [case["case_id"]],
@@ -186,6 +291,7 @@ def response_path(store, run_id, task_id) -> Path:
 
 
 def submit(store: Store, run_id: str, task_id: str, response: dict, *, path: Path | None = None) -> dict:
+    store = scoped_store(store, run_id)
     cfg = config(store, run_id)
     request = store.get(run_id, "workflow_requests", task_id)
     if not request or request["policy_hash"] != _policy():
@@ -201,6 +307,14 @@ def submit(store: Store, run_id: str, task_id: str, response: dict, *, path: Pat
     attempt_id = digest([task_id, str(destination)])
     kind, payload = request["kind"], request["payload"]
     try:
+        from .workflow_driver import executor_blocked
+        if executor_blocked(request, response):
+            store.put(run_id, "workflow_attempts", attempt_id, {**attempt, "status": "EXTERNAL_BLOCKED", "error": response["reason"]})
+            old = store.get(run_id, "workflow_execution", task_id) or {}
+            store.put(run_id, "workflow_execution", task_id, {**old, "task_id": task_id, "kind": kind,
+                "attempts": old.get("attempts", 0), "status": "EXTERNAL_BLOCKED",
+                "blocked_code": "EXECUTOR_CONTEXT_LIMIT", "error": response["reason"]}, mutable=bool(old))
+            return {"task_id": task_id, "blocked": True, "reason": "EXECUTOR_CONTEXT_LIMIT"}
         if kind == "model":
             envelopes = response.get("results", [response])
             submit_model_results(store, run_id, envelopes, executor=cfg["executor"])
@@ -227,18 +341,50 @@ def submit(store: Store, run_id: str, task_id: str, response: dict, *, path: Pat
                     response.get(k) for k in ("query", "scope", "checked_at", "executed_by", "reason"))):
                 raise AuditError("Search needs actual execution, query, scope, time, actor and reason")
             packages = response.get("packages", [])
+            if kind in {"wiki_check", "search"}:
+                issues = validate_search_trace(payload["case"], response,
+                    max_rounds=payload.get("search_guidance", {}).get("max_rounds", 3),
+                    required="search_guidance" in payload)
+                if issues:
+                    raise AuditError("; ".join(issues))
             if outcome in {"FOUND", "CAPTURED"} and not packages:
                 raise AuditError("A captured result requires evidence packages")
-            if kind == "fetch" and (len(packages) != 1 or canonical_url(packages[0]["url"]) != canonical_url(payload["url"])):
+            if kind == "fetch" and (len(packages) != 1 or not same_resource(packages[0]["url"], payload["url"])):
                 raise AuditError("Fetch must return one package for the requested URL, including access failures")
+            for package in packages:
+                EvidencePackage.model_validate(package)
+                errors = capture_quality(package, require_observation=True)["errors"]
+                if errors:
+                    raise AuditError("; ".join(errors))
+            for child in response.get("linked_packages", []):
+                package = child.get("package", {})
+                EvidencePackage.model_validate(package)
+                navigation = child.get("navigation_quote", "")
+                child_cases = child.get("case_ids", [])
+                if (kind != "fetch" or not navigation or navigation not in packages[0].get("text", "")
+                        or not package.get("url") or package["url"] not in navigation
+                        or not child_cases or set(child_cases) - set(payload["case_ids"])):
+                    raise AuditError("Linked capture requires an exact parent navigation quote and applicable selected case IDs")
+                errors = capture_quality(package, require_observation=True)["errors"]
+                if errors:
+                    raise AuditError("; ".join(errors))
             snapshots = []
             for package in packages:
+                quality = capture_quality(package, require_observation=True)
+                if quality["errors"]:
+                    raise AuditError("; ".join(quality["errors"]))
                 if kind == "wiki_check" and resource_kind(snapshot=package) != "WIKI":
                     raise AuditError("Wiki check returned a non-Wiki resource")
                 package = {**package, "case_ids": payload["case_ids"]}
                 if kind != "fetch":
                     package.update(origin="SEARCH_DISCOVERED", record_discovery=True, discovery_query=response["query"])
                 snapshots.append(store.ingest_evidence(run_id, package, path.parent if path else None))
+            for child in response.get("linked_packages", []):
+                package = child.get("package", {})
+                child_cases = child.get("case_ids", [])
+                package = {**package, "case_ids": child_cases, "origin": "LINK_DISCOVERED", "record_discovery": True,
+                           "discovered_from_url": payload["url"], "discovery_query": "INDEX_NAVIGATION"}
+                store.ingest_evidence(run_id, package, path.parent if path else None)
             if kind == "wiki_check":
                 record_wiki_check(store, run_id, payload["case"]["case_id"], outcome=outcome,
                     query=response["query"], scope=response["scope"], checked_at=response["checked_at"],
@@ -249,10 +395,20 @@ def submit(store: Store, run_id: str, task_id: str, response: dict, *, path: Pat
         raise
     store.put(run_id, "workflow_attempts", attempt_id, {**attempt, "status": "ACCEPTED"})
     store.put(run_id, "workflow_results", task_id, {**attempt, "response": response}, mutable=bool(previous))
+    from .workflow_driver import _auth_required, auth_site
+    if _auth_required(response):
+        site = auth_site(request, response)
+        old = store.get(run_id, "workflow_auth", site)
+        if not old or old.get("status") != "WAITING_AUTH":
+            record = {"site": site, "status": "WAITING_AUTH", "task_id": task_id,
+                      "reason": response.get("reason", "Complete login in the existing Edge session")}
+            store.put(run_id, "workflow_auth", site, record, mutable=bool(old))
+            store.event(run_id, "workflow_auth_handoff", record)
     return {"task_id": task_id, "accepted": True}
 
 
 def export(store: Store, run_id: str) -> dict:
+    store = scoped_store(store, run_id)
     from .exporters import export_workbook_xlsx
     from .ranking_report import build_ranked_workbook
     cfg = config(store, run_id)
@@ -279,7 +435,7 @@ def export(store: Store, run_id: str) -> dict:
     for block_id in state.get("block_ids", []):
         block = store.get(run_id, "workflow_blocks", block_id)
         table = next(s for s in workbook["sheets"] if s["name"] == "异常与待处理")
-        values = {"类型": block["reason"], "说明": json.dumps(block["input_budget"], ensure_ascii=False),
+        values = {"类型": block["reason"], "说明": json.dumps(block.get("details", block.get("input_budget", {})), ensure_ascii=False),
                   "case_id": ";".join(block["case_ids"]), "需人工裁决": "否"}
         table["rows"].append([values.get(column, "") for column in table["columns"]])
     output = Path(cfg["directory"]) / "output"
@@ -297,28 +453,30 @@ def export(store: Store, run_id: str) -> dict:
     return result
 
 
-def drive(store: Store, run_id: str, command: list[str], *, max_rounds=32) -> dict:
-    from .agent_adapter import run_agent
-    for _ in range(max_rounds):
-        step = next_tasks(store, run_id)
-        if not step["tasks"]:
-            return export(store, run_id)
-        for task in step["tasks"]:
-            destination = Path(task["response"])
-            try:
-                body = json.loads(destination.read_text(encoding="utf-8-sig")) if destination.exists() else run_agent(
-                    command, Path(task["request"]), destination)
-            except AuditError as exc:
-                store.put(run_id, "workflow_attempts", digest(str(destination)), {"task_id": task["task_id"],
-                    "response": str(destination), "status": "AGENT_FAILED", "error": str(exc)})
-                raise
-            submit(store, run_id, task["task_id"], body, path=destination)
-    raise AuditError("Workflow round limit reached; state and task files retained for resume")
+def drive(store: Store, run_id: str, command: list[str], *, max_rounds=32, workers=2,
+          max_attempts=2, timeout=300, browser_timeout=None) -> dict:
+    from .workflow_driver import drive as run
+    return run(store, run_id, command, max_rounds=max_rounds, workers=workers,
+               max_attempts=max_attempts, timeout=timeout, browser_timeout=browser_timeout)
 
 
 def retry(store: Store, run_id: str, task_id: str) -> dict:
+    from .workflow_driver import reset_execution
     task = store.get(run_id, "workflow_requests", task_id)
+    execution = store.get(run_id, "workflow_execution", task_id) or {}
+    if task and task["kind"] in {"model", "catalog_draft"} and execution.get("blocked_code") == "EXECUTOR_CONTEXT_LIMIT":
+        reset_execution(store, run_id, task_id)
+        old = store.get(run_id, "workflow_execution", task_id)
+        store.put(run_id, "workflow_execution", task_id, {**old, "blocked_code": None}, mutable=True)
+        return {"task_id": task_id, "retry": True}
     if not task or task["kind"] not in {"fetch", "wiki_check", "search"}:
         raise AuditError("Retry applies to collection tasks; changed model decisions need fresh inputs")
     store.put(run_id, "workflow_results", task_id, {"task_id": task_id, "retry": True}, mutable=True)
+    reset_execution(store, run_id, task_id)
+    from .workflow_driver import _site
+    site = _site({"kind": task["kind"]}, task)
+    for auth in store.records(run_id, "workflow_auth"):
+        if auth.get("task_id") == task_id or site and auth.get("site") == site:
+            store.event(run_id, "workflow_auth_retry", auth)
+            store.put(run_id, "workflow_auth", auth["site"], {**auth, "status": "RETRY"}, mutable=True)
     return {"task_id": task_id, "retry": True}

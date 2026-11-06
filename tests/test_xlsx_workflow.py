@@ -59,7 +59,12 @@ class XlsxWorkflowTests(unittest.TestCase):
 
     def package(self, url):
         return {"url": url, "title": "Synthetic captured source", "text": "Synthetic observation; mechanism is unknown.",
-            "status": "CONTENT_CAPTURED", "components": {"body": "COMPLETE"}, "is_synthetic": True}
+            "status": "CONTENT_CAPTURED", "components": {"body": "COMPLETE"}, "is_synthetic": True,
+            "capture_observation": {"page_kind": "BODY", "requested_url": url, "final_url": url,
+                "title": "Synthetic captured source", "body_locator": "synthetic body",
+                "body_quotes": ["Synthetic observation; mechanism is unknown."],
+                "observed_by": "synthetic-test", "observed_at": "2026-11-06T10:00:00+08:00",
+                "tool_observation": "Synthetic test body, no website visited"}}
 
     def draft_response(self, request):
         context = request["payload"]
@@ -92,7 +97,12 @@ class XlsxWorkflowTests(unittest.TestCase):
         if task["kind"] in {"wiki_check", "search"}:
             return {"request_hash": request["request_hash"], "outcome": "NO_MATCH", "executed": True,
                 "query": "synthetic bounded query", "scope": "synthetic project only", "checked_at": "2026-11-06T10:00:00+08:00",
-                "executed_by": "synthetic-producer", "reason": "No match in the synthetic bounded corpus", "packages": []}
+                "executed_by": "synthetic-producer", "reason": "No match in the synthetic bounded corpus", "packages": [],
+                "search_facets": [{"kind": "symptom", "value": request["payload"]["case"]["description"],
+                    "source_field": "问题描述", "source_cell": request["payload"]["case"]["cell_locations"]["问题描述"],
+                    "source_quote": request["payload"]["case"]["description"], "hypothesis": False}],
+                "search_attempts": [{"round": 1, "query": "synthetic bounded query", "scope": "synthetic project only",
+                    "reason": "Synthetic search simulation", "executed": True, "checked_at": "2026-11-06T10:00:00+08:00"}]}
         if task["kind"] == "model":
             return bridge_fixtures.CodexBridgeTests.envelope(SimpleNamespace(run_id=self.run), request["payload"]["task"])
         if task["kind"] == "catalog_draft":
@@ -228,7 +238,7 @@ class XlsxWorkflowTests(unittest.TestCase):
     def test_driver_calls_configured_agent_adapter_and_finishes_without_extra_reports(self):
         self.start()
         calls = []
-        def fake_agent(command, request_path, destination):
+        def fake_agent(command, request_path, destination, **kwargs):
             request = json.loads(request_path.read_text(encoding="utf-8"))
             task = {"task_id": request["task_id"], "kind": request["kind"], "request": str(request_path)}
             response = self.response(task)
@@ -318,7 +328,7 @@ class XlsxWorkflowTests(unittest.TestCase):
         saved_path.write_text(json.dumps(self.response(pending), ensure_ascii=False), encoding="utf-8-sig")
         saved_bytes = saved_path.read_bytes()
         calls = []
-        def fake_agent(command, request_path, destination):
+        def fake_agent(command, request_path, destination, **kwargs):
             request = json.loads(request_path.read_text(encoding="utf-8"))
             self.assertNotEqual(request["task_id"], pending["task_id"], "Existing complete response must be resumed, not overwritten")
             task = {"task_id": request["task_id"], "kind": request["kind"], "request": str(request_path)}

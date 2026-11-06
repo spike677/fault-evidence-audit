@@ -54,6 +54,22 @@ RetrievalStatus = Literal[
 ]
 
 
+class PageObservation(Contract):
+    """Collector observations; page quality is not inferred from text length."""
+    page_kind: Literal[
+        "BODY", "INDEX", "TITLE_ONLY", "LOGIN", "FORBIDDEN", "RENDER_PENDING",
+        "EXTRACTION_FAILED", "UNRELATED",
+    ]
+    requested_url: str = Field(min_length=1)
+    final_url: str = Field(min_length=1)
+    title: str = ""
+    body_locator: str = ""
+    body_quotes: list[str] = Field(default_factory=list)
+    observed_by: str = Field(min_length=1)
+    observed_at: str = Field(min_length=1)
+    tool_observation: str = Field(min_length=1)
+
+
 class EvidencePackage(Contract):
     schema_version: Literal["1.0"] = "1.0"
     url: str
@@ -77,6 +93,7 @@ class EvidencePackage(Contract):
     record_discovery: bool = False
     discovery_query: str = ""
     discovered_from_url: str | None = None
+    capture_observation: PageObservation | None = None
 
 
 class EvidenceRef(Contract):

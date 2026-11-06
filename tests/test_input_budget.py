@@ -158,7 +158,8 @@ class BridgeBudgetTests(unittest.TestCase):
         self.assertEqual(task["input_budget"]["chars"], len(canonical_json(task)))
         self.assertEqual(task["input_budget"]["budget"], 48000)
         self.assertEqual(task["input_budget"]["scope"], "WHOLE_MODEL_TASK")
-        self.assertEqual(task["payload"]["snapshot"]["text"], self.snapshot["text"])
+        self.assertNotIn("text", task["payload"]["snapshot"])
+        self.assertEqual("".join(s["text"] for s in task["payload"]["snapshot"]["segments"]), self.snapshot["text"])
         self.assertIn("input_scope", task["payload"]["snapshot"])
 
     def test_98_item_catalog_is_preserved_and_missing_or_duplicate_sets_cannot_export(self):
@@ -269,7 +270,8 @@ class BridgeBudgetTests(unittest.TestCase):
             if not summary_tasks:
                 break
             self.assertEqual(summaries, [], "A final summary must not exist while a source group is missing")
-            self.assertEqual(len(summary_tasks), 1)
+            if not groups:
+                self.assertGreater(len(summary_tasks), 1, "Independent groups must all be available for isolated workers")
             task = summary_tasks[0]
             self.assertLessEqual(task["input_budget"]["chars"], task["input_budget"]["budget"])
             submit_model_results(self.store, self.run_id, [self.envelope(task)])

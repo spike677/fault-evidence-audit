@@ -7,8 +7,9 @@ from pathlib import Path
 from .contracts import EvidenceSummary, Judgment
 from .gates import event_anchor_errors, judgment_semantic_errors, processing_decision
 from .store import AuditError, Store, canonical_url, digest
+from .resource_identity import resource_key, resource_url, snapshot_index, same_resource
 
-RULE_VERSION = "nightly-0.1.8"
+RULE_VERSION = "nightly-0.1.11"
 
 
 def cited_refs(summary: dict):
@@ -126,11 +127,11 @@ def import_into(store: Store, run_id: str, result: dict, catalog: bool = False) 
 
 def associations(store: Store, run_id: str) -> tuple[list[tuple[dict, dict]], list[dict]]:
     cases = {c["case_id"]: c for c in store.records(run_id, "cases")}
-    by_url = {s["url"]: s for s in store.active_snapshots(run_id)}
+    by_url = snapshot_index(store.active_snapshots(run_id))
     pairs, missing, seen = [], [], set()
     for ref in store.records(run_id, "references"):
         try:
-            snapshot = by_url.get(canonical_url(ref["url"])) if ref.get("url") and ref.get("status") == "PARSED" else None
+            snapshot = by_url.get(resource_key(ref["url"])) if ref.get("url") and ref.get("status") == "PARSED" else None
         except AuditError:
             snapshot = None
         if not snapshot:
@@ -168,9 +169,9 @@ def planned_work(store: Store, run_id: str, plan: dict | None = None) -> tuple[l
     snapshots = {s["snapshot_id"]: s for s in store.active_snapshots(run_id)}
     work = [item for item in plan["work_items"] if item.get("snapshot_id") in snapshots]
     selected = {ref_id for item in plan["cases"] for ref_id in item["selected_ref_ids"]}
-    available = {s["url"] for s in snapshots.values() if s["status"] in {"COMPLETE", "PARTIAL", "CONTENT_CAPTURED"} and s["text"].strip()}
+    available = {resource_key(s["url"]) for s in snapshots.values() if s["status"] in {"COMPLETE", "PARTIAL", "CONTENT_CAPTURED"} and s["text"].strip()}
     missing = [r for r in store.records(run_id, "references") if r["ref_id"] in selected
-               and (r.get("status") != "PARSED" or not r.get("url") or canonical_url(r["url"]) not in available)]
+               and (r.get("status") != "PARSED" or not r.get("url") or resource_key(r["url"]) not in available)]
     return work, missing
 
 
@@ -238,7 +239,7 @@ def task_views(store: Store, run_id: str, plan: dict | None = None) -> list[dict
 
 
 def fetch_resource_id(url: str) -> str:
-    return "resource-" + digest(canonical_url(url))[:24]
+    return "resource-" + digest(resource_key(url))[:24]
 
 
 def necessary_judgments(store: Store, run_id: str, plan: dict | None = None, **filters) -> list[dict]:
@@ -252,7 +253,7 @@ def necessary_judgments(store: Store, run_id: str, plan: dict | None = None, **f
 def fetch_tasks(store: Store, run_id: str, *, include_unselected: bool = False) -> dict:
     plan = evidence_plan(store, run_id)
     selected = {rid for case in plan["cases"] for rid in case["selected_ref_ids"]}
-    by_url = {s["url"]: s for s in store.active_snapshots(run_id)}
+    by_url = snapshot_index(store.active_snapshots(run_id))
     grouped = {}
     malformed = []
     for ref in store.records(run_id, "references"):
@@ -262,11 +263,13 @@ def fetch_tasks(store: Store, run_id: str, *, include_unselected: bool = False) 
         if not include_unselected and ref["ref_id"] not in selected:
             continue
         try:
-            url = canonical_url(ref["url"])
+            url = resource_url(ref["url"])
         except AuditError:
             malformed.append(ref)
             continue
-        group = grouped.setdefault(url, {"url": url, "case_ids": [], "references": [], "retrieval_status": "NOT_FETCHED", "required": False})
+        group = grouped.setdefault(url, {"url": url, "case_ids": [], "references": [], "original_urls": [], "retrieval_status": "NOT_FETCHED", "required": False})
+        if ref["url"] not in group["original_urls"]:
+            group["original_urls"].append(ref["url"])
         group["required"] = group["required"] or ref["ref_id"] in selected
         if ref["case_id"] not in group["case_ids"]:
             group["case_ids"].append(ref["case_id"])
@@ -276,7 +279,11 @@ def fetch_tasks(store: Store, run_id: str, *, include_unselected: bool = False) 
             group["snapshot_id"] = by_url[url]["snapshot_id"]
     for group in grouped.values():
         if group["retrieval_status"] in {"COMPLETE", "PARTIAL", "CONTENT_CAPTURED"} and by_url[group["url"]]["text"].strip():
-            group["required"] = False
+            from .capture_quality import capture_quality
+            cfg = store.get(run_id, "xlsx_workflow", "config")
+            quality = capture_quality(by_url[group["url"]], require_observation=bool(cfg))
+            group["required"] = group["required"] and not quality["usable_body"]
+            group["capture_quality"] = quality
     return {"run_id": run_id, "fetch_tasks": list(grouped.values()) if include_unselected else [g for g in grouped.values() if g["required"]],
             "malformed_references": malformed, "evidence_plan": plan,
             "note": "Only required selected original links need collection. Do not search to fill fields or evidence types; use the evidence plan."}
@@ -284,7 +291,7 @@ def fetch_tasks(store: Store, run_id: str, *, include_unselected: bool = False) 
 
 def evidence_index(store: Store, run_id: str, url: str | None = None) -> dict:
     """Expose every citing case and its individual verdict without merging cases."""
-    target = canonical_url(url) if url else None
+    target = resource_key(url) if url else None
     cases = {case["case_id"]: case for case in store.records(run_id, "cases")}
     judgments = necessary_judgments(store, run_id)
     snapshots = store.records(run_id, "snapshots")
@@ -305,7 +312,7 @@ def evidence_index(store: Store, run_id: str, url: str | None = None) -> dict:
             })
         entries.append({**group, "shared_by_multiple_cases": len(associations) > 1,
                         "associations": associations,
-                        "snapshot_versions": [s["snapshot_id"] for s in snapshots if s["url"] == group["url"]]})
+                        "snapshot_versions": [s["snapshot_id"] for s in snapshots if same_resource(s["url"], group["url"])]})
     return {"run_id": run_id, "evidence_index": entries,
             "shared_evidence_count": sum(entry["shared_by_multiple_cases"] for entry in entries),
             "malformed_references": plan["malformed_references"],
@@ -364,8 +371,8 @@ def execute(store: Store, run_id: str, judge, *, mode: str, model_id: str, retry
     # Mark previously missing references resolved as soon as evidence is supplied.
     missing_ids = set(missing_resources)
     selected_ref_ids = {rid for row in plan["cases"] for rid in row["selected_ref_ids"]}
-    readable_urls = {s["url"] for s in store.active_snapshots(run_id) if s["status"] in {"COMPLETE", "PARTIAL", "CONTENT_CAPTURED"} and s["text"].strip()}
-    captured_refs = {fetch_resource_id(r["url"]) for r in store.records(run_id, "references") if r["ref_id"] in selected_ref_ids and r.get("status") == "PARSED" and r.get("url") and canonical_url(r["url"]) in readable_urls}
+    readable_urls = {resource_key(s["url"]) for s in store.active_snapshots(run_id) if s["status"] in {"COMPLETE", "PARTIAL", "CONTENT_CAPTURED"} and s["text"].strip()}
+    captured_refs = {fetch_resource_id(r["url"]) for r in store.records(run_id, "references") if r["ref_id"] in selected_ref_ids and r.get("status") == "PARSED" and r.get("url") and resource_key(r["url"]) in readable_urls}
     for task in store.tasks(run_id):
         if task["kind"] == "fetch" and task["target_id"] not in missing_ids and task["target_id"] in captured_refs:
             store.task_status(run_id, task["task_id"], "SUCCEEDED")
@@ -375,6 +382,11 @@ def execute(store: Store, run_id: str, judge, *, mode: str, model_id: str, retry
             continue
         if snapshot["status"] not in {"COMPLETE", "PARTIAL", "CONTENT_CAPTURED"} or not snapshot["text"].strip():
             store.task_status(run_id, task["task_id"], "BLOCKED", "Evidence body unavailable: " + snapshot["status"])
+            continue
+        from .capture_quality import capture_quality
+        quality = capture_quality(snapshot, require_observation=bool(store.get(run_id, "xlsx_workflow", "config")))
+        if not quality["usable_body"]:
+            store.task_status(run_id, task["task_id"], "BLOCKED", "PAGE_BODY_UNAVAILABLE: " + quality["status"])
             continue
         store.task_status(run_id, task["task_id"], "RUNNING")
         try:
@@ -391,11 +403,16 @@ def execute(store: Store, run_id: str, judge, *, mode: str, model_id: str, retry
                 current.append(segment)
             if current:
                 groups.append(current)
+            awaiting = []
             for group in groups:
                 view = {**snapshot, "segments": group, "text": "".join(s["text"] for s in group),
                         "input_scope": input_scope(snapshot, group, group=len(groups) > 1)}
                 judge.pipeline_task_id = task["task_id"]
-                response = EvidenceSummary.model_validate(judge.summarize(view)).model_dump()
+                try:
+                    response = EvidenceSummary.model_validate(judge.summarize(view)).model_dump()
+                except model.PendingModelResult as exc:
+                    awaiting.append(exc)
+                    continue
                 if response["snapshot_id"] != sid:
                     raise AuditError("Summary refers to a different snapshot")
                 problems = check_citations(list(cited_refs(response)), snapshot)
@@ -404,6 +421,8 @@ def execute(store: Store, run_id: str, judge, *, mode: str, model_id: str, retry
                 responses.append(response)
                 issues.extend(response["issues"])
                 unknown.extend(response["unknown_fields"])
+            if awaiting:
+                raise awaiting[0]
             actual_models = sorted({r["model_id"] for r in responses})
             if len(actual_models) != 1:
                 raise AuditError("Model identity changed between summary chunks")
@@ -595,15 +614,20 @@ def validate(store: Store, run_id: str) -> dict:
     errors, pending = [], []
     if not cases:
         errors.append("No imported cases")
-    exclusions = store.records(run_id, "exclusions")
+    # Reconcile the actual imported source before applying the selected view;
+    # a 232-row scope must not rewrite a larger document's original row counts.
+    integrity_store = getattr(store, "unscoped", store)
+    integrity_cases = integrity_store.records(run_id, "cases")
+    integrity_refs = integrity_store.records(run_id, "references")
+    exclusions = integrity_store.records(run_id, "exclusions")
     for document in store.records(run_id, "documents"):
         if "input_record_count" not in document:
             continue
         sha = document["source_sha256"]
-        document_cases = [c for c in cases if c["source_sha256"] == sha]
+        document_cases = [c for c in integrity_cases if c["source_sha256"] == sha]
         document_excluded = [e for e in exclusions if e.get("source_sha256") == sha]
         document_ids = {c["case_id"] for c in document_cases}
-        document_refs = [r for r in refs if r["case_id"] in document_ids and r["discovered_by"] == "importer"]
+        document_refs = [r for r in integrity_refs if r["case_id"] in document_ids and r["discovered_by"] == "importer"]
         if len(document_cases) != document["case_count"] or len(document_excluded) != document["excluded_count"] or (
             len(document_cases) + len(document_excluded) != document["input_record_count"]
         ):
