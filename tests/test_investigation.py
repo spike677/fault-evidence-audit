@@ -267,6 +267,42 @@ class InvestigationTests(unittest.TestCase):
         self.assertFalse(causes[0]["human_accepted"])
         self.assertEqual(causes[0]["observation_scope"], "CAPTURED_CONTENT")
 
+    def test_full_document_judgment_rechecks_its_recorded_complete_input(self):
+        case = self.source()[0]
+        snapshot = self.snapshot(status="COMPLETE")
+        _, judgment = self.finish(case, snapshot)
+        judgment.update(observation_scope="FULL_DOCUMENT", input_scope={
+            "scope": "FULL_CAPTURED_SNAPSHOT",
+            "provided_segment_ids": [segment["segment_id"] for segment in snapshot["segments"]]})
+        self.store.put(self.run, "judgments", judgment["judgment_id"], judgment, mutable=True)
+        result = investigation_plan(self.store, self.run)
+        self.assertEqual(result["work_items"][0]["excluded_results"], [])
+        self.assertEqual([cause["value"] for cause in result["cases"][0]["root_cause_candidates"]],
+                         ["buffer reused before completion"])
+
+    def test_selected_input_cannot_be_rechecked_as_a_full_document(self):
+        case = self.source()[0]
+        snapshot = self.snapshot(status="COMPLETE")
+        _, judgment = self.finish(case, snapshot)
+        judgment.update(observation_scope="FULL_DOCUMENT", input_scope={
+            "scope": "SELECTED_SEGMENTS",
+            "provided_segment_ids": [snapshot["segments"][0]["segment_id"]]})
+        self.store.put(self.run, "judgments", judgment["judgment_id"], judgment, mutable=True)
+        result = investigation_plan(self.store, self.run)
+        self.assertEqual(result["cases"][0]["root_cause_candidates"], [])
+        self.assertIn("FULL_DOCUMENT observations require", result["work_items"][0]["excluded_results"][0]["reason"])
+
+    def test_recheck_does_not_expand_missing_selected_segments_to_saved_text(self):
+        case = self.source()[0]
+        snapshot = self.snapshot(status="COMPLETE")
+        _, judgment = self.finish(case, snapshot)
+        judgment["input_scope"] = {"scope": "SELECTED_SEGMENTS", "provided_segment_ids": []}
+        self.store.put(self.run, "judgments", judgment["judgment_id"], judgment, mutable=True)
+        result = investigation_plan(self.store, self.run)
+        self.assertEqual(result["cases"][0]["root_cause_candidates"], [])
+        self.assertTrue(result["work_items"][0]["excluded_results"])
+        self.assertTrue(result["independent_technical_facts"])
+
     def test_reject_old_policy_and_changed_snapshot_cannot_supply_case_cause(self):
         case = self.source()[0]
         snap = self.snapshot()

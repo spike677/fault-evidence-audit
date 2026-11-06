@@ -165,7 +165,12 @@ def investigation_plan(store: Store, run_id: str) -> dict:
             try:
                 value = {key: judgment[key] for key in Judgment.model_fields if key in judgment}
                 context = work_context(store, run_id, work["work_id"], plan)
-                checked = gate_judgment(cases[work["representative_case_id"]], snapshot, value, context=context)
+                scope = judgment.get("input_scope", {})
+                selected = set(scope.get("provided_segment_ids", []))
+                segments = [segment for segment in snapshot["segments"] if segment["segment_id"] in selected]
+                view = {**snapshot, "input_scope": scope, "segments": segments,
+                        "text": "".join(segment["text"] for segment in segments)} if scope else snapshot
+                checked = gate_judgment(cases[work["representative_case_id"]], view, value, context=context)
             except (ValueError, KeyError) as exc:
                 excluded.append({"judgment_id": jid, "reason": "INVALID_JUDGMENT: " + str(exc)})
                 continue

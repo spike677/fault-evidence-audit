@@ -9,7 +9,7 @@ import re
 from collections import Counter
 
 from .catalog_drafts import COLUMNS
-from .exporters import (_flat, _involves_case, _needs_attention, _reference_audit_rows,
+from .exporters import (_fact_comparison_rows, _flat, _involves_case, _needs_attention, _reference_audit_rows,
                         _required, _review_status, _summary_rows, _table, _text)
 
 RANKING_BASIS = ("原表明确优先级（P0/P1/数字，小值优先）→整理处理组→来源文件/Sheet/Excel行/case_id。"
@@ -158,6 +158,30 @@ def build_ranked_workbook(data: dict, wiki_checks: dict | None = None,
             "Wiki查询范围": _wiki(checks, case_id).get("scope", "")})
     evidence_rows.sort(key=lambda row: (row.get("排名") or 10**9, str(row.get("引用编号") or ""), str(row.get("判断编号") or "")))
 
+    judgments_by_id = {j.get("judgment_id"): j for j in current["judgments"]}
+    fact_columns = ["排名", "原编号", "case_id", "关联case_id", "来源文件", "Sheet", "Excel行", "原文归属说明",
+                    "判断编号", "工作编号", "快照编号", "适用子问题", "对照类型", "原记录字段", "原记录单元格",
+                    "原记录引文", "原记录值", "原记录含义", "采集原文值", "采集原文含义", "正文精确引文",
+                    "判断", "理由", "处理状态", "审核状态"]
+    fact_rows = []
+    for fact in _fact_comparison_rows(current):
+        case_id = fact.get("source_case_id")
+        case, row = cases.get(case_id, {}), by_case.get(case_id, {})
+        fact_rows.append({"排名": row.get("排名"), "原编号": row.get("原编号", ""), "case_id": case_id,
+            "关联case_id": "；".join(fact.get("member_case_ids", [])),
+            "来源文件": case.get("source_file", ""), "Sheet": case.get("sheet", ""), "Excel行": case.get("row"),
+            "原文归属说明": fact.get("source_scope"), "判断编号": fact.get("judgment_id"),
+            "工作编号": fact.get("work_id"), "快照编号": fact.get("snapshot_id"),
+            "适用子问题": (fact.get("applicable_issue") or {}).get("label", ""),
+            "对照类型": fact.get("category"), "原记录字段": fact.get("source_field"),
+            "原记录单元格": fact.get("source_cell"), "原记录引文": fact.get("source_quote"),
+            "原记录值": fact.get("source_value"), "原记录含义": fact.get("source_meaning"),
+            "采集原文值": fact.get("evidence_value"), "采集原文含义": fact.get("evidence_meaning"),
+            "正文精确引文": _citations(fact.get("evidence", [])), "判断": fact.get("relation"),
+            "理由": fact.get("reason"), "处理状态": fact.get("processing_status"),
+            "审核状态": _review_status(judgments_by_id.get(fact.get("judgment_id"), {}))})
+    fact_rows.sort(key=lambda row: (row.get("排名") or 10**9, str(row.get("判断编号") or "")))
+
     proposal_rows = []
     for proposal in proposals:
         item = {"提案编号": proposal.get("proposal_id"), "修订": proposal.get("revision"),
@@ -217,6 +241,7 @@ def build_ranked_workbook(data: dict, wiki_checks: dict | None = None,
         "run": data.get("run", {}), "sheets": [
             _table("整体故障排名", ranked, list(ranked[0]) if ranked else ["排名", "原编号", "case_id", "来源文件", "Sheet", "Excel行", "问题描述原文"]),
             _table("来源与证据", evidence_rows),
+            _table("事实对照", fact_rows, fact_columns),
             _table("模式库建议", proposal_rows, list(proposal_rows[0]) if proposal_rows else ["提案编号", "关联原编号", "case_id", "建议动作", "模式名称", "状态"]),
             _table("异常与待处理", exceptions, list(dict.fromkeys(key for row in exceptions for key in row)) if exceptions else ["排名", "原编号", "case_id", "类型", "需人工裁决", "说明"]),
             _table("运行统计", stats, ["指标", "值", "口径"])]}

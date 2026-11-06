@@ -30,7 +30,7 @@ class RankingReportTests(unittest.TestCase):
         data = self.sample()
         before = copy.deepcopy(data)
         workbook = build_ranked_workbook(data)
-        self.assertEqual(len(workbook["sheets"]), 5)
+        self.assertEqual(len(workbook["sheets"]), 6)
         self.assertEqual(workbook["sheets"][0]["columns"][:3], ["排名", "原编号", "case_id"])
         self.assertIn("不代表已验证故障严重程度", RANKING_BASIS)
         rows = records(workbook, "整体故障排名")
@@ -94,6 +94,33 @@ class RankingReportTests(unittest.TestCase):
         self.assertFalse(any(row["case_id"] == "C1" for row in rows))
         self.assertEqual(next(row for row in records(workbook, "整体故障排名") if row["case_id"] == "C1")["需人工裁决"], "否")
 
+    def test_fact_comparisons_keep_source_meaning_and_only_current_necessary_judgments(self):
+        data = self.sample()
+        fact = {"category": "NUMBER", "source_field": "问题描述", "source_cell": "Cases!D2",
+                "source_quote": "logprob 0.404", "source_value": "0.404", "source_meaning": "logprob",
+                "evidence_value": "0.404", "evidence_meaning": "probability", "relation": "DIFFERENT",
+                "reason": "same digits with different meanings", "evidence": [{"segment_id": "S1:s1", "quote": "probability 0.404"}]}
+        judgment = {"judgment_id": "J1", "case_id": "C1", "member_case_ids": ["C1", "C2"],
+                    "snapshot_id": "S1", "work_id": "W1", "processing_status": "PENDING",
+                    "review_status": "NOT_REQUIRED", "fact_comparisons": [fact],
+                    "applicable_issue": {"label": "first subproblem"}}
+        data["judgments"] = [judgment, copy.deepcopy(judgment),
+            {**judgment, "judgment_id": "J-old", "is_stale": True},
+            {**judgment, "judgment_id": "J-unused", "required": False}]
+        before = copy.deepcopy(data)
+        rows = records(build_ranked_workbook(data), "事实对照")
+        self.assertEqual(len(rows), 1)
+        row = rows[0]
+        self.assertEqual((row["case_id"], row["关联case_id"], row["原编号"]), ("C1", "C1；C2", "WB-SYN-1"))
+        self.assertEqual((row["来源文件"], row["Sheet"], row["Excel行"], row["原记录单元格"]), ("A.xlsx", "Cases", 2, "Cases!D2"))
+        self.assertIn("属于source_case_id", row["原文归属说明"])
+        self.assertEqual((row["原记录引文"], row["原记录值"], row["原记录含义"]), ("logprob 0.404", "0.404", "logprob"))
+        self.assertEqual((row["采集原文值"], row["采集原文含义"], row["判断"]), ("0.404", "probability", "DIFFERENT"))
+        self.assertEqual(row["正文精确引文"], "S1:s1: probability 0.404")
+        self.assertEqual((row["判断编号"], row["工作编号"], row["快照编号"], row["适用子问题"]), ("J1", "W1", "S1", "first subproblem"))
+        self.assertEqual(row["审核状态"], "NOT_REQUIRED")
+        self.assertEqual(data, before)
+
     def test_wiki_blocking_and_no_match_are_visible_without_human_accept(self):
         workbook = build_ranked_workbook(self.sample(), {
             "C1": {"status": "BLOCKED", "reason": "login required", "query": "synthetic fault", "scope": "synthetic wiki space"},
@@ -137,8 +164,9 @@ class RankingReportTests(unittest.TestCase):
 
     def test_empty_input_has_named_tables_and_zero_cases(self):
         workbook = build_ranked_workbook({})
-        self.assertEqual(len(workbook["sheets"]), 5)
+        self.assertEqual(len(workbook["sheets"]), 6)
         self.assertEqual(records(workbook, "整体故障排名"), [])
+        self.assertEqual(records(workbook, "事实对照"), [])
         stats = {row["指标"]: row["值"] for row in records(workbook, "运行统计")}
         self.assertEqual(stats["故障记录数量"], 0)
 
