@@ -1,8 +1,35 @@
 # OpenChamber / OpenCode 接入与验收
 
-对应核心0.1.11，以下保留底层文件协议验收步骤。结构化XLSX的当前默认入口是README中的xlsx-workflow；Word/PPT、任意布局XLSX和时间范围收集为TODO。OpenChamber是现场前端，文件任务由它连接的OpenCode执行；OpenCode可完成采集与模型判断，无需Codex再代做一遍。本包只安装项目模板、发布文件任务、接收结果并运行本地门禁，不启动OpenChamber，也不包含OpenChamber/OpenCode服务客户端。
+对应核心0.1.12及本次补修，以下保留底层文件协议验收步骤。结构化XLSX的当前默认入口是README中的xlsx-workflow；Word/PPT、任意布局XLSX和时间范围收集为TODO。OpenChamber是现场前端，文件任务由它连接的OpenCode执行；OpenCode可完成采集与模型判断，无需Codex再代做一遍。本包只安装项目模板、发布文件任务、接收结果并运行本地门禁，不启动OpenChamber，也不包含OpenChamber/OpenCode服务客户端。
 
 以下步骤是执行手册，尚不代表真实OpenChamber 2.5.2、OpenCode 2.1.4/2.2.0、内网登录或DeepSeek已联调。`doctor`通过只证明本地依赖可用。
+
+## 2026-11-06：25+5 试验异机继续
+
+用户要求先提交当前代码和验证报告，本机试验已经停止。当前版本保持 0.1.12，以这次 Git 提交和策略指纹区分补修，不把版本号当作输入身份。停止点和未完成事项见 [VALIDATION](../VALIDATION.md)；公开仓库不含私有 SQLite、原库、内部链接或模型原始响应。
+
+私有交接包需另行拷贝到目标机器；仅克隆 GitHub 不能恢复这批历史。包中的 `checkpoint.json` 是停止点，旧 `manifest.json` 是准备阶段记录，不能用它的初始状态判断试验是否执行。包保留原始尝试、未提交文件和两个相关 run；不得自动把未提交文件接纳为结果，也不得把协调器的隐藏留出答案交给检索子 Agent。
+
+优先在 Windows 按原绝对路径恢复项目及 `work/pilot-25plus5-20261106`。采集快照和工作流目录包含绝对路径，当前没有通用路径迁移命令；路径不同或不能安全复用时，保留旧库为历史，建立明确关联的后续 run，重新导入资料并生成受影响的语义任务，不用批量替换已签名 JSON 或修改旧 hash。私有包包含原输入与触发定义的副本及 hash，原文件路径只是来源身份，不能为了恢复而改写出处。
+
+在项目根目录使用目标机器实际 Python，先执行完整回归。下面仅查看现有试验并生成当前合法任务，不自动启动真实搜索：
+
+```powershell
+$PythonExe = 'python' # 目标机器实际解释器，安装 requirements.txt
+$PilotRoot = Join-Path (Get-Location) 'work/pilot-25plus5-20261106'
+$PilotState = Join-Path $PilotRoot 'state'
+$PilotRun = 'run-20261106T111207Z-99fa76e5'
+$env:FAULTAUDIT_MAX_INPUT_CHARS = '48000'
+& $PythonExe -m unittest discover -s tests -v
+& $PythonExe run_faultaudit.py --state $PilotState trigger-workflow status --run $PilotRun
+& $PythonExe run_faultaudit.py --state $PilotState trigger-workflow next --run $PilotRun
+```
+
+`run-20261106T110521Z-6c3ec768` 只是保留的准备阶段 run，不是本次继续的目标。保存代码字节、预算及来源配置决定任务有效性；`.gitattributes` 要求 LF。目标机器指纹不一致时按正常失效机制重新生成请求，保留旧响应，不能强行恢复旧判断为当前。当前执行者仍为 `codex`；OpenChamber 可先代协调这个原 run 的文件任务，但结果 `producer.executor` 必须满足请求合同，不能把实际 OpenCode 改名为 Codex。需要原生 `opencode` 执行身份时另建关联后续 run，使用 `--executor opencode`，保留旧试验以便对账。
+
+续跑顺序：先核对那条说明与绑定不一致的抓取阻塞，再恢复有效任务；完成或明确阻塞 25 条 Init 后才可尝试维护试验基线，之后用保留的 5 条无链接输入走正式增量流程。试验基线始终不是正式 30 条基线，不能据此修改正式库。5 份留出预检可以作为线索，不可冒充已通过正式映射。Wiki 本轮显式 `NOT_SUPPORTED`，GitCode/GitHub 可用；恢复 Wiki 时通过 `set-sources` 显式改策略，重新生成旧策略依赖，不把未检索写为 `NO_MATCH`。站点登录失败保留阻塞，其他记录继续推进，不每十条请求继续授权。
+
+正文必须保留实际取得的原文；翻译、分析与猜测放在采集说明中。引文在快照里存在不等于网站原文真实，需核对采集观察与实际页面。公开报告的 632 项回归是本机证据，目标机仍需重跑同一命令并记录解释器、依赖、实际 provider/model 与工具权限。
 
 ## 0.1.11 默认：原生子 Agent 或真实 CLI 适配，整批持续推进
 

@@ -171,7 +171,10 @@ def build_workbook(data: dict) -> dict:
         {"指标": "覆盖范围", "值": COVERAGE_SCOPE},
         {"指标": "本地执行验证", "值": "未执行"},
         {"指标": "初始化基线", "值": (data.get("baseline") or {}).get("baseline_id", "未冻结")},
-        {"指标": "基线状态", "值": (data.get("baseline") or {}).get("status", "未冻结")}]
+        {"指标": "基线状态", "值": (data.get("baseline") or {}).get("status", "未冻结")},
+        {"指标": "基线库范围", "值": ((data.get("baseline") or {}).get("catalog_scope") or {}).get("scope", "未声明"),
+         "口径": "子集实验基线外候选不等于正式全库新增模式"},
+        {"指标": "基线采集来源", "值": "；".join(((data.get("baseline") or {}).get("collection_source_policy") or {}).get("collection_sources", []))}]
     return {"schema_version": "1.0", "kind": "TRIGGER_CLASSIFICATION", "run": {"run_id": data.get("run_id", "")},
         "sheets": [
             _table("模式初始化总览" if data.get("phase", "INIT") == "INIT" else "故障分类总览", overview,

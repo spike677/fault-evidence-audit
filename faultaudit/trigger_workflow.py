@@ -33,12 +33,13 @@ def _catalog(store, run_id):
 
 
 def start_init(store: Store, modes: Path, taxonomy: Path, work_root: Path, *,
-               executor="opencode", branch_source=None, user_branches=True) -> dict:
+               executor="opencode", branch_source=None, user_branches=True,
+               catalog_scope="ORIGINAL_MECHANISM_LIBRARY") -> dict:
     from .evidence_plan import register_search_policy
     from .pipeline import import_into
     if executor not in {"opencode", "codex"}:
         raise AuditError("Executor must be opencode or codex")
-    library = import_catalog(modes, scope="ORIGINAL_MECHANISM_LIBRARY")
+    library = import_catalog(modes, scope=catalog_scope)
     if not library["items"] or len({i["item_id"] for i in library["items"]}) != len(library["items"]):
         raise AuditError("Initialization requires a nonempty library with unique original mode IDs")
     frozen = load_taxonomy(taxonomy, branch_source,
@@ -101,17 +102,21 @@ def _model_taxonomy(frozen):
 
 
 def _linked_snapshots(store, run_id, case_id):
+    from .evidence_plan import collection_source_policy, resource_kind
+    policy = collection_source_policy(store, run_id)
     active = snapshot_index(store.active_snapshots(run_id))
     selected = {}
     for ref in store.records(run_id, "references"):
         if ref["case_id"] == case_id and ref.get("url"):
             snapshot = active.get(resource_key(ref["url"]))
-            if snapshot and not store.verify_snapshot(snapshot):
+            if (snapshot and not store.verify_snapshot(snapshot) and (not policy["explicit_override"]
+                    or resource_kind(snapshot=snapshot) in policy["collection_sources"])):
                 selected[snapshot["snapshot_id"]] = snapshot
     for relation in store.records(run_id, "evidence_associations"):
         if relation["case_id"] == case_id and relation.get("user_confirmed"):
             snapshot = store.get(run_id, "snapshots", relation.get("snapshot_id", ""))
-            if snapshot and snapshot["snapshot_id"] in {s["snapshot_id"] for s in active.values()}:
+            if (snapshot and snapshot["snapshot_id"] in {s["snapshot_id"] for s in active.values()}
+                    and (not policy["explicit_override"] or resource_kind(snapshot=snapshot) in policy["collection_sources"])):
                 selected[snapshot["snapshot_id"]] = snapshot
     return selected
 
@@ -156,6 +161,7 @@ def _issues(store, run_id, case_id):
 def _basis(store, run_id, subject, snapshot_id=None):
     """No plan calls: source routing calls this function, so it cannot recurse."""
     from .pipeline import current_summaries
+    from .evidence_plan import collection_source_policy
     cid = subject["case_id"]
     settings = _settings(store, run_id)
     snapshots = _linked_snapshots(store, run_id, cid)
@@ -168,7 +174,8 @@ def _basis(store, run_id, subject, snapshot_id=None):
             and (not snapshot_id or r.get("url") and resource_key(r["url"]) in resource_ids)], key=lambda r: r["ref_id"]),
         "snapshots": sorted(snapshots),
         "summaries": sorted([digest(s) for s in current_summaries(store, run_id) if s["snapshot_id"] in snapshots]),
-        "baseline": settings.get("baseline_id")}
+        "baseline": settings.get("baseline_id"),
+        "collection_policy": collection_source_policy(store, run_id)["policy_hash"]}
     if not snapshot_id:
         base["wiki_checks"] = sorted(digest(c) for c in store.records(run_id, "wiki_checks") if c["case_id"] == cid)
     if settings["phase"] == "INCREMENTAL":
@@ -273,6 +280,8 @@ def accept_assessment(store, run_id, request, response):
 def source_lookups(store, run_id):
     """Resolve only original identifiers, never manufacture an internal URL."""
     from .wiki_checks import wiki_plan
+    from .evidence_plan import collection_source_policy
+    policy = collection_source_policy(store, run_id)
     cases = {c["case_id"]: c for c in store.records(run_id, "cases")}
     for cid, case in cases.items():
         # Wiki work is generated first; an access gap must not stop other sources.
@@ -285,6 +294,9 @@ def source_lookups(store, run_id):
             for value in re.findall(r"\b(?:DTS\d{10,}|WIKI\d{10,})\b", ref["raw_text"], flags=re.I):
                 identifiers.setdefault(value.upper(), []).append(ref["ref_id"])
         for identifier, refs in identifiers.items():
+            kind = "WIKI" if identifier.startswith("WIKI") else "DTS"
+            if policy["explicit_override"] and kind not in policy["collection_sources"]:
+                continue
             key = digest([cid, identifier])
             if store.get(run_id, "trigger_source_lookups", key):
                 continue
@@ -314,6 +326,8 @@ def record_source_lookup(store, run_id, payload, response, snapshots):
 
 def _projection(store, run_id):
     from .wiki_checks import wiki_plan
+    from .evidence_plan import collection_source_policy, resource_kind
+    policy = collection_source_policy(store, run_id)
     cfg = _settings(store, run_id)
     assessments = current_assessments(store, run_id)
     subjects = [{**s, "source_case": store.get(run_id, "cases", s["case_id"])}
@@ -350,6 +364,10 @@ def _projection(store, run_id):
                 gaps.append({"case_id": cid, "kind": "SUMMARY_MISSING", "reason": snapshot["url"]})
         for ref in store.records(run_id, "references"):
             if ref["case_id"] != cid:
+                continue
+            if policy["explicit_override"] and resource_kind(ref, case=subject["source_case"]) not in policy["collection_sources"]:
+                gaps.append({"case_id": cid, "kind": "SOURCE_NOT_AVAILABLE_USER_POLICY",
+                    "reason": ref["raw_text"] + ": " + policy["reason"]})
                 continue
             if ref.get("url"):
                 if resource_key(ref["url"]) not in snapshot_index(list(_linked_snapshots(store, run_id, cid).values())):
@@ -408,13 +426,15 @@ def _index_identity(store, run_id):
 
 
 def finalize(store, run_id, *, allow_pending=False):
+    from .evidence_plan import collection_source_policy
     if _settings(store, run_id)["phase"] != "INIT":
         raise AuditError("Only an initialization run can maintain a baseline")
     data = _projection(store, run_id)
     missing = {s["subject_id"] for s in data["subjects"]} - {a["subject_id"] for a in data["assessments"]}
     if missing or any(g["kind"] in {"ISSUE_UNASSESSED", "TASK_PENDING"} for g in data["gaps"]):
         raise AuditError("Every original mode and current source issue needs an assessment; pending tasks cannot be finalized")
-    informational = {"TRIGGER_UNKNOWNS", "CAPTURE_PARTIAL", "CAPTURE_CONTENT_CAPTURED", "BASELINE_STALE"}
+    informational = {"TRIGGER_UNKNOWNS", "CAPTURE_PARTIAL", "CAPTURE_CONTENT_CAPTURED", "BASELINE_STALE",
+                     "WIKI_NOT_SUPPORTED", "SOURCE_NOT_AVAILABLE_USER_POLICY"}
     blocking = [g for g in data["gaps"] if g["kind"] not in informational]
     if blocking and not allow_pending:
         raise AuditError("Initialization has explicit gaps; finish them or finalize a provisional baseline with --allow-pending")
@@ -432,6 +452,8 @@ def finalize(store, run_id, *, allow_pending=False):
     baseline = {"baseline_id": "trigger-baseline-" + identity[:24], "run_id": run_id,
         "status": "READY_WITH_GAPS" if blocking else "READY", "index_hash": identity,
         "taxonomy_id": _settings(store, run_id)["taxonomy_id"], "mode_ids": [i["item_id"] for i in _catalog(store, run_id)],
+        "catalog_scope": store.get(run_id, "catalog_selections", "frozen"),
+        "collection_source_policy": collection_source_policy(store, run_id),
         "assessment_ids": [a["assessment_id"] for a in data["assessments"]], "coverage_details": details,
         "gaps": data["gaps"], "coverage_kind": "HISTORICAL_EVIDENCE", "execution_verified": False}
     store.put(run_id, "trigger_baselines", baseline["baseline_id"], baseline)
@@ -480,7 +502,13 @@ def start_incremental(store, source, baseline_run, work_root, *, executor="openc
         "selected_case_ids": selected, "scope_hash": digest(selected), "purpose": "TRIGGER_INCREMENTAL",
         "capture_quality_required": True, "max_search_rounds": 3, "capture_attempts_per_resource": 3}
     store.put(run_id, "xlsx_workflow", "config", cfg)
-    register_search_policy(store, run_id, {"required_sources": ["WIKI"]})
+    source_policy = baseline.get("collection_source_policy", {})
+    if source_policy.get("explicit_override"):
+        from .xlsx_workflow import configure_collection
+        configure_collection(store, run_id, source_policy["collection_sources"],
+            wiki_policy=source_policy["wiki_policy"], reason=source_policy["reason"])
+    else:
+        register_search_policy(store, run_id, {"required_sources": ["WIKI"]})
     frozen = _taxonomy(store, baseline_run)
     store.put(run_id, "trigger_taxonomies", frozen["taxonomy_id"], frozen)
     store.put(run_id, "trigger_baseline_refs", "baseline", baseline)

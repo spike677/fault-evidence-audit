@@ -51,6 +51,33 @@ def _trigger_source_relations(store: Store, run_id: str) -> dict:
     return source_relations(store, run_id)
 
 
+def collection_source_policy(store: Store, run_id: str) -> dict:
+    """Read an explicit run collection limit without changing provenance.
+
+    Absent configuration keeps the existing collector behavior, including
+    references whose resource kind still needs recovery. A configured limit is
+    an availability declaration, never a successful search or evidence check.
+    """
+    config = store.get(run_id, "xlsx_workflow", "config") or {}
+    configured = config.get("collection_sources")
+    wiki_policy = config.get("wiki_policy") or "REQUIRED"
+    if wiki_policy not in {"REQUIRED", "NOT_SUPPORTED"}:
+        raise AuditError("wiki_policy must be REQUIRED or NOT_SUPPORTED")
+    if configured is not None and (not isinstance(configured, list) or not configured or any(
+            not isinstance(source, str) or source not in SEARCH_SOURCES for source in configured)):
+        raise AuditError("collection_sources must contain supported source names")
+    explicit = configured is not None or wiki_policy == "NOT_SUPPORTED"
+    reason = config.get("collection_policy_reason") or ""
+    if explicit and (not isinstance(reason, str) or not reason.strip()):
+        raise AuditError("An explicit collection source policy requires collection_policy_reason")
+    enabled = sorted(set(configured) if configured is not None else SEARCH_SOURCES)
+    if wiki_policy == "NOT_SUPPORTED":
+        enabled = [source for source in enabled if source != "WIKI"]
+    identity = {"collection_sources": enabled, "wiki_policy": wiki_policy,
+                "reason": reason.strip() if isinstance(reason, str) else ""}
+    return {**identity, "explicit_override": explicit, "policy_hash": digest(identity)}
+
+
 def normalize_search_policy(policy: dict) -> dict:
     """Validate a complete, small search stopping policy, without coercion."""
     if not isinstance(policy, dict) or set(policy) - set(DEFAULT_SEARCH_POLICY):
@@ -324,6 +351,38 @@ def _search_rank(option: dict):
             (option["snapshot"] or {}).get("snapshot_id", ""))
 
 
+def _completed_navigation(options: list[dict], active: dict) -> dict:
+    """An observed search index yields to its own captured body descendants.
+
+    This only plans reading. It neither confirms the source's relevance nor
+    lets an unrelated new candidate hide an authentication failure.
+    """
+    from .capture_quality import capture_quality
+    discovered = [o for o in options if o["relation"] == "SEARCH_DISCOVERED" and not o["user_confirmed"]]
+    completed = {}
+    for index in discovered:
+        snapshot = index["snapshot"]
+        if not snapshot or capture_quality(snapshot)["status"] != "INDEX":
+            continue
+        root = _resource(snapshot.get("url"))
+        reached, bodies = {root}, []
+        while True:
+            before = len(reached)
+            for child in discovered:
+                ref = child["ref"] or {}
+                url = _resource(ref.get("url"))
+                parent = _resource(ref.get("parent_url"))
+                if url and url != root and parent in reached:
+                    reached.add(url)
+                    if _readable(child, active) and child not in bodies:
+                        bodies.append(child)
+            if len(reached) == before:
+                break
+        if bodies:
+            completed[root] = {"index": index, "bodies": bodies}
+    return completed
+
+
 def _goal(policy: dict, usable: list[dict], kind) -> dict:
     unique = {option["snapshot"]["snapshot_id"]: option for option in usable}
     sources = sorted({kind(option) for option in unique.values()} - {"UNKNOWN"})
@@ -363,7 +422,14 @@ def build_evidence_plan(store: Store, run_id: str, *, judgments: list[dict] | No
     group_by_case = {case_id: group for group in groups for case_id in group["case_ids"]}
     judgments = [judgment for judgment in judgments or [] if not judgment.get("is_stale", False)]
     domain_relations = _trigger_source_relations(store, run_id)
+    collection_policy = collection_source_policy(store, run_id)
+    enabled_sources = set(collection_policy["collection_sources"])
     candidates = {}
+    unavailable_by_case = {}
+
+    def allowed(option, case):
+        return not collection_policy["explicit_override"] or resource_kind(option["ref"], option["snapshot"],
+            cases.get((option["ref"] or {}).get("case_id"), case)) in enabled_sources
 
     def resource_url(association):
         snapshot = snapshots.get(association.get("snapshot_id"))
@@ -398,7 +464,16 @@ def build_evidence_plan(store: Store, run_id: str, *, judgments: list[dict] | No
                     "reason": "Snapshot origin is not upgraded by user confirmation", "trace": {"case_id": case_id}}
                 options.append(_candidate(actual_ref, actual_snapshot, provenance["relation"],
                     {"source": provenance, "association": association}, association))
-        candidates[case_id] = options
+        candidates[case_id] = [option for option in options if allowed(option, case)]
+        unavailable_by_case[case_id] = [{"case_id": case_id,
+            "ref_id": (option["ref"] or {}).get("ref_id"),
+            "snapshot_id": (option["snapshot"] or {}).get("snapshot_id"),
+            "url": (option["ref"] or option["snapshot"] or {}).get("url"),
+            "resource_kind": resource_kind(option["ref"], option["snapshot"], case),
+            "source_grade": option["relation"], "provenance": option["provenance"],
+            "status": "NOT_SUPPORTED", "reason": collection_policy["reason"],
+            "collection_policy_hash": collection_policy["policy_hash"]}
+            for option in options if not allowed(option, case)]
 
     # Only an explicitly confirmed group can borrow another member's supplied source.
     for case_id, options in candidates.items():
@@ -461,9 +536,12 @@ def build_evidence_plan(store: Store, run_id: str, *, judgments: list[dict] | No
     plans, work = [], {}
     for case_id, case in sorted(cases.items()):
         group = group_by_case.get(case_id)
-        case_judgments = [judgment for judgment in judgments if not judgment.get("work_id")
-                          or judgment["work_id"] in candidate_work_ids_by_case[case_id]]
+        case_judgments = [judgment for judgment in judgments if (not judgment.get("work_id")
+                          or judgment["work_id"] in candidate_work_ids_by_case[case_id])
+                          and (not collection_policy["explicit_override"] or resource_kind(
+                              snapshot=snapshots.get(judgment.get("snapshot_id")), case=case) in enabled_sources)]
         all_options = candidates[case_id]
+        navigation = _completed_navigation(all_options, active)
         domain_assessments = [{"snapshot_id": snapshot_id, "source_relation": relation}
             for (candidate_case_id, snapshot_id), relation in sorted(domain_relations.items())
             if candidate_case_id == case_id and snapshot_id in active]
@@ -496,12 +574,18 @@ def build_evidence_plan(store: Store, run_id: str, *, judgments: list[dict] | No
         conflicts = [judgment for judgment in case_judgments if _applies(judgment, case_id) and (_conflicting(judgment) or
             (judgment.get("review_status") != "REJECT" and judgment.get("snapshot_id") in supplied_snapshot_ids
              and (judgment.get("case_attribution") == "MISMATCH" or judgment.get("event_relation") == "DIFFERENT_EVENT")))]
-        search = [option for option in options if option["relation"] == "SEARCH_DISCOVERED" and not option["user_confirmed"]]
+        search = [option for option in options if option["relation"] == "SEARCH_DISCOVERED" and not option["user_confirmed"]
+                  and _resource((option["snapshot"] or option["ref"] or {}).get("url")) not in navigation]
         usable = [option for option in search if option["snapshot"] and (
             option["snapshot"]["snapshot_id"] in domain_usable and _readable(option, active)
             or _search_usable(case, option["snapshot"], case_judgments, cases))]
         unresolved = [option for option in options if option["relation"] == "PROVENANCE_PENDING" and not option["user_confirmed"]]
         selected, required, optional, issues = [], [], [], []
+        optional.extend({"action": "NAVIGATION_CAPTURED", "blocking": False,
+            "snapshot_id": value["index"]["snapshot"]["snapshot_id"],
+            "body_snapshot_ids": sorted({body["snapshot"]["snapshot_id"] for body in value["bodies"]}),
+            "reason": "Index retained as navigation; captured descendants remain unverified evidence candidates"}
+            for value in navigation.values())
         policy_info = get_search_policy(store, run_id, case_id)
         policy = policy_info["policy"]
         kind = lambda option: resource_kind(option["ref"], option["snapshot"],
@@ -563,14 +647,20 @@ def build_evidence_plan(store: Store, run_id: str, *, judgments: list[dict] | No
                 required.extend({"action": "RECOVER_RESOURCE_KIND", "actor": "AGENT", "ref_id": (option["ref"] or {}).get("ref_id"),
                                  "snapshot_id": (option["snapshot"] or {}).get("snapshot_id")} for option in unknown_sources)
             elif remaining:
-                candidate = sorted(remaining, key=_search_rank)[0]
+                def pending_rank(option):
+                    anchors = [_search_rank(value["index"]) for value in navigation.values() if option in value["bodies"]]
+                    return (min(anchors) if anchors else _search_rank(option), _search_rank(option))
+                candidate = sorted(remaining, key=pending_rank)[0]
                 selected.append(candidate)
                 control_status = "CAPTURE_GAP" if candidate["snapshot"] and candidate["snapshot"].get("status") in UNREADABLE else "CANDIDATE_PENDING"
                 path, stop_reason = "SEARCH_CANDIDATE", "EXISTING_CANDIDATE_NEEDS_FACT_COMPARISON"
             else:
+                targets = sorted(set(goal["missing_sources"]) | set(goal["missing_any_sources"]))
+                if collection_policy["explicit_override"]:
+                    targets = sorted((set(targets) or enabled_sources) & enabled_sources)
                 required.append({"action": "SEARCH_SUPPORT" if policy != DEFAULT_SEARCH_POLICY else "SEARCH", "actor": "AGENT",
                     "case_id": case_id, "description": case.get("description", ""), "policy_hash": policy_info["policy_hash"],
-                    "target_sources": sorted(set(goal["missing_sources"]) | set(goal["missing_any_sources"])),
+                    "target_sources": targets,
                     "min_additional_evidence": max(0, policy["min_usable_evidence"] - goal["usable_evidence_count"])})
         chosen_discoveries = [option for option in selected if option in search]
         search_control = {**policy_info, **goal, "search_allowed": control_status == "SEARCH_REQUIRED" and not conflicts,
@@ -639,6 +729,8 @@ def build_evidence_plan(store: Store, run_id: str, *, judgments: list[dict] | No
         routing = {"case_id": case_id, "group_id": group["group_id"] if group else None, "relation": relation,
             "source_grades": grades, "user_confirmed": confirmed, "selected_ref_ids": selected_ref_ids,
             "selected_snapshot_ids": selected_snapshot_ids, "issue_scopes": scopes, "search_policy_hash": policy_info["policy_hash"]}
+        if collection_policy["explicit_override"]:
+            routing["collection_policy_hash"] = collection_policy["policy_hash"]
         if domain_assessments:
             routing["domain_source_assessments"] = domain_assessments
         plan = {**routing, "external_id": case.get("external_id", ""), "source_file": case.get("source_file"),
@@ -655,6 +747,9 @@ def build_evidence_plan(store: Store, run_id: str, *, judgments: list[dict] | No
             "excluded_source_snapshot_ids": sorted(domain_excluded),
             "insufficient_source_snapshot_ids": sorted(domain_weak),
             "provenance": [option["provenance"] for option in selected], "work_ids": []}
+        if collection_policy["explicit_override"]:
+            plan["collection_source_policy"] = collection_policy
+            plan["unavailable_references"] = unavailable_by_case[case_id]
         for option in selected:
             if not _readable(option, active):
                 continue
@@ -705,8 +800,13 @@ def build_evidence_plan(store: Store, run_id: str, *, judgments: list[dict] | No
         item["original_urls"] = sorted(set(item["original_urls"]) | {url})
         citing = {plan["case_id"] for plan in plans if ref_id in plan["selected_ref_ids"]}
         item["case_ids"] = sorted(set(item["case_ids"]) | citing)
-    return {"schema_version": "1.0", "run_id": run_id, "policy_version": POLICY_VERSION,
+    result = {"schema_version": "1.0", "run_id": run_id, "policy_version": POLICY_VERSION,
         "plan_hash": digest({"policy_version": POLICY_VERSION, "routing": [plan["routing_hash"] for plan in plans]}),
         "cases": plans, "groups": group_plans, "ignored_empty_reference_ids": sorted(ignored_empty_refs),
         "work_items": sorted(work.values(), key=lambda item: item["work_id"]),
         "fetch_work_items": sorted(collection.values(), key=lambda item: item["url"])}
+    if collection_policy["explicit_override"]:
+        result["collection_source_policy"] = collection_policy
+        result["unavailable_references"] = [item for case_id in sorted(unavailable_by_case)
+                                            for item in unavailable_by_case[case_id]]
+    return result

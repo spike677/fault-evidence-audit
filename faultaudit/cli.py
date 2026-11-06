@@ -190,6 +190,7 @@ def parser() -> argparse.ArgumentParser:
     init = trigger_flow.add_parser("init")
     init.add_argument("--modes", type=Path, required=True)
     init.add_argument("--taxonomy", type=Path, required=True)
+    init.add_argument("--catalog-scope", default="ORIGINAL_MECHANISM_LIBRARY")
     init.add_argument("--branch-source", type=Path)
     init.add_argument("--user-branches", action="store_true", default=True,
                       help="Use the user's explicit Branch 2/3 definitions (default)")
@@ -202,8 +203,8 @@ def parser() -> argparse.ArgumentParser:
     for entry in (init, classify):
         entry.add_argument("--work-root", type=Path, default=Path("work/runs"))
         entry.add_argument("--executor", choices=["opencode", "codex"], default="opencode")
-    for commands, operations in ((flow, ("next", "submit", "drive", "export", "retry")),
-                                 (trigger_flow, ("next", "submit", "drive", "export", "retry", "status", "finalize"))):
+    for commands, operations in ((flow, ("next", "submit", "drive", "export", "retry", "set-sources")),
+                                 (trigger_flow, ("next", "submit", "drive", "export", "retry", "status", "finalize", "set-sources"))):
         for operation in operations:
             cmd = commands.add_parser(operation)
             cmd.add_argument("--run", default="latest")
@@ -213,6 +214,11 @@ def parser() -> argparse.ArgumentParser:
                 cmd.add_argument("--response", type=Path, required=True)
             if operation == "finalize":
                 cmd.add_argument("--allow-pending", action="store_true")
+            if operation == "set-sources":
+                cmd.add_argument("--source", action="append", required=True,
+                    choices=["WIKI", "DTS", "GITCODE", "GITHUB", "GITEE", "CODEHUB"])
+                cmd.add_argument("--wiki-policy", choices=["REQUIRED", "NOT_SUPPORTED"], required=True)
+                cmd.add_argument("--reason", required=True)
             if operation == "drive":
                 cmd.add_argument("--agent-command-file", type=Path, required=True, help="JSON argv with {request}/{response}")
                 cmd.add_argument("--max-rounds", type=int, default=32)
@@ -287,7 +293,8 @@ def main(argv: list[str] | None = None) -> int:
                 from . import trigger_workflow as trigger_workflow
             if operation == "init":
                 result = trigger_workflow.start_init(store, args.modes, args.taxonomy, args.work_root,
-                    executor=args.executor, branch_source=args.branch_source, user_branches=args.user_branches)
+                    executor=args.executor, branch_source=args.branch_source, user_branches=args.user_branches,
+                    catalog_scope=args.catalog_scope)
             elif operation == "classify":
                 result = trigger_workflow.start_incremental(store, args.input, args.baseline_run, args.work_root,
                     executor=args.executor, baseline_id=args.baseline_id, allow_pending_baseline=args.allow_pending_baseline)
@@ -305,6 +312,9 @@ def main(argv: list[str] | None = None) -> int:
                         json.loads(args.response.read_text(encoding="utf-8-sig")), path=args.response)
                 elif operation == "retry":
                     result = workflow.retry(store, selected_run, args.task_id)
+                elif operation == "set-sources":
+                    result = workflow.configure_collection(store, selected_run, args.source,
+                        wiki_policy=args.wiki_policy, reason=args.reason)
                 elif operation == "drive":
                     result = workflow.drive(store, selected_run,
                         json.loads(args.agent_command_file.read_text(encoding="utf-8-sig")), max_rounds=args.max_rounds,

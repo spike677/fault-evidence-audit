@@ -7,10 +7,10 @@ import re
 FACET_KINDS = {"model", "operator", "symptom", "trigger", "framework", "version", "root_claim", "identifier"}
 
 
-def search_guidance(case: dict, *, max_rounds: int = 3) -> dict:
+def search_guidance(case: dict, *, max_rounds: int = 3, collection_policy: dict | None = None) -> dict:
     if isinstance(max_rounds, bool) or not isinstance(max_rounds, int) or max_rounds < 1:
         raise ValueError("max_search_rounds must be a positive integer")
-    return {"max_rounds": max_rounds, "facet_kinds": sorted(FACET_KINDS),
+    value = {"max_rounds": max_rounds, "facet_kinds": sorted(FACET_KINDS),
         "source_cells": [{"field": field, "cell": case.get("cell_locations", {}).get(field, "")}
                          for field, value in case.get("raw", {}).items() if value],
         "instructions": (
@@ -28,6 +28,13 @@ def search_guidance(case: dict, *, max_rounds: int = 3) -> dict:
             "or expand merely to fill unknown fields. NO_MATCH is bounded by actual checked scope; "
             "login, rendering and extraction failures are BLOCKED, not an empty search result."
         )}
+    if collection_policy and collection_policy.get("wiki_policy") == "NOT_SUPPORTED":
+        value["instructions"] = value["instructions"].replace("Search Wiki first.",
+            "Wiki is NOT_SUPPORTED by explicit user selection; do not query it or claim it was checked. "
+            "Search only the enabled collection sources, GitCode first when enabled.")
+        value["collection_sources"] = collection_policy["collection_sources"]
+        value["wiki_policy"] = "NOT_SUPPORTED"
+    return value
 
 
 def validate_search_trace(case: dict, response: dict, *, max_rounds: int = 3, required: bool = False) -> list[str]:

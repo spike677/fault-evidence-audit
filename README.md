@@ -4,6 +4,8 @@
 
 版本 0.1.12，2026 年 11 月 6 日。核心负责导入故障表、保存原文与引用来源、规划必要证据、生成采集和模型任务、检查返回结果并生成复核报告。模型任务可由 OpenCode 或 Codex 会话执行，内网采集仍由具备授权与登录态的现场环境完成。支持文件交接及外部 Agent 命令适配，不包含直连模型或网站的网络客户端。
 
+本次 0.1.12 补修已提交显式采集来源配置及目录子页路由。25+5 真实资料试验按用户要求中途交接，尚未完成初始化或正式增量归类；停止点见[验证故障报告](reports/pilot-25plus5-20261106.xlsx)和[验收记录](VALIDATION.md)，异机续跑见[交接说明](integration/OPENCODE_HANDOFF.md)。公开仓库不包含私有运行状态，恢复历史还需另行转移私有检查点。
+
 ## 结构化 XLSX 全流程（本轮默认入口）
 
 `xlsx-workflow` 负责 Wiki 优先、采集与模型任务推进、模式归类和整体故障排名。默认交付一个 `故障整理及模式库建议.xlsx`，包含排名、来源与证据、事实对照、模式库建议、异常与待处理、运行统计。前三列固定“排名、原编号、case_id”，保留文件、Sheet、Excel 行、单元格和原始归因；事实对照保留两侧值与含义、原单元格和快照引文。排名是明确的整理优先级，不冒充故障严重程度。
@@ -107,6 +109,10 @@ $InitRunId = $Init.run_id
 ```
 
 `finalize` 要求每个原模式及每个当前资料子问题已有有效判断，未执行任务不能跳过。采集阻塞或来源机理仍不明确时，可显式加 `--allow-pending` 冻结 `READY_WITH_GAPS` 临时基线；普通触发谓词未知、可引用的部分正文不阻止维护基线，未知项逐条保留，不因此成为人工异常或技术否定结论。新增案例默认要求 `READY` 基线；若明确使用临时基线，`classify` 需指定 `--allow-pending-baseline`。输入、摘要、规则或基线依赖变化后，旧判断及旧基线保留为历史，不能继续充当当前有效结论。
+
+若用户明确说明本轮不支持 Wiki，可设置运行级来源可用性，不把未访问伪造为 `NO_MATCH`。例如 `trigger-workflow set-sources --run <id> --source GITCODE --source GITHUB --wiki-policy NOT_SUPPORTED --reason '用户明确本轮只能访问公开代码源'`。Wiki 显示 `NOT_SUPPORTED/checked=false`，原 Wiki/DTS 引用留档但不再派发采集或编号解析任务；GitCode 优先，GitHub 官方上游补充单列。旧请求因来源策略改变失效，历史不删除。默认流程仍然 Wiki 优先。来源设置随初始化基线传入后续批次。
+
+子集试验在 `init` 时显式给 `--catalog-scope PILOT_SUBSET_25_OF_30`，冻结并在报告中保留该范围。对 25 条实验基线的排除不代表对原始 30 条正式库的排除，不能据此正式新增模式。原始模式定义也不能被当作具体客户事件，搜索到同机理资料不等于找到了原事件。
 
 ```powershell
 $New = & $PythonExe run_faultaudit.py --state $TriggerState trigger-workflow classify `

@@ -8,7 +8,8 @@ from __future__ import annotations
 from datetime import datetime
 
 from .capture_quality import capture_quality
-from .evidence_plan import TABLE_GRADES, _search_usable, _trigger_source_relations, resource_kind, source_relation
+from .evidence_plan import (TABLE_GRADES, _search_usable, _trigger_source_relations,
+                            collection_source_policy, resource_kind, source_relation)
 from .resource_identity import resource_key, snapshot_index
 from .store import AuditError, Store, canonical_url, digest, now
 
@@ -36,8 +37,12 @@ def _inputs(store: Store, run_id: str, case: dict | str) -> tuple[dict, dict, li
     identity = {"rule_version": RULE_VERSION, "cases": cases, "supplied_references": supplied,
                 "groups": groups, "associations": associations,
                 "capture_quality_required": requires_body_observation(store, run_id)}
+    collection_policy = collection_source_policy(store, run_id)
+    if collection_policy["explicit_override"]:
+        identity["collection_policy_hash"] = collection_policy["policy_hash"]
     return source, {"input_hash": digest(identity), "cases": cases, "associations": associations,
-                    "domain_source_relations": _trigger_source_relations(store, run_id)}, refs, supplied
+                    "domain_source_relations": _trigger_source_relations(store, run_id),
+                    "collection_source_policy": collection_policy}, refs, supplied
 
 
 def _materials(store: Store, run_id: str, source: dict, context: dict, refs: list[dict], supplied: list[dict]) -> list[dict]:
@@ -108,7 +113,17 @@ def wiki_plan(store: Store, run_id: str, case: dict | str) -> dict:
     domain_assessments = [{"snapshot_id": item["snapshot"]["snapshot_id"], "source_relation": item["domain_source_relation"]}
         for item in materials if item["snapshot"] and item["domain_source_relation"]]
     actions = []
-    if usable:
+    collection_policy = context["collection_source_policy"]
+    unsupported = collection_policy["explicit_override"] and "WIKI" not in collection_policy["collection_sources"]
+    if unsupported:
+        status = "NOT_SUPPORTED"
+        reason = ("Explicit run collection policy: Wiki is unavailable; "
+                  f"wiki_policy={collection_policy['wiki_policy']}; "
+                  f"collection_sources={','.join(collection_policy['collection_sources'])}; "
+                  f"{collection_policy['reason']}")
+        latest = {}
+        pending = []
+    elif usable:
         status, reason = "FOUND", "Existing readable supplied/confirmed Wiki or currently verified discovery; no additional Wiki search"
     elif pending:
         repair = [item for item in pending if item["capture_readable"] and not item["readable"]
@@ -140,7 +155,7 @@ def wiki_plan(store: Store, run_id: str, case: dict | str) -> dict:
                      "snapshots": snapshots, "check_id": latest.get("check_id")}
     if domain_assessments:
         task_identity["domain_source_assessments"] = domain_assessments
-    return {"case_id": source["case_id"], "status": status, "checked": status in {"FOUND", "NO_MATCH"},
+    result = {"case_id": source["case_id"], "status": status, "checked": status in {"FOUND", "NO_MATCH"},
             "search_allowed": status == "SEARCH_REQUIRED", "input_hash": context["input_hash"],
             "task_id": "wiki-" + digest(task_identity)[:24],
             "required_actions": actions, "wiki_ref_ids": sorted({rid for item in materials for rid in item["ref_ids"]}),
@@ -154,6 +169,13 @@ def wiki_plan(store: Store, run_id: str, case: dict | str) -> dict:
                 "page_kind": item["capture_quality"]["status"], "needs_repair": item["capture_quality"]["needs_repair"],
                 "errors": item["capture_quality"]["errors"]} for item in pending if item["snapshot"] and not item["readable"]],
             "case_root_cause_confirmed": False}
+    if collection_policy["explicit_override"]:
+        result["collection_source_policy"] = collection_policy
+        result["unavailable_references"] = [{"ref_ids": item["ref_ids"], "url": item["url"],
+            "snapshot_id": item["snapshot"]["snapshot_id"] if item["snapshot"] else None,
+            "resource_kind": "WIKI", "status": "NOT_SUPPORTED", "reason": collection_policy["reason"]}
+            for item in materials] if unsupported else []
+    return result
 
 
 def record_wiki_check(store: Store, run_id: str, case_id: str, *, outcome: str,
@@ -161,6 +183,9 @@ def record_wiki_check(store: Store, run_id: str, case_id: str, *, outcome: str,
                       executed: bool = False, snapshot_id: str | None = None, reason: str = "") -> dict:
     """Append an idempotent search/read declaration; FOUND may remain pending."""
     source, context, refs, supplied = _inputs(store, run_id, case_id)
+    policy = context["collection_source_policy"]
+    if policy["explicit_override"] and "WIKI" not in policy["collection_sources"]:
+        raise AuditError("Wiki is NOT_SUPPORTED by the explicit run collection policy; no check was performed")
     if outcome not in {"FOUND", "NO_MATCH", "BLOCKED"}:
         raise AuditError("Wiki outcome must be FOUND, NO_MATCH or BLOCKED")
     materials = _materials(store, run_id, source, context, refs, supplied)

@@ -12,7 +12,7 @@ from urllib.parse import urlsplit
 
 from .bridge import CodexJudge, OpenCodeJudge, export_model_tasks, policy_fingerprint, submit_model_results
 from .catalog_drafts import prepare_draft, validate_draft
-from .evidence_plan import register_search_policy, resource_kind
+from .evidence_plan import register_search_policy, resource_kind, collection_source_policy
 from .importers import import_cases, import_catalog
 from .input_budget import InputTooLarge, finalize_model_task
 from .pipeline import evidence_plan, execute, fetch_tasks, import_into, report_data
@@ -98,6 +98,7 @@ def _json(path: Path, value: dict) -> None:
 def _request(store, run_id, cfg, kind, payload, instructions, priority) -> dict | None:
     try:
         request = finalize_model_task({"kind": kind, "run_id": run_id, "policy_hash": _policy(),
+            "collection_policy_hash": collection_source_policy(store, run_id)["policy_hash"],
             "instructions": instructions, "payload": payload,
             "execution_context": {"new_session_required": True, "history": "THIS_TASK_ONLY",
                 "role": "browser" if kind in {"fetch", "wiki_check", "search"} else "semantic",
@@ -133,11 +134,14 @@ def next_tasks(store: Store, run_id: str) -> dict:
     trigger_mode = cfg.get("purpose", "").startswith("TRIGGER_")
     cases = store.records(run_id, "cases")
     checks = {case["case_id"]: wiki_plan(store, run_id, case) for case in cases}
+    source_policy = collection_source_policy(store, run_id)
     # A bounded NO_MATCH fulfills checking, not finding. Release only this
     # workflow's temporary Wiki selection condition for the individual case.
     for cid, check in checks.items():
-        register_search_policy(store, run_id,
-            {} if check["status"] == "NO_MATCH" else {"required_sources": ["WIKI"]}, case_id=cid)
+        stopping = ({"required_any_sources": source_policy["collection_sources"]}
+                    if check["status"] == "NOT_SUPPORTED" else
+                    {} if check["status"] == "NO_MATCH" else {"required_sources": ["WIKI"]})
+        register_search_policy(store, run_id, stopping, case_id=cid)
     tasks, blocks = [], []
     def add(kind, payload, text, priority):
         value = _request(store, run_id, cfg, kind, payload, text, priority)
@@ -150,7 +154,7 @@ def next_tasks(store: Store, run_id: str) -> dict:
         if not done.get("retry"):
             continue
         old = store.get(run_id, "workflow_requests", done["task_id"])
-        if old and old["policy_hash"] == _policy():
+        if old and old["policy_hash"] == _policy() and old.get("collection_policy_hash") == source_policy["policy_hash"]:
             if set(old["payload"].get("case_ids", [])) - {c["case_id"] for c in cases}:
                 continue
             case = old["payload"].get("case")
@@ -163,7 +167,7 @@ def next_tasks(store: Store, run_id: str) -> dict:
     for case in cases:
         check = checks[case["case_id"]]
         if check["status"] == "SEARCH_REQUIRED":
-            guidance = search_guidance(case, max_rounds=cfg.get("max_search_rounds", 3))
+            guidance = search_guidance(case, max_rounds=cfg.get("max_search_rounds", 3), collection_policy=source_policy)
             add("wiki_check", {"case": case, "case_ids": [case["case_id"]], "wiki_input_hash": check["input_hash"],
                                "wiki_task_id": check["task_id"], "search_guidance": guidance,
                                **({"previous_domain_assessments": check.get("domain_source_assessments", [])} if trigger_mode else {})},
@@ -229,7 +233,7 @@ def next_tasks(store: Store, run_id: str) -> dict:
     if cfg.get("purpose") == "TRIGGER_INIT":
         from .trigger_workflow import source_lookups
         for lookup in source_lookups(store, run_id):
-            guidance = search_guidance(lookup["case"], max_rounds=cfg.get("max_search_rounds", 3))
+            guidance = search_guidance(lookup["case"], max_rounds=cfg.get("max_search_rounds", 3), collection_policy=source_policy)
             add("search", {**lookup, "search_guidance": guidance},
                 "Resolve this ORIGINAL supplied identifier using the actual Wiki/DTS search tools. "
                 "Do not construct or guess an internal URL. Capture the page for this exact identifier, "
@@ -238,19 +242,22 @@ def next_tasks(store: Store, run_id: str) -> dict:
                 "reason and search trace. " + guidance["instructions"] + " " + collection_observation_instructions(), 1)
     for row in plan["cases"]:
         check = checks[row["case_id"]]
-        if row["search_control"]["search_allowed"] and check["status"] in {"FOUND", "NO_MATCH"}:
+        if row["search_control"]["search_allowed"] and check["status"] in {"FOUND", "NO_MATCH", "NOT_SUPPORTED"}:
             case = next(c for c in cases if c["case_id"] == row["case_id"])
             prior_ids = set(row["excluded_candidate_judgment_ids"] + row["insufficient_candidate_judgment_ids"])
             prior = [{"judgment_id": j["judgment_id"],
                       "url": store.get(run_id, "snapshots", j["snapshot_id"])["url"], "reason": j["short_reason"]}
                      for j in store.records(run_id, "judgments") if j["judgment_id"] in prior_ids]
-            guidance = search_guidance(case, max_rounds=cfg.get("max_search_rounds", 3))
+            guidance = search_guidance(case, max_rounds=cfg.get("max_search_rounds", 3), collection_policy=source_policy)
             add("search", {"case": case, "case_ids": [case["case_id"]], "search_policy": row["search_control"]["policy"],
                 "search_guidance": guidance,
+                "collection_source_policy": source_policy,
                 **({"previous_domain_assessments": row.get("domain_source_assessments", [])} if trigger_mode else {}),
                 "excluded_candidate_judgment_ids": row["excluded_candidate_judgment_ids"],
                 "insufficient_candidate_judgment_ids": row["insufficient_candidate_judgment_ids"], "previous_candidates": prior},
-                "Search for evidence of this specific fault, GitHub then GitCode/Gitee/CodeHub/DTS as applicable. "
+                "Search for evidence of this specific fault within collection_source_policy.collection_sources. "
+                "When GitCode is explicitly selected, search GitCode first; any enabled GitHub fallback remains separately attributed. "
+                "Wiki NOT_SUPPORTED is an explicit user override, not a completed Wiki search or NO_MATCH. "
                 "Stop after one adequate candidate; do not fill all source types. Return {request_hash, "
                 "outcome: FOUND|NO_MATCH|BLOCKED, executed:true, query, scope, checked_at, executed_by, reason, "
                 "packages:[captured EvidencePackage]}. Keyword matches are not confirmed incidents. "
@@ -321,6 +328,8 @@ def submit(store: Store, run_id: str, task_id: str, response: dict, *, path: Pat
     request = store.get(run_id, "workflow_requests", task_id)
     if not request or request["policy_hash"] != _policy():
         raise AuditError("Workflow request is missing or its policy changed")
+    if request.get("collection_policy_hash") != collection_source_policy(store, run_id)["policy_hash"]:
+        raise AuditError("Collection source availability changed; request a fresh task and preserve the old response")
     previous = store.get(run_id, "workflow_results", task_id)
     if previous and not previous.get("retry"):
         if previous["response_hash"] == digest(response):
@@ -381,6 +390,8 @@ def submit(store: Store, run_id: str, task_id: str, response: dict, *, path: Pat
                 raise AuditError("Fetch must return one package for the requested URL, including access failures")
             for package in packages:
                 EvidencePackage.model_validate(package)
+                if (source_policy := collection_source_policy(store, run_id))["explicit_override"] and resource_kind(snapshot=package) not in source_policy["collection_sources"]:
+                    raise AuditError("Collected resource is outside the explicitly enabled sources")
                 errors = capture_quality(package, require_observation=True)["errors"]
                 if errors:
                     raise AuditError("; ".join(errors))
@@ -517,3 +528,24 @@ def retry(store: Store, run_id: str, task_id: str) -> dict:
             store.event(run_id, "workflow_auth_retry", auth)
             store.put(run_id, "workflow_auth", auth["site"], {**auth, "status": "RETRY"}, mutable=True)
     return {"task_id": task_id, "retry": True}
+
+
+def configure_collection(store: Store, run_id: str, sources: list[str], *, wiki_policy="NOT_SUPPORTED", reason: str) -> dict:
+    """Record an explicit user-selected availability scope without faking reads."""
+    from .evidence_plan import SEARCH_SOURCES
+    old = config(store, run_id)
+    if (not sources or len(sources) != len(set(sources)) or set(sources) - set(SEARCH_SOURCES)
+            or not reason.strip() or wiki_policy not in {"REQUIRED", "NOT_SUPPORTED"}
+            or wiki_policy == "NOT_SUPPORTED" and "WIKI" in sources
+            or wiki_policy == "REQUIRED" and "WIKI" not in sources):
+        raise AuditError("Select unique supported sources and an explicit consistent Wiki policy with a reason")
+    value = {**old, "collection_sources": sorted(sources), "wiki_policy": wiki_policy,
+             "collection_policy_reason": reason}
+    if old != value:
+        store.put(run_id, "xlsx_workflow", "config", value, mutable=True)
+        store.event(run_id, "collection_source_policy_changed", {"previous": old, "current": value})
+    policy = {"required_any_sources": sources}
+    register_search_policy(store, run_id, policy)
+    for case in store.records(run_id, "cases"):
+        register_search_policy(store, run_id, policy, case_id=case["case_id"])
+    return {"run_id": run_id, **collection_source_policy(store, run_id)}
