@@ -226,3 +226,92 @@ class CatalogItem(Contract):
     catalog_version: str = ""
     sheet: str = ""
     row: int | None = Field(default=None, ge=1)
+
+
+class CatalogDraftRow(Contract):
+    """The user's fifteen columns; evidence and proposal status live alongside."""
+    level1: Literal["芯片使能"]
+    level2: Literal["CANN"]
+    level3: Literal["计算算子", "通信算子", "图引擎"]
+    level4: Literal["算子计算", "算子接口", "数据切分", "图融合优化"]
+    pattern_name: str = Field(min_length=1)
+    root_cause: str = Field(min_length=1)
+    effect: str = Field(min_length=1)
+    scenario: str = Field(min_length=1)
+    precision_type: str = Field(min_length=1)
+    detection: str = Field(min_length=1)
+    mitigation: str = Field(min_length=1)
+    constructibility: str = Field(min_length=1)
+    injection_tool: str = Field(min_length=1)
+    injection_method: str = Field(min_length=1)
+    case_links: str = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def nonblank_cells(self) -> "CatalogDraftRow":
+        if any(not getattr(self, key).strip() for key in type(self).model_fields):
+            raise ValueError("draft cells must not be blank; use an explicit unknown")
+        return self
+
+
+class CatalogSourceCell(Contract):
+    case_id: str = Field(min_length=1)
+    field: str = Field(min_length=1)
+    cell: str = Field(min_length=1)
+    quote: str = Field(min_length=1)
+
+
+class CatalogFieldBasis(Contract):
+    kind: Literal["ABSTRACTION", "SOURCE_CELL", "CITED_FACT", "CODE_INFERENCE", "PROPOSED", "UNKNOWN"]
+    fact_ids: list[str] = Field(default_factory=list)
+    source_cells: list[CatalogSourceCell] = Field(default_factory=list)
+    note: str = Field(min_length=1)
+
+
+class CatalogCoverageComparison(Contract):
+    item_id: str = Field(min_length=1)
+    relation: Literal["SAME_PATTERN", "PARTIAL", "DIFFERENT", "UNKNOWN"]
+    reason: str = Field(min_length=1)
+
+
+class CatalogProposal(Contract):
+    proposal_id: str = Field(min_length=1)
+    revision: int = Field(ge=1, strict=True)
+    action: Literal["ADD", "REFINE", "APPEND_CASE", "NO_CHANGE"]
+    target_item_id: str | None = None
+    case_ids: list[str] = Field(min_length=1)
+    work_ids: list[str] = Field(default_factory=list)
+    evidence_scope: Literal["CASE_ROOT_CAUSE", "INDEPENDENT_TECHNICAL_PATTERN"]
+    implementation_owner: str = Field(min_length=1)
+    row: CatalogDraftRow
+    field_bases: dict[str, CatalogFieldBasis]
+    coverage_comparisons: list[CatalogCoverageComparison] = Field(min_length=1)
+    unknowns: list[str] = Field(default_factory=list)
+    conflicts: list[str] = Field(default_factory=list)
+    self_check: SelfCheck
+    injection_execution: Literal["NOT_EXECUTED"] = "NOT_EXECUTED"
+
+    @model_validator(mode="after")
+    def nonblank_identity(self) -> "CatalogProposal":
+        if not self.proposal_id.strip() or not self.implementation_owner.strip():
+            raise ValueError("proposal identity and implementation owner must not be blank")
+        if any(not item.reason.strip() for item in self.coverage_comparisons):
+            raise ValueError("every catalog comparison requires a nonblank reason")
+        return self
+
+
+class CatalogDraftProducer(Contract):
+    executor_version: str = Field(default="UNREPORTED", min_length=1)
+    provider: str = Field(default="UNREPORTED", min_length=1)
+    model: str = Field(default="UNREPORTED", min_length=1)
+    session_id: str = Field(default="UNREPORTED", min_length=1)
+
+
+class CatalogDraft(Contract):
+    """External Agent file response, never a human review or library update."""
+    schema_version: Literal["1.0"] = "1.0"
+    kind: Literal["CATALOG_DRAFT"] = "CATALOG_DRAFT"
+    request_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    executor: Literal["opencode", "codex", "manual"]
+    created_by: str = Field(min_length=1)
+    producer: CatalogDraftProducer
+    proposals: list[CatalogProposal] = Field(min_length=1)

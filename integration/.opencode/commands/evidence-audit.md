@@ -5,7 +5,8 @@ description: "通过OpenCode采集证据并执行模型任务，回传本地核�
 使用 fault-evidence-audit Skill 处理以下任务：$ARGUMENTS
 
 通过 Skill 的 scripts/run_audit.py 调用核心 CLI，使用现有 run ID 继续任务。
-核心版本0.1.8管理导入、快照、证据计划、文件任务协议、本地门禁及只读统计；本命令的模型provider/model与实际执行由OpenCode环境负责。
+核心版本0.1.9管理导入、快照、证据计划、文件任务协议、本地门禁及只读统计；本命令的模型provider/model与实际执行由OpenCode环境负责。
+模式库草案使用 catalog-draft prepare --run <id> --case-id <内部caseID> --expected-additions <数> --out <新目录>。完整读取request.json，按schema填写新response.json并如实声明producer；草案走catalog-draft validate/export，不能交给submit-model-results。只读状态、保留完整冻结库，旧表陈述不升级为已验证根因，不修改正式库或生成ACCEPT；操作说明见docs/catalog-draft.md。超限或读不全即阻塞，不删减任务。
 先以--state <state> evidence-plan --run <id> --out preview.json只读预览。整理全部已有原表/旧汇总引用及显式确认资料，不只选一份；已有可用内容就提事实并停止新增补链，不取消其他已有引用。未选搜索候选留档。
 逐条核验仓库Issue/PR和真实根因时，再以--state <state> investigation-plan --run <id> --out investigation.json导出只读调查计划。保留每条source_case及出处，按resources去重读取作者正文、相关讨论、适用关联Issue和必要修复Diff；按work_items的work_id和子问题处理。链接仅导航候选，不等于关联成立。independent_technical_facts是资料自身事实，root_cause_candidates只供当前工作候选；ROOT_CAUSE_UNCONFIRMED不可改成完成根因。仍由本环境执行采集和模型，使用原EvidencePackage和model-tasks/submit-model-results回传，不新增网站/模型客户端或人工ACCEPT。
 来源分级SOURCE_CELL_LINKED/LEGACY_TABLE_LINKED/SEARCH_DISCOVERED/PROVENANCE_PENDING与user_confirmed独立，旧表引用不升级为周报原链；来源待恢复由Agent先处理。同case/snapshot多issue按work_id分开，逐引用和逐子问题完整展示，不改任务work标识或跨issue复用结果。

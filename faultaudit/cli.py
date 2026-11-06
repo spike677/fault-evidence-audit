@@ -4,13 +4,8 @@ from __future__ import annotations
 import argparse
 import importlib.metadata
 import json
-import os
 import platform
-import subprocess
 import sys
-import uuid
-import zipfile
-import xml.etree.ElementTree as ET
 from pathlib import Path
 
 from . import __version__
@@ -163,6 +158,20 @@ def parser() -> argparse.ArgumentParser:
     investigation = sub.add_parser("investigation-plan", help="Read-only issue/PR investigation plan and cited current technical facts")
     investigation.add_argument("--run", default="latest")
     investigation.add_argument("--out", type=Path, required=True)
+    catalog_draft = sub.add_parser("catalog-draft", help="Read-only pattern proposals, validation and merge preview")
+    draft_commands = catalog_draft.add_subparsers(dest="draft_command", required=True)
+    for operation in ("prepare", "validate", "export"):
+        draft_cmd = draft_commands.add_parser(operation)
+        draft_cmd.add_argument("--run", default="latest")
+        draft_cmd.add_argument("--out", type=Path, required=operation != "validate")
+        if operation == "prepare":
+            draft_cmd.add_argument("--case-id", action="append", required=True, help="Exact internal case ID; repeat to select")
+            draft_cmd.add_argument("--expected-additions", type=int, required=True)
+        else:
+            draft_cmd.add_argument("--request", type=Path, required=True)
+            draft_cmd.add_argument("--draft", type=Path, required=True)
+        if operation == "export":
+            draft_cmd.add_argument("--xlsx", action="store_true")
     search_policy = sub.add_parser("set-search-policy", help="Set a run default or case search stopping requirement")
     search_policy.add_argument("--run", default="latest")
     search_policy.add_argument("--case-id")
@@ -212,17 +221,17 @@ def main(argv: list[str] | None = None) -> int:
             return 2 if result["status"] == "RECONCILIATION_FAILED" else 0
         # Keep doctor and --version available even when third-party dependencies
         # are absent, so a new environment can diagnose itself without a traceback.
-        from .contracts import EvidencePackage, EvidenceSummary, Judgment
+        from .contracts import CatalogDraft, EvidencePackage, EvidenceSummary, Judgment
         from .importers import import_cases, import_catalog
         from .pipeline import (check_catalog_import, evidence_index, execute, fetch_tasks,
                                import_into, report_data, validate)
         from .store import AuditError, Store
         if args.command == "schemas":
-            for cls in (EvidencePackage, EvidenceSummary, Judgment):
+            for cls in (EvidencePackage, EvidenceSummary, Judgment, CatalogDraft):
                 write_json(cls.model_json_schema(), args.out / f"{cls.__name__}.schema.json")
             write_json({"schemas": str(args.out.resolve())})
             return 0
-        store = Store(args.state, read_only=args.command in {"evidence-plan", "investigation-plan"})
+        store = Store(args.state, read_only=args.command in {"evidence-plan", "investigation-plan", "catalog-draft"})
         if args.command == "demo":
             write_json(demo(store, args.out.resolve()))
             return 0
@@ -247,6 +256,38 @@ def main(argv: list[str] | None = None) -> int:
                         "validation": validate(store, run_id)})
             return 0
         run_id = store.run_info(args.run)["run_id"]
+        if args.command == "catalog-draft":
+            from .catalog_drafts import prepare_draft, validate_draft, export_draft, write_new_json
+            if args.out and args.out.resolve().is_relative_to(store.root):
+                raise AuditError("Read-only catalog draft output must be outside the state directory")
+            if args.draft_command == "prepare":
+                result = prepare_draft(store, run_id, args.case_id, args.expected_additions)
+                args.out.mkdir(parents=True, exist_ok=False)
+                if result["status"] == "BLOCKED":
+                    write_new_json(args.out / "blocked.json", result)
+                    write_json({"status": "BLOCKED", "reason": result["reason"], "input_budget": result["input_budget"],
+                                "output": str(args.out.resolve()), "sqlite_read_only": True})
+                    return 2
+                write_new_json(args.out / "request.json", result["request"])
+                write_new_json(args.out / "response_template.json", result["response_template"])
+                write_json({"status": result["status"], "output": str(args.out.resolve()),
+                            "input_budget": result["request"]["input_budget"], "sqlite_read_only": True})
+                return 0
+            load = lambda path: json.loads(path.read_text(encoding="utf-8-sig"))
+            request, response = load(args.request), load(args.draft)
+            if args.draft_command == "validate":
+                result = validate_draft(store, run_id, request, response)
+                if args.out:
+                    write_new_json(args.out, result)
+                write_json(result)
+                return 2 if result["errors"] else 0
+            result = export_draft(store, run_id, request, response, args.out.resolve())
+            if args.xlsx and result["outputs"]:
+                from .exporters import export_workbook_xlsx
+                result["outputs"].update(export_workbook_xlsx(Path(result["outputs"]["workbook_data"]),
+                                                           args.out.resolve() / "catalog_draft.xlsx"))
+            write_json(result)
+            return 2 if result["validation"]["errors"] else 0
         if args.command == "investigation-plan":
             from .investigation import investigation_plan
             if args.out.resolve().is_relative_to(store.root):
@@ -334,33 +375,8 @@ def main(argv: list[str] | None = None) -> int:
             data = report_data(store, run_id, baseline=load(args.baseline), round_manifest=load(args.round_manifest))
             output = export_report(data, args.out.resolve())
             if args.xlsx:
-                node = os.getenv("FAULTAUDIT_NODE", "node")
-                script = Path(__file__).resolve().parents[1] / "scripts" / "export_xlsx.mjs"
-                target = args.out.resolve() / "audit.xlsx"
-                temporary = args.out.resolve() / f"audit-build-{uuid.uuid4().hex[:8]}.xlsx"
-                command = [node, str(script), "--input", str(output["workbook_data"]), "--output", str(temporary),
-                           "--preview-dir", str(args.out.resolve() / "xlsx_previews")]
-                if os.getenv("FAULTAUDIT_NODE_MODULES"):
-                    command.extend(["--modules", os.environ["FAULTAUDIT_NODE_MODULES"]])
-                process = subprocess.run(command,
-                                         capture_output=True, text=True, encoding="utf-8", errors="replace")
-                if not temporary.is_file():
-                    raise AuditError("Basic reports were saved; optional XLSX exporter failed: " + process.stderr[-2000:])
-                # Some bundled runtimes report 1 after a completed save. Check a
-                # fresh output's ZIP and workbook structure instead of trusting an
-                # old file or ignoring the runtime status.
-                with zipfile.ZipFile(temporary) as package:
-                    if package.testzip():
-                        raise AuditError("XLSX ZIP integrity check failed")
-                    workbook = ET.fromstring(package.read("xl/workbook.xml"))
-                    expected = len(json.loads(Path(output["workbook_data"]).read_text(encoding="utf-8"))["sheets"])
-                    ns = {"s": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
-                    if len(workbook.findall("s:sheets/s:sheet", ns)) != expected:
-                        raise AuditError("XLSX sheet count does not match report data")
-                temporary.replace(target)
-                output["xlsx"] = str(target)
-                if process.returncode:
-                    output["xlsx_runtime_warning"] = f"Runtime exited {process.returncode}; fresh saved ZIP and sheet count verified. Check previews before use."
+                from .exporters import export_workbook_xlsx
+                output.update(export_workbook_xlsx(Path(output["workbook_data"]), args.out.resolve() / "audit.xlsx"))
             write_json({"run_id": run_id, "outputs": output, "validation": validate(store, run_id),
                         "statistics_status": data["statistics"]["status"],
                         "round_statistics_status": data["statistics"]["round"]["status"]})

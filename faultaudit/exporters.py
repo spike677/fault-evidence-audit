@@ -514,6 +514,39 @@ def _statistics_rows(statistics: dict) -> list[dict]:
     return rows
 
 
+def export_workbook_xlsx(workbook_path: Path, target: Path) -> dict:
+    """Use the existing optional artifact-tool adapter and verify a fresh save."""
+    import os
+    import subprocess
+    import uuid
+    import zipfile
+    import xml.etree.ElementTree as ET
+
+    node = os.getenv("FAULTAUDIT_NODE", "node")
+    script = Path(__file__).resolve().parents[1] / "scripts" / "export_xlsx.mjs"
+    temporary = target.with_name(f"{target.stem}-build-{uuid.uuid4().hex[:8]}.xlsx")
+    command = [node, str(script), "--input", str(workbook_path), "--output", str(temporary),
+               "--preview-dir", str(target.parent / "xlsx_previews")]
+    if os.getenv("FAULTAUDIT_NODE_MODULES"):
+        command.extend(["--modules", os.environ["FAULTAUDIT_NODE_MODULES"]])
+    process = subprocess.run(command, capture_output=True, text=True, encoding="utf-8", errors="replace")
+    if not temporary.is_file():
+        raise ValueError("Basic reports were saved; optional XLSX exporter failed: " + process.stderr[-2000:])
+    with zipfile.ZipFile(temporary) as package:
+        if package.testzip():
+            raise ValueError("XLSX ZIP integrity check failed")
+        workbook = ET.fromstring(package.read("xl/workbook.xml"))
+        expected = len(json.loads(workbook_path.read_text(encoding="utf-8"))["sheets"])
+        ns = {"s": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
+        if len(workbook.findall("s:sheets/s:sheet", ns)) != expected:
+            raise ValueError("XLSX sheet count does not match report data")
+    temporary.replace(target)
+    result = {"xlsx": str(target)}
+    if process.returncode:
+        result["xlsx_runtime_warning"] = f"Runtime exited {process.returncode}; fresh saved ZIP and sheet count verified. Check previews before use."
+    return result
+
+
 def export_report(data: dict, output_dir: Path) -> dict:
     """Write JSON, HTML, all TSV tables and workbook_data without Node imports.
 
