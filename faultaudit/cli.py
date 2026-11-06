@@ -160,6 +160,9 @@ def parser() -> argparse.ArgumentParser:
     plan = sub.add_parser("evidence-plan", help="Read-only preview of selected evidence, search stops and necessary work")
     plan.add_argument("--run", default="latest")
     plan.add_argument("--out", type=Path)
+    investigation = sub.add_parser("investigation-plan", help="Read-only issue/PR investigation plan and cited current technical facts")
+    investigation.add_argument("--run", default="latest")
+    investigation.add_argument("--out", type=Path, required=True)
     search_policy = sub.add_parser("set-search-policy", help="Set a run default or case search stopping requirement")
     search_policy.add_argument("--run", default="latest")
     search_policy.add_argument("--case-id")
@@ -219,7 +222,7 @@ def main(argv: list[str] | None = None) -> int:
                 write_json(cls.model_json_schema(), args.out / f"{cls.__name__}.schema.json")
             write_json({"schemas": str(args.out.resolve())})
             return 0
-        store = Store(args.state, read_only=args.command == "evidence-plan")
+        store = Store(args.state, read_only=args.command in {"evidence-plan", "investigation-plan"})
         if args.command == "demo":
             write_json(demo(store, args.out.resolve()))
             return 0
@@ -244,6 +247,12 @@ def main(argv: list[str] | None = None) -> int:
                         "validation": validate(store, run_id)})
             return 0
         run_id = store.run_info(args.run)["run_id"]
+        if args.command == "investigation-plan":
+            from .investigation import investigation_plan
+            if args.out.resolve().is_relative_to(store.root):
+                raise AuditError("Read-only investigation output must be outside the state directory")
+            write_json(investigation_plan(store, run_id), args.out)
+            return 0
         if args.command == "evidence-plan":
             from .pipeline import evidence_plan
             write_json(evidence_plan(store, run_id), args.out)

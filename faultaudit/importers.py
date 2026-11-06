@@ -25,7 +25,7 @@ _ALIASES = {
     "trigger": ("trigger", "触发条件", "触发", "适用条件", "条件"),
 }
 _REFERENCE_HEADERS = ("wiki", "dts", "pr", "github", "gitcode", "codehub", "链接", "url", "commit")
-_EMPTY_LINKS = {"", "无", "暂无", "无链接", "未提供", "-", "—", "/", "n/a", "none", "null"}
+_EMPTY_LINKS = {"", "无", "暂无", "无链接", "未提供", "-", "—", "/", "n/a", "none", "null", "无（待补）", "无(待补)"}
 _URL_RE = re.compile(r"https?://[^\s<>\[\]\"'()\\，；。]*", re.IGNORECASE)
 
 
@@ -37,6 +37,11 @@ def _text(value: Any) -> str:
     if isinstance(value, (dict, list)):
         return json.dumps(value, ensure_ascii=False, sort_keys=True)
     return str(value)
+
+
+def is_empty_link_value(value: Any) -> bool:
+    """Recognize only a whole-field empty-link placeholder, never a substring."""
+    return _text(value).strip().casefold() in _EMPTY_LINKS
 
 
 def _pick(raw: dict[str, str], field: str) -> str:
@@ -217,7 +222,7 @@ def _references(case: dict[str, Any], locations: dict[str, str], targets: dict[s
                           or bool(re.search(r"(^|[\s_/#（(])prs?($|[\s_/#）)])", reference_key))
                           or (reference_key.startswith("pr") and any("\u4e00" <= char <= "\u9fff" for char in reference_key))
                           or raw.lstrip().upper().startswith("=HYPERLINK("))
-        if not urls and (not looks_like_ref or raw.strip().casefold() in _EMPTY_LINKS):
+        if not urls and (not looks_like_ref or is_empty_link_value(raw)):
             continue
         location = f"{case['sheet']}!{locations.get(key, key)} (row {case['row']})"
         for index, candidate in enumerate(urls or [None], start=1):

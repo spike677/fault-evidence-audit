@@ -95,6 +95,16 @@ $AuditRunId
 
 ### 2. 先预览证据计划，再采集必要原文
 
+需要逐条核验 Issue、PR 与根因时，可额外导出只读调查计划：
+
+```powershell
+& $PythonExe run_faultaudit.py --state $AuditState investigation-plan --run $AuditRunId --out work/investigation_plan.json
+```
+
+计划包含每条原记录、出处、按 URL 去重的资料、现有 `work_id` 与适用子问题。OpenChamber/OpenCode 或 Codex 先读取已有正文、相关讨论、明确关联的 Issue 和必要修复 Diff，再用现有证据包、独立摘要和模型文件协议回传。搜索许可继续按 `search_control.search_allowed` 执行。
+
+资料自身的技术事实与当前故障根因候选分别输出；标题、链接、历史归因和另一事件的根因均不能直接填入当前记录。缺依据时明确保留 `ROOT_CAUSE_UNCONFIRMED`。命令不联网、不执行模型、不新增人工 ACCEPT。详细字段和接续步骤见 [调查计划说明](docs/investigation-plan.md)。
+
 现场升级后先运行只读预览，不提交资料或结果：
 
 ```powershell

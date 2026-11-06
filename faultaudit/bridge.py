@@ -5,7 +5,7 @@ metadata is an executor's audit declaration, not proof of provider routing.
 """
 from __future__ import annotations
 
-from . import contracts, gates, model, prompts, input_budget, evidence_plan
+from . import contracts, gates, model, prompts, input_budget, evidence_plan, importers
 from . import store as store_module
 from .contracts import EvidenceSummary
 from .model import PendingModelResult, validate_task_result
@@ -26,7 +26,7 @@ def _executor(value: str) -> str:
 def policy_fingerprint() -> str:
     from .pipeline import RULE_VERSION
     source_hash = digest(b"".join(Path(module.__file__).read_bytes() for module in
-                                  (contracts, gates, model, prompts, store_module, input_budget, evidence_plan))
+                                  (contracts, gates, model, prompts, store_module, input_budget, evidence_plan, importers))
                          + Path(__file__).read_bytes() + Path(__file__).with_name("pipeline.py").read_bytes())
     return digest({"source_hash": source_hash, "input_budget_policy": input_budget.budget_policy(),
                    "prompt_version": prompts.PROMPT_VERSION, "rule_version": RULE_VERSION})

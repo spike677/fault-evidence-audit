@@ -8,6 +8,7 @@ from __future__ import annotations
 import re
 from urllib.parse import urlsplit
 
+from .importers import is_empty_link_value
 from .store import AuditError, Store, canonical_url, digest, now
 
 POLICY_VERSION = "evidence-first-0.1.8"
@@ -325,11 +326,15 @@ def build_evidence_plan(store: Store, run_id: str, *, judgments: list[dict] | No
     The planner is read-only; origin recovery and all collection run externally.
     """
     cases = {case["case_id"]: case for case in store.records(run_id, "cases")}
-    refs = {ref["ref_id"]: ref for ref in store.records(run_id, "references")}
+    all_refs = store.records(run_id, "references")
+    ignored_empty_refs = {ref["ref_id"] for ref in all_refs
+                          if not ref.get("url") and is_empty_link_value(ref.get("raw_text", ""))}
+    refs = {ref["ref_id"]: ref for ref in all_refs if ref["ref_id"] not in ignored_empty_refs}
     snapshots = {snapshot["snapshot_id"]: snapshot for snapshot in store.records(run_id, "snapshots")}
     active = {snapshot["snapshot_id"]: snapshot for snapshot in store.active_snapshots(run_id)}
     by_url = {_url(snapshot["url"]): snapshot for snapshot in active.values()}
-    associations = [record for record in store.records(run_id, "evidence_associations") if record.get("user_confirmed") is True]
+    associations = [record for record in store.records(run_id, "evidence_associations") if record.get("user_confirmed") is True
+                    and (record.get("ref_id") not in ignored_empty_refs or record.get("snapshot_id"))]
     groups = [group for group in store.records(run_id, "event_groups") if group.get("user_confirmed") is True]
     group_by_case = {case_id: group for group in groups for case_id in group["case_ids"]}
     judgments = [judgment for judgment in judgments or [] if not judgment.get("is_stale", False)]
@@ -650,5 +655,6 @@ def build_evidence_plan(store: Store, run_id: str, *, judgments: list[dict] | No
         item["case_ids"] = sorted(set(item["case_ids"]) | citing)
     return {"schema_version": "1.0", "run_id": run_id, "policy_version": POLICY_VERSION,
         "plan_hash": digest({"policy_version": POLICY_VERSION, "routing": [plan["routing_hash"] for plan in plans]}),
-        "cases": plans, "groups": group_plans, "work_items": sorted(work.values(), key=lambda item: item["work_id"]),
+        "cases": plans, "groups": group_plans, "ignored_empty_reference_ids": sorted(ignored_empty_refs),
+        "work_items": sorted(work.values(), key=lambda item: item["work_id"]),
         "fetch_work_items": sorted(collection.values(), key=lambda item: item["url"])}

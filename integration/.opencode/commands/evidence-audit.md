@@ -7,6 +7,7 @@ description: "通过OpenCode采集证据并执行模型任务，回传本地核�
 通过 Skill 的 scripts/run_audit.py 调用核心 CLI，使用现有 run ID 继续任务。
 核心版本0.1.8管理导入、快照、证据计划、文件任务协议、本地门禁及只读统计；本命令的模型provider/model与实际执行由OpenCode环境负责。
 先以--state <state> evidence-plan --run <id> --out preview.json只读预览。整理全部已有原表/旧汇总引用及显式确认资料，不只选一份；已有可用内容就提事实并停止新增补链，不取消其他已有引用。未选搜索候选留档。
+逐条核验仓库Issue/PR和真实根因时，再以--state <state> investigation-plan --run <id> --out investigation.json导出只读调查计划。保留每条source_case及出处，按resources去重读取作者正文、相关讨论、适用关联Issue和必要修复Diff；按work_items的work_id和子问题处理。链接仅导航候选，不等于关联成立。independent_technical_facts是资料自身事实，root_cause_candidates只供当前工作候选；ROOT_CAUSE_UNCONFIRMED不可改成完成根因。仍由本环境执行采集和模型，使用原EvidencePackage和model-tasks/submit-model-results回传，不新增网站/模型客户端或人工ACCEPT。
 来源分级SOURCE_CELL_LINKED/LEGACY_TABLE_LINKED/SEARCH_DISCOVERED/PROVENANCE_PENDING与user_confirmed独立，旧表引用不升级为周报原链；来源待恢复由Agent先处理。同case/snapshot多issue按work_id分开，逐引用和逐子问题完整展示，不改任务work标识或跨issue复用结果。
 默认min_usable_evidence=1，无强制来源；无适用证据时按SEARCH执行，已有Wiki/GitCode/GitHub/CodeHub或DTS任一可用资料停止新增搜索，无DTS自动补证。未读/失败先处理。已有资料后，仅额外显式required_sources(AND)/required_any_sources(OR)/数量条件未满足且search_control允许时定向补搜，一满足就停，不凑类型。每次搜索前重读计划，取得候选后先摘要核验再决定下一次；可读URL或泛关键词相同不算满足。search_control.satisfied不代表根因确认或库覆盖，不伪造user_confirmed。
 OpenChamber实际连接的OpenCode可执行全部文件任务替代Codex；本包不启动Chamber或直连服务。doctor只检查本地依赖，不证明网站登录/DeepSeek联调；接入与合成验收命令见核心integration/OPENCODE_HANDOFF.md。

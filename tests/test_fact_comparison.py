@@ -319,7 +319,7 @@ class FactComparisonTests(unittest.TestCase):
     def test_prompt_contains_bounded_facts_and_source_context(self):
         case, snap, value = fixture()
         messages = comparison_messages(case, snap, {}, context={"source_relation": "SOURCE_LINKED"})
-        self.assertEqual(PROMPT_VERSION, "faultaudit-1.7")
+        self.assertEqual(PROMPT_VERSION, "faultaudit-1.8")
         self.assertIn("source_cell", messages[0]["content"])
         self.assertIn("self_check", messages[0]["content"])
         self.assertIn("SOURCE_LINKED", messages[1]["content"])
