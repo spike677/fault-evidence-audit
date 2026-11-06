@@ -8,7 +8,7 @@ from __future__ import annotations
 from datetime import datetime
 
 from .capture_quality import capture_quality
-from .evidence_plan import TABLE_GRADES, _search_usable, resource_kind, source_relation
+from .evidence_plan import TABLE_GRADES, _search_usable, _trigger_source_relations, resource_kind, source_relation
 from .resource_identity import resource_key, snapshot_index
 from .store import AuditError, Store, canonical_url, digest, now
 
@@ -36,7 +36,8 @@ def _inputs(store: Store, run_id: str, case: dict | str) -> tuple[dict, dict, li
     identity = {"rule_version": RULE_VERSION, "cases": cases, "supplied_references": supplied,
                 "groups": groups, "associations": associations,
                 "capture_quality_required": requires_body_observation(store, run_id)}
-    return source, {"input_hash": digest(identity), "cases": cases, "associations": associations}, refs, supplied
+    return source, {"input_hash": digest(identity), "cases": cases, "associations": associations,
+                    "domain_source_relations": _trigger_source_relations(store, run_id)}, refs, supplied
 
 
 def _materials(store: Store, run_id: str, source: dict, context: dict, refs: list[dict], supplied: list[dict]) -> list[dict]:
@@ -46,6 +47,7 @@ def _materials(store: Store, run_id: str, source: dict, context: dict, refs: lis
     by_url = snapshot_index(list(active.values()))
     original_ids = {ref["ref_id"] for ref in supplied}
     associations = context["associations"]
+    domain_relations = context["domain_source_relations"]
     judgments = current_judgments(store, run_id)
     all_cases = {case["case_id"]: case for case in store.records(run_id, "cases")}
     materials = {}
@@ -75,14 +77,22 @@ def _materials(store: Store, run_id: str, source: dict, context: dict, refs: lis
         quality = capture_quality(snapshot, require_observation=requires_body_observation(store, run_id)) if snapshot else None
         item["capture_quality"] = quality
         item["readable"] = bool(item["capture_readable"] and quality["usable_body"])
+        item["domain_source_relation"] = None
+        item["assessment_complete"] = False
         if snapshot:
             relevant = [j for j in judgments if j["snapshot_id"] == snapshot["snapshot_id"]
                         and source["case_id"] in j.get("member_case_ids", [j["case_id"]])
                         and j.get("review_status") != "REJECT"]
             item["excluded"] = any(j.get("case_attribution") == "MISMATCH" or j.get("event_relation") == "DIFFERENT_EVENT"
                                    for j in relevant)
+            domain_relation = domain_relations.get((source["case_id"], snapshot["snapshot_id"]))
+            item["domain_source_relation"] = domain_relation
+            item["excluded"] |= domain_relation == "NOT_RELATED"
+            item["assessment_complete"] = bool(item["readable"] and not item["supplied"] and not item["confirmed"]
+                and domain_relation in {"MATCH", "PARTIAL", "UNKNOWN", "NOT_RELATED", "SUPPLIED_IDENTIFIER"})
             item["usable"] = item["readable"] and not item["excluded"] and (
-                item["supplied"] or item["confirmed"] or _search_usable(source, snapshot, judgments, all_cases))
+                item["supplied"] or item["confirmed"] or domain_relation in {"MATCH", "SUPPLIED_IDENTIFIER"}
+                or _search_usable(source, snapshot, judgments, all_cases))
     return sorted(materials.values(), key=lambda item: (not item["supplied"], item["url"] or ""))
 
 
@@ -94,7 +104,9 @@ def wiki_plan(store: Store, run_id: str, case: dict | str) -> dict:
                if record["case_id"] == source["case_id"] and record["input_hash"] == context["input_hash"]]
     latest = max(records, key=lambda record: record["revision"], default={})
     usable = [item for item in materials if item["usable"]]
-    pending = [item for item in materials if not item["excluded"] and not item["usable"]]
+    pending = [item for item in materials if not item["excluded"] and not item["usable"] and not item["assessment_complete"]]
+    domain_assessments = [{"snapshot_id": item["snapshot"]["snapshot_id"], "source_relation": item["domain_source_relation"]}
+        for item in materials if item["snapshot"] and item["domain_source_relation"]]
     actions = []
     if usable:
         status, reason = "FOUND", "Existing readable supplied/confirmed Wiki or currently verified discovery; no additional Wiki search"
@@ -124,14 +136,20 @@ def wiki_plan(store: Store, run_id: str, case: dict | str) -> dict:
         actions = [{"action": "SEARCH_WIKI", "case_id": source["case_id"],
                     "scope": "WIKI", "query_planning": "AGENT_SOURCE_GROUNDED_FACETS"}]
     snapshots = sorted({item["snapshot"]["snapshot_id"] for item in materials if item["snapshot"] and not item["excluded"]})
+    task_identity = {"input": context["input_hash"], "status": status,
+                     "snapshots": snapshots, "check_id": latest.get("check_id")}
+    if domain_assessments:
+        task_identity["domain_source_assessments"] = domain_assessments
     return {"case_id": source["case_id"], "status": status, "checked": status in {"FOUND", "NO_MATCH"},
             "search_allowed": status == "SEARCH_REQUIRED", "input_hash": context["input_hash"],
-            "task_id": "wiki-" + digest({"input": context["input_hash"], "status": status,
-                "snapshots": snapshots, "check_id": latest.get("check_id")})[:24],
+            "task_id": "wiki-" + digest(task_identity)[:24],
             "required_actions": actions, "wiki_ref_ids": sorted({rid for item in materials for rid in item["ref_ids"]}),
             "wiki_snapshot_ids": snapshots, "check_id": latest.get("check_id"), "reason": reason,
             "query": latest.get("query", ""), "scope": latest.get("scope", ""),
             "checked_at": latest.get("checked_at", ""), "executed_by": latest.get("executed_by", ""),
+            "domain_source_assessments": domain_assessments,
+            "excluded_source_snapshot_ids": sorted(item["snapshot_id"] for item in domain_assessments if item["source_relation"] == "NOT_RELATED"),
+            "insufficient_source_snapshot_ids": sorted(item["snapshot_id"] for item in domain_assessments if item["source_relation"] in {"PARTIAL", "UNKNOWN"}),
             "capture_quality_gaps": [{"url": item["url"], "snapshot_id": item["snapshot"]["snapshot_id"],
                 "page_kind": item["capture_quality"]["status"], "needs_repair": item["capture_quality"]["needs_repair"],
                 "errors": item["capture_quality"]["errors"]} for item in pending if item["snapshot"] and not item["readable"]],
@@ -165,7 +183,8 @@ def record_wiki_check(store: Store, run_id: str, case_id: str, *, outcome: str,
                 raise ValueError("timezone missing")
         except ValueError as exc:
             raise AuditError("Wiki check time must be an ISO timestamp with timezone") from exc
-        if outcome == "NO_MATCH" and any(not item["excluded"] for item in materials):
+        if outcome == "NO_MATCH" and any(not item["excluded"] and not (item["assessment_complete"] and not item["usable"])
+                                         for item in materials):
             raise AuditError("Cannot report NO_MATCH while an existing Wiki is pending or available")
     identity = {"case_id": case_id, "input_hash": context["input_hash"], "outcome": outcome,
                 "query": query, "scope": scope, "checked_at": checked_at, "executed_by": executed_by,

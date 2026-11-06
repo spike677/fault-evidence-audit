@@ -1,0 +1,183 @@
+"""Pure, one-workbook projection of initialized trigger coverage and proposals.
+
+The caller supplies current validated assessments. Historical evidence labels
+describe concrete source issues; they never establish executor/path coverage.
+"""
+from __future__ import annotations
+
+from .exporters import _table, _text
+
+
+COVERAGE_SCOPE = "历史资料证据归类；非算子执行、路径或测试覆盖；多标签数量不可相加为故障数"
+_BASIS = {"SOURCE_DEFINITION": "原模式定义（尚未经网页核验）", "SOURCE_REPORTED": "资料陈述",
+          "CODE_INFERENCE": "代码推断", "UNKNOWN": "未知"}
+
+
+def _unique(records: list[dict], key: str) -> list[dict]:
+    seen, result = set(), []
+    for record in records:
+        identity = record[key]
+        if identity not in seen:
+            result.append(record)
+            seen.add(identity)
+    return result
+
+
+def _citations(value: dict) -> str:
+    return "\n".join(dict.fromkeys(
+        [f"{ref.get('segment_id', '')}: {ref.get('quote', '')}" for ref in value.get("evidence", [])]
+        + [f"{ref.get('field', '')} [{ref.get('cell', '')}]: {ref.get('quote', '')}"
+           for ref in value.get("source_cells", [])]))
+
+
+def _source(subject: dict) -> dict:
+    case = subject.get("source_case", {})
+    return {"原编号": case.get("external_id", ""), "模式编号": subject.get("mode_id", ""),
+            "case_id": subject.get("case_id", ""), "来源文件": case.get("source_file", ""),
+            "Sheet": case.get("sheet", ""), "原始行": case.get("row", ""),
+            "单元格定位": "；".join(f"{key}={cell}" for key, cell in case.get("cell_locations", {}).items())}
+
+
+def _state(assessments: list[dict]) -> str:
+    if not assessments:
+        return "UNASSESSED"
+    states = {a["result"].get("processing_status", "PENDING") for a in assessments}
+    if "EXCEPTION" in states:
+        return "EXCEPTION"
+    return "AUTO_PROCESSED" if states == {"AUTO_PROCESSED"} else "PENDING"
+
+
+def build_workbook(data: dict) -> dict:
+    """Return the existing ArtifactTool workbook-data schema without I/O.
+
+    Assessment IDs are deduplicated and explicit stale records are excluded.
+    Currentness policy and semantic gates remain the workflow's responsibility.
+    A MODE_ENTRY is not projected as a historical incident.
+    """
+    subjects = _unique(data.get("subjects", []), "subject_id")
+    by_subject = {s["subject_id"]: s for s in subjects}
+    by_case = {s["case_id"]: s for s in subjects}
+    assessments = _unique([a for a in data.get("assessments", []) if not a.get("is_stale")
+                           and a["subject_id"] in by_subject], "assessment_id")
+    taxonomy = data.get("taxonomy", {})
+    items = {item["id"]: item for item in taxonomy.get("items", [])}
+    checks = data.get("wiki_checks", {})
+    supplied_gap_keys = {(g.get("case_id"), g.get("kind")) for g in data.get("gaps", [])}
+    overview, coverage, details, branches, gaps = [], [], [], [], []
+    for subject in subjects:
+        relevant = [a for a in assessments if a["subject_id"] == subject["subject_id"]]
+        matched = {r["trigger_id"] for a in relevant for r in a["result"].get("rows", []) if r["relation"] == "MATCH"}
+        partial = {r["trigger_id"] for a in relevant for r in a["result"].get("rows", []) if r["relation"] == "PARTIAL"} - matched
+        check = checks.get(subject["case_id"], {})
+        case = subject.get("source_case", {})
+        overview.append({**_source(subject), "对象编号": subject["subject_id"],
+            "对象类型": subject.get("subject_kind", ""), "原模式/问题描述": case.get("description", ""),
+            "原故障原因": case.get("root_cause_raw", ""), "处理状态": _state(relevant),
+            "当前逐资料子问题判断数": len(relevant), "匹配触发类数": len(matched),
+            "匹配触发类": "；".join(sorted(matched)), "部分触发类数": len(partial),
+            "部分触发类": "；".join(sorted(partial)), "Wiki检查": check.get("status", "MISSING"),
+            "Wiki说明": check.get("reason", ""), "建议动作": "；".join(sorted({
+                a["result"].get("decision", {}).get("action", "") for a in relevant} - {""})),
+            "需人工裁决": "是" if any(a["result"].get("review_required") for a in relevant) else "否",
+            "覆盖范围": COVERAGE_SCOPE})
+        if not relevant and (subject["case_id"], "UNASSESSED") not in supplied_gap_keys:
+            gaps.append({**_source(subject), "类型": "UNASSESSED", "说明": "尚无当前有效逐资料分类；不能推定未覆盖或新增模式", "需人工裁决": "否"})
+        if (check.get("status") not in {"FOUND", "NO_MATCH"}
+                and (subject["case_id"], "WIKI_" + check.get("status", "MISSING")) not in supplied_gap_keys):
+            gaps.append({**_source(subject), "类型": "WIKI_" + check.get("status", "MISSING"),
+                         "说明": check.get("reason", "Wiki检查尚未完成"), "需人工裁决": "否"})
+
+    for assessment in assessments:
+        result = assessment["result"]
+        source = _source(by_subject[assessment["subject_id"]])
+        aid = assessment["assessment_id"]
+        context = {**source, "判断编号": aid, "快照编号": assessment.get("snapshot_id", ""),
+                   "子问题序号": assessment.get("issue_index", ""), "子问题": assessment.get("issue_label", ""),
+                   "资料对应关系": result.get("source_relation", "UNKNOWN")}
+        local_details = {d["detail_id"] for d in result.get("details", [])}
+        for row in result.get("rows", []):
+            item = items.get(row["trigger_id"], {})
+            predicates = "\n".join(f"[{p.get('clause_role', 'INCLUSION')}] {p.get('clause', '')} => {p.get('result', 'UNKNOWN')}"
+                                    + ("\n" + _citations(p) if _citations(p) else "")
+                                    for p in row.get("predicate_checks", []))
+            coverage.append({**context, "触发类编号": row["trigger_id"], "触发族": item.get("family_id", ""),
+                "触发类名称": item.get("name", ""), "完整定义": item.get("definition", ""),
+                "适用性": row.get("applicability", "UNKNOWN"), "对应判断": row.get("relation", "UNKNOWN"),
+                "依据类型": _BASIS.get(row.get("evidence_basis", "UNKNOWN"), row.get("evidence_basis")),
+                "完整谓词检查": predicates, "精确引文及单元格": _citations(row), "判断说明": row.get("reason", ""),
+                "关联明细编号": "；".join((aid + ":" + did) if did in local_details else ("baseline:" + did)
+                                         for did in row.get("detail_ids", [])),
+                "覆盖种类": "HISTORICAL_EVIDENCE", "本地执行验证": "未执行", "覆盖范围": COVERAGE_SCOPE})
+        for detail in result.get("details", []):
+            details.append({**context, "明细编号": aid + ":" + detail["detail_id"],
+                "响应内明细编号": detail["detail_id"], "所属模式编号": detail.get("mode_id", ""),
+                "明细名称": detail.get("name", ""), "具体机理": detail.get("mechanism", ""),
+                "算子": detail.get("operator", ""), "适用条件": "\n".join(detail.get("conditions", [])),
+                "触发类": "；".join(detail.get("trigger_ids", [])),
+                "触发类判断": "；".join(r["trigger_id"] + ":" + r["relation"] for r in result.get("rows", [])
+                    if r["trigger_id"] in detail.get("trigger_ids", [])),
+                "依据类型": _BASIS.get(detail.get("evidence_basis", "UNKNOWN"), detail.get("evidence_basis")),
+                "精确引文及单元格": _citations(detail), "未确定项": "\n".join(detail.get("unknowns", [])),
+                "建议动作": result.get("decision", {}).get("action", ""),
+                "状态": "分类明细/建议，未自动正式入库", "本地执行验证": "未执行"})
+        for branch in result.get("external_branches", []):
+            branches.append({**context, "记录类型": "分类判断", "分支编号": branch["branch_id"],
+                "对应判断": branch.get("relation", "UNKNOWN"), "子类编号": "；".join(branch.get("category_ids", [])),
+                "说明": branch.get("reason", ""), "精确引文及单元格": _citations(branch), "计入42类": "否"})
+        for reason in result.get("review_reasons", []):
+            gaps.append({**context, "类型": "FACT_CONFLICT", "说明": _text(reason),
+                         "需人工裁决": "是" if result.get("review_required") else "否"})
+
+    for branch in taxonomy.get("branches", []):
+        branches.append({"记录类型": "分支定义", "分支编号": branch["branch_id"],
+            "名称": branch.get("name", ""), "对应判断": branch.get("status", "UNDEFINED"),
+            "子类编号": "；".join(c["id"] for c in branch.get("categories", [])),
+            "说明": branch.get("definition", ""), "子类定义": _text(branch.get("categories", [])),
+            "定义来源": branch.get("provenance", branch.get("source_file", "")), "计入42类": "否"})
+    for gap in data.get("gaps", []):
+        subject = by_case.get(gap.get("case_id"), {})
+        if gap.get("kind") == "FACT_CONFLICT" and any(
+                row.get("case_id") == gap.get("case_id") and row["类型"] == "FACT_CONFLICT" for row in gaps):
+            continue  # Current assessment reasons already retain the individual conflicts.
+        gaps.append({**_source(subject), "类型": gap.get("kind", "GAP"), "说明": gap.get("reason", ""),
+                     "需人工裁决": "是" if gap.get("review_required") else "否"})
+    for resource in data.get("resources", []):
+        subject = by_case.get(resource.get("case_id"), {})
+        gaps.append({**_source(subject), "类型": "资料台账", "说明": resource.get("reason", ""),
+            "引用编号": resource.get("ref_id", ""), "URL/原始引用": resource.get("url") or resource.get("raw_text", ""),
+            "最初来源": resource.get("origin", ""), "来源单元格": resource.get("location", ""),
+            "快照编号": resource.get("snapshot_id", ""), "采集状态": resource.get("capture_status", resource.get("status", "")),
+            "资料对应关系": resource.get("source_relation", ""), "需人工裁决": "否"})
+
+    gaps = _unique([{"_row_identity": _text(row), **row} for row in gaps], "_row_identity")
+    gaps = [{key: value for key, value in row.items() if key != "_row_identity"} for row in gaps]
+
+    modes = {s["mode_id"] for s in subjects if s.get("mode_id")}
+    matched_ids = {r["触发类编号"] for r in coverage if r["对应判断"] == "MATCH"}
+    source_issues = {(a.get("snapshot_id"), a.get("summary_task_id"), a.get("issue_index")) for a in assessments if a.get("snapshot_id")}
+    stats = [{"指标": "运行编号", "值": data.get("run_id", "")},
+        {"指标": "流程阶段", "值": data.get("phase", "INIT")},
+        {"指标": "42类唯一项数", "值": len(items), "口径": "唯一trigger_id；Branch2/3在此数之外"},
+        {"指标": "输入触发族数", "值": len({i.get("family_id") for i in items.values()} - {None, ""})},
+        {"指标": "原模式数量", "值": len(modes), "口径": "唯一mode_id；模式条目不是故障事件"},
+        {"指标": "来源记录数量", "值": len({s["case_id"] for s in subjects}), "口径": "唯一case_id"},
+        {"指标": "当前分类判断数量", "值": len(assessments), "口径": "唯一assessment_id；排除显式过期项"},
+        {"指标": "涉及资料子问题数量", "值": len(source_issues), "口径": "唯一(snapshot_id,summary_task_id,issue_index)，跨模式共享同摘要不重复计数"},
+        {"指标": "有匹配证据的触发类数", "值": len(matched_ids), "口径": "唯一trigger_id；仅已列具体条件的历史证据，不代表全类或执行覆盖"},
+        {"指标": "逐项匹配标签数", "值": sum(r["对应判断"] == "MATCH" for r in coverage), "口径": "逐判断逐触发类的标签；不能当作故障数量"},
+        {"指标": "分类明细数量", "值": len(details), "口径": "assessment_id:detail_id，不自动合并不同资料机理"},
+        {"指标": "未分类来源数量", "值": sum(r["处理状态"] == "UNASSESSED" for r in overview)},
+        {"指标": "需人工裁决来源数量", "值": sum(r["需人工裁决"] == "是" for r in overview)},
+        {"指标": "覆盖范围", "值": COVERAGE_SCOPE},
+        {"指标": "本地执行验证", "值": "未执行"},
+        {"指标": "初始化基线", "值": (data.get("baseline") or {}).get("baseline_id", "未冻结")},
+        {"指标": "基线状态", "值": (data.get("baseline") or {}).get("status", "未冻结")}]
+    return {"schema_version": "1.0", "kind": "TRIGGER_CLASSIFICATION", "run": {"run_id": data.get("run_id", "")},
+        "sheets": [
+            _table("模式初始化总览" if data.get("phase", "INIT") == "INIT" else "故障分类总览", overview,
+                   list(overview[0]) if overview else ["原编号", "模式编号", "case_id", "处理状态", "覆盖范围"]),
+            _table("42类覆盖详情", coverage, list(coverage[0]) if coverage else ["判断编号", "模式编号", "触发类编号", "对应判断", "覆盖范围"]),
+            _table("机理明细", details, list(details[0]) if details else ["明细编号", "所属模式编号", "具体机理", "触发类", "状态"]),
+            _table("Branch2和3", branches, list(dict.fromkeys(key for row in branches for key in row)) if branches else ["记录类型", "分支编号", "对应判断", "计入42类"]),
+            _table("证据与缺口", gaps, list(dict.fromkeys(key for row in gaps for key in row)) if gaps else ["case_id", "类型", "说明", "需人工裁决"]),
+            _table("运行统计", stats, ["指标", "值", "口径"])]}

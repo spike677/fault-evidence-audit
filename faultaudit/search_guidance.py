@@ -4,7 +4,7 @@ from __future__ import annotations
 from datetime import datetime
 import re
 
-FACET_KINDS = {"model", "operator", "symptom", "trigger", "framework", "version", "root_claim"}
+FACET_KINDS = {"model", "operator", "symptom", "trigger", "framework", "version", "root_claim", "identifier"}
 
 
 def search_guidance(case: dict, *, max_rounds: int = 3) -> dict:
@@ -15,7 +15,7 @@ def search_guidance(case: dict, *, max_rounds: int = 3) -> dict:
                          for field, value in case.get("raw", {}).items() if value],
         "instructions": (
             "Use Agent reasoning to extract source-grounded model names/aliases, complete operator names, "
-            "symptoms, trigger conditions, framework/configuration and versions. Return search_facets "
+            "symptoms, trigger conditions, framework/configuration, versions and supplied Wiki/DTS identifiers. Return search_facets "
             "[{kind,value,source_field,source_cell,source_quote,hypothesis}]. Each value and quote must "
             "occur in the original field; root_claim is an unverified hypothesis, not a required filter. "
             "Unknown facets stay absent, never invented. Based on actual search results, adapt combinations, "

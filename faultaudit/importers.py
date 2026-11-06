@@ -19,12 +19,12 @@ _ALIASES = {
     "description": ("问题描述", "故障描述", "故障现象", "问题现象", "description", "symptom", "问题", "描述", "故障模式描述", "故障名称", "故障模式名称", "模式名称", "故障模式"),
     "customer_model": ("客户/模型", "客户／模型", "客户模型", "customer_model", "模型", "客户"),
     "operator": ("算子", "operator", "operator_raw", "涉及算子", "故障算子", "作用点"),
-    "root_cause": ("根因", "根因/进展", "根因／进展", "root_cause_raw", "root_cause", "根因原文", "原因", "故障根因"),
-    "item_id": ("item_id", "故障模式ID", "故障模式编号", "故障编号", "ID", "id", "编号", "序号", "统一ID"),
+    "root_cause": ("根因", "根因/进展", "根因／进展", "root_cause_raw", "root_cause", "根因原文", "原因", "故障根因", "故障原因"),
+    "item_id": ("item_id", "baseline_id", "mode_id", "故障模式ID", "故障模式编号", "故障编号", "ID", "id", "编号", "序号", "统一ID"),
     "mechanism": ("mechanism", "失效机理", "故障机理", "机理", "根因", "故障模式", "故障原因"),
     "trigger": ("trigger", "触发条件", "触发", "适用条件", "条件"),
 }
-_REFERENCE_HEADERS = ("wiki", "dts", "pr", "github", "gitcode", "codehub", "链接", "url", "commit")
+_REFERENCE_HEADERS = ("wiki", "dts", "pr", "github", "gitcode", "codehub", "链接", "link", "url", "commit")
 _EMPTY_LINKS = {"", "无", "暂无", "无链接", "未提供", "-", "—", "/", "n/a", "none", "null", "无（待补）", "无(待补)"}
 _URL_RE = re.compile(r"https?://[^\s<>\[\]\"'()\\，；。]*", re.IGNORECASE)
 
@@ -192,6 +192,7 @@ def extract_urls(raw: str) -> list[str]:
     or source rows remain independent, even when their target is identical.
     """
     unescaped = html.unescape(re.sub(r"\\([\\\[\]()_*])", r"\1", raw))
+    unescaped = re.sub(r"\b(https?)\\:", r"\1:", unescaped, flags=re.IGNORECASE)
     result = []
     for match in _URL_RE.finditer(unescaped):
         url = match.group(0).rstrip(".,;:!?，；。")
@@ -215,8 +216,10 @@ def _references(case: dict[str, Any], locations: dict[str, str], targets: dict[s
     for key, raw in case["raw"].items():
         target = targets.get(key)
         urls = extract_urls(raw)
-        if target and target not in urls:
-            urls.append(target)
+        if target:
+            for target_url in extract_urls(target) or [target]:
+                if target_url not in urls:
+                    urls.append(target_url)
         reference_key = key.casefold()
         looks_like_ref = (any(token in reference_key for token in _REFERENCE_HEADERS if token != "pr")
                           or bool(re.search(r"(^|[\s_/#（(])prs?($|[\s_/#）)])", reference_key))
@@ -225,7 +228,12 @@ def _references(case: dict[str, Any], locations: dict[str, str], targets: dict[s
         if not urls and (not looks_like_ref or is_empty_link_value(raw)):
             continue
         location = f"{case['sheet']}!{locations.get(key, key)} (row {case['row']})"
-        for index, candidate in enumerate(urls or [None], start=1):
+        # A supplied identifier remains a source citation even beside a full URL.
+        # The Agent resolves its real location; importing never invents a DTS host.
+        bare_dts = looks_like_ref and any(not any(token in url for url in urls)
+            for token in re.findall(r"\bDTS\d{10,}\b", raw, re.IGNORECASE))
+        candidates = [*urls, None] if urls and bare_dts else urls or [None]
+        for index, candidate in enumerate(candidates, start=1):
             valid = bool(candidate) and _valid_url(candidate)
             status = "PARSED" if valid else "MALFORMED" if candidate else "UNRESOLVED"
             if status != "PARSED":

@@ -82,9 +82,11 @@ def start(store: Store, source: Path, catalog: Path, work_root: Path, *, executo
 
 def _policy() -> str:
     from . import wiki_checks, capture_quality, search_guidance, resource_identity, workflow_scope
+    from . import trigger_taxonomy, trigger_assessment, trigger_workflow
     return digest({"core": policy_fingerprint(), "workflow": digest(Path(__file__).read_bytes()),
                    "helpers": digest(b"".join(Path(module.__file__).read_bytes() for module in
-                       (wiki_checks, capture_quality, search_guidance, resource_identity, workflow_scope)))})
+                       (wiki_checks, capture_quality, search_guidance, resource_identity, workflow_scope,
+                        trigger_taxonomy, trigger_assessment, trigger_workflow)))})
 
 
 def _json(path: Path, value: dict) -> None:
@@ -128,6 +130,7 @@ def _request(store, run_id, cfg, kind, payload, instructions, priority) -> dict 
 def next_tasks(store: Store, run_id: str) -> dict:
     store = scoped_store(store, run_id)
     cfg = config(store, run_id)
+    trigger_mode = cfg.get("purpose", "").startswith("TRIGGER_")
     cases = store.records(run_id, "cases")
     checks = {case["case_id"]: wiki_plan(store, run_id, case) for case in cases}
     # A bounded NO_MATCH fulfills checking, not finding. Release only this
@@ -162,7 +165,8 @@ def next_tasks(store: Store, run_id: str) -> dict:
         if check["status"] == "SEARCH_REQUIRED":
             guidance = search_guidance(case, max_rounds=cfg.get("max_search_rounds", 3))
             add("wiki_check", {"case": case, "case_ids": [case["case_id"]], "wiki_input_hash": check["input_hash"],
-                               "wiki_task_id": check["task_id"], "search_guidance": guidance},
+                               "wiki_task_id": check["task_id"], "search_guidance": guidance,
+                               **({"previous_domain_assessments": check.get("domain_source_assessments", [])} if trigger_mode else {})},
                 "Search Wiki first within a stated scope. Return {request_hash, outcome: FOUND|NO_MATCH|BLOCKED, "
                 "executed:true, query, scope, checked_at (ISO timezone), executed_by, reason, packages:[]}. "
                 "FOUND requires actual captured Wiki EvidencePackage(s); they remain candidates until comparison. "
@@ -222,6 +226,16 @@ def next_tasks(store: Store, run_id: str) -> dict:
             + collection_observation_instructions(),
             0 if resource_kind({"url": item["url"]}) == "WIKI" else 2)
     plan = evidence_plan(store, run_id)
+    if cfg.get("purpose") == "TRIGGER_INIT":
+        from .trigger_workflow import source_lookups
+        for lookup in source_lookups(store, run_id):
+            guidance = search_guidance(lookup["case"], max_rounds=cfg.get("max_search_rounds", 3))
+            add("search", {**lookup, "search_guidance": guidance},
+                "Resolve this ORIGINAL supplied identifier using the actual Wiki/DTS search tools. "
+                "Do not construct or guess an internal URL. Capture the page for this exact identifier, "
+                "not a PR mentioning it. Keep the original reference and SEARCH_DISCOVERED URL origins separate. "
+                "Return the standard executed search response with packages, query, scope, checked_at, executed_by, "
+                "reason and search trace. " + guidance["instructions"] + " " + collection_observation_instructions(), 1)
     for row in plan["cases"]:
         check = checks[row["case_id"]]
         if row["search_control"]["search_allowed"] and check["status"] in {"FOUND", "NO_MATCH"}:
@@ -233,6 +247,7 @@ def next_tasks(store: Store, run_id: str) -> dict:
             guidance = search_guidance(case, max_rounds=cfg.get("max_search_rounds", 3))
             add("search", {"case": case, "case_ids": [case["case_id"]], "search_policy": row["search_control"]["policy"],
                 "search_guidance": guidance,
+                **({"previous_domain_assessments": row.get("domain_source_assessments", [])} if trigger_mode else {}),
                 "excluded_candidate_judgment_ids": row["excluded_candidate_judgment_ids"],
                 "insufficient_candidate_judgment_ids": row["insufficient_candidate_judgment_ids"], "previous_candidates": prior},
                 "Search for evidence of this specific fault, GitHub then GitCode/Gitee/CodeHub/DTS as applicable. "
@@ -241,11 +256,15 @@ def next_tasks(store: Store, run_id: str) -> dict:
                 "packages:[captured EvidencePackage]}. Keyword matches are not confirmed incidents. "
                 + guidance["instructions"] + " " + collection_observation_instructions(), 2)
     judge = CodexJudge(store, run_id) if cfg["executor"] == "codex" else OpenCodeJudge(store, run_id)
-    execute(store, run_id, judge, mode=cfg["executor"], model_id=cfg["executor"] + "-managed")
+    execute(store, run_id, judge, mode=cfg["executor"], model_id=cfg["executor"] + "-managed",
+            summarize_only=cfg.get("purpose") == "TRIGGER_INIT")
     for task in export_model_tasks(store, run_id, executor=cfg["executor"])["tasks"]:
         add("model", {"task": task},
             "Execute the complete enclosed model task using its instructions and expected_contract. Return its "
-            "standard result envelope with original run/task/request hash and actual producer metadata. "
+            "standard result envelope {schema_version:'1.0',run_id:inner.run_id,task_id:inner.task_id,"
+            "request_hash:inner.request_hash,producer:{executor:'" + cfg["executor"] + "'," + cfg["executor"] + "_version:"
+            "actual version or 'unreported',provider:actual provider,model:actual model or 'unreported',"
+            "session_id:actual task session},result:expected_contract body}. "
             "The inner task, not this dispatch wrapper, supplies the response identity. Do not invent ACCEPT.", 3)
     # A ready case does not wait for unrelated cases' fetch/summary tasks.
     pending_cases = set()
@@ -259,7 +278,13 @@ def next_tasks(store: Store, run_id: str) -> dict:
         if inner.get("kind") == "summarize":
             sid = inner["payload"]["snapshot"]["snapshot_id"]
             pending_cases.update(row["case_id"] for row in plan["cases"] if sid in row["selected_snapshot_ids"])
-    for case in cases:
+    if trigger_mode:
+        from .trigger_workflow import classification_payloads
+        from .trigger_assessment import instructions as trigger_instructions
+        for payload in classification_payloads(store, run_id):
+            if not set(payload["case_ids"]) & pending_cases:
+                add("trigger_classify", payload, trigger_instructions(), 4)
+    for case in ([] if trigger_mode else cases):
         if case["case_id"] not in pending_cases:
             prepared = prepare_draft(store, run_id, [case["case_id"]])
             if prepared["status"] == "BLOCKED":
@@ -326,6 +351,9 @@ def submit(store: Store, run_id: str, task_id: str, response: dict, *, path: Pat
                 raise AuditError("; ".join(validation["errors"]))
             store.put(run_id, "workflow_drafts", payload["request"]["request_hash"],
                       {"request": payload["request"], "response": response, "validation": validation})
+        elif kind == "trigger_classify":
+            from .trigger_workflow import accept_assessment
+            accept_assessment(store, run_id, request, response)
         else:
             if response.get("request_hash") != request["request_hash"]:
                 raise AuditError("Collection response request_hash mismatch")
@@ -356,6 +384,9 @@ def submit(store: Store, run_id: str, task_id: str, response: dict, *, path: Pat
                 errors = capture_quality(package, require_observation=True)["errors"]
                 if errors:
                     raise AuditError("; ".join(errors))
+            if payload.get("source_lookup"):
+                from .trigger_workflow import validate_source_lookup
+                validate_source_lookup(payload, response)
             for child in response.get("linked_packages", []):
                 package = child.get("package", {})
                 EvidencePackage.model_validate(package)
@@ -390,6 +421,9 @@ def submit(store: Store, run_id: str, task_id: str, response: dict, *, path: Pat
                     query=response["query"], scope=response["scope"], checked_at=response["checked_at"],
                     executed_by=response["executed_by"], executed=True, reason=response["reason"],
                     snapshot_id=snapshots[0]["snapshot_id"] if snapshots else None)
+            if payload.get("source_lookup"):
+                from .trigger_workflow import record_source_lookup
+                record_source_lookup(store, run_id, payload, response, snapshots)
     except Exception as exc:
         store.put(run_id, "workflow_attempts", attempt_id, {**attempt, "status": "REJECTED", "error": str(exc)})
         raise
@@ -412,6 +446,9 @@ def export(store: Store, run_id: str) -> dict:
     from .exporters import export_workbook_xlsx
     from .ranking_report import build_ranked_workbook
     cfg = config(store, run_id)
+    if cfg.get("purpose", "").startswith("TRIGGER_"):
+        from .trigger_workflow import export as trigger_export
+        return trigger_export(store, run_id)
     cases = store.records(run_id, "cases")
     checks = {c["case_id"]: wiki_plan(store, run_id, c) for c in cases}
     proposals = []
@@ -464,7 +501,7 @@ def retry(store: Store, run_id: str, task_id: str) -> dict:
     from .workflow_driver import reset_execution
     task = store.get(run_id, "workflow_requests", task_id)
     execution = store.get(run_id, "workflow_execution", task_id) or {}
-    if task and task["kind"] in {"model", "catalog_draft"} and execution.get("blocked_code") == "EXECUTOR_CONTEXT_LIMIT":
+    if task and task["kind"] in {"model", "catalog_draft", "trigger_classify"} and execution.get("blocked_code") == "EXECUTOR_CONTEXT_LIMIT":
         reset_execution(store, run_id, task_id)
         old = store.get(run_id, "workflow_execution", task_id)
         store.put(run_id, "workflow_execution", task_id, {**old, "blocked_code": None}, mutable=True)

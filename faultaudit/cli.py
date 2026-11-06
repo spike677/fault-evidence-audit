@@ -185,20 +185,41 @@ def parser() -> argparse.ArgumentParser:
     start.add_argument("--catalog-scope", default="UNSPECIFIED")
     start.add_argument("--expected-catalog-count", type=int)
     start.add_argument("--case-ids-file", type=Path, help="Optional JSON array of target case IDs; frozen for this workflow")
-    for operation in ("next", "submit", "drive", "export", "retry"):
-        cmd = flow.add_parser(operation)
-        cmd.add_argument("--run", default="latest")
-        if operation in {"submit", "retry"}:
-            cmd.add_argument("--task-id", required=True)
-        if operation == "submit":
-            cmd.add_argument("--response", type=Path, required=True)
-        if operation == "drive":
-            cmd.add_argument("--agent-command-file", type=Path, required=True, help="JSON argv with {request}/{response}")
-            cmd.add_argument("--max-rounds", type=int, default=32)
-            cmd.add_argument("--workers", type=int, default=2)
-            cmd.add_argument("--max-attempts", type=int, default=2)
-            cmd.add_argument("--timeout", type=float, default=300)
-            cmd.add_argument("--browser-timeout", type=float)
+    trigger = sub.add_parser("trigger-workflow", help="Initialize trigger coverage, then classify incremental faults")
+    trigger_flow = trigger.add_subparsers(dest="trigger_command", required=True)
+    init = trigger_flow.add_parser("init")
+    init.add_argument("--modes", type=Path, required=True)
+    init.add_argument("--taxonomy", type=Path, required=True)
+    init.add_argument("--branch-source", type=Path)
+    init.add_argument("--user-branches", action="store_true", default=True,
+                      help="Use the user's explicit Branch 2/3 definitions (default)")
+    init.add_argument("--no-user-branches", action="store_false", dest="user_branches")
+    classify = trigger_flow.add_parser("classify")
+    classify.add_argument("--baseline-run", required=True)
+    classify.add_argument("--baseline-id")
+    classify.add_argument("--input", type=Path, required=True)
+    classify.add_argument("--allow-pending-baseline", action="store_true")
+    for entry in (init, classify):
+        entry.add_argument("--work-root", type=Path, default=Path("work/runs"))
+        entry.add_argument("--executor", choices=["opencode", "codex"], default="opencode")
+    for commands, operations in ((flow, ("next", "submit", "drive", "export", "retry")),
+                                 (trigger_flow, ("next", "submit", "drive", "export", "retry", "status", "finalize"))):
+        for operation in operations:
+            cmd = commands.add_parser(operation)
+            cmd.add_argument("--run", default="latest")
+            if operation in {"submit", "retry"}:
+                cmd.add_argument("--task-id", required=True)
+            if operation == "submit":
+                cmd.add_argument("--response", type=Path, required=True)
+            if operation == "finalize":
+                cmd.add_argument("--allow-pending", action="store_true")
+            if operation == "drive":
+                cmd.add_argument("--agent-command-file", type=Path, required=True, help="JSON argv with {request}/{response}")
+                cmd.add_argument("--max-rounds", type=int, default=32)
+                cmd.add_argument("--workers", type=int, default=2)
+                cmd.add_argument("--max-attempts", type=int, default=2)
+                cmd.add_argument("--timeout", type=float, default=300)
+                cmd.add_argument("--browser-timeout", type=float)
     search_policy = sub.add_parser("set-search-policy", help="Set a run default or case search stopping requirement")
     search_policy.add_argument("--run", default="latest")
     search_policy.add_argument("--case-id")
@@ -259,27 +280,40 @@ def main(argv: list[str] | None = None) -> int:
             write_json({"schemas": str(args.out.resolve())})
             return 0
         store = Store(args.state, read_only=args.command in {"evidence-plan", "investigation-plan", "catalog-draft"})
-        if args.command == "xlsx-workflow":
+        if args.command in {"xlsx-workflow", "trigger-workflow"}:
             from . import xlsx_workflow as workflow
-            if args.flow_command == "start":
+            operation = args.flow_command if args.command == "xlsx-workflow" else args.trigger_command
+            if args.command == "trigger-workflow":
+                from . import trigger_workflow as trigger_workflow
+            if operation == "init":
+                result = trigger_workflow.start_init(store, args.modes, args.taxonomy, args.work_root,
+                    executor=args.executor, branch_source=args.branch_source, user_branches=args.user_branches)
+            elif operation == "classify":
+                result = trigger_workflow.start_incremental(store, args.input, args.baseline_run, args.work_root,
+                    executor=args.executor, baseline_id=args.baseline_id, allow_pending_baseline=args.allow_pending_baseline)
+            elif operation == "start":
                 result = workflow.start(store, args.input, args.catalog, args.work_root, executor=args.executor,
                     source_kind=args.source_kind, catalog_sheets=args.catalog_sheet,
                     expected_catalog_count=args.expected_catalog_count, catalog_scope=args.catalog_scope, run_id=args.run,
                     case_ids=json.loads(args.case_ids_file.read_text(encoding="utf-8-sig")) if args.case_ids_file else None)
             else:
                 selected_run = store.run_info(args.run)["run_id"]
-                if args.flow_command == "next":
+                if operation == "next":
                     result = workflow.next_tasks(store, selected_run)
-                elif args.flow_command == "submit":
+                elif operation == "submit":
                     result = workflow.submit(store, selected_run, args.task_id,
                         json.loads(args.response.read_text(encoding="utf-8-sig")), path=args.response)
-                elif args.flow_command == "retry":
+                elif operation == "retry":
                     result = workflow.retry(store, selected_run, args.task_id)
-                elif args.flow_command == "drive":
+                elif operation == "drive":
                     result = workflow.drive(store, selected_run,
                         json.loads(args.agent_command_file.read_text(encoding="utf-8-sig")), max_rounds=args.max_rounds,
                         workers=args.workers, max_attempts=args.max_attempts, timeout=args.timeout,
                         browser_timeout=args.browser_timeout)
+                elif operation == "status":
+                    result = trigger_workflow.status(store, selected_run)
+                elif operation == "finalize":
+                    result = trigger_workflow.finalize(store, selected_run, allow_pending=args.allow_pending)
                 else:
                     result = workflow.export(store, selected_run)
             write_json(result)

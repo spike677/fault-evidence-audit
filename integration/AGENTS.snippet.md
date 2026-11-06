@@ -1,5 +1,7 @@
 ## 故障证据核验
 
+0.1.12新增trigger-workflow：先init维护原CANN机制库×42类输入触发条件的历史证据覆盖索引，再classify新案例。Branch2实现实例（平台/SoC、编译选项/宏、构建变体）与Branch3执行情境（设备调度、流与异步、同步/竞态）单列，不计42。MODE_ENTRY不是故障事件，不虚构SAME_EVENT；每模式/每快照/每子问题用独立trigger_classify子Agent给出完整42项、完整谓词及引文。原始引用全部整理，缺Wiki必须先让Agent按原模式名/原因搜索Wiki；裸DTS/Wiki编号由Agent实际定位URL，不编URL。程序完成查重、派发、引用/范围/旧结果门禁与覆盖详情；子Agent负责摘要、语义关联、归类和一次自检。未知不等于未覆盖，42类未命中不证明新根因。Init覆盖详情是历史资料归类，不是注入/ATK执行覆盖。finalize冻结基线，增量分归入已有明细、扩充分支、新模式候选、待定；原源输入/策略变化需维护基线。复用audit.sqlite3和tasks请求/响应目录，最终只交付一个初始化覆盖XLSX或新案例分类XLSX；实际内网取证和登录仍由现场完成。
+
 0.1.11默认使用xlsx-workflow整批推进，一次授权后不每10条申请继续。OpenChamber/OpenCode支持原生子agent和Agent搜索：主会话只调度ID/状态/路径，fault-audit-worker以新上下文完整读一项request、写独立response，语义并发2、Edge串行1；仅协调器提交SQLite。CLI适配器scripts/run_opencode_agent.py与原生子agent路线二选一，不同时控制同一run。实际服务/子agent工具权限、搜索和现有Edge登录态须现场预检，用户手动完成登录，同站点集中交接。Wiki仅标题/目录/未渲染不算完整正文；使用capture_observation及带原单元格依据的search_facets/search_attempts。正常来源/事实和库映射不例行要求ACCEPT，已有链接和工作复用不等于自动事件合并。最终仅交付一个排名XLSX；以下为兼容底层接口说明，不能覆盖本段Wiki优先和新默认入口。
 
 相关任务通过 fault-evidence-audit Skill 调用独立 faultaudit 核心，实际状态以 SQLite 和 run ID 为准。

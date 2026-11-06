@@ -9,7 +9,7 @@ from .gates import event_anchor_errors, judgment_semantic_errors, processing_dec
 from .store import AuditError, Store, canonical_url, digest
 from .resource_identity import resource_key, resource_url, snapshot_index, same_resource
 
-RULE_VERSION = "nightly-0.1.11"
+RULE_VERSION = "nightly-0.1.12"
 
 
 def cited_refs(summary: dict):
@@ -342,7 +342,8 @@ def _model_failure(store: Store, run_id: str, task: dict, exc: Exception) -> Non
         store.task_status(run_id, task["task_id"], "FAILED", str(exc))
 
 
-def execute(store: Store, run_id: str, judge, *, mode: str, model_id: str, retry_failed: bool = False) -> dict:
+def execute(store: Store, run_id: str, judge, *, mode: str, model_id: str, retry_failed: bool = False,
+            summarize_only: bool = False) -> dict:
     from .bridge import policy_fingerprint
     from . import prompts, gates, contracts, model
     from . import store as store_module
@@ -439,6 +440,18 @@ def execute(store: Store, run_id: str, judge, *, mode: str, model_id: str, retry
             _model_failure(store, run_id, task, exc)
     summaries = {s["snapshot_id"]: s for s in current_summaries(store, run_id)
                  if s["model_mode"] == mode and s.get("requested_model_id", s["model_id"]) == model_id}
+    if summarize_only:
+        for call in getattr(judge, "calls", []):
+            store.event(run_id, "model_bridge_event", call)
+        store.event(run_id, "execution", {"mode": mode, "model_id": model_id, "rules": RULE_VERSION,
+                                           "summarize_only": True})
+        relevant = {"summarize": set(active), "fetch": set(missing_resources)}
+        return {"run_id": run_id, "phase": "SUMMARIZE_ONLY",
+                "complete": not missing_resources and set(active) <= set(summaries),
+                "counts": {"snapshots": len(active), "summaries": len(set(active) & set(summaries)),
+                           "missing_resources": len(missing_resources)},
+                "tasks": [task for task in store.tasks(run_id)
+                          if task["target_id"] in relevant.get(task["kind"], set()) and task["status"] != "STALE"]}
     for item in work:
         case = cases_by_id[item["representative_case_id"]]
         snapshot = active[item["snapshot_id"]]

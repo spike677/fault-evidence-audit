@@ -99,9 +99,11 @@ async function main() {
     };
     for (let column = 0; column < table.columns.length; column += 1) {
       const label = String(table.columns[column]);
-      if (/引文/.test(label)) {
+      if (/谓词检查/.test(label)) {
+        sheet.getRange(`${columnName(column)}1:${columnName(column)}${endRow}`).format.columnWidth = 104;
+      } else if (/引文/.test(label)) {
         sheet.getRange(`${columnName(column)}1:${columnName(column)}${endRow}`).format.columnWidth = 72;
-      } else if (/描述|根因|判断|缺口|理由|说明|原因|建议|reason|text|content|facts|evidence|issues|raw/.test(label)) {
+      } else if (/描述|根因|判断|定义|缺口|理由|说明|原因|建议|reason|text|content|facts|evidence|issues|raw/.test(label)) {
         sheet.getRange(`${columnName(column)}1:${columnName(column)}${endRow}`).format.columnWidth = 48;
       }
     }

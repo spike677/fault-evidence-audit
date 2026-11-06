@@ -37,6 +37,20 @@ def _resource(value: str | None) -> str | None:
     return resource_key(url) if url else None
 
 
+def _trigger_source_relations(store: Store, run_id: str) -> dict:
+    """Use mode-entry source checks only in taxonomy initialization runs.
+
+    A mode definition is not an incident. These checks route source material
+    without manufacturing an event judgment or a human confirmation.
+    """
+    config = store.get(run_id, "xlsx_workflow", "config") or {}
+    if config.get("purpose") != "TRIGGER_INIT":
+        return {}
+    from .trigger_workflow import source_relations
+
+    return source_relations(store, run_id)
+
+
 def normalize_search_policy(policy: dict) -> dict:
     """Validate a complete, small search stopping policy, without coercion."""
     if not isinstance(policy, dict) or set(policy) - set(DEFAULT_SEARCH_POLICY):
@@ -348,6 +362,7 @@ def build_evidence_plan(store: Store, run_id: str, *, judgments: list[dict] | No
     groups = [group for group in store.records(run_id, "event_groups") if group.get("user_confirmed") is True]
     group_by_case = {case_id: group for group in groups for case_id in group["case_ids"]}
     judgments = [judgment for judgment in judgments or [] if not judgment.get("is_stale", False)]
+    domain_relations = _trigger_source_relations(store, run_id)
     candidates = {}
 
     def resource_url(association):
@@ -449,6 +464,12 @@ def build_evidence_plan(store: Store, run_id: str, *, judgments: list[dict] | No
         case_judgments = [judgment for judgment in judgments if not judgment.get("work_id")
                           or judgment["work_id"] in candidate_work_ids_by_case[case_id]]
         all_options = candidates[case_id]
+        domain_assessments = [{"snapshot_id": snapshot_id, "source_relation": relation}
+            for (candidate_case_id, snapshot_id), relation in sorted(domain_relations.items())
+            if candidate_case_id == case_id and snapshot_id in active]
+        domain_excluded = {item["snapshot_id"] for item in domain_assessments if item["source_relation"] == "NOT_RELATED"}
+        domain_weak = {item["snapshot_id"] for item in domain_assessments if item["source_relation"] in {"PARTIAL", "UNKNOWN"}}
+        domain_usable = {item["snapshot_id"] for item in domain_assessments if item["source_relation"] in {"MATCH", "SUPPLIED_IDENTIFIER"}}
         excluded = [judgment for judgment in case_judgments if _applies(judgment, case_id)
             and (judgment.get("case_attribution") == "MISMATCH" or judgment.get("event_relation") == "DIFFERENT_EVENT")
             and judgment.get("review_status") != "REJECT" and judgment.get("snapshot_id") in active
@@ -467,14 +488,18 @@ def build_evidence_plan(store: Store, run_id: str, *, judgments: list[dict] | No
             return judgment["work_id"] == "work-" + digest(key)[:24]
 
         options = [option for option in all_options if not (option["relation"] == "SEARCH_DISCOVERED"
-            and not option["user_confirmed"] and any(option_judged(option, judgment) for judgment in excluded + insufficient))]
+            and not option["user_confirmed"] and (
+                (option["snapshot"] or {}).get("snapshot_id") in domain_excluded | domain_weak
+                or any(option_judged(option, judgment) for judgment in excluded + insufficient)))]
         supplied = [option for option in options if option["relation"] in TABLE_GRADES or option["user_confirmed"]]
         supplied_snapshot_ids = {option["snapshot"]["snapshot_id"] for option in supplied if option["snapshot"]}
         conflicts = [judgment for judgment in case_judgments if _applies(judgment, case_id) and (_conflicting(judgment) or
             (judgment.get("review_status") != "REJECT" and judgment.get("snapshot_id") in supplied_snapshot_ids
              and (judgment.get("case_attribution") == "MISMATCH" or judgment.get("event_relation") == "DIFFERENT_EVENT")))]
         search = [option for option in options if option["relation"] == "SEARCH_DISCOVERED" and not option["user_confirmed"]]
-        usable = [option for option in search if option["snapshot"] and _search_usable(case, option["snapshot"], case_judgments, cases)]
+        usable = [option for option in search if option["snapshot"] and (
+            option["snapshot"]["snapshot_id"] in domain_usable and _readable(option, active)
+            or _search_usable(case, option["snapshot"], case_judgments, cases))]
         unresolved = [option for option in options if option["relation"] == "PROVENANCE_PENDING" and not option["user_confirmed"]]
         selected, required, optional, issues = [], [], [], []
         policy_info = get_search_policy(store, run_id, case_id)
@@ -484,7 +509,7 @@ def build_evidence_plan(store: Store, run_id: str, *, judgments: list[dict] | No
         selected = sorted(supplied, key=lambda option: _rank(option, active))
         conflict_ids = {judgment.get("snapshot_id") for judgment in conflicts}
         counted = [option for option in supplied if _readable(option, active)
-                   and option["snapshot"]["snapshot_id"] not in conflict_ids]
+                   and option["snapshot"]["snapshot_id"] not in conflict_ids | domain_excluded]
 
         def helps(option, goal):
             if goal["missing_sources"] or goal["missing_any_sources"]:
@@ -516,7 +541,7 @@ def build_evidence_plan(store: Store, run_id: str, *, judgments: list[dict] | No
         control_status = "SATISFIED" if goal["satisfied"] else "SEARCH_REQUIRED"
         path, stop_reason = ("TABLE_REFERENCES", "ALL_SUPPLIED_REFERENCES_SELECTED_NO_SEARCH") if supplied else (
             ("VERIFIED_SEARCH", "USABLE_SEARCH_EVIDENCE_FOUND") if goal["satisfied"] else
-            ("SEARCH_REQUIRED", "EXISTING_CANDIDATES_EXCLUDED_NO_APPLICABLE_EVIDENCE" if excluded else "NO_EVIDENCE_SEARCH_REQUIRED"))
+            ("SEARCH_REQUIRED", "EXISTING_CANDIDATES_EXCLUDED_NO_APPLICABLE_EVIDENCE" if excluded or domain_excluded else "NO_EVIDENCE_SEARCH_REQUIRED"))
         if not goal["satisfied"] and not conflicts:
             pending_supplied = [option for option in supplied if not _readable(option, active)]
             unknown_sources = [option for option in supplied if kind(option) == "UNKNOWN"] if (
@@ -553,6 +578,8 @@ def build_evidence_plan(store: Store, run_id: str, *, judgments: list[dict] | No
             "selected_candidate_ref_ids": sorted({option["ref"]["ref_id"] for option in chosen_discoveries if option["ref"]}),
             "selected_candidate_snapshot_ids": sorted({option["snapshot"]["snapshot_id"] for option in chosen_discoveries if option["snapshot"]}),
             "counting_basis": "UNIQUE_READABLE_SUPPLIED_SNAPSHOT_OR_FACT_VALIDATED_DISCOVERY;_NOT_FAULT_CONFIRMATION"}
+        if domain_assessments:
+            search_control["counting_basis"] += ";_TRIGGER_INIT_CURRENT_SOURCE_ASSESSMENT"
         if conflicts:
             search_control["satisfied"] = False
             search_control["reasons"].append("KNOWN_CONFLICT")
@@ -612,6 +639,8 @@ def build_evidence_plan(store: Store, run_id: str, *, judgments: list[dict] | No
         routing = {"case_id": case_id, "group_id": group["group_id"] if group else None, "relation": relation,
             "source_grades": grades, "user_confirmed": confirmed, "selected_ref_ids": selected_ref_ids,
             "selected_snapshot_ids": selected_snapshot_ids, "issue_scopes": scopes, "search_policy_hash": policy_info["policy_hash"]}
+        if domain_assessments:
+            routing["domain_source_assessments"] = domain_assessments
         plan = {**routing, "external_id": case.get("external_id", ""), "source_file": case.get("source_file"),
             "sheet": case.get("sheet"), "row": case.get("row"),
             "source_grade": relation, "path": path, "routing_hash": digest(routing),
@@ -622,6 +651,9 @@ def build_evidence_plan(store: Store, run_id: str, *, judgments: list[dict] | No
             "excluded_candidate_judgment_ids": sorted(j.get("judgment_id", "") for j in excluded),
             "insufficient_candidate_judgment_ids": sorted(j.get("judgment_id", "") for j in insufficient
                 if any(option["relation"] == "SEARCH_DISCOVERED" and not option["user_confirmed"] and option_judged(option, j) for option in all_options)),
+            "domain_source_assessments": domain_assessments,
+            "excluded_source_snapshot_ids": sorted(domain_excluded),
+            "insufficient_source_snapshot_ids": sorted(domain_weak),
             "provenance": [option["provenance"] for option in selected], "work_ids": []}
         for option in selected:
             if not _readable(option, active):

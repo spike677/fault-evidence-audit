@@ -68,7 +68,7 @@ def auth_site(request: dict, response: dict) -> str:
 
 def executor_blocked(request: dict, response: dict) -> bool:
     """Transport-level inability to read input is never a model result."""
-    if request.get("kind") not in {"model", "catalog_draft"} or response.get("outcome") != "BLOCKED":
+    if request.get("kind") not in {"model", "catalog_draft", "trigger_classify"} or response.get("outcome") != "BLOCKED":
         return False
     if (response.get("request_hash") != request.get("request_hash")
             or not request.get("request_hash") or response.get("reason_code") != "EXECUTOR_CONTEXT_LIMIT"
@@ -134,6 +134,8 @@ def _finish(store, run_id, step, *, rounds, reason):
         request = store.get(run_id, "workflow_requests", record["task_id"]) or {}
         payload = request.get("payload", {})
         cases = payload.get("case_ids", [])
+        if not cases and payload.get("subject", {}).get("case_id"):
+            cases = [payload["subject"]["case_id"]]
         if not cases and payload.get("task", {}).get("payload", {}).get("case"):
             cases = [payload["task"]["payload"]["case"]["case_id"]]
         block = {"kind": record["kind"], "case_ids": cases,

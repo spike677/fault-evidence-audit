@@ -5,6 +5,12 @@ description: "在OpenCode环境按必要证据计划采集并执行faultaudit模
 
 # 故障证据核验
 
+## 0.1.12：先初始化覆盖，再判断新增案例
+
+用户要求初始化现有CANN模式时，使用 `trigger-workflow init --modes <原始模式库> --taxonomy <trigger_library.md> --work-root work/runs --executor opencode`，保存新初始化run_id，再沿用next/submit或drive逐条连续处理。原模式库不等于42类：42类是输入触发条件；Branch2（平台/SoC、编译选项/宏、构建变体；固定单实例可为0）和Branch3（设备调度、流与异步、同步/竞态；同实参同二进制）单列。现有模式是MODE_ENTRY，不能虚构故障事件来通过原事件判断门禁。Wiki最高优先，缺Wiki先按模式名、原因和原单元格事实由Agent展开有界搜索，已有Wiki先读；所有原始链接继续整理。裸DTS/Wiki编号由Agent实际定位原页面，不拼造URL、不将另一页面提到编号当作原资料。
+
+先共享独立摘要，再以每模式/快照/具体子问题分发 `trigger_classify` 新上下文，完整处理42项及Branch2/3，并保留机理明细、谓词条件、精确引文与未知项。分类kind使用外层request_hash及payload.response_schema，不是INNER模型信封。正常自动处理，明确事实冲突才交人工；未知不是未覆盖。全部原模式及资料子问题处理后用 `trigger-workflow finalize` 冻结覆盖基线；采集/来源仍有缺口仅可显式 `--allow-pending` 临时冻结，不能跳过未执行工作。随后 `trigger-workflow classify --baseline-run <初始化run> --input <新增结构化XLSX> --work-root work/runs --executor opencode`，判断归入已知明细、扩充分支、新模式候选或待定；42类未命中不能证明新故障机理。只交付一个 `模式初始化及覆盖详情.xlsx` 或 `故障分类及分支建议.xlsx`。复用原SQLite、快照和tasks文件，不额外创建报告或第二套队列。真实站点、Edge登录、provider/model仍在现场验证。
+
 ## 0.1.11：整批持续执行与独立子 Agent（本节优先）
 
 OpenChamber 通过 OpenCode 支持原生子 Agent 和 Agent 搜索；不要解释成“工具只能记账，必须用户逐条取证判断”。在已授权批次内持续执行，不每 10 条申请继续。主会话只保留任务 ID、状态和路径，单项 request/response 交给 `.opencode/agents/fault-audit-worker.md` 的新上下文；使用实际版本的原生 `subagent`/Task 工具，不复用其他任务的 sessionID。语义任务可并发 2，Edge 采集队列保持 1，由协调器唯一提交 SQLite。不要同时启动 CLI driver 和聊天协调器抢同一 run。
@@ -19,7 +25,7 @@ OpenChamber 通过 OpenCode 支持原生子 Agent 和 Agent 搜索；不要解�
 
 最终只交付 `work/runs/<run_id>/output/故障整理及模式库建议.xlsx`。暂停/升级前备份，优先原 state、原 run 续跑；未就绪、权限和冲突保持真实待办。以下保留底层文件协议的兼容操作，不能覆盖本节的默认入口、Wiki 优先与单工作簿约定。
 
-本 Skill 对应核心版本 0.1.11。通过 `scripts/run_audit.py` 调用本地核验核心。用核心的 `scripts/install_opencode.py --project <工作区>` 安装后，入口通过本地 `core-location.json` 定位核心，无需设置环境变量；同一磁盘优先保存相对路径，整个工作区与核心一起移动后仍可调用。跨磁盘安装保存本地绝对路径，迁移后可设置 FAULTAUDIT_HOME；如需重装，先保留并移走旧定位配置，安装器不会覆盖不同内容。可用 `FAULTAUDIT_HOME` 显式指定含 `run_faultaudit.py` 的核心目录，配置无效时直接报错，不回退到其他核心。核心只导入、保存快照、规划证据、发布任务及运行本地门禁；本 Skill 的模型执行及内网采集在 OpenCode 环境完成。
+本 Skill 对应核心版本 0.1.12。通过 `scripts/run_audit.py` 调用本地核验核心。用核心的 `scripts/install_opencode.py --project <工作区>` 安装后，入口通过本地 `core-location.json` 定位核心，无需设置环境变量；同一磁盘优先保存相对路径，整个工作区与核心一起移动后仍可调用。跨磁盘安装保存本地绝对路径，迁移后可设置 FAULTAUDIT_HOME；如需重装，先保留并移走旧定位配置，安装器不会覆盖不同内容。可用 `FAULTAUDIT_HOME` 显式指定含 `run_faultaudit.py` 的核心目录，配置无效时直接报错，不回退到其他核心。核心只导入、保存快照、规划证据、发布任务及运行本地门禁；本 Skill 的模型执行及内网采集在 OpenCode 环境完成。
 
 DTS、Wiki、GitCode、GitHub、CodeHub 等目标网站访问统一由 OpenChamber 环境负责，使用其连接的 OpenCode 与现场工具执行。网站登录、搜索、正文/分页/附件/评论/Diff 读取及网络重试不进入 Codex 核心。`fetch-tasks` 仅导出清单，不能当作已经读取网页的证明。
 

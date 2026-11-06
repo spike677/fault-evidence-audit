@@ -2,7 +2,7 @@
 
 故障证据核验核心。核心测试与 `examples/` 使用合成数据；用户指定发布的模式库草案单独存放在 [`catalog/drafts/`](catalog/drafts/README.md)，与测试数据及正式库分开。
 
-版本 0.1.11，2026 年 11 月 6 日。核心负责导入故障表、保存原文与引用来源、规划必要证据、生成采集和模型任务、检查返回结果并生成复核报告。模型任务可由 OpenCode 或 Codex 会话执行，内网采集仍由具备授权与登录态的现场环境完成。支持文件交接及外部 Agent 命令适配，不包含直连模型或网站的网络客户端。
+版本 0.1.12，2026 年 11 月 6 日。核心负责导入故障表、保存原文与引用来源、规划必要证据、生成采集和模型任务、检查返回结果并生成复核报告。模型任务可由 OpenCode 或 Codex 会话执行，内网采集仍由具备授权与登录态的现场环境完成。支持文件交接及外部 Agent 命令适配，不包含直连模型或网站的网络客户端。
 
 ## 结构化 XLSX 全流程（本轮默认入口）
 
@@ -59,6 +59,67 @@ $PythonExe = 'python' # 使用具备 requirements.txt 依赖的实际解释器
 目标网站包括 DTS、Wiki、GitCode、GitHub、CodeHub。真实资料由具备授权与登录态的现场工具采集；现有现场方案使用 OpenChamber/OpenCode。登录认证、搜索、正文读取、分页、附件、评论、Diff、网络重试和权限故障处理均在采集环境完成。核验核心不访问这些网站，也不保存其认证凭据；选择 Codex 执行模型任务不会自动获得这些站点的访问能力。
 
 `fetch-tasks` 只导出待访问 URL 及其引用来源清单，不发送网页请求；`ingest-evidence` 只读取现场返回的本地证据包。模型任务交给选定的执行会话，核心仅做结果验收。
+
+## 先初始化模式覆盖，再判断新增案例
+
+`trigger-workflow` 在同一核心上增加两个阶段：先逐条维护原 CANN 算子模式的证据与分类明细，冻结初始化基线；随后用该基线判断新案例属于已有明细、需要扩充分支，还是具有新模式依据。原模式编号保持不变，初始化条目是模式定义，不能冒充一条实际故障事件。
+
+`trigger_library.md` 的 **9 族、42 类是输入触发条件**，与原 CANN 库的故障机理是两个维度。二者是多对多关系：同一机理可有多个触发条件，同一触发类也可涉及多个机理。覆盖详情保留“原模式 → 具体资料子问题 → 算子/条件/机理明细 → 触发类 → 完整谓词检查及引文”，不把同一个数值或名称匹配当成完整覆盖。这里的覆盖是历史资料证据归类，始终标记 `HISTORICAL_EVIDENCE`、`execution_verified=false`，不表示已经运行算子、注入故障或覆盖所有内核路径。
+
+Branch 2/3 单独登记，不加入 42 类的分母。默认采用用户于 2026-11-06 明确提供的定义，来源与 Markdown 文件分开保存：
+
+| 分支 | 子类 | 边界 |
+| --- | --- | --- |
+| 2：实现实例 | 2.1 平台/SoC；2.2 编译选项/宏；2.3 构建变体 | 固定单实例可为 0；这不表示已经验证无故障 |
+| 3：执行情境 | 3.1 设备调度；3.2 流与异步；3.3 同步/竞态 | 在同实参、同二进制下考察 |
+
+可用 `--branch-source '定义.json'` 提供显式结构化分支定义，或 `--no-user-branches` 保留未定义状态；没有定义的子类不能由 Agent 自行编造。分类表中的未知不自动变成人工审核事项。
+
+实现按五个模块分工，复用已有采集、摘要、任务去重与输入预算：
+
+| 模块 | 程序承担 | 需要独立子 Agent 的部分 |
+| --- | --- | --- |
+| 输入与分类基准 | `importers`、`trigger_taxonomy` 保留原编号、来源位置、文件 Hash，冻结完整原库、42 类及 Branch 定义 | 当前结构化输入无需模型抽取；Word/PPT、任意布局仍为 TODO |
+| 取证编排 | `evidence_plan`、`wiki_checks`、`xlsx_workflow` 选择全部已有引用、Wiki 优先、同资源共享抓取、有界补读和续跑 | 浏览器 worker 搜索、读取 Wiki/DTS/GitCode/GitHub，核对正文、讨论与必要 Diff |
+| 独立资料摘要 | `pipeline`、`bridge` 对同快照共享摘要、分组齐备后汇总，并按资料子问题拆开 | 每个摘要任务用独立上下文提取有原文引用的症状、算子、触发、机理、修复与未知项 |
+| 事实对照与分类 | `trigger_assessment` 检查完整 42 项、原单元格和快照引文、Requires/Skip 条件及决策前提 | 每个模式/案例与资料子问题独立判断，比较含义，完成一次自检；不混用同页其他问题 |
+| 基线与交付 | `trigger_workflow`、`trigger_report` 保存当前有效明细、冻结基线、检查失效，输出一份 XLSX | 新案例的语义归类复用原全库映射；明确且有引用的未解冲突才交人工 |
+
+没有 Wiki 时，必须先以模式名称、故障原因、算子、症状等原单元格事实指导 Agent 搜索 Wiki；已有 Wiki 则先读原链接，不重复补搜。搜索词及扩展由 Agent 根据实际结果形成，核心不硬编码关键词。原记录提供的 Wiki、DTS、PR 等有效引用全部整理，一份可用资料只停止新增扩搜，不跳过其余原始资料。裸 DTS/Wiki 编号交给 Agent 实际查找并读取对应页面，程序核对编号与资料类型，不拼造内部 URL；查到的地址仍保留“搜索发现”身份和原编号来源链。
+
+登录失败、空页、只读到目录或缺少 Diff 均保留具体采集缺口；`CONTENT_CAPTURED`/`PARTIAL` 中已有的精确引文仍可用于分类。缺失字段保持未知，不能据此认定不适用、另一事件或新增模式。Wiki 有界搜索的 `NO_MATCH` 只描述已查范围，登录失败不能写成 `NO_MATCH`。现场继续通过 OpenChamber/OpenCode 的浏览器和子 Agent 执行，Edge 登录仍由用户手动完成。
+
+初始化示例（沿用上文 `$PythonExe`，路径改为现场实际值）：
+
+```powershell
+$TriggerState = 'work/trigger-state'
+$Init = & $PythonExe run_faultaudit.py --state $TriggerState trigger-workflow init `
+  --modes '原始CANN算子故障模式库.xlsx' --taxonomy 'trigger_library.md' `
+  --work-root work/runs --executor opencode | Out-String | ConvertFrom-Json
+$InitRunId = $Init.run_id
+& $PythonExe run_faultaudit.py --state $TriggerState trigger-workflow next --run $InitRunId
+# 现场主会话循环 next/submit，或复用已有 Agent 命令适配器整批推进：
+& $PythonExe run_faultaudit.py --state $TriggerState trigger-workflow drive --run $InitRunId `
+  --agent-command-file '实际Agent命令配置.json' --workers 2 --timeout 1000 --browser-timeout 1000
+& $PythonExe run_faultaudit.py --state $TriggerState trigger-workflow status --run $InitRunId
+& $PythonExe run_faultaudit.py --state $TriggerState trigger-workflow finalize --run $InitRunId
+& $PythonExe run_faultaudit.py --state $TriggerState trigger-workflow export --run $InitRunId
+```
+
+`finalize` 要求每个原模式及每个当前资料子问题已有有效判断，未执行任务不能跳过。采集阻塞或来源机理仍不明确时，可显式加 `--allow-pending` 冻结 `READY_WITH_GAPS` 临时基线；普通触发谓词未知、可引用的部分正文不阻止维护基线，未知项逐条保留，不因此成为人工异常或技术否定结论。新增案例默认要求 `READY` 基线；若明确使用临时基线，`classify` 需指定 `--allow-pending-baseline`。输入、摘要、规则或基线依赖变化后，旧判断及旧基线保留为历史，不能继续充当当前有效结论。
+
+```powershell
+$New = & $PythonExe run_faultaudit.py --state $TriggerState trigger-workflow classify `
+  --baseline-run $InitRunId --input '新增结构化故障表.xlsx' `
+  --work-root work/runs --executor opencode | Out-String | ConvertFrom-Json
+$NewRunId = $New.run_id
+& $PythonExe run_faultaudit.py --state $TriggerState trigger-workflow next --run $NewRunId
+# 使用同一 next/submit 或 drive 接口完成该批次，再 export。
+```
+
+新案例先比较完整原机理库：`CLASSIFY_EXISTING` 需有实际库覆盖与已有明细；`EXTEND_DETAIL` 在已有机理下提出有依据的新条件/实现明细；`PROPOSE_NEW_MODE` 需完整原库逐项排除及当前同事件直接根因依据。仅 42 类未命中、Branch 2/3 不同或资料缺失，均不足以提出新机理；证据不足用 `UNDETERMINED`。所有动作是分类/维护建议，不自动正式入库，也不生成或继承人工 `ACCEPT`。
+
+中间数据只用既有 `<state>/audit.sqlite3` 和 `<state>/snapshots/<snapshot_id>/`；任务文件固定在 `work/runs/<run_id>/tasks/<task_id>/request.json` 与 `attempt-<n>/response.json`。摘要、分类结果、基线及历史留在同一数据库，不再建第二套队列或数据库。对外每批只交付一个 XLSX：初始化为 `work/runs/<run_id>/output/模式初始化及覆盖详情.xlsx`，增量为 `故障分类及分支建议.xlsx`，含总览、42 类覆盖详情、机理明细、Branch 2/3、证据与缺口、运行统计。模型任务仍受整请求预算约束，处理不了时明确阻塞，不截取前缀后提交成功。
 
 ## 本版可用范围
 
