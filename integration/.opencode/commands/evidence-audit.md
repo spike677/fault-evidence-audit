@@ -6,6 +6,8 @@ description: "通过OpenCode采集证据并执行模型任务，回传本地核�
 
 通过 Skill 的 scripts/run_audit.py 调用核心 CLI，使用现有 run ID 继续任务。
 核心版本0.1.9管理导入、快照、证据计划、文件任务协议、本地门禁及只读统计；本命令的模型provider/model与实际执行由OpenCode环境负责。
+从文档整理故障时Wiki为第一优先级：已有Wiki先读并核对，默认不另搜Wiki；没有Wiki时，即使已有其他站点证据，也必须先做有范围的Wiki补证检查。查无匹配记录查询范围与NO_MATCH；登录失败记录BLOCKED，不能算检查完成，其他资料继续整理。已有原链保留，最终核对发现错挂/冲突才定向补证。不把required_sources=WIKI当成“检查过Wiki”的替代，也不无限寻找。该前置门禁尚需新文档流水线程序实现，0.1.9不能仅凭提示词视为已具备。
+新流水线文件命名与位置以docs/catalog-engineering-plan.md“固定存放位置与最少文件”为准：复用原state；任务只保留必要request.json及按尝试保存的response.json，最终交付一个故障整理及模式库建议.xlsx。不要额外撰写逐条Markdown/HTML总结或多版交付物；当前CLI的多文件导出尚需精简出口，不修改或删除历史文件来伪装精简。
 模式库草案使用 catalog-draft prepare --run <id> --case-id <内部caseID> --expected-additions <数> --out <新目录>。完整读取request.json，按schema填写新response.json并如实声明producer；草案走catalog-draft validate/export，不能交给submit-model-results。只读状态、保留完整冻结库，旧表陈述不升级为已验证根因，不修改正式库或生成ACCEPT；操作说明见docs/catalog-draft.md。超限或读不全即阻塞，不删减任务。
 先以--state <state> evidence-plan --run <id> --out preview.json只读预览。整理全部已有原表/旧汇总引用及显式确认资料，不只选一份；已有可用内容就提事实并停止新增补链，不取消其他已有引用。未选搜索候选留档。
 逐条核验仓库Issue/PR和真实根因时，再以--state <state> investigation-plan --run <id> --out investigation.json导出只读调查计划。保留每条source_case及出处，按resources去重读取作者正文、相关讨论、适用关联Issue和必要修复Diff；按work_items的work_id和子问题处理。链接仅导航候选，不等于关联成立。independent_technical_facts是资料自身事实，root_cause_candidates只供当前工作候选；ROOT_CAUSE_UNCONFIRMED不可改成完成根因。仍由本环境执行采集和模型，使用原EvidencePackage和model-tasks/submit-model-results回传，不新增网站/模型客户端或人工ACCEPT。
