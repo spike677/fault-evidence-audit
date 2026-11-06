@@ -2,7 +2,48 @@
 
 故障证据核验核心。核心测试与 `examples/` 使用合成数据；用户指定发布的模式库草案单独存放在 [`catalog/drafts/`](catalog/drafts/README.md)，与测试数据及正式库分开。
 
-版本 0.1.9，2026 年 11 月 6 日。核心负责导入故障表、保存原文与引用来源、规划必要证据、生成采集和模型任务、检查返回结果并生成复核报告。模型任务可由 OpenCode 或 Codex 会话执行，内网采集仍由具备授权与登录态的现场环境完成。当前使用文件任务往返，不包含直连模型服务的网络客户端。
+版本 0.1.10，2026 年 11 月 6 日。核心负责导入故障表、保存原文与引用来源、规划必要证据、生成采集和模型任务、检查返回结果并生成复核报告。模型任务可由 OpenCode 或 Codex 会话执行，内网采集仍由具备授权与登录态的现场环境完成。支持文件交接及外部 Agent 命令适配，不包含直连模型或网站的网络客户端。
+
+## 结构化 XLSX 全流程（本轮默认入口）
+
+`xlsx-workflow` 负责 Wiki 优先、采集与模型任务推进、模式归类和整体故障排名。默认交付一个 `故障整理及模式库建议.xlsx`，包含排名、来源与证据、模式库建议、异常与待处理、运行统计。前三列固定“排名、原编号、case_id”，保留文件、Sheet、Excel 行、单元格和原始归因；排名是明确的整理优先级，不冒充故障严重程度。
+
+```powershell
+$PythonExe = 'python' # 使用具备 requirements.txt 依赖的实际解释器
+& $PythonExe run_faultaudit.py --state .faultaudit xlsx-workflow start `
+  --input '实际结构化故障表.xlsx' --catalog '实际原始模式库.xlsx' `
+  --expected-catalog-count 30 --work-root work/runs --executor opencode
+# 使用上一步返回的明确 run_id；库数量按实际冻结原库填写，不固定为30。
+& $PythonExe run_faultaudit.py --state .faultaudit xlsx-workflow next --run RUN_ID
+```
+
+`next` 返回按 Wiki 优先排列的任务及准确的 `request`、`response` 路径。OpenChamber/OpenCode 读取完整请求，使用其已有网站工具或模型执行，把响应写到返回路径后提交；程序继续解锁下一阶段，不要求用户手工组织阶段文件。
+
+来源类型沿用导入器的 `LEGACY_TABLE` 默认；确为原始周报/OBP 时显式指定 `--source-kind ORIGINAL_WEEKLY` 或 `ORIGINAL_OBP`。三类已有链接都直接进入整理，不将普通汇总表自动标成原始周报。
+
+工作流处理指定 run 的全部记录；新批次默认创建新 run，`--run` 用于同批续跑，不作为既有多来源运行的子集筛选参数。
+
+```powershell
+& $PythonExe run_faultaudit.py --state .faultaudit xlsx-workflow submit --run RUN_ID `
+  --task-id TASK_ID --response 'next返回的response路径'
+# 循环 next/submit，直到 READY_TO_EXPORT；再生成唯一交付文件。
+& $PythonExe run_faultaudit.py --state .faultaudit xlsx-workflow export --run RUN_ID
+```
+
+已具备现场 Agent 命令适配器时，使用 `drive` 自动循环并导出：
+
+```powershell
+& $PythonExe run_faultaudit.py --state .faultaudit xlsx-workflow drive --run RUN_ID `
+  --agent-command-file '实际Agent命令配置.json'
+```
+
+配置是 argv JSON 数组，例如 `["实际解释器绝对路径", "现场适配脚本绝对路径", "{request}", "{response}"]`。程序以 `shell=False` 替换两个绝对文件路径，适配器按请求类型调用现场工具/模型并写响应；不是声称 OpenCode 原生命令支持这些参数。也可由 OpenChamber 会话直接循环调用 `next/submit`，无需进程适配器。
+
+原 Wiki 优先读取、不再重复补搜；没有 Wiki 时，即使已有 PR 也必须执行有范围的 Wiki 检查。`NO_MATCH` 留存查询后允许处理其他证据；登录失败保持 `BLOCKED`。已有引用全部整理，默认一份可用证据满足后停止新增搜索。需要重试访问时用 `xlsx-workflow retry --run RUN_ID --task-id TASK_ID`，保留旧响应。
+
+工作文件固定在 `work/runs/<run_id>/tasks/<task_id>/request.json` 和 `attempt-<n>/response.json`，最终输出为 `work/runs/<run_id>/output/故障整理及模式库建议.xlsx`；摘要、Wiki 检查及判断保存在原 state，证据原文仍用现有 snapshots。导出用的临时 JSON/预览在完成后清理，不默认另产 HTML、Markdown、TSV 或重复 JSON 报告。可选 XLSX 依赖仍见下文；有待办时结果为 `COMPLETE_WITH_PENDING`、CLI 退出2，不能把待办说成工具失败或全部完成。
+
+本轮模块分别是既有表格导入、`wiki_checks`、`agent_adapter`、`xlsx_workflow`、`catalog_drafts`、`ranking_report` 和既有 XLSX 适配器。**TODO：Word/PPT、任意布局 XLSX 的 Agent 抽取、时间范围收集**；这些入口本轮不支持。
 
 2026 年 11 月 6 日交付：[新增 3 条模式 XLSX 与合并核对说明](catalog/drafts/README.md)。0.1.9 增加 [catalog-draft 操作说明](docs/catalog-draft.md)：准备 Agent 输入、校验模式草案、无损合并预览及 XLSX 导出。它不自动采集、调用模型或正式入库；[原工程化方案](docs/catalog-engineering-plan.md)保留为设计记录。
 

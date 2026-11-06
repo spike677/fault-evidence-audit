@@ -1,4 +1,6 @@
-# 模式草案工具（0.1.9）
+# 模式草案工具（0.1.10，兼容 0.1.9）
+
+0.1.10 的 `--expected-additions` 为可选：省略时由 Agent 根据完整原库自主决定动作和新增数量；明确指定“只新增3条”时仍严格执行。结构化 XLSX 的默认完整流程使用 README 中的 `xlsx-workflow`，自动连接本层并只交付一个排名工作簿；下面独立命令仍用于单独检查与调试。
 
 `catalog-draft prepare / validate / export` 复用当前运行的来源、独立资料事实、`work_id`、冻结原库与有效性门禁，只读打开 SQLite。输出写到 state 之外的新位置；不更新正式库、不创建人工 ACCEPT。
 
@@ -14,7 +16,7 @@ $PythonExe = 'python' # 使用安装了 requirements.txt 的实际解释器
   --expected-additions 3 --out work/catalog-input-r1
 ```
 
-`prepare` 必须指定本轮选定记录和预期新增条数，并保留完整冻结库。成功输出 `request.json` 与 `response_template.json`。请求包含指令、完整响应 schema、当前资料事实、原单元格、工作范围、库映射和来源缺口，并核算整份序列化请求的字符数。
+`prepare` 必须指定本轮选定记录，预期新增条数可选，并保留完整冻结库。成功输出 `request.json` 与 `response_template.json`。请求包含指令、完整响应 schema、当前资料事实、原单元格、工作范围、库映射和来源缺口，并核算整份序列化请求的字符数。
 
 默认预算仍为 48,000 字符，配置键沿用 `FAULTAUDIT_MAX_INPUT_CHARS`。超限时退出 2，仅输出 `blocked.json`，其中保留完整上下文及大小、预算和 `INPUT_TOO_LARGE` 原因，不生成可执行请求。不通过截取正文、事实或库条目让任务成功；执行会话读不全时也应报告阻塞。
 

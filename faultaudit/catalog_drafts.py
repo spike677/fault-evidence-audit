@@ -16,7 +16,7 @@ from .investigation import ROOT_FIELDS, investigation_plan
 from .pipeline import current_mappings
 from .store import AuditError, Store, canonical_url, digest
 
-RULE_VERSION = "catalog-draft-1.0"
+RULE_VERSION = "catalog-draft-1.1"
 COLUMNS = dict(zip(CatalogDraftRow.model_fields, [
     "一级（架构层次）", "二级（物理实体）", "三级（部件、功能模块）", "四级（部件、功能模块）",
     "模式名称", "故障原因", "故障影响", "参考业务场景", "精度故障类型", "检查机制", "模块处理建议",
@@ -24,8 +24,10 @@ COLUMNS = dict(zip(CatalogDraftRow.model_fields, [
 ]))
 SUGGESTIONS = {"detection", "mitigation", "constructibility", "injection_tool", "injection_method"}
 INSTRUCTIONS = """Produce a CATALOG_DRAFT JSON response using the supplied schema and request_hash.
-Use all selected cases and compare every frozen catalog item per proposal. The expected
-number of ADD proposals is fixed by this request. Do not create human ACCEPT or modify state.
+Use all selected cases and compare every frozen catalog item per proposal. When expected_additions
+is null, decide ADD/REFINE/APPEND_CASE/NO_CHANGE and the number of new patterns from the evidence.
+When expected_additions is an integer, it is an explicit exact ADD-count constraint, including zero.
+Do not create human ACCEPT or modify state.
 Abstract the pattern name; describe the specific mechanism separately. Fill all fifteen columns
 and a field basis for each. Cite current fact_ids or exact source cells; imported attributions
 are not verified root causes. Keep absent details unknown, units and implementation ownership
@@ -46,11 +48,12 @@ def draft_policy_fingerprint() -> str:
                    "sources": digest(Path(__file__).read_bytes() + Path(investigation.__file__).read_bytes())})
 
 
-def draft_context(store: Store, run_id: str, case_ids: list[str], expected_additions: int) -> dict:
+def draft_context(store: Store, run_id: str, case_ids: list[str], expected_additions: int | None = None) -> dict:
     if not case_ids or len(set(case_ids)) != len(case_ids):
         raise AuditError("Select a nonempty, unique case ID set")
-    if isinstance(expected_additions, bool) or not isinstance(expected_additions, int) or expected_additions < 0:
-        raise AuditError("Expected additions must be a nonnegative integer")
+    if expected_additions is not None and (isinstance(expected_additions, bool)
+            or not isinstance(expected_additions, int) or expected_additions < 0):
+        raise AuditError("Expected additions must be a nonnegative integer or omitted for automatic classification")
     plan = investigation_plan(store, run_id)
     selected = set(case_ids)
     cases = [case for case in plan["cases"] if case["case_id"] in selected]
@@ -76,7 +79,7 @@ def draft_context(store: Store, run_id: str, case_ids: list[str], expected_addit
             "input_scope": "COMPLETE_FROZEN_CATALOG_AND_SELECTED_CASES; CAPTURED_EVIDENCE_ONLY"}
 
 
-def prepare_draft(store: Store, run_id: str, case_ids: list[str], expected_additions: int) -> dict:
+def prepare_draft(store: Store, run_id: str, case_ids: list[str], expected_additions: int | None = None) -> dict:
     context = draft_context(store, run_id, case_ids, expected_additions)
     unsigned = {"kind": "catalog_draft", "schema_version": "1.0", "run_id": run_id,
                 "policy_hash": draft_policy_fingerprint(), "instructions": INSTRUCTIONS,
@@ -256,12 +259,13 @@ def validate_draft(store: Store, run_id: str, request: dict, response: dict) -> 
             warnings.append(prefix + root_status)
     if covered != selected:
         errors.append("Every selected case must appear in a proposal; cases cannot be silently dropped")
-    if additions != context["expected_additions"]:
+    if context["expected_additions"] is not None and additions != context["expected_additions"]:
         errors.append(f"Expected {context['expected_additions']} ADD proposals, received {additions}")
     return {"status": "BLOCKED" if errors else "VALID_DRAFT", "errors": errors, "warnings": warnings,
             "rule_version": RULE_VERSION, "policy_hash": request["policy_hash"],
             "input_budget": request["input_budget"], "request_hash": request["request_hash"], "response_hash": digest(response),
             "baseline_hash": context["baseline_hash"], "baseline_count": len(catalog_ids),
+            "expected_additions": context["expected_additions"],
             "proposal_count": len(seen), "case_count": len(covered), "addition_count": additions,
             "merged_preview_count": len(catalog_ids) + additions, "proposals": statuses,
             "executor": draft.executor, "created_by": draft.created_by,

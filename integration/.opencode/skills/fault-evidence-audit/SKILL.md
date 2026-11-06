@@ -5,7 +5,7 @@ description: "在OpenCode环境按必要证据计划采集并执行faultaudit模
 
 # 故障证据核验
 
-本 Skill 对应核心版本 0.1.8。通过 `scripts/run_audit.py` 调用本地核验核心。用核心的 `scripts/install_opencode.py --project <工作区>` 安装后，入口通过本地 `core-location.json` 定位核心，无需设置环境变量；同一磁盘优先保存相对路径，整个工作区与核心一起移动后仍可调用。跨磁盘安装保存本地绝对路径，迁移后可设置 FAULTAUDIT_HOME；如需重装，先保留并移走旧定位配置，安装器不会覆盖不同内容。可用 `FAULTAUDIT_HOME` 显式指定含 `run_faultaudit.py` 的核心目录，配置无效时直接报错，不回退到其他核心。核心只导入、保存快照、规划证据、发布任务及运行本地门禁；本 Skill 的模型执行及内网采集在 OpenCode 环境完成。
+本 Skill 对应核心版本 0.1.10。通过 `scripts/run_audit.py` 调用本地核验核心。用核心的 `scripts/install_opencode.py --project <工作区>` 安装后，入口通过本地 `core-location.json` 定位核心，无需设置环境变量；同一磁盘优先保存相对路径，整个工作区与核心一起移动后仍可调用。跨磁盘安装保存本地绝对路径，迁移后可设置 FAULTAUDIT_HOME；如需重装，先保留并移走旧定位配置，安装器不会覆盖不同内容。可用 `FAULTAUDIT_HOME` 显式指定含 `run_faultaudit.py` 的核心目录，配置无效时直接报错，不回退到其他核心。核心只导入、保存快照、规划证据、发布任务及运行本地门禁；本 Skill 的模型执行及内网采集在 OpenCode 环境完成。
 
 DTS、Wiki、GitCode、GitHub、CodeHub 等目标网站访问统一由 OpenChamber 环境负责，使用其连接的 OpenCode 与现场工具执行。网站登录、搜索、正文/分页/附件/评论/Diff 读取及网络重试不进入 Codex 核心。`fetch-tasks` 仅导出清单，不能当作已经读取网页的证明。
 
@@ -16,6 +16,10 @@ OpenChamber可由其连接的OpenCode执行本Skill，替代Codex执行模型与
 本 Skill 默认执行 OpenCode 流程。核心另支持 Codex 会话，通过 `model-tasks/submit-model-results --executor codex` 和 `run --mode codex` 使用同一文件协议；Codex 的生产者使用 executor=codex 与 codex_version，不冒充 OpenCode 或 DeepSeek。精确模型/后台版本未知时明确标注 unreported。
 
 ## 操作
+
+结构化 XLSX 的默认完整流程先使用 `xlsx-workflow start --input <故障表.xlsx> --catalog <实际原库> --executor opencode`，保存返回 run_id；循环 `xlsx-workflow next --run <id>`，按每项返回的准确 request/response 路径执行采集或语义判断，再以 `xlsx-workflow submit --run <id> --task-id <id> --response <路径>` 回传。程序控制 Wiki 优先、无匹配留痕、去重、依赖与续跑；到 READY_TO_EXPORT 后 `xlsx-workflow export --run <id>` 只交付一个 `故障整理及模式库建议.xlsx`。网站/模型仍使用本环境现有能力，不冒充调用或登录。当前不支持 Word/PPT、任意布局 XLSX 或时间范围收集。具体命令、外部进程适配及固定路径见核心 README。
+
+下面是底层文件协议的兼容操作；本轮默认流程不额外生成逐条说明或多份报告。
 
 1. 运行核心 `doctor` 检查本地依赖；另在现场确认实际 OpenCode 服务版本、模型执行能力、采集工具及输入文件。OpenChamber 2.5.2 可能连接内置 OpenCode 2.1.4，不能仅凭 PATH 中 2.2.0 推定实际后端。
 2. 导入原始周报或旧汇总表，明确 `--source-kind`。旧表根因默认来源未知。保存 run ID，后续会话继续该 run。

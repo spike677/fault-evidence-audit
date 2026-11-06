@@ -166,21 +166,43 @@ def parser() -> argparse.ArgumentParser:
         draft_cmd.add_argument("--out", type=Path, required=operation != "validate")
         if operation == "prepare":
             draft_cmd.add_argument("--case-id", action="append", required=True, help="Exact internal case ID; repeat to select")
-            draft_cmd.add_argument("--expected-additions", type=int, required=True)
+            draft_cmd.add_argument("--expected-additions", type=int, help="Optional exact ADD count; omitted lets Agent decide")
         else:
             draft_cmd.add_argument("--request", type=Path, required=True)
             draft_cmd.add_argument("--draft", type=Path, required=True)
         if operation == "export":
             draft_cmd.add_argument("--xlsx", action="store_true")
+    workflow = sub.add_parser("xlsx-workflow", help="Structured XLSX, Wiki-first Agent workflow and one ranked workbook")
+    flow = workflow.add_subparsers(dest="flow_command", required=True)
+    start = flow.add_parser("start")
+    start.add_argument("--input", type=Path, required=True)
+    start.add_argument("--catalog", type=Path, required=True)
+    start.add_argument("--work-root", type=Path, default=Path("work/runs"))
+    start.add_argument("--run")
+    start.add_argument("--executor", choices=["opencode", "codex"], default="opencode")
+    start.add_argument("--source-kind", choices=["ORIGINAL_WEEKLY", "ORIGINAL_OBP", "LEGACY_TABLE"], default="LEGACY_TABLE")
+    start.add_argument("--catalog-sheet", action="append")
+    start.add_argument("--catalog-scope", default="UNSPECIFIED")
+    start.add_argument("--expected-catalog-count", type=int)
+    for operation in ("next", "submit", "drive", "export", "retry"):
+        cmd = flow.add_parser(operation)
+        cmd.add_argument("--run", default="latest")
+        if operation in {"submit", "retry"}:
+            cmd.add_argument("--task-id", required=True)
+        if operation == "submit":
+            cmd.add_argument("--response", type=Path, required=True)
+        if operation == "drive":
+            cmd.add_argument("--agent-command-file", type=Path, required=True, help="JSON argv with {request}/{response}")
+            cmd.add_argument("--max-rounds", type=int, default=32)
     search_policy = sub.add_parser("set-search-policy", help="Set a run default or case search stopping requirement")
     search_policy.add_argument("--run", default="latest")
     search_policy.add_argument("--case-id")
     search_policy.add_argument("--file", type=Path, help="Complete policy JSON; cannot be combined with policy flags")
     search_policy.add_argument("--min-evidence", type=int)
     search_policy.add_argument("--require-source", action="append", default=None,
-                               choices=["WIKI", "DTS", "GITCODE", "GITHUB", "CODEHUB"])
+                               choices=["WIKI", "DTS", "GITCODE", "GITHUB", "GITEE", "CODEHUB"])
     search_policy.add_argument("--require-any-source", nargs="+", default=None,
-                               choices=["WIKI", "DTS", "GITCODE", "GITHUB", "CODEHUB"])
+                               choices=["WIKI", "DTS", "GITCODE", "GITHUB", "GITEE", "CODEHUB"])
     group = sub.add_parser("register-event-group", help="Register only a user-confirmed event relationship")
     group.add_argument("--run", default="latest")
     group.add_argument("--case-ids", nargs="+", required=True)
@@ -232,6 +254,28 @@ def main(argv: list[str] | None = None) -> int:
             write_json({"schemas": str(args.out.resolve())})
             return 0
         store = Store(args.state, read_only=args.command in {"evidence-plan", "investigation-plan", "catalog-draft"})
+        if args.command == "xlsx-workflow":
+            from . import xlsx_workflow as workflow
+            if args.flow_command == "start":
+                result = workflow.start(store, args.input, args.catalog, args.work_root, executor=args.executor,
+                    source_kind=args.source_kind, catalog_sheets=args.catalog_sheet,
+                    expected_catalog_count=args.expected_catalog_count, catalog_scope=args.catalog_scope, run_id=args.run)
+            else:
+                selected_run = store.run_info(args.run)["run_id"]
+                if args.flow_command == "next":
+                    result = workflow.next_tasks(store, selected_run)
+                elif args.flow_command == "submit":
+                    result = workflow.submit(store, selected_run, args.task_id,
+                        json.loads(args.response.read_text(encoding="utf-8-sig")), path=args.response)
+                elif args.flow_command == "retry":
+                    result = workflow.retry(store, selected_run, args.task_id)
+                elif args.flow_command == "drive":
+                    result = workflow.drive(store, selected_run,
+                        json.loads(args.agent_command_file.read_text(encoding="utf-8-sig")), max_rounds=args.max_rounds)
+                else:
+                    result = workflow.export(store, selected_run)
+            write_json(result)
+            return 2 if result.get("status") == "COMPLETE_WITH_PENDING" else 0
         if args.command == "demo":
             write_json(demo(store, args.out.resolve()))
             return 0

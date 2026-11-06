@@ -12,7 +12,7 @@ from .importers import is_empty_link_value
 from .store import AuditError, Store, canonical_url, digest, now
 
 POLICY_VERSION = "evidence-first-0.1.8"
-SEARCH_SOURCES = {"WIKI", "DTS", "GITCODE", "GITHUB", "CODEHUB"}
+SEARCH_SOURCES = {"WIKI", "DTS", "GITCODE", "GITHUB", "GITEE", "CODEHUB"}
 DEFAULT_SEARCH_POLICY = {"min_usable_evidence": 1, "required_sources": [], "required_any_sources": []}
 ORIGINAL_KINDS = {"ORIGINAL_WEEKLY", "ORIGINAL_OBP", "SOURCE_WEEKLY_REPORT", "SOURCE_OBP"}
 TABLE_GRADES = {"SOURCE_CELL_LINKED", "LEGACY_TABLE_LINKED"}
@@ -21,7 +21,7 @@ DISCOVERY_KINDS = {"SEARCH_DISCOVERED", "LINK_DISCOVERED", "OPEN_CODE_SEARCH", "
 UNREADABLE = {"AUTH_REQUIRED", "FORBIDDEN", "NOT_FOUND", "TIMEOUT", "PARSE_FAILED", "UNSUPPORTED", "NETWORK_BLOCKED"}
 IDENTITY_COLUMNS = {"序号", "统一id", "case_id", "external_id", "source_id", "来源", "source", "source_file",
                     "source_sheet", "source_row", "优先级组", "优先级", "priority", "source_priority", "wiki", "dts",
-                    "pr", "github", "gitcode", "codehub", "url", "证据来源", "证据判断", "证据强度", "库覆盖（98条）"}
+                    "pr", "github", "gitcode", "gitee", "codehub", "url", "证据来源", "证据判断", "证据强度", "库覆盖（98条）"}
 
 
 def _url(value: str | None) -> str | None:
@@ -91,6 +91,8 @@ def resource_kind(ref: dict | None = None, snapshot: dict | None = None, case: d
             return "GITHUB"
         if host == "gitcode.com" or host.endswith(".gitcode.com"):
             return "GITCODE"
+        if host == "gitee.com" or host.endswith(".gitee.com"):
+            return "GITEE"
         if host.startswith(("codehub.", "codehub-")) or "codehub" in host.split("."):
             return "CODEHUB"
         if host.startswith("wiki.") or re.search(r"/(?:wiki|wikis)(?:/|$)", path):
@@ -105,9 +107,9 @@ def resource_kind(ref: dict | None = None, snapshot: dict | None = None, case: d
                 continue
             key = header.strip().casefold()
             for word, kind in (("wiki", "WIKI"), ("dts", "DTS"), ("gitcode", "GITCODE"),
-                               ("github", "GITHUB"), ("codehub", "CODEHUB")):
+                               ("github", "GITHUB"), ("gitee", "GITEE"), ("codehub", "CODEHUB")):
                 if word in key:
-                    if kind in {"GITCODE", "GITHUB"} and (ref.get("url") or snapshot.get("url")):
+                    if kind in {"GITCODE", "GITHUB", "GITEE"} and (ref.get("url") or snapshot.get("url")):
                         continue
                     return kind
     return {"WIKI": "WIKI", "DTS": "DTS"}.get(snapshot.get("artifact_type"), "UNKNOWN")
@@ -546,6 +548,13 @@ def build_evidence_plan(store: Store, run_id: str, *, judgments: list[dict] | No
         if conflicts:
             search_control["satisfied"] = False
             search_control["reasons"].append("KNOWN_CONFLICT")
+        # In the XLSX workflow, a blocked supplied PR or a wrong original Wiki
+        # must not hide an already captured replacement Wiki from verification.
+        if "WIKI" in goal["missing_sources"] and store.get(run_id, "xlsx_workflow", "config"):
+            pending = [option for option in search if kind(option) == "WIKI"
+                       and option not in selected and option not in usable]
+            if pending:
+                selected.append(sorted(pending, key=_search_rank)[0])
         if conflicts:
             conflict_ids = {judgment.get("snapshot_id") for judgment in conflicts}
             for option in options:
