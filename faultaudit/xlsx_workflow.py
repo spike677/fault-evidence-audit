@@ -82,11 +82,11 @@ def start(store: Store, source: Path, catalog: Path, work_root: Path, *, executo
 
 def _policy() -> str:
     from . import wiki_checks, capture_quality, search_guidance, resource_identity, workflow_scope
-    from . import trigger_taxonomy, trigger_assessment, trigger_workflow
+    from . import trigger_taxonomy, trigger_assessment, trigger_workflow, trigger_v4, trigger_v4_assessment, trigger_design
     return digest({"core": policy_fingerprint(), "workflow": digest(Path(__file__).read_bytes()),
                    "helpers": digest(b"".join(Path(module.__file__).read_bytes() for module in
                        (wiki_checks, capture_quality, search_guidance, resource_identity, workflow_scope,
-                        trigger_taxonomy, trigger_assessment, trigger_workflow)))})
+                        trigger_taxonomy, trigger_assessment, trigger_workflow, trigger_v4, trigger_v4_assessment, trigger_design)))})
 
 
 def _json(path: Path, value: dict) -> None:
@@ -134,11 +134,18 @@ def next_tasks(store: Store, run_id: str) -> dict:
     trigger_mode = cfg.get("purpose", "").startswith("TRIGGER_")
     cases = store.records(run_id, "cases")
     if cfg.get("purpose") == "TRIGGER_INIT" and cfg.get("init_basis") == "SOURCE_DEFINITIONS":
-        from .trigger_workflow import classification_payloads
-        from .trigger_assessment import instructions as trigger_instructions
+        from .trigger_workflow import classification_payloads, classification_instructions
         tasks, blocks = [], []
         for payload in classification_payloads(store, run_id):
-            value = _request(store, run_id, cfg, "trigger_classify", payload, trigger_instructions(), 4)
+            value = _request(store, run_id, cfg, "trigger_classify", payload, classification_instructions(payload), 4)
+            if value and value.get("blocked"):
+                blocks.append(value["block_id"])
+            elif value:
+                tasks.append(value)
+        from .trigger_design import payloads as design_payloads, instructions as design_instructions
+        pending = {cid for task in tasks for cid in store.get(run_id, "workflow_requests", task["task_id"])["payload"].get("case_ids", [])}
+        for payload in design_payloads(store, run_id, pending_case_ids=pending):
+            value = _request(store, run_id, cfg, "trigger_design", payload, design_instructions(), 5)
             if value and value.get("blocked"):
                 blocks.append(value["block_id"])
             elif value:
@@ -299,11 +306,14 @@ def next_tasks(store: Store, run_id: str) -> dict:
             sid = inner["payload"]["snapshot"]["snapshot_id"]
             pending_cases.update(row["case_id"] for row in plan["cases"] if sid in row["selected_snapshot_ids"])
     if trigger_mode:
-        from .trigger_workflow import classification_payloads
-        from .trigger_assessment import instructions as trigger_instructions
+        from .trigger_workflow import classification_payloads, classification_instructions
         for payload in classification_payloads(store, run_id):
             if not set(payload["case_ids"]) & pending_cases:
-                add("trigger_classify", payload, trigger_instructions(), 4)
+                add("trigger_classify", payload, classification_instructions(payload), 4)
+        from .trigger_design import payloads as design_payloads, instructions as design_instructions
+        design_pending = pending_cases | {cid for task in tasks for cid in store.get(run_id, "workflow_requests", task["task_id"])["payload"].get("case_ids", [])}
+        for payload in design_payloads(store, run_id, pending_case_ids=design_pending):
+            add("trigger_design", payload, design_instructions(), 5)
     for case in ([] if trigger_mode else cases):
         if case["case_id"] not in pending_cases:
             prepared = prepare_draft(store, run_id, [case["case_id"]])
@@ -380,6 +390,9 @@ def submit(store: Store, run_id: str, task_id: str, response: dict, *, path: Pat
         elif kind == "trigger_classify":
             from .trigger_workflow import accept_assessment
             accept_assessment(store, run_id, request, response)
+        elif kind == "trigger_design":
+            from .trigger_design import accept_design
+            accept_design(store, run_id, request, response)
         else:
             if response.get("request_hash") != request["request_hash"]:
                 raise AuditError("Collection response request_hash mismatch")
@@ -529,7 +542,7 @@ def retry(store: Store, run_id: str, task_id: str) -> dict:
     from .workflow_driver import reset_execution
     task = store.get(run_id, "workflow_requests", task_id)
     execution = store.get(run_id, "workflow_execution", task_id) or {}
-    if task and task["kind"] in {"model", "catalog_draft", "trigger_classify"} and execution.get("blocked_code") == "EXECUTOR_CONTEXT_LIMIT":
+    if task and task["kind"] in {"model", "catalog_draft", "trigger_classify", "trigger_design"} and execution.get("blocked_code") == "EXECUTOR_CONTEXT_LIMIT":
         reset_execution(store, run_id, task_id)
         old = store.get(run_id, "workflow_execution", task_id)
         store.put(run_id, "workflow_execution", task_id, {**old, "blocked_code": None}, mutable=True)

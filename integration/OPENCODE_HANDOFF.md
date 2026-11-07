@@ -1,8 +1,18 @@
 # OpenChamber / OpenCode 接入与验收
 
-对应核心0.1.14，以下保留底层文件协议验收步骤。结构化XLSX的当前默认入口是README中的xlsx-workflow；Word/PPT、任意布局XLSX和时间范围收集为TODO。OpenChamber是现场前端，文件任务由它连接的OpenCode执行；OpenCode可完成采集与模型判断，无需Codex再代做一遍。本包只安装项目模板、发布文件任务、接收结果并运行本地门禁，不启动OpenChamber，也不包含OpenChamber/OpenCode服务客户端。
+对应核心0.1.15，以下保留底层文件协议验收步骤。结构化XLSX的当前默认入口是README中的xlsx-workflow；Word/PPT、任意布局XLSX和时间范围收集为TODO。OpenChamber是现场前端，文件任务由它连接的OpenCode执行；OpenCode可完成采集与模型判断，无需Codex再代做一遍。本包只安装项目模板、发布文件任务、接收结果并运行本地门禁，不启动OpenChamber，也不包含OpenChamber/OpenCode服务客户端。
 
 以下步骤是执行手册，尚不代表真实OpenChamber 2.5.2、OpenCode 2.1.4/2.2.0、内网登录或DeepSeek已联调。`doctor`通过只证明本地依赖可用。
+
+## 0.1.15：V4规则与设计卡接入
+
+本阶段没有E方法的设备执行器。先备份state与任务文件，在Init使用`configure-v4 --run INIT_RUN_ID --source 实际V4.md`，或初始化时增加`--v4`。原42、修订42、V4及映射分版本冻结，不改旧定义。新策略会使旧请求、分类、设计卡和基线失效，原文及人工历史保留；完成新版分类和设计后重新finalize，再建立绑定新基线的关联增量run。禁止把旧人工ACCEPT转移为新版裁决。
+
+分类响应新增完整`v4_rows`及逐构造检查；`rows`仍为独立修订42兼容轴。原文与规范Requires/Skip同时提供；族覆盖条款以`family_requires_override/family_skip_override`为准。映射方向和规则版本明确，但不得据映射复制标签。I3完整适用要有合法驱动实参、算址公式、位宽/提升、边界单位和容量；C2/C4的输入驱动分派需派生事实与完整路径谓词，不能把loopRpSize填成API控制。Branch3对照绑定目标调用，同实参/同二进制不要求干扰者使用相同参数。
+
+`trigger_design`直接使用OUTER hash和DesignResponse，由现有新子会话执行；不使用model envelope。任务完整提供选中类别规则及对应指导案例，说明未选范围。设计卡保留单一子问题事实，记录变量、边界、参考、路径、检查、规程和能力缺口。E2/E4/跨流要明确目标、参与者实参与输出归属及串行基准；跨流另列event记录/wait位置。能力不足不是语义不适用，未命中路径不是已覆盖；当前执行只能NOT_RUN。
+
+先验收文件调度、分类和设计卡，再单独验收实际输出预填、线程交错、跨流等待、存储复用、多rank及NPU执行。本机真实Init/30条V4实机验收在代码上传后继续，不能把0.1.14聚合记录当新版通过。默认预算48K未变，现场完整输入或会话容量不足都明确阻塞；不修改hash强行接纳旧响应。
 
 ## 0.1.14：条件优先分类与升级
 

@@ -190,6 +190,8 @@ def parser() -> argparse.ArgumentParser:
     init = trigger_flow.add_parser("init")
     init.add_argument("--modes", type=Path, required=True)
     init.add_argument("--taxonomy", type=Path, required=True)
+    init.add_argument("--v4", type=Path, help="Freeze V4 alongside independent revised-42 compatibility rules")
+    init.add_argument("--capabilities-file", type=Path, help="Declared design capabilities; not an execution receipt")
     init.add_argument("--catalog-scope", default="ORIGINAL_MECHANISM_LIBRARY")
     init.add_argument("--basis", choices=["HISTORICAL_EVIDENCE", "SOURCE_DEFINITIONS"],
                       default="HISTORICAL_EVIDENCE", help="Initialize from verified webpages or explicit source definitions only")
@@ -202,6 +204,10 @@ def parser() -> argparse.ArgumentParser:
     classify.add_argument("--baseline-id")
     classify.add_argument("--input", type=Path, required=True)
     classify.add_argument("--allow-pending-baseline", action="store_true")
+    configure_v4 = trigger_flow.add_parser("configure-v4", help="Maintain an Init with separately frozen V4 and revised42 rules")
+    configure_v4.add_argument("--run", default="latest")
+    configure_v4.add_argument("--source", type=Path, required=True)
+    configure_v4.add_argument("--capabilities-file", type=Path)
     for entry in (init, classify):
         entry.add_argument("--work-root", type=Path, default=Path("work/runs"))
         entry.add_argument("--executor", choices=["opencode", "codex"], default="opencode")
@@ -296,7 +302,8 @@ def main(argv: list[str] | None = None) -> int:
             if operation == "init":
                 result = trigger_workflow.start_init(store, args.modes, args.taxonomy, args.work_root,
                     executor=args.executor, branch_source=args.branch_source, user_branches=args.user_branches,
-                    catalog_scope=args.catalog_scope, basis=args.basis)
+                    catalog_scope=args.catalog_scope, basis=args.basis, v4_source=args.v4,
+                    capabilities=json.loads(args.capabilities_file.read_text(encoding="utf-8-sig")) if args.capabilities_file else None)
             elif operation == "classify":
                 result = trigger_workflow.start_incremental(store, args.input, args.baseline_run, args.work_root,
                     executor=args.executor, baseline_id=args.baseline_id, allow_pending_baseline=args.allow_pending_baseline)
@@ -317,6 +324,9 @@ def main(argv: list[str] | None = None) -> int:
                 elif operation == "set-sources":
                     result = workflow.configure_collection(store, selected_run, args.source,
                         wiki_policy=args.wiki_policy, reason=args.reason)
+                elif operation == "configure-v4":
+                    result = trigger_workflow.configure_v4(store, selected_run, args.source,
+                        capabilities=json.loads(args.capabilities_file.read_text(encoding="utf-8-sig")) if args.capabilities_file else None)
                 elif operation == "drive":
                     result = workflow.drive(store, selected_run,
                         json.loads(args.agent_command_file.read_text(encoding="utf-8-sig")), max_rounds=args.max_rounds,

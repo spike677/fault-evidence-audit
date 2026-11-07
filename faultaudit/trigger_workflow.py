@@ -18,7 +18,7 @@ from .store import AuditError, Store, digest
 from .trigger_assessment import CLASSIFICATION_FRAMEWORK, instructions, response_schema, validate_assessment
 from .trigger_taxonomy import builtin_user_branches, load_taxonomy
 
-RULE_VERSION = "trigger-conditions-first-0.1.14"
+RULE_VERSION = "trigger-v4-design-0.1.15"
 
 
 def _settings(store, run_id):
@@ -34,7 +34,8 @@ def _catalog(store, run_id):
 
 def start_init(store: Store, modes: Path, taxonomy: Path, work_root: Path, *,
                executor="opencode", branch_source=None, user_branches=True,
-               catalog_scope="ORIGINAL_MECHANISM_LIBRARY", basis="HISTORICAL_EVIDENCE") -> dict:
+               catalog_scope="ORIGINAL_MECHANISM_LIBRARY", basis="HISTORICAL_EVIDENCE",
+               v4_source=None, capabilities=None) -> dict:
     from .evidence_plan import register_search_policy
     from .pipeline import import_into
     if executor not in {"opencode", "codex"}:
@@ -77,12 +78,61 @@ def start_init(store: Store, modes: Path, taxonomy: Path, work_root: Path, *,
         "catalog_hash": digest(_catalog(store, run_id)), "rule_version": RULE_VERSION, "basis": basis,
         "classification_framework": CLASSIFICATION_FRAMEWORK})
     register_search_policy(store, run_id, {"required_sources": ["WIKI"]})
+    if v4_source is not None:
+        configure_v4(store, run_id, v4_source, capabilities=capabilities)
     return {**cfg, "mode_count": len(subjects), "trigger_count": len(frozen["items"]),
         "branch_categories": [c["id"] for b in frozen["branches"] for c in b.get("categories", [])]}
 
 
 def _taxonomy(store, run_id):
     return store.get(run_id, "trigger_taxonomies", _settings(store, run_id)["taxonomy_id"])
+
+
+def _v4(store, run_id):
+    key = _settings(store, run_id).get("v4_taxonomy_id")
+    return store.get(run_id, "trigger_v4_taxonomies", key) if key else None
+
+
+def configure_v4(store, run_id, source, *, capabilities=None):
+    """Freeze a versioned interpretation without overwriting any old definition."""
+    from .trigger_v4 import load_v4, revise_42, freeze_mapping, PROFILE, LEGACY_VERSION
+    from .xlsx_workflow import config
+    settings = _settings(store, run_id)
+    if settings["phase"] != "INIT":
+        raise AuditError("Maintain V4 on Init, then use its newly frozen baseline for a linked incremental run")
+    current = _taxonomy(store, run_id)
+    original = store.get(run_id, "trigger_taxonomies", current.get("original_taxonomy_id", current["taxonomy_id"]))
+    frozen = load_v4(Path(source))
+    revised = revise_42(original)
+    mapping = freeze_mapping(original, revised, frozen)
+    capabilities = capabilities or {"classes": {}, "methods": {}, "provenance": "NOT_PROVIDED"}
+    if not isinstance(capabilities, dict) or set(capabilities) - {"classes", "methods", "provenance"}:
+        raise AuditError("Capabilities are declared design constraints, not execution results")
+    if not capabilities.get("provenance") or not isinstance(capabilities.get("classes", {}), dict) or not isinstance(capabilities.get("methods", {}), dict):
+        raise AuditError("Capabilities need provenance and class/method dictionaries")
+    for key, entry in capabilities.get("classes", {}).items():
+        if key not in {v["id"] for v in frozen["items"]} or entry.get("construction") not in {"UNKNOWN", "BLOCKED", "DECLARED_SUPPORTED"} or not entry.get("reason"):
+            raise AuditError("Class capability needs a V4 ID, declared status and reason")
+    for key, entry in capabilities.get("methods", {}).items():
+        if key not in {v["method_id"] for v in frozen["methods"]} or entry.get("availability") not in {"UNKNOWN", "BLOCKED", "DECLARED_SUPPORTED"} or not entry.get("reason"):
+            raise AuditError("Method capabilities describe declared availability, never successful execution")
+    store.put(run_id, "trigger_original_definitions", original["taxonomy_id"],
+        {"definition_version": LEGACY_VERSION, "taxonomy": original})
+    store.put(run_id, "trigger_taxonomies", revised["taxonomy_id"], revised)
+    store.put(run_id, "trigger_v4_taxonomies", frozen["taxonomy_id"], frozen)
+    store.put(run_id, "trigger_mappings", mapping["mapping_id"], mapping)
+    updated = {**settings, "taxonomy_id": revised["taxonomy_id"], "v4_taxonomy_id": frozen["taxonomy_id"],
+        "mapping_id": mapping["mapping_id"], "classification_profile": PROFILE,
+        "execution_capabilities": capabilities, "rule_version": RULE_VERSION}
+    store.put(run_id, "trigger_config", "config", updated, mutable=True)
+    cfg = config(store, run_id)
+    store.put(run_id, "xlsx_workflow", "config", {**cfg, "rule_version": RULE_VERSION}, mutable=True)
+    store.event(run_id, "trigger_v4_configured", {"previous_taxonomy_id": current["taxonomy_id"],
+        "taxonomy_id": revised["taxonomy_id"], "v4_taxonomy_id": frozen["taxonomy_id"], "mapping_id": mapping["mapping_id"]})
+    return {"run_id": run_id, "classification_profile": PROFILE, "legacy_version": LEGACY_VERSION,
+        "revised_version": revised["definition_version"], "v4_version": frozen["definition_version"],
+        "categories": 31, "constructions": 55, "mounts": 64, "guides": 195,
+        "execution_implemented": False}
 
 
 def _model_taxonomy(frozen):
@@ -95,6 +145,11 @@ def _model_taxonomy(frozen):
     value = {k: frozen[k] for k in ("taxonomy_id", "taxonomy_hash", "source_file", "source_sha256", "item_count")}
     value["items"] = [{k: item[k] for k in ("id", "family_id", "name", "definition", "requires", "skip_if", "line_start", "line_end") if k in item}
                        for item in frozen["items"]]
+    for item, source in zip(value["items"], frozen["items"]):
+        item.update({k: source[k] for k in ("allowed_fact_roles", "family_requires_override", "family_skip_override",
+            "construction_requires", "analysis_requires", "revision_reason") if k in source})
+    value.update({k: frozen[k] for k in ("definition_version", "original_definition_version", "original_taxonomy_id",
+        "branch_comparison_scope") if k in frozen})
     value["families"] = frozen.get("families", [])
     value["context"] = {k: v for k, v in frozen.get("context", {}).items() if k in {"scope", "applicability"}}
     value["branches"] = [{k: v for k, v in b.items() if k not in {"source_sha256", "source_file"}}
@@ -201,10 +256,11 @@ def _basis(store, run_id, subject, snapshot_id=None):
     from .evidence_plan import collection_source_policy
     cid = subject["case_id"]
     settings = _settings(store, run_id)
+    profile_identity = {k: settings[k] for k in ("classification_profile", "v4_taxonomy_id", "mapping_id", "execution_capabilities") if k in settings}
     if settings["phase"] == "INIT" and settings.get("basis") == "SOURCE_DEFINITIONS":
         return digest({"subject": subject, "source": store.get(run_id, "cases", cid),
             "taxonomy": _taxonomy(store, run_id), "catalog": _catalog(store, run_id),
-            "assessment_basis": "SOURCE_DEFINITIONS"})
+            "assessment_basis": "SOURCE_DEFINITIONS", "classification_profile": profile_identity})
     snapshots = _linked_snapshots(store, run_id, cid)
     if snapshot_id:
         snapshots = {sid: s for sid, s in snapshots.items() if sid == snapshot_id}
@@ -217,7 +273,7 @@ def _basis(store, run_id, subject, snapshot_id=None):
         "summaries": sorted([digest(s) for s in current_summaries(store, run_id) if s["snapshot_id"] in snapshots]),
         "baseline": settings.get("baseline_id"),
         "collection_policy": collection_source_policy(store, run_id)["policy_hash"],
-        "assessment_basis": settings.get("basis", "HISTORICAL_EVIDENCE")}
+        "assessment_basis": settings.get("basis", "HISTORICAL_EVIDENCE"), "classification_profile": profile_identity}
     if not snapshot_id:
         base["wiki_checks"] = sorted(digest(c) for c in store.records(run_id, "wiki_checks") if c["case_id"] == cid)
     if settings["phase"] == "INCREMENTAL":
@@ -285,6 +341,7 @@ def classification_payloads(store, run_id):
                 for detail in baseline["declared_details"]]
     catalog = _catalog(store, run_id)
     definition_init = settings["phase"] == "INIT" and settings.get("basis") == "SOURCE_DEFINITIONS"
+    v4 = _v4(store, run_id)
     assessments = current_assessments(store, run_id)
     for subject in sorted(store.records(run_id, "trigger_subjects"), key=lambda s: s["subject_id"]):
         cid = subject["case_id"]
@@ -299,7 +356,7 @@ def classification_payloads(store, run_id):
                 judgments = [j for j in current_judgments(store, run_id) if j["case_id"] == cid
                     and j["snapshot_id"] == sid and (j.get("applicable_issue") or {}).get("label") == label]
                 mappings = [m for m in current_mappings(store, run_id) if m["case_id"] == cid]
-            yield {"phase": settings["phase"], "classification_framework": CLASSIFICATION_FRAMEWORK,
+            payload = {"phase": settings["phase"], "classification_framework": CLASSIFICATION_FRAMEWORK,
                 "evaluation_order": ["condition_facts", "rows", "external_branches", "details", "declared_comparison", "decision"],
                 "subject": {**subject, "source_case": store.get(run_id, "cases", cid)},
                 "assessment_basis": settings.get("basis", "HISTORICAL_EVIDENCE"),
@@ -323,7 +380,31 @@ def classification_payloads(store, run_id):
                     "full_original_records_frozen_in_store": True,
                     "comparison_projection_excludes": "Repeated raw source chapters/quote bundles and prior trigger rationales; all definitions and mechanism detail fields are retained in full"},
                 "basis_hash": _basis(store, run_id, subject, (issue or {}).get("snapshot_id")),
-                "case_ids": [cid], "response_schema": response_schema()}
+                "case_ids": [cid], "response_schema": response_schema(include_v4=bool(v4))}
+            if v4:
+                from .trigger_v4 import model_v4
+                mapping = store.get(run_id, "trigger_mappings", settings["mapping_id"])
+                payload.update(classification_profile=settings["classification_profile"], v4_taxonomy=model_v4(v4),
+                    mapping={k: mapping[k] for k in ("mapping_id", "mapping_version", "source_definition_version",
+                        "revised_definition_version", "relation_direction", "purpose", "rows")},
+                    execution_capabilities=settings["execution_capabilities"],
+                    evaluation_order=["condition_facts", "v4_rows", "rows", "external_branches", "details", "declared_comparison", "decision"])
+            yield payload
+
+
+def classification_instructions(payload):
+    text = instructions()
+    if payload.get("v4_taxonomy"):
+        from .trigger_v4_assessment import instructions as v4_instructions
+        text = text.replace("The primary framework is the 42 INPUT conditions plus Branch 2/3.",
+            "The primary framework is V4's 31 categories/55 constructions plus Branch 2/3; rows is the independent revised-42 compatibility frame.")
+        text = text.replace("extract condition_facts, assess all 42 rows and Branch 2/3, organize",
+            "extract condition_facts, assess all V4 rows/constructions, independently assess revised 42 rows and Branch 2/3, organize")
+        text = text.replace("All 1.C positives need a stated API-control fact, not an internal algorithm name.",
+            "The revised-42 API-control items retain their own allowed-role metadata; V4 C2/C4 separately allow traced input-driven paths.")
+        text = v4_instructions() + "\n" + text
+        text += "\nFor revised rows use each item's allowed_fact_roles and family overrides. The original 1.3 family exclusion does not apply to revised 1.3.2.\n"
+    return text
 
 
 def accept_assessment(store, run_id, request, response):
@@ -481,11 +562,27 @@ def _projection(store, run_id):
             baseline = {**baseline, "status": "STALE"}
             gaps.append({"case_id": "", "kind": "BASELINE_STALE", "reason": "Maintain initialization before incremental decisions"})
     gaps = list({digest(g): g for g in gaps}.values())
-    return {"run_id": run_id, "phase": cfg["phase"], "classification_framework": CLASSIFICATION_FRAMEWORK,
+    projection = {"run_id": run_id, "phase": cfg["phase"], "classification_framework": CLASSIFICATION_FRAMEWORK,
         "coverage_kind": cfg.get("basis", "HISTORICAL_EVIDENCE"),
         "taxonomy": _taxonomy(store, run_id), "subjects": subjects,
         "assessments": assessments, "wiki_checks": checks, "resources": resources,
         "gaps": gaps, "baseline": baseline}
+    if _v4(store, run_id):
+        from .trigger_design import current_designs
+        designs = current_designs(store, run_id, assessments)
+        designed = {d["case_id"] for d in designs}
+        for subject in subjects:
+            if subject["case_id"] not in designed:
+                gaps.append({"case_id": subject["case_id"], "kind": "DESIGN_PENDING",
+                    "reason": "Current scoped classification has not yet produced its separate design cards; no execution is claimed"})
+        for a in assessments:
+            if any(r["applicability"] in {"PARTIAL", "UNKNOWN"} for r in a["result"].get("v4_rows", [])):
+                gaps.append({"case_id": a["case_id"], "kind": "V4_UNKNOWNS", "reason": "V4 semantic classification keeps explicit unknown prerequisites"})
+        projection.update(v4_taxonomy=_v4(store, run_id),
+            mapping=store.get(run_id, "trigger_mappings", cfg["mapping_id"]),
+            execution_capabilities=cfg["execution_capabilities"], designs=designs,
+            original_taxonomy=store.get(run_id, "trigger_taxonomies", _taxonomy(store, run_id)["original_taxonomy_id"]))
+    return projection
 
 
 def status(store, run_id):
@@ -514,7 +611,7 @@ def finalize(store, run_id, *, allow_pending=False):
     missing = {s["subject_id"] for s in data["subjects"]} - {a["subject_id"] for a in data["assessments"]}
     if missing or any(g["kind"] in {"ISSUE_UNASSESSED", "TASK_PENDING"} for g in data["gaps"]):
         raise AuditError("Every original mode and current source issue needs an assessment; pending tasks cannot be finalized")
-    informational = {"TRIGGER_UNKNOWNS", "CAPTURE_PARTIAL", "CAPTURE_CONTENT_CAPTURED", "BASELINE_STALE",
+    informational = {"TRIGGER_UNKNOWNS", "V4_UNKNOWNS", "CAPTURE_PARTIAL", "CAPTURE_CONTENT_CAPTURED", "BASELINE_STALE",
                      "WIKI_NOT_SUPPORTED", "SOURCE_NOT_AVAILABLE_USER_POLICY"}
     blocking = [g for g in data["gaps"] if g["kind"] not in informational]
     if blocking and not allow_pending:
@@ -552,7 +649,7 @@ def finalize(store, run_id, *, allow_pending=False):
             "issue_label": assessment.get("issue_label"),
             "source_case": {key: source[key] for key in ("external_id", "description", "root_cause_raw",
                 "source_file", "source_sha256", "sheet", "row", "cell_locations") if key in source},
-            "condition_facts": result.get("condition_facts", []), "rows": result["rows"],
+            "condition_facts": result.get("condition_facts", []), "rows": result["rows"], "v4_rows": result.get("v4_rows", []),
             "external_branches": result["external_branches"],
             "condition_processing_status": result.get("condition_processing_status"),
             "source_relation": result["source_relation"], "coverage_kind": result["coverage_kind"],
@@ -566,6 +663,10 @@ def finalize(store, run_id, *, allow_pending=False):
         "declared_details": declared_details,
         "classification_framework": CLASSIFICATION_FRAMEWORK, "condition_index": condition_index,
         "gaps": data["gaps"], "coverage_kind": data["coverage_kind"], "execution_verified": False}
+    if data.get("v4_taxonomy"):
+        baseline.update(v4_taxonomy_id=data["v4_taxonomy"]["taxonomy_id"],
+            v4_definition_version=data["v4_taxonomy"]["definition_version"],
+            mapping_id=data["mapping"]["mapping_id"], revised_definition_version=data["taxonomy"]["definition_version"])
     store.put(run_id, "trigger_baselines", baseline["baseline_id"], baseline)
     store.put(run_id, "trigger_baseline_heads", "current", {"baseline_id": baseline["baseline_id"]}, mutable=True)
     return baseline
@@ -629,6 +730,15 @@ def start_incremental(store, source, baseline_run, work_root, *, executor="openc
         "catalog_hash": digest(catalog), "rule_version": RULE_VERSION, "basis": "HISTORICAL_EVIDENCE",
         "baseline_basis": baseline.get("coverage_kind", "HISTORICAL_EVIDENCE"),
         "classification_framework": CLASSIFICATION_FRAMEWORK})
+    baseline_settings = _settings(store, baseline_run)
+    if baseline_settings.get("v4_taxonomy_id"):
+        for kind, key in (("trigger_v4_taxonomies", baseline_settings["v4_taxonomy_id"]),
+                          ("trigger_mappings", baseline_settings["mapping_id"]),
+                          ("trigger_taxonomies", frozen["original_taxonomy_id"])):
+            store.put(run_id, kind, key, store.get(baseline_run, kind, key))
+        settings = _settings(store, run_id)
+        store.put(run_id, "trigger_config", "config", {**settings,
+            **{k: baseline_settings[k] for k in ("classification_profile", "v4_taxonomy_id", "mapping_id", "execution_capabilities")}}, mutable=True)
     for case in store.records(run_id, "cases"):
         subject = {"subject_id": "case-subject-" + digest(case["case_id"])[:24],
             "case_id": case["case_id"], "subject_kind": "FAULT_CASE"}

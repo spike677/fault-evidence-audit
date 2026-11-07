@@ -360,7 +360,11 @@ def build_workbook(data: dict) -> dict:
                        for k in ("42项适用", "42项部分", "Branch适用", "Branch部分")},
                     "对比口径": "旧证据关系与新描述分类是不同维度；不能以标签增多声称根因证实或分类准确率提升"})
             sheets.append(_table("分类前后对照", comparison, columns(comparison, ["case_id", "旧评估数", "新评估数"])))
-        return {"schema_version": "1.0", "kind": "TRIGGER_CLASSIFICATION", "run": {"run_id": data.get("run_id", "")}, "sheets": sheets}
+        book = {"schema_version": "1.0", "kind": "TRIGGER_CLASSIFICATION", "run": {"run_id": data.get("run_id", "")}, "sheets": sheets}
+        if data.get("v4_taxonomy"):
+            from .trigger_v4_report import extend_workbook
+            return extend_workbook(book, data)
+        return book
     return {"schema_version": "1.0", "kind": "TRIGGER_CLASSIFICATION", "run": {"run_id": data.get("run_id", "")},
         "sheets": [
             _table("模式初始化总览" if data.get("phase", "INIT") == "INIT" else "故障分类总览", overview,

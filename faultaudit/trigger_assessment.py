@@ -31,6 +31,18 @@ class Grounded(Contract):
     source_cells: list[SourceCell] = Field(default_factory=list)
 
 
+class Derivation(Contract):
+    driving_input_fact_ids: list[str] = Field(default_factory=list)
+    expression: str = ""
+    arithmetic_types: list[str] = Field(default_factory=list)
+    promotion: str = ""
+    boundary: str = ""
+    unit: str = ""
+    capacity: str = ""
+    dispatch_predicate: str = ""
+    path_fact_ids: list[str] = Field(default_factory=list)
+
+
 class ConditionFact(Grounded):
     fact_id: str = Field(min_length=1)
     statement: str = Field(min_length=1)
@@ -38,8 +50,11 @@ class ConditionFact(Grounded):
     role: Literal["INPUT_VALUE", "INPUT_SHAPE", "INPUT_DTYPE", "INPUT_LAYOUT", "INDEX_OR_OFFSET",
                   "INTERMEDIATE_VALUE", "INTERNAL_COMPUTATION", "API_CONTROL", "PLATFORM",
                   "COMPILER_OPTION", "BUILD_VARIANT", "VERSION", "DEVICE_SCHEDULING",
-                  "STREAM_ASYNC", "SYNC_RACE", "SAME_ARGUMENTS", "SAME_BINARY", "UNKNOWN"]
+                  "STREAM_ASYNC", "SYNC_RACE", "SAME_ARGUMENTS", "SAME_BINARY", "UNKNOWN",
+                  "DERIVED_CONTROL", "PATH_PREDICATE", "CAPACITY", "OUTPUT_STATE"]
     evidence_basis: Basis
+    target_call_id: str = ""
+    derivation: Derivation | None = None
 
 
 class PredicateCheck(Grounded):
@@ -58,6 +73,28 @@ class TriggerRow(Grounded):
     reason: str = Field(min_length=1)
     detail_ids: list[str] = Field(default_factory=list)
     condition_fact_ids: list[str] = Field(default_factory=list)
+
+
+class CoverageDimensions(Contract):
+    construction: Literal["UNKNOWN", "DECLARED_SUPPORTED", "BLOCKED"] = "UNKNOWN"
+    construction_reason: str = Field(min_length=1)
+    path: Literal["UNKNOWN", "NOT_COVERED", "DESIGN_ONLY"] = "UNKNOWN"
+    path_reason: str = Field(min_length=1)
+    execution: Literal["NOT_RUN"] = "NOT_RUN"
+
+
+class ConstructionCheck(Grounded):
+    construction_id: str = Field(min_length=1)
+    applicability: Applicability
+    definition_check: PredicateCheck
+    condition_fact_ids: list[str] = Field(default_factory=list)
+    reason: str = Field(min_length=1)
+
+
+class V4Row(TriggerRow):
+    construction_checks: list[ConstructionCheck]
+    coverage: CoverageDimensions
+    unknowns: list[str] = Field(default_factory=list)
 
 
 class Detail(Grounded):
@@ -80,6 +117,7 @@ class BranchCategory(Grounded):
     condition_fact_ids: list[str] = Field(default_factory=list)
     reason: str = Field(min_length=1)
     unknowns: list[str] = Field(default_factory=list)
+    comparison_target_call_id: str = ""
 
 
 class OutsideBranch(Grounded):
@@ -140,6 +178,7 @@ class TriggerAssessment(Contract):
     case_id: str = Field(min_length=1)
     condition_facts: list[ConditionFact] = Field(default_factory=list)
     rows: list[TriggerRow]
+    v4_rows: list[V4Row] = Field(default_factory=list)
     external_branches: list[OutsideBranch]
     source_relation: Literal["MATCH", "PARTIAL", "UNKNOWN", "NOT_RELATED"] = "UNKNOWN"
     source_alignment: list[SourceAlignment] = Field(default_factory=list)
@@ -152,8 +191,13 @@ class TriggerAssessment(Contract):
     execution_verified: Literal[False] = False
 
 
-def response_schema() -> dict:
-    return TriggerAssessment.model_json_schema()
+def response_schema(*, include_v4=False) -> dict:
+    value = TriggerAssessment.model_json_schema()
+    if not include_v4:
+        value["properties"].pop("v4_rows", None)
+        for key in ("V4Row", "ConstructionCheck", "CoverageDimensions"):
+            value.get("$defs", {}).pop(key, None)
+    return value
 
 
 def instructions() -> str:
@@ -310,15 +354,14 @@ def _validate_conditions(payload, result, grounded, definitions, families):
     for row in result.rows:
         item = definitions[row.trigger_id]
         family = families.get(item.get("family_id"), {})
-        included = {item["definition"].strip()} | {v.strip() for entry in (item, family) for v in entry.get("requires", [])}
-        excluded = {v.strip() for entry in (item, family) for v in entry.get("skip_if", [])}
-        wanted = {("INCLUSION", v) for v in included if v} | {("EXCLUSION", v) for v in excluded if v}
+        from .trigger_v4 import canonical_conditions
+        wanted = canonical_conditions(item, family)
         got = [(c.clause_role, c.clause) for c in row.predicate_checks]
         if len(got) != len(set(got)) or set(got) != wanted:
             raise AuditError("Condition classification must check every complete canonical definition/Requires/Skip exactly once")
         selected = support(row, row.trigger_id, needed=row.applicability != "UNKNOWN",
                            decisive=row.applicability != "UNKNOWN")
-        required_roles = condition_role_requirements(row.trigger_id)
+        required_roles = set(item.get("allowed_fact_roles", condition_role_requirements(row.trigger_id)))
         if row.applicability != "UNKNOWN" and required_roles and not required_roles & {f.role for f in selected}:
             raise AuditError("Condition label needs the proper input/index/API semantic role, not intermediate/internal facts")
         for check in row.predicate_checks:
@@ -360,6 +403,8 @@ def _validate_conditions(payload, result, grounded, definitions, families):
                     else "UNKNOWN" if "UNKNOWN" in states or not states else "NOT_APPLICABLE")
         if branch.relation != expected:
             raise AuditError("Branch summary must retain leaf applicability and unknowns")
+    from .trigger_v4_assessment import validate_target_scope
+    validate_target_scope(payload, result)
 
 
 def validate_assessment(payload: dict, response: dict, request_hash: str) -> dict:
@@ -439,14 +484,26 @@ def validate_assessment(payload: dict, response: dict, request_hash: str) -> dic
     definitions = {item["id"]: item for item in items}
     families = {family["family_id"]: family for family in payload["taxonomy"].get("families", [])}
     _validate_conditions(payload, result, grounded, definitions, families)
+    from .trigger_v4_assessment import validate_v4, validate_derivation
+    validate_v4(payload, result, grounded)
+    if payload["taxonomy"].get("definition_version") == "TRIGGER42-BOUNDARIES-0.1.15":
+        facts = {f.fact_id: f for f in result.condition_facts}
+        offset = rows.get("1.3.2")
+        if offset and offset.applicability == "APPLICABLE":
+            derived = [facts[key] for key in offset.condition_fact_ids if facts[key].derivation]
+            if not derived:
+                raise AuditError("Revised offset full applicability needs the actual address derivation")
+            for fact in derived:
+                validate_derivation(fact, facts, complete=True)
     for row in result.rows:
         grounded(row, row.trigger_id)
         _unique(row.detail_ids, "Row detail IDs")
         item = definitions[row.trigger_id]
         family = families.get(item.get("family_id"), {})
-        inclusions = {item["definition"].strip()}
-        inclusions.update(text.strip() for entry in (item, family) for text in entry.get("requires", []))
-        exclusions = {text.strip() for entry in (item, family) for text in entry.get("skip_if", [])}
+        from .trigger_v4 import canonical_conditions
+        canonical = canonical_conditions(item, family)
+        inclusions = {text for role, text in canonical if role == "INCLUSION"}
+        exclusions = {text for role, text in canonical if role == "EXCLUSION"}
         inclusions.discard("")
         exclusions.discard("")
         for check in row.predicate_checks:
@@ -649,6 +706,13 @@ def validate_assessment(payload: dict, response: dict, request_hash: str) -> dic
         raise AuditError("Declared comparison requires an incremental baseline with frozen declared details")
     output = result.model_dump()
     output["coverage_kind"] = assessment_basis
+    if payload.get("v4_taxonomy"):
+        output["classification_profile"] = payload["classification_profile"]
+        output["definition_versions"] = {"legacy": payload["mapping"]["source_definition_version"],
+            "revised42": payload["taxonomy"]["definition_version"],
+            "v4": payload["v4_taxonomy"]["definition_version"], "mapping": payload["mapping"]["mapping_version"]}
+        output["v4_processing_status"] = ("ASSESSED_WITH_UNKNOWNS" if any(
+            r.applicability in {"UNKNOWN", "PARTIAL"} for r in result.v4_rows) else "ASSESSED")
     if payload.get("classification_framework") == CLASSIFICATION_FRAMEWORK:
         output["classification_framework"] = CLASSIFICATION_FRAMEWORK
         output["condition_processing_status"] = ("ASSESSED_WITH_UNKNOWNS" if any(

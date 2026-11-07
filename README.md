@@ -2,7 +2,22 @@
 
 故障证据核验核心。核心测试使用合成数据，`examples/` 另保留不含原文的实机聚合验收记录；用户指定发布的模式库草案单独存放在 [`catalog/drafts/`](catalog/drafts/README.md)，与测试数据及正式库分开。
 
-版本 0.1.14，2026 年 11 月 7 日。核心负责导入故障表、保存原文与引用来源、规划必要证据、生成采集和模型任务、检查返回结果并生成复核报告。模型任务可由 OpenCode 或 Codex 会话执行，内网采集仍由具备授权与登录态的现场环境完成。支持文件交接及外部 Agent 命令适配，不包含直连模型或网站的网络客户端。
+版本 0.1.15，2026 年 11 月 7 日。核心负责导入故障表、保存原文与引用来源、规划必要证据、生成采集和模型任务、检查返回结果并生成复核报告。模型任务可由 OpenCode 或 Codex 会话执行，内网采集仍由具备授权与登录态的现场环境完成。支持文件交接及外部 Agent 命令适配，不包含直连模型或网站的网络客户端。
+
+0.1.15 接入范围为“V4分类规则修订＋用例设计规程”。V4的31类、55种唯一构造、64次挂载、195个指导案例分别冻结；原42定义、修订42边界及解释映射独立保留，映射不传递适用性或覆盖结论。分类任务完整核对V4与修订42；后续`trigger_design`任务按范围选取指导案例，产出变量、边界、参考、目标路径、检查项与能力缺口。语义适用、构造能力、路径覆盖和执行结果分列。E1—E5及跨流生产—消费协议仅生成设计，所有执行结果为`NOT_RUN`，未实现设备、线程或多rank执行器。本版代码先上传，真实Init和30条新版实机验证继续进行；旧版实机记录仍保留，不算新版通过。
+
+初始化时显式提供本机V4文件（仓库不附带用户原文或Init内容）：
+
+```powershell
+python run_faultaudit.py --state .faultaudit trigger-workflow init `
+  --modes '原机制库.xlsx' --taxonomy '原trigger_library.md' --v4 '实际V4.md' `
+  --basis SOURCE_DEFINITIONS --work-root work/runs --executor opencode
+# 已有Init在备份后维护版本化定义；旧基线和响应保留。
+python run_faultaudit.py --state .faultaudit trigger-workflow configure-v4 `
+  --run INIT_RUN_ID --source '实际V4.md'
+```
+
+`next/submit/drive`自动衔接分类与设计任务。若有实际执行器能力声明，可在`init`或`configure-v4`增加`--capabilities-file`；文件只声明能力，不能当执行记录。示例结构为`{"provenance":"实际能力检查来源","classes":{"T1":{"construction":"BLOCKED","reason":"实际入口自动连续化"}},"methods":{}}`。预算仍检查完整序列化请求，默认48,000字符；超限明确阻塞，不删减31类定义或修订42条。
 
 0.1.14 将 42 项输入触发条件与 Branch 2/3 作为主要分类框架，先分类条件，再整理机理和对照原库。原文声明归类与资料确认分开；保留 0.1.13 的来源定义 Init、采集、独立摘要和模型文件协议。完整回归和本轮实机结果见[验收记录](VALIDATION.md)，异机续跑见[交接说明](integration/OPENCODE_HANDOFF.md)。此前 0.1.12 的 25+5 停止点保留在[历史验证报告](reports/pilot-25plus5-20261106.xlsx)。公开仓库不包含本轮 Init、私有运行状态或原始响应。
 
