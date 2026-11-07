@@ -117,8 +117,12 @@ async function main() {
         columnWidths[column] = 72;
       } else if (/谓词检查|条件核对|机理及未知边界/.test(label)) {
         columnWidths[column] = 104;
+      } else if (/^(原文定位|精确引文及单元格)$/.test(label)) {
+        columnWidths[column] = 240;
       } else if (/引文|原文.*位置|原文定位|单元格定位/.test(label)) {
         columnWidths[column] = 120;
+      } else if (label === "未知项") {
+        columnWidths[column] = 96;
       } else if (label === "来源文件") {
         columnWidths[column] = 72;
       } else if (/描述|根因|判断|定义|缺口|理由|说明|原因|建议|事实原义|机理|边界|未确定项|未知项|reason|text|content|facts|evidence|issues|raw/.test(label)) {
@@ -133,7 +137,7 @@ async function main() {
       // over-size unrelated rows. Size each persisted row from all its cells.
       for (let row = 1; row < matrix.length; row += 1) {
         const lines = Math.max(...matrix[row].map((value, column) => wrappedLines(value, columnWidths[column])));
-        sheet.getRange(`A${row + 1}:${endColumn}${row + 1}`).format.rowHeight = Math.max(24, lines * 14 + 8);
+        sheet.getRange(`A${row + 1}:${endColumn}${row + 1}`).format.rowHeight = Math.max(24, lines * 13 + 8);
       }
       const excelTable = sheet.tables.add(`A1:${endColumn}${endRow}`, true, `AuditTable${index + 1}`);
       excelTable.showFilterButton = true;
