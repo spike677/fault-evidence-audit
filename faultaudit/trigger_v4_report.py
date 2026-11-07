@@ -108,23 +108,35 @@ def extend_workbook(book, data):
         extra.append(_table("Init V4条件索引", init_rows))
     previous = data.get("previous_classification")
     if previous:
-        old = {(a["case_id"], a.get("snapshot_id"), a.get("issue_label")): a for a in previous.get("assessments", [])}
+        old = {(a["case_id"], a.get("snapshot_id"), a.get("issue_index"), a.get("issue_label")): a for a in previous.get("assessments", [])}
         changes = []
-        for a in assessments:
-            prior = old.get((a["case_id"], a.get("snapshot_id"), a.get("issue_label")))
-            source = _source(subjects[a["subject_id"]])
+        old_version = previous.get("taxonomy", {}).get("definition_version", "TRIGGER42-ORIGINAL-v1")
+
+        def compare_rows(a, prior, source, phase):
             before = {r["trigger_id"]: r for r in prior["result"]["rows"]} if prior else {}
             for row in a["result"]["rows"]:
                 prior_row = before.get(row["trigger_id"])
                 if prior_row and all(prior_row[k] == row[k] for k in ("applicability", "relation")):
                     continue
                 item = next(i for i in data["taxonomy"]["items"] if i["id"] == row["trigger_id"])
-                changes.append({**source, "子问题": a["issue_label"], "原42编号": row["trigger_id"],
+                changes.append({"阶段": phase, **source, "子问题": a["issue_label"], "原42编号": row["trigger_id"],
                     "旧适用性": prior_row["applicability"] if prior_row else "无同范围旧评估", "旧理由": prior_row["reason"] if prior_row else "",
                     "新适用性": row["applicability"], "新理由": row["reason"], "定义修订原因": item["revision_reason"],
                     "新原文及位置": _condition_refs(row, a["result"]), "旧判断编号": prior["assessment_id"] if prior else "",
-                    "新判断编号": a["assessment_id"], "旧定义版本": "TRIGGER42-ORIGINAL-v1",
+                    "新判断编号": a["assessment_id"], "旧定义版本": old_version,
                     "新定义版本": data["taxonomy"]["definition_version"], "覆盖传递": "无；新旧独立评估"})
+
+        for a in assessments:
+            prior = old.get((a["case_id"], a.get("snapshot_id"), a.get("issue_index"), a.get("issue_label")))
+            compare_rows(a, prior, _source(subjects[a["subject_id"]]), data["phase"])
+        if data["phase"] == "INCREMENTAL" and frozen.get("status") != "STALE":
+            def entry_view(entry):
+                return {**entry, "result": {"rows": entry["rows"], "condition_facts": entry.get("condition_facts", [])}}
+            prior_index = {(e.get("mode_id") or e["case_id"], e.get("snapshot_id"), e.get("issue_index"), e.get("issue_label")): e
+                           for e in (previous.get("baseline") or {}).get("condition_index", [])}
+            for entry in frozen.get("condition_index", []):
+                prior = prior_index.get((entry.get("mode_id") or entry["case_id"], entry.get("snapshot_id"), entry.get("issue_index"), entry.get("issue_label")))
+                compare_rows(entry_view(entry), entry_view(prior) if prior else None, _source(entry), "INIT")
         extra.append(_table("逐项分类变化", changes, list(changes[0]) if changes else ["case_id", "原42编号", "旧适用性", "新适用性", "说明"]))
     stats = next(s for s in book["sheets"] if s["name"] == "运行统计")
     stats["rows"].extend([["V4条件类", 31, "独立分类定义，不与原42相加"], ["V4唯一构造代码", 55, "按construction_id去重"],

@@ -292,6 +292,26 @@ class V4WorkflowTests(unittest.TestCase):
             base=workflow.finalize(self.store,self.run)
             self.assertEqual(base['v4_definition_version'],V4_VERSION)
             self.assertEqual(len(base['condition_index'][0]['v4_rows']),31)
+            combined=copy.deepcopy(projection)
+            combined.update(phase='INCREMENTAL',baseline=copy.deepcopy(base))
+            previous_index=copy.deepcopy(base['condition_index'])
+            previous_index[0]['rows'][0]['applicability']='APPLICABLE'
+            wrong_issue=copy.deepcopy(projection['assessments'][0])
+            wrong_issue['issue_index']=999
+            combined['previous_classification']={'taxonomy':{'definition_version':'SYNTHETIC-PRIOR'},
+                'assessments':[wrong_issue],'baseline':{'condition_index':previous_index}}
+            changes=next(t for t in build_workbook(combined)['sheets'] if t['name']=='逐项分类变化')
+            init_changes=[dict(zip(changes['columns'],r)) for r in changes['rows'] if r[0]=='INIT']
+            self.assertEqual(len(init_changes),1)
+            self.assertEqual(init_changes[0]['旧适用性'],'APPLICABLE')
+            self.assertEqual(init_changes[0]['新适用性'],'UNKNOWN')
+            self.assertEqual(init_changes[0]['旧定义版本'],'SYNTHETIC-PRIOR')
+            increment_changes=[dict(zip(changes['columns'],r)) for r in changes['rows'] if r[0]=='INCREMENTAL']
+            self.assertEqual(len(increment_changes),42)
+            self.assertTrue(all(r['旧适用性']=='无同范围旧评估' for r in increment_changes))
+            combined['baseline']['status']='STALE'
+            stale_changes=next(t for t in build_workbook(combined)['sheets'] if t['name']=='逐项分类变化')
+            self.assertFalse(any(r[0]=='INIT' for r in stale_changes['rows']))
             history=len(self.store.records(self.run,'trigger_assessments'))
             path.write_text(markdown()+'\nnew source annotation\n',encoding='utf-8')
             workflow.configure_v4(self.store,self.run,path)
