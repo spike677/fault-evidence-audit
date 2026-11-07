@@ -90,7 +90,8 @@ class CollectionSourcePolicyTests(unittest.TestCase):
             "evidence": payload["source_issue"]["facts"][0]["evidence"],
             "source_cells": [{"field": "故障原因", "cell": self.case["cell_locations"]["故障原因"],
                               "quote": self.case["raw"]["故障原因"]}]}]
-        return workflow.accept_assessment(self.store, self.run, request, response)
+        from tests.condition_fixtures import condition_attempt
+        return workflow.accept_assessment(self.store, self.run, request, condition_attempt(payload, response))
 
     def test_default_supplied_reference_and_wiki_priority_are_unchanged(self):
         plan = self.plan()

@@ -126,7 +126,8 @@ class TriggerWorkflowTests(unittest.TestCase):
             response["details"] = [{"detail_id": "SYN-DEFINITION", "mode_id": payload["subject"]["mode_id"],
                 "name": "Synthetic source definition", "mechanism": source["raw"]["故障原因"],
                 "trigger_ids": [EXPECTED_IDS[0]], "evidence_basis": "SOURCE_DEFINITION", "source_cells": [cell]}]
-        return response
+        from tests.condition_fixtures import condition_attempt
+        return condition_attempt(payload, response)
 
     def accept(self, payload, **options):
         request = self.request(payload)
@@ -151,6 +152,41 @@ class TriggerWorkflowTests(unittest.TestCase):
         self.assertTrue(all(s["subject_kind"] == "MODE_ENTRY" for s in subjects))
         self.assertEqual({s["case_id"] for s in subjects}, set(cfg["selected_case_ids"]))
         self.assertEqual(self.store.records(self.run, "judgments"), [])
+
+    def test_conditions_first_payload_order_and_frozen_index(self):
+        from faultaudit.trigger_assessment import CLASSIFICATION_FRAMEWORK
+        self.start()
+        payload = next(workflow.classification_payloads(self.store, self.run))
+        self.assertEqual(payload["classification_framework"], CLASSIFICATION_FRAMEWORK)
+        self.assertEqual(payload["evaluation_order"][:3], ["condition_facts", "rows", "external_branches"])
+        self.accept(payload, definition_only=True)
+        baseline = workflow.finalize(self.store, self.run, allow_pending=True)
+        self.assertEqual(baseline["classification_framework"], CLASSIFICATION_FRAMEWORK)
+        self.assertEqual(len(baseline["condition_index"]), 1)
+        entry = baseline["condition_index"][0]
+        self.assertEqual(entry["mode_id"], self.cases()[0]["external_id"])
+        self.assertEqual(len(entry["rows"]), 42)
+        self.assertEqual(entry["source_case"]["cell_locations"], self.cases()[0]["cell_locations"])
+        self.assertFalse(entry["execution_verified"])
+
+    def test_new_framework_rejects_old_request_and_retains_history_on_policy_change(self):
+        self.start()
+        payload = next(workflow.classification_payloads(self.store, self.run))
+        saved = self.accept(payload, definition_only=True)
+        workflow.finalize(self.store, self.run, allow_pending=True)
+        old_payload = copy.deepcopy(payload)
+        old_payload.pop("classification_framework")
+        with self.assertRaisesRegex(AuditError, "framework|policy"):
+            self.accept(old_payload, definition_only=True)
+        count = len(self.store.records(self.run, "trigger_assessments"))
+        with patch("faultaudit.xlsx_workflow._policy", return_value="changed-conditions-policy"):
+            self.assertEqual(workflow.current_assessments(self.store, self.run), [])
+            with self.assertRaises(AuditError): workflow._baseline(self.store, self.run, allow_pending=True)
+            projection = workflow._projection(self.store, self.run)
+            self.assertEqual(projection["assessments"], [])
+            self.assertTrue(list(workflow.classification_payloads(self.store, self.run)))
+        self.assertEqual(len(self.store.records(self.run, "trigger_assessments")), count)
+        self.assertEqual(workflow.current_assessments(self.store, self.run)[0]["assessment_id"], saved["assessment_id"])
 
     def test_even_provisional_baseline_requires_every_original_mode_assessed(self):
         self.start(2)

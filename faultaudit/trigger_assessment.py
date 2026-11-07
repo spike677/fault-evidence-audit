@@ -16,6 +16,8 @@ from .store import AuditError
 
 Basis = Literal["SOURCE_DEFINITION", "SOURCE_REPORTED", "CODE_INFERENCE", "UNKNOWN"]
 CoverageKind = Literal["HISTORICAL_EVIDENCE", "SOURCE_DEFINITIONS"]
+CLASSIFICATION_FRAMEWORK = "CONDITIONS_FIRST_V1"
+Applicability = Literal["APPLICABLE", "PARTIAL", "UNKNOWN", "NOT_APPLICABLE"]
 
 
 class SourceCell(Contract):
@@ -29,20 +31,33 @@ class Grounded(Contract):
     source_cells: list[SourceCell] = Field(default_factory=list)
 
 
+class ConditionFact(Grounded):
+    fact_id: str = Field(min_length=1)
+    statement: str = Field(min_length=1)
+    subject: Literal["SOURCE_RECORD", "CURRENT_ISSUE"]
+    role: Literal["INPUT_VALUE", "INPUT_SHAPE", "INPUT_DTYPE", "INPUT_LAYOUT", "INDEX_OR_OFFSET",
+                  "INTERMEDIATE_VALUE", "INTERNAL_COMPUTATION", "API_CONTROL", "PLATFORM",
+                  "COMPILER_OPTION", "BUILD_VARIANT", "VERSION", "DEVICE_SCHEDULING",
+                  "STREAM_ASYNC", "SYNC_RACE", "SAME_ARGUMENTS", "SAME_BINARY", "UNKNOWN"]
+    evidence_basis: Basis
+
+
 class PredicateCheck(Grounded):
     clause: str = Field(min_length=1)
     clause_role: Literal["INCLUSION", "EXCLUSION"] = "INCLUSION"
     result: Literal["MET", "NOT_MET", "UNKNOWN"]
+    condition_fact_ids: list[str] = Field(default_factory=list)
 
 
 class TriggerRow(Grounded):
     trigger_id: str = Field(min_length=1)
-    applicability: Literal["APPLICABLE", "NOT_APPLICABLE", "UNKNOWN"]
+    applicability: Applicability
     relation: Literal["MATCH", "PARTIAL", "NOT_MATCHED", "UNKNOWN"]
     evidence_basis: Basis
     predicate_checks: list[PredicateCheck] = Field(default_factory=list)
     reason: str = Field(min_length=1)
     detail_ids: list[str] = Field(default_factory=list)
+    condition_fact_ids: list[str] = Field(default_factory=list)
 
 
 class Detail(Grounded):
@@ -59,11 +74,20 @@ class Detail(Grounded):
     execution_verified: Literal[False] = False
 
 
+class BranchCategory(Grounded):
+    category_id: str = Field(min_length=1)
+    applicability: Applicability
+    condition_fact_ids: list[str] = Field(default_factory=list)
+    reason: str = Field(min_length=1)
+    unknowns: list[str] = Field(default_factory=list)
+
+
 class OutsideBranch(Grounded):
     branch_id: Literal["2", "3"]
-    relation: Literal["APPLICABLE", "NOT_APPLICABLE", "UNKNOWN"]
+    relation: Applicability
     category_ids: list[str] = Field(default_factory=list)
     reason: str = Field(min_length=1)
+    category_checks: list[BranchCategory] = Field(default_factory=list)
 
 
 class SourceAlignment(Grounded):
@@ -114,13 +138,14 @@ class TriggerAssessment(Contract):
     executor: Literal["opencode", "codex"]
     producer: CatalogDraftProducer
     case_id: str = Field(min_length=1)
+    condition_facts: list[ConditionFact] = Field(default_factory=list)
+    rows: list[TriggerRow]
+    external_branches: list[OutsideBranch]
     source_relation: Literal["MATCH", "PARTIAL", "UNKNOWN", "NOT_RELATED"] = "UNKNOWN"
     source_alignment: list[SourceAlignment] = Field(default_factory=list)
-    rows: list[TriggerRow]
     details: list[Detail] = Field(default_factory=list)
-    external_branches: list[OutsideBranch]
-    decision: Decision
     declared_comparison: DeclaredComparison | None = None
+    decision: Decision
     fact_conflicts: list[FactConflict] = Field(default_factory=list)
     self_check: SelfCheck
     coverage_kind: CoverageKind = "HISTORICAL_EVIDENCE"
@@ -132,8 +157,35 @@ def response_schema() -> dict:
 
 
 def instructions() -> str:
-    return """Classify exactly the 42 frozen INPUT trigger predicates; keep Branch 2/3 outside their count.
+    return """The primary framework is the 42 INPUT conditions plus Branch 2/3. Mechanism-library
+association and adoption follow condition classification; they never decide which conditions may
+be described. Use this order: extract condition_facts, assess all 42 rows and Branch 2/3, organize
+mechanism details, compare the original mechanism catalog, then give the adoption suggestion.
+Training/inference catalog scope restricts adoption only; ALWAYS classify conditions for both.
+Do not wait for all conditions to become known before organizing an already stated mechanism.
+Classify exactly the 42 frozen INPUT trigger predicates; keep Branch 2/3 outside their count.
 Return one TriggerAssessment JSON bound to the OUTER request_hash and supplied case_id.
+Extract grounded condition_facts with unique fact_id, semantic role and subject SOURCE_RECORD or
+CURRENT_ISSUE. SOURCE_RECORD facts are historical/source declarations, not independently verified
+root causes. CURRENT_ISSUE facts quote only this issue's permitted facts/segments. An unbound search
+candidate's conditions cannot become the original record's labels. Original linked references or
+an established source MATCH permit describing the applicable issue; neither confirms an incident.
+For each row applicability is DESCRIPTION classification: APPLICABLE, PARTIAL, UNKNOWN or
+NOT_APPLICABLE. relation is the SEPARATE existing evidence-confirmation judgment. A source-only
+APPLICABLE/PARTIAL description never authorizes strong MATCH, DIRECT, SAME_EVENT or formal ADD.
+Link positive description rows and decided predicate_checks to their condition_fact_ids. Exact
+statement of a condition can yield a PARTIAL description label while Requires/Skip remain unknown;
+for example INT32 address-offset overflow maps to 1.3.2, retaining missing address-mapping argument
+or threshold-formula information. APPLICABLE needs the whole predicate, including Requires/Skip.
+Intermediate Inf is not input Inf. Internal nondeterminism is not an exposed deterministic API
+control. All 1.C positives need a stated API-control fact, not an internal algorithm name.
+Assess every explicitly defined Branch 2/3 leaf in category_checks, preserving its fact IDs and
+unknowns. A concrete platform constraint/change supports 2.1. Ordinary version differences alone
+do not establish a BUILD_VARIANT for 2.3. Branch 3 needs actual scheduling/stream/synchronization
+facts, plus same arguments and same binary for full applicability; otherwise use PARTIAL/UNKNOWN.
+No 42-label match never implies Branch 2/3 or a new mechanism. Same conditions do not merge
+mechanisms; different conditions do not prove different mechanisms. Missing fields do not trigger
+additional searches. Reuse available evidence and keep its capture gaps visible.
 Use every unique taxonomy item id once. Read each item, its family Requires/Skip and global
 applicability rules. For each row list the complete predicate conditions in predicate_checks;
 check all roles, values, units, controls and constraints. Similar words or one equal constant
@@ -151,8 +203,10 @@ not by inventing SAME_EVENT. source_relation MATCH needs a grounded mechanism MA
 both exact source cells and webpage quotes. Generic operator or trigger-category matches are
 insufficient. NOT_RELATED needs positive mechanism DIFFERENT evidence, not absent fields.
 Do not retain DIFFERENT alignments under source_relation MATCH. An unresolved positive
-fact difference under PARTIAL/UNKNOWN belongs in grounded fact_conflicts, not a silent
-normal result. An unrelated search candidate may be NOT_RELATED without manufacturing a
+fact contradiction under PARTIAL belongs in grounded fact_conflicts. Under UNKNOWN, an unbound
+candidate's different symptoms/context may both be true: retain DIFFERENT alignments and unknown
+association without inventing a contradiction or failed self-check. An unrelated search candidate
+may be NOT_RELATED without manufacturing a
 conflict in the original mode. Technical differences never alone negate the original fault.
 Quotes must be exact within the supplied issue's facts, provided original segments and scope;
 source_cells must quote source_case.raw at its exact cell_locations. A summary is an index,
@@ -181,8 +235,9 @@ Read the complete request. If it exceeds execution capacity, report transport bl
 of returning a successful truncated classification.
 When assessment_basis is SOURCE_DEFINITIONS and phase INIT, read only the frozen original
 definition and supplied chat/source cells. No search, webpage capture, SAME_EVENT, or incident
-confirmation is part of this initialization. Keep source_relation UNKNOWN, all 42 trigger rows
-PARTIAL or UNKNOWN, and retain at least one concrete SOURCE_DEFINITION detail for this mode.
+confirmation is part of this initialization. Keep source_relation UNKNOWN and evidence relation
+PARTIAL or UNKNOWN; description applicability may be APPLICABLE/PARTIAL/UNKNOWN/NOT_APPLICABLE
+according to the cited source. Retain at least one SOURCE_DEFINITION mechanism detail for this mode.
 Do not omit the definition's mechanism because it lacks webpage verification. Mark coverage_kind
 SOURCE_DEFINITIONS; execution_verified remains false. Exact source_cells also anchor chat fields.
 An incremental baseline may separately contain declared_details. If so, declared_comparison is
@@ -212,6 +267,99 @@ def _unique(values: list[str], label: str) -> set[str]:
     if len(values) != len(set(values)):
         raise AuditError(label + " must be unique")
     return set(values)
+
+
+def _validate_conditions(payload, result, grounded, definitions, families):
+    """Validate description labels without weakening evidence/incident gates."""
+    from .trigger_taxonomy import BRANCH_ROLES, condition_role_requirements
+    if payload.get("classification_framework") != CLASSIFICATION_FRAMEWORK:
+        return
+    facts = {f.fact_id: f for f in result.condition_facts}
+    _unique([f.fact_id for f in result.condition_facts], "Condition fact IDs")
+    issue = payload.get("source_issue") or {}
+    linked_reference = issue.get("reference_relation") in {
+        "SOURCE_CELL_LINKED", "LEGACY_TABLE_LINKED", "USER_CONFIRMED"}
+    for fact in facts.values():
+        grounded(fact, "Condition fact", needed=True)
+        if fact.subject == "SOURCE_RECORD":
+            if fact.evidence_basis != "SOURCE_DEFINITION" or not fact.source_cells or fact.evidence:
+                raise AuditError("Record condition facts require source declarations/cells, not webpage confirmation")
+        elif (fact.evidence_basis not in {"SOURCE_REPORTED", "CODE_INFERENCE"}
+                or not fact.evidence):
+            raise AuditError("Issue condition facts require scoped webpage evidence and its reported/inferred basis")
+
+    def support(value, label, *, needed=False, decisive=False):
+        ids = _unique(value.condition_fact_ids, label + " condition fact IDs")
+        if not ids <= set(facts) or needed and not ids:
+            raise AuditError(label + " requires known local condition facts")
+        selected = [facts[key] for key in ids]
+        if decisive and any(f.subject == "CURRENT_ISSUE" and not (
+                result.source_relation == "MATCH" or linked_reference and result.source_relation != "NOT_RELATED") for f in selected):
+            raise AuditError("Unbound candidate facts cannot supply the record's condition classification")
+        if ids:
+            for ref in value.evidence:
+                if not any(ref.segment_id == r.segment_id and ref.quote in r.quote
+                           for f in selected for r in f.evidence):
+                    raise AuditError(label + " evidence is outside its linked condition facts")
+            for cell in value.source_cells:
+                if not any(cell.field == r.field and cell.cell == r.cell and cell.quote in r.quote
+                           for f in selected for r in f.source_cells):
+                    raise AuditError(label + " source quote is outside its linked condition facts")
+        return selected
+
+    for row in result.rows:
+        item = definitions[row.trigger_id]
+        family = families.get(item.get("family_id"), {})
+        included = {item["definition"].strip()} | {v.strip() for entry in (item, family) for v in entry.get("requires", [])}
+        excluded = {v.strip() for entry in (item, family) for v in entry.get("skip_if", [])}
+        wanted = {("INCLUSION", v) for v in included if v} | {("EXCLUSION", v) for v in excluded if v}
+        got = [(c.clause_role, c.clause) for c in row.predicate_checks]
+        if len(got) != len(set(got)) or set(got) != wanted:
+            raise AuditError("Condition classification must check every complete canonical definition/Requires/Skip exactly once")
+        selected = support(row, row.trigger_id, needed=row.applicability != "UNKNOWN",
+                           decisive=row.applicability != "UNKNOWN")
+        required_roles = condition_role_requirements(row.trigger_id)
+        if row.applicability != "UNKNOWN" and required_roles and not required_roles & {f.role for f in selected}:
+            raise AuditError("Condition label needs the proper input/index/API semantic role, not intermediate/internal facts")
+        for check in row.predicate_checks:
+            check_facts = support(check, "Predicate", needed=check.result != "UNKNOWN", decisive=check.result != "UNKNOWN")
+            if (check.clause == item["definition"].strip() and check.result != "UNKNOWN"
+                    and required_roles and not required_roles & {f.role for f in check_facts}):
+                raise AuditError("The predicate's semantic role cannot be borrowed from another condition fact")
+        negative = any(c.clause_role == "INCLUSION" and c.result == "NOT_MET"
+                       or c.clause_role == "EXCLUSION" and c.result == "MET" for c in row.predicate_checks)
+        complete = all(c.result == ("MET" if c.clause_role == "INCLUSION" else "NOT_MET") for c in row.predicate_checks)
+        if row.applicability == "APPLICABLE" and not complete:
+            raise AuditError("Description APPLICABLE needs all conditions; use PARTIAL for a grounded clue with missing prerequisites")
+        if row.applicability in {"APPLICABLE", "PARTIAL"} and negative:
+            raise AuditError("A known Requires/Skip exclusion cannot be positively classified")
+
+    for branch in result.external_branches:
+        definition = next((b for b in payload["taxonomy"].get("branches", []) if b["branch_id"] == branch.branch_id), {})
+        leaves = {c["id"] for c in definition.get("categories", [])} if definition.get("status") == "DEFINED" else set()
+        ids = [c.category_id for c in branch.category_checks]
+        if _unique(ids, "Branch category checks") != leaves:
+            raise AuditError("Condition classification must assess every explicitly defined Branch 2/3 category")
+        for category in branch.category_checks:
+            grounded(category, "Branch category")
+            selected = support(category, "Branch category", needed=category.applicability != "UNKNOWN",
+                               decisive=category.applicability != "UNKNOWN")
+            roles = {f.role for f in selected}
+            if category.applicability != "UNKNOWN" and BRANCH_ROLES.get(category.category_id) not in roles:
+                raise AuditError("Branch label needs its explicit platform/build/execution role; version-only is not a build variant")
+            missing = {"SAME_ARGUMENTS", "SAME_BINARY"} - roles if branch.branch_id == "3" else set()
+            if category.applicability == "APPLICABLE" and missing:
+                raise AuditError("Branch 3 full applicability needs same arguments and same binary")
+            if category.applicability == "PARTIAL" and not category.unknowns:
+                raise AuditError("Partial branch classification must name its missing conditions")
+        applicable = {c.category_id for c in branch.category_checks if c.applicability == "APPLICABLE"}
+        if set(branch.category_ids) != applicable:
+            raise AuditError("Branch category_ids must contain exactly the fully description-applicable leaves")
+        states = {c.applicability for c in branch.category_checks}
+        expected = ("APPLICABLE" if "APPLICABLE" in states else "PARTIAL" if "PARTIAL" in states
+                    else "UNKNOWN" if "UNKNOWN" in states or not states else "NOT_APPLICABLE")
+        if branch.relation != expected:
+            raise AuditError("Branch summary must retain leaf applicability and unknowns")
 
 
 def validate_assessment(payload: dict, response: dict, request_hash: str) -> dict:
@@ -290,6 +438,7 @@ def validate_assessment(payload: dict, response: dict, request_hash: str) -> dic
     rows = {row.trigger_id: row for row in result.rows}
     definitions = {item["id"]: item for item in items}
     families = {family["family_id"]: family for family in payload["taxonomy"].get("families", [])}
+    _validate_conditions(payload, result, grounded, definitions, families)
     for row in result.rows:
         grounded(row, row.trigger_id)
         _unique(row.detail_ids, "Row detail IDs")
@@ -380,7 +529,7 @@ def validate_assessment(payload: dict, response: dict, request_hash: str) -> dic
             allowed_categories = leaves or {branch.branch_id}
             if not _unique(branch.category_ids, "Outside category IDs") <= allowed_categories:
                 raise AuditError("Outside category IDs must come from their explicit definitions")
-            if branch.relation != "UNKNOWN":
+            if branch.relation != "UNKNOWN" and payload.get("classification_framework") != CLASSIFICATION_FRAMEWORK:
                 grounded(branch, "Outside branch", needed=True)
 
     check = result.self_check
@@ -500,6 +649,12 @@ def validate_assessment(payload: dict, response: dict, request_hash: str) -> dic
         raise AuditError("Declared comparison requires an incremental baseline with frozen declared details")
     output = result.model_dump()
     output["coverage_kind"] = assessment_basis
+    if payload.get("classification_framework") == CLASSIFICATION_FRAMEWORK:
+        output["classification_framework"] = CLASSIFICATION_FRAMEWORK
+        output["condition_processing_status"] = ("ASSESSED_WITH_UNKNOWNS" if any(
+            r.applicability in {"PARTIAL", "UNKNOWN"} for r in result.rows) or any(
+            c.applicability in {"PARTIAL", "UNKNOWN"} for b in result.external_branches for c in b.category_checks)
+            else "ASSESSED")
     for value in output["details"]:
         value["coverage_kind"] = ("SOURCE_DEFINITIONS" if value["evidence_basis"] == "SOURCE_DEFINITION"
                                   else "HISTORICAL_EVIDENCE")

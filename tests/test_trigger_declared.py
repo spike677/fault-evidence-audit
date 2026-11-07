@@ -71,7 +71,7 @@ class DeclaredWorkflowTests(unittest.TestCase):
         data = workflow._projection(self.store, self.source.run)
         self.assertEqual({g["kind"] for g in data["gaps"]}, {"TRIGGER_UNKNOWNS"})
         report = build_workbook(data)
-        self.assertTrue(all(r["覆盖范围"] == SOURCE_DEFINITION_SCOPE for r in records(report, "42类覆盖详情")))
+        self.assertTrue(all(r["覆盖范围"] == SOURCE_DEFINITION_SCOPE for r in records(report, "42项条件分类")))
         self.assertFalse(any(r["类型"].startswith("WIKI_") for r in records(report, "证据与缺口")))
 
     def test_source_init_requires_concrete_detail_and_frozen_basis(self):

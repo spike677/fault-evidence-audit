@@ -16,6 +16,20 @@ FAMILY_COUNTS = {"1.1": 5, "1.2": 8, "1.3": 4, "1.4": 3,
                  "1.5": 4, "1.6": 2, "1.7": 6, "1.8": 3, "1.C": 7}
 EXPECTED_IDS = tuple(f"{family}.{index}" for family, count in FAMILY_COUNTS.items()
                      for index in range(1, count + 1))
+BRANCH_ROLES = {"2.1": "PLATFORM", "2.2": "COMPILER_OPTION", "2.3": "BUILD_VARIANT",
+                "3.1": "DEVICE_SCHEDULING", "3.2": "STREAM_ASYNC", "3.3": "SYNC_RACE"}
+
+
+def condition_role_requirements(trigger_id: str) -> set[str]:
+    """Source-role boundaries, not extra taxonomy items or keyword matching."""
+    if trigger_id.startswith("1.C."):
+        return {"API_CONTROL"}
+    if trigger_id.startswith("1.7."):
+        return {"INPUT_VALUE"}
+    if trigger_id.startswith("1.3."):
+        return {"INDEX_OR_OFFSET"}
+    return {"INPUT_VALUE", "INPUT_SHAPE", "INPUT_DTYPE", "INPUT_LAYOUT", "INDEX_OR_OFFSET", "API_CONTROL"}
+
 _HEADING = re.compile(r"^\s*\\?(#{1,6})\s+(.+?)\s*$")
 _FAMILY = re.compile(r"^(1\.(?:\d+|C))\s+(.+)$")
 _ITEM = re.compile(r"^\s*(?:[-*]\s+)?`?\[[^\]]*\]`?\s+\*\*"

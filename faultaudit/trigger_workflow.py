@@ -15,10 +15,10 @@ from .contracts import SourceCase
 from .importers import import_cases, import_catalog
 from .resource_identity import resource_key, snapshot_index
 from .store import AuditError, Store, digest
-from .trigger_assessment import instructions, response_schema, validate_assessment
+from .trigger_assessment import CLASSIFICATION_FRAMEWORK, instructions, response_schema, validate_assessment
 from .trigger_taxonomy import builtin_user_branches, load_taxonomy
 
-RULE_VERSION = "trigger-workflow-1"
+RULE_VERSION = "trigger-conditions-first-0.1.14"
 
 
 def _settings(store, run_id):
@@ -74,7 +74,8 @@ def start_init(store: Store, modes: Path, taxonomy: Path, work_root: Path, *,
         "init_basis": basis}
     store.put(run_id, "xlsx_workflow", "config", cfg)
     store.put(run_id, "trigger_config", "config", {"phase": "INIT", "taxonomy_id": frozen["taxonomy_id"],
-        "catalog_hash": digest(_catalog(store, run_id)), "rule_version": RULE_VERSION, "basis": basis})
+        "catalog_hash": digest(_catalog(store, run_id)), "rule_version": RULE_VERSION, "basis": basis,
+        "classification_framework": CLASSIFICATION_FRAMEWORK})
     register_search_policy(store, run_id, {"required_sources": ["WIKI"]})
     return {**cfg, "mode_count": len(subjects), "trigger_count": len(frozen["items"]),
         "branch_categories": [c["id"] for b in frozen["branches"] for c in b.get("categories", [])]}
@@ -101,6 +102,13 @@ def _model_taxonomy(frozen):
     value["input_scope"] = {"trigger_ids": [i["id"] for i in frozen["items"]], "item_count": 42,
         "included": "All definitions, local/family Requires/Skip and global scope/applicability",
         "excluded": "Duplicate item source_quote copies; generator N-allocation/execution instructions outside historical classification"}
+    value["classification_boundaries"] = {
+        "description_and_confirmation_separate": True,
+        "input_values_are_not_intermediate_values": True,
+        "control_arguments_require_exposed_api_controls": True,
+        "ordinary_versions_are_not_build_variants": True,
+        "branch3_full_applicability_requires": ["same arguments", "same binary"],
+        "unknown_condition_fields_do_not_request_more_searches": True}
     return value
 
 
@@ -146,7 +154,10 @@ def _issues(store, run_id, case_id):
     from .pipeline import current_summaries, check_citations
     from .model import validate_task_result
     from .contracts import EvidenceSummary
+    from .evidence_plan import source_relation
     snapshots = _linked_snapshots(store, run_id, case_id)
+    case = store.get(run_id, "cases", case_id)
+    refs = [r for r in store.records(run_id, "references") if r["case_id"] == case_id and r.get("url")]
     issues = []
     for summary in sorted(current_summaries(store, run_id), key=lambda s: s["task_id"]):
         snapshot = snapshots.get(summary["snapshot_id"])
@@ -161,20 +172,26 @@ def _issues(store, run_id, case_id):
         for index, issue in enumerate(summary.get("issues", [])):
             facts = []
             for fact in issue.get("facts", []):
-                refs = fact.get("evidence", [])
-                if fact.get("value") in (None, "", [], {}) or not refs or check_citations(refs, snapshot):
+                fact_refs = fact.get("evidence", [])
+                if fact.get("value") in (None, "", [], {}) or not fact_refs or check_citations(fact_refs, snapshot):
                     continue
                 identity = {"summary_task_id": summary["task_id"], "issue_label": issue["label"],
-                    "issue_index": index, "field": fact["field"], "value": fact["value"], "evidence": refs}
+                    "issue_index": index, "field": fact["field"], "value": fact["value"], "evidence": fact_refs}
                 facts.append({"fact_id": "fact-" + digest(identity)[:24], **identity})
             selected = {r["segment_id"] for f in facts for r in f["evidence"]}
             view = {k: snapshot[k] for k in ("snapshot_id", "url", "status", "title", "text_sha256") if k in snapshot}
             view["segments"] = [s for s in snapshot["segments"] if s["segment_id"] in selected]
             scope = {"scope": "ISSUE_CITED_SEGMENTS", "provided_segment_ids": sorted(selected),
                 "total_snapshot_segments": len(snapshot["segments"]), "full_text_verified": False}
+            grades = {source_relation(case, r)["relation"] for r in refs
+                      if resource_key(r["url"]) == resource_key(snapshot["url"])}
+            confirmed = any(a["case_id"] == case_id and a.get("snapshot_id") == snapshot["snapshot_id"]
+                and a.get("user_confirmed") for a in store.records(run_id, "evidence_associations"))
+            reference_relation = ("USER_CONFIRMED" if confirmed else "SOURCE_CELL_LINKED" if "SOURCE_CELL_LINKED" in grades
+                else "LEGACY_TABLE_LINKED" if "LEGACY_TABLE_LINKED" in grades else "SEARCH_DISCOVERED")
             issues.append({"snapshot_id": snapshot["snapshot_id"], "summary_task_id": summary["task_id"],
                 "issue_index": index, "label": issue["label"], "facts": facts,
-                "snapshot": view, "input_scope": scope})
+                "snapshot": view, "input_scope": scope, "reference_relation": reference_relation})
     return issues
 
 
@@ -282,7 +299,9 @@ def classification_payloads(store, run_id):
                 judgments = [j for j in current_judgments(store, run_id) if j["case_id"] == cid
                     and j["snapshot_id"] == sid and (j.get("applicable_issue") or {}).get("label") == label]
                 mappings = [m for m in current_mappings(store, run_id) if m["case_id"] == cid]
-            yield {"phase": settings["phase"], "subject": {**subject, "source_case": store.get(run_id, "cases", cid)},
+            yield {"phase": settings["phase"], "classification_framework": CLASSIFICATION_FRAMEWORK,
+                "evaluation_order": ["condition_facts", "rows", "external_branches", "details", "declared_comparison", "decision"],
+                "subject": {**subject, "source_case": store.get(run_id, "cases", cid)},
                 "assessment_basis": settings.get("basis", "HISTORICAL_EVIDENCE"),
                 "taxonomy": taxonomy, "source_issue": issue,
                 "wiki_check": {"records": [c for c in store.records(run_id, "wiki_checks") if c["case_id"] == cid],
@@ -310,6 +329,8 @@ def classification_payloads(store, run_id):
 def accept_assessment(store, run_id, request, response):
     from .xlsx_workflow import _policy, config
     payload = request["payload"]
+    if payload.get("classification_framework") != CLASSIFICATION_FRAMEWORK:
+        raise AuditError("Classification requires the current conditions-first policy; regenerate old requests")
     settings = _settings(store, run_id)
     if (payload.get("phase") != settings["phase"]
             or payload.get("assessment_basis", "HISTORICAL_EVIDENCE") != settings.get("basis", "HISTORICAL_EVIDENCE")):
@@ -460,7 +481,8 @@ def _projection(store, run_id):
             baseline = {**baseline, "status": "STALE"}
             gaps.append({"case_id": "", "kind": "BASELINE_STALE", "reason": "Maintain initialization before incremental decisions"})
     gaps = list({digest(g): g for g in gaps}.values())
-    return {"run_id": run_id, "phase": cfg["phase"], "coverage_kind": cfg.get("basis", "HISTORICAL_EVIDENCE"),
+    return {"run_id": run_id, "phase": cfg["phase"], "classification_framework": CLASSIFICATION_FRAMEWORK,
+        "coverage_kind": cfg.get("basis", "HISTORICAL_EVIDENCE"),
         "taxonomy": _taxonomy(store, run_id), "subjects": subjects,
         "assessments": assessments, "wiki_checks": checks, "resources": resources,
         "gaps": gaps, "baseline": baseline}
@@ -518,6 +540,23 @@ def finalize(store, run_id, *, allow_pending=False):
                     "trigger_assessments": labels, "detail_id": a["assessment_id"] + ":" + detail["detail_id"],
                     "assessment_id": a["assessment_id"], "snapshot_id": a["snapshot_id"], "issue_index": a["issue_index"]})
     identity = _index_identity(store, run_id)
+    condition_index = []
+    subjects = {s["subject_id"]: s for s in data["subjects"]}
+    for assessment in data["assessments"]:
+        subject = subjects[assessment["subject_id"]]
+        source = subject["source_case"]
+        result = assessment["result"]
+        condition_index.append({"assessment_id": assessment["assessment_id"],
+            "mode_id": subject.get("mode_id"), "case_id": assessment["case_id"],
+            "snapshot_id": assessment.get("snapshot_id"), "issue_index": assessment.get("issue_index"),
+            "issue_label": assessment.get("issue_label"),
+            "source_case": {key: source[key] for key in ("external_id", "description", "root_cause_raw",
+                "source_file", "source_sha256", "sheet", "row", "cell_locations") if key in source},
+            "condition_facts": result.get("condition_facts", []), "rows": result["rows"],
+            "external_branches": result["external_branches"],
+            "condition_processing_status": result.get("condition_processing_status"),
+            "source_relation": result["source_relation"], "coverage_kind": result["coverage_kind"],
+            "execution_verified": False})
     baseline = {"baseline_id": "trigger-baseline-" + identity[:24], "run_id": run_id,
         "status": "READY_WITH_GAPS" if blocking else "READY", "index_hash": identity,
         "taxonomy_id": _settings(store, run_id)["taxonomy_id"], "mode_ids": [i["item_id"] for i in _catalog(store, run_id)],
@@ -525,6 +564,7 @@ def finalize(store, run_id, *, allow_pending=False):
         "collection_source_policy": collection_source_policy(store, run_id),
         "assessment_ids": [a["assessment_id"] for a in data["assessments"]], "coverage_details": details,
         "declared_details": declared_details,
+        "classification_framework": CLASSIFICATION_FRAMEWORK, "condition_index": condition_index,
         "gaps": data["gaps"], "coverage_kind": data["coverage_kind"], "execution_verified": False}
     store.put(run_id, "trigger_baselines", baseline["baseline_id"], baseline)
     store.put(run_id, "trigger_baseline_heads", "current", {"baseline_id": baseline["baseline_id"]}, mutable=True)
@@ -540,6 +580,8 @@ def _baseline(store, run_id, baseline_id=None, *, allow_pending=False):
         raise AuditError("Initialized baseline is stale; maintain/finalize it again without deleting history")
     if baseline["status"] != "READY" and not allow_pending:
         raise AuditError("Baseline has gaps; complete initialization or explicitly allow a provisional baseline")
+    if baseline.get("classification_framework") != CLASSIFICATION_FRAMEWORK or not baseline.get("condition_index"):
+        raise AuditError("Maintain the conditions-first Init index before incremental classification")
     return baseline
 
 
@@ -585,7 +627,8 @@ def start_incremental(store, source, baseline_run, work_root, *, executor="openc
     store.put(run_id, "trigger_config", "config", {"phase": "INCREMENTAL", "taxonomy_id": frozen["taxonomy_id"],
         "baseline_run": baseline_run, "baseline_id": baseline["baseline_id"], "allow_pending_baseline": allow_pending_baseline,
         "catalog_hash": digest(catalog), "rule_version": RULE_VERSION, "basis": "HISTORICAL_EVIDENCE",
-        "baseline_basis": baseline.get("coverage_kind", "HISTORICAL_EVIDENCE")})
+        "baseline_basis": baseline.get("coverage_kind", "HISTORICAL_EVIDENCE"),
+        "classification_framework": CLASSIFICATION_FRAMEWORK})
     for case in store.records(run_id, "cases"):
         subject = {"subject_id": "case-subject-" + digest(case["case_id"])[:24],
             "case_id": case["case_id"], "subject_kind": "FAULT_CASE"}
@@ -593,12 +636,14 @@ def start_incremental(store, source, baseline_run, work_root, *, executor="openc
     return {**cfg, "purpose": "TRIGGER_INCREMENTAL", "baseline_id": baseline["baseline_id"]}
 
 
-def export(store, run_id):
+def export(store, run_id, *, previous_classification=None):
     from .xlsx_workflow import config
     from .trigger_report import build_workbook
     from .exporters import export_workbook_xlsx
     cfg = config(store, run_id)
     data = _projection(store, run_id)
+    if previous_classification is not None:
+        data["previous_classification"] = previous_classification
     workbook = build_workbook(data)
     output = Path(cfg["directory"]) / "output"
     output.mkdir(parents=True, exist_ok=True)

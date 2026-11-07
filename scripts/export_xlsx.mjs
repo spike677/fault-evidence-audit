@@ -42,6 +42,13 @@ function columnName(index) {
   return answer;
 }
 
+function wrappedLines(value, width) {
+  return String(value ?? "").split(/\r?\n/).reduce((total, line) => {
+    const units = [...line].reduce((count, character) => count + (character.codePointAt(0) > 255 ? 2 : 1), 0);
+    return total + Math.max(1, Math.ceil(units / (width - 2)));
+  }, 0);
+}
+
 async function main() {
   const args = options(process.argv.slice(2));
   let artifact;
@@ -97,19 +104,29 @@ async function main() {
       fill: "#223F62", font: { name: "Arial", size: 10, bold: true, color: "#FFFFFF" },
       rowHeight: 36, wrapText: true, horizontalAlignment: "center", verticalAlignment: "center",
     };
+    const columnWidths = table.columns.map(() => 24);
     for (let column = 0; column < table.columns.length; column += 1) {
       const label = String(table.columns[column]);
-      if (/谓词检查/.test(label)) {
-        sheet.getRange(`${columnName(column)}1:${columnName(column)}${endRow}`).format.columnWidth = 104;
-      } else if (/引文/.test(label)) {
-        sheet.getRange(`${columnName(column)}1:${columnName(column)}${endRow}`).format.columnWidth = 72;
-      } else if (/描述|根因|判断|定义|缺口|理由|说明|原因|建议|reason|text|content|facts|evidence|issues|raw/.test(label)) {
-        sheet.getRange(`${columnName(column)}1:${columnName(column)}${endRow}`).format.columnWidth = 48;
+      if (/谓词检查|条件核对|机理及未知边界/.test(label)) {
+        columnWidths[column] = 104;
+      } else if (/引文|原文.*位置|原文定位|单元格定位/.test(label)) {
+        columnWidths[column] = 120;
+      } else if (label === "来源文件") {
+        columnWidths[column] = 72;
+      } else if (/描述|根因|判断|定义|缺口|理由|说明|原因|建议|事实原义|机理|边界|未确定项|未知项|reason|text|content|facts|evidence|issues|raw/.test(label)) {
+        columnWidths[column] = 48;
       }
+      sheet.getRange(`${columnName(column)}1:${columnName(column)}${endRow}`).format.columnWidth = columnWidths[column];
     }
     if (matrix.length > 1) {
       sheet.getRange(`A2:${endColumn}${endRow}`).format.verticalAlignment = "top";
       sheet.getRange(`A2:${endColumn}${endRow}`).format.autofitRows();
+      // Whole-range autofit can under-size newline-rich predicate cells and
+      // over-size unrelated rows. Size each persisted row from all its cells.
+      for (let row = 1; row < matrix.length; row += 1) {
+        const lines = Math.max(...matrix[row].map((value, column) => wrappedLines(value, columnWidths[column])));
+        sheet.getRange(`A${row + 1}:${endColumn}${row + 1}`).format.rowHeight = Math.max(24, lines * 14 + 8);
+      }
       const excelTable = sheet.tables.add(`A1:${endColumn}${endRow}`, true, `AuditTable${index + 1}`);
       excelTable.showFilterButton = true;
       excelTable.showBandedColumns = false;
