@@ -8,6 +8,8 @@
 
 初始化时显式提供本机V4文件（仓库不附带用户原文或Init内容）：
 
+完整V4、修订42、响应schema及机制目录通常超过默认48,000字符预算。应在Init前根据实际请求和执行器容量显式设置`FAULTAUDIT_MAX_INPUT_CHARS`，分类、设计、提交和导出全程保持同值；修改预算会使旧请求失效。本轮Codex隔离试验使用240,000字符，不代表现场模型已具备相同容量。保留默认值时，超限任务会如实阻塞。
+
 ```powershell
 python run_faultaudit.py --state .faultaudit trigger-workflow init `
   --modes '原机制库.xlsx' --taxonomy '原trigger_library.md' --v4 '实际V4.md' `

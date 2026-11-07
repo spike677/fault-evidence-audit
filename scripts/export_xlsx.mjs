@@ -107,7 +107,15 @@ async function main() {
     const columnWidths = table.columns.map(() => 24);
     for (let column = 0; column < table.columns.length; column += 1) {
       const label = String(table.columns[column]);
-      if (/谓词检查|条件核对|机理及未知边界/.test(label)) {
+      if (label === "变量及依据") {
+        columnWidths[column] = 160;
+      } else if (label === "完整条件核对") {
+        columnWidths[column] = 128;
+      } else if (label === "完整执行规程") {
+        columnWidths[column] = 104;
+      } else if (/^(参考计算|目标路径|检查项|执行步骤|能力要求)$/.test(label)) {
+        columnWidths[column] = 72;
+      } else if (/谓词检查|条件核对|机理及未知边界/.test(label)) {
         columnWidths[column] = 104;
       } else if (/引文|原文.*位置|原文定位|单元格定位/.test(label)) {
         columnWidths[column] = 120;
