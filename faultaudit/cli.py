@@ -208,6 +208,11 @@ def parser() -> argparse.ArgumentParser:
     configure_v4.add_argument("--run", default="latest")
     configure_v4.add_argument("--source", type=Path, required=True)
     configure_v4.add_argument("--capabilities-file", type=Path)
+    reassess = trigger_flow.add_parser("reassess", help="Request a fresh subject assessment; preserve sources and history")
+    reassess.add_argument("--run", default="latest")
+    reassess.add_argument("--subject-id", required=True)
+    reassess.add_argument("--reason", required=True)
+    reassess.add_argument("--requested-by", required=True, help="Actual Agent/operator requesting reassessment; not a human verdict")
     for entry in (init, classify):
         entry.add_argument("--work-root", type=Path, default=Path("work/runs"))
         entry.add_argument("--executor", choices=["opencode", "codex"], default="opencode")
@@ -327,6 +332,10 @@ def main(argv: list[str] | None = None) -> int:
                 elif operation == "configure-v4":
                     result = trigger_workflow.configure_v4(store, selected_run, args.source,
                         capabilities=json.loads(args.capabilities_file.read_text(encoding="utf-8-sig")) if args.capabilities_file else None)
+                elif operation == "reassess":
+                    from .trigger_maintenance import request_reassessment
+                    result = request_reassessment(store, selected_run, args.subject_id,
+                        reason=args.reason, requested_by=args.requested_by)
                 elif operation == "drive":
                     result = workflow.drive(store, selected_run,
                         json.loads(args.agent_command_file.read_text(encoding="utf-8-sig")), max_rounds=args.max_rounds,

@@ -14,6 +14,8 @@
 
 文件响应必须是`payload.response_schema`规定的原始对象。`validate_assessment`返回系统内部normalized结构，包含派生版本/处理状态等字段，不能把返回值再当模型响应发布；应校验原始对象后写原始对象本身。格式拒收后保留原attempt，使用`next`返回的新attempt路径修正，不覆盖旧文件，也不提交`review_required`等系统字段。
 
+已接收的解释如发现明确错误，用`trigger-workflow reassess --run RUN_ID --subject-id SUBJECT_ID --reason "具体解释错误及需重核的边界" --requested-by opencode`请求定向重评。该操作仅推进目标subject的输入修订，理由不是来源证据或人工裁决；原始单元格、旧请求/响应及人工历史不改。重复的待执行请求保持幂等。随后使用`next/submit`实际重判；若影响Init，重新维护并finalize后，以新基线建立明确关联的增量run。不要直接改写已接受响应，不为普通未知或补齐字段反复重评。
+
 先验收文件调度、分类和设计卡，再单独验收实际输出预填、线程交错、跨流等待、存储复用、多rank及NPU执行。本机真实Init/30条V4实机验收在代码上传后继续，不能把0.1.14聚合记录当新版通过。默认预算48K未变，现场完整输入或会话容量不足都明确阻塞；不修改hash强行接纳旧响应。
 
 ## 0.1.14：条件优先分类与升级
