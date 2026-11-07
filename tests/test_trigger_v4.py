@@ -318,3 +318,7 @@ class V4WorkflowTests(unittest.TestCase):
         payload=next(workflow.classification_payloads(self.store,self.run))
         self.assertEqual((len(payload['taxonomy']['items']),len(payload['v4_taxonomy']['items']),len(payload['v4_taxonomy']['constructions'])),(42,31,55))
         self.assertEqual(len(self.store.records(self.run,'trigger_assessments')),0)
+        from faultaudit.trigger_report import build_workbook
+        book=build_workbook(workflow._projection(self.store,self.run))
+        self.assertTrue(all(s['columns'] for s in book['sheets']))
+        self.assertEqual(next(s['rows'] for s in book['sheets'] if s['name']=='V4条件分类'),[])

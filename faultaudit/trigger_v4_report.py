@@ -88,7 +88,10 @@ def extend_workbook(book, data):
         "族Skip覆盖": "\n".join(item.get("family_skip_override", []))} for item in data["taxonomy"]["items"]]
     protocol_rows = [{"规程编号": m["method_id"], "名称": m["name"], "完整执行规程": m["definition"],
         "执行能力": "未实现；仅设计规程", "计入输入类别": "否"} for m in v4["methods"]]
-    extra = [_table("V4条件分类", new_rows), _table("V4构造情形", constructions),
+    extra = [_table("V4条件分类", new_rows, list(new_rows[0]) if new_rows else
+                    ["原编号", "case_id", "V4类编号", "语义适用性", "证据确认", "构造能力", "路径覆盖", "执行结果"]),
+        _table("V4构造情形", constructions, list(constructions[0]) if constructions else
+                    ["原编号", "case_id", "V4类编号", "构造代码", "语义适用性", "说明"]),
         _table("用例设计卡", designs, list(designs[0]) if designs else ["case_id", "设计状态", "能力缺口", "执行结果"]),
         _table("参与者与对照", participants, list(participants[0]) if participants else ["case_id", "参与者", "目标调用", "执行结果"]),
         _table("42与V4映射", mapping_rows), _table("V4定义与解释", definitions),
