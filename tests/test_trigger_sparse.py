@@ -117,6 +117,9 @@ class SparseAssessmentTests(unittest.TestCase):
             self.assertEqual(len(out['v4_rows']),1)
             self.assertEqual(out['v4_rows'][0]['construction_checks'],[])
             self.assertEqual(out['details'][0]['trigger_ids'],[])
+            r.update(v4_rows=[],scenarios=[],label_links=[],classification_summary={
+                'status':'INSUFFICIENT_INFORMATION','reason':'该源定义没有可归类的输入条件','unknowns':['合法输入条件']})
+            self.assertEqual(validate_assessment(p,r,HASH)['v4_processing_status'],'NOT_ASSESSED')
         finally: fixture.tearDown()
 
     def test_branch_only_means_identified_context_not_all_inputs_excluded(self):

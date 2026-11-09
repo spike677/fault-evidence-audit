@@ -274,5 +274,10 @@ def validate_sparse(payload, response, request_hash):
         "full_rule_catalogs_supplied": True}
     out["processing_status"] = "EXCEPTION" if out["fact_conflicts"] else "PENDING" if expected == "INSUFFICIENT_INFORMATION" else "AUTO_PROCESSED"
     out["condition_processing_status"] = expected
+    if v4:
+        out["v4_processing_status"] = ("NOT_ASSESSED" if not out["v4_rows"] else
+            "ASSESSED_WITH_UNKNOWNS" if any(r["applicability"] == "PARTIAL" or any(
+                c["result"] == "UNKNOWN" for c in r["predicate_checks"]) for r in out["v4_rows"])
+            else "ASSESSED_SELECTED_RULES")
     out["label_links_scope"] = "ASSESSMENT_LOCAL"
     return out
