@@ -4,6 +4,8 @@
 
 新Init使用实际原库、`D:\project\typora\trigger_library.md`及原V4文件。程序解析实际42个ID、名称和定义，校验SHA和原冻结内容，导出原42核对清单；不能用文件名代替内容核对。V4源文件不改。暂缺的`42_vs_55_mapping.md`不阻塞，也不作自动标签转换。
 
+若当前42文件的字节SHA与旧Init冻结版本不同，`configure-baseline`会拒绝直接复用；不要改旧记录或伪造SHA。保留旧Init，以当前已核对原文件运行新Init，并在现场接续记录中注明前后run_id。定义是否一致可比较旧导出的`original_taxonomy.items`与新回执；不能据此宣称源文件字节完全相同。
+
 ```powershell
 python run_faultaudit.py --state STATE trigger-workflow init `
   --modes '原30条CANN模式库.xlsx' --taxonomy 'D:\project\typora\trigger_library.md' `
