@@ -87,3 +87,5 @@ CLI：0表示相应阶段完成（也可能只是明确的诊断/协议设计完
 ## 5. 现场边界
 
 本轮只用合成模式/任务/规则验证程序。原30条、实际模型语义能力、现场子agent权限/上下文、真实任务生成与设备路径均不能由合成测试替代。现场仍先备份state，核验当前冻结Baseline及少量代表样本，再接续正式处理。原42/V4定义、旧模型响应和人工历史保持保留。
+
+验证回执见[`examples/precision_bridge_validation.json`](../examples/precision_bridge_validation.json)：30项Bridge合成验收、159项保留定向回归及5项受影响报告复查通过；实际上游三个格式/JSON脚本的1条合成规则smoke通过，正式预算不足仍阻塞。没有做完整回归或设备执行。此前`repository_audit.html/json`是只读审查时的历史快照，其“Adapter尚未实现”不代表本版当前能力。
