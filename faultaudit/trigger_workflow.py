@@ -18,7 +18,7 @@ from .store import AuditError, Store, digest
 from .trigger_assessment import CLASSIFICATION_FRAMEWORK, instructions, response_schema, validate_assessment
 from .trigger_taxonomy import builtin_user_branches, load_taxonomy
 
-RULE_VERSION = "trigger-v4-design-0.1.15"
+RULE_VERSION = "trigger-sparse-v5-0.1.16"
 
 
 def _settings(store, run_id):
@@ -35,7 +35,7 @@ def _catalog(store, run_id):
 def start_init(store: Store, modes: Path, taxonomy: Path, work_root: Path, *,
                executor="opencode", branch_source=None, user_branches=True,
                catalog_scope="ORIGINAL_MECHANISM_LIBRARY", basis="HISTORICAL_EVIDENCE",
-               v4_source=None, capabilities=None) -> dict:
+               v4_source=None, capabilities=None, sparse=False, with_designs=False) -> dict:
     from .evidence_plan import register_search_policy
     from .pipeline import import_into
     if executor not in {"opencode", "codex"}:
@@ -80,7 +80,10 @@ def start_init(store: Store, modes: Path, taxonomy: Path, work_root: Path, *,
     register_search_policy(store, run_id, {"required_sources": ["WIKI"]})
     if v4_source is not None:
         configure_v4(store, run_id, v4_source, capabilities=capabilities)
-    return {**cfg, "mode_count": len(subjects), "trigger_count": len(frozen["items"]),
+    if sparse:
+        configure_v5(store, run_id, with_designs=with_designs)
+    return {**cfg, "classification_contract": _settings(store, run_id).get("classification_contract", "DENSE_V1"),
+        "mode_count": len(subjects), "trigger_count": len(frozen["items"]),
         "branch_categories": [c["id"] for b in frozen["branches"] for c in b.get("categories", [])]}
 
 
@@ -91,6 +94,24 @@ def _taxonomy(store, run_id):
 def _v4(store, run_id):
     key = _settings(store, run_id).get("v4_taxonomy_id")
     return store.get(run_id, "trigger_v4_taxonomies", key) if key else None
+
+
+def configure_v5(store, run_id, *, with_designs=False):
+    """Opt an Init into V5 without rewriting sources, responses or verdicts."""
+    from .trigger_sparse import CONTRACT
+    settings = _settings(store, run_id)
+    if settings["phase"] != "INIT":
+        raise AuditError("Maintain the Init in V5, then create a linked incremental run")
+    if settings.get("classification_contract") == CONTRACT and settings.get("design_tasks_enabled", False) == with_designs:
+        return {"run_id": run_id, "classification_contract": CONTRACT, "idempotent": True}
+    store.put(run_id, "trigger_config", "config", {**settings,
+        "classification_contract": CONTRACT, "rule_version": RULE_VERSION, "design_tasks_enabled": with_designs}, mutable=True)
+    from .xlsx_workflow import config
+    cfg = config(store, run_id)
+    store.put(run_id, "xlsx_workflow", "config", {**cfg, "rule_version": RULE_VERSION}, mutable=True)
+    store.event(run_id, "trigger_v5_configured", {"previous_contract": settings.get("classification_contract", "DENSE_V1"),
+        "classification_contract": CONTRACT, "design_tasks_enabled": with_designs, "sources_rewritten": False, "human_accept_inherited": False})
+    return {"run_id": run_id, "classification_contract": CONTRACT}
 
 
 def configure_v4(store, run_id, source, *, capabilities=None):
@@ -256,7 +277,7 @@ def _basis(store, run_id, subject, snapshot_id=None):
     from .evidence_plan import collection_source_policy
     cid = subject["case_id"]
     settings = _settings(store, run_id)
-    profile_identity = {k: settings[k] for k in ("classification_profile", "v4_taxonomy_id", "mapping_id", "execution_capabilities") if k in settings}
+    profile_identity = {k: settings[k] for k in ("classification_profile", "v4_taxonomy_id", "mapping_id", "execution_capabilities", "classification_contract") if k in settings}
     if settings["phase"] == "INIT" and settings.get("basis") == "SOURCE_DEFINITIONS":
         return digest({"subject": subject, "source": store.get(run_id, "cases", cid),
             "taxonomy": _taxonomy(store, run_id), "catalog": _catalog(store, run_id),
@@ -389,10 +410,21 @@ def classification_payloads(store, run_id):
                         "revised_definition_version", "relation_direction", "purpose", "rows")},
                     execution_capabilities=settings["execution_capabilities"],
                     evaluation_order=["condition_facts", "v4_rows", "rows", "external_branches", "details", "declared_comparison", "decision"])
+            if settings.get("classification_contract") == "SPARSE_SCENARIOS_V5":
+                from .trigger_sparse import CONTRACT, schema, frame_version
+                payload.update(classification_contract=CONTRACT, response_schema=schema(),
+                    frame_versions={scheme: frame_version(payload, scheme)
+                        for scheme in (["REVISED42", "BRANCH", "V4"] if v4 else ["REVISED42", "BRANCH"])},
+                    evaluation_order=["condition_facts", "details", "scenarios", "rows", "v4_rows",
+                        "external_branches", "label_links", "classification_summary", "declared_comparison", "candidate_proposal", "decision"])
+                payload["input_scope"].update(output_rule_scope="SELECTED_RULES", omitted_rules="NOT_ASSESSED")
             yield payload
 
 
 def classification_instructions(payload):
+    if payload.get("classification_contract") == "SPARSE_SCENARIOS_V5":
+        from .trigger_sparse import instructions as sparse_instructions
+        return sparse_instructions()
     text = instructions()
     if payload.get("v4_taxonomy"):
         from .trigger_v4_assessment import instructions as v4_instructions
@@ -507,6 +539,9 @@ def _projection(store, run_id):
                 gaps.append({"case_id": cid, "kind": "ISSUE_UNASSESSED",
                     "reason": issue["snapshot_id"] + ":" + str(issue["issue_index"])})
         for a in values:
+            summary = a["result"].get("classification_summary", {})
+            if summary.get("status") == "INSUFFICIENT_INFORMATION":
+                gaps.append({"case_id": cid, "kind": "CLASSIFICATION_INFORMATION_GAP", "reason": summary["reason"]})
             same_material_match = any(v.get("snapshot_id") == a.get("snapshot_id")
                 and v["result"]["source_relation"] == "MATCH" for v in values)
             if not definition_init and a["result"]["source_relation"] != "MATCH" and not (
@@ -565,13 +600,14 @@ def _projection(store, run_id):
     projection = {"run_id": run_id, "phase": cfg["phase"], "classification_framework": CLASSIFICATION_FRAMEWORK,
         "coverage_kind": cfg.get("basis", "HISTORICAL_EVIDENCE"),
         "taxonomy": _taxonomy(store, run_id), "subjects": subjects,
+        "classification_contract": cfg.get("classification_contract", "DENSE_V1"),
         "assessments": assessments, "wiki_checks": checks, "resources": resources,
         "gaps": gaps, "baseline": baseline}
     if _v4(store, run_id):
         from .trigger_design import current_designs
         designs = current_designs(store, run_id, assessments)
         designed = {d["case_id"] for d in designs}
-        for subject in subjects:
+        for subject in (subjects if cfg.get("classification_contract") != "SPARSE_SCENARIOS_V5" or cfg.get("design_tasks_enabled") else []):
             if subject["case_id"] not in designed:
                 gaps.append({"case_id": subject["case_id"], "kind": "DESIGN_PENDING",
                     "reason": "Current scoped classification has not yet produced its separate design cards; no execution is claimed"})
@@ -612,7 +648,7 @@ def finalize(store, run_id, *, allow_pending=False):
     if missing or any(g["kind"] in {"ISSUE_UNASSESSED", "TASK_PENDING"} for g in data["gaps"]):
         raise AuditError("Every original mode and current source issue needs an assessment; pending tasks cannot be finalized")
     informational = {"TRIGGER_UNKNOWNS", "V4_UNKNOWNS", "CAPTURE_PARTIAL", "CAPTURE_CONTENT_CAPTURED", "BASELINE_STALE",
-                     "WIKI_NOT_SUPPORTED", "SOURCE_NOT_AVAILABLE_USER_POLICY"}
+                     "WIKI_NOT_SUPPORTED", "SOURCE_NOT_AVAILABLE_USER_POLICY", "CLASSIFICATION_INFORMATION_GAP"}
     blocking = [g for g in data["gaps"] if g["kind"] not in informational]
     if blocking and not allow_pending:
         raise AuditError("Initialization has explicit gaps; finish them or finalize a provisional baseline with --allow-pending")
@@ -653,15 +689,18 @@ def finalize(store, run_id, *, allow_pending=False):
             "external_branches": result["external_branches"],
             "condition_processing_status": result.get("condition_processing_status"),
             "source_relation": result["source_relation"], "coverage_kind": result["coverage_kind"],
-            "execution_verified": False})
+            "execution_verified": False,
+            **{k: result[k] for k in ("classification_contract", "classification_summary", "scenarios",
+                "scenario_relation", "label_links", "classification_scope") if k in result}})
     baseline = {"baseline_id": "trigger-baseline-" + identity[:24], "run_id": run_id,
-        "status": "READY_WITH_GAPS" if blocking else "READY", "index_hash": identity,
+        "status": "READY_WITH_GAPS" if blocking or any(g["kind"] == "CLASSIFICATION_INFORMATION_GAP" for g in data["gaps"]) else "READY", "index_hash": identity,
         "taxonomy_id": _settings(store, run_id)["taxonomy_id"], "mode_ids": [i["item_id"] for i in _catalog(store, run_id)],
         "catalog_scope": store.get(run_id, "catalog_selections", "frozen"),
         "collection_source_policy": collection_source_policy(store, run_id),
         "assessment_ids": [a["assessment_id"] for a in data["assessments"]], "coverage_details": details,
         "declared_details": declared_details,
         "classification_framework": CLASSIFICATION_FRAMEWORK, "condition_index": condition_index,
+        "classification_contract": _settings(store, run_id).get("classification_contract", "DENSE_V1"),
         "gaps": data["gaps"], "coverage_kind": data["coverage_kind"], "execution_verified": False}
     if data.get("v4_taxonomy"):
         baseline.update(v4_taxonomy_id=data["v4_taxonomy"]["taxonomy_id"],
@@ -731,6 +770,11 @@ def start_incremental(store, source, baseline_run, work_root, *, executor="openc
         "baseline_basis": baseline.get("coverage_kind", "HISTORICAL_EVIDENCE"),
         "classification_framework": CLASSIFICATION_FRAMEWORK})
     baseline_settings = _settings(store, baseline_run)
+    if baseline_settings.get("classification_contract"):
+        settings = _settings(store, run_id)
+        store.put(run_id, "trigger_config", "config", {**settings,
+            "classification_contract": baseline_settings["classification_contract"],
+            "design_tasks_enabled": baseline_settings.get("design_tasks_enabled", False)}, mutable=True)
     if baseline_settings.get("v4_taxonomy_id"):
         for kind, key in (("trigger_v4_taxonomies", baseline_settings["v4_taxonomy_id"]),
                           ("trigger_mappings", baseline_settings["mapping_id"]),
@@ -746,24 +790,31 @@ def start_incremental(store, source, baseline_run, work_root, *, executor="openc
     return {**cfg, "purpose": "TRIGGER_INCREMENTAL", "baseline_id": baseline["baseline_id"]}
 
 
-def export(store, run_id, *, previous_classification=None):
+def export(store, run_id, *, previous_classification=None, xlsx=False):
     from .xlsx_workflow import config
-    from .trigger_report import build_workbook
+    from .trigger_html import render, index_workbook
+    from .trigger_combinations import analyze
     from .exporters import export_workbook_xlsx
     cfg = config(store, run_id)
     data = _projection(store, run_id)
     if previous_classification is not None:
         data["previous_classification"] = previous_classification
-    workbook = build_workbook(data)
     output = Path(cfg["directory"]) / "output"
     output.mkdir(parents=True, exist_ok=True)
-    name = "模式初始化及覆盖详情.xlsx" if data["phase"] == "INIT" else "故障分类及分支建议.xlsx"
-    with tempfile.TemporaryDirectory(prefix="trigger-xlsx-", dir=Path(cfg["directory"])) as scratch:
-        source = Path(scratch) / "workbook.json"
-        source.write_text(json.dumps(workbook, ensure_ascii=False), encoding="utf-8")
-        result = export_workbook_xlsx(source, Path(scratch) / name)
-        Path(result["xlsx"]).replace(output / name)
-    result.update(xlsx=str(output / name), status="COMPLETE_WITH_PENDING" if data["gaps"] else "COMPLETE",
+    data["combination_analysis"] = analyze(data)
+    (output / "report.json").write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    (output / "report.html").write_text(render(data), encoding="utf-8")
+    result = {"report_html": str(output / "report.html"), "report_json": str(output / "report.json"),
+        "primary_report": "HTML", "classification_contract": data["classification_contract"]}
+    if xlsx:
+        name = "故障分类索引.xlsx"
+        with tempfile.TemporaryDirectory(prefix="trigger-xlsx-", dir=Path(cfg["directory"])) as scratch:
+            source = Path(scratch) / "workbook.json"
+            source.write_text(json.dumps(index_workbook(data), ensure_ascii=False), encoding="utf-8")
+            saved = export_workbook_xlsx(source, Path(scratch) / name)
+            Path(saved["xlsx"]).replace(output / name)
+        result.update(saved, xlsx=str(output / name))
+    result.update(status="COMPLETE_WITH_PENDING" if data["gaps"] else "COMPLETE",
                   gap_count=len(data["gaps"]), coverage_kind=data["coverage_kind"], execution_verified=False)
     store.event(run_id, "trigger_export", result)
     return result

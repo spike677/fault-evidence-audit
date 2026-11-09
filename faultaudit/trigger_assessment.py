@@ -413,6 +413,9 @@ def validate_assessment(payload: dict, response: dict, request_hash: str) -> dic
     Semantic entailment remains the Agent's responsibility. Mechanical gates
     check provenance, scope, completeness and the explicit decision prerequisites.
     """
+    if payload.get("classification_contract") == "SPARSE_SCENARIOS_V5":
+        from .trigger_sparse import validate_sparse
+        return validate_sparse(payload, response, request_hash)
     try:
         result = TriggerAssessment.model_validate(response)
     except ValidationError as exc:

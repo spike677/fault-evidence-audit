@@ -1,8 +1,28 @@
 # OpenChamber / OpenCode 接入与验收
 
-对应核心0.1.15，以下保留底层文件协议验收步骤。结构化XLSX的当前默认入口是README中的xlsx-workflow；Word/PPT、任意布局XLSX和时间范围收集为TODO。OpenChamber是现场前端，文件任务由它连接的OpenCode执行；OpenCode可完成采集与模型判断，无需Codex再代做一遍。本包只安装项目模板、发布文件任务、接收结果并运行本地门禁，不启动OpenChamber，也不包含OpenChamber/OpenCode服务客户端。
+对应核心0.1.16，以下保留底层文件协议验收步骤。结构化XLSX的采集入口仍是xlsx-workflow，模式归类用trigger-workflow，主审查报告为HTML；Word/PPT、任意布局XLSX和时间范围收集为TODO。OpenChamber是现场前端，文件任务由它连接的OpenCode执行；OpenCode可完成采集与模型判断。本包只安装项目模板、发布文件任务、接收结果并运行本地门禁，不启动OpenChamber，也不包含服务客户端。
 
 以下步骤是执行手册，尚不代表真实OpenChamber 2.5.2、OpenCode 2.1.4/2.2.0、内网登录或DeepSeek已联调。`doctor`通过只证明本地依赖可用。
+
+## 0.1.16 / V5：先原30条，后62条候选
+
+本轮按用户要求先上传代码，只做部分验证，不跑完整回归或Codex端到端。以examples/v5_partial_validation.json为本版记录，前版696项不可作新版证明。原30条语义分类未验收前，不恢复62条批量分类。原库、V4正文、Init、现场state、私有响应和工作簿不公开上传。
+
+备份state和任务目录后，在原Init启用V5；原15项聊天候选目录不是原30条CANN库。新建CLI Init默认稀疏，Python API为兼容旧调用需sparse=True。已有V4/42定义原样冻结，V5只是分类合同，不是改写分类库。
+
+```powershell
+python run_faultaudit.py --state STATE trigger-workflow configure-v5 --run INIT_RUN_ID
+python run_faultaudit.py --state STATE trigger-workflow next --run INIT_RUN_ID
+# 每个trigger_classify请求交现有独立fault-audit-worker，再按原文件协议submit。
+python run_faultaudit.py --state STATE trigger-workflow export --run INIT_RUN_ID
+# report.html是主要审查入口，report.json保留当前完整审计；--xlsx按需生成四表索引。
+```
+
+保持既有显式预算；本版不自动提高默认48K。完整定义仍传入，超限仍阻塞。V5返回SparseAssessment：只列有据类别，所选类别完整核对Requires/Skip；正标签均有label_links，scheme/version/detail/fact/scenario一致。所有scenario_id均为本assessment局部ID，同名s1不跨资料合并。未选择是NOT_ASSESSED，不是排除；BRANCH_ONLY只说明当前识别到实现/执行/环境依赖。无标签保留具体信息缺口。候选建议与正式decision分开，无自动ACCEPT或入库。
+
+设计是单独可选阶段；需要时用configure-v5 --with-designs，复用既有子Agent，卡片绑定一个本地情景。组合统计由程序计算，case与mode、规则版本和描述/确认轴分开；旧结果无情景时不推断同情景。HTML图柱和数量可反查来源，灰点只表示未关联。停止任务不等于根因已证实。
+
+合同变更沿用哈希失效机制；旧请求拒收，原响应/人工历史保留。完成原30条语义复核再finalize；信息不足可形成READY_WITH_GAPS，不能自动当正式基线完成。后续确需临时基线时明确使用已有--allow-pending-baseline；62条来源全集重审、算子根因分层及目标机器实际执行留给下一阶段，不把本轮前置检查冒充完成。
 
 ## 0.1.15：V4规则与设计卡接入
 

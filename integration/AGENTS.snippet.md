@@ -1,5 +1,7 @@
 ## 故障证据核验
 
+0.1.16 / V5优先于下面密集合同的历史说明。CLI Init默认SPARSE_SCENARIOS_V5，完整读冻结规则但只输出有据类别/构造；所选类别完整核对Requires/Skip，未选是NOT_ASSESSED，不是排除。每个正标签有版本化label_links，绑定detail、局部fact和scenario。不同子问题的同名s1不合并；同案共现不等于同情景或充分触发。无可归类事实时明确INSUFFICIENT_INFORMATION；BRANCH_ONLY只表达当前识别的执行/实现/环境依赖。HTML为主要审查报告，JSON保留完整当前审计，XLSX仅可选四表索引。设计阶段用--with-designs显式启用，仍NOT_RUN，不阻塞默认V5分类。沿用既有采集和独立子Agent/next/submit/drive；候选建议不自动入库或ACCEPT。先完成原30条语义验收再处理62条，不把15项聊天候选目录冒充原库；代码部分验证不是现场批次已通过。
+
 0.1.15可显式配置V4：31条件类、55唯一构造、64挂载、195指导案例分层计数；保留原42及修订42定义版本，映射只解释不传递适用/覆盖。按request.evaluation_order独立判断V4、修订42和Branch，再对照机理。输入/派生/上下文事实分开；I3可由普通shape/stride驱动但完整适用需公式/位宽/提升/边界单位/容量，C2/C4输入分派不能冒充API。后续trigger_design生成设计卡，E1-E5及跨流规程只作方案，execution_status=NOT_RUN、execution_implemented=false；实际执行另行验收。四种状态为语义适用、构造能力、路径覆盖、执行结果，能力受阻不能变不适用。新版本优先于以下历史说明。完整指令及实际能力仍以每份request为准。
 
 0.1.14当前分类顺序：原记录/已有资料、独立摘要、condition_facts、完整42项及Branch2/3、机理明细、原模式对照、入库建议。42条件和6个已定义Branch叶是主框架，15类原模式只用于机理关联。描述applicability与证据relation分别判断，原文INT32偏移溢出可先1.3.2 PARTIAL，不等待网页证明才整理；未写出的Requires/Skip未知保留。每个确定谓词/标签绑定真实输入/API角色的局部condition_fact及原cell/当前资料子问题引文，内部Sparse/非确定性和中间Inf不冒充输入mask/API参数/输入Inf。版本不等于构建变体，Branch3完全适用必须有同实参同二进制依据；42未匹配不强塞Branch。训练同样分类，入库范围另判。已有证据不因未知补搜，原文分类不升级强MATCH、DIRECT、根因确认或正式新增。Init冻结条件索引，报告先条件后机理；新策略重发受影响请求，历史及人工记录保留。

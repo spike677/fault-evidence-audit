@@ -82,11 +82,11 @@ def start(store: Store, source: Path, catalog: Path, work_root: Path, *, executo
 
 def _policy() -> str:
     from . import wiki_checks, capture_quality, search_guidance, resource_identity, workflow_scope
-    from . import trigger_taxonomy, trigger_assessment, trigger_workflow, trigger_v4, trigger_v4_assessment, trigger_design
+    from . import trigger_taxonomy, trigger_assessment, trigger_workflow, trigger_v4, trigger_v4_assessment, trigger_design, trigger_sparse
     return digest({"core": policy_fingerprint(), "workflow": digest(Path(__file__).read_bytes()),
                    "helpers": digest(b"".join(Path(module.__file__).read_bytes() for module in
                        (wiki_checks, capture_quality, search_guidance, resource_identity, workflow_scope,
-                        trigger_taxonomy, trigger_assessment, trigger_workflow, trigger_v4, trigger_v4_assessment, trigger_design)))})
+                        trigger_taxonomy, trigger_assessment, trigger_workflow, trigger_v4, trigger_v4_assessment, trigger_design, trigger_sparse)))})
 
 
 def _json(path: Path, value: dict) -> None:

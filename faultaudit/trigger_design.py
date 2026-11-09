@@ -40,6 +40,7 @@ class TargetInvariant(Contract):
 class DesignCard(Contract):
     card_id: str = Field(min_length=1)
     assessment_id: str = Field(min_length=1)
+    scenario_id: str = ""
     status: Literal["DESIGN_READY", "NEEDS_FACTS", "CAPABILITY_BLOCKED"]
     category_ids: list[str] = Field(default_factory=list)
     construction_ids: list[str] = Field(default_factory=list)
@@ -107,6 +108,10 @@ device-verified history case; companion source audit is unavailable. Complete on
 self_check for numeric meanings, quotes, counterevidence, issue scope and technical/event split.
 If the full request exceeds execution capacity return the standard transport BLOCKED response;
 never trim input or invent a successful partial read.
+For a V5 sparse assessment, bind scenario_id to one provided local scenario and use only its
+facts and linked categories. Different scenarios are not one executable AND combination.
+When classification has no scenario, use an empty scenario_id and NEEDS_FACTS, not a claimed
+known combination. Symbolic new test proposals remain design-only.
 """
 
 
@@ -141,6 +146,8 @@ def payloads(store, run_id, *, pending_case_ids=()):
     if not frozen:
         return
     settings = _settings(store, run_id)
+    if settings.get("classification_contract") == "SPARSE_SCENARIOS_V5" and not settings.get("design_tasks_enabled", False):
+        return
     current = current_assessments(store, run_id)
     done = {v["case_id"] for v in current_designs(store, run_id, current)}
     from .xlsx_workflow import _policy
@@ -162,6 +169,7 @@ def payloads(store, run_id, *, pending_case_ids=()):
             views.append({"assessment_id": a["assessment_id"], "result_sha256": digest(result),
                 "issue_label": a["issue_label"], "snapshot_id": a.get("snapshot_id"),
                 "source_relation": result["source_relation"], "condition_facts": result["condition_facts"],
+                **{k: result[k] for k in ("classification_contract", "scenarios", "scenario_relation", "label_links") if k in result},
                 "selected_rows": [{k: r[k] for k in ("trigger_id", "applicability", "relation", "condition_fact_ids", "reason", "coverage", "unknowns")} for r in selected],
                 "known_mechanisms": [{k: d[k] for k in ("name", "mechanism", "conditions", "unknowns", "evidence_basis")} for d in result["details"]]})
         guides = [g for g in frozen["guides"] if g["category_id"] in categories]
@@ -203,6 +211,21 @@ def validate_design(payload, response, request_hash):
     for card in result.cards:
         if card.assessment_id not in views:
             raise AuditError("Design cannot borrow another case or stale issue assessment")
+        view = views[card.assessment_id]
+        if view.get("classification_contract") == "SPARSE_SCENARIOS_V5":
+            scenarios = {s["scenario_id"]: s for s in view["scenarios"]}
+            if scenarios:
+                if card.scenario_id not in scenarios:
+                    raise AuditError("V5 design must bind one local scenario")
+                allowed = set(scenarios[card.scenario_id]["condition_fact_ids"])
+                if not set(card.condition_fact_ids) <= allowed or any(not set(v.condition_fact_ids) <= allowed for v in card.variables):
+                    raise AuditError("Design cannot combine facts from different V5 scenarios")
+                labels = {l["trigger_id"] for l in view["label_links"]
+                    if l["scheme"] == "V4" and card.scenario_id in l["scenario_ids"]}
+                if not set(card.category_ids) <= labels:
+                    raise AuditError("Design categories must be linked to its selected scenario")
+            elif card.scenario_id or card.status != "NEEDS_FACTS" or card.category_ids:
+                raise AuditError("No classified scenario: keep the design NEEDS_FACTS")
         view = views[card.assessment_id]
         facts = {f["fact_id"]: f for f in view["condition_facts"]}
         if not set(card.condition_fact_ids) <= set(facts):

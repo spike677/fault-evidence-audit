@@ -191,6 +191,8 @@ def parser() -> argparse.ArgumentParser:
     init.add_argument("--modes", type=Path, required=True)
     init.add_argument("--taxonomy", type=Path, required=True)
     init.add_argument("--v4", type=Path, help="Freeze V4 alongside independent revised-42 compatibility rules")
+    init.add_argument("--legacy-dense", action="store_true", help="Explicit legacy response contract; default is V5 sparse")
+    init.add_argument("--with-designs", action="store_true", help="Also schedule separate scenario-bound design tasks")
     init.add_argument("--capabilities-file", type=Path, help="Declared design capabilities; not an execution receipt")
     init.add_argument("--catalog-scope", default="ORIGINAL_MECHANISM_LIBRARY")
     init.add_argument("--basis", choices=["HISTORICAL_EVIDENCE", "SOURCE_DEFINITIONS"],
@@ -208,6 +210,9 @@ def parser() -> argparse.ArgumentParser:
     configure_v4.add_argument("--run", default="latest")
     configure_v4.add_argument("--source", type=Path, required=True)
     configure_v4.add_argument("--capabilities-file", type=Path)
+    configure_v5 = trigger_flow.add_parser("configure-v5", help="Maintain an existing Init using sparse scenario classification")
+    configure_v5.add_argument("--run", default="latest")
+    configure_v5.add_argument("--with-designs", action="store_true")
     reassess = trigger_flow.add_parser("reassess", help="Request a fresh subject assessment; preserve sources and history")
     reassess.add_argument("--run", default="latest")
     reassess.add_argument("--subject-id", required=True)
@@ -221,6 +226,8 @@ def parser() -> argparse.ArgumentParser:
         for operation in operations:
             cmd = commands.add_parser(operation)
             cmd.add_argument("--run", default="latest")
+            if operation == "export" and commands is trigger_flow:
+                cmd.add_argument("--xlsx", action="store_true", help="Also export a compact optional XLSX index")
             if operation in {"submit", "retry"}:
                 cmd.add_argument("--task-id", required=True)
             if operation == "submit":
@@ -308,7 +315,8 @@ def main(argv: list[str] | None = None) -> int:
                 result = trigger_workflow.start_init(store, args.modes, args.taxonomy, args.work_root,
                     executor=args.executor, branch_source=args.branch_source, user_branches=args.user_branches,
                     catalog_scope=args.catalog_scope, basis=args.basis, v4_source=args.v4,
-                    capabilities=json.loads(args.capabilities_file.read_text(encoding="utf-8-sig")) if args.capabilities_file else None)
+                    capabilities=json.loads(args.capabilities_file.read_text(encoding="utf-8-sig")) if args.capabilities_file else None,
+                    sparse=not args.legacy_dense, with_designs=args.with_designs)
             elif operation == "classify":
                 result = trigger_workflow.start_incremental(store, args.input, args.baseline_run, args.work_root,
                     executor=args.executor, baseline_id=args.baseline_id, allow_pending_baseline=args.allow_pending_baseline)
@@ -332,6 +340,8 @@ def main(argv: list[str] | None = None) -> int:
                 elif operation == "configure-v4":
                     result = trigger_workflow.configure_v4(store, selected_run, args.source,
                         capabilities=json.loads(args.capabilities_file.read_text(encoding="utf-8-sig")) if args.capabilities_file else None)
+                elif operation == "configure-v5":
+                    result = trigger_workflow.configure_v5(store, selected_run, with_designs=args.with_designs)
                 elif operation == "reassess":
                     from .trigger_maintenance import request_reassessment
                     result = request_reassessment(store, selected_run, args.subject_id,
@@ -346,7 +356,8 @@ def main(argv: list[str] | None = None) -> int:
                 elif operation == "finalize":
                     result = trigger_workflow.finalize(store, selected_run, allow_pending=args.allow_pending)
                 else:
-                    result = workflow.export(store, selected_run)
+                    result = (trigger_workflow.export(store, selected_run, xlsx=args.xlsx)
+                        if args.command == "trigger-workflow" else workflow.export(store, selected_run))
             write_json(result)
             return 2 if result.get("status") == "COMPLETE_WITH_PENDING" else 0
         if args.command == "demo":
