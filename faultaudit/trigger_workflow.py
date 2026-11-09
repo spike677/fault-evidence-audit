@@ -18,7 +18,7 @@ from .store import AuditError, Store, digest
 from .trigger_assessment import CLASSIFICATION_FRAMEWORK, instructions, response_schema, validate_assessment
 from .trigger_taxonomy import builtin_user_branches, load_taxonomy
 
-RULE_VERSION = "trigger-sparse-v5-0.1.16"
+RULE_VERSION = "cann-baseline-builder-0.1.17"
 
 
 def _settings(store, run_id):
@@ -35,13 +35,15 @@ def _catalog(store, run_id):
 def start_init(store: Store, modes: Path, taxonomy: Path, work_root: Path, *,
                executor="opencode", branch_source=None, user_branches=True,
                catalog_scope="ORIGINAL_MECHANISM_LIBRARY", basis="HISTORICAL_EVIDENCE",
-               v4_source=None, capabilities=None, sparse=False, with_designs=False) -> dict:
+               v4_source=None, capabilities=None, sparse=False, with_designs=False, baseline_builder=False, expected_mode_count=None) -> dict:
     from .evidence_plan import register_search_policy
     from .pipeline import import_into
     if executor not in {"opencode", "codex"}:
         raise AuditError("Executor must be opencode or codex")
     if basis not in {"HISTORICAL_EVIDENCE", "SOURCE_DEFINITIONS"}:
         raise AuditError("Init basis must be HISTORICAL_EVIDENCE or SOURCE_DEFINITIONS")
+    if baseline_builder:
+        basis = "SOURCE_DEFINITIONS"
     library = import_catalog(modes, scope=catalog_scope)
     if not library["items"] or len({i["item_id"] for i in library["items"]}) != len(library["items"]):
         raise AuditError("Initialization requires a nonempty library with unique original mode IDs")
@@ -82,7 +84,11 @@ def start_init(store: Store, modes: Path, taxonomy: Path, work_root: Path, *,
         configure_v4(store, run_id, v4_source, capabilities=capabilities)
     if sparse:
         configure_v5(store, run_id, with_designs=with_designs)
+    if baseline_builder:
+        from .cann_baseline import configure
+        configure(store, run_id, expected_mode_count=expected_mode_count)
     return {**cfg, "classification_contract": _settings(store, run_id).get("classification_contract", "DENSE_V1"),
+        **{k: _settings(store, run_id)[k] for k in ("knowledge_profile", "api42_registry_id", "input_condition_scheme") if k in _settings(store, run_id)},
         "mode_count": len(subjects), "trigger_count": len(frozen["items"]),
         "branch_categories": [c["id"] for b in frozen["branches"] for c in b.get("categories", [])]}
 
@@ -150,6 +156,9 @@ def configure_v4(store, run_id, source, *, capabilities=None):
     store.put(run_id, "xlsx_workflow", "config", {**cfg, "rule_version": RULE_VERSION}, mutable=True)
     store.event(run_id, "trigger_v4_configured", {"previous_taxonomy_id": current["taxonomy_id"],
         "taxonomy_id": revised["taxonomy_id"], "v4_taxonomy_id": frozen["taxonomy_id"], "mapping_id": mapping["mapping_id"]})
+    if settings.get("knowledge_profile"):
+        from .cann_baseline import configure
+        configure(store, run_id)
     return {"run_id": run_id, "classification_profile": PROFILE, "legacy_version": LEGACY_VERSION,
         "revised_version": revised["definition_version"], "v4_version": frozen["definition_version"],
         "categories": 31, "constructions": 55, "mounts": 64, "guides": 195,
@@ -277,7 +286,10 @@ def _basis(store, run_id, subject, snapshot_id=None):
     from .evidence_plan import collection_source_policy
     cid = subject["case_id"]
     settings = _settings(store, run_id)
-    profile_identity = {k: settings[k] for k in ("classification_profile", "v4_taxonomy_id", "mapping_id", "execution_capabilities", "classification_contract") if k in settings}
+    profile_identity = {k: settings[k] for k in ("classification_profile", "v4_taxonomy_id", "mapping_id", "execution_capabilities", "classification_contract", "knowledge_profile", "input_condition_scheme", "api42_registry_id") if k in settings}
+    if settings.get("knowledge_profile") and settings["phase"] == "INIT":
+        from .cann_baseline import current_definitions
+        profile_identity["mode_definition"] = [digest(d["result"]) for d in current_definitions(store, run_id) if d["subject_id"] == subject["subject_id"]]
     if settings["phase"] == "INIT" and settings.get("basis") == "SOURCE_DEFINITIONS":
         return digest({"subject": subject, "source": store.get(run_id, "cases", cid),
             "taxonomy": _taxonomy(store, run_id), "catalog": _catalog(store, run_id),
@@ -314,7 +326,8 @@ def current_assessments(store, run_id):
         key = (record["subject_id"], record.get("snapshot_id"))
         if key not in bases and key[0] in subjects:
             bases[key] = _basis(store, run_id, subjects[key[0]], key[1])
-        return bases.get(key)
+        value = bases.get(key)
+        return digest({"base": value, "axis": record["baseline_axis"]}) if record.get("baseline_axis") else value
     return sorted([a for a in store.records(run_id, "trigger_assessments")
         if a.get("policy_hash") == _policy() and a.get("basis_hash") == basis(a)],
         key=lambda a: a["assessment_id"])
@@ -345,15 +358,18 @@ def source_relations(store, run_id):
     return result
 
 
-def classification_payloads(store, run_id):
+def classification_payloads(store, run_id, *, for_baseline_axes=False):
     from .pipeline import current_judgments, current_mappings
     settings, taxonomy = _settings(store, run_id), _model_taxonomy(_taxonomy(store, run_id))
+    if settings.get("knowledge_profile") and settings["phase"] == "INIT" and not for_baseline_axes:
+        return
     baseline = store.get(run_id, "trigger_baseline_refs", "baseline")
     if baseline:
         # Gaps, source policy and assessment indexes are bookkeeping, not additional
         # semantic input. Keep the complete frozen mechanism/detail definitions.
         baseline = {k: baseline[k] for k in ("baseline_id", "run_id", "status", "index_hash", "mode_ids",
-            "catalog_scope", "coverage_kind", "coverage_details", "declared_details", "execution_verified") if k in baseline}
+            "catalog_scope", "coverage_kind", "coverage_details", "declared_details", "execution_verified",
+            "knowledge_profile", "mode_records", "input_condition_scheme") if k in baseline}
         if baseline.get("declared_details"):
             # Original partial trigger rationales are retained in state; the
             # complete mechanism/condition definitions and source anchors below
@@ -364,12 +380,18 @@ def classification_payloads(store, run_id):
     definition_init = settings["phase"] == "INIT" and settings.get("basis") == "SOURCE_DEFINITIONS"
     v4 = _v4(store, run_id)
     assessments = current_assessments(store, run_id)
+    definitions = {}
+    if settings.get("knowledge_profile") and settings["phase"] == "INIT":
+        from .cann_baseline import current_definitions
+        definitions = {d["subject_id"]: d for d in current_definitions(store, run_id)}
     for subject in sorted(store.records(run_id, "trigger_subjects"), key=lambda s: s["subject_id"]):
         cid = subject["case_id"]
+        if settings.get("knowledge_profile") and settings["phase"] == "INIT" and subject["subject_id"] not in definitions:
+            continue
         issues = ([None] if definition_init else _issues(store, run_id, cid) or [None])
         for issue in issues:
             key = (subject["subject_id"], (issue or {}).get("snapshot_id"), (issue or {}).get("summary_task_id"), (issue or {}).get("issue_index"))
-            if any((a["subject_id"], a.get("snapshot_id"), a.get("summary_task_id"), a.get("issue_index")) == key for a in assessments):
+            if not for_baseline_axes and any((a["subject_id"], a.get("snapshot_id"), a.get("summary_task_id"), a.get("issue_index")) == key for a in assessments):
                 continue
             judgments, mappings = [], []
             if settings["phase"] == "INCREMENTAL":
@@ -402,6 +424,11 @@ def classification_payloads(store, run_id):
                     "comparison_projection_excludes": "Repeated raw source chapters/quote bundles and prior trigger rationales; all definitions and mechanism detail fields are retained in full"},
                 "basis_hash": _basis(store, run_id, subject, (issue or {}).get("snapshot_id")),
                 "case_ids": [cid], "response_schema": response_schema(include_v4=bool(v4))}
+            payload.update(input_condition_scheme=settings.get("input_condition_scheme", "REVISED42"))
+            if settings.get("knowledge_profile"):
+                payload["knowledge_profile"] = settings["knowledge_profile"]
+                if subject["subject_id"] in definitions:
+                    payload["normalized_mode"] = definitions[subject["subject_id"]]["result"]
             if v4:
                 from .trigger_v4 import model_v4
                 mapping = store.get(run_id, "trigger_mappings", settings["mapping_id"])
@@ -414,10 +441,15 @@ def classification_payloads(store, run_id):
                 from .trigger_sparse import CONTRACT, schema, frame_version
                 payload.update(classification_contract=CONTRACT, response_schema=schema(),
                     frame_versions={scheme: frame_version(payload, scheme)
-                        for scheme in (["REVISED42", "BRANCH", "V4"] if v4 else ["REVISED42", "BRANCH"])},
+                        for scheme in ([settings.get("input_condition_scheme", "REVISED42"), "BRANCH", "V4"] if v4
+                            else [settings.get("input_condition_scheme", "REVISED42"), "BRANCH"])},
                     evaluation_order=["condition_facts", "details", "scenarios", "rows", "v4_rows",
                         "external_branches", "label_links", "classification_summary", "declared_comparison", "candidate_proposal", "decision"])
                 payload["input_scope"].update(output_rule_scope="SELECTED_RULES", omitted_rules="NOT_ASSESSED")
+            if settings.get("knowledge_profile"):
+                payload["mapping_document_status"] = "NOT_PROVIDED"
+                if payload.get("mapping"):
+                    payload["mapping"] = {k:v for k,v in payload["mapping"].items() if k != "rows"}
             yield payload
 
 
@@ -448,8 +480,16 @@ def accept_assessment(store, run_id, request, response):
     if (payload.get("phase") != settings["phase"]
             or payload.get("assessment_basis", "HISTORICAL_EVIDENCE") != settings.get("basis", "HISTORICAL_EVIDENCE")):
         raise AuditError("Classification phase/basis differs from the frozen workflow configuration")
+    if settings.get("knowledge_profile"):
+        if payload.get("knowledge_profile") != settings["knowledge_profile"]:
+            raise AuditError("Classification must use the current knowledge lifecycle contract")
+        if settings["phase"] == "INIT" and not payload.get("normalized_mode"):
+            raise AuditError("Normalize the original mode before classifying it")
     subject = store.get(run_id, "trigger_subjects", payload["subject"]["subject_id"])
-    if not subject or payload["basis_hash"] != _basis(store, run_id, subject, (payload.get("source_issue") or {}).get("snapshot_id")):
+    expected_basis = _basis(store, run_id, subject, (payload.get("source_issue") or {}).get("snapshot_id")) if subject else None
+    if payload.get("baseline_axis"):
+        expected_basis = digest({"base": expected_basis, "axis": payload["baseline_axis"]})
+    if not subject or payload["basis_hash"] != expected_basis:
         raise AuditError("Classification input/baseline changed; request a fresh task")
     if response.get("executor") != config(store, run_id)["executor"]:
         raise AuditError("Classification executor differs from configured Agent")
@@ -462,6 +502,7 @@ def accept_assessment(store, run_id, request, response):
         "snapshot_id": issue.get("snapshot_id"), "issue_index": issue.get("issue_index"),
         "issue_label": issue.get("label", "Source definition only"),
         "summary_task_id": issue.get("summary_task_id"), "basis_hash": payload["basis_hash"],
+        **({"baseline_axis": payload["baseline_axis"]} if payload.get("baseline_axis") else {}),
         "policy_hash": _policy(), "raw_response": response, "result": result}
     store.put(run_id, "trigger_assessments", record["assessment_id"], record)
     return record
@@ -514,7 +555,7 @@ def record_source_lookup(store, run_id, payload, response, snapshots):
     store.put(run_id, "trigger_source_lookups", lookup["lookup_key"], record, mutable=True)
 
 
-def _projection(store, run_id):
+def _projection(store, run_id, *, include_baseline_review=True):
     from .wiki_checks import wiki_plan
     from .evidence_plan import collection_source_policy, resource_kind
     policy = collection_source_policy(store, run_id)
@@ -601,6 +642,7 @@ def _projection(store, run_id):
         "coverage_kind": cfg.get("basis", "HISTORICAL_EVIDENCE"),
         "taxonomy": _taxonomy(store, run_id), "subjects": subjects,
         "classification_contract": cfg.get("classification_contract", "DENSE_V1"),
+        "input_condition_scheme": cfg.get("input_condition_scheme", "REVISED42"),
         "assessments": assessments, "wiki_checks": checks, "resources": resources,
         "gaps": gaps, "baseline": baseline}
     if _v4(store, run_id):
@@ -618,6 +660,23 @@ def _projection(store, run_id):
             mapping=store.get(run_id, "trigger_mappings", cfg["mapping_id"]),
             execution_capabilities=cfg["execution_capabilities"], designs=designs,
             original_taxonomy=store.get(run_id, "trigger_taxonomies", _taxonomy(store, run_id)["original_taxonomy_id"]))
+    if cfg.get("knowledge_profile"):
+        from .cann_baseline import current_definitions, current_execution, mode_records, FIELDS, stage_gaps, current_review
+        projection.update(knowledge_profile=cfg["knowledge_profile"], mapping_document_status="NOT_PROVIDED",
+            mode_definitions=current_definitions(store, run_id), baseline_execution=current_execution(store, run_id),
+            api42_registry=store.get(run_id, "api42_registry_receipts", cfg.get("api42_registry_id", "")))
+        projection["mode_records"] = mode_records(projection) if cfg["phase"] == "INIT" else (baseline or {}).get("mode_records", [])
+        if cfg["phase"] == "INIT":
+            gaps.extend(stage_gaps(projection))
+            if include_baseline_review:
+                projection["baseline_review"] = current_review(store, run_id, projection)
+                if not projection["baseline_review"]:
+                    gaps.append({"case_id": "", "kind": "BASELINE_CROSS_REVIEW_PENDING", "reason": "Horizontal review across all original modes is required"})
+            for mode in projection["mode_records"]:
+                for field in FIELDS:
+                    if mode[field]["status"] == "UNKNOWN":
+                        gaps.append({"case_id": mode["source_case_id"], "kind": "MODE_MECHANISM_UNCLEAR" if field == "failure_mechanism" else "MODE_DEFINITION_INFORMATION_GAP",
+                            "reason": field + ": " + mode[field]["text"]})
     return projection
 
 
@@ -633,8 +692,15 @@ def status(store, run_id):
 
 def _index_identity(store, run_id):
     from .xlsx_workflow import _policy
+    dependencies = {}
+    if _settings(store, run_id).get("knowledge_profile") and _settings(store, run_id)["phase"] == "INIT":
+        from .cann_baseline import current_execution, current_review
+        dependencies["execution"] = sorted(digest(r["result"]) for r in current_execution(store, run_id))
+        review = current_review(store, run_id)
+        dependencies["horizontal_review"] = digest(review["result"]) if review else None
     return digest({"catalog": _catalog(store, run_id), "taxonomy": _taxonomy(store, run_id),
         "policy": _policy(), "subjects": store.records(run_id, "trigger_subjects"),
+        "baseline_dependencies": dependencies,
         "bases": [_basis(store, run_id, s) for s in store.records(run_id, "trigger_subjects")],
         "assessments": [a["assessment_id"] for a in current_assessments(store, run_id)]})
 
@@ -644,11 +710,20 @@ def finalize(store, run_id, *, allow_pending=False):
     if _settings(store, run_id)["phase"] != "INIT":
         raise AuditError("Only an initialization run can maintain a baseline")
     data = _projection(store, run_id)
+    if data.get("knowledge_profile"):
+        from .cann_baseline import stage_gaps
+        if stage_gaps(data) or not data.get("baseline_review"):
+            raise AuditError("Complete A1-A4 and the horizontal review before freezing Baseline v1")
+        recommendation = data["baseline_review"]["result"]["recommendation"]
+        if recommendation == "REWORK_REQUIRED":
+            raise AuditError("Horizontal review requires rework; no baseline can be frozen")
+        if recommendation == "READY_WITH_GAPS" and not allow_pending:
+            raise AuditError("Horizontal review retains gaps; explicitly finalize a provisional baseline or resolve them")
     missing = {s["subject_id"] for s in data["subjects"]} - {a["subject_id"] for a in data["assessments"]}
-    if missing or any(g["kind"] in {"ISSUE_UNASSESSED", "TASK_PENDING"} for g in data["gaps"]):
+    if missing or any(g["kind"] in {"ISSUE_UNASSESSED", "TASK_PENDING", "MODE_DEFINITION_PENDING"} for g in data["gaps"]):
         raise AuditError("Every original mode and current source issue needs an assessment; pending tasks cannot be finalized")
     informational = {"TRIGGER_UNKNOWNS", "V4_UNKNOWNS", "CAPTURE_PARTIAL", "CAPTURE_CONTENT_CAPTURED", "BASELINE_STALE",
-                     "WIKI_NOT_SUPPORTED", "SOURCE_NOT_AVAILABLE_USER_POLICY", "CLASSIFICATION_INFORMATION_GAP"}
+                     "WIKI_NOT_SUPPORTED", "SOURCE_NOT_AVAILABLE_USER_POLICY", "CLASSIFICATION_INFORMATION_GAP", "MODE_DEFINITION_INFORMATION_GAP", "MODE_MECHANISM_UNCLEAR"}
     blocking = [g for g in data["gaps"] if g["kind"] not in informational]
     if blocking and not allow_pending:
         raise AuditError("Initialization has explicit gaps; finish them or finalize a provisional baseline with --allow-pending")
@@ -691,9 +766,9 @@ def finalize(store, run_id, *, allow_pending=False):
             "source_relation": result["source_relation"], "coverage_kind": result["coverage_kind"],
             "execution_verified": False,
             **{k: result[k] for k in ("classification_contract", "classification_summary", "scenarios",
-                "scenario_relation", "label_links", "classification_scope") if k in result}})
+                "scenario_relation", "label_links", "classification_scope", "execution_method_links") if k in result}})
     baseline = {"baseline_id": "trigger-baseline-" + identity[:24], "run_id": run_id,
-        "status": "READY_WITH_GAPS" if blocking or any(g["kind"] == "CLASSIFICATION_INFORMATION_GAP" for g in data["gaps"]) else "READY", "index_hash": identity,
+        "status": "READY_WITH_GAPS" if blocking or any(g["kind"] in {"CLASSIFICATION_INFORMATION_GAP", "MODE_MECHANISM_UNCLEAR"} for g in data["gaps"]) else "READY", "index_hash": identity,
         "taxonomy_id": _settings(store, run_id)["taxonomy_id"], "mode_ids": [i["item_id"] for i in _catalog(store, run_id)],
         "catalog_scope": store.get(run_id, "catalog_selections", "frozen"),
         "collection_source_policy": collection_source_policy(store, run_id),
@@ -702,10 +777,20 @@ def finalize(store, run_id, *, allow_pending=False):
         "classification_framework": CLASSIFICATION_FRAMEWORK, "condition_index": condition_index,
         "classification_contract": _settings(store, run_id).get("classification_contract", "DENSE_V1"),
         "gaps": data["gaps"], "coverage_kind": data["coverage_kind"], "execution_verified": False}
+    if data.get("knowledge_profile"):
+        baseline.update(knowledge_profile=data["knowledge_profile"], mode_records=data["mode_records"],
+            input_condition_scheme=data["input_condition_scheme"], mapping_document_status="NOT_PROVIDED",
+            api42_registry=data["api42_registry"], baseline_review=data["baseline_review"],
+            baseline_version="CANN-BASELINE-v1-" + identity[:16])
+        if recommendation == "READY_WITH_GAPS":
+            baseline["status"] = "READY_WITH_GAPS"
     if data.get("v4_taxonomy"):
         baseline.update(v4_taxonomy_id=data["v4_taxonomy"]["taxonomy_id"],
             v4_definition_version=data["v4_taxonomy"]["definition_version"],
             mapping_id=data["mapping"]["mapping_id"], revised_definition_version=data["taxonomy"]["definition_version"])
+    if data.get("knowledge_profile"):
+        baseline.pop("revised_definition_version", None)
+        baseline["api_definition_version"] = data["taxonomy"]["definition_version"]
     store.put(run_id, "trigger_baselines", baseline["baseline_id"], baseline)
     store.put(run_id, "trigger_baseline_heads", "current", {"baseline_id": baseline["baseline_id"]}, mutable=True)
     return baseline
@@ -774,7 +859,12 @@ def start_incremental(store, source, baseline_run, work_root, *, executor="openc
         settings = _settings(store, run_id)
         store.put(run_id, "trigger_config", "config", {**settings,
             "classification_contract": baseline_settings["classification_contract"],
-            "design_tasks_enabled": baseline_settings.get("design_tasks_enabled", False)}, mutable=True)
+            "design_tasks_enabled": baseline_settings.get("design_tasks_enabled", False),
+            **{k: baseline_settings[k] for k in ("knowledge_profile", "input_condition_scheme") if k in baseline_settings}}, mutable=True)
+        if baseline_settings.get("api42_registry_id"):
+            registry_id = baseline_settings["api42_registry_id"]
+            store.put(run_id, "api42_registry_receipts", registry_id, store.get(baseline_run, "api42_registry_receipts", registry_id))
+            store.put(run_id, "trigger_config", "config", {**_settings(store, run_id), "api42_registry_id": registry_id}, mutable=True)
     if baseline_settings.get("v4_taxonomy_id"):
         for kind, key in (("trigger_v4_taxonomies", baseline_settings["v4_taxonomy_id"]),
                           ("trigger_mappings", baseline_settings["mapping_id"]),
@@ -801,6 +891,15 @@ def export(store, run_id, *, previous_classification=None, xlsx=False):
         data["previous_classification"] = previous_classification
     output = Path(cfg["directory"]) / "output"
     output.mkdir(parents=True, exist_ok=True)
+    if data.get("knowledge_profile") and data["phase"] == "INIT":
+        from .baseline_reports import export as export_baseline
+        head = store.get(run_id, "trigger_baseline_heads", "current") or {}
+        frozen = store.get(run_id, "trigger_baselines", head.get("baseline_id", ""))
+        data["baseline_freeze"] = ({"baseline_id": frozen["baseline_id"], "version": frozen["baseline_version"],
+            "status": frozen["status"] if frozen["index_hash"] == _index_identity(store, run_id) else "STALE"} if frozen else {"status":"NOT_FROZEN"})
+        result = export_baseline(data, output)
+        store.event(run_id, "trigger_export", result)
+        return result
     data["combination_analysis"] = analyze(data)
     (output / "report.json").write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
     (output / "report.html").write_text(render(data), encoding="utf-8")

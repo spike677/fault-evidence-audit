@@ -22,7 +22,8 @@ def analyze(data):
     units = sorted(set(unit_for.values()))
     assessments = _current(data)
     tax = data.get("taxonomy", {})
-    frames = [("REVISED42", tax.get("definition_version") or tax.get("taxonomy_hash") or tax.get("taxonomy_id") or "UNVERSIONED", tax.get("items", []), "rows")]
+    api_scheme = data.get("input_condition_scheme", "REVISED42")
+    frames = [(api_scheme, tax.get("definition_version") or tax.get("taxonomy_hash") or tax.get("taxonomy_id") or "UNVERSIONED", tax.get("items", []), "rows")]
     if data.get("v4_taxonomy"):
         v4 = data["v4_taxonomy"]
         frames.insert(0, ("V4", v4["definition_version"], v4["items"], "v4_rows"))
@@ -34,12 +35,14 @@ def analyze(data):
             assessed = set()
             legacy_without_scenarios = set()
             for a in assessments:
+                if a.get("baseline_axis") and a["baseline_axis"] != ("V4" if scheme == "V4" else "API42"):
+                    continue
                 cid = a["case_id"]
                 if cid not in unit_for:
                     continue
                 u = unit_for[cid]; result = a["result"]
                 versions = result.get("definition_versions", {})
-                result_version = versions.get("v4" if scheme == "V4" else "revised42", version)
+                result_version = versions.get("v4" if scheme == "V4" else "original42" if scheme == "ORIGINAL42" else "revised42", version)
                 if result_version != version:
                     continue
                 assessed.add(u)

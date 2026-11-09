@@ -1,3 +1,7 @@
+# 0.1.17 Baseline Builder（优先于以下历史说明）
+
+原30条先完成A1定义整理→独立A2 V4条件/构造、A3原始42 API条件、A4 E1-E5及证据缺口→六维横向审查→显式finalize。复用原next/submit/drive及独立worker，不每10条申请。failure_mechanism是CANN真实因果机理；V4的6主题/31条件类/55种构造/195案例和E1-E5分别维护，不重命名知识库。原42须从实际trigger_library.md解析核对路径、SHA-256、42个ID/名称/定义/重复/缺失；不使用V5修订42，不等缺失的42_vs_55_mapping.md，不自动转换标签。无客户Wiki不阻塞A1-A3；未采集正文、未运行设备分别保持SOURCE_VERIFIED=false、HARDWARE_VALIDATED=false。缺API前提保持未知；已证实非API依赖才可给A3 NOT_APPLICABLE。只有四阶段及横向审查完成才可冻结，待澄清项显式保留，不能自动合并、入库或产生人工ACCEPT。交付仅baseline_30_modes.html、baseline_30_modes.json、baseline_42_api_mapping.tsv、baseline_v4_mapping.tsv，HTML为主要入口，具体命令见OPENCODE_HANDOFF.md。
+
 ## 故障证据核验
 
 0.1.16 / V5优先于下面密集合同的历史说明。CLI Init默认SPARSE_SCENARIOS_V5，完整读冻结规则但只输出有据类别/构造；所选类别完整核对Requires/Skip，未选是NOT_ASSESSED，不是排除。每个正标签有版本化label_links，绑定detail、局部fact和scenario。不同子问题的同名s1不合并；同案共现不等于同情景或充分触发。无可归类事实时明确INSUFFICIENT_INFORMATION；BRANCH_ONLY只表达当前识别的执行/实现/环境依赖。HTML为主要审查报告，JSON保留完整当前审计，XLSX仅可选四表索引。设计阶段用--with-designs显式启用，仍NOT_RUN，不阻塞默认V5分类。沿用既有采集和独立子Agent/next/submit/drive；候选建议不自动入库或ACCEPT。先完成原30条语义验收再处理62条，不把15项聊天候选目录冒充原库；代码部分验证不是现场批次已通过。

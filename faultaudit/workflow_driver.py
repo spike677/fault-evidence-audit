@@ -68,7 +68,8 @@ def auth_site(request: dict, response: dict) -> str:
 
 def executor_blocked(request: dict, response: dict) -> bool:
     """Transport-level inability to read input is never a model result."""
-    if request.get("kind") not in {"model", "catalog_draft", "trigger_classify", "trigger_design"} or response.get("outcome") != "BLOCKED":
+    from .knowledge_common import SEMANTIC_KINDS
+    if request.get("kind") not in {"model", "catalog_draft", "trigger_classify", "trigger_design"} | SEMANTIC_KINDS or response.get("outcome") != "BLOCKED":
         return False
     if (response.get("request_hash") != request.get("request_hash")
             or not request.get("request_hash") or response.get("reason_code") != "EXECUTOR_CONTEXT_LIMIT"

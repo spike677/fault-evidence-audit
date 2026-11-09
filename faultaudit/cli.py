@@ -192,11 +192,13 @@ def parser() -> argparse.ArgumentParser:
     init.add_argument("--taxonomy", type=Path, required=True)
     init.add_argument("--v4", type=Path, help="Freeze V4 alongside independent revised-42 compatibility rules")
     init.add_argument("--legacy-dense", action="store_true", help="Explicit legacy response contract; default is V5 sparse")
+    init.add_argument("--simple-v5", action="store_true", help="Use the prior single-task sparse Init, without Baseline Builder")
+    init.add_argument("--expected-mode-count", type=int, default=30, help="Baseline Builder original mode count")
     init.add_argument("--with-designs", action="store_true", help="Also schedule separate scenario-bound design tasks")
     init.add_argument("--capabilities-file", type=Path, help="Declared design capabilities; not an execution receipt")
     init.add_argument("--catalog-scope", default="ORIGINAL_MECHANISM_LIBRARY")
     init.add_argument("--basis", choices=["HISTORICAL_EVIDENCE", "SOURCE_DEFINITIONS"],
-                      default="HISTORICAL_EVIDENCE", help="Initialize from verified webpages or explicit source definitions only")
+                      default="SOURCE_DEFINITIONS", help="Existing mode definitions do not require customer-event confirmation")
     init.add_argument("--branch-source", type=Path)
     init.add_argument("--user-branches", action="store_true", default=True,
                       help="Use the user's explicit Branch 2/3 definitions (default)")
@@ -213,6 +215,9 @@ def parser() -> argparse.ArgumentParser:
     configure_v5 = trigger_flow.add_parser("configure-v5", help="Maintain an existing Init using sparse scenario classification")
     configure_v5.add_argument("--run", default="latest")
     configure_v5.add_argument("--with-designs", action="store_true")
+    builder = trigger_flow.add_parser("configure-baseline", help="Verify original API42 and enable A1-A4 plus horizontal review")
+    builder.add_argument("--run", default="latest")
+    builder.add_argument("--expected-mode-count", type=int, default=30)
     reassess = trigger_flow.add_parser("reassess", help="Request a fresh subject assessment; preserve sources and history")
     reassess.add_argument("--run", default="latest")
     reassess.add_argument("--subject-id", required=True)
@@ -316,7 +321,8 @@ def main(argv: list[str] | None = None) -> int:
                     executor=args.executor, branch_source=args.branch_source, user_branches=args.user_branches,
                     catalog_scope=args.catalog_scope, basis=args.basis, v4_source=args.v4,
                     capabilities=json.loads(args.capabilities_file.read_text(encoding="utf-8-sig")) if args.capabilities_file else None,
-                    sparse=not args.legacy_dense, with_designs=args.with_designs)
+                    sparse=not args.legacy_dense, with_designs=args.with_designs,
+                    baseline_builder=not args.legacy_dense and not args.simple_v5, expected_mode_count=args.expected_mode_count)
             elif operation == "classify":
                 result = trigger_workflow.start_incremental(store, args.input, args.baseline_run, args.work_root,
                     executor=args.executor, baseline_id=args.baseline_id, allow_pending_baseline=args.allow_pending_baseline)
@@ -342,6 +348,9 @@ def main(argv: list[str] | None = None) -> int:
                         capabilities=json.loads(args.capabilities_file.read_text(encoding="utf-8-sig")) if args.capabilities_file else None)
                 elif operation == "configure-v5":
                     result = trigger_workflow.configure_v5(store, selected_run, with_designs=args.with_designs)
+                elif operation == "configure-baseline":
+                    from .cann_baseline import configure
+                    result = configure(store, selected_run, expected_mode_count=args.expected_mode_count)
                 elif operation == "reassess":
                     from .trigger_maintenance import request_reassessment
                     result = request_reassessment(store, selected_run, args.subject_id,

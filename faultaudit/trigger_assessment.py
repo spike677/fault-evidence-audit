@@ -89,6 +89,7 @@ class ConstructionCheck(Grounded):
     definition_check: PredicateCheck
     condition_fact_ids: list[str] = Field(default_factory=list)
     reason: str = Field(min_length=1)
+    construction_recipe: str = ""
 
 
 class V4Row(TriggerRow):

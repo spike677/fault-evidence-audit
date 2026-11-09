@@ -270,6 +270,7 @@ def model_v4(frozen: dict) -> dict:
         "construction_count", "mount_count", "guide_count", "source_audit_status")} | {
         "items": [{k: v[k] for k in keys} for v in frozen["items"]],
         "constructions": [{k: c[k] for k in ("id", "name", "definition")} for c in frozen["constructions"]],
+        "methods": [{k: m[k] for k in ("method_id", "name", "definition")} for m in frozen["methods"] if m["method_id"] in {"E1", "E2", "E3", "E4", "E5"}],
         "global_rules": frozen["global_rules"],
         "input_scope": {"all_31_definitions_complete": True, "all_55_constructions_complete": True,
             "all_64_mounts_included": True, "guidance_examples_included": False,

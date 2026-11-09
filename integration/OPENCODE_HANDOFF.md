@@ -1,3 +1,38 @@
+# 0.1.17：原30条 Baseline Builder
+
+本段优先于历史的单任务Init说明。保留现场state、原始资料、旧请求和人工记录；备份后在原Init上维护，不清空或自动入库。当前只处理原30条，不派发62条增量，也不新增采集、模型或设备客户端。
+
+新Init使用实际原库、`D:\project\typora\trigger_library.md`及原V4文件。程序解析实际42个ID、名称和定义，校验SHA和原冻结内容，导出原42核对清单；不能用文件名代替内容核对。V4源文件不改。暂缺的`42_vs_55_mapping.md`不阻塞，也不作自动标签转换。
+
+```powershell
+python run_faultaudit.py --state STATE trigger-workflow init `
+  --modes '原30条CANN模式库.xlsx' --taxonomy 'D:\project\typora\trigger_library.md' `
+  --v4 '原V4.md' --expected-mode-count 30 --work-root work/runs --executor opencode
+# 已有原库Init：先配置实际原V4（如尚未配置），再启用Builder。
+python run_faultaudit.py --state STATE trigger-workflow configure-baseline --run INIT_RUN_ID --expected-mode-count 30
+python run_faultaudit.py --state STATE xlsx-workflow next --run INIT_RUN_ID
+```
+
+`init`默认Builder且要求V4；`--simple-v5`保留0.1.16单项稀疏流程，`--legacy-dense`保留旧密集流程。Python API的`start_init`仍须显式`baseline_builder=True`。A1完成一条后，该条即可派发独立A2/A3/A4，不等待其他条的历史证据：
+
+- `baseline_define`：原定义、真实`failure_mechanism`、对象、表现、输入/执行前提、范围和排除边界；每个明确陈述引用本地原单元格。
+- `baseline_v4`：独立评估V4主题/条件类/构造，选中构造给出可读的设计建议和缺失条件，S5只是条件类，不继承其全部构造。
+- `baseline_api42`：使用原始42，独立判断，不读取映射补标签。缺条件为信息不足；明确非API依赖才可整体不适用。
+- `baseline_execution`：E1-E5、可用引用/采集元数据和证据缺口。它没有实际读取网页或执行硬件的能力，不会伪造核验状态。
+- `baseline_review`：四阶段全完成后，在同一完整模式集合上审查六维关系；每个维度必须说明发现或缺口。证据键按阶段/评估限定，避免把两项任务的F1当同一事实。不自动合并。
+
+仍由主协调器通过`next/submit/drive`推进，现有新上下文子agent返回指定schema及OUTER hash；新CLI适配器已识别全部五种任务。不要在每10条之后申请继续。程序检查完整序列化请求预算；默认48,000不变。根据现场真实执行器容量设置`FAULTAUDIT_MAX_INPUT_CHARS`，所有操作保持同值，变更会使旧任务失效。超限/执行器上下文不足明确BLOCKED，不删定义/模式/段落。只有完成四阶段与横向审查后才允许finalize；REWORK_REQUIRED不能冻结，READY_WITH_GAPS需要显式`--allow-pending`且版本仍标临时，不变成来源证实。
+
+```powershell
+python run_faultaudit.py --state STATE trigger-workflow export --run INIT_RUN_ID
+python run_faultaudit.py --state STATE trigger-workflow finalize --run INIT_RUN_ID
+# 存在已审查、明确保留的缺口时，由操作者明确选择finalize --allow-pending。
+```
+
+只输出`baseline_30_modes.html`（主要入口）、`baseline_30_modes.json`、`baseline_42_api_mapping.tsv`、`baseline_v4_mapping.tsv`。阶段未完成时允许导出进度，显示UNASSESSED/NOT_FROZEN，不能当作30条分类已完成。Baseline v1绑定原42回执、模式定义、A2/A3/A4、横向审查及策略，输入/证据/策略变化使当前头失效，保留旧版本。MODE_DEFINITION、SOURCE_VERIFIED、HARDWARE_VALIDATED分开；缺历史Wiki不会让原定义及条件归类全部变UNKNOWN。
+
+Codex本轮仅做合成数据的定向验证和原30条输入/派发预检；实际30条语义分类、内网访问、执行器上下文容量及新worker现场安装由OpenCode验收。不得把合成响应或文件桥接跑通说成模型完成了30条。
+
 # OpenChamber / OpenCode 接入与验收
 
 对应核心0.1.16，以下保留底层文件协议验收步骤。结构化XLSX的采集入口仍是xlsx-workflow，模式归类用trigger-workflow，主审查报告为HTML；Word/PPT、任意布局XLSX和时间范围收集为TODO。OpenChamber是现场前端，文件任务由它连接的OpenCode执行；OpenCode可完成采集与模型判断。本包只安装项目模板、发布文件任务、接收结果并运行本地门禁，不启动OpenChamber，也不包含服务客户端。

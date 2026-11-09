@@ -82,11 +82,11 @@ def start(store: Store, source: Path, catalog: Path, work_root: Path, *, executo
 
 def _policy() -> str:
     from . import wiki_checks, capture_quality, search_guidance, resource_identity, workflow_scope
-    from . import trigger_taxonomy, trigger_assessment, trigger_workflow, trigger_v4, trigger_v4_assessment, trigger_design, trigger_sparse
+    from . import trigger_taxonomy, trigger_assessment, trigger_workflow, trigger_v4, trigger_v4_assessment, trigger_design, trigger_sparse, cann_baseline, knowledge_common
     return digest({"core": policy_fingerprint(), "workflow": digest(Path(__file__).read_bytes()),
                    "helpers": digest(b"".join(Path(module.__file__).read_bytes() for module in
                        (wiki_checks, capture_quality, search_guidance, resource_identity, workflow_scope,
-                        trigger_taxonomy, trigger_assessment, trigger_workflow, trigger_v4, trigger_v4_assessment, trigger_design, trigger_sparse)))})
+                        trigger_taxonomy, trigger_assessment, trigger_workflow, trigger_v4, trigger_v4_assessment, trigger_design, trigger_sparse, cann_baseline, knowledge_common)))})
 
 
 def _json(path: Path, value: dict) -> None:
@@ -136,6 +136,18 @@ def next_tasks(store: Store, run_id: str) -> dict:
     if cfg.get("purpose") == "TRIGGER_INIT" and cfg.get("init_basis") == "SOURCE_DEFINITIONS":
         from .trigger_workflow import classification_payloads, classification_instructions
         tasks, blocks = [], []
+        from .cann_baseline import payloads as definition_payloads, axis_payloads, execution_payloads, review_payloads
+        from .cann_baseline import INSTRUCTIONS, EXECUTION_INSTRUCTIONS, REVIEW_INSTRUCTIONS, axis_instructions
+        stages = [("baseline_define", p, INSTRUCTIONS, 3) for p in definition_payloads(store, run_id)]
+        stages += [(kind, p, axis_instructions(p["baseline_axis"]), 4) for kind, p in axis_payloads(store, run_id)]
+        stages += [("baseline_execution", p, EXECUTION_INSTRUCTIONS, 4) for p in execution_payloads(store, run_id)]
+        stages += [("baseline_review", p, REVIEW_INSTRUCTIONS, 5) for p in review_payloads(store, run_id)]
+        for kind, payload, instruction, priority in stages:
+            value = _request(store, run_id, cfg, kind, payload, instruction, priority)
+            if value and value.get("blocked"):
+                blocks.append(value["block_id"])
+            elif value:
+                tasks.append(value)
         for payload in classification_payloads(store, run_id):
             value = _request(store, run_id, cfg, "trigger_classify", payload, classification_instructions(payload), 4)
             if value and value.get("blocked"):
@@ -387,9 +399,18 @@ def submit(store: Store, run_id: str, task_id: str, response: dict, *, path: Pat
                 raise AuditError("; ".join(validation["errors"]))
             store.put(run_id, "workflow_drafts", payload["request"]["request_hash"],
                       {"request": payload["request"], "response": response, "validation": validation})
-        elif kind == "trigger_classify":
+        elif kind in {"trigger_classify", "baseline_v4", "baseline_api42"}:
             from .trigger_workflow import accept_assessment
             accept_assessment(store, run_id, request, response)
+        elif kind == "baseline_define":
+            from .cann_baseline import accept
+            accept(store, run_id, request, response)
+        elif kind == "baseline_execution":
+            from .cann_baseline import accept_execution
+            accept_execution(store, run_id, request, response)
+        elif kind == "baseline_review":
+            from .cann_baseline import accept_review
+            accept_review(store, run_id, request, response)
         elif kind == "trigger_design":
             from .trigger_design import accept_design
             accept_design(store, run_id, request, response)
@@ -542,7 +563,8 @@ def retry(store: Store, run_id: str, task_id: str) -> dict:
     from .workflow_driver import reset_execution
     task = store.get(run_id, "workflow_requests", task_id)
     execution = store.get(run_id, "workflow_execution", task_id) or {}
-    if task and task["kind"] in {"model", "catalog_draft", "trigger_classify", "trigger_design"} and execution.get("blocked_code") == "EXECUTOR_CONTEXT_LIMIT":
+    from .knowledge_common import SEMANTIC_KINDS
+    if task and task["kind"] in {"model", "catalog_draft", "trigger_classify", "trigger_design"} | SEMANTIC_KINDS and execution.get("blocked_code") == "EXECUTOR_CONTEXT_LIMIT":
         reset_execution(store, run_id, task_id)
         old = store.get(run_id, "workflow_execution", task_id)
         store.put(run_id, "workflow_execution", task_id, {**old, "blocked_code": None}, mutable=True)
