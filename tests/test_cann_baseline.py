@@ -3,6 +3,7 @@ import copy
 import csv
 import hashlib
 import json
+import os
 from pathlib import Path
 import tempfile
 import unittest
@@ -27,6 +28,9 @@ DIMENSIONS = list(builder.CrossDimensionReview.model_fields['dimension'].annotat
 
 class BaselineBuilderTests(unittest.TestCase):
     def setUp(self):
+        self.budget = patch.dict(os.environ, {'FAULTAUDIT_MAX_INPUT_CHARS': '240000'})
+        self.budget.start()
+        self.addCleanup(self.budget.stop)
         self.temp = tempfile.TemporaryDirectory(prefix='synthetic-baseline-', dir=Path(__file__).parent)
         self.root = Path(self.temp.name)
         self.store = Store(self.root / 'state')
@@ -229,7 +233,7 @@ class BaselineBuilderTests(unittest.TestCase):
                 self.assertEqual(len(list(csv.DictReader(stream, delimiter='\t'))), 2)
         html = Path(result['report_html']).read_text(encoding='utf-8')
         for term in ('failure_mechanism', 'A1', 'A2', 'A3', 'A4', 'SHA-256', '横向'):
-            self.assertIn(term, html)
+            self.assertTrue(term in html, term)
 
     def test_original_input_change_invalidates_all_stages_and_keeps_history(self):
         self.start(1); self.advance(); old = builder.current_definitions(self.store, self.run)[0]
@@ -268,7 +272,7 @@ class IndependentAxisGateTests(unittest.TestCase):
         self.assertEqual(out['details'][0]['trigger_ids'], ['1.3.2'])
 
     def test_no_api_details_is_unknown_not_whole_axis_not_applicable(self):
-        p, r = sparse_attempt(); p['baseline_axis'] = 'API42'
+        p, r = sparse_attempt(); p.update(baseline_axis='API42', input_condition_scheme='ORIGINAL42')
         r.update(rows=[], scenarios=[], label_links=[])
         r['classification_summary'] = {'status': 'NOT_APPLICABLE', 'reason': '未给API', 'exclusion_fact_ids': ['F']}
         with self.assertRaisesRegex(AuditError, 'non-API'): validate_assessment(p, r, HASH)
@@ -288,7 +292,7 @@ class IndependentAxisGateTests(unittest.TestCase):
             row = next(v for v in r['v4_rows'] if v['trigger_id'] == 'S5')
             child = row['construction_checks'][0]
             child.update(applicability='PARTIAL', condition_fact_ids=['F'], source_cells=[cell],
-                evidence_basis='SOURCE_DEFINITION', reason='合成分块条件', construction_recipe='合法边界输入设计，API粒度未知')
+                reason='合成分块条件', construction_recipe='合法边界输入设计，API粒度未知')
             row['construction_checks'] = [child]
             p.update(classification_contract=CONTRACT, baseline_axis='V4')
             r.update(classification_contract=CONTRACT, rows=[], external_branches=[], v4_rows=[row],

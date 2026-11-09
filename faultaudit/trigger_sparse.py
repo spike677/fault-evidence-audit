@@ -148,6 +148,8 @@ def validate_sparse(payload, response, request_hash):
         raise AuditError("Invalid V5 sparse assessment: " + str(exc)) from exc
     raw = sparse.model_dump()
     stage = payload.get("baseline_axis")
+    if stage == "API42" and input_scheme(payload) != "ORIGINAL42":
+        raise AuditError("A3 requires the original frozen API42 definitions")
     if stage == "V4" and (sparse.rows or sparse.external_branches or sparse.execution_method_links or any(l.scheme != "V4" for l in sparse.label_links)):
         raise AuditError("A2 classifies V4 only; API42 and execution methods are independent tasks")
     if stage == "API42" and (sparse.v4_rows or sparse.external_branches or sparse.execution_method_links or any(l.scheme != "ORIGINAL42" for l in sparse.label_links)):

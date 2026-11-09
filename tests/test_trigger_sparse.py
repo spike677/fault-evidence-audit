@@ -34,7 +34,8 @@ class SparseAssessmentTests(unittest.TestCase):
         self.assertEqual(r, before)
         self.assertEqual(len(out["rows"]), 1)
         self.assertEqual(out["details"][0]["trigger_ids"], ["1.3.2"])
-        self.assertEqual(out["details"][0]["condition_links"], r["label_links"])
+        from faultaudit.trigger_sparse import LabelLink
+        self.assertEqual(out["details"][0]["condition_links"], [LabelLink.model_validate(l).model_dump() for l in r["label_links"]])
         self.assertEqual(out["classification_scope"]["omitted_rules"], "NOT_ASSESSED")
         self.assertEqual(out["processing_status"], "AUTO_PROCESSED")
         self.assertFalse(out["review_required"])
