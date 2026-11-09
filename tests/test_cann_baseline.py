@@ -299,6 +299,19 @@ class BaselineBuilderTests(unittest.TestCase):
         self.assertEqual(self.store.get(self.run, 'mode_definitions', old['definition_id']), old)
         self.assertEqual([t['kind'] for t in files.next_tasks(self.store, self.run)['tasks']], ['baseline_define'])
 
+    def test_catalog_definition_change_invalidates_a1_without_rewriting_history(self):
+        self.start(1); self.advance()
+        old = builder.current_definitions(self.store, self.run)[0]
+        item = self.store.records(self.run, 'catalog')[0]
+        changed = {**item, 'mechanism': '更新的原模式说明'}
+        self.store.put(self.run, 'catalog', item['item_id'], changed, mutable=True)
+        self.assertEqual(builder.current_definitions(self.store, self.run), [])
+        self.assertEqual(self.store.get(self.run, 'mode_definitions', old['definition_id']), old)
+        extra = {**changed, 'item_id': 'SYN-EXTRA'}
+        self.store.put(self.run, 'catalog', extra['item_id'], extra)
+        with self.assertRaisesRegex(AuditError, 'catalog and Baseline subjects differ'):
+            workflow.finalize(self.store, self.run, allow_pending=True)
+
     def test_execution_dependency_and_policy_change_make_baseline_stale_without_deleting_history(self):
         self.start(1); self.finish_stages(); self.advance()
         frozen = workflow.finalize(self.store, self.run, allow_pending=True)

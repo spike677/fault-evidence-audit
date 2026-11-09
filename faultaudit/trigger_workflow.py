@@ -712,6 +712,8 @@ def finalize(store, run_id, *, allow_pending=False):
     data = _projection(store, run_id)
     if data.get("knowledge_profile"):
         from .cann_baseline import stage_gaps
+        if {s["mode_id"] for s in data["subjects"]} != {m["item_id"] for m in _catalog(store, run_id)}:
+            raise AuditError("Original catalog and Baseline subjects differ; maintain the mode collection first")
         if stage_gaps(data) or not data.get("baseline_review"):
             raise AuditError("Complete A1-A4 and the horizontal review before freezing Baseline v1")
         recommendation = data["baseline_review"]["result"]["recommendation"]

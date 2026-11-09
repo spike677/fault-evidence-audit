@@ -94,6 +94,7 @@ Read the full source. Return the supplied raw schema at the OUTER request_hash; 
 
 def definition_basis(store, run_id, subject):
     return digest({"profile": PROFILE, "subject": subject,
+        "catalog_mode": store.get(run_id, "catalog", subject["mode_id"]),
         "source": store.get(run_id, "cases", subject["case_id"])})
 
 
