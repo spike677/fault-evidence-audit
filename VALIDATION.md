@@ -1,6 +1,8 @@
 # 验收记录
 
-当前开发日期：2026 年 11 月 9 日，Asia/Shanghai。版本：0.1.17。
+当前开发日期：2026 年 11 月 9 日，Asia/Shanghai。版本：0.1.18。
+
+0.1.18独立Precision Bridge按“先推代码，再合成验证”的顺序交付。只新增只读导出、规则绑定与门禁模块；不修改原分类策略及PrecisionTesting原始任务/Prompt/知识库，不自动执行设备。结果在[Bridge聚合回执](examples/precision_bridge_validation.json)记录；以下0.1.17的159项结果仍属历史，不能当作新Bridge已经验证。
 
 0.1.17按用户要求先推代码，再执行定向测试和原30条输入/派发预检，不运行完整回归，也不作Codex实际模型端到端验收。阶段为A1定义、A2独立V4、A3独立原42、A4执行/证据整理及六维横向审查，缺历史Wiki不阻塞A1-A3。验证结果在推送后的[聚合回执](examples/baseline_partial_validation.json)记录；以下0.1.16及更早结果仅属历史，不能当作0.1.17回归通过。原始Init、私有资料和现场state均不提交。
 

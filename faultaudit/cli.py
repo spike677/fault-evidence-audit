@@ -94,6 +94,8 @@ def parser() -> argparse.ArgumentParser:
     p.add_argument("--state", default=".faultaudit", help="Directory containing SQLite and immutable content snapshots")
     p.add_argument("--version", action="version", version=__version__)
     sub = p.add_subparsers(dest="command", required=True)
+    from .precision_cli import add_parser as precision_parser
+    precision_parser(sub)
     sub.add_parser("doctor")
     imp = sub.add_parser("import")
     imp.add_argument("--input", type=Path, required=True)
@@ -289,6 +291,11 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "doctor":
             write_json(doctor())
             return 0
+        if args.command == "precision-bridge":
+            from .precision_cli import run as run_precision
+            result, code = run_precision(args)
+            write_json(result)
+            return code
         if args.command == "reconcile-report":
             from .statistics import report_statistics
             load = lambda path: json.loads(path.read_text(encoding="utf-8-sig")) if path else None

@@ -1,5 +1,7 @@
 # Fault Evidence Audit
 
+0.1.18新增独立`precision-bridge`：只读导出当前有效的READY Baseline，生成完整输入预算检查的绑定任务，保存ATK规则到模式/原42/V4/E1–E5的溯源并运行原生格式/JSON校验。已知模式验证与盲测分开；WARNING逐项保留，CODE-only有依据时走非API路径，E协议通过只表示设计结构完成。它不修改PrecisionTesting的原tasks/Prompt/知识库，不写现场state，不运行设备或自动入库。命令和验收口径见[Bridge说明](integration/PRECISION_BRIDGE.md)。本版代码先推送，合成验证结果随后如实记录。
+
 0.1.17先维护原30条CANN Baseline：A1整理原定义及独立的`failure_mechanism`，A2归类V4条件/构造，A3独立归类原始42条API条件，A4整理E1–E5与证据/实机缺口，最后完成六维横向审查并显式冻结Baseline v1。原42从实际文件解析核对并记录路径、SHA-256及全部ID/名称/定义；原始知识库不改，不使用V5修订42，不等待缺失映射文件，不自动转换标签。没有历史Wiki不阻塞定义和条件分类，也不因此声称来源或硬件已验证。复用已有子agent和文件桥接，主要入口为HTML，交付四份指定文件。见[现场接续说明](integration/OPENCODE_HANDOFF.md)；本轮只做部分验证，尚未代替OpenCode完成原30条实际语义分类。
 
 故障证据核验核心。核心测试使用合成数据，`examples/` 另保留不含原文的实机聚合验收记录；用户指定发布的模式库草案单独存放在 [`catalog/drafts/`](catalog/drafts/README.md)，与测试数据及正式库分开。

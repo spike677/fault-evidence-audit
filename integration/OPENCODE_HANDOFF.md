@@ -1,3 +1,7 @@
+# 0.1.18 独立Precision Bridge
+
+新增命令及Agent职责见[PRECISION_BRIDGE.md](PRECISION_BRIDGE.md)。沿用现有独立worker与文件请求/响应，原30条Baseline先按下文完成并冻结；Bridge不替代Init、不修改旧判据、不运行NPU/GPU。正常生成与有依据的CODE-only/E协议设计不要求逐条人工ACCEPT；只有真实冲突进入异常处理。实际子agent上下文、目标任务生成及现场能力另行验收。
+
 # 0.1.17：原30条 Baseline Builder
 
 本段优先于历史的单任务Init说明。保留现场state、原始资料、旧请求和人工记录；备份后在原Init上维护，不清空或自动入库。当前只处理原30条，不派发62条增量，也不新增采集、模型或设备客户端。
