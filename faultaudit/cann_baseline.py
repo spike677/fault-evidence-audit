@@ -1,6 +1,8 @@
 """Normalize original CANN modes before sparse classification and freezing."""
 from __future__ import annotations
 
+from .run_budget import scoped as run_scoped
+
 import copy
 import hashlib
 from pathlib import Path
@@ -9,11 +11,13 @@ from pydantic import Field, ValidationError
 from .contracts import Contract, CatalogDraftProducer, SelfCheck
 from .knowledge_common import PROFILE, Claim, KnowledgeResponse, validate_common, checked_claim, enabled
 from .store import AuditError, digest
+from .source_manifest import ManifestFact, build as source_manifest, canonical_fact
 
 FIELDS = ("fault_object", "failure_mechanism", "observable_symptoms", "input_trigger_conditions",
           "execution_trigger_conditions", "applicable_scope", "exclusion_boundaries")
 
 
+@run_scoped
 def configure(store, run_id, *, expected_mode_count=None):
     """Select original API42 clauses without modifying any source definition."""
     from .trigger_workflow import _settings, _taxonomy, configure_v5
@@ -75,7 +79,9 @@ class ModeDefinition(Contract):
 
 
 class DefinitionResponse(KnowledgeResponse):
+    condition_facts: list[ManifestFact]
     definition: ModeDefinition
+    evidence_gaps: list[str] = Field(default_factory=list)
 
 
 INSTRUCTIONS = """Normalize THIS existing CANN mode into DefinitionResponse. Preserve mode_id and
@@ -89,22 +95,40 @@ parameters, boundaries or mechanisms. Preserve conflicting original descriptions
 Do not assign V4/API labels or adopt changes here. MODE_DEFINITION is the basis, not source
 verification or hardware validation. Do not search merely to make this definition complete.
 Read the full source. Return the supplied raw schema at the OUTER request_hash; no ACCEPT.
+The program supplies an immutable source_manifest. For every SOURCE_RECORD fact, select
+source_refs=[{source_id, quote}] from that manifest. Leave source_cells empty; the program
+binds the exact original field and coordinate. Never guess headers, including blank or
+multiline headers. A quote must occur verbatim in the selected original_value.
+INFERRED claims need derivation_reason and cited facts. Put absent information in UNKNOWN
+claims or evidence_gaps/self_check.issues, never in an ungrounded SOURCE_RECORD fact.
+Any historical_rejected_inputs are review material only, including unsubmitted mechanical
+repairs. Reuse their technical content only after checking the current frozen original;
+return a fresh response with this task's identity and your actual producer. Do not treat
+a missing backup filename as a missing original when its response hash still matches.
+If compatibility_regeneration is present, read its field checks and correction reasons;
+use them to repair the identified content without copying its old response identity.
 """
 
 
+@run_scoped
 def definition_basis(store, run_id, subject):
     return digest({"profile": PROFILE, "subject": subject,
         "catalog_mode": store.get(run_id, "catalog", subject["mode_id"]),
         "source": store.get(run_id, "cases", subject["case_id"])})
 
 
+@run_scoped
 def current_definitions(store, run_id):
-    from .xlsx_workflow import _policy
-    subjects = {s["subject_id"]: s for s in store.records(run_id, "trigger_subjects")}
-    return [r for r in store.records(run_id, "mode_definitions") if r["policy_hash"] == _policy()
-        and r["subject_id"] in subjects and r["basis_hash"] == definition_basis(store, run_id, subjects[r["subject_id"]])]
+    from .baseline_recovery import select_current
+    return select_current(store, run_id)
 
 
+def save_definition(store, run_id, record, manifest):
+    from .baseline_recovery import save_definition as save
+    return save(store, run_id, record, manifest)
+
+
+@run_scoped
 def payloads(store, run_id):
     cfg = store.get(run_id, "trigger_config", "config") or {}
     if not enabled(store, run_id) or cfg["phase"] != "INIT":
@@ -114,35 +138,56 @@ def payloads(store, run_id):
     for subject in store.records(run_id, "trigger_subjects"):
         if subject["subject_id"] in done:
             continue
+        from .baseline_recovery import route
+        if route(store, run_id, subject, current_ids=done) != "DEFINE":
+            continue
         source = store.get(run_id, "cases", subject["case_id"])
+        from .baseline_recovery import rejected_contexts, regeneration_context
         yield {"subject": {**subject, "source_case": source}, "original_mode": catalog[subject["mode_id"]],
+            "source_manifest": source_manifest(source), "source_manifest_required": True,
+            "historical_rejected_inputs": rejected_contexts(store, run_id, subject),
+            "compatibility_regeneration": regeneration_context(store, run_id, subject),
             "case_ids": [subject["case_id"]], "basis_hash": definition_basis(store, run_id, subject),
             "input_scope": {"original_source_complete": True, "basis": "MODE_DEFINITION"},
             "response_schema": DefinitionResponse.model_json_schema()}
 
 
+@run_scoped
 def accept(store, run_id, request, response):
+    from .run_budget import require_pinned
+    require_pinned(store, run_id)
     from .xlsx_workflow import _policy, config
+    from .xlsx_workflow import check_current_request
+    check_current_request(store, run_id, request)
+    if request["kind"] != "baseline_define":
+        raise AuditError("A1 definition must use its assigned workflow kind")
     payload = request["payload"]
     subject = store.get(run_id, "trigger_subjects", payload["subject"]["subject_id"])
     if not enabled(store, run_id) or not subject or payload["basis_hash"] != definition_basis(store, run_id, subject):
         raise AuditError("Mode definition input changed; request a fresh task")
+    if (payload["subject"]["source_case"] != store.get(run_id, "cases", subject["case_id"])
+            or payload["original_mode"] != store.get(run_id, "catalog", subject["mode_id"])):
+        raise AuditError("A1 source manifest input differs from the frozen original row/catalog")
     value, facts = validate_common(payload, response, DefinitionResponse, request["request_hash"])
     mode = value.definition
     name = payload["original_mode"]["description"]
     if value.executor != config(store, run_id)["executor"] or mode.mode_id != subject["mode_id"] or mode.mode_name != name:
         raise AuditError("Normalized mode identity/name must preserve the original catalog")
     for field in FIELDS:
-        checked_claim(getattr(mode, field), facts)
+        claim = getattr(mode, field)
+        checked_claim(claim, facts)
+        if claim.status == "INFERRED" and not claim.derivation_reason.strip():
+            raise AuditError("An inferred A1 claim needs a derivation_reason, separate from the original quotation")
     result = mode.model_dump()
-    result.update(condition_facts=[f.model_dump() for f in facts.values()], basis="MODE_DEFINITION",
+    result.update(condition_facts=[canonical_fact(f.model_dump()) for f in facts.values()], basis="MODE_DEFINITION",
+        evidence_gaps=value.evidence_gaps,
         validation_status={"MODE_DEFINITION": "REVIEWED_BY_AGENT", "HISTORICAL_EVIDENCE": "NOT_VERIFIED",
             "SOURCE_VERIFIED": False, "HARDWARE_VALIDATED": False},
         evidence_refs=[r for r in store.records(run_id, "references") if r["case_id"] == value.case_id],
         source_case_id=value.case_id)
     record = {"definition_id": request["task_id"], "subject_id": subject["subject_id"], "case_id": value.case_id,
         "basis_hash": payload["basis_hash"], "policy_hash": _policy(), "raw_response": response, "result": result}
-    store.put(run_id, "mode_definitions", record["definition_id"], record)
+    save_definition(store, run_id, record, payload["source_manifest"])
     return record
 
 
@@ -180,6 +225,7 @@ def mode_records(data):
     return result
 
 
+@run_scoped
 def axis_payloads(store, run_id):
     from .trigger_workflow import classification_payloads, current_assessments
     if not enabled(store, run_id):
@@ -194,7 +240,8 @@ def axis_payloads(store, run_id):
             if axis == "V4" and not base.get("v4_taxonomy"):
                 raise AuditError("A2 needs the original frozen V4 source")
             payload = copy.deepcopy(base)
-            payload.update(baseline_axis=axis, basis_hash=digest({"base": base["basis_hash"], "axis": axis}))
+            from .baseline_recovery import axis_basis
+            payload.update(baseline_axis=axis, basis_hash=axis_basis(store, run_id, base["subject"], axis))
             if axis == "API42":
                 payload.pop("v4_taxonomy", None)
             payload["input_scope"].update(classification_axis=axis, cross_axis_conversion="FORBIDDEN")
@@ -233,12 +280,16 @@ the OUTER hash. This is a review/design note, never an execution result or human
 """
 
 
+@run_scoped
 def _execution_basis(store, run_id, subject):
     from .trigger_workflow import _basis, _v4
-    return digest({"subject": _basis(store, run_id, subject), "axis": "EXECUTION",
-        "methods": (_v4(store, run_id) or {}).get("methods", []), "available_evidence": _available_evidence(store, run_id, subject["case_id"])})
+    from .baseline_recovery import definition_dependency
+    return digest({"subject": definition_dependency(store, run_id, subject), "axis": "EXECUTION",
+        "methods": [m for m in (_v4(store, run_id) or {}).get("methods", []) if m["method_id"] in {"E1", "E2", "E3", "E4", "E5"}],
+        "available_evidence": _available_evidence(store, run_id, subject["case_id"])})
 
 
+@run_scoped
 def _available_evidence(store, run_id, case_id):
     from .trigger_workflow import _linked_snapshots
     snapshots = _linked_snapshots(store, run_id, case_id)
@@ -247,6 +298,7 @@ def _available_evidence(store, run_id, case_id):
         "scope": "REFERENCE_AND_CAPTURE_METADATA_ONLY; BODY_VERIFICATION_NOT_CLAIMED"}
 
 
+@run_scoped
 def current_execution(store, run_id):
     from .xlsx_workflow import _policy
     subjects = {s["subject_id"]: s for s in store.records(run_id, "trigger_subjects")}
@@ -254,8 +306,10 @@ def current_execution(store, run_id):
         and r["subject_id"] in subjects and r["basis_hash"] == _execution_basis(store, run_id, subjects[r["subject_id"]])]
 
 
+@run_scoped
 def execution_payloads(store, run_id):
     from .trigger_workflow import _v4, _settings
+    from .baseline_recovery import technical_projection
     if not enabled(store, run_id) or _settings(store, run_id)["phase"] != "INIT":
         return
     done = {r["subject_id"] for r in current_execution(store, run_id)}
@@ -264,15 +318,18 @@ def execution_payloads(store, run_id):
         if subject["subject_id"] in done or subject["subject_id"] not in definitions:
             continue
         yield {"subject": {**subject, "source_case": store.get(run_id, "cases", subject["case_id"])},
-            "normalized_mode": definitions[subject["subject_id"]]["result"],
+            "normalized_mode": technical_projection(definitions[subject["subject_id"]]["result"]),
             "available_evidence": _available_evidence(store, run_id, subject["case_id"]),
             "methods": [m for m in (_v4(store, run_id) or {}).get("methods", []) if m["method_id"] in {"E1", "E2", "E3", "E4", "E5"}],
             "case_ids": [subject["case_id"]], "basis_hash": _execution_basis(store, run_id, subject),
             "response_schema": ExecutionResponse.model_json_schema()}
 
 
+@run_scoped
 def accept_execution(store, run_id, request, response):
     from .xlsx_workflow import _policy, config
+    from .xlsx_workflow import check_current_request
+    check_current_request(store, run_id, request)
     payload = request["payload"]; subject = store.get(run_id, "trigger_subjects", payload["subject"]["subject_id"])
     if not enabled(store, run_id) or not subject or payload["basis_hash"] != _execution_basis(store, run_id, subject):
         raise AuditError("Execution review source/definition changed")
@@ -358,6 +415,7 @@ def _review_basis(data):
     return digest({"profile": PROFILE, "registry": data.get("api42_registry"), "modes": data["mode_records"]})
 
 
+@run_scoped
 def current_review(store, run_id, data=None):
     from .xlsx_workflow import _policy
     if data is None:
@@ -376,6 +434,7 @@ def current_review(store, run_id, data=None):
     return next((r for r in store.records(run_id, "baseline_reviews") if r["policy_hash"] == _policy() and r["basis_hash"] == basis), None)
 
 
+@run_scoped
 def review_payloads(store, run_id):
     from .trigger_workflow import _projection, _settings
     if not enabled(store, run_id) or _settings(store, run_id)["phase"] != "INIT":
@@ -389,8 +448,11 @@ def review_payloads(store, run_id):
             "full_source_document_audit": False}, "response_schema": CrossReviewResponse.model_json_schema()}
 
 
+@run_scoped
 def accept_review(store, run_id, request, response):
     from .xlsx_workflow import _policy, config
+    from .xlsx_workflow import check_current_request
+    check_current_request(store, run_id, request)
     from .trigger_workflow import _projection
     data = _projection(store, run_id, include_baseline_review=False)
     if not enabled(store, run_id) or stage_gaps(data) or request["payload"]["basis_hash"] != _review_basis(data):

@@ -104,8 +104,8 @@ class DeclaredWorkflowTests(unittest.TestCase):
         self.assertTrue(chat["cell"].endswith("/0/聊天记录"))
 
     def test_budget_refusal_never_drops_definition_or_emits_browser_work(self):
-        self.start()
         with patch.dict(os.environ, {BUDGET_ENV: "1000"}):
+            self.start()
             dispatch = xlsx_workflow.next_tasks(self.store, self.source.run)
             self.assertEqual(dispatch["tasks"], [])
             state = self.store.get(self.source.run, "workflow_state", "current")

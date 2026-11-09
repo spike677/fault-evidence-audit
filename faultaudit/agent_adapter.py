@@ -30,6 +30,16 @@ def run_agent(command: list[str], request_path: Path, response_path: Path, *, ti
                    # accidentally attach another task's diagnostic to this one.
                    "FAULTAUDIT_ATTEMPT_FEEDBACK": feedback[:2000]}
     try:
+        request = json.loads(request_path.read_text(encoding="utf-8-sig"))
+    except (OSError, UnicodeError, ValueError) as exc:
+        raise AuditError("Agent request could not be read: " + str(exc)) from exc
+    budget = request.get("input_budget", {}).get("budget")
+    if budget is not None:
+        from .input_budget import BUDGET_ENV
+        if type(budget) is not int or budget <= 0:
+            raise AuditError("Agent request has an invalid input budget")
+        environment[BUDGET_ENV] = str(budget)
+    try:
         process = subprocess.run(argv, cwd=request_path.parent, shell=False, capture_output=True,
                                  text=True, encoding="utf-8", errors="replace", timeout=timeout, env=environment)
     except subprocess.TimeoutExpired as exc:

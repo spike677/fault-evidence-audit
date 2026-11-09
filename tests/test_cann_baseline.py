@@ -71,6 +71,9 @@ class BaselineBuilderTests(unittest.TestCase):
         cell = {'field': '故障原因', 'cell': case['cell_locations']['故障原因'], 'quote': case['raw']['故障原因']}
         fact = {'fact_id': 'F', 'statement': cell['quote'], 'subject': 'SOURCE_RECORD', 'role': 'SYNC_RACE',
             'evidence_basis': 'SOURCE_DEFINITION', 'source_cells': [cell]}
+        if request['kind'] == 'baseline_define':
+            from faultaudit.source_manifest import references_for_cells
+            fact['source_refs'] = references_for_cells(p['source_manifest'], [cell])
         common = {'request_hash': request['request_hash'], 'case_id': case['case_id'], 'executor': 'codex',
             'producer': template['producer'], 'condition_facts': [fact], 'self_check': template['self_check']}
         claim = {'text': cell['quote'], 'status': 'STATED', 'condition_fact_ids': ['F']}

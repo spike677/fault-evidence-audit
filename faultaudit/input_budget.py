@@ -6,6 +6,8 @@ tokens or bytes. It includes instructions, data, scope, hashes and budget metada
 from __future__ import annotations
 
 import os
+from contextlib import contextmanager
+from contextvars import ContextVar
 from typing import Any
 
 from . import model
@@ -15,10 +17,26 @@ from .store import canonical_json, digest
 BUDGET_ENV = "FAULTAUDIT_MAX_INPUT_CHARS"
 BUDGET_VERSION = "whole-model-task-1"
 BUDGET_SCOPE = "WHOLE_MODEL_TASK"
+_RUN_BUDGET: ContextVar[int | None] = ContextVar("faultaudit_run_budget", default=None)
+
+
+@contextmanager
+def using_budget(budget: int | None):
+    """A run-local override, isolated across nested runs and threads."""
+    if budget is not None and (type(budget) is not int or budget <= 0):
+        raise ModelError("Run input budget must be a positive integer", "INVALID_INPUT_BUDGET")
+    token = _RUN_BUDGET.set(budget)
+    try:
+        yield
+    finally:
+        _RUN_BUDGET.reset(token)
 
 
 def get_budget_chars() -> int:
     """Read a positive character limit, defaulting to the shared model constant."""
+    pinned = _RUN_BUDGET.get()
+    if pinned is not None:
+        return pinned
     configured = os.environ.get(BUDGET_ENV)
     try:
         budget = int(configured.strip()) if configured is not None else model.MAX_INPUT_CHARS

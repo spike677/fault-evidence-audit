@@ -187,6 +187,7 @@ def parser() -> argparse.ArgumentParser:
     start.add_argument("--catalog-scope", default="UNSPECIFIED")
     start.add_argument("--expected-catalog-count", type=int)
     start.add_argument("--case-ids-file", type=Path, help="Optional JSON array of target case IDs; frozen for this workflow")
+    start.add_argument("--input-budget", type=int, help="Freeze the new run's complete-request character budget")
     trigger = sub.add_parser("trigger-workflow", help="Initialize trigger coverage, then classify incremental faults")
     trigger_flow = trigger.add_subparsers(dest="trigger_command", required=True)
     init = trigger_flow.add_parser("init")
@@ -228,6 +229,13 @@ def parser() -> argparse.ArgumentParser:
     for entry in (init, classify):
         entry.add_argument("--work-root", type=Path, default=Path("work/runs"))
         entry.add_argument("--executor", choices=["opencode", "codex"], default="opencode")
+        entry.add_argument("--input-budget", type=int, help="Freeze the new run's complete-request character budget")
+    for commands in (flow, trigger_flow):
+        pin_budget = commands.add_parser("pin-budget", help="Freeze the original run budget; preserve requests and history")
+        pin_budget.add_argument("--run", default="latest")
+        pin_budget.add_argument("--chars", type=int, required=True)
+    recovery = trigger_flow.add_parser("recovery-plan", help="Read-only mode/stage recovery preview; no tasks or model execution")
+    recovery.add_argument("--run", default="latest")
     for commands, operations in ((flow, ("next", "submit", "drive", "export", "retry", "set-sources")),
                                  (trigger_flow, ("next", "submit", "drive", "export", "retry", "status", "finalize", "set-sources"))):
         for operation in operations:
@@ -317,7 +325,9 @@ def main(argv: list[str] | None = None) -> int:
                 write_json(cls.model_json_schema(), args.out / f"{cls.__name__}.schema.json")
             write_json({"schemas": str(args.out.resolve())})
             return 0
-        store = Store(args.state, read_only=args.command in {"evidence-plan", "investigation-plan", "catalog-draft"})
+        read_only = args.command in {"evidence-plan", "investigation-plan", "catalog-draft"} or (
+            args.command == "trigger-workflow" and args.trigger_command in {"recovery-plan", "status"})
+        store = Store(args.state, read_only=read_only)
         if args.command in {"xlsx-workflow", "trigger-workflow"}:
             from . import xlsx_workflow as workflow
             operation = args.flow_command if args.command == "xlsx-workflow" else args.trigger_command
@@ -329,18 +339,27 @@ def main(argv: list[str] | None = None) -> int:
                     catalog_scope=args.catalog_scope, basis=args.basis, v4_source=args.v4,
                     capabilities=json.loads(args.capabilities_file.read_text(encoding="utf-8-sig")) if args.capabilities_file else None,
                     sparse=not args.legacy_dense, with_designs=args.with_designs,
-                    baseline_builder=not args.legacy_dense and not args.simple_v5, expected_mode_count=args.expected_mode_count)
+                    baseline_builder=not args.legacy_dense and not args.simple_v5, expected_mode_count=args.expected_mode_count,
+                    input_budget_chars=args.input_budget)
             elif operation == "classify":
                 result = trigger_workflow.start_incremental(store, args.input, args.baseline_run, args.work_root,
-                    executor=args.executor, baseline_id=args.baseline_id, allow_pending_baseline=args.allow_pending_baseline)
+                    executor=args.executor, baseline_id=args.baseline_id, allow_pending_baseline=args.allow_pending_baseline,
+                    input_budget_chars=args.input_budget)
             elif operation == "start":
                 result = workflow.start(store, args.input, args.catalog, args.work_root, executor=args.executor,
                     source_kind=args.source_kind, catalog_sheets=args.catalog_sheet,
                     expected_catalog_count=args.expected_catalog_count, catalog_scope=args.catalog_scope, run_id=args.run,
-                    case_ids=json.loads(args.case_ids_file.read_text(encoding="utf-8-sig")) if args.case_ids_file else None)
+                    case_ids=json.loads(args.case_ids_file.read_text(encoding="utf-8-sig")) if args.case_ids_file else None,
+                    input_budget_chars=args.input_budget)
             else:
                 selected_run = store.run_info(args.run)["run_id"]
-                if operation == "next":
+                if operation == "pin-budget":
+                    from .run_budget import pin
+                    result = pin(store, selected_run, args.chars)
+                elif operation == "recovery-plan":
+                    from .baseline_recovery import recovery_plan
+                    result = recovery_plan(store, selected_run)
+                elif operation == "next":
                     result = workflow.next_tasks(store, selected_run)
                 elif operation == "submit":
                     result = workflow.submit(store, selected_run, args.task_id,
@@ -375,7 +394,7 @@ def main(argv: list[str] | None = None) -> int:
                     result = (trigger_workflow.export(store, selected_run, xlsx=args.xlsx)
                         if args.command == "trigger-workflow" else workflow.export(store, selected_run))
             write_json(result)
-            return 2 if result.get("status") == "COMPLETE_WITH_PENDING" else 0
+            return 2 if result.get("status") in {"COMPLETE_WITH_PENDING", "BLOCKED"} else 0
         if args.command == "demo":
             write_json(demo(store, args.out.resolve()))
             return 0

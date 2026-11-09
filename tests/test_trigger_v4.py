@@ -251,7 +251,8 @@ class V4WorkflowTests(unittest.TestCase):
     response=workflow_helpers.TriggerWorkflowTests.response
     def test_v4_workflow_dispatches_design_and_keeps_versioned_history(self):
         from faultaudit import xlsx_workflow as xw
-        self.start()
+        with patch.dict('os.environ', {'FAULTAUDIT_MAX_INPUT_CHARS': '160000'}):
+            self.start()
         path=self.root/'synthetic-v4.md';path.write_text(markdown(),encoding='utf-8')
         self.store.put(self.run,'trigger_config','config',{**workflow._settings(self.store,self.run),'basis':'SOURCE_DEFINITIONS'},mutable=True)
         cfg=self.store.get(self.run,'xlsx_workflow','config')
@@ -322,7 +323,9 @@ class V4WorkflowTests(unittest.TestCase):
 
     def test_v4_requests_block_on_actual_serialized_budget_and_keep_full_definitions(self):
         from faultaudit import xlsx_workflow as xw
-        self.start();path=self.root/'v4.md';path.write_text(markdown(),encoding='utf-8')
+        with patch.dict('os.environ', {'FAULTAUDIT_MAX_INPUT_CHARS': '1000'}):
+            self.start()
+        path=self.root/'v4.md';path.write_text(markdown(),encoding='utf-8')
         cfg=self.store.get(self.run,'xlsx_workflow','config')
         self.store.put(self.run,'xlsx_workflow','config',{**cfg,'init_basis':'SOURCE_DEFINITIONS'},mutable=True)
         settings=workflow._settings(self.store,self.run)
@@ -335,6 +338,7 @@ class V4WorkflowTests(unittest.TestCase):
             blocks=[self.store.get(self.run,'workflow_blocks',key) for key in state['block_ids']]
             self.assertTrue(blocks)
             self.assertTrue(all(b['reason']=='INPUT_TOO_LARGE' for b in blocks))
+            self.assertTrue(all(b['input_budget']['budget']==1000 for b in blocks))
         payload=next(workflow.classification_payloads(self.store,self.run))
         self.assertEqual((len(payload['taxonomy']['items']),len(payload['v4_taxonomy']['items']),len(payload['v4_taxonomy']['constructions'])),(42,31,55))
         self.assertEqual(len(self.store.records(self.run,'trigger_assessments')),0)

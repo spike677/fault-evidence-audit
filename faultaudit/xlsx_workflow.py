@@ -5,6 +5,8 @@ with the configured Agent, through files or an argv-based process adapter.
 """
 from __future__ import annotations
 
+from .run_budget import scoped as run_scoped
+
 import json
 import tempfile
 from pathlib import Path
@@ -37,7 +39,7 @@ def config(store: Store, run_id: str) -> dict:
 
 def start(store: Store, source: Path, catalog: Path, work_root: Path, *, executor="opencode",
           source_kind="LEGACY_TABLE", catalog_sheets=None, expected_catalog_count=None,
-          catalog_scope="UNSPECIFIED", run_id=None, case_ids=None) -> dict:
+          catalog_scope="UNSPECIFIED", run_id=None, case_ids=None, input_budget_chars=None) -> dict:
     if source.suffix.lower() not in {".xlsx", ".xlsm"}:
         raise AuditError("This workflow supports structured XLSX only; Word/PPT/arbitrary layouts are TODO")
     if executor not in {"opencode", "codex"}:
@@ -77,16 +79,52 @@ def start(store: Store, source: Path, catalog: Path, work_root: Path, *, executo
             store.event(run_id, "workflow_config_upgraded", {"previous": old, "current": value})
     if not old:
         register_search_policy(store, run_id, {"required_sources": ["WIKI"]})
+        from .run_budget import pin
+        from .input_budget import get_budget_chars
+        pin(store, run_id, get_budget_chars() if input_budget_chars is None else input_budget_chars, reason="WORKFLOW_START")
+    elif input_budget_chars is not None:
+        from .run_budget import pin
+        pin(store, run_id, input_budget_chars)
     return {**value, "case_count": len(selected), "catalog_count": len(items["items"])}
 
 
 def _policy() -> str:
     from . import wiki_checks, capture_quality, search_guidance, resource_identity, workflow_scope
     from . import trigger_taxonomy, trigger_assessment, trigger_workflow, trigger_v4, trigger_v4_assessment, trigger_design, trigger_sparse, cann_baseline, knowledge_common
+    from . import run_budget, source_manifest, baseline_recovery
     return digest({"core": policy_fingerprint(), "workflow": digest(Path(__file__).read_bytes()),
                    "helpers": digest(b"".join(Path(module.__file__).read_bytes() for module in
                        (wiki_checks, capture_quality, search_guidance, resource_identity, workflow_scope,
-                        trigger_taxonomy, trigger_assessment, trigger_workflow, trigger_v4, trigger_v4_assessment, trigger_design, trigger_sparse, cann_baseline, knowledge_common)))})
+                         trigger_taxonomy, trigger_assessment, trigger_workflow, trigger_v4, trigger_v4_assessment, trigger_design, trigger_sparse, cann_baseline, knowledge_common,
+                         run_budget, source_manifest, baseline_recovery)))})
+
+
+def check_archived_request(request):
+    """Verify the saved envelope without pretending its policy is current."""
+    from .input_budget import check_input_budget
+    if digest({k: v for k, v in request.items() if k != "request_hash"}) != request.get("request_hash"):
+        raise AuditError("Workflow request integrity mismatch")
+    budget = request.get("input_budget", {}).get("budget")
+    if type(budget) is not int or budget <= 0:
+        raise AuditError("Workflow request budget is missing or invalid")
+    measured = check_input_budget(request, budget=budget)
+    if any(request["input_budget"].get(k) != measured[k] for k in ("chars", "budget", "scope", "serialization")):
+        raise AuditError("Workflow request input budget metadata mismatch")
+
+
+@run_scoped
+def check_current_request(store, run_id, request):
+    from .run_budget import require_pinned, KIND, KEY
+    require_pinned(store, run_id)
+    if request.get("run_id") != run_id or request.get("policy_hash") != _policy():
+        raise AuditError("Workflow request is missing or its policy changed")
+    if store.get(run_id, "workflow_requests", request.get("task_id", "")) != request:
+        raise AuditError("Workflow request differs from the assigned immutable request")
+    check_archived_request(request)
+    if request["input_budget"]["budget"] != store.get(run_id, KIND, KEY)["budget"]:
+        raise AuditError("Workflow request budget differs from the frozen run budget")
+    if request.get("collection_policy_hash") != collection_source_policy(store, run_id)["policy_hash"]:
+        raise AuditError("Collection source availability changed; request a fresh task and preserve the old response")
 
 
 def _json(path: Path, value: dict) -> None:
@@ -95,7 +133,10 @@ def _json(path: Path, value: dict) -> None:
         path.write_text(json.dumps(value, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
+@run_scoped
 def _request(store, run_id, cfg, kind, payload, instructions, priority) -> dict | None:
+    from .run_budget import require_pinned
+    require_pinned(store, run_id)
     try:
         request = finalize_model_task({"kind": kind, "run_id": run_id, "policy_hash": _policy(),
             "collection_policy_hash": collection_source_policy(store, run_id)["policy_hash"],
@@ -128,7 +169,10 @@ def _request(store, run_id, cfg, kind, payload, instructions, priority) -> dict 
     return {"task_id": task_id, "kind": kind, "priority": priority, "request": str(path)}
 
 
+@run_scoped
 def next_tasks(store: Store, run_id: str) -> dict:
+    from .run_budget import require_pinned
+    require_pinned(store, run_id)
     store = scoped_store(store, run_id)
     cfg = config(store, run_id)
     trigger_mode = cfg.get("purpose", "").startswith("TRIGGER_")
@@ -138,7 +182,9 @@ def next_tasks(store: Store, run_id: str) -> dict:
         tasks, blocks = [], []
         from .cann_baseline import payloads as definition_payloads, axis_payloads, execution_payloads, review_payloads
         from .cann_baseline import INSTRUCTIONS, EXECUTION_INSTRUCTIONS, REVIEW_INSTRUCTIONS, axis_instructions
+        from .baseline_recovery import compatibility_payloads, INSTRUCTIONS as COMPATIBILITY_INSTRUCTIONS
         stages = [("baseline_define", p, INSTRUCTIONS, 3) for p in definition_payloads(store, run_id)]
+        stages += [("baseline_compatibility", p, COMPATIBILITY_INSTRUCTIONS, 3) for p in compatibility_payloads(store, run_id)]
         stages += [(kind, p, axis_instructions(p["baseline_axis"]), 4) for kind, p in axis_payloads(store, run_id)]
         stages += [("baseline_execution", p, EXECUTION_INSTRUCTIONS, 4) for p in execution_payloads(store, run_id)]
         stages += [("baseline_review", p, REVIEW_INSTRUCTIONS, 5) for p in review_payloads(store, run_id)]
@@ -148,6 +194,16 @@ def next_tasks(store: Store, run_id: str) -> dict:
                 blocks.append(value["block_id"])
             elif value:
                 tasks.append(value)
+        from .baseline_recovery import recovery_plan
+        from .knowledge_common import enabled as baseline_enabled
+        modes = recovery_plan(store, run_id)["matrix"] if baseline_enabled(store, run_id) else []
+        for mode in modes:
+            if mode["definition_path"] == "CONFLICT":
+                block = {"kind": "baseline_compatibility", "case_ids": [mode["case_id"]],
+                         "reason": "HISTORICAL_DEFINITION_CONFLICT", "policy_hash": _policy(),
+                         "details": {"subject_id": mode["subject_id"], "mode_id": mode["mode_id"]}}
+                store.put(run_id, "workflow_blocks", digest(block), block)
+                blocks.append(digest(block))
         for payload in classification_payloads(store, run_id):
             value = _request(store, run_id, cfg, "trigger_classify", payload, classification_instructions(payload), 4)
             if value and value.get("blocked"):
@@ -348,8 +404,9 @@ def _finish_tasks(store, run_id, cfg, tasks, blocks, checks):
     for task in tasks:
         task["response"] = str(response_path(store, run_id, task["task_id"]))
     store.put(run_id, "workflow_state", "current", {"block_ids": blocks,
+              "plan_policy_hash": _policy(),
               "task_ids": [task["task_id"] for task in tasks]}, mutable=True)
-    return {"run_id": run_id, "status": "WAITING_AGENT" if tasks else "READY_TO_EXPORT",
+    return {"run_id": run_id, "status": "WAITING_AGENT" if tasks else "BLOCKED" if blocks else "READY_TO_EXPORT",
             "tasks": tasks, "wiki_checks": checks, "directory": cfg["directory"]}
 
 
@@ -361,14 +418,16 @@ def response_path(store, run_id, task_id) -> Path:
     return folder / "response.json"
 
 
+@run_scoped
 def submit(store: Store, run_id: str, task_id: str, response: dict, *, path: Path | None = None) -> dict:
+    from .run_budget import require_pinned
+    require_pinned(store, run_id)
     store = scoped_store(store, run_id)
     cfg = config(store, run_id)
     request = store.get(run_id, "workflow_requests", task_id)
-    if not request or request["policy_hash"] != _policy():
+    if not request:
         raise AuditError("Workflow request is missing or its policy changed")
-    if request.get("collection_policy_hash") != collection_source_policy(store, run_id)["policy_hash"]:
-        raise AuditError("Collection source availability changed; request a fresh task and preserve the old response")
+    check_current_request(store, run_id, request)
     previous = store.get(run_id, "workflow_results", task_id)
     if previous and not previous.get("retry"):
         if previous["response_hash"] == digest(response):
@@ -405,6 +464,9 @@ def submit(store: Store, run_id: str, task_id: str, response: dict, *, path: Pat
         elif kind == "baseline_define":
             from .cann_baseline import accept
             accept(store, run_id, request, response)
+        elif kind == "baseline_compatibility":
+            from .baseline_recovery import accept_compatibility
+            accept_compatibility(store, run_id, request, response)
         elif kind == "baseline_execution":
             from .cann_baseline import accept_execution
             accept_execution(store, run_id, request, response)
@@ -503,6 +565,7 @@ def submit(store: Store, run_id: str, task_id: str, response: dict, *, path: Pat
     return {"task_id": task_id, "accepted": True}
 
 
+@run_scoped
 def export(store: Store, run_id: str) -> dict:
     store = scoped_store(store, run_id)
     from .exporters import export_workbook_xlsx
@@ -552,6 +615,7 @@ def export(store: Store, run_id: str) -> dict:
     return result
 
 
+@run_scoped
 def drive(store: Store, run_id: str, command: list[str], *, max_rounds=32, workers=2,
           max_attempts=2, timeout=300, browser_timeout=None) -> dict:
     from .workflow_driver import drive as run
@@ -559,6 +623,7 @@ def drive(store: Store, run_id: str, command: list[str], *, max_rounds=32, worke
                max_attempts=max_attempts, timeout=timeout, browser_timeout=browser_timeout)
 
 
+@run_scoped
 def retry(store: Store, run_id: str, task_id: str) -> dict:
     from .workflow_driver import reset_execution
     task = store.get(run_id, "workflow_requests", task_id)
@@ -582,6 +647,7 @@ def retry(store: Store, run_id: str, task_id: str) -> dict:
     return {"task_id": task_id, "retry": True}
 
 
+@run_scoped
 def configure_collection(store: Store, run_id: str, sources: list[str], *, wiki_policy="NOT_SUPPORTED", reason: str) -> dict:
     """Record an explicit user-selected availability scope without faking reads."""
     from .evidence_plan import SEARCH_SOURCES

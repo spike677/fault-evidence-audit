@@ -88,6 +88,15 @@ class AgentAdapterTests(unittest.TestCase):
             run_agent(command, self.request, self.response)
         self.assertEqual(self.response.read_text(encoding="utf-8"), '{"old": true}')
 
+    def test_request_budget_is_handed_to_worker_without_changing_parent_environment(self):
+        self.request.write_text(json.dumps({'input_budget': {'budget': 160000}}), encoding='utf-8')
+        command = self.command(
+            "import os\n"
+            "pathlib.Path(sys.argv[2]).write_text(json.dumps({'budget':os.environ['FAULTAUDIT_MAX_INPUT_CHARS']}),encoding='utf-8')\n")
+        with patch.dict(os.environ, {'FAULTAUDIT_MAX_INPUT_CHARS': '48000'}):
+            self.assertEqual(run_agent(command, self.request, self.response)['budget'], '160000')
+            self.assertEqual(os.environ['FAULTAUDIT_MAX_INPUT_CHARS'], '48000')
+
     def test_nonzero_exit_reports_stderr_and_keeps_attempt_output(self):
         command = self.command(
             "pathlib.Path(sys.argv[2]).write_text('{\"partial\": true}', encoding='utf-8')\n"

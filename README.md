@@ -1,12 +1,14 @@
 # Fault Evidence Audit
 
+0.1.19修复原run的Baseline恢复：`pin-budget`固定历史160000预算，规划/提交/查询使用同一run配置；A1由程序来源清单绑定真实字段/坐标；`baseline_compatibility`要求Agent逐字段复核历史，结构通过不自动转当前结果。旧响应、旧Policy和人工历史保留，分类依赖每模式选用的一份技术定义，证据清单变化只重做必要阶段。`recovery-plan`提供只读进度和卡点，原30模式的A2/A3/A4应覆盖90个阶段单元。升级和续跑见[BASELINE_RECOVERY.md](integration/BASELINE_RECOVERY.md)，测试记录见[恢复验证回执](examples/baseline_recovery_validation.json)。本版不改42/V4、不扩展Bridge，不自动入库或启动现场drive。
+
 0.1.18新增独立`precision-bridge`：只读导出当前有效的READY Baseline，生成完整输入预算检查的绑定任务，保存ATK规则到模式/原42/V4/E1–E5的溯源并运行原生格式/JSON校验。已知模式验证与盲测分开；WARNING逐项保留，CODE-only有依据时走非API路径，E协议通过只表示设计结构完成。它不修改PrecisionTesting的原tasks/Prompt/知识库，不写现场state，不运行设备或自动入库。命令和验收口径见[Bridge说明](integration/PRECISION_BRIDGE.md)。已完成30项Bridge合成测试、159项保留定向回归，以及真实上游三个校验器的合成smoke；具体提交、范围和限制见[验证回执](examples/precision_bridge_validation.json)。
 
 0.1.17先维护原30条CANN Baseline：A1整理原定义及独立的`failure_mechanism`，A2归类V4条件/构造，A3独立归类原始42条API条件，A4整理E1–E5与证据/实机缺口，最后完成六维横向审查并显式冻结Baseline v1。原42从实际文件解析核对并记录路径、SHA-256及全部ID/名称/定义；原始知识库不改，不使用V5修订42，不等待缺失映射文件，不自动转换标签。没有历史Wiki不阻塞定义和条件分类，也不因此声称来源或硬件已验证。复用已有子agent和文件桥接，主要入口为HTML，交付四份指定文件。见[现场接续说明](integration/OPENCODE_HANDOFF.md)；本轮只做部分验证，尚未代替OpenCode完成原30条实际语义分类。
 
 故障证据核验核心。核心测试使用合成数据，`examples/` 另保留不含原文的实机聚合验收记录；用户指定发布的模式库草案单独存放在 [`catalog/drafts/`](catalog/drafts/README.md)，与测试数据及正式库分开。
 
-版本 0.1.16，2026 年 11 月 9 日。核心负责导入故障表、保存原文与引用来源、规划必要证据、生成采集和模型任务、检查返回结果并生成复核报告。模型任务可由 OpenCode 或 Codex 会话执行，内网采集仍由具备授权与登录态的现场环境完成。支持文件交接及外部 Agent 命令适配，不包含直连模型或网站的网络客户端。
+当前版本 0.1.19，2026 年 11 月 9 日。核心负责导入故障表、保存原文与引用来源、规划必要证据、生成采集和模型任务、检查返回结果并生成复核报告。模型任务可由 OpenCode 或 Codex 会话执行，内网采集仍由具备授权与登录态的现场环境完成。支持文件交接及外部 Agent 命令适配，不包含直连模型或网站的网络客户端。
 
 V5首批接入：CLI的`trigger-workflow init`默认使用`SPARSE_SCENARIOS_V5`合同，完整提供冻结规则，但模型仅返回有依据的类别和所选构造，不再生成42/31条UNKNOWN矩阵。每个正向标签必须通过`label_links`关联规则版本、机理明细、事实和本地情景。未选项是NOT_ASSESSED，部分适用不变成强MATCH；正式入库与人工ACCEPT门禁不变。既有Python API默认保留旧合同兼容，使用`sparse=True`启用V5；CLI仅在明确`--legacy-dense`时使用旧合同。
 
@@ -18,9 +20,9 @@ V5首批接入：CLI的`trigger-workflow init`默认使用`SPARSE_SCENARIOS_V5`�
 
 0.1.15历史接入范围为“V4分类规则修订＋用例设计规程”。V4的31类、55种唯一构造、64次挂载、195个指导案例分别冻结；原42定义、修订42边界及解释映射独立保留，映射不传递适用性或覆盖结论。旧密集合同继续兼容；V5不改这些分类定义。E1—E5及跨流生产—消费仍仅生成设计，执行结果为NOT_RUN，未实现设备、线程或多rank执行器。
 
-初始化时显式提供本机V4文件（仓库不附带用户原文或Init内容）：
+初始化时显式提供已核对的原42与V4文件；仓库knowledge/下已保存两份授权原文，Init内容仍不提交：
 
-完整V4、修订42、响应schema及机制目录通常超过默认48,000字符预算。应在Init前根据实际请求和执行器容量显式设置`FAULTAUDIT_MAX_INPUT_CHARS`，分类、设计、提交和导出全程保持同值；修改预算会使旧请求失效。本轮Codex隔离试验使用240,000字符，不代表现场模型已具备相同容量。保留默认值时，超限任务会如实阻塞。
+完整V4、修订42、响应schema及机制目录通常超过默认48,000字符预算。新Init用`--input-budget`固定预算，或在启动前设置`FAULTAUDIT_MAX_INPUT_CHARS`作为初始值；已有run用`pin-budget`固定其历史请求一致使用的预算。分类、设计、提交和导出读取run固定值，不再依赖每个终端环境；旧请求身份校验仍保留。本轮Codex隔离试验使用240,000字符，不代表现场模型已具备相同容量。保留默认值时，超限任务会如实阻塞。
 
 ```powershell
 python run_faultaudit.py --state .faultaudit trigger-workflow init `

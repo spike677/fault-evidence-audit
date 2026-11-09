@@ -8,13 +8,14 @@ from .trigger_assessment import ConditionFact
 from .store import AuditError
 
 PROFILE = "CANN_BASELINE_BUILDER_V1"
-SEMANTIC_KINDS = {"baseline_define", "baseline_v4", "baseline_api42", "baseline_execution", "baseline_review"}
+SEMANTIC_KINDS = {"baseline_define", "baseline_compatibility", "baseline_v4", "baseline_api42", "baseline_execution", "baseline_review"}
 
 
 class Claim(Contract):
     text: str = Field(min_length=1)
     status: Literal["STATED", "INFERRED", "UNKNOWN"]
     condition_fact_ids: list[str] = Field(default_factory=list)
+    derivation_reason: str = ""
 
 
 class KnowledgeResponse(Contract):
@@ -27,6 +28,8 @@ class KnowledgeResponse(Contract):
 
 
 def validate_common(payload, response, model, request_hash):
+    from .source_manifest import prepare
+    response = prepare(payload, response)
     try:
         value = model.model_validate(response)
     except ValidationError as exc:

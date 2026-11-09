@@ -101,7 +101,7 @@ def render(data):
             'A4执行证据整理模式数':len({e['case_id'] for e in data.get('baseline_execution',[])}),
             '基线冻结':data.get('baseline_freeze',{'status':'NOT_FROZEN'}),
             '42原始基准':{**{k:registry.get(k) for k in ('source_file','actual_ids','duplicate_ids','missing_ids','unexpected_ids')},'SHA-256':registry.get('source_sha256')},
-            '映射文件':'暂缺，不阻塞分类；禁止自动转换标签'}) + '<h3>横向审查</h3>' + _pre(data.get('baseline_review') or '尚未完成横向审查，不可冻结Baseline v1') + '</section>'
+            '映射文件':'暂缺，不阻塞分类；禁止自动转换标签'}) + '<h3>运行预算、历史兼容与剩余阶段</h3>' + _pre(data.get('recovery', {})) + '<h3>横向审查</h3>' + _pre(data.get('baseline_review') or '尚未完成横向审查，不可冻结Baseline v1') + '</section>'
     header = f'''<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>CANN V5 故障模式与条件审查</title><style>
 body{{font:15px/1.6 system-ui,sans-serif;color:#172b4d;background:#f5f7fa;margin:0}}main{{max-width:1280px;margin:auto;padding:24px}}

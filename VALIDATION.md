@@ -1,6 +1,14 @@
 # 验收记录
 
-当前开发日期：2026 年 11 月 9 日，Asia/Shanghai。版本：0.1.18。
+当前开发日期：2026 年 11 月 9 日，Asia/Shanghai。版本：0.1.19。
+
+0.1.19原run恢复修复已用合成数据验收：完整`python -m unittest discover -s tests -v`共786项通过，219.223秒。新增24项恢复测试及1项worker预算交接测试；这些已经包含在786项中，不额外累加。实际解释器Python 3.12.14，Pydantic 2.14.1，openpyxl 3.1.5。实际解释器路径、依赖、日志与代码SHA见[恢复验证回执](examples/baseline_recovery_validation.json)。
+
+另以真实CLI执行21条本地命令，验证160000固定预算在终端默认48000下仍有效，2个显式历史复核＋1个新定义完成3个合成模式，随后9个A2/A3/A4阶段单元、A5及四文件报告导出。所有模型响应均为合成夹具，不是实际模型语义验收；导出退出2为保留3项缺口，Baseline未冻结、人工裁决为0，旧定义、原文和只读预览前后数据库均按对应断言保留。完整30模式合成场景另验证18个兼容＋12个整理后派发90个唯一当前阶段任务，重复规划不增派。
+
+复用旧原文不等于继承旧Policy或人工ACCEPT。Source manifest由冻结row生成，字段、坐标、引文与原Store核对；仅结构通过不生成当前定义。Agent明确REUSE后追加新复核与选用指针；REGENERATE携带纠错依据，CONFLICT和上下文不足明确阻塞。新增预算使用ContextVar隔离，不修改全局环境；旧终端预算变更测试调整为Init前设预算，原超限断言保留。回归中发现的非Builder范围兼容问题已修复，最终全量结果以上述786项为准。
+
+原42/V4内容及Precision Bridge专用模块未改，现场state和模型响应未获取/修改/上传，没有启动现场drive、采集或硬件执行。现场Python 3.14.3回归、真实语义复核、新worker接入及后续A2/A3/A4/A5仍待验证；升级顺序见[BASELINE_RECOVERY.md](integration/BASELINE_RECOVERY.md)。以下0.1.18及更早记录保留为历史，不代替本轮现场验收。
 
 0.1.18独立Precision Bridge按“先推代码，再合成验证”的顺序交付。只新增只读导出、规则绑定与门禁模块；不修改原分类策略及PrecisionTesting原始任务/Prompt/知识库，不自动执行设备。结果在[Bridge聚合回执](examples/precision_bridge_validation.json)记录；以下0.1.17的159项结果仍属历史，不能当作新Bridge已经验证。
 

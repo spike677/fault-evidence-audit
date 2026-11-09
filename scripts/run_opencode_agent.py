@@ -99,7 +99,7 @@ def build_command(capabilities: dict, request: Path, response: Path, *, kind: st
         "For semantic tasks cite the supplied original snippets and source cells. "
         "Write one JSON response to the assigned destination; do not write SQLite, change hashes or create human ACCEPT. "
         "Only kind=model binds the INNER task identity; catalog_draft binds the INNER request_hash; "
-        "precision_bind, trigger_classify, trigger_design, baseline_define, baseline_v4, baseline_api42, baseline_execution, baseline_review and collection bind the OUTER request_hash. Semantic precision/trigger/baseline tasks return their payload.response_schema "
+        "precision_bind, trigger_classify, trigger_design, baseline_define, baseline_compatibility, baseline_v4, baseline_api42, baseline_execution, baseline_review and collection bind the OUTER request_hash. Semantic precision/trigger/baseline tasks return their payload.response_schema "
         "body directly, with producer.executor_version, not the inner model result envelope. "
         "Report actual producer identity; do not infer provider/model from this project or label another model DeepSeek. "
         "If the full task cannot be processed, report a transport BLOCKED with OUTER request_hash, reason_code and reason "

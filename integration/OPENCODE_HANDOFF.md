@@ -1,3 +1,7 @@
+# 0.1.19 Baseline恢复
+
+本轮优先执行[BASELINE_RECOVERY.md](BASELINE_RECOVERY.md)：在原run固定160000预算，用来源清单和显式语义任务复核历史，不回填旧Policy或人工ACCEPT。先只读`recovery-plan`，再规划和现场代表任务验收；Codex不启动现场drive。下文有关终端环境变量必须保持相同的旧操作方式，已由run固定预算取代。Precision Bridge本次不扩展。
+
 # 0.1.18 独立Precision Bridge
 
 新增命令及Agent职责见[PRECISION_BRIDGE.md](PRECISION_BRIDGE.md)。沿用现有独立worker与文件请求/响应，原30条Baseline先按下文完成并冻结；Bridge不替代Init、不修改旧判据、不运行NPU/GPU。正常生成与有依据的CODE-only/E协议设计不要求逐条人工ACCEPT；只有真实冲突进入异常处理。实际子agent上下文、目标任务生成及现场能力另行验收。

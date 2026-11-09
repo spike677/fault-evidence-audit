@@ -152,7 +152,7 @@ class TriggerCoreHookTests(unittest.TestCase):
         with closing(Store(state)) as store:
             run_id = store.create_run({"is_synthetic": True})
         module = types.ModuleType("faultaudit.trigger_workflow")
-        for name in ("start_init", "start_incremental", "status", "finalize"):
+        for name in ("start_init", "start_incremental", "status", "finalize", "export"):
             setattr(module, name, MagicMock(return_value={"status": "COMPLETE"}))
         prefix = ["--state", str(state), "trigger-workflow"]
         with patch.dict(sys.modules, {"faultaudit.trigger_workflow": module}), \
@@ -173,7 +173,8 @@ class TriggerCoreHookTests(unittest.TestCase):
                 ("retry", "retry", ["--task-id", "T1"]), ("export", "export", []),
                 ("drive", "drive", ["--agent-command-file", str(command)]))
             for operation, method, extra in operations:
-                with patch.object(xlsx_workflow, method, return_value={"status": "COMPLETE"}) as shared:
+                target = module if operation == "export" else xlsx_workflow
+                with patch.object(target, method, return_value={"status": "COMPLETE"}) as shared:
                     self.assertEqual(cli.main([*prefix, operation, "--run", run_id, *extra]), 0)
                     self.assertEqual(shared.call_args.args[1], run_id)
 

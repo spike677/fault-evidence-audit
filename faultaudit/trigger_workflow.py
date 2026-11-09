@@ -6,6 +6,8 @@ indexes are projections of current cited assessments; formal adoption is separat
 """
 from __future__ import annotations
 
+from .run_budget import scoped as run_scoped
+
 import json
 import re
 import tempfile
@@ -18,7 +20,7 @@ from .store import AuditError, Store, digest
 from .trigger_assessment import CLASSIFICATION_FRAMEWORK, instructions, response_schema, validate_assessment
 from .trigger_taxonomy import builtin_user_branches, load_taxonomy
 
-RULE_VERSION = "cann-baseline-builder-0.1.17"
+RULE_VERSION = "cann-baseline-builder-0.1.19"
 
 
 def _settings(store, run_id):
@@ -35,7 +37,8 @@ def _catalog(store, run_id):
 def start_init(store: Store, modes: Path, taxonomy: Path, work_root: Path, *,
                executor="opencode", branch_source=None, user_branches=True,
                catalog_scope="ORIGINAL_MECHANISM_LIBRARY", basis="HISTORICAL_EVIDENCE",
-               v4_source=None, capabilities=None, sparse=False, with_designs=False, baseline_builder=False, expected_mode_count=None) -> dict:
+               v4_source=None, capabilities=None, sparse=False, with_designs=False, baseline_builder=False, expected_mode_count=None,
+               input_budget_chars=None) -> dict:
     from .evidence_plan import register_search_policy
     from .pipeline import import_into
     if executor not in {"opencode", "codex"}:
@@ -76,6 +79,9 @@ def start_init(store: Store, modes: Path, taxonomy: Path, work_root: Path, *,
         "capture_quality_required": True, "max_search_rounds": 3, "capture_attempts_per_resource": 3,
         "init_basis": basis}
     store.put(run_id, "xlsx_workflow", "config", cfg)
+    from .run_budget import pin
+    from .input_budget import get_budget_chars
+    pin(store, run_id, get_budget_chars() if input_budget_chars is None else input_budget_chars, reason="WORKFLOW_START")
     store.put(run_id, "trigger_config", "config", {"phase": "INIT", "taxonomy_id": frozen["taxonomy_id"],
         "catalog_hash": digest(_catalog(store, run_id)), "rule_version": RULE_VERSION, "basis": basis,
         "classification_framework": CLASSIFICATION_FRAMEWORK})
@@ -102,6 +108,7 @@ def _v4(store, run_id):
     return store.get(run_id, "trigger_v4_taxonomies", key) if key else None
 
 
+@run_scoped
 def configure_v5(store, run_id, *, with_designs=False):
     """Opt an Init into V5 without rewriting sources, responses or verdicts."""
     from .trigger_sparse import CONTRACT
@@ -120,6 +127,7 @@ def configure_v5(store, run_id, *, with_designs=False):
     return {"run_id": run_id, "classification_contract": CONTRACT}
 
 
+@run_scoped
 def configure_v4(store, run_id, source, *, capabilities=None):
     """Freeze a versioned interpretation without overwriting any old definition."""
     from .trigger_v4 import load_v4, revise_42, freeze_mapping, PROFILE, LEGACY_VERSION
@@ -280,12 +288,17 @@ def _issues(store, run_id, case_id):
     return issues
 
 
+@run_scoped
 def _basis(store, run_id, subject, snapshot_id=None):
     """No plan calls: source routing calls this function, so it cannot recurse."""
     from .pipeline import current_summaries
     from .evidence_plan import collection_source_policy
     cid = subject["case_id"]
     settings = _settings(store, run_id)
+    if settings.get("knowledge_profile") and settings["phase"] == "INIT":
+        from .baseline_recovery import definition_dependency
+        return digest({"definition": definition_dependency(store, run_id, subject),
+                       "contract": settings.get("classification_contract"), "basis": "SOURCE_DEFINITIONS"})
     profile_identity = {k: settings[k] for k in ("classification_profile", "v4_taxonomy_id", "mapping_id", "execution_capabilities", "classification_contract", "knowledge_profile", "input_condition_scheme", "api42_registry_id") if k in settings}
     if settings.get("knowledge_profile") and settings["phase"] == "INIT":
         from .cann_baseline import current_definitions
@@ -318,11 +331,15 @@ def _basis(store, run_id, subject, snapshot_id=None):
     return digest(base)
 
 
+@run_scoped
 def current_assessments(store, run_id):
     from .xlsx_workflow import _policy
     subjects = {s["subject_id"]: s for s in store.records(run_id, "trigger_subjects")}
     bases = {}
     def basis(record):
+        if record.get("baseline_axis") and _settings(store, run_id).get("knowledge_profile"):
+            from .baseline_recovery import axis_basis
+            return axis_basis(store, run_id, subjects[record["subject_id"]], record["baseline_axis"]) if record["subject_id"] in subjects else None
         key = (record["subject_id"], record.get("snapshot_id"))
         if key not in bases and key[0] in subjects:
             bases[key] = _basis(store, run_id, subjects[key[0]], key[1])
@@ -358,6 +375,7 @@ def source_relations(store, run_id):
     return result
 
 
+@run_scoped
 def classification_payloads(store, run_id, *, for_baseline_axes=False):
     from .pipeline import current_judgments, current_mappings
     settings, taxonomy = _settings(store, run_id), _model_taxonomy(_taxonomy(store, run_id))
@@ -428,7 +446,8 @@ def classification_payloads(store, run_id, *, for_baseline_axes=False):
             if settings.get("knowledge_profile"):
                 payload["knowledge_profile"] = settings["knowledge_profile"]
                 if subject["subject_id"] in definitions:
-                    payload["normalized_mode"] = definitions[subject["subject_id"]]["result"]
+                    from .baseline_recovery import technical_projection
+                    payload["normalized_mode"] = technical_projection(definitions[subject["subject_id"]]["result"])
             if v4:
                 from .trigger_v4 import model_v4
                 mapping = store.get(run_id, "trigger_mappings", settings["mapping_id"])
@@ -471,12 +490,16 @@ def classification_instructions(payload):
     return text
 
 
+@run_scoped
 def accept_assessment(store, run_id, request, response):
     from .xlsx_workflow import _policy, config
     payload = request["payload"]
     if payload.get("classification_framework") != CLASSIFICATION_FRAMEWORK:
         raise AuditError("Classification requires the current conditions-first policy; regenerate old requests")
     settings = _settings(store, run_id)
+    if settings.get("knowledge_profile") and settings["phase"] == "INIT":
+        from .xlsx_workflow import check_current_request
+        check_current_request(store, run_id, request)
     if (payload.get("phase") != settings["phase"]
             or payload.get("assessment_basis", "HISTORICAL_EVIDENCE") != settings.get("basis", "HISTORICAL_EVIDENCE")):
         raise AuditError("Classification phase/basis differs from the frozen workflow configuration")
@@ -488,7 +511,11 @@ def accept_assessment(store, run_id, request, response):
     subject = store.get(run_id, "trigger_subjects", payload["subject"]["subject_id"])
     expected_basis = _basis(store, run_id, subject, (payload.get("source_issue") or {}).get("snapshot_id")) if subject else None
     if payload.get("baseline_axis"):
-        expected_basis = digest({"base": expected_basis, "axis": payload["baseline_axis"]})
+        if settings.get("knowledge_profile"):
+            from .baseline_recovery import axis_basis
+            expected_basis = axis_basis(store, run_id, subject, payload["baseline_axis"]) if subject else None
+        else:
+            expected_basis = digest({"base": expected_basis, "axis": payload["baseline_axis"]})
     if not subject or payload["basis_hash"] != expected_basis:
         raise AuditError("Classification input/baseline changed; request a fresh task")
     if response.get("executor") != config(store, run_id)["executor"]:
@@ -555,6 +582,7 @@ def record_source_lookup(store, run_id, payload, response, snapshots):
     store.put(run_id, "trigger_source_lookups", lookup["lookup_key"], record, mutable=True)
 
 
+@run_scoped
 def _projection(store, run_id, *, include_baseline_review=True):
     from .wiki_checks import wiki_plan
     from .evidence_plan import collection_source_policy, resource_kind
@@ -614,6 +642,10 @@ def _projection(store, run_id, *, include_baseline_review=True):
                 if not resolved:
                     gaps.append({"case_id": cid, "kind": "SOURCE_IDENTIFIER_UNRESOLVED", "reason": ref["raw_text"]})
     state = store.get(run_id, "workflow_state", "current") or {}
+    if cfg.get("knowledge_profile") and cfg["phase"] == "INIT":
+        from .xlsx_workflow import _policy
+        if state.get("plan_policy_hash") != _policy():
+            state = {}
     for bid in state.get("block_ids", []):
         block = store.get(run_id, "workflow_blocks", bid)
         gaps.append({"case_id": ";".join(block.get("case_ids", [])), "kind": block["reason"], "reason": str(block.get("details", block.get("input_budget", "")))})
@@ -677,9 +709,12 @@ def _projection(store, run_id, *, include_baseline_review=True):
                     if mode[field]["status"] == "UNKNOWN":
                         gaps.append({"case_id": mode["source_case_id"], "kind": "MODE_MECHANISM_UNCLEAR" if field == "failure_mechanism" else "MODE_DEFINITION_INFORMATION_GAP",
                             "reason": field + ": " + mode[field]["text"]})
+            from .baseline_recovery import recovery_plan
+            projection["recovery"] = recovery_plan(store, run_id)
     return projection
 
 
+@run_scoped
 def status(store, run_id):
     data = _projection(store, run_id)
     values = data["assessments"]
@@ -690,6 +725,7 @@ def status(store, run_id):
         "coverage_kind": data["coverage_kind"], "execution_verified": False}
 
 
+@run_scoped
 def _index_identity(store, run_id):
     from .xlsx_workflow import _policy
     dependencies = {}
@@ -705,6 +741,7 @@ def _index_identity(store, run_id):
         "assessments": [a["assessment_id"] for a in current_assessments(store, run_id)]})
 
 
+@run_scoped
 def finalize(store, run_id, *, allow_pending=False):
     from .evidence_plan import collection_source_policy
     if _settings(store, run_id)["phase"] != "INIT":
@@ -798,6 +835,7 @@ def finalize(store, run_id, *, allow_pending=False):
     return baseline
 
 
+@run_scoped
 def _baseline(store, run_id, baseline_id=None, *, allow_pending=False):
     head = store.get(run_id, "trigger_baseline_heads", "current") or {}
     baseline = store.get(run_id, "trigger_baselines", baseline_id or head.get("baseline_id", ""))
@@ -813,7 +851,7 @@ def _baseline(store, run_id, baseline_id=None, *, allow_pending=False):
 
 
 def start_incremental(store, source, baseline_run, work_root, *, executor="opencode", baseline_id=None,
-                      allow_pending_baseline=False):
+                      allow_pending_baseline=False, input_budget_chars=None):
     from .pipeline import import_into
     from .evidence_plan import register_search_policy
     baseline = _baseline(store, baseline_run, baseline_id, allow_pending=allow_pending_baseline)
@@ -841,6 +879,9 @@ def start_incremental(store, source, baseline_run, work_root, *, executor="openc
         "selected_case_ids": selected, "scope_hash": digest(selected), "purpose": "TRIGGER_INCREMENTAL",
         "capture_quality_required": True, "max_search_rounds": 3, "capture_attempts_per_resource": 3}
     store.put(run_id, "xlsx_workflow", "config", cfg)
+    from .run_budget import pin
+    from .input_budget import get_budget_chars
+    pin(store, run_id, get_budget_chars() if input_budget_chars is None else input_budget_chars, reason="WORKFLOW_START")
     source_policy = baseline.get("collection_source_policy", {})
     if source_policy.get("explicit_override"):
         from .xlsx_workflow import configure_collection
@@ -882,6 +923,7 @@ def start_incremental(store, source, baseline_run, work_root, *, executor="openc
     return {**cfg, "purpose": "TRIGGER_INCREMENTAL", "baseline_id": baseline["baseline_id"]}
 
 
+@run_scoped
 def export(store, run_id, *, previous_classification=None, xlsx=False):
     from .xlsx_workflow import config
     from .trigger_html import render, index_workbook
