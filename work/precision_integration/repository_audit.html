@@ -1,0 +1,235 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>PrecisionTesting 只读审查与 CANN 接入设计</title>
+<style>body{margin:0;background:#f3f5f8;color:#172b4d;font:15px/1.75 system-ui,"Microsoft YaHei",sans-serif}main{max-width:1180px;margin:auto;padding:28px}h1{font-size:28px;line-height:1.4}h2{font-size:23px;border-left:5px solid #2a6a7f;padding-left:12px}h3{font-size:18px}nav{position:sticky;top:0;background:#fff;padding:12px;border-bottom:1px solid #dce4eb;z-index:1}nav a{margin-right:18px}section,article{background:white;padding:22px;border:1px solid #dce4eb;border-radius:8px;margin:16px 0}article{padding:16px}.metric{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}.metric div{background:#fff;padding:18px;border-radius:8px;border:1px solid #dce4eb}.metric b{font-size:25px;display:block}.note{border-left:4px solid #b57a13;padding:14px;background:#fff5df}.pill{display:inline-block;background:#eaf0f5;padding:2px 9px;border-radius:4px;font-size:13px}table{border-collapse:collapse;width:100%;font-size:14px}th,td{vertical-align:top;text-align:left;border-bottom:1px solid #dce4eb;padding:9px;overflow-wrap:anywhere}th{background:#f1f5f8}pre{white-space:pre-wrap;overflow-wrap:anywhere;font:13px/1.6 ui-monospace,monospace;background:#f5f7fa;padding:14px}.scroll{overflow:auto}a{color:#165c80}code{font-family:ui-monospace,monospace}details{margin:12px 0}summary{cursor:pointer;font-weight:600}.flow{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.flow span{background:#e7f2f2;padding:10px;border-radius:4px}small{color:#526477}@media(max-width:750px){main{padding:12px}.metric{grid-template-columns:1fr 1fr}nav{position:static}section{padding:14px}}@media print{nav{display:none}body{background:white}article,section{break-inside:avoid}main{padding:0}}</style></head><body><main><header><p>READ-ONLY AUDIT · 2026-11-09T04:14:47.776534+00:00</p><h1>PrecisionTesting 仓库审查<br>与 CANN 故障知识库接入设计</h1><p>准确目标：<a href="https://gitcode.com/yunqixuan/PrecisionTesting">yunqixuan/PrecisionTesting</a> · main · 72c62d2deab7cac9cce2061034167e22ef45a140</p><p class="note">本轮完成源码审查、原42核对及接口设计。Adapter尚未实现，30条现场Baseline未在本轮验收；未运行NPU/GPU，未提交Queue，不把合成探针当真实模式验证。</p></header><div class="metric"><div><b>42 = 35 + 7</b>本地与目标均唯一完整</div><div><b>3</b>HTML实体表示差异</div><div><b>7</b>合成边界探针</div><div><b>0</b>硬件执行 / Queue提交</div></div><nav><a href="#identity">仓库</a><a href="#api">原42</a><a href="#findings">接入问题</a><a href="#flow">数据流</a><a href="#contract">接口</a><a href="#plan">模块与门槛</a><a href="#validation">验证</a></nav><section id="identity"><h2>1. 目标身份与审查范围</h2><pre>{
+  &quot;owner&quot;: &quot;yunqixuan&quot;,
+  &quot;name&quot;: &quot;PrecisionTesting&quot;,
+  &quot;url&quot;: &quot;https://gitcode.com/yunqixuan/PrecisionTesting&quot;,
+  &quot;branch&quot;: &quot;main&quot;,
+  &quot;head_commit&quot;: &quot;72c62d2deab7cac9cce2061034167e22ef45a140&quot;,
+  &quot;checkout_path&quot;: &quot;D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\work\\precision_integration\\PrecisionTesting&quot;,
+  &quot;uncommitted_changes&quot;: [],
+  &quot;sparse_checkout&quot;: true,
+  &quot;checked_out_sections&quot;: [
+    &quot;prompts&quot;,
+    &quot;tasks&quot;,
+    &quot;openskill&quot;,
+    &quot;scripts&quot;,
+    &quot;docs&quot;,
+    &quot;atk_queue&quot;
+  ],
+  &quot;offline_lfs_assets_materialized&quot;: false,
+  &quot;scripts_executed&quot;: &quot;Only reviewed Python formatting/report validators against synthetic isolated fixtures&quot;,
+  &quot;other_same_named_repository_used&quot;: false
+}</pre><pre>{
+  &quot;operator_prompts&quot;: 151,
+  &quot;v910_prompts&quot;: 56,
+  &quot;task_slugs&quot;: 390,
+  &quot;sampled_operator_task&quot;: &quot;ops-math-v910-aclnnExpm1&quot;,
+  &quot;all_operator_tasks_individually_validated&quot;: false
+}</pre><p>本轮审查公共生成、校验、物化、报告及队列衔接，抽查Expm1任务。未用其他同名仓库替代，没有逐条执行全部算子任务；未拉取大型离线资产或运行环境安装脚本。独立副本当前Git工作树干净。</p></section><section id="api"><h2>2. 原始42的实际版本</h2><div class="scroll"><table><thead><tr><th>对象</th><th>文件字节SHA-256/身份</th></tr></thead><tbody><tr><td>用户原始42</td><td>69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82</td></tr><tr><td>目标checkout文件</td><td>42a97b709dc8293841e9cd5d283245f6c3e5cd412788dd28872a22b7b70b5b45</td></tr><tr><td>目标Git blob</td><td>6f03a7f27ce6395326a997db752e8da65158de2254b821bf9d8be87f5ad7720b</td></tr><tr><td>目标coverage实际计算的文本Hash</td><td>6f03a7f27ce6395326a997db752e8da65158de2254b821bf9d8be87f5ad7720b</td></tr></tbody></table></div><p>三个ID的差别来自&lt;/&gt;与HTML实体表示。族级Requires/Skip一致；全局scope/applicability/coverage另有Markdown标记转义、表格空白和空行差异，经仅用于比较的表示规范化后内容一致。没有写回任一原库，也不据此混用文件Hash。原始1.3族边界保留，不使用Fault Evidence Audit修订42。不把V4的55种构造当失效机理或API trigger。</p><div class="scroll"><table><thead><tr><th>原42 ID</th><th>名称</th><th>核对</th></tr></thead><tbody><tr><td>1.1.1</td><td>Zero dimension</td><td>EXACT_DEFINITION_FIELDS</td></tr><tr><td>1.1.2</td><td>Zero repeat/loop count</td><td>EXACT_DEFINITION_FIELDS</td></tr><tr><td>1.1.3</td><td>All-zero rows/blocks</td><td>EXACT_DEFINITION_FIELDS</td></tr><tr><td>1.1.4</td><td>Empty expert (MoE)</td><td>EXACT_DEFINITION_FIELDS</td></tr><tr><td>1.1.5</td><td>Empty partition/shard</td><td>EXACT_DEFINITION_FIELDS</td></tr><tr><td>1.2.1</td><td>Minimal dimension (M/N/K=1)</td><td>EXACT_DEFINITION_FIELDS</td></tr><tr><td>1.2.2</td><td>Tail-block misalignment</td><td>EXACT_DEFINITION_FIELDS</td></tr><tr><td>1.2.3</td><td>Split count exceeds limit</td><td>EXACT_DEFINITION_FIELDS</td></tr><tr><td>1.2.4</td><td>Very large dimension (int overflow)</td><td>EXACT_DEFINITION_FIELDS</td></tr><tr><td>1.2.5</td><td>Broadcast degeneration</td><td>EXACT_DEFINITION_FIELDS</td></tr><tr><td>1.2.6</td><td>Tiling template boundary (off-by-one)</td><td>EXACT_DEFINITION_FIELDS</td></tr><tr><td>1.2.7</td><td>Convolution special shape combo</td><td>EXACT_DEFINITION_FIELDS</td></tr><tr><td>1.2.8</td><td>Output dim &lt; minimum transfer granularity</td><td>HTML_ENTITY_REPRESENTATION_ONLY</td></tr><tr><td>1.3.1</td><td>Index OOB / extreme</td><td>EXACT_DEFINITION_FIELDS</td></tr><tr><td>1.3.2</td><td>Offset overflow (&gt;uint16 / &gt;int32)</td><td>HTML_ENTITY_REPRESENTATION_ONLY</td></tr><tr><td>1.3.3</td><td>Sliding window / attention window boundary</td><td>EXACT_DEFINITION_FIELDS</td></tr><tr><td>1.3.4</td><td>Expert/routing index combo (MoE)</td><td>EXACT_DEFINITION_FIELDS</td></tr><tr><td>1.4.1</td><td>Non-contiguous tensor</td><td>EXACT_DEFINITION_FIELDS</td></tr><tr><td>1.4.2</td><td>Large stride (&gt;65535)</td><td>HTML_ENTITY_REPRESENTATION_ONLY</td></tr><tr><td>1.4.3</td><td>Special format (NZ, TND)</td><td>EXACT_DEFINITION_FIELDS</td></tr><tr><td>1.5.1</td><td>Non-aligned sequence length</td><td>EXACT_DEFINITION_FIELDS</td></tr><tr><td>1.5.2</td><td>Very long sequence</td><td>EXACT_DEFINITION_FIELDS</td></tr><tr><td>1.5.3</td><td>Decode-length (seq_len=1)</td><td>EXACT_DEFINITION_FIELDS</td></tr><tr><td>1.5.4</td><td>Head dim not aligned</td><td>EXACT_DEFINITION_FIELDS</td></tr><tr><td>1.6.1</td><td>Batch &gt; 1</td><td>EXACT_DEFINITION_FIELDS</td></tr><tr><td>1.6.2</td><td>Uneven expert/token allocation</td><td>EXACT_DEFINITION_FIELDS</td></tr><tr><td>1.7.1</td><td>All-zero → div-by-zero (scale=INF)</td><td>EXACT_DEFINITION_FIELDS</td></tr><tr><td>1.7.2</td><td>NaN / Inf</td><td>EXACT_DEFINITION_FIELDS</td></tr><tr><td>1.7.3</td><td>Extreme large values</td><td>EXACT_DEFINITION_FIELDS</td></tr><tr><td>1.7.4</td><td>Near-zero denominator</td><td>EXACT_DEFINITION_FIELDS</td></tr><tr><td>1.7.5</td><td>Log-domain instability</td><td>EXACT_DEFINITION_FIELDS</td></tr><tr><td>1.7.6</td><td>Intermediate overflow (mul before div)</td><td>EXACT_DEFINITION_FIELDS</td></tr><tr><td>1.8.1</td><td>Packed variable-length sequence</td><td>EXACT_DEFINITION_FIELDS</td></tr><tr><td>1.8.2</td><td>Mask type/combination</td><td>EXACT_DEFINITION_FIELDS</td></tr><tr><td>1.8.3</td><td>Negative padding (crop)</td><td>EXACT_DEFINITION_FIELDS</td></tr><tr><td>1.C.1</td><td>动态/静态量化、quant 粒度</td><td>EXACT_DEFINITION_FIELDS</td></tr><tr><td>1.C.2</td><td>输出低精度 / out dtype</td><td>EXACT_DEFINITION_FIELDS</td></tr><tr><td>1.C.3</td><td>cubeMathType / KEEP_DTYPE</td><td>EXACT_DEFINITION_FIELDS</td></tr><tr><td>1.C.4</td><td>RoPE / sink / dual-IO 等模式</td><td>EXACT_DEFINITION_FIELDS</td></tr><tr><td>1.C.5</td><td>deterministic / accumulate</td><td>EXACT_DEFINITION_FIELDS</td></tr><tr><td>1.C.6</td><td>format / NZ</td><td>EXACT_DEFINITION_FIELDS</td></tr><tr><td>1.C.7</td><td>reduction / dim / transpose</td><td>EXACT_DEFINITION_FIELDS</td></tr></tbody></table></div><details><summary>三项原文差异（仅表示差异）</summary><pre>[
+  {
+    &quot;id&quot;: &quot;1.2.8&quot;,
+    &quot;fields&quot;: [
+      &quot;definition&quot;
+    ],
+    &quot;local&quot;: {
+      &quot;id&quot;: &quot;1.2.8&quot;,
+      &quot;name&quot;: &quot;Output dim &lt; minimum transfer granularity&quot;,
+      &quot;definition&quot;: &quot;输出 &lt; 32B 等。\nRequires: 可推出 output 元素数与 dtype 宽度。&quot;,
+      &quot;requires&quot;: [
+        &quot;可推出 output 元素数与 dtype 宽度。&quot;
+      ],
+      &quot;skip_if&quot;: []
+    },
+    &quot;repository&quot;: {
+      &quot;id&quot;: &quot;1.2.8&quot;,
+      &quot;name&quot;: &quot;Output dim &lt; minimum transfer granularity&quot;,
+      &quot;definition&quot;: &quot;输出 &amp;lt; 32B 等。\nRequires: 可推出 output 元素数与 dtype 宽度。&quot;,
+      &quot;requires&quot;: [
+        &quot;可推出 output 元素数与 dtype 宽度。&quot;
+      ],
+      &quot;skip_if&quot;: []
+    }
+  },
+  {
+    &quot;id&quot;: &quot;1.3.2&quot;,
+    &quot;fields&quot;: [
+      &quot;definition&quot;,
+      &quot;requires&quot;
+    ],
+    &quot;local&quot;: {
+      &quot;id&quot;: &quot;1.3.2&quot;,
+      &quot;name&quot;: &quot;Offset overflow (&gt;uint16 / &gt;int32)&quot;,
+      &quot;definition&quot;: &quot;算址偏移溢出。\nRequires: shape/index 使 offset 公式 &gt; 阈值；常与 1.2.4 组合。&quot;,
+      &quot;requires&quot;: [
+        &quot;shape/index 使 offset 公式 &gt; 阈值；常与 1.2.4 组合。&quot;
+      ],
+      &quot;skip_if&quot;: []
+    },
+    &quot;repository&quot;: {
+      &quot;id&quot;: &quot;1.3.2&quot;,
+      &quot;name&quot;: &quot;Offset overflow (&gt;uint16 / &gt;int32)&quot;,
+      &quot;definition&quot;: &quot;算址偏移溢出。\nRequires: shape/index 使 offset 公式 &amp;gt; 阈值；常与 1.2.4 组合。&quot;,
+      &quot;requires&quot;: [
+        &quot;shape/index 使 offset 公式 &amp;gt; 阈值；常与 1.2.4 组合。&quot;
+      ],
+      &quot;skip_if&quot;: []
+    }
+  },
+  {
+    &quot;id&quot;: &quot;1.4.2&quot;,
+    &quot;fields&quot;: [
+      &quot;definition&quot;
+    ],
+    &quot;local&quot;: {
+      &quot;id&quot;: &quot;1.4.2&quot;,
+      &quot;name&quot;: &quot;Large stride (&gt;65535)&quot;,
+      &quot;definition&quot;: &quot;由 shape 推出使 stride&gt;65535。\nRequires: 高维大尾维 + 地址按 stride 计算的实现。&quot;,
+      &quot;requires&quot;: [
+        &quot;高维大尾维 + 地址按 stride 计算的实现。&quot;
+      ],
+      &quot;skip_if&quot;: []
+    },
+    &quot;repository&quot;: {
+      &quot;id&quot;: &quot;1.4.2&quot;,
+      &quot;name&quot;: &quot;Large stride (&gt;65535)&quot;,
+      &quot;definition&quot;: &quot;由 shape 推出使 stride&amp;gt;65535。\nRequires: 高维大尾维 + 地址按 stride 计算的实现。&quot;,
+      &quot;requires&quot;: [
+        &quot;高维大尾维 + 地址按 stride 计算的实现。&quot;
+      ],
+      &quot;skip_if&quot;: []
+    }
+  }
+]</pre></details><p>统计实际规则中的TRIGGER引用与账本一致性；没有验证该规则的值真正满足条件，也不直接给故障模式覆盖率。</p><div class="scroll"><table><thead><tr><th>检查类型</th><th>实际边界</th></tr></thead><tbody><tr><td>硬错误</td><td>基本JSON结构；id/status/risk枚举及重复账本ID；case integer ID唯一</td></tr><tr><td>WARNING</td><td>42账本完整性与未评估项；预算/数量；canonical文本Hash与同步；primary case归属；actual引用对账；CODE声明与源码字符串</td></tr><tr><td>覆盖要求</td><td>不要求所有42项生成case；skipped/not_testable允许，但理由与适用性需Agent据原文判断。</td></tr></tbody></table></div></section><section id="findings"><h2>3. 必须先处理的接入边界</h2><p>以下是两系统的接口差异；原库无需被整套重写。源码链接固定到审查commit。</p><article><p class="pill">P1 · PT-01</p><h3>退出码0不能表示正式覆盖验收通过</h3><p>公共Schema/coverage校验将数量不足、缺覆盖账本、未评估trigger及多项对账问题作为WARNING；有这些WARNING仍可打印PASS并返回0。合成CLI样例返回0且有4个WARNING。</p><p><b>接入影响：</b>正式生成完成率不能只看进程退出码；同时也不能把允许带警告的smoke当正式max_cases交付。</p><p><b>必要适配：</b>在独立Adapter中分别记录core_errors、coverage_warnings、formal_ready、smoke_ready。保留上游退出码，正式结果要求已解释并解决所有适用缺口，不覆写上游校验器。</p><ul><li><a href="https://gitcode.com/yunqixuan/PrecisionTesting/blob/72c62d2deab7cac9cce2061034167e22ef45a140/scripts/verify_schema.py#L164">scripts/verify_schema.py:164</a></li><li><a href="https://gitcode.com/yunqixuan/PrecisionTesting/blob/72c62d2deab7cac9cce2061034167e22ef45a140/scripts/verify_trigger_coverage.py#L214">scripts/verify_trigger_coverage.py:214</a></li><li><a href="https://gitcode.com/yunqixuan/PrecisionTesting/blob/72c62d2deab7cac9cce2061034167e22ef45a140/openskill/01_generate_test_rules.md#L40">openskill/01_generate_test_rules.md:40</a></li></ul></article><article><p class="pill">P1 · PT-02</p><h3>没有原42适用项的CODE-only用例缺独立验收路径</h3><p>完整42项账本均标为skipped、声明有效CODE-state-only且同步账本后，单条CODE-only用例仍产生missing a primary trigger budget entry警告。</p><p><b>接入影响：</b>纯执行条件/E方法可能无法在不伪造API标签的情况下达到零WARNING；这不是新的42类别已经成立。</p><p><b>必要适配：</b>先登记NOT_SUPPORTED_BY_CURRENT_NATIVE_FORMAL_GATE。后续增加明确的非API执行协议验收路径及CODE工作预算；不能任意忽略WARNING或给E条件强加42标签。</p><ul><li><a href="https://gitcode.com/yunqixuan/PrecisionTesting/blob/72c62d2deab7cac9cce2061034167e22ef45a140/scripts/verify_trigger_coverage.py#L369">scripts/verify_trigger_coverage.py:369</a></li><li><a href="https://gitcode.com/yunqixuan/PrecisionTesting/blob/72c62d2deab7cac9cce2061034167e22ef45a140/docs/simplified_atk_test_rules__json.md#L61">docs/simplified_atk_test_rules__json.md:61</a></li></ul></article><article><p class="pill">P1 · PT-03</p><h3>通用Schema门禁没有完成算子合法域与条件语义检查</h3><p>公共检查主要核对字段类型、嵌套层次及运行字段。合成not_an_operator_dtype和含字符串/负数的shape可通过公共结构检查及JSON准备；并未调用对应算子。</p><p><b>接入影响：</b>接口文档/YAML文件存在、Schema校验通过，不等于dtype/shape/attr满足目标算子，更不等于真正满足42或V4谓词。</p><p><b>必要适配：</b>继续让独立Agent读取目标接口与源码进行有引文的约束核对；工程层验证可判定约束，无法验证的项目保留UNKNOWN/能力缺口。不要标记完整合法域覆盖。</p><ul><li><a href="https://gitcode.com/yunqixuan/PrecisionTesting/blob/72c62d2deab7cac9cce2061034167e22ef45a140/scripts/prepare_atk_submission.py#L436">scripts/prepare_atk_submission.py:436</a></li><li><a href="https://gitcode.com/yunqixuan/PrecisionTesting/blob/72c62d2deab7cac9cce2061034167e22ef45a140/scripts/prepare_atk_submission.py#L520">scripts/prepare_atk_submission.py:520</a></li><li><a href="https://gitcode.com/yunqixuan/PrecisionTesting/blob/72c62d2deab7cac9cce2061034167e22ef45a140/openskill/01_generate_test_rules.md#L188">openskill/01_generate_test_rules.md:188</a></li></ul></article><article><p class="pill">P1 · PT-04</p><h3>精度报告格式通过不等于设备证据已验真</h3><p>validate_task_dir核对分析JSON、计数平衡、结论和展示文件；没有据evidence数组核实真实job/log。本轮仅合成的报告在job/log不存在时也通过该门禁。Queue执行器另有日志、xlsx及attempt检查，可复用但不等于report门禁执行了它们。</p><p><b>接入影响：</b>不能据analysis.json的pass/fault自动把CANN模式升级为HARDWARE_VALIDATED或确认根因。部分case ERROR时任务顶层仍可能为pass。</p><p><b>必要适配：</b>回写前独立核对job/attempt、输入及配置Hash、原始ATK日志/xlsx、运行环境、golden及逐case结果；路径命中、故障复现、根因确认分别记录，未有证据保持未知。</p><ul><li><a href="https://gitcode.com/yunqixuan/PrecisionTesting/blob/72c62d2deab7cac9cce2061034167e22ef45a140/scripts/verify_precision_report.py#L50">scripts/verify_precision_report.py:50</a></li><li><a href="https://gitcode.com/yunqixuan/PrecisionTesting/blob/72c62d2deab7cac9cce2061034167e22ef45a140/scripts/verify_precision_report.py#L151">scripts/verify_precision_report.py:151</a></li><li><a href="https://gitcode.com/yunqixuan/PrecisionTesting/blob/72c62d2deab7cac9cce2061034167e22ef45a140/atk_queue/atk_queue/executor.py#L597">atk_queue/atk_queue/executor.py:597</a></li></ul></article><article><p class="pill">P1 · PT-05</p><h3>盲测任务与已知模式验证目标不同</h3><p>现有prompt/Step 0明确限制读取groundtruth和公开issue/PR精度结论；参考源码不等于镜像中的实际二进制。知识库导出的已知失效机理会改变实验信息条件。</p><p><b>接入影响：</b>把故障答案直接灌入原盲测任务，会混淆能力评测和已知模式复现；读旧源码也不能证明正在测试同一缺陷版本。</p><p><b>必要适配：</b>Adapter任务显式使用KNOWN_PATTERN_VALIDATION，标记unblinded并保留mode与来源；独立协调指令消费sidecar，不修改原prompt或tasks。source_snapshot_commit与runtime镜像/CANN版本单列，结果不计作原盲测成绩。</p><ul><li><a href="https://gitcode.com/yunqixuan/PrecisionTesting/blob/72c62d2deab7cac9cce2061034167e22ef45a140/openskill/00_prepare_task.md#L58">openskill/00_prepare_task.md:58</a></li><li><a href="https://gitcode.com/yunqixuan/PrecisionTesting/blob/72c62d2deab7cac9cce2061034167e22ef45a140/prompts/ops-math-v910-aclnnExpm1.md#L53">prompts/ops-math-v910-aclnnExpm1.md:53</a></li><li><a href="https://gitcode.com/yunqixuan/PrecisionTesting/blob/72c62d2deab7cac9cce2061034167e22ef45a140/prompts/ops-math-v910-aclnnExpm1.md#L17">prompts/ops-math-v910-aclnnExpm1.md:17</a></li></ul></article><article><p class="pill">P2 · PT-06</p><h3>机理和V4溯源需要独立sidecar；normalize会丢信息</h3><p>原生规则通过id、generate_intent、trigger_library_ref保留42/CODE来源；没有CANN mode_id/Baseline版本/V4/E的专用协议。prepare保留原inputs和trigger引用；normalize_atk_suite输出的case仅含id/inputs/config，丢弃意图与trigger引用。</p><p><b>接入影响：</b>不能用internal_suite.json当知识库往返载体，也不能将S5或某个V4构造写成TRIGGER-1.x来迁就原生格式。</p><p><b>必要适配：</b>原生test_suite.json及ATK JSON保持原格式，新增一个cann_pattern_context.json内的规则绑定段保存完整机理、独立轴ID、来源和输入Hash；同一文件贯穿生成/校验/回写。</p><ul><li><a href="https://gitcode.com/yunqixuan/PrecisionTesting/blob/72c62d2deab7cac9cce2061034167e22ef45a140/scripts/prepare_atk_submission.py#L318">scripts/prepare_atk_submission.py:318</a></li><li><a href="https://gitcode.com/yunqixuan/PrecisionTesting/blob/72c62d2deab7cac9cce2061034167e22ef45a140/scripts/prepare_atk_submission.py#L589">scripts/prepare_atk_submission.py:589</a></li><li><a href="https://gitcode.com/yunqixuan/PrecisionTesting/blob/72c62d2deab7cac9cce2061034167e22ef45a140/docs/simplified_atk_test_rules__json.md#L36">docs/simplified_atk_test_rules__json.md:36</a></li></ul></article><article><p class="pill">P2 · PT-07</p><h3>标签不同的相同输入不会触发当前重复告警</h3><p>canonical_case_signature将trigger_ref_ids与inputs共同作为签名；本轮完全相同inputs仅换trigger标签后没有重复WARNING。</p><p><b>接入影响：</b>多个模式/标签可重复调度同一份物理测试。反过来，E1有意重复也不能被普通去重误删。</p><p><b>必要适配：</b>独立记录execution_work_id：目标二进制/配置、输入规范、seed、执行协议及目标调用。标签/模式绑定单独多对多；显式保留E方法要求的重复次数及参与者。</p><ul><li><a href="https://gitcode.com/yunqixuan/PrecisionTesting/blob/72c62d2deab7cac9cce2061034167e22ef45a140/scripts/verify_trigger_coverage.py#L76">scripts/verify_trigger_coverage.py:76</a></li></ul></article><article><p class="pill">P2 · PT-08</p><h3>聚合报告校验器包含固定历史13任务计数</h3><p>verify_precision_report.validate_index最终要求fault=8、pass=0、blocked=5。该校验不是通用30模式索引合同。</p><p><b>接入影响：</b>不能直接套该index门禁验收30条CANN模式或后续任意批次。逐workspace报告检查可复用，批次统计需由Fault Evidence Audit维护。</p><p><b>必要适配：</b>保留目标历史索引；在Adapter/现有HTML中按唯一mode_id、workspace/case/job和阶段分别统计，不硬编码结果分布。</p><ul><li><a href="https://gitcode.com/yunqixuan/PrecisionTesting/blob/72c62d2deab7cac9cce2061034167e22ef45a140/scripts/verify_precision_report.py#L287">scripts/verify_precision_report.py:287</a></li></ul></article><article><p class="pill">P2 · PT-09</p><h3>JSON物化及队列线程不等于通用E1-E5执行器</h3><p>prepare将metadata和可选输出shape/dtype写入ATK JSON，不分配真实设备张量。公共生成/队列接口未发现E1-E5协议Schema；调度worker线程及ACL自检同步并不能证明目标算子的流/线程/参与者实验已实现。</p><p><b>接入影响：</b>有V4/E标签、有输出预填JSON或Queue并发，不等于保持了实际stride、输出预填、前序状态、线程交错或多rank条件。</p><p><b>必要适配：</b>建立能力声明：规则JSON生成、真实输入构造、路径观测、执行结果四维分开。E1-E5及跨流规程先输出设计，缺执行器时明确BLOCKED/NOT_RUN；不改原executor来凑验收。</p><ul><li><a href="https://gitcode.com/yunqixuan/PrecisionTesting/blob/72c62d2deab7cac9cce2061034167e22ef45a140/scripts/prepare_atk_submission.py#L306">scripts/prepare_atk_submission.py:306</a></li><li><a href="https://gitcode.com/yunqixuan/PrecisionTesting/blob/72c62d2deab7cac9cce2061034167e22ef45a140/atk_queue/atk_queue/worker.py#L51">atk_queue/atk_queue/worker.py:51</a></li></ul></article><article><p class="pill">P2 · PT-10</p><h3>只生成用例的依赖与UTF-8环境应预检</h3><p>本机Python 3.12.14最初缺yaml，verify_schema导入prepare时失败。README快速开始主要列Python，queue setup的install_requires为空。审查探针使用独立probe_deps安装PyYAML 6.0.3，未改共享解释器。多个read_text未显式指定编码。</p><p><b>接入影响：</b>不能把缺依赖/编码问题误报为规则错误或模型失败；Windows现场应检查UTF-8与PyYAML。</p><p><b>必要适配：</b>Adapter preflight只检查依赖和工具版本，现场决定安装；本轮记录PYTHONUTF8=1及独立依赖路径，不静默安装到现场全局环境。</p><ul><li><a href="https://gitcode.com/yunqixuan/PrecisionTesting/blob/72c62d2deab7cac9cce2061034167e22ef45a140/scripts/prepare_atk_submission.py#L28">scripts/prepare_atk_submission.py:28</a></li><li><a href="https://gitcode.com/yunqixuan/PrecisionTesting/blob/72c62d2deab7cac9cce2061034167e22ef45a140/atk_queue/setup.py#L9">atk_queue/setup.py:9</a></li><li><a href="https://gitcode.com/yunqixuan/PrecisionTesting/blob/72c62d2deab7cac9cce2061034167e22ef45a140/scripts/verify_schema.py#L49">scripts/verify_schema.py:49</a></li></ul></article></section><section id="flow"><h2>4. 完整数据流</h2><div class="flow"><span>当前冻结Baseline</span>→<span>known-pattern上下文</span>→<span>原生规则/覆盖/ATK JSON</span>→<span>获准设备与原始结果</span>→<span>证据与演进提案</span></div><p>当前实际仅执行合成格式/接口探针；图中后续链路是接入设计，并非本轮端到端已经打通。</p><article><h3>任务选择</h3><div class="scroll"><table><thead><tr><th>项目</th><th>内容</th></tr></thead><tbody><tr><td>input</td><td>明确operator/task slug；必要时CANN已冻结模式包</td></tr><tr><td>output</td><td>任务prompt与task源目录</td></tr><tr><td>schema</td><td>原生Markdown prompt；Adapter上下文合同（拟定）</td></tr><tr><td>automation</td><td>Agent读取；已有prompt与tasks可复用</td></tr><tr><td>failure</td><td>缺task/接口/源码或目标版本不符则阻塞</td></tr><tr><td>human</td><td>选择新的待测目标或无法消解争议；不逐10条确认</td></tr></tbody></table></div><ul><li><a href="https://gitcode.com/yunqixuan/PrecisionTesting/blob/72c62d2deab7cac9cce2061034167e22ef45a140/prompts/ops-math-v910-aclnnExpm1.md#L40">prompts/ops-math-v910-aclnnExpm1.md:40</a></li></ul></article><article><h3>创建Workspace</h3><div class="scroll"><table><thead><tr><th>项目</th><th>内容</th></tr></thead><tbody><tr><td>input</td><td>tasks/&lt;slug&gt;、canonical docs/trigger_library.md</td></tr><tr><td>output</td><td>.runs/&lt;slug&gt;--日期-NN；source资产、trigger副本、coverage初始账本</td></tr><tr><td>schema</td><td>workspace_origin.v1、trigger_coverage.v1</td></tr><tr><td>automation</td><td>现有程序复制与初始化</td></tr><tr><td>failure</td><td>源目录不存在/路径冲突则退出；不要覆写tasks</td></tr><tr><td>human</td><td>通常无需</td></tr></tbody></table></div><ul><li><a href="https://gitcode.com/yunqixuan/PrecisionTesting/blob/72c62d2deab7cac9cce2061034167e22ef45a140/scripts/create_workspace.py#L159">scripts/create_workspace.py:159</a></li><li><a href="https://gitcode.com/yunqixuan/PrecisionTesting/blob/72c62d2deab7cac9cce2061034167e22ef45a140/scripts/create_workspace.py#L130">scripts/create_workspace.py:130</a></li></ul></article><article><h3>源码/API分析与构造</h3><div class="scroll"><table><thead><tr><th>项目</th><th>内容</th></tr></thead><tbody><tr><td>input</td><td>完整operator_doc/schema、源码、原42；已知模式场景另加V4/E与机理上下文</td></tr><tr><td>output</td><td>constraints.md、test_suite.json、trigger_coverage.json、设计报告</td></tr><tr><td>schema</td><td>规则数组：id/generate_intent/trigger_library_ref/inputs</td></tr><tr><td>automation</td><td>必须由Agent做语义分析与设计；程序不能从标签自动构造合法用例</td></tr><tr><td>failure</td><td>前提/源码/执行能力缺失保持未知或阻塞</td></tr><tr><td>human</td><td>只处理不消解的冲突和知识变更审批</td></tr></tbody></table></div><ul><li><a href="https://gitcode.com/yunqixuan/PrecisionTesting/blob/72c62d2deab7cac9cce2061034167e22ef45a140/openskill/01_generate_test_rules.md#L94">openskill/01_generate_test_rules.md:94</a></li><li><a href="https://gitcode.com/yunqixuan/PrecisionTesting/blob/72c62d2deab7cac9cce2061034167e22ef45a140/openskill/01_generate_test_rules.md#L147">openskill/01_generate_test_rules.md:147</a></li></ul></article><article><h3>Schema与覆盖账本校验</h3><div class="scroll"><table><thead><tr><th>项目</th><th>内容</th></tr></thead><tbody><tr><td>input</td><td>规则数组、config、workspace Trigger Library及账本</td></tr><tr><td>output</td><td>结构错误、覆盖WARNING及PASS文字</td></tr><tr><td>schema</td><td>trigger_coverage.v1；公共结构检查（非完整算子Schema引擎）</td></tr><tr><td>automation</td><td>现有程序可复用，正式门禁需要独立解释WARNING</td></tr><tr><td>failure</td><td>core error非零；若只有WARNING可退出0，不能当正式完成</td></tr><tr><td>human</td><td>正常错误由Agent自修；CODE-only能力边界待协议明确</td></tr></tbody></table></div><ul><li><a href="https://gitcode.com/yunqixuan/PrecisionTesting/blob/72c62d2deab7cac9cce2061034167e22ef45a140/scripts/verify_schema.py#L98">scripts/verify_schema.py:98</a></li><li><a href="https://gitcode.com/yunqixuan/PrecisionTesting/blob/72c62d2deab7cac9cce2061034167e22ef45a140/scripts/verify_trigger_coverage.py#L205">scripts/verify_trigger_coverage.py:205</a></li></ul></article><article><h3>ATK JSON物化</h3><div class="scroll"><table><thead><tr><th>项目</th><th>内容</th></tr></thead><tbody><tr><td>input</td><td>test_suite.json、atk_run_config.json、原runnable</td></tr><tr><td>output</td><td>02_atk_run/atk_input/test_suite.atk.json</td></tr><tr><td>schema</td><td>ATK-native输入对象、原生序列嵌套与runtime字段</td></tr><tr><td>automation</td><td>现有prepare可直接复用；不生成真实设备张量</td></tr><tr><td>failure</td><td>有skipped或valid数量不足则拒写部分suite；runnable缺失/变化有门禁</td></tr><tr><td>human</td><td>runnable问题交维护者，不让Agent改黄金执行器</td></tr></tbody></table></div><ul><li><a href="https://gitcode.com/yunqixuan/PrecisionTesting/blob/72c62d2deab7cac9cce2061034167e22ef45a140/scripts/prepare_atk_submission.py#L680">scripts/prepare_atk_submission.py:680</a></li><li><a href="https://gitcode.com/yunqixuan/PrecisionTesting/blob/72c62d2deab7cac9cce2061034167e22ef45a140/scripts/prepare_atk_submission.py#L716">scripts/prepare_atk_submission.py:716</a></li></ul></article><article><h3>Queue与设备执行</h3><div class="scroll"><table><thead><tr><th>项目</th><th>内容</th></tr></thead><tbody><tr><td>input</td><td>获准的workspace/ATK JSON、Linux队列配置、NPU/GPU及镜像</td></tr><tr><td>output</td><td>job JSON、attempt marker、job-N原始日志/xlsx或远程指针</td></tr><tr><td>schema</td><td>Job schema_version=2；native ATK产物</td></tr><tr><td>automation</td><td>已有队列可复用，实际环境未在本轮验收</td></tr><tr><td>failure</td><td>按调度/环境/setup/ACL/executor/输入/runtime分类；completed不代表精度通过</td></tr><tr><td>human</td><td>环境授权/登录及任务源修复；本轮不提交任何job</td></tr></tbody></table></div><ul><li><a href="https://gitcode.com/yunqixuan/PrecisionTesting/blob/72c62d2deab7cac9cce2061034167e22ef45a140/atk_queue/atk_queue/job.py#L23">atk_queue/atk_queue/job.py:23</a></li><li><a href="https://gitcode.com/yunqixuan/PrecisionTesting/blob/72c62d2deab7cac9cce2061034167e22ef45a140/atk_queue/atk_queue/executor.py#L34">atk_queue/atk_queue/executor.py:34</a></li><li><a href="https://gitcode.com/yunqixuan/PrecisionTesting/blob/72c62d2deab7cac9cce2061034167e22ef45a140/openskill/02_run_atk_verification.md#L172">openskill/02_run_atk_verification.md:172</a></li></ul></article><article><h3>Golden比较及精度分析</h3><div class="scroll"><table><thead><tr><th>项目</th><th>内容</th></tr></thead><tbody><tr><td>input</td><td>实际job/attempt下ATK日志、报告、tensor、规则与标准</td></tr><tr><td>output</td><td>analysis.json与precision_fault_report.md/html</td></tr><tr><td>schema</td><td>precision_analysis.v2；任务状态pass/fault/blocked</td></tr><tr><td>automation</td><td>ATK比较由运行端完成；Agent分析，程序核对展示/计数</td></tr><tr><td>failure</td><td>比较缺失/不可信为blocked；FAULT不直接确认CANN具体机理</td></tr><tr><td>human</td><td>根因冲突/Golden争议才进入人工异常</td></tr></tbody></table></div><ul><li><a href="https://gitcode.com/yunqixuan/PrecisionTesting/blob/72c62d2deab7cac9cce2061034167e22ef45a140/scripts/verify_precision_report.py#L16">scripts/verify_precision_report.py:16</a></li><li><a href="https://gitcode.com/yunqixuan/PrecisionTesting/blob/72c62d2deab7cac9cce2061034167e22ef45a140/openskill/03_analyze_precision_report.md#L33">openskill/03_analyze_precision_report.md:33</a></li></ul></article><article><h3>知识库反馈</h3><div class="scroll"><table><thead><tr><th>项目</th><th>内容</th></tr></thead><tbody><tr><td>input</td><td>实际case绑定、job/attempt、Hash、路径证据、对照与指标</td></tr><tr><td>output</td><td>新的证据快照/关联建议与演进提案</td></tr><tr><td>schema</td><td>沿用Fault Evidence Audit采集/审计协议；回写绑定待实现</td></tr><tr><td>automation</td><td>拟由独立Adapter验真后回到现有证据流程，不改正式模式</td></tr><tr><td>failure</td><td>缺日志、版本、路径或关联信息则保留未确认</td></tr><tr><td>human</td><td>专家审批模式/分类体系变更；禁止模型自动ACCEPT</td></tr></tbody></table></div><ul></ul></article></section><section id="contract"><h2>5. 独立Adapter的数据合同（设计稿）</h2><p>每个选中模式/算子工作一个cann_pattern_context.json；原生规则文件保持不变。该上下文文件的bindings段在生成后登记实际规则ID与输入Hash。</p><p>真实CANN失效机理、V4条件类、V4具体构造、原42、E1-E5各自有版本及来源；没有自动标签转换。</p><div class="scroll"><table><thead><tr><th>字段</th><th>类型</th><th>含义</th></tr></thead><tbody><tr><td>mode_id</td><td>string</td><td>保留原始模式ID；不是客户事件编号</td></tr><tr><td>mode_name</td><td>string</td><td>保留原始名称</td></tr><tr><td>failure_mechanism</td><td>grounded Claim</td><td>真实技术因果机理，与所有条件/构造标签分开</td></tr><tr><td>fault_object</td><td>grounded Claim</td><td>故障对象</td></tr><tr><td>observable_symptoms</td><td>grounded Claim</td><td>原始表现</td></tr><tr><td>input_trigger_conditions</td><td>grounded Claim</td><td>实际输入前提与未知项</td></tr><tr><td>execution_trigger_conditions</td><td>grounded Claim</td><td>非API执行前提</td></tr><tr><td>applicable_scope</td><td>grounded Claim</td><td>适用范围</td></tr><tr><td>exclusion_boundaries</td><td>grounded Claim</td><td>排除边界</td></tr><tr><td>v4_theme_ids</td><td>string[]</td><td>V4主题ID；不自动从42转换</td></tr><tr><td>v4_class_ids</td><td>string[]</td><td>31条件类的显式选择</td></tr><tr><td>v4_scenario_ids</td><td>string[]</td><td>55种具体构造代码的显式选择；S5不是构造代码</td></tr><tr><td>api_trigger_ids</td><td>string[]</td><td>原始42 ID；允许有依据地不适用/信息不足</td></tr><tr><td>execution_method_ids</td><td>E1-E5[]</td><td>执行方法，不能写成API trigger</td></tr><tr><td>requires</td><td>scoped condition[]</td><td>按规则ID、版本保存完整条件，不压平不同子问题</td></tr><tr><td>skip_if</td><td>scoped condition[]</td><td>不将执行能力不足当接口不适用</td></tr><tr><td>source_evidence</td><td>scoped source refs[]</td><td>原单元格/源码/快照片段、精确引文与SHA</td></tr><tr><td>validation_status</td><td>object</td><td>MODE_DEFINITION / SOURCE_VERIFIED / HARDWARE_VALIDATED分别保存</td></tr><tr><td>baseline_version</td><td>string</td><td>已冻结且仍当前有效；provisional仅允许显式诊断，不计正式覆盖</td></tr><tr><td>definition_registry</td><td>object</td><td>原42文件Hash/版本；V4 6/31/55/195/E分层；目标库raw/text/blob Hash另列</td></tr><tr><td>operator_target</td><td>object</td><td>明确task slug/API、task/prompt/config/runnable Hash、参考源码commit及运行镜像版本</td></tr><tr><td>bindings</td><td>case binding[]</td><td>native case_id→mode/条件/构造/E/来源；本地情景与实验参与者作用域保留</td></tr></tbody></table></div><h3>原生规则与绑定</h3><pre>{
+  &quot;native_rule_fields&quot;: [
+    &quot;id&quot;,
+    &quot;generate_intent&quot;,
+    &quot;trigger_library_ref&quot;,
+    &quot;inputs&quot;
+  ],
+  &quot;binding_fields&quot;: [
+    &quot;native_case_id&quot;,
+    &quot;mode_id&quot;,
+    &quot;detail_ids&quot;,
+    &quot;source_fact_ids&quot;,
+    &quot;api_trigger_ids&quot;,
+    &quot;v4_class_ids&quot;,
+    &quot;v4_scenario_ids&quot;,
+    &quot;execution_method_ids&quot;,
+    &quot;construction_basis&quot;,
+    &quot;test_suite_sha256&quot;,
+    &quot;atk_suite_sha256&quot;,
+    &quot;execution_work_id&quot;,
+    &quot;target_call_id&quot;,
+    &quot;participant_roles&quot;,
+    &quot;planned_target_path&quot;,
+    &quot;observed_path_status&quot;
+  ],
+  &quot;purpose&quot;: &quot;KNOWN_PATTERN_VALIDATION&quot;,
+  &quot;blind_evaluation&quot;: false
+}</pre><pre>[
+  &quot;不把V4构造代码转换成TRIGGER-1.x；42↔V4映射不用于自动补标签&quot;,
+  &quot;不将normalized internal_suite用作有损的机理/来源往返载体&quot;,
+  &quot;不改PrecisionTesting原prompt、tasks、runnable或canonical库以迁就Adapter&quot;,
+  &quot;无匹配的operator task/API或目标路径能力时明确阻塞，不拿同算子名替代版本/情境核验&quot;,
+  &quot;缺少字段留未知，不自动扩搜，不自动入库或继承人工ACCEPT&quot;,
+  &quot;Agent独立新上下文，完整读取要求的文件与选段，超限明确BLOCKED；协调器只持有ID/状态/路径，不每10条询问继续&quot;
+]</pre><h3>回写独立状态</h3><pre>{
+  &quot;status&quot;: &quot;NOT_IMPLEMENTED_NOT_EXECUTED&quot;,
+  &quot;required_artifacts&quot;: [
+    &quot;job/attempt identity&quot;,
+    &quot;raw input and config hashes&quot;,
+    &quot;runtime/source version separation&quot;,
+    &quot;native ATK log/xlsx&quot;,
+    &quot;golden/threshold and per-case metrics&quot;,
+    &quot;actual path/protocol observations&quot;
+  ],
+  &quot;independent_statuses&quot;: [
+    &quot;classification&quot;,
+    &quot;rule_generation&quot;,
+    &quot;input_materialization&quot;,
+    &quot;path_coverage&quot;,
+    &quot;execution_result&quot;,
+    &quot;failure_reproduction&quot;,
+    &quot;mechanism_confirmation&quot;
+  ],
+  &quot;never_infer&quot;: [
+    &quot;标签→测试已生成&quot;,
+    &quot;ATK JSON→真实stride/状态已构造&quot;,
+    &quot;Queue completed→accuracy通过&quot;,
+    &quot;accuracy False→具体CANN根因确认&quot;,
+    &quot;report checker通过→HARDWARE_VALIDATED&quot;
+  ]
+}</pre></section><section id="plan"><h2>6. 模块、Agent边界与分期门槛</h2><div class="scroll"><table><thead><tr><th>模块</th><th>复用</th><th>Agent职责</th><th>最小新增/限制</th></tr></thead><tbody><tr><td>既有Baseline Builder</td><td>0.1.17的原42核对、A1-A4、六维横向审查、失效与冻结</td><td>定义/双轴归类/执行指导及横向语义审查</td><td>不重写Init。现场完成原30条后再消费其当前冻结版本；附件新增的evidence/gaps两TSV作为下一开发切片，不假称已有六文件输出。</td></tr><tr><td>既有发现与证据链</td><td>Wiki优先、原始链接全部整理、独立摘要、来源分级与work_id</td><td>真实网站搜索/正文采集/事实对照，仍由OpenChamber/OpenCode及用户登录</td><td>Baseline验收前不启动62条或新的批量发现；同一快照摘要继续共享。</td></tr><tr><td>独立PrecisionTesting Bridge</td><td>冻结mode_records、source/evidence refs及现有文件桥接</td><td>明确选用的算子任务和适用子问题/构造理由</td><td>未来只新增导出/上下文绑定/严格验收/回写接口，不建新网站或模型客户端。本轮仅完成接口设计。</td></tr><tr><td>规则生成与预检</td><td>目标仓库openskill、workspace、native规则、schema/coverage/prepare</td><td>结合原机理和合法API域设计输入并自检</td><td>独立known-pattern任务模式；非API协议、正式/diagnostic结果及WARNING分流。</td></tr><tr><td>执行及结果验真</td><td>目标atk_queue及原始日志、xlsx、attempt机制</td><td>精度分析与有证据的根因假设</td><td>实际执行需获准环境；按case/attempt回写原始证据，不自动确认机理或更改知识库。</td></tr><tr><td>演进审批与HTML统计</td><td>当前提案/历史/正式入库门禁与HTML统计</td><td>区别已有覆盖、扩展详情、新CANN模式及独立42/V4扩展建议</td><td>变更由专家审批；统计区分模式、case/子问题、标签、规则、job/attempt、路径和复现，不能相加混用。</td></tr></tbody></table></div><div class="scroll"><table><thead><tr><th>阶段</th><th>实际状态</th><th>本轮边界</th></tr></thead><tbody><tr><td>A 仓库只读审查</td><td>COMPLETE_FOR_PINNED_COMMIT</td><td>准确仓库与72c62d2已核对；公共链路和Expm1样本已查；不是151算子逐项验收</td></tr><tr><td>B 原始42核对</td><td>COMPLETE_WITH_RECORDED_REPRESENTATION_DIFFERENCES</td><td>35+7；3项HTML实体表示差异；各自冻结Hash，不自动替换</td></tr><tr><td>C Adapter接口</td><td>DESIGN_READY_NOT_IMPLEMENTED</td><td>本报告给出字段/作用域/绑定/状态合同及所需适配；没有伪称Adapter已经可运行</td></tr><tr><td>D 原30条Baseline v1</td><td>ONSITE_ACCEPTANCE_REQUIRED</td><td>本轮未读取现场state或提交30条模型结果；沿用0.1.17 A1-A4及横向审查，核验当前已冻结版本</td></tr><tr><td>E 代表性模式生成</td><td>BLOCKED_PENDING_BASELINE_AND_BRIDGE</td><td>先通过Baseline门槛，再验证规则生成/Schema/Coverage/JSON物化；本轮合成探针不算代表性模式验收</td></tr><tr><td>F 新故障批量发现/增量</td><td>NOT_STARTED</td><td>两道验收门槛通过后恢复；不将CODE或未知分类直接认定体系扩展</td></tr><tr><td>G NPU/GPU与回写</td><td>NOT_RUN</td><td>没有启动环境、提交job或运行硬件；结果需实际日志与路径证据</td></tr></tbody></table></div><h3>两道正式门槛</h3><p><b>Gate 1：</b>原30条A1-A4及横向审查完成，核对原42与V4定义、当前有效性、未知和冲突后显式冻结Baseline v1。没有历史Wiki不阻塞MODE_DEFINITION/条件归类，但不能因此伪造SOURCE_VERIFIED或HARDWARE_VALIDATED。</p><p><b>Gate 2：</b>代表性模式能通过独立Bridge生成可追溯规则，并完成合法域、覆盖/预算、原生JSON与能力边界验收。CODE-only/E协议不得靠虚假42标签满足条件。只有通过后才恢复批量增量；设备执行另行验收。</p><pre>[
+  &quot;先由OpenCode现场核验/完成30条A1-A4与横向审查，明确冻结Baseline v1及缺口&quot;,
+  &quot;仅实现独立Bridge上下文导出及native rule绑定；原42和V4独立，协议注明known-pattern&quot;,
+  &quot;加入正式/smoke/非API路径验收与重复执行身份；不要通过伪标签清WARNING&quot;,
+  &quot;选择少量已知机理样本验证生成与物化，完成第二门槛后才恢复批量与实际设备执行&quot;
+]</pre></section><section id="validation"><h2>7. 实际验证与数据保护</h2><p>Python 3.12.14，隔离PyYAML 6.0.3，PYTHONUTF8=1。7个探针均观察到预期边界；这不是7个真实故障通过测试。本轮由Codex完成，本机未找到OpenCode CLI，也未探测OpenChamber原生子agent权限；现场仍可复用原生worker和文件协议，不必因此新增模型客户端。</p><details><summary>warning_with_exit_zero</summary><pre>{
+  &quot;id&quot;: &quot;warning_with_exit_zero&quot;,
+  &quot;executed&quot;: true,
+  &quot;exit_code&quot;: 0,
+  &quot;warning_count&quot;: 4,
+  &quot;pass_text_present&quot;: true,
+  &quot;meaning&quot;: &quot;Core format success does not establish full case budget, complete trigger ledger or semantic coverage&quot;
+}</pre></details><details><summary>operator_legality_not_a_general_schema_gate</summary><pre>{
+  &quot;id&quot;: &quot;operator_legality_not_a_general_schema_gate&quot;,
+  &quot;executed&quot;: true,
+  &quot;structure_errors&quot;: [],
+  &quot;structure_warnings&quot;: [],
+  &quot;materialized_json_cases&quot;: 1,
+  &quot;skipped_cases&quot;: 0,
+  &quot;meaning&quot;: &quot;Unsupported dtype/invalid dimension contents can satisfy the common format validator; no operator-specific legality or device run is implied&quot;
+}</pre></details><details><summary>materialization_and_normalization</summary><pre>{
+  &quot;id&quot;: &quot;materialization_and_normalization&quot;,
+  &quot;executed&quot;: true,
+  &quot;materialized_retains_trigger_refs&quot;: true,
+  &quot;materialized_retains_inputs&quot;: true,
+  &quot;normalized_case_keys&quot;: [
+    &quot;config&quot;,
+    &quot;id&quot;,
+    &quot;inputs&quot;
+  ],
+  &quot;normalization_drops_generate_intent&quot;: true,
+  &quot;normalization_drops_trigger_refs&quot;: true,
+  &quot;meaning&quot;: &quot;ATK-ready JSON can be reused; normalized internal_suite is a lossy audit transport&quot;
+}</pre></details><details><summary>same_inputs_different_labels_are_not_reported_as_duplicates</summary><pre>{
+  &quot;id&quot;: &quot;same_inputs_different_labels_are_not_reported_as_duplicates&quot;,
+  &quot;executed&quot;: true,
+  &quot;same_input_specification&quot;: true,
+  &quot;duplicate_warnings&quot;: [],
+  &quot;meaning&quot;: &quot;Deduplicate physical test work independently from label attribution; deliberate E1 repetitions still need an explicit protocol&quot;
+}</pre></details><details><summary>code_only_case_cannot_clear_primary_api_trigger_warning</summary><pre>{
+  &quot;id&quot;: &quot;code_only_case_cannot_clear_primary_api_trigger_warning&quot;,
+  &quot;executed&quot;: true,
+  &quot;library_entries&quot;: 42,
+  &quot;all_ledger_entries_assessed&quot;: true,
+  &quot;errors&quot;: [],
+  &quot;warnings&quot;: [
+    &quot;suite cases missing a primary trigger budget entry: 0&quot;
+  ],
+  &quot;meaning&quot;: &quot;Do not invent an API42 label to clear a warning for a genuinely execution-only condition; formal acceptance needs a dedicated non-API path&quot;
+}</pre></details><details><summary>report_gate_does_not_verify_job_or_log_existence</summary><pre>{
+  &quot;id&quot;: &quot;report_gate_does_not_verify_job_or_log_existence&quot;,
+  &quot;executed&quot;: true,
+  &quot;presentation_validation_errors&quot;: [],
+  &quot;real_job_exists&quot;: false,
+  &quot;real_log_exists&quot;: false,
+  &quot;meaning&quot;: &quot;Report consistency is not hardware evidence; an importer must independently verify artifacts and job identity&quot;
+}</pre></details><details><summary>pass_is_not_all_cases_executed</summary><pre>{
+  &quot;id&quot;: &quot;pass_is_not_all_cases_executed&quot;,
+  &quot;executed&quot;: true,
+  &quot;derived_task_status&quot;: &quot;pass&quot;,
+  &quot;execution_success&quot;: 1,
+  &quot;execution_error&quot;: 2,
+  &quot;meaning&quot;: &quot;Preserve per-case execution and path gaps rather than marking an entire mode hardware covered&quot;
+}</pre></details><pre>{
+  &quot;target_tracked_files_modified&quot;: false,
+  &quot;faultaudit_runtime_changed&quot;: false,
+  &quot;production_state_opened&quot;: false,
+  &quot;production_state_modified&quot;: false,
+  &quot;init_content_published&quot;: false,
+  &quot;automatic_accept_or_adoption&quot;: false,
+  &quot;full_regression_run&quot;: false,
+  &quot;original30_semantic_classification_run&quot;: false,
+  &quot;npu_gpu_tests_run&quot;: false
+}</pre><h3>交付与中间件</h3><p>主要交付只含repository_audit.html及repository_audit.json；原始Init与现场state未复制进报告。</p><div class="scroll"><table><thead><tr><th>相对路径</th><th>用途</th></tr></thead><tbody><tr><td>PrecisionTesting/</td><td>独立只读源码审查副本，保留HEAD与稀疏范围</td></tr><tr><td>api42_comparison.json</td><td>两份原42完整定义核对回执，私有中间件不提交</td></tr><tr><td>probe_results.json</td><td>7个合成接口边界探针的聚合结果</td></tr><tr><td>synthetic_*_workspace/</td><td>合成反例，明确不能作为设备或真实故障证据</td></tr><tr><td>probe_deps/</td><td>隔离PyYAML依赖，不修改共享环境</td></tr></tbody></table></div></section><footer><p>完整结构化审查数据：<a href="repository_audit.json">repository_audit.json</a>。本报告没有修改PrecisionTesting原任务/Prompt/知识库，也不批准或执行正式模式变更。</p></footer></main></body></html>
