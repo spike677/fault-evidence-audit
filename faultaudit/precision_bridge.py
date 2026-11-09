@@ -161,13 +161,13 @@ def _protocol(protocol, binding, rules):
     if target_call.role != "TARGET" or target_call.case_id != binding.case_id:
         raise AuditError("The named comparison target must be the target participant")
     expected_inputs = rules[binding.case_id]["inputs"]
-    if any(p.role == "TARGET" and rules[p.case_id]["inputs"] != expected_inputs for p in protocol.participants):
+    if any(p.role == "TARGET" and digest(rules[p.case_id]["inputs"]) != digest(expected_inputs) for p in protocol.participants):
         raise AuditError("All compared target invocations must preserve target arguments")
     if protocol.method_id in {"E2", "E4"}:
         compared = [p for p in protocol.participants if p.role == "TARGET" or protocol.method_id == "E4" and p.role == "INTERFERER"]
         for participant in compared:
             if not any(p.role == "CONTROL" and p.output_owner == participant.output_owner
-                    and rules[p.case_id]["inputs"] == rules[participant.case_id]["inputs"] for p in protocol.participants):
+                    and digest(rules[p.case_id]["inputs"]) == digest(rules[participant.case_id]["inputs"]) for p in protocol.participants):
                 raise AuditError("Each compared target/interferer needs its own serial control and output ownership")
     roles = [p.role for p in protocol.participants]
     if (protocol.method_id == "E1" and (protocol.repeats < 2 or not protocol.reset_policy.strip())
@@ -261,6 +261,20 @@ def validate_draft(context, draft, suite_path):
 
 def bind(store, context_value, suite, assignment, output):
     context = current_context(context_value, store)
+    if isinstance(assignment, dict) and assignment.get("outcome") == "BLOCKED":
+        request = draft_request(context.model_dump(), suite)
+        if (assignment.get("request_hash") != request["request_hash"]
+                or assignment.get("reason_code") != "EXECUTOR_CONTEXT_LIMIT"
+                or not isinstance(assignment.get("reason"), str) or not assignment["reason"].strip()):
+            raise AuditError("Executor blocking requires the current OUTER hash, context-limit code and reason")
+        block = {"schema_version": "cann_precision_binding_block.v1", "status": "BLOCKED",
+            "reason": "EXECUTOR_CONTEXT_LIMIT", "context_hash": context.context_hash,
+            "suite_sha256": target.file_hash(suite), "raw_response": assignment,
+            "binding_created": False, "hardware_validated": False, "state_written": False}
+        path = target.protect_output(output, store=store, repo=context.target["repo_path"])
+        target.immutable_json(path, block)
+        return {"block": str(path), "status": "BLOCKED", "reason": block["reason"],
+            "binding_created": False, "state_written": False}
     draft, works, _ = validate_draft(context, assignment, suite)
     body = {"schema_version": "cann_precision_bindings.v1", "bridge_policy_hash": policy_hash(),
         "draft": draft.model_dump(), "execution_work_ids": works}

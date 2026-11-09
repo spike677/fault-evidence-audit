@@ -62,7 +62,8 @@ def run(args):
             return {"request": str(args.out.resolve()), "task_id": request["task_id"], "request_hash": request["request_hash"],
                 "input_budget": request["input_budget"], "status": "WAITING_AGENT", "state_written": False}, 0
         if action == "bind":
-            return bridge.bind(store, context.model_dump(), args.suite, target.read_json(args.assignments), args.out), 0
+            result = bridge.bind(store, context.model_dump(), args.suite, target.read_json(args.assignments), args.out)
+            return result, 2 if result.get("status") == "BLOCKED" else 0
         if args.timeout < 1:
             raise AuditError("Native checker timeout must be positive")
         report = gate.check(store, context.model_dump(), target.read_json(args.bindings), args.workspace,

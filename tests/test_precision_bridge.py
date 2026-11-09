@@ -78,6 +78,11 @@ class PrecisionBridgeTests(unittest.TestCase):
         for name, kind in zip(target.CHECKERS, ('schema', 'coverage', 'prepare')):
             (self.repo / name).write_text(CHECKER.replace('KIND', repr(kind)), encoding='utf-8')
             self.committed[name] = (self.repo / name).read_bytes()
+        for name in target.WORKFLOW:
+            path=self.repo/name;path.parent.mkdir(parents=True,exist_ok=True)
+            path.write_text('Synthetic workflow instructions; no device execution.\n',encoding='utf-8')
+        for name in (*target.WORKFLOW,'docs/trigger_library.md','prompts/'+self.slug+'.md'):
+            self.committed[name]=(self.repo/name).read_bytes()
         self.remote = target.REPOSITORY; self.head = target.AUDITED_COMMIT
         self.git_patch = patch('faultaudit.precision_target._git', side_effect=self.fake_git)
         self.git_patch.start(); self.addCleanup(self.git_patch.stop)
@@ -419,6 +424,23 @@ class PrecisionBridgeTests(unittest.TestCase):
         self.assertIn('ATK_JSON_DIFFERS_FROM_UPSTREAM_MATERIALIZATION',report['errors'])
         self.assertFalse(report['formal_suite_ready'])
 
+    def test_json_numeric_types_are_not_silently_equated_during_materialization_check(self):
+        draft=self.draft();bound=self.root/'bound.json'
+        bridge.bind(self.store,self.context,self.suite,draft,bound)
+        native=copy.deepcopy(self.rules)
+        for row in native:row.update(target.read_json(self.task/'02_atk_run/atk_run_config.json')['atk_config']['case_template'])
+        native[0]['id']=0.0
+        self.assertEqual(native[0]['id'],0)  # Python equality alone is insufficient.
+        atk=self.root/'float-id.json';self.write(atk,native)
+        report=gate.check(self.store,self.context,target.read_json(bound),self.workspace,suite=self.suite,atk_suite=atk)
+        self.assertIn('ATK_JSON_DIFFERS_FROM_UPSTREAM_MATERIALIZATION',report['errors'])
+        self.assertFalse(report['formal_suite_ready'])
+
+    def test_shared_workflow_prompt_is_part_of_the_readonly_target_identity(self):
+        (self.repo/target.WORKFLOW[0]).write_text('changed workflow instructions',encoding='utf-8')
+        with self.assertRaisesRegex(AuditError,'differs from the reviewed'):
+            bridge.current_context(self.context,self.store)
+
     def test_missing_semantic_facts_and_missing_final_atk_artifact_remain_visible(self):
         draft=self.draft();draft['rules'][0]['semantic_review']['status']='NEEDS_FACTS'
         report=self.bind_and_check(draft)
@@ -440,6 +462,17 @@ class PrecisionBridgeTests(unittest.TestCase):
         self.assertEqual(task['input_budget']['chars'],serialized_chars(task))
         with patch.dict('os.environ',{'FAULTAUDIT_MAX_INPUT_CHARS':'10'}):
             with self.assertRaises(InputTooLarge):bridge.draft_request(self.context,self.suite)
+
+    def test_executor_context_limit_is_a_preserved_block_not_a_binding_or_model_success(self):
+        request=bridge.draft_request(self.context,self.suite)
+        response={'request_hash':request['request_hash'],'outcome':'BLOCKED',
+            'reason_code':'EXECUTOR_CONTEXT_LIMIT','reason':'The complete task cannot fit this synthetic execution context'}
+        out=self.root/'blocked.json'
+        result=bridge.bind(self.store,self.context,self.suite,response,out)
+        self.assertEqual(result['status'],'BLOCKED');self.assertFalse(result['binding_created'])
+        self.assertEqual(target.read_json(out)['raw_response'],response)
+        response['request_hash']='a'*64
+        with self.assertRaises(AuditError):bridge.bind(self.store,self.context,self.suite,response,self.root/'forged-block.json')
 
     def test_cli_uses_read_only_state_and_returns_pending_for_no_materialized_output(self):
         from faultaudit.cli import main

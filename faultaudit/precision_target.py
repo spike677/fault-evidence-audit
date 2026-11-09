@@ -14,6 +14,8 @@ from .trigger_taxonomy import load_taxonomy
 AUDITED_COMMIT = "72c62d2deab7cac9cce2061034167e22ef45a140"
 REPOSITORY = "https://gitcode.com/yunqixuan/PrecisionTesting.git"
 CHECKERS = ("scripts/verify_schema.py", "scripts/verify_trigger_coverage.py", "scripts/prepare_atk_submission.py")
+WORKFLOW = ("openskill/00_prepare_task.md", "openskill/01_generate_test_rules.md",
+            "openskill/02_run_atk_verification.md", "openskill/03_analyze_precision_report.md")
 
 
 def file_hash(path):
@@ -63,13 +65,13 @@ def describe(repo, slug, *, expected_commit=AUDITED_COMMIT):
         raise AuditError("TARGET_REAUDIT_REQUIRED: checkout does not match the explicitly reviewed commit")
     if head != AUDITED_COMMIT:
         raise AuditError("TARGET_REAUDIT_REQUIRED: update this Bridge release after reviewing the new target commit")
-    protected = [*CHECKERS, "docs/trigger_library.md", "tasks/" + slug, "prompts/" + slug + ".md"]
+    protected = [*CHECKERS, *WORKFLOW, "docs/trigger_library.md", "tasks/" + slug, "prompts/" + slug + ".md"]
     if _git(repo, "status", "--porcelain=v1", "--untracked-files=no", "--", *protected):
         raise AuditError("PrecisionTesting selected source assets have uncommitted changes")
-    for relative in CHECKERS:
+    for relative in (*CHECKERS, *WORKFLOW, "docs/trigger_library.md", "prompts/" + slug + ".md"):
         committed = subprocess.check_output(["git", "-C", str(repo), "show", "HEAD:" + relative], timeout=30)
         if (repo / relative).read_bytes().replace(b"\r\n", b"\n") != committed.replace(b"\r\n", b"\n"):
-            raise AuditError("Native checker differs from the reviewed Git source: " + relative)
+            raise AuditError("Protected target asset differs from the reviewed Git source: " + relative)
     task = inside(repo / "tasks", slug)
     config = read_json(task / "02_atk_run/atk_run_config.json")
     if config.get("slug") != slug or not config.get("atk_config", {}).get("target_aclnn_name"):
@@ -80,6 +82,7 @@ def describe(repo, slug, *, expected_commit=AUDITED_COMMIT):
         "api_name": config["atk_config"]["target_aclnn_name"], "task_assets": _manifest(task),
         "prompt_sha256": file_hash(repo / "prompts" / (slug + ".md")),
         "checker_sha256": {p: file_hash(repo / p) for p in CHECKERS},
+        "workflow_sha256": {p: file_hash(repo / p) for p in WORKFLOW},
         "library_file_sha256": file_hash(library),
         "library_text_sha256": hashlib.sha256(library.read_text(encoding="utf-8").encode("utf-8")).hexdigest(),
         "api42_items": taxonomy["items"], "api42_families": taxonomy["families"], "api42_context": taxonomy["context"],
@@ -181,7 +184,7 @@ def protect_output(path, *, store=None, repo=None):
 def immutable_json(path, value):
     path = Path(path)
     if path.exists():
-        if read_json(path) != value:
+        if digest(read_json(path)) != digest(value):
             raise AuditError("Existing Bridge artifact differs; choose a new path and retain history")
     else:
         path.parent.mkdir(parents=True, exist_ok=True)

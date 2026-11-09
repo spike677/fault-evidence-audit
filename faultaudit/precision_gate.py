@@ -77,7 +77,7 @@ def check(store, context_value, bound_value, workspace, *, suite=None, atk_suite
     methods = sorted({p.method_id for b in draft.rules for p in b.protocols})
     materialized_matches = False
     if atk_suite is not None:
-        materialized_matches = target.read_json(atk_suite) == witness
+        materialized_matches = digest(target.read_json(atk_suite)) == digest(witness)
         if not materialized_matches: errors.append("ATK_JSON_DIFFERS_FROM_UPSTREAM_MATERIALIZATION")
     duplicate = defaultdict(list)
     for case_id, identity in works.items(): duplicate[identity].append(int(case_id))
@@ -94,6 +94,7 @@ def check(store, context_value, bound_value, workspace, *, suite=None, atk_suite
         "rule_design_ready": ready, "semantic_review": {"kind": "AGENT_DECLARATION_WITH_VERIFIED_QUOTES_NOT_A_TRUTH_ORACLE", "case_status": reviews},
         "errors": errors, "semantic_pending_case_ids": semantic_pending, "warning_outcomes": warning_outcomes,
         "native_results": results, "inputs_sha256": before, "native_materialization_sha256": digest(witness) if witness is not None else None,
+        "native_materialization_hash_kind": "CANONICAL_JSON_UNICODE_SHA256; distinct from raw file-byte hashes",
         "provided_atk_json_matches_materialization": materialized_matches, "code_only_accepted_design_case_ids": sorted(non_api),
         "execution_method_ids": methods, "execution_capability": "NOT_IMPLEMENTED_BY_BRIDGE", "device_execution": "NOT_RUN",
         "hardware_validated": False, "path_coverage": "NOT_VERIFIED", "mechanism_confirmation": "NOT_ESTABLISHED",
