@@ -190,7 +190,7 @@ def parser() -> argparse.ArgumentParser:
     init = trigger_flow.add_parser("init")
     init.add_argument("--modes", type=Path, required=True)
     init.add_argument("--taxonomy", type=Path, required=True)
-    init.add_argument("--v4", type=Path, help="Freeze V4 alongside independent revised-42 compatibility rules")
+    init.add_argument("--v4", type=Path, help="Original V4 required by default Baseline Builder; API42 remains original")
     init.add_argument("--legacy-dense", action="store_true", help="Explicit legacy response contract; default is V5 sparse")
     init.add_argument("--simple-v5", action="store_true", help="Use the prior single-task sparse Init, without Baseline Builder")
     init.add_argument("--expected-mode-count", type=int, default=30, help="Baseline Builder original mode count")

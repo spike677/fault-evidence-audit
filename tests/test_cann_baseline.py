@@ -44,11 +44,11 @@ class BaselineBuilderTests(unittest.TestCase):
         self.store.close()
         self.temp.cleanup()
 
-    def start(self, count=2, **options):
+    def start(self, count=2, cause='同一调用发生同步竞争，输出有残留', **options):
         book = Workbook(); sheet = book.active
         sheet.append(['故障模式编号', '模式名称', '故障原因', '算子', '案例链接'])
         for i in range(count):
-            sheet.append([f'SYN-{i}', '合成模式' + str(i), '同一调用发生同步竞争，输出有残留', 'SyntheticFoo', ''])
+            sheet.append([f'SYN-{i}', '合成模式' + str(i), cause, 'SyntheticFoo', ''])
         book.save(self.modes)
         cfg = workflow.start_init(self.store, self.modes, self.taxonomy, self.root / 'work',
             executor='codex', v4_source=self.v4, baseline_builder=True, expected_mode_count=count, **options)
@@ -176,6 +176,57 @@ class BaselineBuilderTests(unittest.TestCase):
         self.assertEqual(counts[('V4', 'DESCRIPTION')], 1)
         self.assertEqual(counts[('ORIGINAL42', 'DESCRIPTION')], 0)
 
+    def test_positive_independent_labels_reach_baseline_without_verification_inheritance(self):
+        from tests.v4_fixtures import v4_unknown
+        from faultaudit.trigger_v4 import canonical_conditions
+        self.start(2, cause='合法输入维长65，尾块分块地址步长错误'); self.advance()
+        for task in files.next_tasks(self.store, self.run)['tasks']:
+            request = self.request(task); p = request['payload']; r = self.response(request)
+            if task['kind'] in {'baseline_v4', 'baseline_api42'}:
+                r['condition_facts'][0]['role'] = 'INPUT_SHAPE'
+                cell = r['condition_facts'][0]['source_cells'][0]
+                scheme = 'V4' if task['kind'] == 'baseline_v4' else 'ORIGINAL42'
+                key = 'S5' if scheme == 'V4' else '1.2.4'
+                if scheme == 'V4':
+                    row = next(v for v in v4_unknown(p, r)['v4_rows'] if v['trigger_id'] == key)
+                    child = row['construction_checks'][0]
+                    child.update(applicability='PARTIAL', condition_fact_ids=['F'], source_cells=[cell],
+                        reason='原输入维长与分块线索', construction_recipe='构造粒度边界两侧合法输入；接口粒度仍待补充')
+                    row['construction_checks'] = [child]; r['v4_rows'] = [row]
+                else:
+                    item = next(i for i in p['taxonomy']['items'] if i['id'] == key)
+                    family = next(f for f in p['taxonomy']['families'] if f['family_id'] == item['family_id'])
+                    row = {'trigger_id': key, 'predicate_checks': [{'clause_role': role, 'clause': text, 'result': 'UNKNOWN'}
+                        for role, text in sorted(canonical_conditions(item, family))]}
+                    r['rows'] = [row]
+                row.update(applicability='PARTIAL', relation='UNKNOWN', evidence_basis='SOURCE_DEFINITION',
+                    condition_fact_ids=['F'], source_cells=[cell], reason='按原文条件归类，未确认全部前提')
+                r['classification_summary'] = {'status': 'CLASSIFIED', 'reason': '合成明确输入线索', 'unknowns': ['接口粒度']}
+                r['scenarios'] = [{'scenario_id': 's', 'title': '同一尾块输入', 'condition_fact_ids': ['F'], 'reason': '同一单元格'}]
+                r['label_links'] = [{'scheme': scheme, 'trigger_id': key, 'definition_version': frame_version(p, scheme),
+                    'detail_ids': ['D'], 'scenario_ids': ['s'], 'condition_fact_ids': ['F'],
+                    'construction_ids': [child['construction_id']] if scheme == 'V4' else []}]
+            self.submit(task, r)
+        task = files.next_tasks(self.store, self.run)['tasks'][0]
+        review = self.response(self.request(task)); ids = review['reviewed_mode_ids']
+        records = self.request(task)['payload']['mode_records']
+        review['findings'] = [{'relation': 'SHARED_CONSTRUCTION', 'mode_ids': ids,
+            'reason': '共用合成构造线索，不证明相同失效机理', 'source_fact_ids': {m['mode_id']: ['A1:F'] for m in records}}]
+        next(c for c in review['comparison_checks'] if c['dimension'] == 'SHARED_CONSTRUCTION')['finding_indexes'] = [0]
+        self.submit(task, review)
+        frozen = workflow.finalize(self.store, self.run, allow_pending=True)
+        for mode in frozen['mode_records']:
+            self.assertEqual(mode['v4_theme_ids'], ['S'])
+            self.assertEqual(mode['v4_class_ids'], ['S5'])
+            self.assertEqual(len(mode['v4_scenario_ids']), 1)
+            self.assertNotIn('S5', mode['v4_scenario_ids'])
+            self.assertEqual(mode['api_trigger_ids'], ['1.2.4'])
+            self.assertEqual(mode['execution_method_ids'], ['E3'])
+            self.assertFalse(mode['validation_status']['SOURCE_VERIFIED'])
+            self.assertFalse(mode['validation_status']['HARDWARE_VALIDATED'])
+        self.assertEqual(len(frozen['mode_ids']), 2)
+        self.assertEqual(self.store.records(self.run, 'reviews'), [])
+
     def test_cross_review_is_required_even_with_allow_pending_and_checks_every_dimension(self):
         self.start(2)
         with self.assertRaisesRegex(AuditError, 'A1-A4'): workflow.finalize(self.store, self.run, allow_pending=True)
@@ -263,6 +314,17 @@ class BaselineBuilderTests(unittest.TestCase):
 
 
 class IndependentAxisGateTests(unittest.TestCase):
+    def test_all_builder_tasks_report_context_limits_as_transport_blocks(self):
+        from faultaudit.knowledge_common import SEMANTIC_KINDS
+        from faultaudit.workflow_driver import executor_blocked
+        for kind in SEMANTIC_KINDS:
+            request = {'kind': kind, 'request_hash': HASH}
+            response = {'request_hash': HASH, 'outcome': 'BLOCKED', 'reason_code': 'EXECUTOR_CONTEXT_LIMIT',
+                'reason': 'Complete frozen input cannot fit this execution session'}
+            self.assertTrue(executor_blocked(request, response))
+            response['request_hash'] = 'forged'
+            with self.assertRaises(AuditError): executor_blocked(request, response)
+
     def test_original42_link_cannot_use_revised42_or_v4_crosswalk(self):
         p, r = sparse_attempt(); p.update(baseline_axis='API42', input_condition_scheme='ORIGINAL42')
         with self.assertRaises(AuditError): validate_assessment(p, r, HASH)
