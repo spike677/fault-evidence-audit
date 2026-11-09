@@ -526,4 +526,6 @@ class PrecisionBridgeTests(unittest.TestCase):
         self.assertNotEqual(result['report_json'],next_result['report_json'])
         self.assertEqual(Path(result['report_json']).read_bytes(),first)
         self.assertIn('未执行',Path(result['report_html']).read_text(encoding='utf-8'))
+        self.assertIn('CANN真实失效机理',Path(result['report_html']).read_text(encoding='utf-8'))
+        self.assertIn(self.mode['failure_mechanism']['text'],Path(result['report_html']).read_text(encoding='utf-8'))
         self.assertEqual(len(list(out.glob('*.json'))),2)

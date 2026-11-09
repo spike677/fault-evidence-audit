@@ -81,6 +81,16 @@ def check(store, context_value, bound_value, workspace, *, suite=None, atk_suite
         if not materialized_matches: errors.append("ATK_JSON_DIFFERS_FROM_UPSTREAM_MATERIALIZATION")
     duplicate = defaultdict(list)
     for case_id, identity in works.items(): duplicate[identity].append(int(case_id))
+    used_modes = {l.mode_id for b in draft.rules for l in b.mode_links}
+    source_modes = [{k:m[k] for k in ("mode_id", "mode_name", "failure_mechanism", "validation_status", "evidence_index")}
+        for m in context.modes if m["mode_id"] in used_modes]
+    api_selected = {k for b in draft.rules for k in b.api_trigger_ids}
+    v4_selected = {k for b in draft.rules for l in b.mode_links for k in l.v4_class_ids}
+    construction_selected = {k for b in draft.rules for l in b.mode_links for k in l.v4_scenario_ids}
+    api_taxonomy = context.api42.get("taxonomy", context.api42)
+    condition_definitions = {"api42": [i for i in api_taxonomy["items"] if i["id"] in api_selected],
+        "v4_classes": [i for i in (context.v4 or {}).get("items", []) if i["id"] in v4_selected],
+        "v4_constructions": [i for i in (context.v4 or {}).get("constructions", []) if i["id"] in construction_selected]}
     ready = not errors and not semantic_pending
     native_status = ("BLOCKED" if errors else "NEEDS_SEMANTIC_FACTS" if semantic_pending else
         "PROTOCOL_DESIGN_ONLY" if methods else "DIAGNOSTIC_ONLY" if diagnostic else
@@ -99,6 +109,8 @@ def check(store, context_value, bound_value, workspace, *, suite=None, atk_suite
         "execution_method_ids": methods, "execution_capability": "NOT_IMPLEMENTED_BY_BRIDGE", "device_execution": "NOT_RUN",
         "hardware_validated": False, "path_coverage": "NOT_VERIFIED", "mechanism_confirmation": "NOT_ESTABLISHED",
         "root_cause_or_event_confirmed": False, "automatic_adoption": False, "human_accept_created": False, "state_written": False,
+        "mode_sources": source_modes, "selected_condition_definitions": condition_definitions,
+        "attribution_semantics": "NEW_TEST_DESIGN_LINKS; NO_SAME_EVENT_OR_HISTORICAL_SAME_SCENARIO_INHERITANCE",
         "review_required": "CONFLICT" in reviews.values(),
         "statistics": {"unique_native_case_ids": len(draft.rules), "unique_input_spec_work_ids": len(duplicate),
             "mode_ids_with_rules": sorted({l.mode_id for b in draft.rules for l in b.mode_links}),
@@ -119,9 +131,16 @@ def write_report(report, output, *, store=None, repo=None):
     pre = lambda v: "<pre>" + esc(json.dumps(v, ensure_ascii=False, indent=2)) + "</pre>"
     content = '<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Precision Bridge 验收</title><style>body{font:15px/1.7 system-ui,sans-serif;background:#f5f7fa;color:#18314a;margin:0}main{max-width:1050px;margin:auto;padding:24px}section{background:white;border:1px solid #dae3eb;border-radius:8px;padding:20px;margin:16px 0}pre{white-space:pre-wrap;overflow-wrap:anywhere;font:13px/1.6 ui-monospace,monospace}h1{font-size:26px}summary{cursor:pointer}</style></head><body><main>'
     content += '<h1>Precision Bridge · ' + esc(report["status"]) + '</h1><p>' + esc(report["purpose"]) + ' · ' + esc(report["native_suite_status"]) + '</p><p>设计、原生JSON就绪与实机验证分别记录。CODE-only及E1-E5设计通过不等于目标路径已命中。本工具没有执行NPU/GPU或创建人工ACCEPT。</p>'
+    content += '<section><h2>CANN真实失效机理与来源</h2><p>以下是已有模式的原始声明及引用，不是本次新增的根因确认。新测试中的标签组合不继承历史资料的同一事件或同情景关系。</p>'
+    if not report["mode_sources"]:
+        content += '<p>盲测上下文没有导出已有模式知识。</p>'
+    for mode in report["mode_sources"]:
+        content += '<h3>' + esc(mode["mode_id"] + ' · ' + mode["mode_name"]) + '</h3><p>' + esc(mode["failure_mechanism"]["text"]) + '</p>' + pre(mode)
+    content += '</section>'
     for title, value in (("门禁与缺口", {k:report[k] for k in ("errors","semantic_pending_case_ids","formal_suite_ready","rule_design_ready","execution_method_ids")}),
         ("计数口径",report["statistics"]), ("WARNING逐项处理（原文保留）",report["warning_outcomes"]),
-        ("规则到模式、条件及执行规程的溯源",report["binding_details"]), ("Baseline与输入身份",{k:report[k] for k in ("baseline","context_hash","binding_hash","inputs_sha256")}),
+        ("规则到模式、条件及执行规程的溯源",report["binding_details"]), ("所选条件的完整定义（各轴独立）",report["selected_condition_definitions"]),
+        ("Baseline与输入身份",{k:report[k] for k in ("baseline","context_hash","binding_hash","inputs_sha256")}),
         ("原生校验器记录",report["native_results"])):
         content += '<section><h2>' + esc(title) + '</h2>' + pre(value) + '</section>'
     content += '<p>完整数据：<a href="' + esc(path.name) + '">' + esc(path.name) + '</a>。状态与历史保留；未执行结果不计实机覆盖。</p></main></body></html>'
