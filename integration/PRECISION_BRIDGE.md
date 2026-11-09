@@ -68,13 +68,17 @@ python run_faultaudit.py --state STATE precision-bridge check --context work/pre
 | 原生错误、依赖缺失、未知WARNING | BLOCKED；退出0也不能升级 |
 | 正式suite不足max_cases | BLOCKED，不改任务配置 |
 | 显式`--diagnostic-smoke` | 只解释已识别的数量WARNING，标为DIAGNOSTIC_ONLY，永不冒充正式完成 |
-| CODE-only、冻结A3有积极非API依据和真实源码引用 | 独立非API规则绑定；可完成JSON验收，不强加42标签 |
+| CODE-only、冻结A3有积极非API依据，或有独立`non_api_basis`及真实源码引用 | 独立非API规则绑定；可完成JSON验收，不强加42标签 |
 | CODE-only、只是缺API信息 | 不放行缺主trigger的WARNING，保留缺口 |
 | E1–E5完整设计、原模式方法和源码有依据 | 可自动完成协议设计验收；保持PROTOCOL_DESIGN_ONLY、NOT_RUN，`formal_suite_ready=false` |
 | 缺E协议、伪造执行成功或目标/串行参考不一致 | 拒收 |
 | 缺最终ATK JSON或与上游物化不同 | 不标原生正式suite就绪 |
 
 非API仅解释当前确切的“缺主API trigger预算归属”WARNING，逐case核对；不会清除其他覆盖告警。E1需要重复/复位，E2有P/Q前序及目标对照，E3说明输出预填，E4为目标/干扰者各保留自己的串行参考、实参和输出归属，E5明确参与者配置。所有方法都约束被比较的目标调用；干扰/前序调用允许不同参数。协议是设计结构，当前Bridge没有执行这些方法的能力。
+
+盲测CODE-only不能借用Baseline；可用独立`non_api_basis`记录非API事实角色、原文中实际存在的`positive_fact`、该规则的范围解释和源码精确引用，并由Agent明确核对。程序验证事实原文、范围和声明结构，仍不代替语义判真。仅仅没找到API字段或填入输入形状角色，不会因此放行。盲测不从已有模式继承V4/E方法或历史结论。
+
+单调用CODE路径只接受明确的内部计算依据；输出状态、流、竞态或设备调度仍需要执行协议，不能换成CODE_PATH标签就冒充原生单调用已能表达。盲测原生路线不继承已有E方法知识，缺相应独立能力时保持阻塞。
 
 `formal_suite_ready`仅表示当前原生规则/JSON与绑定验收就绪，不表示模式已复现。分类、生成、JSON物化、路径覆盖、执行、故障复现和根因确认分别记录；`hardware_validated=false`、`path_coverage=NOT_VERIFIED`、`mechanism_confirmation=NOT_ESTABLISHED`始终保持。本版没有结果回写或自动正式知识库修改。
 

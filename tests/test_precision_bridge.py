@@ -65,7 +65,7 @@ class PrecisionBridgeTests(unittest.TestCase):
         (self.repo / 'docs').mkdir(); (self.repo / 'scripts').mkdir(); (self.repo / 'prompts').mkdir()
         shutil.copy2(self.fixture.taxonomy, self.repo / 'docs/trigger_library.md')
         (self.repo / 'prompts' / (self.slug + '.md')).write_text('Synthetic blind task; no real operator.', encoding='utf-8')
-        self.source_text = '// Synthetic only.\n// Legal API domain: self fp32 dimensions are nonnegative.\n// E1 repeat; E2 predecessors; E3 prefill; E4 interference; E5 ranks.\n'
+        self.source_text = '// Synthetic only.\n// Legal API domain: self fp32 dimensions are nonnegative.\n// E1 repeat; E2 predecessors; E3 prefill; E4 interference; E5 ranks.\n// Internal computation uses a fixed accumulation order independent of API controls.\n'
         (self.task / '01_generate/src/kernel.cpp').write_text(self.source_text, encoding='utf-8')
         (self.task / '01_generate/interfaces/operator_doc.md').write_text(self.source_text, encoding='utf-8')
         (self.task / '02_atk_run/atk_runnable/executor.py').write_text('# synthetic, not executed\n', encoding='utf-8')
@@ -135,6 +135,7 @@ class PrecisionBridgeTests(unittest.TestCase):
             else:
                 cell=r['condition_facts'][0]['source_cells'][0]
                 if task['kind']=='baseline_api42' and non_api:
+                    r['condition_facts'][0]['role']='INTERNAL_COMPUTATION'
                     r['classification_summary']={'status':'NOT_APPLICABLE','reason':'明确执行条件独立于API输入轴','exclusion_fact_ids':['F']}
                 else:
                     r['condition_facts'][0]['role']='INPUT_SHAPE'
@@ -309,6 +310,35 @@ class PrecisionBridgeTests(unittest.TestCase):
         self.assertFalse(report['actual_agent_context_isolation_attested'])
         draft=self.draft(context);draft['rules'][0]['mode_links']=self.draft()['rules'][0]['mode_links']
         with self.assertRaises(AuditError):bridge.bind(None,context,self.suite,draft,self.root/'bad.json')
+
+    def test_blind_code_only_uses_independent_positive_source_basis_not_baseline_knowledge(self):
+        path=self.root/'blind.json';bridge.export_blind(self.repo,self.slug,path)
+        context=target.read_json(path)
+        self.rules[0]['trigger_library_ref']=['CODE-internal: synthetic internal output-state dimension']
+        self.write(self.suite,self.rules)
+        draft=self.draft(context);b=draft['rules'][0]
+        b.update(api_trigger_ids=[],code_ids=['internal'],code_justifications=[{'code_id':'internal','kind':'CODE_PATH',
+            'reason':'原算子源码中的独立非API维度','source_evidence':[self.citation()]}],
+            non_api_basis={'role':'INTERNAL_COMPUTATION','positive_fact':'fixed accumulation order','scope_reason':'本规则的内部计算维度，不声称整个API轴不适用',
+                'source_evidence':[{'path':'01_generate/src/kernel.cpp','line':4,'quote':self.source_text.splitlines(keepends=True)[3]}]})
+        report=self.bind_and_check(draft,context=context)
+        self.assertTrue(report['formal_suite_ready'])
+        self.assertEqual(report['native_suite_status'],'FORMAL_READY_WITH_NON_API_BINDING')
+        self.assertIsNone(report['baseline']);self.assertFalse(report['hardware_validated'])
+
+    def test_non_api_code_basis_requires_a_positive_quoted_fact_not_an_api_role_or_missing_field(self):
+        draft=self.code_case(None,method=None,kind='CODE_PATH')
+        draft['rules'][0]['non_api_basis']={'role':'OUTPUT_STATE','positive_fact':'No such observation exists',
+            'scope_reason':'缺API不能当非API结论','source_evidence':[self.citation()]}
+        with self.assertRaisesRegex(AuditError,'positive non-API fact'):
+            bridge.bind(self.store,self.context,self.suite,draft,self.root/'bad.json')
+        draft['rules'][0]['non_api_basis']['role']='INPUT_SHAPE'
+        with self.assertRaises(AuditError):bridge.bind(self.store,self.context,self.suite,draft,self.root/'bad.json')
+        draft['rules'][0]['non_api_basis']={'role':'OUTPUT_STATE','positive_fact':'E3 prefill',
+            'scope_reason':'执行条件不能伪装成单调用代码路径','source_evidence':[{
+                'path':'01_generate/src/kernel.cpp','line':3,'quote':self.source_text.splitlines(keepends=True)[2]}]}
+        with self.assertRaisesRegex(AuditError,'complete E protocol'):
+            bridge.bind(self.store,self.context,self.suite,draft,self.root/'bad.json')
 
     def test_unknown_warning_blocks_even_when_native_checkers_exit_zero(self):
         self.write(self.workspace/'synthetic_checker_flags.json',{'warnings':['Unknown new native coverage gap']})

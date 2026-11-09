@@ -92,6 +92,14 @@ class SemanticReview(Contract):
     source_evidence: list[CodeCitation] = Field(default_factory=list)
 
 
+class NonApiBasis(Contract):
+    """A positive local code observation, not an absence-based axis exclusion."""
+    role: Literal["INTERNAL_COMPUTATION", "SYNC_RACE", "STREAM_ASYNC", "OUTPUT_STATE", "DEVICE_SCHEDULING"]
+    positive_fact: str = Field(min_length=1)
+    scope_reason: str = Field(min_length=1)
+    source_evidence: list[CodeCitation] = Field(min_length=1)
+
+
 class RuleBinding(Contract):
     case_id: StrictInt = Field(ge=0)
     inputs_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
@@ -101,6 +109,7 @@ class RuleBinding(Contract):
     code_justifications: list[CodeJustification] = Field(default_factory=list)
     protocols: list[ExecutionProtocol] = Field(default_factory=list)
     semantic_review: SemanticReview
+    non_api_basis: NonApiBasis | None = None
     experiment_seed: StrictInt | None = None
 
 

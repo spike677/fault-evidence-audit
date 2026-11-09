@@ -231,7 +231,12 @@ def validate_draft(context, draft, suite_path):
             if not set(link.v4_scenario_ids) <= constructors:
                 raise AuditError("V4 scenario needs its own explicit construction proof; class IDs are not constructions")
             linked_api.update(link.api_trigger_ids); methods.update(link.execution_method_ids)
-            excluded &= any(r["axis"] == "API42" and r["summary"]["status"] == "NOT_APPLICABLE" for r in mode["classification_rationales"])
+            exclusion_roles = set()
+            for rationale in mode["classification_rationales"]:
+                if rationale["axis"] == "API42" and rationale["summary"]["status"] == "NOT_APPLICABLE":
+                    exclusion_roles.update(mode["evidence_index"].get(rationale["assessment_id"] + ":" + fid, {}).get("role")
+                        for fid in rationale["summary"].get("exclusion_fact_ids", []))
+            excluded &= exclusion_roles == {"INTERNAL_COMPUTATION"}
         if not context.blind_evaluation and linked_api != api:
             raise AuditError("Native API refs cannot be inherited from a different mode or inferred from V4")
         if _unique([p.method_id for p in b.protocols], "E protocols") != methods:
@@ -243,7 +248,17 @@ def validate_draft(context, draft, suite_path):
             for citation in j.source_evidence: target.verify_citation(context.target, citation)
             if j.kind == "EXECUTION_METHOD" and not b.protocols:
                 raise AuditError("Execution-only CODE justification requires a complete E protocol")
-        if codes and not api and not context.blind_evaluation and (b.protocols or excluded):
+        independent_non_api = False
+        if b.non_api_basis:
+            if not codes or not all(j.kind == "CODE_PATH" for j in b.code_justifications):
+                raise AuditError("Independent non-API code basis must belong to actual CODE_PATH references")
+            for citation in b.non_api_basis.source_evidence: target.verify_citation(context.target, citation)
+            if not any(b.non_api_basis.positive_fact in c.quote for c in b.non_api_basis.source_evidence):
+                raise AuditError("A positive non-API fact must occur in its exact code quotation; missing fields are insufficient")
+            if b.non_api_basis.role != "INTERNAL_COMPUTATION" and not b.protocols:
+                raise AuditError("Execution-context evidence needs a complete E protocol, not a single-call CODE_PATH label")
+            independent_non_api = b.semantic_review.status == "CHECKED"
+        if codes and not api and (independent_non_api or not context.blind_evaluation and (b.protocols or excluded)):
             non_api.add(b.case_id)
         if b.semantic_review.status == "CHECKED" and not b.semantic_review.source_evidence:
             raise AuditError("A checked legal-domain claim needs exact operator source/API quotations")
