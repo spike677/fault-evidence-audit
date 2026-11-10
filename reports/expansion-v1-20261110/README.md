@@ -13,16 +13,20 @@
 
 ## 阅读与复现
 
-[下载HTML交互报告](CANN_EXPANSION_CANDIDATE_CATALOG.html)（下载后本地打开） · [19案例完整数据](technical_cases.json) · [证据观察及定位](evidence/observations.json) · [42条件统计](api42_coverage.json) · [42设计索引](api42_test_catalog.json) · [验证记录](validation/publication_validation.json)
+[下载完整HTML结果](CANN_EXPANSION_FULL_RESULTS.html)（单文件，下载后在本地或远端机器打开） · [每案最强证据索引](evidence/STRONGEST_EVIDENCE.md) · [19案例完整数据](technical_cases.json) · [证据观察及定位](evidence/observations.json) · [42条件统计](api42_coverage.json) · [42设计索引](api42_test_catalog.json) · [验证记录](validation/publication_validation.json)
+
+完整HTML包括案例、模式增量/候选、API42、V4、测试、缺口和所有公开证据；完整表示发布内容齐备，不表示42项已覆盖或设备已验收。旧HTML文件名保留为相同内容的兼容入口。GitHub文件页显示HTML源码，下载后打开才能使用交互视图。
 
 ```sh
-python -m faultaudit.review_bundle verify reports/expansion-v1-20261110
+python -m faultaudit.review_bundle evidence reports/expansion-v1-20261110
 python -m faultaudit.review_bundle render reports/expansion-v1-20261110
+python -m faultaudit.review_bundle manifest reports/expansion-v1-20261110
+python -m faultaudit.review_bundle verify reports/expansion-v1-20261110
 python -m unittest discover -s tests -p test_review_bundle.py -v
 node scripts/verify_expansion_publication_ui.cjs reports/expansion-v1-20261110
 ```
 
-这些命令只读取公开包、检查数据/Host算术/代码语法并生成静态报告，不执行所展示的设备配方。
+这些命令只读取公开包、检查数据/Host算术/代码语法并生成静态报告，不执行所展示的设备配方。manifest仅在显式重建后更新哈希，verify不会自动修复或删改数据。
 
 ## 发布边界
 

@@ -2,6 +2,8 @@
 
 2026-11-10：[CANN Expansion 公开技术审查包](reports/expansion-v1-20261110/README.md)已整理19条公开代码案例、23条API42/V4关系、逐项源码定位、42项测试设计索引及可重跑的离线检查。18/19/20三种API42口径独立展示；正式入库和设备执行均为0。原始Init、内部原文及现场state未提交。审查包不改变应用版本或生产流程。
 
+[完整自包含HTML结果](reports/expansion-v1-20261110/CANN_EXPANSION_FULL_RESULTS.html) · [每案最强证据](reports/expansion-v1-20261110/evidence/STRONGEST_EVIDENCE.md)。HTML下载后可在远端机器浏览器打开，不依赖本机路径或外部JSON；GitHub文件页显示源码。
+
 0.1.20定向修复Baseline协议：A1由程序物化原始SOURCE_RECORD，模型只选source_id及字段用途；A2保留三级事实门禁，增加正确/错误示例和具体ID反馈；A3明确稀疏UNKNOWN、特定排除与全轴非API依赖。历史UNKNOWN不能通过REUSE升级。完整原请求与同任务纠错上下文共同检查预算，旧attempt和进程日志保留。已完成A2/A3/A4只有依赖未变且通过当前Validator时才只读复用，旧Policy不改写，旧请求不可继续提交。升级及隔离复测见[SCHEMA_REMEDIATION.md](integration/SCHEMA_REMEDIATION.md)。现场真实OpenCode回放仍需单独验收，不自动ACCEPT、冻结或重采已有证据。
 
 0.1.19修复原run的Baseline恢复：`pin-budget`固定历史160000预算，规划/提交/查询使用同一run配置；A1由程序来源清单绑定真实字段/坐标；`baseline_compatibility`要求Agent逐字段复核历史，结构通过不自动转当前结果。旧响应、旧Policy和人工历史保留，分类依赖每模式选用的一份技术定义，证据清单变化只重做必要阶段。`recovery-plan`提供只读进度和卡点，原30模式的A2/A3/A4应覆盖90个阶段单元。升级和续跑见[BASELINE_RECOVERY.md](integration/BASELINE_RECOVERY.md)，测试记录见[恢复验证回执](examples/baseline_recovery_validation.json)。本版不改42/V4、不扩展Bridge，不自动入库或启动现场drive。

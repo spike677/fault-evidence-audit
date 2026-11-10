@@ -87,8 +87,33 @@ class PublicReviewBundleTests(unittest.TestCase):
             for name in bundle.DATA_FILES.values():
                 p=target/name;p.parent.mkdir(parents=True,exist_ok=True);p.write_bytes((ROOT/name).read_bytes())
             bundle.render(target)
-            for name in ['README.md','CANN_EXPANSION_CANDIDATE_CATALOG.html']:
+            for name in ['README.md','CANN_EXPANSION_FULL_RESULTS.html','CANN_EXPANSION_CANDIDATE_CATALOG.html','evidence/STRONGEST_EVIDENCE.md']:
                 self.assertEqual((target/name).read_bytes(),(ROOT/name).read_bytes())
+
+    def test_every_case_has_primary_evidence_without_event_upgrade(self):
+        data=bundle.read_bundle(ROOT);rows=data['strongest']['entries']
+        self.assertEqual({r['technical_case_id']for r in rows},{c['technical_case_id']for c in data['cases']['cases']})
+        self.assertEqual(len(rows),19)
+        self.assertTrue(all(r['does_not_prove']and not r['formal_mode_adoption']and not r['weekly_event_confirmed']for r in rows))
+
+    def test_gather_primary_uses_rechecked_diff_and_fixed_file(self):
+        e=next(e for e in bundle.read_bundle(ROOT)['strongest']['entries']if e['technical_case_id']=='TC-GATHER-SCALAR-COUNT')
+        self.assertEqual(e['primary_observation_id'],'OBS:TC-GATHER-SCALAR-COUNT:2')
+        self.assertEqual(e['representation'],'EXACT_OBSERVED_DIFF_LINES')
+        self.assertIn('/blob/f1359e5fbab5971b2aeeda58e2fdc5ec8e92fab0/',e['pinned_source_url'])
+
+    def test_four_support_contexts_keep_prior_capture_scope(self):
+        rows=bundle.read_bundle(ROOT)['contexts']['contexts']
+        self.assertEqual({r['source_id']for r in rows},{'CAT-API-BOOL','CAT-TEST-GRAD-DEVICE','CAT-TEST-GRAD-META','CAT-API-GATHER'})
+        self.assertTrue(all(r['capture_origin']=='PRIOR_TARGETED_OBSERVATION'and not r['hardware_executed']for r in rows))
+
+    def test_full_html_alias_and_all_public_sections_are_embedded(self):
+        import re
+        raw=(ROOT/'CANN_EXPANSION_FULL_RESULTS.html').read_bytes()
+        self.assertEqual(raw,(ROOT/'CANN_EXPANSION_CANDIDATE_CATALOG.html').read_bytes())
+        payload=json.loads(re.search(r'<script type="application/json" id="payload">([\s\S]*?)</script>',raw.decode()).group(1))
+        self.assertEqual(payload,bundle.read_bundle(ROOT))
+        self.assertTrue({'increments','candidates','gaps','strongest','contexts'}<=set(payload))
 
 
 if __name__=='__main__':unittest.main(verbosity=2)
