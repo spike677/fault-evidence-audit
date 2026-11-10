@@ -1,0 +1,220 @@
+{
+  "entries": [
+    {
+      "technical_case_id": "TC-PLUGIN-ASYNC",
+      "action": "RELATED_OUT_OF_SCOPE",
+      "proposed_mode_id": null,
+      "mechanism_subtype_id": null,
+      "mechanism_subtype_name": "调频plugin异步资源生命周期",
+      "mechanism_relation": "FUNCTIONAL_OUT_OF_SCOPE",
+      "impact_status": "RESOURCE_LIFECYCLE_FAILURE_REPORTED",
+      "reason": "封装生命周期问题，未证明CANN数值kernel缺陷。",
+      "formal_adoption": false
+    },
+    {
+      "technical_case_id": "TC-GRADPROBS-DTYPE",
+      "action": "NEW_CANDIDATE",
+      "proposed_mode_id": null,
+      "mechanism_subtype_id": "DRAFT-OUTPUT-DTYPE-OWNER",
+      "mechanism_subtype_name": "输出数据类型归属对象错误",
+      "mechanism_relation": "NEW_MECHANISM_CANDIDATE",
+      "impact_status": "OUTPUT_DTYPE_CONTRACT_CHANGE",
+      "reason": "输出类型归属对象有源码依据；接口层收录范围和设备返回仍待审查。",
+      "formal_adoption": false
+    },
+    {
+      "technical_case_id": "TC-RADIX-SYNC",
+      "action": "ADD_CASE_TO_EXISTING",
+      "proposed_mode_id": "M007",
+      "mechanism_subtype_id": "M007.MULTICORE_DEPENDENCY",
+      "mechanism_subtype_name": "多核搬运/计算依赖缺同步",
+      "mechanism_relation": "SAME_MECHANISM",
+      "impact_status": "PRECISION_ISSUE_REPORTED",
+      "reason": "多核及搬运/计算依赖缺同步，与M007相符；同PR另有空间修复，贡献尚未隔离。",
+      "formal_adoption": false
+    },
+    {
+      "technical_case_id": "TC-RADIX-API-WORKSPACE",
+      "action": "EXTEND_EXISTING_MODE",
+      "proposed_mode_id": "M015",
+      "mechanism_subtype_id": "M015.TMP_API_OMISSION",
+      "mechanism_subtype_name": "库API临时空间总预算漏项",
+      "mechanism_relation": "FAMILY_RELATED",
+      "impact_status": "IMPACT_UNCONFIRMED",
+      "reason": "预算漏计成立，但没有实际访问区间/错误输出证明M015意义的踩踏。",
+      "formal_adoption": false
+    },
+    {
+      "technical_case_id": "TC-BOOL-REDUCE",
+      "action": "NEW_CANDIDATE",
+      "proposed_mode_id": null,
+      "mechanism_subtype_id": "NEW-C6-BOOL-REDUCTION",
+      "mechanism_subtype_name": "BOOL输出语义与归约路径不匹配（待辨别）",
+      "mechanism_relation": "NEW_MECHANISM_CANDIDATE",
+      "impact_status": "BOOL_REDUCTION_PATH_CHANGE",
+      "reason": "逻辑归约依赖有限精度连乘有独立抽象价值；仍需旧输出与转换链，不按候选强弱排序替代证据。",
+      "formal_adoption": false
+    },
+    {
+      "technical_case_id": "TC-GEMM-PRECISION-FLAG",
+      "action": "EXTEND_EXISTING_MODE",
+      "proposed_mode_id": "M001",
+      "mechanism_subtype_id": "M001.PRECISION_CONTROL_PROPAGATION",
+      "mechanism_subtype_name": "精度控制信息沿分支传播遗漏",
+      "mechanism_relation": "FAMILY_RELATED",
+      "impact_status": "PRECISION_PATH_CHANGE_SUPPORTED",
+      "reason": "M001精度路径的强扩展；控制信息遗漏不同于原例升精时点，不声称已发生Inf。",
+      "formal_adoption": false
+    },
+    {
+      "technical_case_id": "TC-GATHER-SCALAR-COUNT",
+      "action": "ADD_CASE_TO_EXISTING",
+      "proposed_mode_id": "M011",
+      "mechanism_subtype_id": "M011.COUNT_UNIT",
+      "mechanism_subtype_name": "分派谓词中的元素/字节单位混用",
+      "mechanism_relation": "FAMILY_RELATED",
+      "impact_status": "DISPATCH_ERROR_SUPPORTED_PRECISION_UNCONFIRMED",
+      "reason": "API实现模式分派不等于tiling模板；当前没有证实精度错误、性能回退或实际mode日志。",
+      "formal_adoption": false
+    },
+    {
+      "technical_case_id": "TC-MATMUL-DISPATCH-DTYPE",
+      "action": "RELATED_OUT_OF_SCOPE",
+      "proposed_mode_id": null,
+      "mechanism_subtype_id": "M011.TYPE_STAGE",
+      "mechanism_subtype_name": "分派检查使用错误转换阶段的类型",
+      "mechanism_relation": "FUNCTIONAL_OUT_OF_SCOPE",
+      "impact_status": "BINARY_DISPATCH_FAILURE_REPORTED",
+      "reason": "找不到二进制属于功能分派；只保留与M011的技术关系，不进入精度案例主表。",
+      "formal_adoption": false
+    },
+    {
+      "technical_case_id": "TC-REPEAT-INT32-ROUTE",
+      "action": "ADD_CASE_TO_EXISTING",
+      "proposed_mode_id": "M011",
+      "mechanism_subtype_id": "M011.RANGE_GUARD",
+      "mechanism_subtype_name": "分派遗漏大shape范围条件",
+      "mechanism_relation": "FAMILY_RELATED",
+      "impact_status": "DISPATCH_ERROR_SUPPORTED_PRECISION_UNCONFIRMED",
+      "reason": "大shape选路条件有据，内部溢出及错误数值未证实。",
+      "formal_adoption": false
+    },
+    {
+      "technical_case_id": "TC-FIA-M-PIPE",
+      "action": "EXTEND_EXISTING_MODE",
+      "proposed_mode_id": "M007",
+      "mechanism_subtype_id": "M007.MATRIX_PIPE_DEPENDENCY",
+      "mechanism_subtype_name": "核内矩阵流水依赖缺屏障",
+      "mechanism_relation": "FAMILY_RELATED",
+      "impact_status": "DEPENDENCY_REPAIR_SUPPORTED",
+      "reason": "核内矩阵流水与原M007多核搬运情境不同，改为机制详情，不共用原多核测试替代。",
+      "formal_adoption": false
+    },
+    {
+      "technical_case_id": "TC-GMM-K0",
+      "action": "EXTEND_EXISTING_MODE",
+      "proposed_mode_id": "M020",
+      "mechanism_subtype_id": "M020.EMPTY_REDUCTION_OUTPUT",
+      "mechanism_subtype_name": "空归约维度与非空输出处理不当",
+      "mechanism_relation": "FAMILY_RELATED",
+      "impact_status": "SPECIAL_PATH_REPAIR_OUTPUT_UNCONFIRMED",
+      "reason": "K=0特殊tiling/空归约路径已定位，未证明某次错误输出未清零；同时比较M020与M011。",
+      "formal_adoption": false
+    },
+    {
+      "technical_case_id": "TC-FAG-MTE2-DIM",
+      "action": "EXTEND_EXISTING_MODE",
+      "proposed_mode_id": "M004",
+      "mechanism_subtype_id": "M004.TRANSFER_EXTENT_DIMENSION",
+      "mechanism_subtype_name": "搬运范围计算引用错误维度",
+      "mechanism_relation": "FAMILY_RELATED",
+      "impact_status": "OOM_REPORTED",
+      "reason": "搬运尺寸源错用不等于偏移算错或越界；仅作M004相关机制候选。",
+      "formal_adoption": false
+    },
+    {
+      "technical_case_id": "TC-NSA-TOPK-TMPUB",
+      "action": "ADD_CASE_TO_EXISTING",
+      "proposed_mode_id": "M015",
+      "mechanism_subtype_id": "M015.TMP_API_ESTIMATION",
+      "mechanism_subtype_name": "库API临时空间估算公式不足",
+      "mechanism_relation": "FAMILY_RELATED",
+      "impact_status": "IMPACT_UNCONFIRMED",
+      "reason": "临时UB预算估算不足，不据此认定发生踩踏或精度错误。",
+      "formal_adoption": false
+    },
+    {
+      "technical_case_id": "TC-SFAG-EVENT-ID",
+      "action": "EXTEND_EXISTING_MODE",
+      "proposed_mode_id": "M007",
+      "mechanism_subtype_id": "M007.EVENT_STATE_PROPAGATION",
+      "mechanism_subtype_name": "同步依赖标识初始化/传递遗漏",
+      "mechanism_relation": "FAMILY_RELATED",
+      "impact_status": "HANG_REPORTED",
+      "reason": "同步事件状态传递不同于少写屏障；卡死与精度影响分开。",
+      "formal_adoption": false
+    },
+    {
+      "technical_case_id": "TC-MEGAMOE-REUSE-SPAN",
+      "action": "EXTEND_EXISTING_MODE",
+      "proposed_mode_id": "M015",
+      "mechanism_subtype_id": "M015.REUSE_SPAN_LIFETIME",
+      "mechanism_subtype_name": "复用缓冲跨度与未读数据生命周期不兼容",
+      "mechanism_relation": "FAMILY_RELATED",
+      "impact_status": "UNREAD_INPUT_OVERWRITE_SUPPORTED",
+      "reason": "复用跨度/生命周期的强扩展；A2行布局与A3专家槽分别验收，不倒灌为原FIA事件根因。",
+      "formal_adoption": false
+    },
+    {
+      "technical_case_id": "TC-LI-DUPLICATE-SPACE",
+      "action": "EXTEND_EXISTING_MODE",
+      "proposed_mode_id": "M015",
+      "mechanism_subtype_id": "M015.INSTRUCTION_FOOTPRINT",
+      "mechanism_subtype_name": "向量指令实际访问足迹未充分预留",
+      "mechanism_relation": "FAMILY_RELATED",
+      "impact_status": "MEMORY_FOOTPRINT_ERROR_REPORTED",
+      "reason": "指令足迹与M015相关，但mask、偏移、空间三项贡献未隔离。",
+      "formal_adoption": false
+    },
+    {
+      "technical_case_id": "TC-FP8-VSCALE",
+      "action": "NEW_CANDIDATE",
+      "proposed_mode_id": null,
+      "mechanism_subtype_id": "HIST-WB-034",
+      "mechanism_subtype_name": "量化参数对象绑定错误",
+      "mechanism_relation": "NEW_MECHANISM_CANDIDATE",
+      "impact_status": "SCALE_BINDING_CHANGE_SUPPORTED",
+      "reason": "错误scale对象不同于图Dequantize位置或物理排布；完整对象语义待补。",
+      "formal_adoption": false
+    },
+    {
+      "technical_case_id": "TC-DEQUANT-REDUCE-STRIDE",
+      "action": "EXTEND_EXISTING_MODE",
+      "proposed_mode_id": "M004",
+      "mechanism_subtype_id": "M004.REPEAT_STRIDE_UNIT",
+      "mechanism_subtype_name": "整数除法截断过早导致重复访问间距错误",
+      "mechanism_relation": "FAMILY_RELATED",
+      "impact_status": "COMBINED_FIX_PRECISION_REPORTED",
+      "reason": "过早整数截断导致重复间距模型错误；可能合法区间内错读，不等同M004越界踩踏。",
+      "formal_adoption": false
+    },
+    {
+      "technical_case_id": "TC-DEQUANT-SCALE-BUFFER",
+      "action": "EXTEND_EXISTING_MODE",
+      "proposed_mode_id": "M015",
+      "mechanism_subtype_id": "M015.BROADCAST_SCRATCH_ALIAS",
+      "mechanism_subtype_name": "广播临时区与输出空间复用及预算不当",
+      "mechanism_relation": "FAMILY_RELATED",
+      "impact_status": "CO_CHANGED_COMPONENT_ONLY",
+      "reason": "保留共变更临时区线索，独立故障因果未闭合。",
+      "formal_adoption": false
+    }
+  ],
+  "action_counts": {
+    "RELATED_OUT_OF_SCOPE": 2,
+    "NEW_CANDIDATE": 3,
+    "ADD_CASE_TO_EXISTING": 4,
+    "EXTEND_EXISTING_MODE": 10
+  },
+  "original_library_modified": false
+}

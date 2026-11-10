@@ -1,0 +1,92 @@
+{
+  "candidates": [
+    {
+      "draft_id": "DRAFT-OUTPUT-DTYPE-OWNER",
+      "technical_case_ids": [
+        "TC-GRADPROBS-DTYPE"
+      ],
+      "independence": "STRONG_CANDIDATE",
+      "decision": "RETAIN_INDEPENDENT_DRAFT_SCOPE_AND_TEST_PENDING",
+      "similar_modes": [
+        "M001",
+        "M030"
+      ],
+      "suggested_abstract_name": "输出数据类型归属对象错误",
+      "why_distinct": "返回类型取错归属输入对象，即使没有算术溢出或有效位丢失也可能违反返回契约。",
+      "hypotheses": [],
+      "formal_mode_needed": "PLAUSIBLE_NOT_ACCEPTED",
+      "required_next_evidence": [
+        "现场直接返回值/Meta运行；是否纳入CANN精度库的接口层范围"
+      ],
+      "MODE_ACCEPTED": false
+    },
+    {
+      "draft_id": "NEW-C6-BOOL-REDUCTION",
+      "technical_case_ids": [
+        "TC-BOOL-REDUCE"
+      ],
+      "independence": "UNRESOLVED",
+      "decision": "DEFER_NEW_MODE_COMPARE_M001_M019",
+      "similar_modes": [
+        "M001",
+        "M019"
+      ],
+      "suggested_abstract_name": "逻辑归约语义错误地依赖有限精度算术归约（候选）",
+      "why_distinct": "逻辑all(x!=0)不应因有限精度连乘下溢改变。FP32也可能出现此问题，独立性不必低于V scale；仍缺旧CANN输出与转换链，继续与M001/M019比较。",
+      "hypotheses": [
+        {
+          "id": "NUMERIC_PATH",
+          "claim": "数值连乘下溢/中间类型失真",
+          "possible_original_modes": [
+            "M001",
+            "M019"
+          ],
+          "required_evidence": "合法输入、旧ReduceProd中间值/转换顺序、旧新BOOL输出及数值参考"
+        },
+        {
+          "id": "BOOL_CONTRACT",
+          "claim": "独立BOOL契约或算法路径选择缺陷",
+          "possible_original_modes": [],
+          "required_evidence": "排除已有数值机制后仍成立的合法反例及精确接口契约"
+        }
+      ],
+      "formal_mode_needed": "NOT_DETERMINED",
+      "required_next_evidence": [
+        "历史失败输入、旧新输出、转换链；区分下溢与独立BOOL契约问题"
+      ],
+      "semantic_model_supported": true,
+      "MODE_ACCEPTED": false
+    },
+    {
+      "draft_id": "HIST-WB-034",
+      "technical_case_ids": [
+        "TC-FP8-VSCALE"
+      ],
+      "independence": "STRONG_CANDIDATE",
+      "decision": "RETAIN_INDEPENDENT_DRAFT_SEMANTICS_AND_TEST_PENDING",
+      "similar_modes": [
+        "M010",
+        "M024"
+      ],
+      "suggested_abstract_name": "量化参数对象绑定错误",
+      "why_distinct": "kernel使用不对应的scale对象，不等于图节点位置错误或物理排布转换。不得推断具体head/batch轴。",
+      "hypotheses": [],
+      "formal_mode_needed": "PLAUSIBLE_NOT_ACCEPTED",
+      "required_next_evidence": [
+        "scale完整轴语义、合法不同scale值的输入、旧新数值和路径对照"
+      ],
+      "MODE_ACCEPTED": false
+    }
+  ],
+  "retained_historical_candidates": [
+    {
+      "draft_id": "HIST-WB-010",
+      "status": "RETAINED_DECLARATION_OUTSIDE_19"
+    },
+    {
+      "draft_id": "HIST-WB-036",
+      "status": "RETAINED_HISTORY_NOW_COMPARED_AS_EXTENSION_DETAILS"
+    }
+  ],
+  "formal_adoption_count": 0
+}

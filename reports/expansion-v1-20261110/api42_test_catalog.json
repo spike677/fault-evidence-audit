@@ -1,0 +1,1784 @@
+{
+  "conditions": [
+    {
+      "condition_id": "1.1.1",
+      "name": "Zero dimension",
+      "definition": "某维 shape=0。\nRequires: `CON-SHAPE` on tensor-like.  \r\nGenerator: shape 含 0。",
+      "original_requires": [
+        "`CON-SHAPE` on tensor-like."
+      ],
+      "original_skip_if": [],
+      "original_family_requires": [
+        "任一 `TEN-*` 带 `CON-SHAPE`，或控制循环次数的 `scalar`/`attr`，或 `TEN-MOE-ROUTE` / `SEM-MOE-DIST`。"
+      ],
+      "original_family_skip_if": [
+        "算子无张量 shape、无循环计数、无路由——无可退化对象。"
+      ],
+      "original_definition_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+      "design_template": {
+        "operator_family_candidate": "GMM SPLIT_K / 已有空tensor配方",
+        "input_construction": "K=0与K=1对照；M/N取接口合法非零值，输出预填非零哨兵。",
+        "oracle_design": "按目标空归约契约检查输出；该PR路径说明kernel清零。",
+        "target_path_check": "记录SPLIT_K、maxK=0专用路径及写回范围。",
+        "remaining_contract_or_capability_gates": "完整列表/枚举契约、合法M/N及实际输出；不把K=0当空输出。"
+      },
+      "original_mode_ids": [
+        "M020"
+      ],
+      "technical_case_ids": [
+        "TC-GMM-K0"
+      ],
+      "original_relation_ids": [
+        "MAP:M020:API42:1.1.1"
+      ],
+      "technical_relation_ids": [
+        "CAT:TC-GMM-K0:API42:1.1.1"
+      ],
+      "imported_recipe_ids": [
+        "DESIGN-EMBEDDING-EMPTY"
+      ],
+      "original_L3_flag": true,
+      "current_complete_recipe_relation": false,
+      "design_status": "HAS_IMPORTED_RECIPE_UNEXECUTED",
+      "interface_applicability": "CONDITIONAL_ON_SELECTED_TARGET_API",
+      "target_api_contract_fully_verified": false,
+      "construction_capability_validated": false,
+      "target_path_observed": false,
+      "hardware_execution_validated": false,
+      "template_is_executable_coverage": false,
+      "history_required_before_design": false,
+      "invalid_domain_handling": "先分合法正常输入与契约拒绝测试；不将非法参数报错计为精度失败",
+      "condition_has_historical_summary_representative": false
+    },
+    {
+      "condition_id": "1.1.2",
+      "name": "Zero repeat/loop count",
+      "definition": "repeat/loop/r=0。\nRequires: `SEM-SCALAR-COEFF` 或相关 attr/scalar 表示次数。  \r\nSkip if: 无此类参数。",
+      "original_requires": [
+        "`SEM-SCALAR-COEFF` 或相关 attr/scalar 表示次数。"
+      ],
+      "original_skip_if": [
+        "无此类参数。"
+      ],
+      "original_family_requires": [
+        "任一 `TEN-*` 带 `CON-SHAPE`，或控制循环次数的 `scalar`/`attr`，或 `TEN-MOE-ROUTE` / `SEM-MOE-DIST`。"
+      ],
+      "original_family_skip_if": [
+        "算子无张量 shape、无循环计数、无路由——无可退化对象。"
+      ],
+      "original_definition_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+      "design_template": {
+        "operator_family_candidate": "带次数参数的repeat/loop",
+        "input_construction": "x=[1,2,3]，次数0/1/2；只有契约允许0才执行零次数。",
+        "oracle_design": "按列表展开/循环语义计算长度和值；零次数不是beta=0。",
+        "target_path_check": "记录真正消费次数参数的实现分支。",
+        "remaining_contract_or_capability_gates": "目标次数实参及0值契约未绑定。"
+      },
+      "original_mode_ids": [],
+      "technical_case_ids": [],
+      "original_relation_ids": [],
+      "technical_relation_ids": [],
+      "imported_recipe_ids": [],
+      "original_L3_flag": false,
+      "current_complete_recipe_relation": false,
+      "design_status": "DEFINITION_SCOPED_TEMPLATE_BINDING_REQUIRED",
+      "interface_applicability": "CONDITIONAL_ON_SELECTED_TARGET_API",
+      "target_api_contract_fully_verified": false,
+      "construction_capability_validated": false,
+      "target_path_observed": false,
+      "hardware_execution_validated": false,
+      "template_is_executable_coverage": false,
+      "history_required_before_design": false,
+      "invalid_domain_handling": "先分合法正常输入与契约拒绝测试；不将非法参数报错计为精度失败",
+      "condition_has_historical_summary_representative": false
+    },
+    {
+      "condition_id": "1.1.3",
+      "name": "All-zero rows/blocks",
+      "definition": "shape 非空但值全 0。\nRequires: 浮点/量化相关 `TEN-PRIMARY`（或参与 ReduceMax/scale 的张量）。  \r\nSkip if: 无数据张量或纯布尔逻辑且无数值归约。",
+      "original_requires": [
+        "浮点/量化相关 `TEN-PRIMARY`（或参与 ReduceMax/scale 的张量）。"
+      ],
+      "original_skip_if": [
+        "无数据张量或纯布尔逻辑且无数值归约。"
+      ],
+      "original_family_requires": [
+        "任一 `TEN-*` 带 `CON-SHAPE`，或控制循环次数的 `scalar`/`attr`，或 `TEN-MOE-ROUTE` / `SEM-MOE-DIST`。"
+      ],
+      "original_family_skip_if": [
+        "算子无张量 shape、无循环计数、无路由——无可退化对象。"
+      ],
+      "original_definition_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+      "design_template": {
+        "operator_family_candidate": "数值ReduceMax/scale生成",
+        "input_construction": "非空[2,32]数值张量，全0与单点非0对照。",
+        "oracle_design": "独立逐行max；若涉及scale，按其明确零输入规则验收。",
+        "target_path_check": "确认数值归约/scale路径，非纯布尔逻辑。",
+        "remaining_contract_or_capability_gates": "目标API与scale规则；全零不自动等于除零故障。"
+      },
+      "original_mode_ids": [
+        "M002"
+      ],
+      "technical_case_ids": [],
+      "original_relation_ids": [
+        "MAP:M002:API42:1.1.3"
+      ],
+      "technical_relation_ids": [],
+      "imported_recipe_ids": [],
+      "original_L3_flag": false,
+      "current_complete_recipe_relation": false,
+      "design_status": "DEFINITION_SCOPED_TEMPLATE_BINDING_REQUIRED",
+      "interface_applicability": "CONDITIONAL_ON_SELECTED_TARGET_API",
+      "target_api_contract_fully_verified": false,
+      "construction_capability_validated": false,
+      "target_path_observed": false,
+      "hardware_execution_validated": false,
+      "template_is_executable_coverage": false,
+      "history_required_before_design": false,
+      "invalid_domain_handling": "先分合法正常输入与契约拒绝测试；不将非法参数报错计为精度失败",
+      "condition_has_historical_summary_representative": false
+    },
+    {
+      "condition_id": "1.1.4",
+      "name": "Empty expert (MoE)",
+      "definition": "某 expert token 数=0。\nRequires: `TEN-MOE-ROUTE` 或 `SEM-MOE-DIST`。  \r\nSkip if: 非 MoE。",
+      "original_requires": [
+        "`TEN-MOE-ROUTE` 或 `SEM-MOE-DIST`。"
+      ],
+      "original_skip_if": [
+        "非 MoE。"
+      ],
+      "original_family_requires": [
+        "任一 `TEN-*` 带 `CON-SHAPE`，或控制循环次数的 `scalar`/`attr`，或 `TEN-MOE-ROUTE` / `SEM-MOE-DIST`。"
+      ],
+      "original_family_skip_if": [
+        "算子无张量 shape、无循环计数、无路由——无可退化对象。"
+      ],
+      "original_definition_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+      "design_template": {
+        "operator_family_candidate": "MoE分派/归并",
+        "input_construction": "4专家、2个token的合法top-1路由，计数[2,0,0,0]。",
+        "oracle_design": "CPU分桶/恢复顺序及加权结果；空专家不得污染有效输出。",
+        "target_path_check": "记录空专家分支确实被消费。",
+        "remaining_contract_or_capability_gates": "路由/容量/通信与空专家契约、实际参与者。"
+      },
+      "original_mode_ids": [],
+      "technical_case_ids": [],
+      "original_relation_ids": [],
+      "technical_relation_ids": [],
+      "imported_recipe_ids": [],
+      "original_L3_flag": false,
+      "current_complete_recipe_relation": false,
+      "design_status": "DEFINITION_SCOPED_TEMPLATE_BINDING_REQUIRED",
+      "interface_applicability": "CONDITIONAL_ON_SELECTED_TARGET_API",
+      "target_api_contract_fully_verified": false,
+      "construction_capability_validated": false,
+      "target_path_observed": false,
+      "hardware_execution_validated": false,
+      "template_is_executable_coverage": false,
+      "history_required_before_design": false,
+      "invalid_domain_handling": "先分合法正常输入与契约拒绝测试；不将非法参数报错计为精度失败",
+      "condition_has_historical_summary_representative": false
+    },
+    {
+      "condition_id": "1.1.5",
+      "name": "Empty partition/shard",
+      "definition": "分核后某核 0 数据（靠 shape 间接）。\nRequires: `CON-SHAPE` + 多核切分可能（大/怪 shape）。",
+      "original_requires": [
+        "`CON-SHAPE` + 多核切分可能（大/怪 shape）。"
+      ],
+      "original_skip_if": [],
+      "original_family_requires": [
+        "任一 `TEN-*` 带 `CON-SHAPE`，或控制循环次数的 `scalar`/`attr`，或 `TEN-MOE-ROUTE` / `SEM-MOE-DIST`。"
+      ],
+      "original_family_skip_if": [
+        "算子无张量 shape、无循环计数、无路由——无可退化对象。"
+      ],
+      "original_definition_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+      "design_template": {
+        "operator_family_candidate": "可能有空分核的算子",
+        "input_construction": "从真实P核切分谓词构造N=P-1/P/P+1候选，不能仅由小shape认定空核。",
+        "oracle_design": "完整串行参考与输出写回检查。",
+        "target_path_check": "必须取得某参与核工作量为0的tiling/trace。",
+        "remaining_contract_or_capability_gates": "实际核分配谓词、API与执行器观察能力。"
+      },
+      "original_mode_ids": [],
+      "technical_case_ids": [],
+      "original_relation_ids": [],
+      "technical_relation_ids": [],
+      "imported_recipe_ids": [],
+      "original_L3_flag": false,
+      "current_complete_recipe_relation": false,
+      "design_status": "DEFINITION_SCOPED_TEMPLATE_BINDING_REQUIRED",
+      "interface_applicability": "CONDITIONAL_ON_SELECTED_TARGET_API",
+      "target_api_contract_fully_verified": false,
+      "construction_capability_validated": false,
+      "target_path_observed": false,
+      "hardware_execution_validated": false,
+      "template_is_executable_coverage": false,
+      "history_required_before_design": false,
+      "invalid_domain_handling": "先分合法正常输入与契约拒绝测试；不将非法参数报错计为精度失败",
+      "condition_has_historical_summary_representative": false
+    },
+    {
+      "condition_id": "1.2.1",
+      "name": "Minimal dimension (M/N/K=1)",
+      "definition": "核心维=1。\nRequires: 存在可解释为 M/N/K/L 的 shape 维。",
+      "original_requires": [
+        "存在可解释为 M/N/K/L 的 shape 维。"
+      ],
+      "original_skip_if": [],
+      "original_family_requires": [
+        "任一 tensor-like 的 `CON-SHAPE-*`，或 `SEM-GEOM`（卷积组合）。"
+      ],
+      "original_family_skip_if": [
+        "无 shape 可配（极罕见）。"
+      ],
+      "original_definition_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+      "design_template": {
+        "operator_family_candidate": "Matmul",
+        "input_construction": "A[1,17]、B[17,5]，合法dtype/layout；与M=2对照。",
+        "oracle_design": "独立高精逐项点积；报告绝对/相对误差。",
+        "target_path_check": "记录核心维为1的真实目标分支。",
+        "remaining_contract_or_capability_gates": "目标Matmul接口、精度契约和路径标识。"
+      },
+      "original_mode_ids": [],
+      "technical_case_ids": [],
+      "original_relation_ids": [],
+      "technical_relation_ids": [],
+      "imported_recipe_ids": [],
+      "original_L3_flag": false,
+      "current_complete_recipe_relation": false,
+      "design_status": "DEFINITION_SCOPED_TEMPLATE_BINDING_REQUIRED",
+      "interface_applicability": "CONDITIONAL_ON_SELECTED_TARGET_API",
+      "target_api_contract_fully_verified": false,
+      "construction_capability_validated": false,
+      "target_path_observed": false,
+      "hardware_execution_validated": false,
+      "template_is_executable_coverage": false,
+      "history_required_before_design": false,
+      "invalid_domain_handling": "先分合法正常输入与契约拒绝测试；不将非法参数报错计为精度失败",
+      "condition_has_historical_summary_representative": false
+    },
+    {
+      "condition_id": "1.2.2",
+      "name": "Tail-block misalignment",
+      "definition": "维长 ∉ 对齐（16/32/64/128/256）。\nValues: 1,3,7,13,17,33,65,69,127,129,255,257。",
+      "original_requires": [],
+      "original_skip_if": [],
+      "original_family_requires": [
+        "任一 tensor-like 的 `CON-SHAPE-*`，或 `SEM-GEOM`（卷积组合）。"
+      ],
+      "original_family_skip_if": [
+        "无 shape 可配（极罕见）。"
+      ],
+      "original_definition_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+      "design_template": {
+        "operator_family_candidate": "具有尾块的向量/归约算子；dequant配方",
+        "input_construction": "维长31/32/33、63/64/65等合法邻域；dequant另保留输入192→派生输出96的上下文。",
+        "oracle_design": "完整元素参考与尾部写回；元素和字节分别计算。",
+        "target_path_check": "记录实际块粒度及tiling，不能凭输入192推定UbFactorDimy=96。",
+        "remaining_contract_or_capability_gates": "真实对齐粒度、宏/tiling与被比较对象；dequant共变更贡献。"
+      },
+      "original_mode_ids": [
+        "M026"
+      ],
+      "technical_case_ids": [
+        "TC-DEQUANT-REDUCE-STRIDE",
+        "TC-DEQUANT-SCALE-BUFFER"
+      ],
+      "original_relation_ids": [
+        "MAP:M026:API42:1.2.2"
+      ],
+      "technical_relation_ids": [
+        "CAT:TC-DEQUANT-REDUCE-STRIDE:API42:1.2.2",
+        "CAT:TC-DEQUANT-SCALE-BUFFER:API42:1.2.2"
+      ],
+      "imported_recipe_ids": [
+        "DESIGN-DEQUANT-UPSTREAM"
+      ],
+      "original_L3_flag": false,
+      "current_complete_recipe_relation": true,
+      "design_status": "HAS_IMPORTED_RECIPE_UNEXECUTED",
+      "interface_applicability": "CONDITIONAL_ON_SELECTED_TARGET_API",
+      "target_api_contract_fully_verified": false,
+      "construction_capability_validated": false,
+      "target_path_observed": false,
+      "hardware_execution_validated": false,
+      "template_is_executable_coverage": false,
+      "history_required_before_design": false,
+      "invalid_domain_handling": "先分合法正常输入与契约拒绝测试；不将非法参数报错计为精度失败",
+      "condition_has_historical_summary_representative": false
+    },
+    {
+      "condition_id": "1.2.3",
+      "name": "Split count exceeds limit",
+      "definition": "split/chunk 数超内部数组。\nRequires: `SEM-SLICE` / split 类 attr 或可推导 split 的 shape。  \r\nSkip if: 无 split。",
+      "original_requires": [
+        "`SEM-SLICE` / split 类 attr 或可推导 split 的 shape。"
+      ],
+      "original_skip_if": [
+        "无 split。"
+      ],
+      "original_family_requires": [
+        "任一 tensor-like 的 `CON-SHAPE-*`，或 `SEM-GEOM`（卷积组合）。"
+      ],
+      "original_family_skip_if": [
+        "无 shape 可配（极罕见）。"
+      ],
+      "original_definition_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+      "design_template": {
+        "operator_family_candidate": "split/chunk类",
+        "input_construction": "读出实际Smax，再取Smax-1/Smax/Smax+1；非法组合只做契约拒绝测试。",
+        "oracle_design": "合法分块拼接恢复输入；非法请求按接口错误契约判断。",
+        "target_path_check": "记录内部数组/分块边界。",
+        "remaining_contract_or_capability_gates": "真实上限、公开控制参数及合法性。"
+      },
+      "original_mode_ids": [],
+      "technical_case_ids": [],
+      "original_relation_ids": [],
+      "technical_relation_ids": [],
+      "imported_recipe_ids": [],
+      "original_L3_flag": false,
+      "current_complete_recipe_relation": false,
+      "design_status": "DEFINITION_SCOPED_TEMPLATE_BINDING_REQUIRED",
+      "interface_applicability": "CONDITIONAL_ON_SELECTED_TARGET_API",
+      "target_api_contract_fully_verified": false,
+      "construction_capability_validated": false,
+      "target_path_observed": false,
+      "hardware_execution_validated": false,
+      "template_is_executable_coverage": false,
+      "history_required_before_design": false,
+      "invalid_domain_handling": "先分合法正常输入与契约拒绝测试；不将非法参数报错计为精度失败",
+      "condition_has_historical_summary_representative": false
+    },
+    {
+      "condition_id": "1.2.4",
+      "name": "Very large dimension (int overflow)",
+      "definition": "近 uint16/int32/2^24。\nValues: 65535, 65536, 16777217, 2^31 边界。  \r\n代码信号: 窄整型存 offset。",
+      "original_requires": [],
+      "original_skip_if": [],
+      "original_family_requires": [
+        "任一 tensor-like 的 `CON-SHAPE-*`，或 `SEM-GEOM`（卷积组合）。"
+      ],
+      "original_family_skip_if": [
+        "无 shape 可配（极罕见）。"
+      ],
+      "original_definition_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+      "design_template": {
+        "operator_family_candidate": "RepeatInterleave",
+        "input_construction": "单轴2^31-1/2^31/2^31+1，支持dtype且资源足够；repeats=1仅为待绑候选。",
+        "oracle_design": "按repeat语义逐项参考；单纯host谓词检查不算大tensor执行。",
+        "target_path_check": "记录xViewShape与V2实际选路。",
+        "remaining_contract_or_capability_gates": "显存/工作区预算、API和实际大tensor日志；不得缩小后声称命中边界。"
+      },
+      "original_mode_ids": [
+        "M014"
+      ],
+      "technical_case_ids": [
+        "TC-REPEAT-INT32-ROUTE"
+      ],
+      "original_relation_ids": [
+        "MAP:M014:API42:1.2.4"
+      ],
+      "technical_relation_ids": [
+        "CAT:TC-REPEAT-INT32-ROUTE:API42:1.2.4"
+      ],
+      "imported_recipe_ids": [],
+      "original_L3_flag": false,
+      "current_complete_recipe_relation": false,
+      "design_status": "DEFINITION_SCOPED_TEMPLATE_BINDING_REQUIRED",
+      "interface_applicability": "CONDITIONAL_ON_SELECTED_TARGET_API",
+      "target_api_contract_fully_verified": false,
+      "construction_capability_validated": false,
+      "target_path_observed": false,
+      "hardware_execution_validated": false,
+      "template_is_executable_coverage": false,
+      "history_required_before_design": false,
+      "invalid_domain_handling": "先分合法正常输入与契约拒绝测试；不将非法参数报错计为精度失败",
+      "condition_has_historical_summary_representative": false
+    },
+    {
+      "condition_id": "1.2.5",
+      "name": "Broadcast degeneration",
+      "definition": "广播维=1 / stride 0。\nRequires: ≥2 个可广播 tensor 操作数（PRIMARY+OTHER 或列表）。",
+      "original_requires": [
+        "≥2 个可广播 tensor 操作数（PRIMARY+OTHER 或列表）。"
+      ],
+      "original_skip_if": [],
+      "original_family_requires": [
+        "任一 tensor-like 的 `CON-SHAPE-*`，或 `SEM-GEOM`（卷积组合）。"
+      ],
+      "original_family_skip_if": [
+        "无 shape 可配（极罕见）。"
+      ],
+      "original_definition_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+      "design_template": {
+        "operator_family_candidate": "可广播二元运算",
+        "input_construction": "x[2,1,3]、y[1,4,1]→[2,4,3]，逐位置不同值。",
+        "oracle_design": "CPU显式广播索引参考。",
+        "target_path_check": "确认广播维/stride0被目标实现保留。",
+        "remaining_contract_or_capability_gates": "接口广播规则及执行器是否自动物化。"
+      },
+      "original_mode_ids": [],
+      "technical_case_ids": [],
+      "original_relation_ids": [],
+      "technical_relation_ids": [],
+      "imported_recipe_ids": [],
+      "original_L3_flag": false,
+      "current_complete_recipe_relation": false,
+      "design_status": "DEFINITION_SCOPED_TEMPLATE_BINDING_REQUIRED",
+      "interface_applicability": "CONDITIONAL_ON_SELECTED_TARGET_API",
+      "target_api_contract_fully_verified": false,
+      "construction_capability_validated": false,
+      "target_path_observed": false,
+      "hardware_execution_validated": false,
+      "template_is_executable_coverage": false,
+      "history_required_before_design": false,
+      "invalid_domain_handling": "先分合法正常输入与契约拒绝测试；不将非法参数报错计为精度失败",
+      "condition_has_historical_summary_representative": false
+    },
+    {
+      "condition_id": "1.2.6",
+      "name": "Tiling template boundary (off-by-one)",
+      "definition": "落在模板选择边界 ±1。\nRequires: 从 src 读出边界常量 + `CON-SHAPE`。",
+      "original_requires": [
+        "从 src 读出边界常量 + `CON-SHAPE`。"
+      ],
+      "original_skip_if": [],
+      "original_family_requires": [
+        "任一 tensor-like 的 `CON-SHAPE-*`，或 `SEM-GEOM`（卷积组合）。"
+      ],
+      "original_family_skip_if": [
+        "无 shape 可配（极罕见）。"
+      ],
+      "original_definition_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+      "design_template": {
+        "operator_family_candidate": "有明确tiling模板边界的算子",
+        "input_construction": "从目标源码读模板阈值T，取T-1/T/T+1；不把Gather的API mode阈值直接当tiling模板。",
+        "oracle_design": "同一高精参考及全量输出检查。",
+        "target_path_check": "实际kernel/template/核分配发生预期切换。",
+        "remaining_contract_or_capability_gates": "模板阈值及API→模板谓词未绑定。"
+      },
+      "original_mode_ids": [
+        "M008",
+        "M011",
+        "M017"
+      ],
+      "technical_case_ids": [],
+      "original_relation_ids": [
+        "MAP:M008:API42:1.2.6",
+        "MAP:M011:API42:1.2.6",
+        "MAP:M017:API42:1.2.6"
+      ],
+      "technical_relation_ids": [],
+      "imported_recipe_ids": [],
+      "original_L3_flag": false,
+      "current_complete_recipe_relation": false,
+      "design_status": "DEFINITION_SCOPED_TEMPLATE_BINDING_REQUIRED",
+      "interface_applicability": "CONDITIONAL_ON_SELECTED_TARGET_API",
+      "target_api_contract_fully_verified": false,
+      "construction_capability_validated": false,
+      "target_path_observed": false,
+      "hardware_execution_validated": false,
+      "template_is_executable_coverage": false,
+      "history_required_before_design": false,
+      "invalid_domain_handling": "先分合法正常输入与契约拒绝测试；不将非法参数报错计为精度失败",
+      "condition_has_historical_summary_representative": false
+    },
+    {
+      "condition_id": "1.2.7",
+      "name": "Convolution special shape combo",
+      "definition": "input×kernel×stride×dilation×pad。\nRequires: `SEM-GEOM`（attrs/attr_tuple）+ 特征/权重张量。  \r\nSkip if: 非 conv/pool 几何类。",
+      "original_requires": [
+        "`SEM-GEOM`（attrs/attr_tuple）+ 特征/权重张量。"
+      ],
+      "original_skip_if": [
+        "非 conv/pool 几何类。"
+      ],
+      "original_family_requires": [
+        "任一 tensor-like 的 `CON-SHAPE-*`，或 `SEM-GEOM`（卷积组合）。"
+      ],
+      "original_family_skip_if": [
+        "无 shape 可配（极罕见）。"
+      ],
+      "original_definition_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+      "design_template": {
+        "operator_family_candidate": "Conv/Pool几何接口",
+        "input_construction": "合法input/kernel/stride/dilation/pad组合，检查输出几何式。",
+        "oracle_design": "独立滑窗卷积/池化参考，不只检查shape。",
+        "target_path_check": "记录特殊几何分支。",
+        "remaining_contract_or_capability_gates": "目标几何契约、layout及边界合法性。"
+      },
+      "original_mode_ids": [
+        "M007"
+      ],
+      "technical_case_ids": [],
+      "original_relation_ids": [
+        "MAP:M007:API42:1.2.7"
+      ],
+      "technical_relation_ids": [],
+      "imported_recipe_ids": [],
+      "original_L3_flag": false,
+      "current_complete_recipe_relation": false,
+      "design_status": "DEFINITION_SCOPED_TEMPLATE_BINDING_REQUIRED",
+      "interface_applicability": "CONDITIONAL_ON_SELECTED_TARGET_API",
+      "target_api_contract_fully_verified": false,
+      "construction_capability_validated": false,
+      "target_path_observed": false,
+      "hardware_execution_validated": false,
+      "template_is_executable_coverage": false,
+      "history_required_before_design": false,
+      "invalid_domain_handling": "先分合法正常输入与契约拒绝测试；不将非法参数报错计为精度失败",
+      "condition_has_historical_summary_representative": false
+    },
+    {
+      "condition_id": "1.2.8",
+      "name": "Output dim < minimum transfer granularity",
+      "definition": "输出 < 32B 等。\nRequires: 可推出 output 元素数与 dtype 宽度。",
+      "original_requires": [
+        "可推出 output 元素数与 dtype 宽度。"
+      ],
+      "original_skip_if": [],
+      "original_family_requires": [
+        "任一 tensor-like 的 `CON-SHAPE-*`，或 `SEM-GEOM`（卷积组合）。"
+      ],
+      "original_family_skip_if": [
+        "无 shape 可配（极罕见）。"
+      ],
+      "original_definition_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+      "design_template": {
+        "operator_family_candidate": "小输出的copy/gather/归约",
+        "input_construction": "合法输出1个FLOAT32元素=4字节，与32字节及邻域对照；仅为新设计线索。",
+        "oracle_design": "正确输出及目标有效范围写回；不能借LI额外256B建立历史关系。",
+        "target_path_check": "确认实际最小搬运粒度及尾部处理。",
+        "remaining_contract_or_capability_gates": "API、输出宽度、真实搬运路径；没有历史代表不阻止设计。"
+      },
+      "original_mode_ids": [],
+      "technical_case_ids": [],
+      "original_relation_ids": [],
+      "technical_relation_ids": [],
+      "imported_recipe_ids": [],
+      "original_L3_flag": false,
+      "current_complete_recipe_relation": false,
+      "design_status": "DEFINITION_SCOPED_TEMPLATE_BINDING_REQUIRED",
+      "interface_applicability": "CONDITIONAL_ON_SELECTED_TARGET_API",
+      "target_api_contract_fully_verified": false,
+      "construction_capability_validated": false,
+      "target_path_observed": false,
+      "hardware_execution_validated": false,
+      "template_is_executable_coverage": false,
+      "history_required_before_design": false,
+      "invalid_domain_handling": "先分合法正常输入与契约拒绝测试；不将非法参数报错计为精度失败",
+      "condition_has_historical_summary_representative": false
+    },
+    {
+      "condition_id": "1.3.1",
+      "name": "Index OOB / extreme",
+      "definition": "0, -1, MAX_INT, ≥dim。\nRequires: `TEN-INDEX`（dtype 多为 int32/64）。",
+      "original_requires": [
+        "`TEN-INDEX`（dtype 多为 int32/64）。"
+      ],
+      "original_skip_if": [],
+      "original_family_requires": [
+        "- `TEN-INDEX` 或 `tensor_tuple` 索引，或\n- `TEN-MOE-ROUTE` 中的 expert/token 下标，或\n- `SEM-INDEX-CTRL` / `SEM-SLICE`（begin/end/window）且参与地址映射。"
+      ],
+      "original_family_skip_if": [
+        "仅有 `TEN-PRIMARY` 等数据张量、无任何索引/下标/窗映射实参 —— 禁止给 1.3 分配预算。\n（这是「张量输入不会有 index 触发」的形式化表述。）"
+      ],
+      "original_definition_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+      "design_template": {
+        "operator_family_candidate": "Index/Gather类",
+        "input_construction": "0、末索引、-1、dim、MAX_INT；按目标契约分合法索引与必须拒绝的请求。",
+        "oracle_design": "合法索引参考；非法请求只能按明确定义的错误行为验收。",
+        "target_path_check": "确认索引检查与目标kernel。",
+        "remaining_contract_or_capability_gates": "TEN-INDEX契约、负索引支持及错误规范。"
+      },
+      "original_mode_ids": [],
+      "technical_case_ids": [],
+      "original_relation_ids": [],
+      "technical_relation_ids": [],
+      "imported_recipe_ids": [],
+      "original_L3_flag": false,
+      "current_complete_recipe_relation": false,
+      "design_status": "DEFINITION_SCOPED_TEMPLATE_BINDING_REQUIRED",
+      "interface_applicability": "CONDITIONAL_ON_SELECTED_TARGET_API",
+      "target_api_contract_fully_verified": false,
+      "construction_capability_validated": false,
+      "target_path_observed": false,
+      "hardware_execution_validated": false,
+      "template_is_executable_coverage": false,
+      "history_required_before_design": false,
+      "invalid_domain_handling": "先分合法正常输入与契约拒绝测试；不将非法参数报错计为精度失败",
+      "condition_has_historical_summary_representative": false
+    },
+    {
+      "condition_id": "1.3.2",
+      "name": "Offset overflow (>uint16 / >int32)",
+      "definition": "算址偏移溢出。\nRequires: shape/index 使 offset 公式 > 阈值；常与 1.2.4 组合。",
+      "original_requires": [
+        "shape/index 使 offset 公式 > 阈值；常与 1.2.4 组合。"
+      ],
+      "original_skip_if": [],
+      "original_family_requires": [
+        "- `TEN-INDEX` 或 `tensor_tuple` 索引，或\n- `TEN-MOE-ROUTE` 中的 expert/token 下标，或\n- `SEM-INDEX-CTRL` / `SEM-SLICE`（begin/end/window）且参与地址映射。"
+      ],
+      "original_family_skip_if": [
+        "仅有 `TEN-PRIMARY` 等数据张量、无任何索引/下标/窗映射实参 —— 禁止给 1.3 分配预算。\n（这是「张量输入不会有 index 触发」的形式化表述。）"
+      ],
+      "original_definition_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+      "design_template": {
+        "operator_family_candidate": "索引/窗口映射接口",
+        "input_construction": "先绑定offset(index,shape,stride)及位宽，再构造阈值两侧合法输入和足够真实存储。",
+        "oracle_design": "宽整数算址参考及完整值参考。",
+        "target_path_check": "记录窄整数运算位置/类型提升和真实访问区间。",
+        "remaining_contract_or_capability_gates": "原42索引族前提、公式、容量；repeat大shape不能代替这些证据。"
+      },
+      "original_mode_ids": [],
+      "technical_case_ids": [],
+      "original_relation_ids": [],
+      "technical_relation_ids": [],
+      "imported_recipe_ids": [],
+      "original_L3_flag": false,
+      "current_complete_recipe_relation": false,
+      "design_status": "DEFINITION_SCOPED_TEMPLATE_BINDING_REQUIRED",
+      "interface_applicability": "CONDITIONAL_ON_SELECTED_TARGET_API",
+      "target_api_contract_fully_verified": false,
+      "construction_capability_validated": false,
+      "target_path_observed": false,
+      "hardware_execution_validated": false,
+      "template_is_executable_coverage": false,
+      "history_required_before_design": false,
+      "invalid_domain_handling": "先分合法正常输入与契约拒绝测试；不将非法参数报错计为精度失败",
+      "condition_has_historical_summary_representative": false
+    },
+    {
+      "condition_id": "1.3.3",
+      "name": "Sliding window / attention window boundary",
+      "definition": "窗起止非法。\nRequires: `SEM-ATTN-STRUCT` / `SEM-GEOM` 窗参数或 mask 窗。  \r\nSkip if: 无窗。",
+      "original_requires": [
+        "`SEM-ATTN-STRUCT` / `SEM-GEOM` 窗参数或 mask 窗。"
+      ],
+      "original_skip_if": [
+        "无窗。"
+      ],
+      "original_family_requires": [
+        "- `TEN-INDEX` 或 `tensor_tuple` 索引，或\n- `TEN-MOE-ROUTE` 中的 expert/token 下标，或\n- `SEM-INDEX-CTRL` / `SEM-SLICE`（begin/end/window）且参与地址映射。"
+      ],
+      "original_family_skip_if": [
+        "仅有 `TEN-PRIMARY` 等数据张量、无任何索引/下标/窗映射实参 —— 禁止给 1.3 分配预算。\n（这是「张量输入不会有 index 触发」的形式化表述。）"
+      ],
+      "original_definition_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+      "design_template": {
+        "operator_family_candidate": "滑动/attention窗口接口",
+        "input_construction": "窗口起止位于0、L-1、L边界；非法start/end单列契约拒绝。",
+        "oracle_design": "显式窗口mask参考。",
+        "target_path_check": "确认窗口实参进入目标映射，不能用通信window代替。",
+        "remaining_contract_or_capability_gates": "窗口API、合法域、mask语义及错误规范。"
+      },
+      "original_mode_ids": [],
+      "technical_case_ids": [],
+      "original_relation_ids": [],
+      "technical_relation_ids": [],
+      "imported_recipe_ids": [],
+      "original_L3_flag": false,
+      "current_complete_recipe_relation": false,
+      "design_status": "DEFINITION_SCOPED_TEMPLATE_BINDING_REQUIRED",
+      "interface_applicability": "CONDITIONAL_ON_SELECTED_TARGET_API",
+      "target_api_contract_fully_verified": false,
+      "construction_capability_validated": false,
+      "target_path_observed": false,
+      "hardware_execution_validated": false,
+      "template_is_executable_coverage": false,
+      "history_required_before_design": false,
+      "invalid_domain_handling": "先分合法正常输入与契约拒绝测试；不将非法参数报错计为精度失败",
+      "condition_has_historical_summary_representative": false
+    },
+    {
+      "condition_id": "1.3.4",
+      "name": "Expert/routing index combo (MoE)",
+      "definition": "极端/全同/重复路由。\nRequires: `TEN-MOE-ROUTE` 或 `SEM-MOE-DIST`。  \r\nSkip if: 非 MoE。",
+      "original_requires": [
+        "`TEN-MOE-ROUTE` 或 `SEM-MOE-DIST`。"
+      ],
+      "original_skip_if": [
+        "非 MoE。"
+      ],
+      "original_family_requires": [
+        "- `TEN-INDEX` 或 `tensor_tuple` 索引，或\n- `TEN-MOE-ROUTE` 中的 expert/token 下标，或\n- `SEM-INDEX-CTRL` / `SEM-SLICE`（begin/end/window）且参与地址映射。"
+      ],
+      "original_family_skip_if": [
+        "仅有 `TEN-PRIMARY` 等数据张量、无任何索引/下标/窗映射实参 —— 禁止给 1.3 分配预算。\n（这是「张量输入不会有 index 触发」的形式化表述。）"
+      ],
+      "original_definition_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+      "design_template": {
+        "operator_family_candidate": "MoE路由接口",
+        "input_construction": "所有token去同一专家及极端路由；同token重复专家只有契约允许才使用。",
+        "oracle_design": "CPU专家分桶、权重与恢复参考。",
+        "target_path_check": "记录真实路由/容量/合并路径。",
+        "remaining_contract_or_capability_gates": "合法top-k、重复语义、路由与通信契约。"
+      },
+      "original_mode_ids": [],
+      "technical_case_ids": [],
+      "original_relation_ids": [],
+      "technical_relation_ids": [],
+      "imported_recipe_ids": [],
+      "original_L3_flag": false,
+      "current_complete_recipe_relation": false,
+      "design_status": "DEFINITION_SCOPED_TEMPLATE_BINDING_REQUIRED",
+      "interface_applicability": "CONDITIONAL_ON_SELECTED_TARGET_API",
+      "target_api_contract_fully_verified": false,
+      "construction_capability_validated": false,
+      "target_path_observed": false,
+      "hardware_execution_validated": false,
+      "template_is_executable_coverage": false,
+      "history_required_before_design": false,
+      "invalid_domain_handling": "先分合法正常输入与契约拒绝测试；不将非法参数报错计为精度失败",
+      "condition_has_historical_summary_representative": false
+    },
+    {
+      "condition_id": "1.4.1",
+      "name": "Non-contiguous tensor",
+      "definition": "`[not testable]` — 除非 schema 暴露 stride。",
+      "original_requires": [],
+      "original_skip_if": [],
+      "original_family_requires": [
+        "`SEM-LAYOUT`，或 `SEM-TRANSPOSE` 导致非平凡 stride，或 schema 暴露 format/stride，或 `CON-ALIGN`。"
+      ],
+      "original_family_skip_if": [
+        "固定 ND、无 format/transpose/align 实参且框架不可控 stride（多项标 `[not testable]`）。"
+      ],
+      "original_definition_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+      "design_template": {
+        "operator_family_candidate": "明确暴露stride的接口",
+        "input_construction": "对同一逻辑数据构造转置view和连续副本，仅在schema允许且执行器保留stride时执行。",
+        "oracle_design": "同逻辑值的独立连续参考。",
+        "target_path_check": "保存实际stride与storage offset，检查未被自动连续化。",
+        "remaining_contract_or_capability_gates": "原定义not testable限制：schema无stride时记能力/接口缺口，非全局不适用。"
+      },
+      "original_mode_ids": [
+        "M027"
+      ],
+      "technical_case_ids": [],
+      "original_relation_ids": [
+        "MAP:M027:API42:1.4.1"
+      ],
+      "technical_relation_ids": [],
+      "imported_recipe_ids": [],
+      "original_L3_flag": false,
+      "current_complete_recipe_relation": false,
+      "design_status": "DEFINITION_SCOPED_TEMPLATE_BINDING_REQUIRED",
+      "interface_applicability": "CONDITIONAL_ON_SELECTED_TARGET_API",
+      "target_api_contract_fully_verified": false,
+      "construction_capability_validated": false,
+      "target_path_observed": false,
+      "hardware_execution_validated": false,
+      "template_is_executable_coverage": false,
+      "history_required_before_design": false,
+      "invalid_domain_handling": "先分合法正常输入与契约拒绝测试；不将非法参数报错计为精度失败",
+      "condition_has_historical_summary_representative": false
+    },
+    {
+      "condition_id": "1.4.2",
+      "name": "Large stride (>65535)",
+      "definition": "由 shape 推出使 stride>65535。\nRequires: 高维大尾维 + 地址按 stride 计算的实现。",
+      "original_requires": [
+        "高维大尾维 + 地址按 stride 计算的实现。"
+      ],
+      "original_skip_if": [],
+      "original_family_requires": [
+        "`SEM-LAYOUT`，或 `SEM-TRANSPOSE` 导致非平凡 stride，或 schema 暴露 format/stride，或 `CON-ALIGN`。"
+      ],
+      "original_family_skip_if": [
+        "固定 ND、无 format/transpose/align 实参且框架不可控 stride（多项标 `[not testable]`）。"
+      ],
+      "original_definition_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+      "design_template": {
+        "operator_family_candidate": "允许大stride的索引/布局接口",
+        "input_construction": "合法stride取65535/65536/65537并按最大offset分配足够存储。",
+        "oracle_design": "宽整数offset与逻辑值参考。",
+        "target_path_check": "记录API stride真实传入kernel。",
+        "remaining_contract_or_capability_gates": "stride契约、存储容量及执行器保留能力；内部srcRepStride不算。"
+      },
+      "original_mode_ids": [],
+      "technical_case_ids": [],
+      "original_relation_ids": [],
+      "technical_relation_ids": [],
+      "imported_recipe_ids": [],
+      "original_L3_flag": false,
+      "current_complete_recipe_relation": false,
+      "design_status": "DEFINITION_SCOPED_TEMPLATE_BINDING_REQUIRED",
+      "interface_applicability": "CONDITIONAL_ON_SELECTED_TARGET_API",
+      "target_api_contract_fully_verified": false,
+      "construction_capability_validated": false,
+      "target_path_observed": false,
+      "hardware_execution_validated": false,
+      "template_is_executable_coverage": false,
+      "history_required_before_design": false,
+      "invalid_domain_handling": "先分合法正常输入与契约拒绝测试；不将非法参数报错计为精度失败",
+      "condition_has_historical_summary_representative": false
+    },
+    {
+      "condition_id": "1.4.3",
+      "name": "Special format (NZ, TND)",
+      "definition": "Requires: `SEM-LAYOUT` 可选 NZ/TND 等。  \r\nSkip if: 仅 ND。",
+      "original_requires": [
+        "`SEM-LAYOUT` 可选 NZ/TND 等。"
+      ],
+      "original_skip_if": [
+        "仅 ND。"
+      ],
+      "original_family_requires": [
+        "`SEM-LAYOUT`，或 `SEM-TRANSPOSE` 导致非平凡 stride，或 schema 暴露 format/stride，或 `CON-ALIGN`。"
+      ],
+      "original_family_skip_if": [
+        "固定 ND、无 format/transpose/align 实参且框架不可控 stride（多项标 `[not testable]`）。"
+      ],
+      "original_definition_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+      "design_template": {
+        "operator_family_candidate": "允许NZ/TND的算子",
+        "input_construction": "同逻辑张量使用目标接口认可的ND与NZ/TND格式。",
+        "oracle_design": "按官方布局转换回逻辑表示后比较目标算子参考。",
+        "target_path_check": "确认格式专用kernel，单做格式往返不算算子覆盖。",
+        "remaining_contract_or_capability_gates": "格式枚举、转换契约、layout工具与目标接口。"
+      },
+      "original_mode_ids": [
+        "M024",
+        "M027"
+      ],
+      "technical_case_ids": [],
+      "original_relation_ids": [
+        "MAP:M024:API42:1.4.3",
+        "MAP:M027:API42:1.4.3"
+      ],
+      "technical_relation_ids": [],
+      "imported_recipe_ids": [],
+      "original_L3_flag": false,
+      "current_complete_recipe_relation": false,
+      "design_status": "DEFINITION_SCOPED_TEMPLATE_BINDING_REQUIRED",
+      "interface_applicability": "CONDITIONAL_ON_SELECTED_TARGET_API",
+      "target_api_contract_fully_verified": false,
+      "construction_capability_validated": false,
+      "target_path_observed": false,
+      "hardware_execution_validated": false,
+      "template_is_executable_coverage": false,
+      "history_required_before_design": false,
+      "invalid_domain_handling": "先分合法正常输入与契约拒绝测试；不将非法参数报错计为精度失败",
+      "condition_has_historical_summary_representative": false
+    },
+    {
+      "condition_id": "1.5.1",
+      "name": "Non-aligned sequence length",
+      "definition": "seq ∉ 16/32/64/128 倍数。",
+      "original_requires": [],
+      "original_skip_if": [],
+      "original_family_requires": [
+        "`SEM-SEQ-LEN` / `TEN-SEQ-META` / `SEM-ATTN-STRUCT` / `TEN-ATTN-QKV` 上可解释的 seq/head 维。"
+      ],
+      "original_family_skip_if": [
+        "无序列维语义（纯点对点 elemwise 且无 seq）。"
+      ],
+      "original_definition_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+      "design_template": {
+        "operator_family_candidate": "Attention",
+        "input_construction": "候选B=1,H=2,D=64，seq=15/16/17、31/32/33，须满足接口支持。",
+        "oracle_design": "独立QK→mask→softmax→V参考，保留布局/缩放语义。",
+        "target_path_check": "记录非对齐seq实际tiling。",
+        "remaining_contract_or_capability_gates": "完整QKV、mask、精度契约与路径。"
+      },
+      "original_mode_ids": [
+        "M018"
+      ],
+      "technical_case_ids": [],
+      "original_relation_ids": [
+        "MAP:M018:API42:1.5.1"
+      ],
+      "technical_relation_ids": [],
+      "imported_recipe_ids": [],
+      "original_L3_flag": false,
+      "current_complete_recipe_relation": false,
+      "design_status": "DEFINITION_SCOPED_TEMPLATE_BINDING_REQUIRED",
+      "interface_applicability": "CONDITIONAL_ON_SELECTED_TARGET_API",
+      "target_api_contract_fully_verified": false,
+      "construction_capability_validated": false,
+      "target_path_observed": false,
+      "hardware_execution_validated": false,
+      "template_is_executable_coverage": false,
+      "history_required_before_design": false,
+      "invalid_domain_handling": "先分合法正常输入与契约拒绝测试；不将非法参数报错计为精度失败",
+      "condition_has_historical_summary_representative": false
+    },
+    {
+      "condition_id": "1.5.2",
+      "name": "Very long sequence",
+      "definition": "2048/4096/8192…",
+      "original_requires": [],
+      "original_skip_if": [],
+      "original_family_requires": [
+        "`SEM-SEQ-LEN` / `TEN-SEQ-META` / `SEM-ATTN-STRUCT` / `TEN-ATTN-QKV` 上可解释的 seq/head 维。"
+      ],
+      "original_family_skip_if": [
+        "无序列维语义（纯点对点 elemwise 且无 seq）。"
+      ],
+      "original_definition_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+      "design_template": {
+        "operator_family_candidate": "Attention长序列",
+        "input_construction": "seq=2048/4096/8192的合法配置，先核对内存与参考预算。",
+        "oracle_design": "完整或可证明完整的分块高精参考，禁止截断前缀后声称通过。",
+        "target_path_check": "记录长序列实现。",
+        "remaining_contract_or_capability_gates": "资源、完整参考及目标接口。"
+      },
+      "original_mode_ids": [
+        "M018"
+      ],
+      "technical_case_ids": [],
+      "original_relation_ids": [
+        "MAP:M018:API42:1.5.2"
+      ],
+      "technical_relation_ids": [],
+      "imported_recipe_ids": [],
+      "original_L3_flag": false,
+      "current_complete_recipe_relation": false,
+      "design_status": "DEFINITION_SCOPED_TEMPLATE_BINDING_REQUIRED",
+      "interface_applicability": "CONDITIONAL_ON_SELECTED_TARGET_API",
+      "target_api_contract_fully_verified": false,
+      "construction_capability_validated": false,
+      "target_path_observed": false,
+      "hardware_execution_validated": false,
+      "template_is_executable_coverage": false,
+      "history_required_before_design": false,
+      "invalid_domain_handling": "先分合法正常输入与契约拒绝测试；不将非法参数报错计为精度失败",
+      "condition_has_historical_summary_representative": false
+    },
+    {
+      "condition_id": "1.5.3",
+      "name": "Decode-length (seq_len=1)",
+      "definition": "单步 decode 路径。",
+      "original_requires": [],
+      "original_skip_if": [],
+      "original_family_requires": [
+        "`SEM-SEQ-LEN` / `TEN-SEQ-META` / `SEM-ATTN-STRUCT` / `TEN-ATTN-QKV` 上可解释的 seq/head 维。"
+      ],
+      "original_family_skip_if": [
+        "无序列维语义（纯点对点 elemwise 且无 seq）。"
+      ],
+      "original_definition_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+      "design_template": {
+        "operator_family_candidate": "Decode Attention",
+        "input_construction": "合法Q长度1、KV长度17，与prefill对照。",
+        "oracle_design": "单行attention高精参考。",
+        "target_path_check": "必须命中decode专用路径，seq=1本身不足证明命中。",
+        "remaining_contract_or_capability_gates": "decode契约、缓存与路径观察。"
+      },
+      "original_mode_ids": [],
+      "technical_case_ids": [],
+      "original_relation_ids": [],
+      "technical_relation_ids": [],
+      "imported_recipe_ids": [],
+      "original_L3_flag": false,
+      "current_complete_recipe_relation": false,
+      "design_status": "DEFINITION_SCOPED_TEMPLATE_BINDING_REQUIRED",
+      "interface_applicability": "CONDITIONAL_ON_SELECTED_TARGET_API",
+      "target_api_contract_fully_verified": false,
+      "construction_capability_validated": false,
+      "target_path_observed": false,
+      "hardware_execution_validated": false,
+      "template_is_executable_coverage": false,
+      "history_required_before_design": false,
+      "invalid_domain_handling": "先分合法正常输入与契约拒绝测试；不将非法参数报错计为精度失败",
+      "condition_has_historical_summary_representative": false
+    },
+    {
+      "condition_id": "1.5.4",
+      "name": "Head dim not aligned",
+      "definition": "dSize 非标准对齐。\nRequires: head 维存在（ATTN-STRUCT 或 QKV shape）。",
+      "original_requires": [
+        "head 维存在（ATTN-STRUCT 或 QKV shape）。"
+      ],
+      "original_skip_if": [],
+      "original_family_requires": [
+        "`SEM-SEQ-LEN` / `TEN-SEQ-META` / `SEM-ATTN-STRUCT` / `TEN-ATTN-QKV` 上可解释的 seq/head 维。"
+      ],
+      "original_family_skip_if": [
+        "无序列维语义（纯点对点 elemwise 且无 seq）。"
+      ],
+      "original_definition_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+      "design_template": {
+        "operator_family_candidate": "Attention head维",
+        "input_construction": "headDim=63/64/65候选，只执行目标契约允许值。",
+        "oracle_design": "对应head维的独立attention参考。",
+        "target_path_check": "记录非标准head维的实际路径。",
+        "remaining_contract_or_capability_gates": "合法head维集合、layout及kernel。"
+      },
+      "original_mode_ids": [],
+      "technical_case_ids": [],
+      "original_relation_ids": [],
+      "technical_relation_ids": [],
+      "imported_recipe_ids": [],
+      "original_L3_flag": false,
+      "current_complete_recipe_relation": false,
+      "design_status": "DEFINITION_SCOPED_TEMPLATE_BINDING_REQUIRED",
+      "interface_applicability": "CONDITIONAL_ON_SELECTED_TARGET_API",
+      "target_api_contract_fully_verified": false,
+      "construction_capability_validated": false,
+      "target_path_observed": false,
+      "hardware_execution_validated": false,
+      "template_is_executable_coverage": false,
+      "history_required_before_design": false,
+      "invalid_domain_handling": "先分合法正常输入与契约拒绝测试；不将非法参数报错计为精度失败",
+      "condition_has_historical_summary_representative": false
+    },
+    {
+      "condition_id": "1.6.1",
+      "name": "Batch > 1",
+      "definition": "batch=2/4 激活不同 offset/workspace。",
+      "original_requires": [],
+      "original_skip_if": [],
+      "original_family_requires": [
+        "shape 上存在 batch/sample 维，或 MoE token 分配。"
+      ],
+      "original_family_skip_if": [
+        "无 batch 概念的标量核。"
+      ],
+      "original_definition_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+      "design_template": {
+        "operator_family_candidate": "带batch算子",
+        "input_construction": "batch=1/2/4，每个batch使用不同可识别数据。",
+        "oracle_design": "与各batch独立串行调用比较，同时比较数值参考。",
+        "target_path_check": "记录batch offset、workspace及实际并行路径。",
+        "remaining_contract_or_capability_gates": "API及历史精确输入仍需补；摘要代表不等于原文/设备确认。"
+      },
+      "original_mode_ids": [
+        "M003",
+        "M017",
+        "M022"
+      ],
+      "technical_case_ids": [],
+      "original_relation_ids": [
+        "MAP:M003:API42:1.6.1",
+        "MAP:M017:API42:1.6.1",
+        "MAP:M022:API42:1.6.1"
+      ],
+      "technical_relation_ids": [],
+      "imported_recipe_ids": [],
+      "original_L3_flag": false,
+      "current_complete_recipe_relation": false,
+      "design_status": "DEFINITION_SCOPED_TEMPLATE_BINDING_REQUIRED",
+      "interface_applicability": "CONDITIONAL_ON_SELECTED_TARGET_API",
+      "target_api_contract_fully_verified": false,
+      "construction_capability_validated": false,
+      "target_path_observed": false,
+      "hardware_execution_validated": false,
+      "template_is_executable_coverage": false,
+      "history_required_before_design": false,
+      "invalid_domain_handling": "先分合法正常输入与契约拒绝测试；不将非法参数报错计为精度失败",
+      "condition_has_historical_summary_representative": true
+    },
+    {
+      "condition_id": "1.6.2",
+      "name": "Uneven expert/token allocation",
+      "definition": "Requires: MoE 路由实参（同 1.1.4/1.3.4）。  \r\nSkip if: 非 MoE。",
+      "original_requires": [
+        "MoE 路由实参（同 1.1.4/1.3.4）。"
+      ],
+      "original_skip_if": [
+        "非 MoE。"
+      ],
+      "original_family_requires": [
+        "shape 上存在 batch/sample 维，或 MoE token 分配。"
+      ],
+      "original_family_skip_if": [
+        "无 batch 概念的标量核。"
+      ],
+      "original_definition_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+      "design_template": {
+        "operator_family_candidate": "MoE分配",
+        "input_construction": "4专家、8token计数[5,2,1,0]与[2,2,2,2]对照，满足容量契约。",
+        "oracle_design": "CPU分派和归并参考。",
+        "target_path_check": "记录实际expert counts与有效负载。",
+        "remaining_contract_or_capability_gates": "MoE路由、容量、通信及参考。"
+      },
+      "original_mode_ids": [],
+      "technical_case_ids": [],
+      "original_relation_ids": [],
+      "technical_relation_ids": [],
+      "imported_recipe_ids": [],
+      "original_L3_flag": false,
+      "current_complete_recipe_relation": false,
+      "design_status": "DEFINITION_SCOPED_TEMPLATE_BINDING_REQUIRED",
+      "interface_applicability": "CONDITIONAL_ON_SELECTED_TARGET_API",
+      "target_api_contract_fully_verified": false,
+      "construction_capability_validated": false,
+      "target_path_observed": false,
+      "hardware_execution_validated": false,
+      "template_is_executable_coverage": false,
+      "history_required_before_design": false,
+      "invalid_domain_handling": "先分合法正常输入与契约拒绝测试；不将非法参数报错计为精度失败",
+      "condition_has_historical_summary_representative": false
+    },
+    {
+      "condition_id": "1.7.1",
+      "name": "All-zero → div-by-zero (scale=INF)",
+      "definition": "`constant(0)`；常与动态量化 attr 联用。",
+      "original_requires": [],
+      "original_skip_if": [],
+      "original_family_requires": [
+        "至少一数值型 `TEN-PRIMARY` / `OTHER-OPERAND` / `WEIGHT` / `SCALE-ZP` / `SEM-SCALAR-COEFF`（浮点或会转浮点）。"
+      ],
+      "original_family_skip_if": [
+        "无数值载荷（纯 shape 推导算子且无 data）。"
+      ],
+      "original_definition_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+      "design_template": {
+        "operator_family_candidate": "动态量化scale生成",
+        "input_construction": "全零行与非零行对照。",
+        "oracle_design": "量化输出及scale应按目标零输入规范判断，不预设scale一定0或一定1。",
+        "target_path_check": "确认scale生成、保护分支及NaN/Inf掩码。",
+        "remaining_contract_or_capability_gates": "零scale契约与Oracle尚未绑定。"
+      },
+      "original_mode_ids": [],
+      "technical_case_ids": [],
+      "original_relation_ids": [],
+      "technical_relation_ids": [],
+      "imported_recipe_ids": [],
+      "original_L3_flag": false,
+      "current_complete_recipe_relation": false,
+      "design_status": "DEFINITION_SCOPED_TEMPLATE_BINDING_REQUIRED",
+      "interface_applicability": "CONDITIONAL_ON_SELECTED_TARGET_API",
+      "target_api_contract_fully_verified": false,
+      "construction_capability_validated": false,
+      "target_path_observed": false,
+      "hardware_execution_validated": false,
+      "template_is_executable_coverage": false,
+      "history_required_before_design": false,
+      "invalid_domain_handling": "先分合法正常输入与契约拒绝测试；不将非法参数报错计为精度失败",
+      "condition_has_historical_summary_representative": false
+    },
+    {
+      "condition_id": "1.7.2",
+      "name": "NaN / Inf",
+      "definition": "Requires: `CON-BOUNDARY-INFNAN` 或 dtype 为浮点。",
+      "original_requires": [],
+      "original_skip_if": [],
+      "original_family_requires": [
+        "至少一数值型 `TEN-PRIMARY` / `OTHER-OPERAND` / `WEIGHT` / `SCALE-ZP` / `SEM-SCALAR-COEFF`（浮点或会转浮点）。"
+      ],
+      "original_family_skip_if": [
+        "无数值载荷（纯 shape 推导算子且无 data）。"
+      ],
+      "original_definition_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+      "design_template": {
+        "operator_family_candidate": "契约允许NaN/Inf的数值接口",
+        "input_construction": "有限对照中分别插入NaN、+Inf、-Inf。",
+        "oracle_design": "按接口传播规则比较掩码、符号和有限结果，不能仅用容差。",
+        "target_path_check": "确认目标dtype/硬件支持与路径。",
+        "remaining_contract_or_capability_gates": "特殊值域契约；硬件不支持时不能当正常精度测试。"
+      },
+      "original_mode_ids": [
+        "M029"
+      ],
+      "technical_case_ids": [],
+      "original_relation_ids": [
+        "MAP:M029:API42:1.7.2"
+      ],
+      "technical_relation_ids": [],
+      "imported_recipe_ids": [],
+      "original_L3_flag": false,
+      "current_complete_recipe_relation": false,
+      "design_status": "DEFINITION_SCOPED_TEMPLATE_BINDING_REQUIRED",
+      "interface_applicability": "CONDITIONAL_ON_SELECTED_TARGET_API",
+      "target_api_contract_fully_verified": false,
+      "construction_capability_validated": false,
+      "target_path_observed": false,
+      "hardware_execution_validated": false,
+      "template_is_executable_coverage": false,
+      "history_required_before_design": false,
+      "invalid_domain_handling": "先分合法正常输入与契约拒绝测试；不将非法参数报错计为精度失败",
+      "condition_has_historical_summary_representative": false
+    },
+    {
+      "condition_id": "1.7.3",
+      "name": "Extreme large values",
+      "definition": "近 FP 上限 / exp 溢出区。",
+      "original_requires": [],
+      "original_skip_if": [],
+      "original_family_requires": [
+        "至少一数值型 `TEN-PRIMARY` / `OTHER-OPERAND` / `WEIGHT` / `SCALE-ZP` / `SEM-SCALAR-COEFF`（浮点或会转浮点）。"
+      ],
+      "original_family_skip_if": [
+        "无数值载荷（纯 shape 推导算子且无 data）。"
+      ],
+      "original_definition_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+      "design_template": {
+        "operator_family_candidate": "数值/exp类",
+        "input_construction": "有限输入接近dtype上限；exp另围绕log(max)合法邻域，输入不能先变成Inf。",
+        "oracle_design": "高精参考及有限/溢出分类。",
+        "target_path_check": "记录算术精度路径。",
+        "remaining_contract_or_capability_gates": "输入dtype、值域及溢出规范；算子名本身不是代表证据。"
+      },
+      "original_mode_ids": [],
+      "technical_case_ids": [],
+      "original_relation_ids": [],
+      "technical_relation_ids": [],
+      "imported_recipe_ids": [],
+      "original_L3_flag": false,
+      "current_complete_recipe_relation": false,
+      "design_status": "DEFINITION_SCOPED_TEMPLATE_BINDING_REQUIRED",
+      "interface_applicability": "CONDITIONAL_ON_SELECTED_TARGET_API",
+      "target_api_contract_fully_verified": false,
+      "construction_capability_validated": false,
+      "target_path_observed": false,
+      "hardware_execution_validated": false,
+      "template_is_executable_coverage": false,
+      "history_required_before_design": false,
+      "invalid_domain_handling": "先分合法正常输入与契约拒绝测试；不将非法参数报错计为精度失败",
+      "condition_has_historical_summary_representative": false
+    },
+    {
+      "condition_id": "1.7.4",
+      "name": "Near-zero denominator",
+      "definition": "scale/除数 ~0。\nRequires: 除数角色张量或 scalar。",
+      "original_requires": [
+        "除数角色张量或 scalar。"
+      ],
+      "original_skip_if": [],
+      "original_family_requires": [
+        "至少一数值型 `TEN-PRIMARY` / `OTHER-OPERAND` / `WEIGHT` / `SCALE-ZP` / `SEM-SCALAR-COEFF`（浮点或会转浮点）。"
+      ],
+      "original_family_skip_if": [
+        "无数值载荷（纯 shape 推导算子且无 data）。"
+      ],
+      "original_definition_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+      "design_template": {
+        "operator_family_candidate": "明确除数角色的接口",
+        "input_construction": "除数1、2^-10、2^-20，分子固定；零值按契约另列。",
+        "oracle_design": "高精除法及异常规则，不把任意小scale都认作分母。",
+        "target_path_check": "确认该参数实际作为除数。",
+        "remaining_contract_or_capability_gates": "参数角色、数值域与参考规范。"
+      },
+      "original_mode_ids": [
+        "M016"
+      ],
+      "technical_case_ids": [],
+      "original_relation_ids": [
+        "MAP:M016:API42:1.7.4"
+      ],
+      "technical_relation_ids": [],
+      "imported_recipe_ids": [],
+      "original_L3_flag": false,
+      "current_complete_recipe_relation": false,
+      "design_status": "DEFINITION_SCOPED_TEMPLATE_BINDING_REQUIRED",
+      "interface_applicability": "CONDITIONAL_ON_SELECTED_TARGET_API",
+      "target_api_contract_fully_verified": false,
+      "construction_capability_validated": false,
+      "target_path_observed": false,
+      "hardware_execution_validated": false,
+      "template_is_executable_coverage": false,
+      "history_required_before_design": false,
+      "invalid_domain_handling": "先分合法正常输入与契约拒绝测试；不将非法参数报错计为精度失败",
+      "condition_has_historical_summary_representative": true
+    },
+    {
+      "condition_id": "1.7.5",
+      "name": "Log-domain instability",
+      "definition": "概率近 0/1。\nRequires: 进入 log/softmax 的输入。",
+      "original_requires": [
+        "进入 log/softmax 的输入。"
+      ],
+      "original_skip_if": [],
+      "original_family_requires": [
+        "至少一数值型 `TEN-PRIMARY` / `OTHER-OPERAND` / `WEIGHT` / `SCALE-ZP` / `SEM-SCALAR-COEFF`（浮点或会转浮点）。"
+      ],
+      "original_family_skip_if": [
+        "无数值载荷（纯 shape 推导算子且无 data）。"
+      ],
+      "original_definition_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+      "design_template": {
+        "operator_family_candidate": "Log/Softmax语义接口",
+        "input_construction": "log概率eps与1-eps；softmax另构造logit差值，不能把概率与logit混用。",
+        "oracle_design": "稳定高精log/softmax参考。",
+        "target_path_check": "记录进入log或归一化的实际值。",
+        "remaining_contract_or_capability_gates": "接口值域、参数含义和精度规范。"
+      },
+      "original_mode_ids": [],
+      "technical_case_ids": [],
+      "original_relation_ids": [],
+      "technical_relation_ids": [],
+      "imported_recipe_ids": [],
+      "original_L3_flag": false,
+      "current_complete_recipe_relation": false,
+      "design_status": "DEFINITION_SCOPED_TEMPLATE_BINDING_REQUIRED",
+      "interface_applicability": "CONDITIONAL_ON_SELECTED_TARGET_API",
+      "target_api_contract_fully_verified": false,
+      "construction_capability_validated": false,
+      "target_path_observed": false,
+      "hardware_execution_validated": false,
+      "template_is_executable_coverage": false,
+      "history_required_before_design": false,
+      "invalid_domain_handling": "先分合法正常输入与契约拒绝测试；不将非法参数报错计为精度失败",
+      "condition_has_historical_summary_representative": false
+    },
+    {
+      "condition_id": "1.7.6",
+      "name": "Intermediate overflow (mul before div)",
+      "definition": "大值触发中间溢出。",
+      "original_requires": [],
+      "original_skip_if": [],
+      "original_family_requires": [
+        "至少一数值型 `TEN-PRIMARY` / `OTHER-OPERAND` / `WEIGHT` / `SCALE-ZP` / `SEM-SCALAR-COEFF`（浮点或会转浮点）。"
+      ],
+      "original_family_skip_if": [
+        "无数值载荷（纯 shape 推导算子且无 data）。"
+      ],
+      "original_definition_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+      "design_template": {
+        "operator_family_candidate": "已有prod提升时点配方",
+        "input_construction": "FP16输入[256,256]、明确FP32计算/输出契约，参考乘积65536；引用既有设计并核对支持性。",
+        "oracle_design": "先高精计算再按契约转换；区分输入Inf与中间溢出。",
+        "target_path_check": "记录实际累积dtype和提升时点。",
+        "remaining_contract_or_capability_gates": "目标版本/路径与设备结果；GEMM标记修复不自动证明Inf。"
+      },
+      "original_mode_ids": [
+        "M001",
+        "M009"
+      ],
+      "technical_case_ids": [],
+      "original_relation_ids": [
+        "MAP:M001:API42:1.7.6",
+        "MAP:M009:API42:1.7.6"
+      ],
+      "technical_relation_ids": [],
+      "imported_recipe_ids": [
+        "DESIGN-BADDBMM-INTERMEDIATE",
+        "DESIGN-PROD-PROMOTION"
+      ],
+      "original_L3_flag": true,
+      "current_complete_recipe_relation": false,
+      "design_status": "HAS_IMPORTED_RECIPE_UNEXECUTED",
+      "interface_applicability": "CONDITIONAL_ON_SELECTED_TARGET_API",
+      "target_api_contract_fully_verified": false,
+      "construction_capability_validated": false,
+      "target_path_observed": false,
+      "hardware_execution_validated": false,
+      "template_is_executable_coverage": false,
+      "history_required_before_design": false,
+      "invalid_domain_handling": "先分合法正常输入与契约拒绝测试；不将非法参数报错计为精度失败",
+      "condition_has_historical_summary_representative": true
+    },
+    {
+      "condition_id": "1.8.1",
+      "name": "Packed variable-length sequence",
+      "definition": "batchSizes/packed 实参。\nRequires: pack 相关 attr 或 SEQ-LEN 数组。",
+      "original_requires": [
+        "pack 相关 attr 或 SEQ-LEN 数组。"
+      ],
+      "original_skip_if": [],
+      "original_family_requires": [
+        "`TEN-MASK` / `SEM-SPARSE-MASK` / `SEM-PADDED-MODE` / packed 相关 attr / `SEM-GEOM` 负 padding。"
+      ],
+      "original_family_skip_if": [
+        "无 mask、无 pack/pad 组织、无 crop。"
+      ],
+      "original_definition_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+      "design_template": {
+        "operator_family_candidate": "Packed序列接口",
+        "input_construction": "长度[3,1,2]，排序后batchSizes=[3,2,1]，保存排序/恢复置换。",
+        "oracle_design": "逐序列独立参考及正确恢复顺序。",
+        "target_path_check": "确认真实packed参数被消费。",
+        "remaining_contract_or_capability_gates": "packed schema、排序与padding契约；TND格式标签不能替代。"
+      },
+      "original_mode_ids": [],
+      "technical_case_ids": [],
+      "original_relation_ids": [],
+      "technical_relation_ids": [],
+      "imported_recipe_ids": [],
+      "original_L3_flag": false,
+      "current_complete_recipe_relation": false,
+      "design_status": "DEFINITION_SCOPED_TEMPLATE_BINDING_REQUIRED",
+      "interface_applicability": "CONDITIONAL_ON_SELECTED_TARGET_API",
+      "target_api_contract_fully_verified": false,
+      "construction_capability_validated": false,
+      "target_path_observed": false,
+      "hardware_execution_validated": false,
+      "template_is_executable_coverage": false,
+      "history_required_before_design": false,
+      "invalid_domain_handling": "先分合法正常输入与契约拒绝测试；不将非法参数报错计为精度失败",
+      "condition_has_historical_summary_representative": false
+    },
+    {
+      "condition_id": "1.8.2",
+      "name": "Mask type/combination",
+      "definition": "causal/SWA/custom + GQA 等。\nRequires: `TEN-MASK` 或 `SEM-SPARSE-MASK`。",
+      "original_requires": [
+        "`TEN-MASK` 或 `SEM-SPARSE-MASK`。"
+      ],
+      "original_skip_if": [],
+      "original_family_requires": [
+        "`TEN-MASK` / `SEM-SPARSE-MASK` / `SEM-PADDED-MODE` / packed 相关 attr / `SEM-GEOM` 负 padding。"
+      ],
+      "original_family_skip_if": [
+        "无 mask、无 pack/pad 组织、无 crop。"
+      ],
+      "original_definition_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+      "design_template": {
+        "operator_family_candidate": "Attention mask/GQA",
+        "input_construction": "按契约分别使用causal、窗口、自定义mask；GQA候选Hq=4,Hkv=2。",
+        "oracle_design": "显式mask及head映射参考。",
+        "target_path_check": "记录mask类型及GQA路径。",
+        "remaining_contract_or_capability_gates": "布尔/加性mask编码、支持组合与布局。"
+      },
+      "original_mode_ids": [
+        "M003"
+      ],
+      "technical_case_ids": [],
+      "original_relation_ids": [
+        "MAP:M003:API42:1.8.2"
+      ],
+      "technical_relation_ids": [],
+      "imported_recipe_ids": [],
+      "original_L3_flag": false,
+      "current_complete_recipe_relation": false,
+      "design_status": "DEFINITION_SCOPED_TEMPLATE_BINDING_REQUIRED",
+      "interface_applicability": "CONDITIONAL_ON_SELECTED_TARGET_API",
+      "target_api_contract_fully_verified": false,
+      "construction_capability_validated": false,
+      "target_path_observed": false,
+      "hardware_execution_validated": false,
+      "template_is_executable_coverage": false,
+      "history_required_before_design": false,
+      "invalid_domain_handling": "先分合法正常输入与契约拒绝测试；不将非法参数报错计为精度失败",
+      "condition_has_historical_summary_representative": false
+    },
+    {
+      "condition_id": "1.8.3",
+      "name": "Negative padding (crop)",
+      "definition": "Requires: `SEM-GEOM` padding 允许负值。",
+      "original_requires": [
+        "`SEM-GEOM` padding 允许负值。"
+      ],
+      "original_skip_if": [],
+      "original_family_requires": [
+        "`TEN-MASK` / `SEM-SPARSE-MASK` / `SEM-PADDED-MODE` / packed 相关 attr / `SEM-GEOM` 负 padding。"
+      ],
+      "original_family_skip_if": [
+        "无 mask、无 pack/pad 组织、无 crop。"
+      ],
+      "original_definition_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+      "design_template": {
+        "operator_family_candidate": "允许负padding的crop接口",
+        "input_construction": "一维[1..8]两侧padding=-1候选，应按裁剪语义得到[2..7]。",
+        "oracle_design": "显式切片参考。",
+        "target_path_check": "记录负padding/crop路径。",
+        "remaining_contract_or_capability_gates": "负值合法性、轴顺序和目标API；不支持时只做拒绝契约。"
+      },
+      "original_mode_ids": [],
+      "technical_case_ids": [],
+      "original_relation_ids": [],
+      "technical_relation_ids": [],
+      "imported_recipe_ids": [],
+      "original_L3_flag": false,
+      "current_complete_recipe_relation": false,
+      "design_status": "DEFINITION_SCOPED_TEMPLATE_BINDING_REQUIRED",
+      "interface_applicability": "CONDITIONAL_ON_SELECTED_TARGET_API",
+      "target_api_contract_fully_verified": false,
+      "construction_capability_validated": false,
+      "target_path_observed": false,
+      "hardware_execution_validated": false,
+      "template_is_executable_coverage": false,
+      "history_required_before_design": false,
+      "invalid_domain_handling": "先分合法正常输入与契约拒绝测试；不将非法参数报错计为精度失败",
+      "condition_has_historical_summary_representative": false
+    },
+    {
+      "condition_id": "1.C.1",
+      "name": "动态/静态量化、quant 粒度",
+      "definition": "动态/静态量化、quant 粒度",
+      "original_requires": [
+        "`SEM-QUANT`"
+      ],
+      "original_skip_if": [],
+      "original_family_requires": [],
+      "original_family_skip_if": [],
+      "original_definition_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+      "design_template": {
+        "operator_family_candidate": "dequant动态量化配方",
+        "input_construction": "复用公开quant_mode=1、swiglu_mode=1配置；静态/粒度变体须另绑定枚举。",
+        "oracle_design": "公开分步SwiGLU+npu_dynamic_quant，注明共享量化组件。",
+        "target_path_check": "记录实际动态量化路径与tiling。",
+        "remaining_contract_or_capability_gates": "独立触发因果、真实tiling及静态/粒度契约。"
+      },
+      "original_mode_ids": [],
+      "technical_case_ids": [
+        "TC-DEQUANT-REDUCE-STRIDE",
+        "TC-DEQUANT-SCALE-BUFFER"
+      ],
+      "original_relation_ids": [],
+      "technical_relation_ids": [
+        "CAT:TC-DEQUANT-REDUCE-STRIDE:API42:1.C.1",
+        "CAT:TC-DEQUANT-SCALE-BUFFER:API42:1.C.1"
+      ],
+      "imported_recipe_ids": [
+        "DESIGN-DEQUANT-UPSTREAM"
+      ],
+      "original_L3_flag": false,
+      "current_complete_recipe_relation": true,
+      "design_status": "HAS_IMPORTED_RECIPE_UNEXECUTED",
+      "interface_applicability": "CONDITIONAL_ON_SELECTED_TARGET_API",
+      "target_api_contract_fully_verified": false,
+      "construction_capability_validated": false,
+      "target_path_observed": false,
+      "hardware_execution_validated": false,
+      "template_is_executable_coverage": false,
+      "history_required_before_design": false,
+      "invalid_domain_handling": "先分合法正常输入与契约拒绝测试；不将非法参数报错计为精度失败",
+      "condition_has_historical_summary_representative": false
+    },
+    {
+      "condition_id": "1.C.2",
+      "name": "输出低精度 / out dtype",
+      "definition": "输出低精度 / out dtype",
+      "original_requires": [
+        "`SEM-DTYPE-OUT` / `SEM-QUANT`"
+      ],
+      "original_skip_if": [],
+      "original_family_requires": [],
+      "original_family_skip_if": [],
+      "original_definition_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+      "design_template": {
+        "operator_family_candidate": "BOOL Prod显式输出dtype",
+        "input_construction": "复用FLOAT32输入、显式BOOL输出、910B/910_93的既有配方。",
+        "oracle_design": "all(x!=0)与直接BOOL返回；不以有限精度乘积作逻辑参考。",
+        "target_path_check": "记录useReduceAll与dimList路径。",
+        "remaining_contract_or_capability_gates": "目标ABI/执行器及旧新输出；梯度自动推导dtype不是显式out控制。"
+      },
+      "original_mode_ids": [
+        "M001"
+      ],
+      "technical_case_ids": [
+        "TC-BOOL-REDUCE"
+      ],
+      "original_relation_ids": [
+        "MAP:M001:API42:1.C.2"
+      ],
+      "technical_relation_ids": [
+        "CAT:TC-BOOL-REDUCE:API42:1.C.2"
+      ],
+      "imported_recipe_ids": [
+        "DESIGN-BOOL-ACL",
+        "DESIGN-PROD-PROMOTION"
+      ],
+      "original_L3_flag": true,
+      "current_complete_recipe_relation": true,
+      "design_status": "HAS_IMPORTED_RECIPE_UNEXECUTED",
+      "interface_applicability": "CONDITIONAL_ON_SELECTED_TARGET_API",
+      "target_api_contract_fully_verified": false,
+      "construction_capability_validated": false,
+      "target_path_observed": false,
+      "hardware_execution_validated": false,
+      "template_is_executable_coverage": false,
+      "history_required_before_design": false,
+      "invalid_domain_handling": "先分合法正常输入与契约拒绝测试；不将非法参数报错计为精度失败",
+      "condition_has_historical_summary_representative": false
+    },
+    {
+      "condition_id": "1.C.3",
+      "name": "cubeMathType / KEEP_DTYPE",
+      "definition": "cubeMathType / KEEP_DTYPE",
+      "original_requires": [
+        "`SEM-MATH-MODE`"
+      ],
+      "original_skip_if": [],
+      "original_family_requires": [],
+      "original_family_skip_if": [],
+      "original_definition_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+      "design_template": {
+        "operator_family_candidate": "GEMM精度模式",
+        "input_construction": "beta=0、cubeMathType=4与beta=1控制；NeedEnableFp32Output完整条件待绑定。",
+        "oracle_design": "与契约允许的高精乘加参考比较。",
+        "target_path_check": "记录enableGemm16In32Out在分支上传递并被消费。",
+        "remaining_contract_or_capability_gates": "合法输入输出dtype、目标API和实际参考误差。"
+      },
+      "original_mode_ids": [],
+      "technical_case_ids": [
+        "TC-GEMM-PRECISION-FLAG"
+      ],
+      "original_relation_ids": [],
+      "technical_relation_ids": [
+        "CAT:TC-GEMM-PRECISION-FLAG:API42:1.C.3"
+      ],
+      "imported_recipe_ids": [],
+      "original_L3_flag": false,
+      "current_complete_recipe_relation": false,
+      "design_status": "DEFINITION_SCOPED_TEMPLATE_BINDING_REQUIRED",
+      "interface_applicability": "CONDITIONAL_ON_SELECTED_TARGET_API",
+      "target_api_contract_fully_verified": false,
+      "construction_capability_validated": false,
+      "target_path_observed": false,
+      "hardware_execution_validated": false,
+      "template_is_executable_coverage": false,
+      "history_required_before_design": false,
+      "invalid_domain_handling": "先分合法正常输入与契约拒绝测试；不将非法参数报错计为精度失败",
+      "condition_has_historical_summary_representative": false
+    },
+    {
+      "condition_id": "1.C.4",
+      "name": "RoPE / sink / dual-IO 等模式",
+      "definition": "RoPE / sink / dual-IO 等模式",
+      "original_requires": [
+        "`SEM-ATTN-STRUCT` 等"
+      ],
+      "original_skip_if": [],
+      "original_family_requires": [],
+      "original_family_skip_if": [],
+      "original_definition_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+      "design_template": {
+        "operator_family_candidate": "RoPE/sink/dual-IO接口",
+        "input_construction": "先从目标契约获得合法模式组合，每次只改一个公开模式。",
+        "oracle_design": "按各模式明确公式/状态语义建立参考，不能共享一个猜测Oracle。",
+        "target_path_check": "记录模式对应实现与输入角色。",
+        "remaining_contract_or_capability_gates": "模式枚举、完整语义、合法组合与Oracle。"
+      },
+      "original_mode_ids": [],
+      "technical_case_ids": [],
+      "original_relation_ids": [],
+      "technical_relation_ids": [],
+      "imported_recipe_ids": [],
+      "original_L3_flag": false,
+      "current_complete_recipe_relation": false,
+      "design_status": "DEFINITION_SCOPED_TEMPLATE_BINDING_REQUIRED",
+      "interface_applicability": "CONDITIONAL_ON_SELECTED_TARGET_API",
+      "target_api_contract_fully_verified": false,
+      "construction_capability_validated": false,
+      "target_path_observed": false,
+      "hardware_execution_validated": false,
+      "template_is_executable_coverage": false,
+      "history_required_before_design": false,
+      "invalid_domain_handling": "先分合法正常输入与契约拒绝测试；不将非法参数报错计为精度失败",
+      "condition_has_historical_summary_representative": false
+    },
+    {
+      "condition_id": "1.C.5",
+      "name": "deterministic / accumulate",
+      "definition": "deterministic / accumulate",
+      "original_requires": [
+        "`SEM-DETERMINISTIC` / `SEM-INDEX-CTRL`"
+      ],
+      "original_skip_if": [],
+      "original_family_requires": [],
+      "original_family_skip_if": [],
+      "original_definition_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+      "design_template": {
+        "operator_family_candidate": "显式deterministic/accumulate接口",
+        "input_construction": "同输入、同二进制下切换公开参数；固定所有参与者状态。",
+        "oracle_design": "deterministic按契约比较重复输出；accumulate按明确初值计算参考。",
+        "target_path_check": "记录公开参数实际改变的实现。",
+        "remaining_contract_or_capability_gates": "必须存在API参数；内部barrier/event/backend不能直接替代。"
+      },
+      "original_mode_ids": [],
+      "technical_case_ids": [],
+      "original_relation_ids": [],
+      "technical_relation_ids": [],
+      "imported_recipe_ids": [],
+      "original_L3_flag": false,
+      "current_complete_recipe_relation": false,
+      "design_status": "DEFINITION_SCOPED_TEMPLATE_BINDING_REQUIRED",
+      "interface_applicability": "CONDITIONAL_ON_SELECTED_TARGET_API",
+      "target_api_contract_fully_verified": false,
+      "construction_capability_validated": false,
+      "target_path_observed": false,
+      "hardware_execution_validated": false,
+      "template_is_executable_coverage": false,
+      "history_required_before_design": false,
+      "invalid_domain_handling": "先分合法正常输入与契约拒绝测试；不将非法参数报错计为精度失败",
+      "condition_has_historical_summary_representative": false
+    },
+    {
+      "condition_id": "1.C.6",
+      "name": "format / NZ",
+      "definition": "format / NZ",
+      "original_requires": [
+        "`SEM-LAYOUT`"
+      ],
+      "original_skip_if": [],
+      "original_family_requires": [],
+      "original_family_skip_if": [],
+      "original_definition_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+      "design_template": {
+        "operator_family_candidate": "显式format/NZ接口",
+        "input_construction": "同逻辑输入切换合法format枚举，保留转换元信息。",
+        "oracle_design": "反解到逻辑布局后比较算子参考。",
+        "target_path_check": "记录格式控制被消费及目标kernel。",
+        "remaining_contract_or_capability_gates": "真实format参数、转换工具和支持组合。"
+      },
+      "original_mode_ids": [
+        "M024",
+        "M027"
+      ],
+      "technical_case_ids": [],
+      "original_relation_ids": [
+        "MAP:M024:API42:1.C.6",
+        "MAP:M027:API42:1.C.6"
+      ],
+      "technical_relation_ids": [],
+      "imported_recipe_ids": [],
+      "original_L3_flag": false,
+      "current_complete_recipe_relation": false,
+      "design_status": "DEFINITION_SCOPED_TEMPLATE_BINDING_REQUIRED",
+      "interface_applicability": "CONDITIONAL_ON_SELECTED_TARGET_API",
+      "target_api_contract_fully_verified": false,
+      "construction_capability_validated": false,
+      "target_path_observed": false,
+      "hardware_execution_validated": false,
+      "template_is_executable_coverage": false,
+      "history_required_before_design": false,
+      "invalid_domain_handling": "先分合法正常输入与契约拒绝测试；不将非法参数报错计为精度失败",
+      "condition_has_historical_summary_representative": false
+    },
+    {
+      "condition_id": "1.C.7",
+      "name": "reduction / dim / transpose",
+      "definition": "reduction / dim / transpose",
+      "original_requires": [
+        "`SEM-REDUCE` / `SEM-AXIS` / `SEM-TRANSPOSE`"
+      ],
+      "original_skip_if": [],
+      "original_family_requires": [],
+      "original_family_skip_if": [],
+      "original_definition_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+      "design_template": {
+        "operator_family_candidate": "Reduce/Transpose接口",
+        "input_construction": "形状[2,3,5]，合法dim=0/-1及不同transpose组合，轴长不相等。",
+        "oracle_design": "独立轴归约/转置参考。",
+        "target_path_check": "记录归约轴与转换控制。",
+        "remaining_contract_or_capability_gates": "目标axis/transpose schema及默认/负轴契约。"
+      },
+      "original_mode_ids": [
+        "M005"
+      ],
+      "technical_case_ids": [],
+      "original_relation_ids": [
+        "MAP:M005:API42:1.C.7"
+      ],
+      "technical_relation_ids": [],
+      "imported_recipe_ids": [],
+      "original_L3_flag": false,
+      "current_complete_recipe_relation": false,
+      "design_status": "DEFINITION_SCOPED_TEMPLATE_BINDING_REQUIRED",
+      "interface_applicability": "CONDITIONAL_ON_SELECTED_TARGET_API",
+      "target_api_contract_fully_verified": false,
+      "construction_capability_validated": false,
+      "target_path_observed": false,
+      "hardware_execution_validated": false,
+      "template_is_executable_coverage": false,
+      "history_required_before_design": false,
+      "invalid_domain_handling": "先分合法正常输入与契约拒绝测试；不将非法参数报错计为精度失败",
+      "condition_has_historical_summary_representative": false
+    }
+  ],
+  "condition_count": 42,
+  "design_template_reviewed_count": 42,
+  "imported_recipe_condition_count": 5,
+  "target_validated_executable_coverage_count": 0,
+  "hardware_execution_count": 0,
+  "coverage_claim": "42项设计索引完整，不宣称42项测试已覆盖。已有配方单独列出，其他需绑定API/Oracle/路径。"
+}
