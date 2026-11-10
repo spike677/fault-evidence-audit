@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import copy
+from typing import Literal
 from pydantic import Field
 
 from .contracts import Contract
@@ -9,6 +10,54 @@ from .store import AuditError, digest
 from .trigger_assessment import ConditionFact
 
 VERSION = "source-row-manifest-1"
+SELECTION_CONTRACT = "A1_SOURCE_SELECTION_V2"
+
+
+class FieldBinding(Contract):
+    origin: Literal["SOURCE_DECLARATION", "MODEL_DERIVED", "UNKNOWN"]
+    source_ids: list[str] = Field(default_factory=list)
+    derived_text: str = ""
+    reason: str = ""
+
+
+def materialize_fields(case, manifest, bindings):
+    """The model selects immutable IDs; it never authors original facts or anchors."""
+    if manifest != build(case):
+        raise AuditError("Source manifest differs from the frozen source row")
+    entries = {e["source_id"]: e for e in manifest["entries"]}
+    claims, facts, selected = {}, {}, {}
+    for field, binding in bindings.items():
+        ids = binding.source_ids
+        if len(ids) != len(set(ids)) or not set(ids) <= set(entries):
+            raise AuditError(f"{field}: unknown or duplicate source_id")
+        if binding.origin == "UNKNOWN":
+            if ids or binding.derived_text or not binding.reason.strip():
+                raise AuditError(f"{field}: UNKNOWN needs a gap reason, no asserted facts")
+            claims[field] = {"text": binding.reason, "status": "UNKNOWN", "condition_fact_ids": []}
+            continue
+        if not ids:
+            raise AuditError(f"{field}: declarations and deductions need supporting source_ids")
+        if binding.origin == "SOURCE_DECLARATION" and binding.derived_text:
+            raise AuditError(f"{field}: the program owns declaration text and exact quotes")
+        if binding.origin == "MODEL_DERIVED" and (not binding.derived_text.strip() or not binding.reason.strip()):
+            raise AuditError(f"{field}: MODEL_DERIVED needs derived_text and a derivation_reason")
+        for source_id in ids:
+            entry = entries[source_id]
+            # resolve() checks the actual coordinate and nonblank original text.
+            ref = {"source_id": source_id, "quote": entry["original_value"]}
+            cells = resolve(manifest, [ref])
+            facts[source_id] = {"fact_id": source_id, "statement": entry["original_value"],
+                "subject": "SOURCE_RECORD", "role": "UNKNOWN", "evidence_basis": "SOURCE_DEFINITION",
+                "source_cells": cells, "source_refs": [ref]}
+            selected[source_id] = copy.deepcopy(entry)
+        claims[field] = {"text": ("\n".join(entries[k]["original_value"] for k in ids)
+                                      if binding.origin == "SOURCE_DECLARATION" else binding.derived_text),
+                         "status": "STATED" if binding.origin == "SOURCE_DECLARATION" else "INFERRED",
+                         "condition_fact_ids": ids,
+                         "derivation_reason": binding.reason if binding.origin == "MODEL_DERIVED" else ""}
+    return claims, list(facts.values()), {"contract": SELECTION_CONTRACT,
+        "manifest_hash": manifest["manifest_hash"], "selected_entries": list(selected.values()),
+        "field_bindings": {field: binding.model_dump() for field, binding in bindings.items()}}
 
 
 class SourceReference(Contract):

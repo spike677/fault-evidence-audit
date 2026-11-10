@@ -78,6 +78,11 @@ class BaselineBuilderTests(unittest.TestCase):
             'producer': template['producer'], 'condition_facts': [fact], 'self_check': template['self_check']}
         claim = {'text': cell['quote'], 'status': 'STATED', 'condition_fact_ids': ['F']}
         if request['kind'] == 'baseline_define':
+            if p.get('source_contract'):
+                source_id = next(e['source_id'] for e in p['source_manifest']['entries'] if e['column_key']=='故障原因')
+                return {k: v for k, v in {**common, 'condition_facts': None,
+                    'field_bindings': {field: {'origin': 'SOURCE_DECLARATION', 'source_ids': [source_id]}
+                                       for field in builder.FIELDS}}.items() if k != 'condition_facts'}
             return {**common, 'definition': {'mode_id': p['subject']['mode_id'], 'mode_name': p['original_mode']['description'],
                 **{field: copy.deepcopy(claim) for field in builder.FIELDS}}}
         if request['kind'] == 'baseline_execution':
@@ -157,9 +162,9 @@ class BaselineBuilderTests(unittest.TestCase):
         self.start(1)
         task = files.next_tasks(self.store, self.run)['tasks'][0]
         valid = self.response(self.request(task))
-        for mutate in (lambda r: r['definition']['failure_mechanism'].update(condition_fact_ids=[]),
-                       lambda r: r['condition_facts'][0]['source_cells'][0].update(quote='invented'),
-                       lambda r: r['definition'].update(mode_id='OTHER'),
+        for mutate in (lambda r: r['field_bindings']['failure_mechanism'].update(source_ids=[]),
+                       lambda r: r['field_bindings']['failure_mechanism'].update(quote='invented'),
+                       lambda r: r.update(definition={'mode_id':'OTHER'}),
                        lambda r: r.update(review_status='ACCEPT')):
             invalid = copy.deepcopy(valid); mutate(invalid)
             with self.assertRaises(AuditError): self.submit(task, invalid)
@@ -214,7 +219,7 @@ class BaselineBuilderTests(unittest.TestCase):
         review = self.response(self.request(task)); ids = review['reviewed_mode_ids']
         records = self.request(task)['payload']['mode_records']
         review['findings'] = [{'relation': 'SHARED_CONSTRUCTION', 'mode_ids': ids,
-            'reason': '共用合成构造线索，不证明相同失效机理', 'source_fact_ids': {m['mode_id']: ['A1:F'] for m in records}}]
+            'reason': '共用合成构造线索，不证明相同失效机理', 'source_fact_ids': {m['mode_id']: ['A1:' + m['condition_facts'][0]['fact_id']] for m in records}}]
         next(c for c in review['comparison_checks'] if c['dimension'] == 'SHARED_CONSTRUCTION')['finding_indexes'] = [0]
         self.submit(task, review)
         frozen = workflow.finalize(self.store, self.run, allow_pending=True)
@@ -262,7 +267,8 @@ class BaselineBuilderTests(unittest.TestCase):
             'reason': '相同原文机理待复核', 'source_fact_ids': {m: ['F'] for m in ids}}]
         response['comparison_checks'][0]['finding_indexes'] = [0]
         with self.assertRaisesRegex(AuditError, 'unknown definition facts'): self.submit(task, response)
-        response['findings'][0]['source_fact_ids'] = {m: ['A1:F'] for m in ids}
+        response['findings'][0]['source_fact_ids'] = {m['mode_id']: ['A1:' + m['condition_facts'][0]['fact_id']]
+            for m in self.request(task)['payload']['mode_records']}
         response['recommendation'] = 'REWORK_REQUIRED'
         self.submit(task, response)
         with self.assertRaisesRegex(AuditError, 'rework'): workflow.finalize(self.store, self.run, allow_pending=True)
@@ -281,7 +287,7 @@ class BaselineBuilderTests(unittest.TestCase):
             self.assertEqual(mode['v4_scenario_ids'], [])
             self.assertEqual(mode['api_trigger_ids'], [])
             self.assertEqual(mode['execution_method_ids'], ['E3'])
-            self.assertIn('A1:F', mode['evidence_index'])
+            self.assertIn('A1:' + mode['condition_facts'][0]['fact_id'], mode['evidence_index'])
         for filename in ('baseline_42_api_mapping.tsv', 'baseline_v4_mapping.tsv'):
             with (output / filename).open(encoding='utf-8-sig', newline='') as stream:
                 self.assertEqual(len(list(csv.DictReader(stream, delimiter='\t'))), 2)

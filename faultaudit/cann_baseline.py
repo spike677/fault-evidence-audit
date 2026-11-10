@@ -11,7 +11,8 @@ from pydantic import Field, ValidationError
 from .contracts import Contract, CatalogDraftProducer, SelfCheck
 from .knowledge_common import PROFILE, Claim, KnowledgeResponse, validate_common, checked_claim, enabled
 from .store import AuditError, digest
-from .source_manifest import ManifestFact, build as source_manifest, canonical_fact
+from .source_manifest import (ManifestFact, FieldBinding, SELECTION_CONTRACT, materialize_fields,
+                              build as source_manifest, canonical_fact)
 
 FIELDS = ("fault_object", "failure_mechanism", "observable_symptoms", "input_trigger_conditions",
           "execution_trigger_conditions", "applicable_scope", "exclusion_boundaries")
@@ -84,23 +85,64 @@ class DefinitionResponse(KnowledgeResponse):
     evidence_gaps: list[str] = Field(default_factory=list)
 
 
-INSTRUCTIONS = """Normalize THIS existing CANN mode into DefinitionResponse. Preserve mode_id and
+class DefinitionBindings(Contract):
+    fault_object: FieldBinding
+    failure_mechanism: FieldBinding
+    observable_symptoms: FieldBinding
+    input_trigger_conditions: FieldBinding
+    execution_trigger_conditions: FieldBinding
+    applicable_scope: FieldBinding
+    exclusion_boundaries: FieldBinding
+
+
+class SourceSelectionResponse(Contract):
+    request_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    case_id: str = Field(min_length=1)
+    executor: Literal["opencode", "codex"]
+    producer: CatalogDraftProducer
+    self_check: SelfCheck
+    field_bindings: DefinitionBindings
+    evidence_gaps: list[str] = Field(default_factory=list)
+
+
+def materialize_response(payload, response):
+    """Retain the historical schema for audit; new A1 submissions select IDs only."""
+    if payload.get("source_contract") != SELECTION_CONTRACT:
+        return response, None
+    try:
+        value = SourceSelectionResponse.model_validate(response)
+    except ValidationError as exc:
+        raise AuditError("Invalid A1 source selection: " + str(exc)) from exc
+    claims, facts, receipt = materialize_fields(payload["subject"]["source_case"], payload["source_manifest"],
+                                               {field: getattr(value.field_bindings, field) for field in FIELDS})
+    out = value.model_dump(exclude={"field_bindings"})
+    out.update(condition_facts=facts, definition={"mode_id": payload["subject"]["mode_id"],
+        "mode_name": payload["original_mode"]["description"], **claims})
+    return out, receipt
+
+
+INSTRUCTIONS = """Normalize THIS existing CANN mode into SourceSelectionResponse. The program preserves mode_id and
 the original mode_name. This task defines the CANN failure_mechanism, NOT V4 classification.
 V4 has 6 themes, 31 condition classes, 55 construction scenarios and 195 reference cases;
 none is a failure-mechanism registry. API42 and E1-E5 are separate axes, assigned later.
-For every field extract its technical meaning and scope, with exact source cells through
-condition_facts. Known original claims may be STATED without customer-event confirmation.
-Mark deductions INFERRED; missing facts UNKNOWN with an explanation, never fill plausible
+For each of the seven field_bindings select origin and supporting source_ids.
+SOURCE_DECLARATION selects original declarations: the program creates STATED text and facts.
+MODEL_DERIVED needs source_ids, derived_text and reason; the program marks the claim INFERRED.
+UNKNOWN needs a specific reason, empty source_ids and no derived_text. Never fill plausible
 parameters, boundaries or mechanisms. Preserve conflicting original descriptions visibly.
+Read each selected original_value for its meaning; blank/placeholder/gap text is not
+positive technical support. Use UNKNOWN rather than asserting an absent condition.
 Do not assign V4/API labels or adopt changes here. MODE_DEFINITION is the basis, not source
 verification or hardware validation. Do not search merely to make this definition complete.
 Read the full source. Return the supplied raw schema at the OUTER request_hash; no ACCEPT.
-The program supplies an immutable source_manifest. For every SOURCE_RECORD fact, select
-source_refs=[{source_id, quote}] from that manifest. Leave source_cells empty; the program
-binds the exact original field and coordinate. Never guess headers, including blank or
-multiline headers. A quote must occur verbatim in the selected original_value.
-INFERRED claims need derivation_reason and cited facts. Put absent information in UNKNOWN
-claims or evidence_gaps/self_check.issues, never in an ungrounded SOURCE_RECORD fact.
+The source_manifest is immutable. Select source_id only; do NOT submit condition_facts,
+source_refs, source_cells, quotes, headers, workbook hash, row or coordinate. The program
+materializes SOURCE_RECORD facts and their exact original_value, including multiline and
+__column_15 keys. Do not normalize a header or invent a failure_mechanism column. If that
+field is a technical deduction, use MODEL_DERIVED with the actual supporting IDs.
+SOURCE_DECLARATION can only cite the frozen workbook, never a webpage assertion.
+Historical material facts require captured body evidence in the separate evidence task;
+SOURCE_DECLARATION is not SOURCE_VERIFIED. GAP and SELF_CHECK are not source facts.
 Any historical_rejected_inputs are review material only, including unsubmitted mechanical
 repairs. Reuse their technical content only after checking the current frozen original;
 return a fresh response with this task's identity and your actual producer. Do not treat
@@ -145,11 +187,12 @@ def payloads(store, run_id):
         from .baseline_recovery import rejected_contexts, regeneration_context
         yield {"subject": {**subject, "source_case": source}, "original_mode": catalog[subject["mode_id"]],
             "source_manifest": source_manifest(source), "source_manifest_required": True,
+            "source_contract": SELECTION_CONTRACT,
             "historical_rejected_inputs": rejected_contexts(store, run_id, subject),
             "compatibility_regeneration": regeneration_context(store, run_id, subject),
             "case_ids": [subject["case_id"]], "basis_hash": definition_basis(store, run_id, subject),
             "input_scope": {"original_source_complete": True, "basis": "MODE_DEFINITION"},
-            "response_schema": DefinitionResponse.model_json_schema()}
+            "response_schema": SourceSelectionResponse.model_json_schema()}
 
 
 @run_scoped
@@ -162,13 +205,16 @@ def accept(store, run_id, request, response):
     if request["kind"] != "baseline_define":
         raise AuditError("A1 definition must use its assigned workflow kind")
     payload = request["payload"]
+    if payload.get("source_contract") != SELECTION_CONTRACT:
+        raise AuditError("New A1 tasks must use the program-owned source selection contract")
     subject = store.get(run_id, "trigger_subjects", payload["subject"]["subject_id"])
     if not enabled(store, run_id) or not subject or payload["basis_hash"] != definition_basis(store, run_id, subject):
         raise AuditError("Mode definition input changed; request a fresh task")
     if (payload["subject"]["source_case"] != store.get(run_id, "cases", subject["case_id"])
             or payload["original_mode"] != store.get(run_id, "catalog", subject["mode_id"])):
         raise AuditError("A1 source manifest input differs from the frozen original row/catalog")
-    value, facts = validate_common(payload, response, DefinitionResponse, request["request_hash"])
+    materialized, bindings = materialize_response(payload, response)
+    value, facts = validate_common(payload, materialized, DefinitionResponse, request["request_hash"])
     mode = value.definition
     name = payload["original_mode"]["description"]
     if value.executor != config(store, run_id)["executor"] or mode.mode_id != subject["mode_id"] or mode.mode_name != name:
@@ -185,6 +231,8 @@ def accept(store, run_id, request, response):
             "SOURCE_VERIFIED": False, "HARDWARE_VALIDATED": False},
         evidence_refs=[r for r in store.records(run_id, "references") if r["case_id"] == value.case_id],
         source_case_id=value.case_id)
+    if bindings:
+        result["source_binding"] = bindings
     record = {"definition_id": request["task_id"], "subject_id": subject["subject_id"], "case_id": value.case_id,
         "basis_hash": payload["basis_hash"], "policy_hash": _policy(), "raw_response": response, "result": result}
     save_definition(store, run_id, record, payload["source_manifest"])
@@ -248,10 +296,35 @@ def axis_payloads(store, run_id):
             yield "baseline_v4" if axis == "V4" else "baseline_api42", payload
 
 
-def axis_instructions(axis):
-    from .trigger_sparse import instructions
-    return instructions() + ("\nA2 ONLY: organize V4 themes/condition classes/construction scenarios with independent reasons. Each selected positive construction needs construction_recipe: a readable test-design suggestion plus missing API/legal-domain facts, not a fabricated historical reproduction. Return rows=[], external_branches=[], execution_method_links=[]; no API42 labels.\n" if axis == "V4" else
-        "\nA3 ONLY: classify the ORIGINAL42 API conditions. Return v4_rows=[], external_branches=[], execution_method_links=[]. Do not copy V4 labels. If known execution/internal dependencies cannot be expressed by this API axis, use summary NOT_APPLICABLE with exclusion_fact_ids and a specific explanation. Missing API details alone mean INSUFFICIENT_INFORMATION.\n")
+def axis_instructions(axis, payload=None):
+    from .trigger_sparse import instructions, citation_example
+    if axis == "V4":
+        return instructions() + """\nA2 ONLY: organize V4 themes/condition classes/construction scenarios with independent
+reasons. Each selected positive construction needs construction_recipe: a readable test-design
+suggestion plus missing API/legal-domain facts, not a fabricated historical reproduction.
+Return rows=[], external_branches=[], execution_method_links=[]; no API42 labels.
+""" + citation_example(payload or {})
+    return instructions() + """\nA3 ONLY: classify ORIGINAL42 API input conditions, independently of V4.
+Return v4_rows=[], external_branches=[], execution_method_links=[]. Preserve all 42 original
+definitions; assess selected relevant rules, not a dense matrix. Three semantic states:
+APPLICABLE needs grounded API input facts and all Requires/Skip checks. PARTIAL remains
+available for grounded but incomplete conditions. NOT_APPLICABLE needs a positively evidenced
+failed Requires/active exclusion for a specific rule, never mere lack of information.
+UNKNOWN is valid: represent it with classification_summary.status=INSUFFICIENT_INFORMATION,
+specific unknowns, and no fabricated positive/exclusion rows or links. Omitted rule rows are
+NOT_ASSESSED, not 42 negative judgments. A completed attempt may legitimately remain unknown.
+Whole-axis summary NOT_APPLICABLE is stronger: cite exclusion_fact_ids proving a non-API
+dependency (e.g. an explicitly documented host-thread race). Failure to find shape, dtype,
+API parameters or Wiki text does not prove that dependency. Never infer non-API from absence.
+Example: description 'some precision failures', no API detail -> INSUFFICIENT_INFORMATION,
+unknowns=['legal API inputs/trigger missing'], rows=[], scenarios=[], label_links=[].
+Example: documented 'only host thread interleaving, same arguments/binary' may support a
+whole-axis exclusion using actual quoted non-API facts; it is not a keyword shortcut.
+definition_init does not require historical webpage confirmation to classify original claims.
+source_relation is independent of applicability: without aligned captured body use UNKNOWN;
+PARTIAL needs partial aligned support; MATCH still needs the existing direct body gates.
+Do not upgrade UNKNOWN to a label, NOT_APPLICABLE or source MATCH to finish a task.
+"""
 
 
 class MethodEvidence(Contract):
@@ -300,10 +373,21 @@ def _available_evidence(store, run_id, case_id):
 
 @run_scoped
 def current_execution(store, run_id):
-    from .xlsx_workflow import _policy
+    from .xlsx_workflow import _policy, config
     subjects = {s["subject_id"]: s for s in store.records(run_id, "trigger_subjects")}
-    return [r for r in store.records(run_id, "baseline_execution") if r["policy_hash"] == _policy()
-        and r["subject_id"] in subjects and r["basis_hash"] == _execution_basis(store, run_id, subjects[r["subject_id"]])]
+    records = [r for r in store.records(run_id, "baseline_execution") if r["subject_id"] in subjects
+        and r["basis_hash"] == _execution_basis(store, run_id, subjects[r["subject_id"]])]
+    current = [r for r in records if r["policy_hash"] == _policy()]
+    done = {r["subject_id"] for r in current}
+    from .baseline_recovery import revalidate_stage
+    for record in records:
+        if record["subject_id"] in done:
+            continue
+        value = revalidate_stage(store, run_id, record, "execution_id", "baseline_execution",
+            lambda p, r, h: validate_execution(p, r, h, config(store, run_id)["executor"]))
+        if value:
+            current.append(value); done.add(value["subject_id"])
+    return current
 
 
 @run_scoped
@@ -333,8 +417,16 @@ def accept_execution(store, run_id, request, response):
     payload = request["payload"]; subject = store.get(run_id, "trigger_subjects", payload["subject"]["subject_id"])
     if not enabled(store, run_id) or not subject or payload["basis_hash"] != _execution_basis(store, run_id, subject):
         raise AuditError("Execution review source/definition changed")
-    value, facts = validate_common(payload, response, ExecutionResponse, request["request_hash"])
-    if value.executor != config(store, run_id)["executor"]:
+    result = validate_execution(payload, response, request["request_hash"], config(store, run_id)["executor"])
+    record = {"execution_id": request["task_id"], "subject_id": subject["subject_id"], "case_id": subject["case_id"],
+        "basis_hash": payload["basis_hash"], "policy_hash": _policy(), "raw_response": response, "result": result}
+    store.put(run_id, "baseline_execution", record["execution_id"], record)
+    return record
+
+
+def validate_execution(payload, response, request_hash, executor):
+    value, facts = validate_common(payload, response, ExecutionResponse, request_hash)
+    if value.executor != executor:
         raise AuditError("Execution review executor mismatch")
     checked_claim(value.execution_conditions, facts)
     known = {m["method_id"] for m in payload["methods"]}
@@ -343,10 +435,7 @@ def accept_execution(store, run_id, request, response):
     for link in value.execution_method_links:
         if link.method_id not in known or not set(link.condition_fact_ids) <= set(facts) or len(link.condition_fact_ids) != len(set(link.condition_fact_ids)):
             raise AuditError("Execution method must cite local facts and a frozen E1-E5 definition")
-    record = {"execution_id": request["task_id"], "subject_id": subject["subject_id"], "case_id": value.case_id,
-        "basis_hash": payload["basis_hash"], "policy_hash": _policy(), "raw_response": response, "result": value.model_dump()}
-    store.put(run_id, "baseline_execution", record["execution_id"], record)
-    return record
+    return value.model_dump()
 
 
 def stage_gaps(data):

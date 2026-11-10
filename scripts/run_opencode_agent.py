@@ -16,12 +16,27 @@ import subprocess
 from urllib.parse import urlsplit
 
 
-def _invoke(argv: list[str], project: Path, *, timeout: float):
+def _attempt_logs(directory, stdout, stderr):
+    if directory is None:
+        return
+    for name, value in (("opencode.stdout.log", stdout), ("opencode.stderr.log", stderr)):
+        if isinstance(value, bytes):
+            value = value.decode("utf-8", errors="replace")
+        with (directory / name).open("x", encoding="utf-8") as output:
+            output.write(value or "")
+
+
+def _invoke(argv: list[str], project: Path, *, timeout: float, log_directory=None):
     try:
-        return subprocess.run(argv, cwd=project, shell=False, capture_output=True,
-                              text=True, encoding="utf-8", errors="replace", timeout=timeout)
-    except (OSError, subprocess.TimeoutExpired) as exc:
+        result = subprocess.run(argv, cwd=project, shell=False, capture_output=True,
+                                text=True, encoding="utf-8", errors="replace", timeout=timeout)
+    except subprocess.TimeoutExpired as exc:
+        _attempt_logs(log_directory, exc.stdout, exc.stderr)
         raise RuntimeError("OpenCode command could not complete: " + str(exc)) from exc
+    except OSError as exc:
+        raise RuntimeError("OpenCode command could not complete: " + str(exc)) from exc
+    _attempt_logs(log_directory, result.stdout, result.stderr)
+    return result
 
 
 def _has_flag(help_text: str, flag: str) -> bool:
@@ -115,6 +130,16 @@ def build_command(capabilities: dict, request: Path, response: Path, *, kind: st
             + ". Re-read the unchanged request and original evidence, then correct the reported contract issue. "
             "Do not change request hashes, copy an old answer or infer missing facts from this diagnostic."
         )
+    retry = os.environ.get("FAULTAUDIT_RETRY_CONTEXT", "")
+    if retry:
+        retry_path = Path(retry).resolve()
+        if not retry_path.is_relative_to(request.resolve().parent):
+            raise RuntimeError("Retry context must stay within this task directory")
+        prompt += (f" Read the COMPLETE same-task retry context at {retry_path}. "
+            "It contains the rejected response and located feedback, budgeted together with the original request. "
+            "Repair the reported links/fields while preserving valid parts. Verify every change against the unchanged "
+            "request and original evidence; the old answer and diagnostics are not evidence. Use a new response file "
+            "and actual producer metadata; do not reuse the old Agent session or claim the old response was accepted.")
     # Keep the positional message before the file option: versions exposing
     # --file as a variadic option must not consume the prompt as a second file.
     argv.extend([prompt, "--file", str(request.resolve())])
@@ -132,7 +157,9 @@ def execute_task(executable: str, project: Path, request: Path, response: Path, 
     capabilities = preflight(executable, project, server_url=server_url, agent=agent)
     argv = build_command(capabilities, request, response, kind=value.get("kind", "unknown"), server_url=server_url, model=model)
     response.parent.mkdir(parents=True, exist_ok=True)
-    result = _invoke(argv, project.resolve(), timeout=timeout)
+    if any((response.parent / name).exists() for name in ("opencode.stdout.log", "opencode.stderr.log")):
+        raise RuntimeError("OpenCode attempt logs already exist; allocate a new attempt")
+    result = _invoke(argv, project.resolve(), timeout=timeout, log_directory=response.parent)
     if result.returncode:
         raise RuntimeError(f"OpenCode task process failed (returncode={result.returncode}); attempt output is retained if written")
     if not response.is_file():

@@ -185,7 +185,7 @@ def next_tasks(store: Store, run_id: str) -> dict:
         from .baseline_recovery import compatibility_payloads, INSTRUCTIONS as COMPATIBILITY_INSTRUCTIONS
         stages = [("baseline_define", p, INSTRUCTIONS, 3) for p in definition_payloads(store, run_id)]
         stages += [("baseline_compatibility", p, COMPATIBILITY_INSTRUCTIONS, 3) for p in compatibility_payloads(store, run_id)]
-        stages += [(kind, p, axis_instructions(p["baseline_axis"]), 4) for kind, p in axis_payloads(store, run_id)]
+        stages += [(kind, p, axis_instructions(p["baseline_axis"], p), 4) for kind, p in axis_payloads(store, run_id)]
         stages += [("baseline_execution", p, EXECUTION_INSTRUCTIONS, 4) for p in execution_payloads(store, run_id)]
         stages += [("baseline_review", p, REVIEW_INSTRUCTIONS, 5) for p in review_payloads(store, run_id)]
         for kind, payload, instruction, priority in stages:
@@ -549,7 +549,8 @@ def submit(store: Store, run_id: str, task_id: str, response: dict, *, path: Pat
                 from .trigger_workflow import record_source_lookup
                 record_source_lookup(store, run_id, payload, response, snapshots)
     except Exception as exc:
-        store.put(run_id, "workflow_attempts", attempt_id, {**attempt, "status": "REJECTED", "error": str(exc)})
+        store.put(run_id, "workflow_attempts", attempt_id, {**attempt, "status": "REJECTED", "error": str(exc),
+            **({"diagnostic": exc.diagnostic} if hasattr(exc, "diagnostic") else {})})
         raise
     store.put(run_id, "workflow_attempts", attempt_id, {**attempt, "status": "ACCEPTED"})
     store.put(run_id, "workflow_results", task_id, {**attempt, "response": response}, mutable=bool(previous))

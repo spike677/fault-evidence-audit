@@ -180,6 +180,45 @@ class WorkflowDriverTests(unittest.TestCase):
         self.assertTrue(failed_task[1].startswith("Synthetic validator: citation not in selected segment;"))
         self.assertEqual([feedback for tid, feedback in observations if tid == "SYN-unrelated"], [""])
 
+    def test_oversize_retry_is_blocked_once_and_retains_measured_budget(self):
+        from faultaudit.input_budget import InputTooLarge
+        self.task('SYN-too-large')
+        calls = []
+        def produce(*args, **kwargs):
+            calls.append(args[2])
+            raise InputTooLarge({'chars':6000,'budget':5000,'scope':'WHOLE_MODEL_TASK','kind':'SAME_TASK_RETRY'})
+        result = self.run_driver(produce)
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(result['status'], 'COMPLETE_WITH_PENDING')
+        record = self.store.get(self.run, 'workflow_execution', 'SYN-too-large')
+        self.assertEqual(record['blocked_code'], 'INPUT_TOO_LARGE')
+        self.assertEqual(record['input_budget']['chars'], 6000)
+
+    def test_rejected_response_and_located_feedback_follow_same_task_into_fresh_attempt(self):
+        from faultaudit.trigger_sparse import ClassificationFeedback
+        self.task('SYN-located'); observed = []; original_submit = self.submit
+        def submit(store, run, task_id, response, *, path=None):
+            if not response.get('corrected'):
+                error = ClassificationFeedback('bad link', rule='LINK_FACTS_SUBSET_SCENARIO', row_id='S5',
+                    link_id='label_links[0]', missing=['F1'])
+                store.put(run, 'workflow_attempts', digest([task_id,str(path)]), {'task_id':task_id,
+                    'response':str(path), 'response_hash':digest(response), 'status':'REJECTED', 'diagnostic':error.diagnostic})
+                raise error
+            return original_submit(store, run, task_id, response, path=path)
+        self.submit = submit
+        def produce(command, request, destination, **kwargs):
+            observed.append((destination, kwargs))
+            req = json.loads(request.read_text(encoding='utf-8'))
+            body = {'task_id':req['task_id'], 'request_hash':req['request_hash'], 'corrected':bool(kwargs.get('feedback'))}
+            destination.write_text(json.dumps(body), encoding='utf-8')
+            return body
+        self.assertEqual(self.run_driver(produce)['status'], 'COMPLETE')
+        self.assertEqual(len(observed), 2)
+        self.assertNotEqual(observed[0][0], observed[1][0])
+        self.assertEqual(observed[1][1]['previous_response'], str(observed[0][0]))
+        self.assertEqual(observed[1][1]['diagnostic']['missing_fact_ids'], ['F1'])
+        self.assertTrue(observed[0][0].is_file())
+
     def test_interrupted_response_resumes_submission_without_a_new_agent_context(self):
         task = self.task("SYN-resume")
         path = workflow.response_path(self.store, self.run, task["task_id"])

@@ -75,7 +75,7 @@ class AgentAdapterTests(unittest.TestCase):
             self.assertEqual(len(result["feedback"]), 2000)
             self.assertTrue(result["feedback"].startswith("same-task-diagnostic "))
             self.assertEqual(os.environ["FAULTAUDIT_ATTEMPT_FEEDBACK"], "unrelated-parent-task")
-        self.response.unlink()
+        self.response = self.root / "attempt-2" / "response.json"
         with patch.dict(os.environ, {"FAULTAUDIT_ATTEMPT_FEEDBACK": "unrelated-parent-task"}):
             self.assertEqual(run_agent(command, self.request, self.response)["feedback"], "")
             self.assertEqual(os.environ["FAULTAUDIT_ATTEMPT_FEEDBACK"], "unrelated-parent-task")
@@ -87,6 +87,55 @@ class AgentAdapterTests(unittest.TestCase):
         with self.assertRaisesRegex(AuditError, "already exists"):
             run_agent(command, self.request, self.response)
         self.assertEqual(self.response.read_text(encoding="utf-8"), '{"old": true}')
+
+    def test_retry_handoff_has_complete_same_task_answer_and_structured_diagnostic(self):
+        request = {'request_hash':'a'*64, 'input_budget':{'budget':5000}, 'payload':{'source':'原始事实'}}
+        self.request.write_text(json.dumps(request), encoding='utf-8')
+        prior = self.request.parent / 'attempt-0001/response.json'; prior.parent.mkdir()
+        old = {'request_hash':'a'*64, 'valid_part':'保留有效部分', 'bad_link':'F-missing'}
+        prior.write_text(json.dumps(old, ensure_ascii=False), encoding='utf-8')
+        self.response = self.request.parent / 'attempt-0002/response.json'
+        command = self.command("import os\n"
+            "context=json.loads(pathlib.Path(os.environ['FAULTAUDIT_RETRY_CONTEXT']).read_text(encoding='utf-8'))\n"
+            "pathlib.Path(sys.argv[2]).write_text(json.dumps(context),encoding='utf-8')\n")
+        diagnostic = {'row_id':'S5', 'link_id':'label_links[1]', 'missing_fact_ids':['F-missing']}
+        result = run_agent(command, self.request, self.response, previous_response=str(prior),
+                           diagnostic=diagnostic, feedback='定位错误，需修正引用')
+        self.assertEqual(result['previous_response'], old)
+        self.assertEqual(result['diagnostic'], diagnostic)
+        self.assertEqual(json.loads(prior.read_text(encoding='utf-8')), old)
+        size = json.loads((self.response.parent/'retry_input_budget.json').read_text(encoding='utf-8'))
+        self.assertLessEqual(size['chars'], size['budget'])
+
+    def test_retry_context_over_budget_is_blocked_without_truncation_or_launch(self):
+        from faultaudit.input_budget import InputTooLarge
+        self.request.write_text(json.dumps({'request_hash':'a'*64, 'input_budget':{'budget':1000}}), encoding='utf-8')
+        prior = self.request.parent / 'old/response.json'; prior.parent.mkdir()
+        prior.write_text(json.dumps({'request_hash':'a'*64,'body':'末尾结论'+ 'R'*2000}), encoding='utf-8')
+        command = self.command("raise AssertionError('producer must not launch')\n")
+        with self.assertRaises(InputTooLarge) as error:
+            run_agent(command, self.request, self.response, previous_response=str(prior))
+        self.assertGreater(error.exception.chars, error.exception.budget)
+        self.assertFalse(self.response.exists())
+        self.assertFalse((self.response.parent/'retry_context.json').exists())
+        self.assertIn('末尾结论', json.loads(prior.read_text(encoding='utf-8'))['body'])
+
+    def test_retry_rejects_other_task_identity_or_location(self):
+        self.request.write_text(json.dumps({'request_hash':'a'*64}), encoding='utf-8')
+        prior = self.request.parent/'old.json'; prior.write_text(json.dumps({'request_hash':'b'*64}), encoding='utf-8')
+        command = self.command("raise AssertionError('must not launch')\n")
+        with self.assertRaisesRegex(AuditError, 'unchanged task'):
+            run_agent(command, self.request, self.response, previous_response=str(prior))
+        outside = self.root/'other-task.json'; outside.write_text(json.dumps({'request_hash':'a'*64}), encoding='utf-8')
+        with self.assertRaisesRegex(AuditError, 'belong to this task'):
+            run_agent(command, self.request, self.response, previous_response=str(outside))
+
+    def test_failed_process_logs_survive_and_attempt_directory_is_not_reused(self):
+        command = self.command("print('RAW_STDOUT')\nprint('R'*3500,file=sys.stderr)\nraise SystemExit(2)\n")
+        with self.assertRaisesRegex(AuditError, 'returncode=2'): run_agent(command, self.request, self.response)
+        self.assertIn('RAW_STDOUT', (self.response.parent/'agent.stdout.log').read_text(encoding='utf-8'))
+        self.assertGreater(len((self.response.parent/'agent.stderr.log').read_text(encoding='utf-8')), 3000)
+        with self.assertRaisesRegex(AuditError, 'new attempt'): run_agent(command, self.request, self.response)
 
     def test_request_budget_is_handed_to_worker_without_changing_parent_environment(self):
         self.request.write_text(json.dumps({'input_budget': {'budget': 160000}}), encoding='utf-8')

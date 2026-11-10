@@ -182,7 +182,7 @@ class PrecisionBridgeTests(unittest.TestCase):
             known=context['purpose']=='KNOWN_PATTERN_VALIDATION'
             mode=context['modes'][0] if known else None
             proof_keys=[k for k,v in context['condition_links'].items() if known and v['mode_id']==mode['mode_id']]
-            link={'mode_id':mode['mode_id'],'evidence_keys':['A1:F'],'condition_link_keys':proof_keys,
+            link={'mode_id':mode['mode_id'],'evidence_keys':[next(k for k in mode['evidence_index'] if k.startswith('A1:'))],'condition_link_keys':proof_keys,
                 'api_trigger_ids':['1.2.4'],'v4_class_ids':['S5'],'v4_scenario_ids':mode['v4_scenario_ids'],
                 'execution_method_ids':[],'reason':'合成逐规则溯源'} if known else None
             out['rules'].append({'case_id':case_id,'inputs_sha256':digest(rule['inputs']), 'mode_links':[link] if known else [],

@@ -173,7 +173,6 @@ class ManifestTests(RecoveryFixture):
                          [{'field': '__column_5', 'cell': 'E2', 'quote': last['original_value']}])
         self.assertIn('一级\n(架构层次)', [e['column_key'] for e in manifest['entries']])
         response = self.response(request)
-        response['condition_facts'][0]['source_cells'] = []
         self.submit(task, response)
         fact = builder.current_definitions(self.store, self.run)[0]['result']['condition_facts'][0]
         self.assertEqual(fact['source_cells'][0]['cell'], 'D2')
@@ -183,10 +182,10 @@ class ManifestTests(RecoveryFixture):
         self.start(1)
         task = files.next_tasks(self.store, self.run)['tasks'][0]
         response = self.response(self.request(task))
-        mutations = [lambda r:r['condition_facts'][0]['source_refs'][0].update(source_id='source-not-real'),
-            lambda r:r['condition_facts'][0]['source_refs'][0].update(quote='invented'),
-            lambda r:r['condition_facts'][0]['source_cells'][0].update(field='human readable alias'),
-            lambda r:r['condition_facts'][0].update(source_refs=[])]
+        mutations = [lambda r:r['field_bindings']['failure_mechanism'].update(source_ids=['source-not-real']),
+            lambda r:r['field_bindings']['failure_mechanism'].update(quote='invented'),
+            lambda r:r['field_bindings']['failure_mechanism'].update(field='human readable alias'),
+            lambda r:r['field_bindings']['failure_mechanism'].update(source_ids=[])]
         for mutate in mutations:
             invalid = copy.deepcopy(response); mutate(invalid)
             with self.assertRaises(AuditError): self.submit(task, invalid)
@@ -197,10 +196,10 @@ class ManifestTests(RecoveryFixture):
         self.start(1)
         task = files.next_tasks(self.store, self.run)['tasks'][0]
         response = self.response(self.request(task))
-        response['definition']['failure_mechanism'].update(status='INFERRED')
+        response['field_bindings']['failure_mechanism'].update(origin='MODEL_DERIVED', derived_text='依据源单元格推导同步竞争')
         with self.assertRaisesRegex(AuditError, 'derivation_reason'): self.submit(task, response)
-        response['definition']['failure_mechanism']['derivation_reason'] = '按源故障原因推导；不是逐字原文'
-        response['definition']['input_trigger_conditions'] = {'text': '未提供API前提', 'status': 'UNKNOWN', 'condition_fact_ids': []}
+        response['field_bindings']['failure_mechanism']['reason'] = '按源故障原因推导；不是逐字原文'
+        response['field_bindings']['input_trigger_conditions'] = {'origin': 'UNKNOWN', 'reason': '未提供API前提'}
         response['evidence_gaps'] = ['历史网页正文未核验']
         self.submit(task, response)
         result = builder.current_definitions(self.store, self.run)[0]['result']
@@ -335,7 +334,7 @@ class CompatibilityTests(RecoveryFixture):
         with patch('faultaudit.xlsx_workflow._policy', return_value='1' * 64):
             old_task = files.next_tasks(self.store, self.run)['tasks'][0]
             original = self.response(self.request(old_task))
-            original['condition_facts'][0]['source_refs'][0]['quote'] = 'invented'
+            original['field_bindings']['failure_mechanism']['quote'] = 'invented'
             with self.assertRaises(AuditError): self.submit(old_task, original)
         attempt = self.store.records(self.run, 'workflow_attempts')[0]
         path = Path(attempt['response'])
@@ -352,7 +351,7 @@ class CompatibilityTests(RecoveryFixture):
         roles = {f['role'] for f in self.request(current)['payload']['historical_rejected_inputs'][0]['files']}
         self.assertEqual(roles, {'ORIGINAL_REJECTED', 'UNSUBMITTED_VARIANT'})
         response = self.response(self.request(current))
-        response['condition_facts'][0]['source_refs'][0]['quote'] = 'still invalid'
+        response['field_bindings']['failure_mechanism']['quote'] = 'still invalid'
         with self.assertRaises(AuditError): self.submit(current, response)
         # Current-policy failures must retry this task, not grow a new task per attempt.
         self.assertEqual(files.next_tasks(self.store, self.run)['tasks'][0]['task_id'], current['task_id'])

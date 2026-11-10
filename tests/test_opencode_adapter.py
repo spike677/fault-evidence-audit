@@ -90,6 +90,25 @@ class OpenCodeAdapterTests(unittest.TestCase):
         self.assertNotIn("--server",command)
         self.assertEqual(caps["backend_version"],"NOT_PROBED")
 
+    def test_retry_prompt_points_to_same_task_context_and_never_continues_session(self):
+        retry = self.request.parent/'attempt-2/retry_context.json'
+        with patch.dict(adapter.os.environ, {'FAULTAUDIT_RETRY_CONTEXT':str(retry)}):
+            command = adapter.build_command(self.preflight(), self.request, self.response, kind='baseline_v4')
+        prompt = command[command.index('--file')-1]
+        self.assertIn(str(retry.resolve()), prompt)
+        self.assertIn('Repair the reported links/fields', prompt)
+        self.assertNotIn('--continue', command)
+        self.assertNotIn('--session', command)
+
+    def test_interrupted_process_keeps_partial_raw_logs(self):
+        self.response.parent.mkdir()
+        error = subprocess.TimeoutExpired(['synthetic-opencode'], 1, output=b'partial-event', stderr=b'gateway-interruption')
+        with patch.object(adapter.subprocess, 'run', side_effect=error):
+            with self.assertRaises(RuntimeError):
+                adapter._invoke(['synthetic-opencode'], self.project, timeout=1, log_directory=self.response.parent)
+        self.assertEqual((self.response.parent/'opencode.stdout.log').read_text(encoding='utf-8'), 'partial-event')
+        self.assertEqual((self.response.parent/'opencode.stderr.log').read_text(encoding='utf-8'), 'gateway-interruption')
+
     def test_global_server_profile_is_detected_without_version_guess(self):
         def process(argv,**kwargs):
             if argv[-2:]==["run","--help"]:
@@ -147,6 +166,11 @@ class OpenCodeAdapterTests(unittest.TestCase):
         self.assertIn("capture_observation",text)
         self.assertIn("search_attempts",text)
         self.assertIn("Only the user enters credentials",text)
+        self.assertIn("A1_SOURCE_SELECTION_V2",text)
+        self.assertIn("Do not submit condition_facts, source_refs, source_cells",text)
+        self.assertIn("PARTIAL rows may associate different constructions with different facts",text)
+        self.assertIn("omit unselected UNKNOWN rows (NOT_ASSESSED)",text)
+        self.assertNotIn("select source_refs={source_id, quote}",text)
 
 
 if __name__=="__main__":

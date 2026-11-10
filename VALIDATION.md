@@ -1,6 +1,12 @@
 # 验收记录
 
-当前开发日期：2026 年 11 月 9 日，Asia/Shanghai。版本：0.1.19。
+当前开发日期：2026 年 11 月 10 日，Asia/Shanghai。版本：0.1.20。
+
+0.1.20定向整改完成：完整`python -m unittest discover -s tests -v`共822项通过，226.224秒，新增36项包含在总数内；此前786项保留。137项定向回归和21次实际CLI合成闭环通过，覆盖3条合成模式、2份显式历史兼容、1份新来源选择定义、9个A2/A3/A4单元与A5报告，未冻结、未生成人工ACCEPT。实际解释器Python 3.12.14，Pydantic 2.14.1、openpyxl 3.1.5。回执见[定向整改验证](examples/schema_remediation_validation.json)。
+
+首轮完整回归发现Bridge合成夹具仍引用固定`A1:F`，已改为实际生成来源ID，30项Bridge回归随后通过，再执行上述完整822项。生产Bridge模块未改。完整回归后同步worker模板到来源ID协议，并补跑适配器模板检查；未修改已测Python运行代码。原42/V4和CANN库未改，现场state、149份采集及历史未操作；没有运行现场drive或设备。
+
+本机没有OpenCode可执行文件，也未取得现场完整request/拒绝response副本，附件九条代表任务真实回放均为NOT_RUN。合成结果不代表现场语义或Python 3.14.3已验收。升级及隔离回放顺序见[SCHEMA_REMEDIATION.md](integration/SCHEMA_REMEDIATION.md)。以下0.1.19及更早记录保留为历史。
 
 0.1.19原run恢复修复已用合成数据验收：完整`python -m unittest discover -s tests -v`共786项通过，219.223秒。新增24项恢复测试及1项worker预算交接测试；这些已经包含在786项中，不额外累加。实际解释器Python 3.12.14，Pydantic 2.14.1，openpyxl 3.1.5。实际解释器路径、依赖、日志与代码SHA见[恢复验证回执](examples/baseline_recovery_validation.json)。
 

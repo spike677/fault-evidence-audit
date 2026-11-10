@@ -104,7 +104,7 @@ def save_definition(store, run_id, record, manifest):
 
 def precheck(store, run_id, subject, record):
     """Structural/anchor validation only; technical semantics remains Agent work."""
-    from .cann_baseline import DefinitionResponse, FIELDS
+    from .cann_baseline import DefinitionResponse, FIELDS, materialize_response
     from .xlsx_workflow import check_archived_request, config
     errors = []
     try:
@@ -126,7 +126,8 @@ def precheck(store, run_id, subject, record):
         accepted = store.get(run_id, "workflow_results", record["definition_id"])
         if not accepted or accepted.get("response_hash") != digest(response):
             raise AuditError("Historical accepted response integrity is not established")
-        value, facts = validate_common(request["payload"], response, DefinitionResponse, request["request_hash"])
+        materialized, _ = materialize_response(request["payload"], response)
+        value, facts = validate_common(request["payload"], materialized, DefinitionResponse, request["request_hash"])
         if (value.executor != config(store, run_id)["executor"] or value.definition.mode_id != subject["mode_id"]
                 or value.definition.mode_name != mode["description"]):
             raise AuditError("Historical mode identity or executor differs")
@@ -224,6 +225,16 @@ definition's technical text or invent facts. Use REGENERATE if content needs cha
 CONFLICT for unresolved contrary evidence. No new Wiki search or hardware execution.
 Return CompatibilityResponse at the OUTER hash, actual producer, and one bounded self-check.
 Do not submit SQL, migrate policies, remove history, or generate a human ACCEPT.
+REUSE preserves EACH field independently. The stored claim statuses are STATED, INFERRED,
+UNKNOWN; SUPPORTED is only this review's verdict, not a replacement claim status.
+Example: failure_mechanism STATED -> check SUPPORTED with that field's original facts;
+input_trigger_conditions UNKNOWN -> check UNKNOWN (no new assertion); applicable_scope
+INFERRED -> check SUPPORTED only for the existing limited text, retaining INFERRED and its
+limits. A supported mechanism never fills an unknown API/execution field. A partial scope
+stays partial in its text; REUSE cannot broaden it or erase a conflict. If a field needs
+new facts/text, choose REGENERATE; unresolved contrary versions require CONFLICT.
+Citations must be contained in THAT FIELD's original supporting quote, not merely present
+elsewhere in the same row/cell. Do not use REUSE to promote unknowns or repair technical text.
 """
 
 
@@ -342,6 +353,46 @@ def axis_basis(store, run_id, subject, axis):
                    "frame": frame, "version": VERSION})
 
 
+def revalidate_stage(store, run_id, record, identity_key, kind, validate):
+    """Read-only compatibility for completed A2/A3/A4; never accepts an old request.
+
+    The caller first checks the current technical/input basis. A1 still needs its
+    explicit Agent compatibility review. No records or historical policies change.
+    """
+    from .xlsx_workflow import check_archived_request, config, _policy
+    from .run_budget import KIND, KEY
+    from .model import ModelError
+    try:
+        request = store.get(run_id, "workflow_requests", record[identity_key])
+        accepted = store.get(run_id, "workflow_results", record[identity_key])
+        if (not request or not accepted or accepted.get("retry") or request["kind"] != kind
+                or request.get("run_id") != run_id or request.get("policy_hash") != record["policy_hash"]
+                or accepted.get("response_hash") != digest(record["raw_response"])):
+            return None
+        check_archived_request(request)
+        if request["input_budget"]["budget"] != (store.get(run_id, KIND, KEY) or {}).get("budget"):
+            return None
+        payload = request["payload"]
+        subject = store.get(run_id, "trigger_subjects", record["subject_id"])
+        current = next((r for r in select_current(store, run_id) if r["subject_id"] == record["subject_id"]), None)
+        if (not subject or not current or record["case_id"] != subject["case_id"]
+                or payload.get("baseline_axis") != record.get("baseline_axis")
+                or payload.get("basis_hash") != record["basis_hash"]
+                or payload.get("subject") != {**subject, "source_case": store.get(run_id, "cases", subject["case_id"])}
+                or payload.get("normalized_mode") != technical_projection(current["result"])
+                or record["raw_response"].get("executor") != config(store, run_id)["executor"]):
+            return None
+        normalized = validate(payload, record["raw_response"], request["request_hash"])
+        if normalized != record["result"]:
+            return None
+        return {**record, "current_validation": {"status": "READ_ONLY_REVALIDATED",
+            "historical_policy_hash": record["policy_hash"], "validator_policy_hash": _policy(),
+            "request_hash": request["request_hash"], "historical_records_changed": False,
+            "human_accept_created": False}}
+    except (AuditError, ValidationError, ModelError, KeyError, TypeError, ValueError):
+        return None
+
+
 @run_scoped
 def recovery_plan(store, run_id):
     from .cann_baseline import current_execution
@@ -378,4 +429,6 @@ def recovery_plan(store, run_id):
                 + len({e["subject_id"] for e in executions}),
             "request_count_all_policies": len(requests),
             "request_count_current_policy": sum(r.get("policy_hash") == policy for r in requests),
+            "read_only_revalidated_stage_ids": [r.get("assessment_id", r.get("execution_id"))
+                for r in assessments + executions if r.get("current_validation")],
             "matrix": matrix, "state_writes": 0, "human_accept_created": False}

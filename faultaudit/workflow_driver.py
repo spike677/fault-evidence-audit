@@ -91,7 +91,8 @@ def _body(command, task, timeout):
         return value
     from .agent_adapter import run_agent
     return run_agent(command, Path(task["request"]), destination, timeout=timeout,
-                     feedback=task.get("previous_error", ""))
+                     feedback=task.get("previous_error", ""), previous_response=task.get("previous_response", ""),
+                     diagnostic=task.get("previous_diagnostic"))
 
 
 def reset_execution(store: Store, run_id: str, task_id: str) -> None:
@@ -122,7 +123,9 @@ def _failed_attempt(store, run_id, task, error, *, status="AGENT_FAILED"):
     if not store.get(run_id, "workflow_attempts", identity):
         store.put(run_id, "workflow_attempts", identity,
                   {"task_id": task["task_id"], "response": task["response"], "status": status,
-                   "error": str(error), "recorded_at": now()})
+                   "error": str(error), "recorded_at": now(),
+                   **({"diagnostic": error.diagnostic} if hasattr(error, "diagnostic") else {}),
+                   **({"input_budget": error.details} if hasattr(error, "details") else {})})
 
 
 def _finish(store, run_id, step, *, rounds, reason):
@@ -190,6 +193,15 @@ def drive(store: Store, run_id: str, command: list[str], *, max_rounds=32, worke
                 task = dict(original)
                 saved = store.get(run_id, "workflow_execution", task["task_id"]) or {}
                 task["previous_error"] = saved.get("error", "")[:2000]
+                task["previous_diagnostic"] = saved.get("diagnostic")
+                # Only the same immutable task's archived rejection may enter a fresh worker.
+                rejected = [a for a in store.records(run_id, "workflow_attempts")
+                            if a["task_id"] == task["task_id"] and a.get("status") == "REJECTED"]
+                previous = max((a for a in rejected if Path(a.get("response", "")).is_file()),
+                               key=lambda a: a["response"], default=None)
+                if previous:
+                    task["previous_response"] = previous["response"]
+                    task["previous_diagnostic"] = previous.get("diagnostic")
                 if saved.get("status") == "RUNNING":
                     # Only this coordinator can hold the run lock. RUNNING here
                     # therefore belongs to an interrupted previous process.
@@ -206,7 +218,7 @@ def drive(store: Store, run_id: str, command: list[str], *, max_rounds=32, worke
                         task["response"] = str(workflow.response_path(store, run_id, task["task_id"]))
                 if saved.get("attempts", 0) >= max_attempts and not task.get("resume_attempt"):
                     continue
-                if saved.get("status") == "EXTERNAL_BLOCKED" and saved.get("blocked_code") == "EXECUTOR_CONTEXT_LIMIT":
+                if saved.get("status") == "EXTERNAL_BLOCKED" and saved.get("blocked_code") in {"EXECUTOR_CONTEXT_LIMIT", "INPUT_TOO_LARGE"}:
                     continue
                 if saved.get("status") == "WAITING_AUTH":
                     auth = store.get(run_id, "workflow_auth", saved.get("site", "")) or {}
@@ -266,7 +278,11 @@ def drive(store: Store, run_id: str, command: list[str], *, max_rounds=32, worke
                             workflow.submit(store, run_id, task["task_id"], response, path=Path(task["response"]))
                     except Exception as exc:
                         _failed_attempt(store, run_id, task, exc)
-                        _execution(store, run_id, task, status="FAILED", error=str(exc))
+                        input_blocked = getattr(exc, "code", None) == "INPUT_TOO_LARGE"
+                        _execution(store, run_id, task, status="EXTERNAL_BLOCKED" if input_blocked else "FAILED",
+                            error=str(exc), diagnostic=getattr(exc, "diagnostic", None),
+                            blocked_code="INPUT_TOO_LARGE" if input_blocked else "",
+                            **({"input_budget": exc.details} if input_blocked else {}))
                     else:
                         status = "SUCCEEDED"
                         if context_blocked:
@@ -283,7 +299,7 @@ def drive(store: Store, run_id: str, command: list[str], *, max_rounds=32, worke
                                 store.event(run_id, "workflow_auth_handoff", auth)
                         elif response.get("outcome") == "BLOCKED":
                             status = "EXTERNAL_BLOCKED"
-                        _execution(store, run_id, task, status=status, error=response.get("reason", ""),
+                        _execution(store, run_id, task, status=status, error=response.get("reason", ""), diagnostic=None,
                                    blocked_code="EXECUTOR_CONTEXT_LIMIT" if context_blocked else "")
                     if task["kind"] in BROWSER_KINDS:
                         launch_browser()

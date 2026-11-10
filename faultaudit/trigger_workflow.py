@@ -20,7 +20,7 @@ from .store import AuditError, Store, digest
 from .trigger_assessment import CLASSIFICATION_FRAMEWORK, instructions, response_schema, validate_assessment
 from .trigger_taxonomy import builtin_user_branches, load_taxonomy
 
-RULE_VERSION = "cann-baseline-builder-0.1.19"
+RULE_VERSION = "cann-baseline-builder-0.1.20"
 
 
 def _settings(store, run_id):
@@ -345,9 +345,21 @@ def current_assessments(store, run_id):
             bases[key] = _basis(store, run_id, subjects[key[0]], key[1])
         value = bases.get(key)
         return digest({"base": value, "axis": record["baseline_axis"]}) if record.get("baseline_axis") else value
-    return sorted([a for a in store.records(run_id, "trigger_assessments")
-        if a.get("policy_hash") == _policy() and a.get("basis_hash") == basis(a)],
-        key=lambda a: a["assessment_id"])
+    records = [a for a in store.records(run_id, "trigger_assessments") if a.get("basis_hash") == basis(a)]
+    current = [a for a in records if a.get("policy_hash") == _policy()]
+    unit = lambda a: (a["subject_id"], a.get("baseline_axis"), a.get("snapshot_id"), a.get("issue_index"), a.get("summary_task_id"))
+    done = {unit(a) for a in current}
+    if _settings(store, run_id).get("knowledge_profile"):
+        from .baseline_recovery import revalidate_stage
+        for record in sorted(records, key=lambda a: a["assessment_id"]):
+            axis = record.get("baseline_axis")
+            if axis not in {"V4", "API42"} or unit(record) in done:
+                continue
+            value = revalidate_stage(store, run_id, record, "assessment_id",
+                "baseline_v4" if axis == "V4" else "baseline_api42", validate_assessment)
+            if value:
+                current.append(value); done.add(unit(value))
+    return sorted(current, key=lambda a: a["assessment_id"])
 
 
 def source_relations(store, run_id):

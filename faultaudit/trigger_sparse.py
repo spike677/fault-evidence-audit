@@ -5,6 +5,7 @@ validators in memory only; they are never requested, stored or counted.
 """
 from __future__ import annotations
 
+import json
 from typing import Literal
 
 from pydantic import Field, ValidationError
@@ -16,6 +17,38 @@ from .trigger_v4 import canonical_conditions
 
 CONTRACT = "SPARSE_SCENARIOS_V5"
 POSITIVE = {"APPLICABLE", "PARTIAL"}
+
+
+class ClassificationFeedback(AuditError):
+    """A located contract rejection, not a weaker acceptance path."""
+    def __init__(self, message, *, rule, row_id, link_id=None, construction_id=None,
+                 scenario_id=None, missing=(), unexpected=(), scheme=None):
+        self.diagnostic = {"row_id": row_id, "link_id": link_id, "construction_id": construction_id,
+            "scenario_id": scenario_id, "missing_fact_ids": sorted(missing),
+            "unexpected_fact_ids": sorted(unexpected), "violated_rule": rule, "scheme": scheme}
+        super().__init__(message + ": " + json.dumps(self.diagnostic, ensure_ascii=False, sort_keys=True))
+
+
+def citation_example(payload):
+    """Use frozen construction codes, never confuse a guide case ID with a code."""
+    items = (payload.get("v4_taxonomy") or {}).get("items", [])
+    row = next((i for i in items if len(i.get("construction_ids", [])) >= 2), None)
+    if not row:
+        return ""
+    a, b = row["construction_ids"][:2]
+    example = {"row": {"trigger_id": row["id"], "applicability": "PARTIAL", "condition_fact_ids": ["F1", "F2"],
+        "construction_checks": [{"construction_id": a, "condition_fact_ids": ["F1"]},
+                                {"construction_id": b, "condition_fact_ids": ["F2"]}]},
+        "label_links": [{"construction_ids": [a], "condition_fact_ids": ["F1"], "scenario_ids": ["local-A"]},
+                        {"construction_ids": [b], "condition_fact_ids": ["F2"], "scenario_ids": ["local-B"]}],
+        "scenarios": [{"scenario_id": "local-A", "condition_fact_ids": ["F1"]},
+                      {"scenario_id": "local-B", "condition_fact_ids": ["F2"]}]}
+    return ("\nCITATION EXAMPLE (shape only, not a complete response or evidence): " + json.dumps(example, ensure_ascii=False)
+        + "\nCORRECT: for this PARTIAL row, construction A uses F1 and B uses F2; both positive row facts are linked. "
+          "The two scenarios need not share every fact. For APPLICABLE rows EACH link must instead include ALL row facts. "
+          "INCORRECT: construction A cites F1 but label_links[0] omits F1, or local-A omits F1, or the row adds F3 "
+          "without any link carrying F3. Correct only the broken references against actual evidence; do not drop a "
+          "supported fact to silence the gate. Copy no example facts/labels into the answer.\n")
 
 
 class ClassificationSummary(Contract):
@@ -105,6 +138,13 @@ condition fact IDs and local scenario IDs. Never infer links by taxonomy crosswa
 trigger_ids is the derived current API42 list; V4/Branch links stay separate.
 Each selected positive construction must be explicitly named in a V4 label_link.construction_ids,
 with its own checked definition and fact support; do not inherit every construction of a class.
+Citation containment is construction_check facts SUBSET OF link facts SUBSET OF EACH linked
+local scenario's facts. The union of links must cover ALL positive row facts. Different
+constructions may cite different facts; PARTIAL rows may have distinct scenario links.
+APPLICABLE rows must carry all required row facts in each link, not stitch partial scenarios.
+link_id in rejection feedback is the JSON path label_links[index], not a taxonomy ID.
+Use only construction codes mounted on the selected frozen class; S5-07 is a guide case,
+not a construction code. Keep mode facts, condition-class facts and construction facts distinct.
 E1-E5 execution_method_links are independent: cite local facts/scenarios and explain why useful.
 They do not claim execution or become API42/V4 labels. Method-only organization can be EXECUTION_ONLY.
 Scenarios belong to THIS assessment/current source issue. Within a scenario the cited facts
@@ -179,8 +219,9 @@ def validate_sparse(payload, response, request_hash):
              for d in (payload.get("baseline") or {}).get(k, [])}
     detail_ids = {d.detail_id for d in sparse.details} | known
     linked = {}; linked_facts = {}; used_scenarios = set()
-    for link in sparse.label_links:
+    for link_index, link in enumerate(sparse.label_links):
         key = (link.scheme, link.trigger_id)
+        location = {"row_id": link.trigger_id, "link_id": f"label_links[{link_index}]", "scheme": link.scheme}
         row = selected.get(link.scheme, {}).get(link.trigger_id)
         if not row or row.applicability not in POSITIVE:
             raise AuditError("Label links require a selected positive description label")
@@ -190,12 +231,16 @@ def validate_sparse(payload, response, request_hash):
             raise AuditError("Label link refers to unknown mechanism details")
         fids = _unique(link.condition_fact_ids, "Label link facts")
         if not fids <= set(row.condition_fact_ids):
-            raise AuditError("Label link facts must belong to that rule")
+            raise ClassificationFeedback("Label link facts must belong to that rule", rule="LINK_FACTS_SUBSET_ROW",
+                unexpected=fids - set(row.condition_fact_ids), **location)
         if row.applicability == "APPLICABLE" and fids != set(row.condition_fact_ids):
-            raise AuditError("A fully applicable label cannot split required facts between scenarios")
+            raise ClassificationFeedback("A fully applicable label cannot split required facts between scenarios",
+                rule="APPLICABLE_LINK_COVERS_ROW", missing=set(row.condition_fact_ids) - fids, **location)
         for sid in _unique(link.scenario_ids, "Linked scenarios"):
             if sid not in scenarios or not fids <= set(scenarios[sid].condition_fact_ids):
-                raise AuditError("Label facts must occur together in every linked local scenario")
+                raise ClassificationFeedback("Label facts must occur together in every linked local scenario",
+                    rule="LINK_FACTS_SUBSET_SCENARIO", scenario_id=sid,
+                    missing=fids - set(scenarios[sid].condition_fact_ids if sid in scenarios else []), **location)
             used_scenarios.add(sid)
         if link.construction_ids:
             if link.scheme != "V4":
@@ -203,16 +248,23 @@ def validate_sparse(payload, response, request_hash):
             checks = {c.construction_id: c for c in row.construction_checks}
             for cid in _unique(link.construction_ids, "Construction links"):
                 if cid not in checks or checks[cid].applicability not in POSITIVE or not set(checks[cid].condition_fact_ids) <= fids:
-                    raise AuditError("Construction links require their own positive, cited checks in that scenario")
+                    raise ClassificationFeedback("Construction links require their own positive, cited checks in that scenario",
+                        rule="POSITIVE_CONSTRUCTION_FACTS_SUBSET_LINK", construction_id=cid,
+                        missing=set(checks[cid].condition_fact_ids) - fids if cid in checks else (), **location)
         linked.setdefault(key, set()).update(link.detail_ids)
         linked_facts.setdefault(key, set()).update(fids)
     positive = {(scheme, key) for scheme, values in selected.items() for key, row in values.items()
                 if row.applicability in POSITIVE}
     if set(linked) != positive:
-        raise AuditError("Every positive sparse label requires explicit scenario/mechanism links")
-    for scheme, key in positive:
+        scheme, key = sorted(positive - set(linked))[0]
+        raise ClassificationFeedback("Every positive sparse label requires explicit scenario/mechanism links",
+            rule="POSITIVE_ROW_REQUIRES_LINK", row_id=key, scheme=scheme,
+            missing=selected[scheme][key].condition_fact_ids)
+    for scheme, key in sorted(positive):
         if linked_facts[(scheme, key)] != set(selected[scheme][key].condition_fact_ids):
-            raise AuditError("Positive label facts cannot be silently omitted from scenario links")
+            raise ClassificationFeedback("Positive label facts cannot be silently omitted from scenario links",
+                rule="POSITIVE_ROW_FACTS_COVERED", row_id=key, scheme=scheme,
+                missing=set(selected[scheme][key].condition_fact_ids) - linked_facts[(scheme, key)])
     methods = {m["method_id"] for m in (payload.get("v4_taxonomy") or {}).get("methods", [])}
     for method in sparse.execution_method_links:
         fids = _unique(method.condition_fact_ids, "Execution method facts")
@@ -301,10 +353,13 @@ def validate_sparse(payload, response, request_hash):
         row["construction_checks"] = [c for c in row["construction_checks"] if c["construction_id"] in ids]
         for check in row["construction_checks"]:
             if stage == "V4" and check["applicability"] in POSITIVE and not check.get("construction_recipe", "").strip():
-                raise AuditError("A2 positive construction needs a design recipe and explicit missing conditions")
+                raise ClassificationFeedback("A2 positive construction needs a design recipe and explicit missing conditions",
+                    rule="CONSTRUCTION_RECIPE_REQUIRED", row_id=row["trigger_id"], scheme="V4", construction_id=check["construction_id"])
             if check["applicability"] in POSITIVE and not any(l["scheme"] == "V4" and l["trigger_id"] == row["trigger_id"]
                     and check["construction_id"] in l["construction_ids"] for l in raw["label_links"]):
-                raise AuditError("Every positive construction requires an explicit scenario link")
+                raise ClassificationFeedback("Every positive construction requires an explicit scenario link",
+                    rule="POSITIVE_CONSTRUCTION_REQUIRES_LINK", row_id=row["trigger_id"], scheme="V4",
+                    construction_id=check["construction_id"], missing=check["condition_fact_ids"])
     out["external_branches"] = [b for b in out["external_branches"] if b["branch_id"] in actual_branches]
     for branch in out["external_branches"]:
         branch["category_checks"] = [c for c in branch["category_checks"] if c["category_id"] in selected["BRANCH"]]
