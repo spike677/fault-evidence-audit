@@ -1,0 +1,29 @@
+### What this PR does / why we need it?
+
+This draft records a reference implementation for three runtime-correctness problems found while investigating GLM-5.2 DSpark accuracy on Ascend A5 (950DT).
+
+1. SFA PROLOG_V3 state handling. The reference keeps PROLOG_V3 selected for decode, chunked-prefill verification, and prefix-cache-hit states, and restricts the legacy attention-state and token-count fallback to MLAPO. This avoids re-entering the NATIVE projection path after KV-consumer setup has disposed the native weights.
+
+2. MoE runtime reduction under compiled execution. The reference places the complete upstream MoERunner.forward call behind an opaque custom-op boundary, keeping the communication-dependent reduction decision live when one graph is reused across ALLGATHER, MC2, and ALLTOALL.
+
+3. DSpark profile input sizing and eager draft construction. The reference constructs the draft model under the eager context and grows input_ids to the complete speculative query width when that exceeds the target scheduler token budget.
+
+This Draft PR is for reference only. It records the implementation used to validate the identified root causes and regression tests; it is not presented as the final merge proposal. Its MoE portion overlaps with #16455, #16459, #16476, and the independently split #16495. The SFA and DSpark changes may be reviewed or split independently.
+
+Refs #16484.
+
+### Does this PR introduce _any_ user-facing change?
+
+No API or configuration change. The reference implementation prevents incorrect output or invalid execution paths when runtime attention state, MoE communication method, or DSpark profile query count differs from initialization or tracing state.
+
+### How was this patch tested?
+
+1. git diff --check passed.
+
+2. python -m compileall passed on all six changed runtime and test files.
+
+3. An earlier CPU-mock regression run of the combined patch reported 218 passed and 2 skipped. One unrelated KVCacheTensor constructor compatibility failure occurred in test_model_runner_v1.py.
+
+4. NPU validation is required before any part is marked ready for review.
+
+- vLLM main: https://github.com/vllm-project/vllm/commit/a97dacb7106ee49f39f3d1fc6ae1800ff724e01d
