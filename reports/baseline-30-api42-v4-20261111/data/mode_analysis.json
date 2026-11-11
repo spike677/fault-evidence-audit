@@ -1,0 +1,3677 @@
+[
+  {
+    "mode_id": "M001",
+    "mode_name": "算子实现精度不一致：低精度误差累积",
+    "original_definition": "混合精度模式下npu和gpu的实现行为不一致，如混精下gpu默认先转fp32再计算，npu先fp16计算再转fp32，单算子相同输入gpu侧输出可以正常（超fp16没超fp32）npu溢出",
+    "failure_mechanism": {
+      "text": "混精路径的类型提升顺序不同：GPU先提升至FP32再计算，NPU在低精度计算后再提升，可能先产生溢出或误差。",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-c7807e71337064e3f929d7a1"
+      ],
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "fault_object": {
+      "text": "混合精度算子计算路径（历史摘要为prod）",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-c7807e71337064e3f929d7a1"
+      ],
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "input_trigger_conditions": {
+      "text": "混精训练中 FP16 输入路径（如 prod/matmul）",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-743b2dba79d604c9e93778cc"
+      ],
+      "verification": "DECLARATION_OR_SUMMARY_ONLY",
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "execution_trigger_conditions": {
+      "text": "混合精度训练开关；未设置输入转 FP32 的处理",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-13a349731c10b85c4714d552"
+      ],
+      "verification": "DECLARATION_OR_SUMMARY_ONLY",
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "applicable_scope": {
+      "text": "训练",
+      "origin": "SOURCE_DECLARATION",
+      "source_ids": [
+        "SRC-0ee1fa3cd0567ad4b4c5c2cc"
+      ],
+      "basis": "ORIGINAL_MODE_DECLARATION",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "unresolved_gaps": [
+      "尚无本机历史正文及精确shape/数值域；不能由此确认每个同算子事件。",
+      "冻结工作簿和28份原始快照未在本机取得；引用为Markdown转录/摘要，不是重新核验网页。"
+    ],
+    "historical_evidence_ids": [
+      "A-W01"
+    ],
+    "init_status": "INITIALIZED",
+    "mode_definition_status": "REFINED_WITH_EVIDENCE",
+    "relation_ids": [
+      "MAP:M001:API42:1.7.6",
+      "MAP:M001:API42:1.C.2",
+      "MAP:M001:V4:intermediate_overflow",
+      "MAP:M001:V4:enum_dtype"
+    ],
+    "analysis_note": "逐条对照原定义、输入条件和摘要；只保存下列实际候选关系，未列出的组合未逐格作语义否定。",
+    "execution_method_ids": [],
+    "execution_method_scope": "TECHNICAL_TEST_GUIDANCE_NOT_SYNC_CAUSE_CONFIRMATION",
+    "api42_ids": [
+      "1.7.6",
+      "1.C.2"
+    ],
+    "v4_scenario_ids": [
+      "intermediate_overflow",
+      "enum_dtype"
+    ],
+    "analysis_status": "REVIEWED_SPARSE_NOT_CARTESIAN",
+    "source_verified": false,
+    "hardware_validated": false,
+    "fact_inventory": {
+      "dtype_and_numeric_domain": "FP16输入/FP32输出；BF16仅改善仍有差异",
+      "shape_layout_stride": "历史shape UNKNOWN",
+      "implementation_path_and_control": "torch.prod混精先算后提升；框架调用路径",
+      "basis": "REVIEWED_ORIGINAL_DECLARATION_AND_MARKDOWN_SUMMARIES",
+      "source_ids": [
+        "SRC-0193b96d44e5f4f6d5bcbdbf",
+        "SRC-05e978fd6748c27afc6ce3e3",
+        "SRC-0eacc0f87251fb1eeefaaf2c",
+        "SRC-0ee1fa3cd0567ad4b4c5c2cc",
+        "SRC-199fce11aa67a7fad92e4495",
+        "SRC-2142319b57756046d17adc97",
+        "SRC-343cc58dabb0462cb8068a17",
+        "SRC-3d65e648f47cc6b5e7da0058",
+        "SRC-40b01b50ba80ee87f18aad8e",
+        "SRC-46c7d11388c7f54fa99b4184",
+        "SRC-4a16602cee08e80c3401518d",
+        "SRC-6e6789d46903ddcc8d13f73b",
+        "SRC-718c9f4716429c34fb6bae81",
+        "SRC-757126e988aad4e095446fd1",
+        "SRC-814cdf4c09beed5bdaa2e941",
+        "SRC-92d0cb640e1c1ba9dc9ab0fd",
+        "SRC-96e00b645bbc9c2275544643",
+        "SRC-9b6586b0f4bb3b6ca457301c",
+        "SRC-a951aa4dd8eb49ef0335ec2f",
+        "SRC-adefdcc8d5376250e7ad4896",
+        "SRC-b92b8d3534a5972e99f16e97",
+        "SRC-c5965e166cab0ba1a66e7d6f",
+        "SRC-c7807e71337064e3f929d7a1",
+        "SRC-d0b77769f3177edce8b4793c",
+        "SRC-d50733b9044d70020c8736f5",
+        "SRC-d98d1ca90d33a94be47489cc",
+        "SRC-e411bf96fb92a020ae0b242f",
+        "SRC-e4d5583fc3d971cad0fb46c1",
+        "SRC-f313cee776e6c5c3e6ef82b2",
+        "SRC-f5b6069bb4b7ca0bfe1834a3",
+        "SRC-fa71fc8d792751bb3e262229"
+      ]
+    }
+  },
+  {
+    "mode_id": "M002",
+    "mode_name": "边界值异常",
+    "original_definition": "INTrainingUpdataV2算子variance算出来有负值，导致开根后变为nan",
+    "failure_mechanism": {
+      "text": "方差计算结果出现负值，随后开平方产生NaN。",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-2b49dafe78f0f09e7f7f699a"
+      ],
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "fault_object": {
+      "text": "INTrainingUpdataV2 / InstanceNormalization",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-2b49dafe78f0f09e7f7f699a"
+      ],
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "input_trigger_conditions": {
+      "text": "纯黑/大部分为 0 的输入（in1 大部分为 0）",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-70c125af836c9f368eded7a2"
+      ],
+      "verification": "DECLARATION_OR_SUMMARY_ONLY",
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "execution_trigger_conditions": {
+      "text": "onnx→om 离线推理",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-0ac30b84760152b73a63303c"
+      ],
+      "verification": "DECLARATION_OR_SUMMARY_ONLY",
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "applicable_scope": {
+      "text": "推理",
+      "origin": "SOURCE_DECLARATION",
+      "source_ids": [
+        "SRC-a705033f0728c02b17c4b91c"
+      ],
+      "basis": "ORIGINAL_MODE_DECLARATION",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "unresolved_gaps": [
+      "方差公式、负值阈值及修复代码未取得。",
+      "冻结工作簿和28份原始快照未在本机取得；引用为Markdown转录/摘要，不是重新核验网页。"
+    ],
+    "historical_evidence_ids": [
+      "A-W02"
+    ],
+    "init_status": "INITIALIZED",
+    "mode_definition_status": "REFINED_WITH_EVIDENCE",
+    "relation_ids": [
+      "MAP:M002:API42:1.1.3",
+      "MAP:M002:V4:zeros",
+      "MAP:M002:V4:near_singular"
+    ],
+    "analysis_note": "逐条对照原定义、输入条件和摘要；只保存下列实际候选关系，未列出的组合未逐格作语义否定。",
+    "execution_method_ids": [],
+    "execution_method_scope": "TECHNICAL_TEST_GUIDANCE_NOT_SYNC_CAUSE_CONFIRMATION",
+    "api42_ids": [
+      "1.1.3"
+    ],
+    "v4_scenario_ids": [
+      "zeros",
+      "near_singular"
+    ],
+    "analysis_status": "REVIEWED_SPARSE_NOT_CARTESIAN",
+    "source_verified": false,
+    "hardware_validated": false,
+    "fact_inventory": {
+      "dtype_and_numeric_domain": "纯黑/大部分0；variance负后sqrt NaN；dtype UNKNOWN",
+      "shape_layout_stride": "shape/layout UNKNOWN",
+      "implementation_path_and_control": "INTrainingUpdataV2 / ONNX→OM；方差公式UNKNOWN",
+      "basis": "REVIEWED_ORIGINAL_DECLARATION_AND_MARKDOWN_SUMMARIES",
+      "source_ids": [
+        "SRC-02a95dcfeba70d18bb5612b3",
+        "SRC-0f2f8369f963ca4e0b959752",
+        "SRC-1c44dbc97066a2a04eaeceb1",
+        "SRC-2b49dafe78f0f09e7f7f699a",
+        "SRC-40f4c3dbb270b7429b2ecadb",
+        "SRC-48bb4b794a0e3ce2e7bc8213",
+        "SRC-4a41f1e0f1ce0ffce674fb24",
+        "SRC-4acf338166d4d9e8f72b11cd",
+        "SRC-54ada41ecb2e9b29166d5c9a",
+        "SRC-560021b92519efb96d9fe0e6",
+        "SRC-58d0012eba492b69c99449b5",
+        "SRC-6565997eeeb481bc6503f121",
+        "SRC-66c54b0f1420709f400a70ab",
+        "SRC-6a5e16e620a021aa5ecb1fca",
+        "SRC-7e989e0bb886b8f34cac4bc7",
+        "SRC-8084a37ef7a45cdfb00595a5",
+        "SRC-84a739a176e25e72ad0ee485",
+        "SRC-9a2dd26860b25bc4a3935ae5",
+        "SRC-a0982e28588085d3ce7cb014",
+        "SRC-a705033f0728c02b17c4b91c",
+        "SRC-ac7d60802349d2df8866a2e0",
+        "SRC-b0d94b3f00128d4dbe39f4b6",
+        "SRC-b50ab9a55f3ed18626186803",
+        "SRC-bc1e1bdab7730d9c525efa78",
+        "SRC-c63a394b78b4f614598f86fe",
+        "SRC-c6f52c0539faa912aa96e170",
+        "SRC-dfb9ae69feddd5eb97011453",
+        "SRC-e5fb158e680b6dc7ca9f44b5",
+        "SRC-f36244fd5b2d92a3a04800e8",
+        "SRC-f3aa36d48bcaff9a96b7be3f",
+        "SRC-ff0e7075308b2aafd146e9b2"
+      ]
+    }
+  },
+  {
+    "mode_id": "M003",
+    "mode_name": "tiling切分策略的逻辑异常",
+    "original_definition": "reduce轴没有切多核，但m轴在多batch下切分不同，由于FA是下三角的sparse计算，导致核内的reduce轴切分粒度不同",
+    "failure_mechanism": {
+      "text": "m轴随batch改变切分，改变核内reduce粒度和计算顺序，导致单/多batch结果差异。",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-a54baa324f56cf730d2392af"
+      ],
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "fault_object": {
+      "text": "FA/FIA下三角sparse计算",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-a54baa324f56cf730d2392af"
+      ],
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "input_trigger_conditions": {
+      "text": "多 batch 推理（同一 query）",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-14c9a485cb71746db2cde018"
+      ],
+      "verification": "DECLARATION_OR_SUMMARY_ONLY",
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "execution_trigger_conditions": {
+      "text": "图模式推理 + 融合算子",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-9bc01547447684902abeaa34"
+      ],
+      "verification": "DECLARATION_OR_SUMMARY_ONLY",
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "applicable_scope": {
+      "text": "推理",
+      "origin": "SOURCE_DECLARATION",
+      "source_ids": [
+        "SRC-a9e4e0e1ae0404156170f732"
+      ],
+      "basis": "ORIGINAL_MODE_DECLARATION",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "unresolved_gaps": [
+      "不能把同shape、同二进制的随机竞争等同于输入变化后的计算差异。",
+      "冻结工作簿和28份原始快照未在本机取得；引用为Markdown转录/摘要，不是重新核验网页。"
+    ],
+    "historical_evidence_ids": [
+      "A-W03"
+    ],
+    "init_status": "INITIALIZED",
+    "mode_definition_status": "REFINED_WITH_EVIDENCE",
+    "relation_ids": [
+      "MAP:M003:API42:1.6.1",
+      "MAP:M003:API42:1.8.2",
+      "MAP:M003:V4:enum_mask",
+      "MAP:M003:V4:tile_shape"
+    ],
+    "analysis_note": "逐条对照原定义、输入条件和摘要；只保存下列实际候选关系，未列出的组合未逐格作语义否定。",
+    "execution_method_ids": [],
+    "execution_method_scope": "TECHNICAL_TEST_GUIDANCE_NOT_SYNC_CAUSE_CONFIRMATION",
+    "api42_ids": [
+      "1.6.1",
+      "1.8.2"
+    ],
+    "v4_scenario_ids": [
+      "enum_mask",
+      "tile_shape"
+    ],
+    "analysis_status": "REVIEWED_SPARSE_NOT_CARTESIAN",
+    "source_verified": false,
+    "hardware_validated": false,
+    "fact_inventory": {
+      "dtype_and_numeric_domain": "下三角sparse；dtype与数值域UNKNOWN",
+      "shape_layout_stride": "单/多batch；具体batch数UNKNOWN",
+      "implementation_path_and_control": "FA/FIA m轴切分改变核内reduce粒度；图融合",
+      "basis": "REVIEWED_ORIGINAL_DECLARATION_AND_MARKDOWN_SUMMARIES",
+      "source_ids": [
+        "SRC-012a45deaceb6f8de28a2cd0",
+        "SRC-0ab06686de295191b9693b49",
+        "SRC-12c02357b717436d0b66ccbb",
+        "SRC-131475f7b41a570966c18f7c",
+        "SRC-153bb932046bec4c2f6e87ca",
+        "SRC-2254a2a591d1fa10d7c80061",
+        "SRC-25cd847f7341b3c83fcdc4f2",
+        "SRC-3d85996bd2409e40316e9d50",
+        "SRC-3e077fa15e08968ae9e7ca99",
+        "SRC-406dccfdab57ebdb73e8aad0",
+        "SRC-446d899d08dbea605c568e3b",
+        "SRC-46587e3b3d4cfbfd80b08f39",
+        "SRC-52eb2472cbe428fb439f8067",
+        "SRC-532f2acb14b202bc691df062",
+        "SRC-552d816947d054a87e4f9780",
+        "SRC-5edb4064e92dfb3f286cd8b8",
+        "SRC-6db8332d6cedee18daea6a3e",
+        "SRC-87a94154514ffbbf7bd9494c",
+        "SRC-8ebfe82163798ba1c7bead95",
+        "SRC-932d5f655f8078ef81e9b0a7",
+        "SRC-9f2ca8a7a332c0269bb42bef",
+        "SRC-a54baa324f56cf730d2392af",
+        "SRC-a9e4e0e1ae0404156170f732",
+        "SRC-ad07a999558164ab9d1a7916",
+        "SRC-c7ef991425746219458c2c71",
+        "SRC-cc5c2e4f50ac763c4b89120a",
+        "SRC-dc13e83216c0fc8dd5712e5c",
+        "SRC-e3204048faadf8e0de359512",
+        "SRC-e5d007221e441090691b1b09",
+        "SRC-ea9328a7a07c4716744659a9",
+        "SRC-f98292f3206a8539daf765e2"
+      ]
+    }
+  },
+  {
+    "mode_id": "M004",
+    "mode_name": "越界读写：偏移量计算错误",
+    "original_definition": "window区偏移计算存在问题,导致地址有踩踏，从而导致精度问题",
+    "failure_mechanism": {
+      "text": "原表声明window区偏移计算错误，写入覆盖其他地址，导致MC2反向NaN。",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-4f21e6a2eabd29c3123db333"
+      ],
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "fault_object": {
+      "text": "MC2窗口地址偏移 / mm_reduce_scatter_base",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-4f21e6a2eabd29c3123db333"
+      ],
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "input_trigger_conditions": {
+      "text": "使能 MC2 + 8 机训练",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-4d2d3905dc906f794f8ee371"
+      ],
+      "verification": "DECLARATION_OR_SUMMARY_ONLY",
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "execution_trigger_conditions": {
+      "text": "现网 CANN 8.0.0 + MC2",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-3b1a813aae0e52611eca591d"
+      ],
+      "verification": "DECLARATION_OR_SUMMARY_ONLY",
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "applicable_scope": {
+      "text": "训练",
+      "origin": "SOURCE_DECLARATION",
+      "source_ids": [
+        "SRC-c3110906a4e159f67bdb0095"
+      ],
+      "basis": "ORIGINAL_MODE_DECLARATION",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "unresolved_gaps": [
+      "Part4 D07根因括号引用原表窗口偏移，Part5/6却明确DTS未提该细节；不将回填原表的文字作为独立DTS证明。",
+      "冻结工作簿和28份原始快照未在本机取得；引用为Markdown转录/摘要，不是重新核验网页。"
+    ],
+    "historical_evidence_ids": [
+      "A-D07"
+    ],
+    "init_status": "INITIALIZED",
+    "mode_definition_status": "UNCONFIRMED",
+    "relation_ids": [],
+    "analysis_note": "原声明是通信window偏移，摘要内部冲突；没有已知API输入触发，不强配窗口几何。",
+    "discussion_classification": {
+      "recorded_on": "2026-11-11",
+      "origin": "USER_DISCUSSION",
+      "classification_scope": "MECHANISM_REFINEMENT_FROM_USER_REPAIR_ACCOUNT",
+      "mechanism_refinement": "用户补充：MC2未传入useBufferType；AllGatherMatmul调用SetSkipBufferWindowCopy设置该配置，HCCL获取该值并更新。先按通信缓冲区模式参数漏传或状态传播不一致整理，不直接认定为偏移算式错误。",
+      "input_dependency": "CONTROL_CONFIGURATION_AND_IMPLEMENTATION_PATH; TENSOR_SHAPE_OR_VALUE_TRIGGER_UNKNOWN",
+      "reproduction_status": "CONDITIONS_REQUIRED_RATE_UNKNOWN",
+      "v4_class_candidates": [
+        "C4"
+      ],
+      "v4_scenario_ids": [],
+      "api42_ids": [],
+      "classification_note": "C4显式模式分派作为待核对方向；不把内部必需字段漏传直接当成合法可选参数省略，也不直接增加API42或55构造覆盖。",
+      "public_api_reference": {
+        "url": "https://www.hiascend.com/doc_center/source/zh/canncommercial/800/apiref/ascendcopapi/atlasascendc_api_07_10044.html",
+        "supports": "SetSkipBufferWindowCopy设置通信算法获取输入数据的位置；只支持接口语义，不是本故障的修复提交。"
+      },
+      "evidence_confirmed": false,
+      "hardware_validated": false,
+      "counts_toward_historical_coverage": false
+    },
+    "execution_method_ids": [
+      "E2",
+      "E5"
+    ],
+    "execution_method_scope": "TECHNICAL_TEST_GUIDANCE_NOT_SYNC_CAUSE_CONFIRMATION",
+    "api42_ids": [],
+    "v4_scenario_ids": [],
+    "analysis_status": "REVIEWED_SPARSE_NOT_CARTESIAN",
+    "source_verified": false,
+    "hardware_validated": false,
+    "fact_inventory": {
+      "dtype_and_numeric_domain": "NaN为表现；输入数值域/dtype UNKNOWN",
+      "shape_layout_stride": "通信window区；合法输入shape/地址公式UNKNOWN",
+      "implementation_path_and_control": "CANN8.0.0、MC2、8机；偏移归因有摘要内部冲突",
+      "basis": "REVIEWED_ORIGINAL_DECLARATION_AND_MARKDOWN_SUMMARIES",
+      "source_ids": [
+        "SRC-1584812b6bd6238f4afde1e9",
+        "SRC-1a8fcbcab45df11ab07d83f6",
+        "SRC-222d02e68ec8082b0580af7c",
+        "SRC-27aa916273950ea20f903726",
+        "SRC-334f767bf25375451d661014",
+        "SRC-3f92ef577a232e8f7f6fd40b",
+        "SRC-423543bba79c6df2ad745b28",
+        "SRC-443ac8be9283d4b447fcae13",
+        "SRC-44b05da20f8fa22ec1af7494",
+        "SRC-4f21e6a2eabd29c3123db333",
+        "SRC-563a4607aa37422a2f4b9a92",
+        "SRC-595f79bb63c3cde79ba95bb3",
+        "SRC-6ebbea836ab57833d8b54d92",
+        "SRC-763b294da5b0c0dbdc0719e1",
+        "SRC-7b771efe65ba2d30cef381c0",
+        "SRC-81788a0d561a38690502ac26",
+        "SRC-8468e04dfe5fb7d965ef87bb",
+        "SRC-89d35f06d2efd369bcc4e654",
+        "SRC-8debd370c773fe75845387ee",
+        "SRC-94045c23b017df9561e1c35d",
+        "SRC-9b97a9ec1bc5d4a89527d6d1",
+        "SRC-a88641a26bef4bd3cd336b64",
+        "SRC-ba47cb057bbfecf733952fb4",
+        "SRC-ba64fdb66aeecae61aa7df35",
+        "SRC-ba75122878689b75b85f33eb",
+        "SRC-c3110906a4e159f67bdb0095",
+        "SRC-dc62b2d43d6fae004c570cc3",
+        "SRC-deb890a6fac1200d93741078",
+        "SRC-df1f6eaa247216bfb9b04acf",
+        "SRC-df853a839412c16ed7bbca68",
+        "SRC-e5a770f30e474228389c56a6",
+        "SRC-f50979e055dc8132347b1520",
+        "SRC-f6a7170e7163deaec5585e0b"
+      ]
+    }
+  },
+  {
+    "mode_id": "M005",
+    "mode_name": "浮点数累加序不当",
+    "original_definition": "通信累加顺序不一致导致测试不通过，如不同测试脚本目前是只按照一种求和顺序来比较，而集合通信ReduceScatter实现不同rank天然就会有不同的加法顺序，出现结果不相等的情况。",
+    "failure_mechanism": {
+      "text": "不同rank的浮点求和顺序与单一顺序测试标杆不一致，fp16/bf16 sum结果出现差异。",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-e9b0aa69133aff043359d260"
+      ],
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "fault_object": {
+      "text": "集合通信ReduceScatter(V)",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-e9b0aa69133aff043359d260"
+      ],
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "input_trigger_conditions": {
+      "text": "fp16/bf16 + reducetype=sum",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-d63e941dae4f257ddeb074c2"
+      ],
+      "verification": "DECLARATION_OR_SUMMARY_ONLY",
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "execution_trigger_conditions": {
+      "text": "HCCL/集合通信 ReduceScatterV",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-522750d49611f880880f6594"
+      ],
+      "verification": "DECLARATION_OR_SUMMARY_ONLY",
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "applicable_scope": {
+      "text": "训练",
+      "origin": "SOURCE_DECLARATION",
+      "source_ids": [
+        "SRC-7b6d17c6504b1a11a9394246"
+      ],
+      "basis": "ORIGINAL_MODE_DECLARATION",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "unresolved_gaps": [
+      "D06只给精度不过，未给累加顺序根因；上游Part5的SUPPORTS过强。",
+      "冻结工作簿和28份原始快照未在本机取得；引用为Markdown转录/摘要，不是重新核验网页。"
+    ],
+    "historical_evidence_ids": [
+      "A-D06"
+    ],
+    "init_status": "INITIALIZED",
+    "mode_definition_status": "PARTIALLY_SUPPORTED",
+    "relation_ids": [
+      "MAP:M005:API42:1.C.7",
+      "MAP:M005:V4:enum_dtype",
+      "MAP:M005:V4:long_reduce"
+    ],
+    "analysis_note": "逐条对照原定义、输入条件和摘要；只保存下列实际候选关系，未列出的组合未逐格作语义否定。",
+    "execution_method_ids": [],
+    "execution_method_scope": "TECHNICAL_TEST_GUIDANCE_NOT_SYNC_CAUSE_CONFIRMATION",
+    "api42_ids": [
+      "1.C.7"
+    ],
+    "v4_scenario_ids": [
+      "enum_dtype",
+      "long_reduce"
+    ],
+    "analysis_status": "REVIEWED_SPARSE_NOT_CARTESIAN",
+    "source_verified": false,
+    "hardware_validated": false,
+    "fact_inventory": {
+      "dtype_and_numeric_domain": "fp16/bf16、reducetype=sum",
+      "shape_layout_stride": "归约长度与shape UNKNOWN",
+      "implementation_path_and_control": "ReduceScatterV；根因摘要空白，累加序仅原声明",
+      "basis": "REVIEWED_ORIGINAL_DECLARATION_AND_MARKDOWN_SUMMARIES",
+      "source_ids": [
+        "SRC-077ebaa670d93c89727c6582",
+        "SRC-0c09908b3714bfa23a6b2830",
+        "SRC-18b26986b80be0e775da5f48",
+        "SRC-273a4dd01c389012ea01d84b",
+        "SRC-2a4d72615d74a178356ff223",
+        "SRC-39061a4e6afc83e31635fb3e",
+        "SRC-3b7c7c2a5c891417ae449ad9",
+        "SRC-4b998044c61fc6795e8f340a",
+        "SRC-551eb25c12e235e7100fae49",
+        "SRC-575164c5715293b694c4c585",
+        "SRC-64379943fe22ba58b4ed1bb0",
+        "SRC-6e03c6ca6f31d32184e3655c",
+        "SRC-6e181689e975929f665f51ba",
+        "SRC-7b6d17c6504b1a11a9394246",
+        "SRC-7d393b0b9ef3827c018bf935",
+        "SRC-86566153713c7d678184e122",
+        "SRC-8e043879e966022f4a0877fa",
+        "SRC-9f9ec354a5c6927a96403bf2",
+        "SRC-a4b616a8ea525a354804be4c",
+        "SRC-a689a3bca545d84417dbe396",
+        "SRC-a79431b9ed334390a8ae9dab",
+        "SRC-b12750f6088de6ddaa34f424",
+        "SRC-d1e82b6676d3ccbecfa2033f",
+        "SRC-d61a03fe1dd248b08a6066c7",
+        "SRC-d80da0e78f8bb4d2c069d821",
+        "SRC-dd1d7f5d5344eebe631a6d59",
+        "SRC-e2699315f6b760f87e735695",
+        "SRC-e9b0aa69133aff043359d260",
+        "SRC-ec0153c19cfb2f24fae6ca92",
+        "SRC-f7e56fe7fe2fa3d86de918b0",
+        "SRC-fa551eb51e038e2a30a42404",
+        "SRC-fb822b390cd36d2a8328361d",
+        "SRC-fdf697a534a0eec75322440f"
+      ]
+    }
+  },
+  {
+    "mode_id": "M006",
+    "mode_name": "越界读写：shape错误",
+    "original_definition": "SetSize算子的infershape接口存在问题，output shape是-1，导致其后面的算子ReduceSum推导出的shape是个标量，进而导致分配内存异常；",
+    "failure_mechanism": {
+      "text": "原表声明infer-shape返回-1，后续算子推导为标量，导致内存分配异常。",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-bf19d6ead4761d9d1da7aeac"
+      ],
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "fault_object": {
+      "text": "SetSize infer-shape到ReduceSum的形状链",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-bf19d6ead4761d9d1da7aeac"
+      ],
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "input_trigger_conditions": {
+      "text": "infershape 返回 -1 的算子链",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-05d0432898564836a64c5207"
+      ],
+      "verification": "DECLARATION_OR_SUMMARY_ONLY",
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "execution_trigger_conditions": {
+      "text": "虚机+容器精度测试",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-2d2e0c0487d78a08efc46af3"
+      ],
+      "verification": "DECLARATION_OR_SUMMARY_ONLY",
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "applicable_scope": {
+      "text": "训练",
+      "origin": "SOURCE_DECLARATION",
+      "source_ids": [
+        "SRC-2d9cd8bc823cea98a1430c25"
+      ],
+      "basis": "ORIGINAL_MODE_DECLARATION",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "unresolved_gaps": [
+      "D02仅称目录问题、待确认，未证明SetSize/ReduceSum链。",
+      "冻结工作簿和28份原始快照未在本机取得；引用为Markdown转录/摘要，不是重新核验网页。"
+    ],
+    "historical_evidence_ids": [
+      "A-D02"
+    ],
+    "init_status": "INITIALIZED",
+    "mode_definition_status": "UNCONFIRMED",
+    "relation_ids": [],
+    "analysis_note": "-1由infer-shape返回，标量是下游推断结果；输入构造与内部结果分开。",
+    "discussion_classification": {
+      "recorded_on": "2026-11-11",
+      "origin": "USER_DISCUSSION",
+      "v4_scenario_ids": [
+        "minus_one"
+      ],
+      "v4_scenario_name": "-1：推断维度 / 动态标记 / 哨兵",
+      "classification_scope": "PROVISIONAL_FROM_DESCRIPTION",
+      "note": "按用户指示先记录为V4的-1；原记录描述InferShape输出-1，合法输入标记、传播链及具体修复点仍待确认。",
+      "evidence_confirmed": false,
+      "hardware_validated": false,
+      "counts_toward_historical_coverage": false,
+      "fix_version": {
+        "value": "CANN 6.3 RC1 B060",
+        "origin": "USER_PROVIDED",
+        "verified": false
+      }
+    },
+    "execution_method_ids": [],
+    "execution_method_scope": "TECHNICAL_TEST_GUIDANCE_NOT_SYNC_CAUSE_CONFIRMATION",
+    "api42_ids": [],
+    "v4_scenario_ids": [],
+    "analysis_status": "REVIEWED_SPARSE_NOT_CARTESIAN",
+    "source_verified": false,
+    "hardware_validated": false,
+    "fact_inventory": {
+      "dtype_and_numeric_domain": "内部infer-shape返回-1，不是已知输入哨兵",
+      "shape_layout_stride": "下游推为标量；输入rank UNKNOWN",
+      "implementation_path_and_control": "SetSize→ReduceSum声明；虚机/容器测试未定位机理",
+      "basis": "REVIEWED_ORIGINAL_DECLARATION_AND_MARKDOWN_SUMMARIES",
+      "source_ids": [
+        "SRC-036f0e6919cbd3495bd64afc",
+        "SRC-03fbbb5a680f5fb0fc2714b8",
+        "SRC-0486701c67f465213959d60c",
+        "SRC-1367da3e945b06f1fc907c57",
+        "SRC-16b1ae1c2dc48001464c1012",
+        "SRC-25029c6fddc5dd7f05d55db7",
+        "SRC-2d9cd8bc823cea98a1430c25",
+        "SRC-350a588f7eac5c47245cb7b0",
+        "SRC-3c369b3ce0bffeb10fc0f6bb",
+        "SRC-4fb06fc81b6fb4c0d9149796",
+        "SRC-5bf212dbe49d281e385f2de4",
+        "SRC-60342ca6a1594f67c52565ee",
+        "SRC-69f16e755009690e74fc98d7",
+        "SRC-72143ec3e2e3c31b46076ddf",
+        "SRC-7234df03e7060c4e0e468ae1",
+        "SRC-78057d8b99456e82e436e523",
+        "SRC-7c754df58540bd8654bbd40f",
+        "SRC-86d463f118227076e6c28c6b",
+        "SRC-89fc07692480502018592b03",
+        "SRC-9cc77936af4fa005c1f65914",
+        "SRC-a5c23c23e6131d98c2eb55c4",
+        "SRC-a847d295366b98d48e0e06ab",
+        "SRC-b03777e317d489d9ffbd86ab",
+        "SRC-b901f19850c7870b6459d8fa",
+        "SRC-bd8939b5681d20cb200c2f13",
+        "SRC-bf19d6ead4761d9d1da7aeac",
+        "SRC-c23d5fabf173b4e180403244",
+        "SRC-c454d2cc8b95060602bc8da8",
+        "SRC-c64352cb40f2266de2084eb8",
+        "SRC-e08a770a980094e7a7786ed8",
+        "SRC-e8006795a9955aae175fa4af",
+        "SRC-e9681e058a0547c03fd1c930",
+        "SRC-f3acc3da765ecf613d4a4b79"
+      ]
+    }
+  },
+  {
+    "mode_id": "M007",
+    "mode_name": "缺少同步",
+    "original_definition": "多核同时搬运可能会导致偶现精度问题",
+    "failure_mechanism": {
+      "text": "原表推定多核同时搬运缺少必要同步，使相同调用偶现错误。",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-3b48bc17e29827c233b382aa"
+      ],
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "fault_object": {
+      "text": "多核数据搬运的同步依赖",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-3b48bc17e29827c233b382aa"
+      ],
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "input_trigger_conditions": {
+      "text": "多核并发搬运（indices 与 grad_out 特定 shape）",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-458b8cb64e27aa9e2adff814"
+      ],
+      "verification": "DECLARATION_OR_SUMMARY_ONLY",
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "execution_trigger_conditions": {
+      "text": "AICORE 池化反向，tilingKey=2",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-7de62bf97ea4537730cd43fe"
+      ],
+      "verification": "DECLARATION_OR_SUMMARY_ONLY",
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "applicable_scope": {
+      "text": "训练",
+      "origin": "SOURCE_DECLARATION",
+      "source_ids": [
+        "SRC-2bc3abec57f0d187d7c85c69"
+      ],
+      "basis": "ORIGINAL_MODE_DECLARATION",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "unresolved_gaps": [
+      "D05复现同输入第一次对第二次错，但未给同步根因。算子名不同不能单独证明DIFFERENT_EVENT。",
+      "冻结工作簿和28份原始快照未在本机取得；引用为Markdown转录/摘要，不是重新核验网页。"
+    ],
+    "historical_evidence_ids": [
+      "A-D05"
+    ],
+    "init_status": "INITIALIZED",
+    "mode_definition_status": "PARTIALLY_SUPPORTED",
+    "relation_ids": [
+      "MAP:M007:API42:1.2.7",
+      "MAP:M007:V4:geometry"
+    ],
+    "analysis_note": "同输入偶现优先用执行规程分析；池化几何仅有候选关系。",
+    "execution_method_ids": [
+      "E1",
+      "E5"
+    ],
+    "execution_method_scope": "TECHNICAL_TEST_GUIDANCE_NOT_SYNC_CAUSE_CONFIRMATION",
+    "api42_ids": [
+      "1.2.7"
+    ],
+    "v4_scenario_ids": [
+      "geometry"
+    ],
+    "analysis_status": "REVIEWED_SPARSE_NOT_CARTESIAN",
+    "source_verified": false,
+    "hardware_validated": false,
+    "fact_inventory": {
+      "dtype_and_numeric_domain": "输入值/dtype UNKNOWN；同输入首次对再次错",
+      "shape_layout_stride": "self=[1,17,15,5,5]；indices/grad_out=[1,17,1,1,5]",
+      "implementation_path_and_control": "MaxPool反向tilingKey=2；同步为原声明，DTS根因空白",
+      "basis": "REVIEWED_ORIGINAL_DECLARATION_AND_MARKDOWN_SUMMARIES",
+      "source_ids": [
+        "SRC-046c3c21ac3d62304ff3575e",
+        "SRC-05f28e6bba940fe4c0a78079",
+        "SRC-0b75746b549ee94fa16b671c",
+        "SRC-0cef4b3b59f36169427b3893",
+        "SRC-2bc3abec57f0d187d7c85c69",
+        "SRC-2e979df84307f69bab2b3575",
+        "SRC-3b48bc17e29827c233b382aa",
+        "SRC-555870fabb7e129caf7f0954",
+        "SRC-627ce6425303c47b8c01e456",
+        "SRC-62c7c5394b33021641813f6a",
+        "SRC-6fd70f6b17322d6a0bf351c9",
+        "SRC-73fde72491dda80b962a0971",
+        "SRC-791ab2c059106026d150c2bc",
+        "SRC-7b19b2ab17da0203d0f324e3",
+        "SRC-87d6c6ccb587aa31f7289b61",
+        "SRC-8a3373a2faca213142855272",
+        "SRC-94ce7ab26fe1255bc352a052",
+        "SRC-976ad9ba502aa763e591d17a",
+        "SRC-9a9fea64d8006d35421524d9",
+        "SRC-b4c10a0b279c0bfb73006a5b",
+        "SRC-b4efe029fe5f46d42e763e1f",
+        "SRC-b9258339fd51d491a5c06530",
+        "SRC-bd054434ba80f8d0c795b81d",
+        "SRC-be7b45b1fee7b62526d93ffa",
+        "SRC-bf9d8d57d1dd34168e651ee2",
+        "SRC-d2962b0eb3af7f88aad293f3",
+        "SRC-d515526d7c5b367135b60b27",
+        "SRC-ddfff166b095769e03c04570",
+        "SRC-e51c80527b700fceb24db3c3",
+        "SRC-e8e85b5172725c19c5ed3673",
+        "SRC-ef18285d9dc847b535ab07b2",
+        "SRC-f2114ca78d35872fe11c0a8e",
+        "SRC-fef32b8bd6d207c084438849"
+      ]
+    }
+  },
+  {
+    "mode_id": "M008",
+    "mode_name": "浮点数累加序不当",
+    "original_definition": "累加序实现不一致，如二分累加对比顺序累加，导致精度差异，如未设置export CLOSE_MATMUL_K_SHIFT=1时会有计算误差，具体可能是在router选择时容易出现较大偏差，导致评分下降",
+    "failure_mechanism": {
+      "text": "浮点累加次序随实现/tiling变化，微小差异在router选路中放大。",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-c851534aabb5d657bb408d5f"
+      ],
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "fault_object": {
+      "text": "Matmul K错峰 / router数值敏感路径",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-c851534aabb5d657bb408d5f"
+      ],
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "input_trigger_conditions": {
+      "text": "特定 shape 使 matmul 走 K 错峰 tiling",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-fd4e77ae9def4b0b1932b3b6"
+      ],
+      "verification": "DECLARATION_OR_SUMMARY_ONLY",
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "execution_trigger_conditions": {
+      "text": "推理；MoE router",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-8989f21f44dbd4e2095e4171"
+      ],
+      "verification": "DECLARATION_OR_SUMMARY_ONLY",
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "applicable_scope": {
+      "text": "推理",
+      "origin": "SOURCE_DECLARATION",
+      "source_ids": [
+        "SRC-ff9a698cf823205ce2085f52"
+      ],
+      "basis": "ORIGINAL_MODE_DECLARATION",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "unresolved_gaps": [
+      "W04的TopK/pow及单算子合格linear只是排查分支，不能一并认作根因。",
+      "冻结工作簿和28份原始快照未在本机取得；引用为Markdown转录/摘要，不是重新核验网页。"
+    ],
+    "historical_evidence_ids": [
+      "A-W04"
+    ],
+    "init_status": "INITIALIZED",
+    "mode_definition_status": "REFINED_WITH_EVIDENCE",
+    "relation_ids": [
+      "MAP:M008:API42:1.2.6",
+      "MAP:M008:V4:tile_shape",
+      "MAP:M008:V4:long_reduce",
+      "MAP:M008:V4:cancellation"
+    ],
+    "analysis_note": "逐条对照原定义、输入条件和摘要；只保存下列实际候选关系，未列出的组合未逐格作语义否定。",
+    "execution_method_ids": [],
+    "execution_method_scope": "TECHNICAL_TEST_GUIDANCE_NOT_SYNC_CAUSE_CONFIRMATION",
+    "api42_ids": [
+      "1.2.6"
+    ],
+    "v4_scenario_ids": [
+      "tile_shape",
+      "long_reduce",
+      "cancellation"
+    ],
+    "analysis_status": "REVIEWED_SPARSE_NOT_CARTESIAN",
+    "source_verified": false,
+    "hardware_validated": false,
+    "fact_inventory": {
+      "dtype_and_numeric_domain": "Matmul累加误差被router放大；输入符号分布UNKNOWN",
+      "shape_layout_stride": "具体shape/K/tile UNKNOWN",
+      "implementation_path_and_control": "CLOSE_MATMUL_K_SHIFT=1是环境开关，不是API控制实参",
+      "basis": "REVIEWED_ORIGINAL_DECLARATION_AND_MARKDOWN_SUMMARIES",
+      "source_ids": [
+        "SRC-11f3bf5b4a0dbd23ce2cea8b",
+        "SRC-144474e819828438febd27b9",
+        "SRC-214441dadbbd8f58fae98ed5",
+        "SRC-237dc7e3f905996986557d4a",
+        "SRC-29307bb693783fbff9d38955",
+        "SRC-2b5ab55650cac316bc325e46",
+        "SRC-35eed188ce436b0d6d69b124",
+        "SRC-369cf53c4b9be02653c9800a",
+        "SRC-39a7206c97239ee008895bb2",
+        "SRC-3d873c89818b14ec862d7ac9",
+        "SRC-3e0c4c6929fa49de953cd9e1",
+        "SRC-4bdc5fc56764e9270d754280",
+        "SRC-62a4629988471cf1706dffb1",
+        "SRC-646966f6faea5284707f2475",
+        "SRC-70adddb0fa7ddbb7b219a18d",
+        "SRC-717de272e2b6727986759b04",
+        "SRC-7b5c6e12b0c2b9ab561d93f8",
+        "SRC-810bed13bd81c3a8957a1ad5",
+        "SRC-86259bc5ffbf18ddeb576c30",
+        "SRC-8671bfb6f88ffdf6ef83961d",
+        "SRC-90f63a298ed987e2dd803868",
+        "SRC-9db741d149883e189476c74d",
+        "SRC-a59018b9cd5db9194ee408c6",
+        "SRC-aa2b6ac9971b80e3346d59e5",
+        "SRC-be1cac78e1ed0089693ae8d0",
+        "SRC-c220024a4c7780cbdeeaa3a6",
+        "SRC-c2733a3a8bf4b2a49064e24e",
+        "SRC-c851534aabb5d657bb408d5f",
+        "SRC-e0d35128e9ee3a1d61f2e4b7",
+        "SRC-e76520ca95c7b1f2f70e3298",
+        "SRC-ff9a698cf823205ce2085f52"
+      ]
+    }
+  },
+  {
+    "mode_id": "M009",
+    "mode_name": "精度溢出：数值格式精度不够导致精度溢出",
+    "original_definition": "baddbmm公式out=β input +α (batch1@batch2),计算时括号内为中间变量，超出fp16表示范围",
+    "failure_mechanism": {
+      "text": "中间乘积在低精度范围外，转换/保存为FP16时变为Inf，后续缩放无法恢复。",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-f0813efdc9daf08665ec6edb"
+      ],
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "fault_object": {
+      "text": "baddbmm中间Matmul结果",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-f0813efdc9daf08665ec6edb"
+      ],
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "input_trigger_conditions": {
+      "text": "baddbmm 中间变量超 FP16 范围",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-8e7a13cde08e169a6d26823c"
+      ],
+      "verification": "DECLARATION_OR_SUMMARY_ONLY",
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "execution_trigger_conditions": {
+      "text": "aclnn 拆为 mm + mul 两步",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-e58df3aa31f5c7b63528781d"
+      ],
+      "verification": "DECLARATION_OR_SUMMARY_ONLY",
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "applicable_scope": {
+      "text": "推理",
+      "origin": "SOURCE_DECLARATION",
+      "source_ids": [
+        "SRC-8ed0525ff2a93d91b12bd704"
+      ],
+      "basis": "ORIGINAL_MODE_DECLARATION",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "unresolved_gaps": [
+      "不把中间结果Inf误归为输入原本含Inf；无本机历史修复Diff。",
+      "冻结工作簿和28份原始快照未在本机取得；引用为Markdown转录/摘要，不是重新核验网页。"
+    ],
+    "historical_evidence_ids": [
+      "A-W05"
+    ],
+    "init_status": "INITIALIZED",
+    "mode_definition_status": "REFINED_WITH_EVIDENCE",
+    "relation_ids": [
+      "MAP:M009:API42:1.7.6",
+      "MAP:M009:V4:intermediate_overflow",
+      "MAP:M009:V4:enum_dtype"
+    ],
+    "analysis_note": "逐条对照原定义、输入条件和摘要；只保存下列实际候选关系，未列出的组合未逐格作语义否定。",
+    "execution_method_ids": [],
+    "execution_method_scope": "TECHNICAL_TEST_GUIDANCE_NOT_SYNC_CAUSE_CONFIRMATION",
+    "api42_ids": [
+      "1.7.6"
+    ],
+    "v4_scenario_ids": [
+      "intermediate_overflow",
+      "enum_dtype"
+    ],
+    "analysis_status": "REVIEWED_SPARSE_NOT_CARTESIAN",
+    "source_verified": false,
+    "hardware_validated": false,
+    "fact_inventory": {
+      "dtype_and_numeric_domain": "中间mm约-70000；cast FP16溢出；输入dtype细节UNKNOWN",
+      "shape_layout_stride": "历史shape UNKNOWN",
+      "implementation_path_and_control": "aclnn拆成mm+mul；FP32规避",
+      "basis": "REVIEWED_ORIGINAL_DECLARATION_AND_MARKDOWN_SUMMARIES",
+      "source_ids": [
+        "SRC-09c4cf78f81bec952840952a",
+        "SRC-0a3601c8a53a8608ab7ba58d",
+        "SRC-0d13d971fd8d197a47770255",
+        "SRC-0df3a89904240debe4a099ae",
+        "SRC-16f1f6eb249f436fca12144d",
+        "SRC-1cafa46a406325844fe74cab",
+        "SRC-27c44e033da31a675816f94b",
+        "SRC-4b504ede9e187fa11dd8396a",
+        "SRC-4ffae38e1b765a24f1a1b3bc",
+        "SRC-577559ce23021365ef59b466",
+        "SRC-63195548667651d518378f82",
+        "SRC-67c83555c4926adbe9fc62de",
+        "SRC-6825e0ebcc64a10e22620ea4",
+        "SRC-6c25085596e9b89358eac0c4",
+        "SRC-77b22633bde2cf4ad719ad50",
+        "SRC-8ed0525ff2a93d91b12bd704",
+        "SRC-90e8e0e020893f2746e48721",
+        "SRC-912a24036df881f9293fec8d",
+        "SRC-9784fffb95b2e5b2cedf9c63",
+        "SRC-a3a805d12aa29282dcab3ecd",
+        "SRC-c0ae0ab179b8ce98ed60ae67",
+        "SRC-cd9349f538587f36a61f863b",
+        "SRC-dcabbef82c462550f570e786",
+        "SRC-dce2901c47557fdb60e3c2ba",
+        "SRC-e09e06840638da37ff8121e4",
+        "SRC-e3ae29ed29dbbd0857b26683",
+        "SRC-e3e61a51b4ae1f73e5da14e7",
+        "SRC-e4e988397ecd0d6a667fb65f",
+        "SRC-ea1be4d1fc0463736d1ac284",
+        "SRC-f0813efdc9daf08665ec6edb",
+        "SRC-f09c8be72f93ea8231a06a63"
+      ]
+    }
+  },
+  {
+    "mode_id": "M010",
+    "mode_name": "融合算子反量化位置不当",
+    "original_definition": "图优化阶段因反量化（Dequantize）节点摆放位置错误，导致本应以纯INT8执行的融合算子退化为“反量化+高精度计算+再量化”路径，或使量化参数（scale/zero_point）传递断裂，最终引发精度异常",
+    "failure_mechanism": {
+      "text": "反量化节点位置或量化参数传递错误，改变融合图的计算路径。",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-cbfd780ebe0ca7cb408a5873"
+      ],
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "fault_object": {
+      "text": "图优化中的Dequantize节点及量化参数传递",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-cbfd780ebe0ca7cb408a5873"
+      ],
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "input_trigger_conditions": {
+      "text": "UNKNOWN",
+      "origin": "UNKNOWN",
+      "source_ids": [
+        "SRC-de44e1bd2e9ec91309e314c7"
+      ],
+      "verification": "DECLARATION_OR_SUMMARY_ONLY",
+      "basis": "UNKNOWN",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "execution_trigger_conditions": {
+      "text": "图融合优化",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-e7bec22236b48574f666a814"
+      ],
+      "verification": "DECLARATION_OR_SUMMARY_ONLY",
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "applicable_scope": {
+      "text": "推理",
+      "origin": "SOURCE_DECLARATION",
+      "source_ids": [
+        "SRC-dc3c9fcb9339da48da44758a"
+      ],
+      "basis": "ORIGINAL_MODE_DECLARATION",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "unresolved_gaps": [
+      "原定义完整保留；没有图样例或历史链接，不等同于模式不存在。",
+      "冻结工作簿和28份原始快照未在本机取得；引用为Markdown转录/摘要，不是重新核验网页。"
+    ],
+    "historical_evidence_ids": [],
+    "init_status": "INITIALIZED",
+    "mode_definition_status": "UNCONFIRMED",
+    "relation_ids": [
+      "MAP:M010:V4:enum_quant"
+    ],
+    "analysis_note": "逐条对照原定义、输入条件和摘要；只保存下列实际候选关系，未列出的组合未逐格作语义否定。",
+    "execution_method_ids": [],
+    "execution_method_scope": "TECHNICAL_TEST_GUIDANCE_NOT_SYNC_CAUSE_CONFIRMATION",
+    "api42_ids": [],
+    "v4_scenario_ids": [
+      "enum_quant"
+    ],
+    "analysis_status": "REVIEWED_SPARSE_NOT_CARTESIAN",
+    "source_verified": false,
+    "hardware_validated": false,
+    "fact_inventory": {
+      "dtype_and_numeric_domain": "量化参数与反量化图位置声明",
+      "shape_layout_stride": "shape/scale结构 UNKNOWN",
+      "implementation_path_and_control": "图融合Dequantize，API量化选项UNKNOWN",
+      "basis": "REVIEWED_ORIGINAL_DECLARATION_AND_MARKDOWN_SUMMARIES",
+      "source_ids": [
+        "SRC-00a51c65a87ff8edbbe09feb",
+        "SRC-04f7149effe48f05fbbaa721",
+        "SRC-129c2d246a1030d27a3f8988",
+        "SRC-3153f54aa278a58fe1f419a9",
+        "SRC-5908dc1a83deab5059854f98",
+        "SRC-6a5c59d540f3c02d9b2d0350",
+        "SRC-874a736e56cae9904b7466af",
+        "SRC-8d44a64f8c075ed0b9d55893",
+        "SRC-a4c9bec29bfb126550ce683d",
+        "SRC-c6f0acabc4c1baa49bd30e01",
+        "SRC-ca8ceddf57056cfeb7d70bba",
+        "SRC-cbfd780ebe0ca7cb408a5873",
+        "SRC-dc3c9fcb9339da48da44758a",
+        "SRC-f586b0ed61ebfcf30a1b9d57",
+        "SRC-f596c9b0b6d9a97c53e1cc43"
+      ]
+    }
+  },
+  {
+    "mode_id": "M011",
+    "mode_name": "tiling切分策略分支错误",
+    "original_definition": "tiling逻辑判断或具体条件判断错误，导致走入错误分支",
+    "failure_mechanism": {
+      "text": "Tiling条件判定错误，选择不适用的执行分支。",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-379643568fa69a1dd317a863"
+      ],
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "fault_object": {
+      "text": "Host Tiling分支判定",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-379643568fa69a1dd317a863"
+      ],
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "input_trigger_conditions": {
+      "text": "固定 shape + scatter_ 特定输入",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-b2a282eeaa5becb7e7d20c99"
+      ],
+      "verification": "DECLARATION_OR_SUMMARY_ONLY",
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "execution_trigger_conditions": {
+      "text": "fastvideo 迁移；索引计算",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-9d7b9c53bae99cbff58d3457"
+      ],
+      "verification": "DECLARATION_OR_SUMMARY_ONLY",
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "applicable_scope": {
+      "text": "训练",
+      "origin": "SOURCE_DECLARATION",
+      "source_ids": [
+        "SRC-a081abbe49d93062ac48645c"
+      ],
+      "basis": "ORIGINAL_MODE_DECLARATION",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "unresolved_gaps": [
+      "D09只证明scatter_特定shape报错；不能据算子/描述差异判不同事件，也未证明具体分支。",
+      "冻结工作簿和28份原始快照未在本机取得；引用为Markdown转录/摘要，不是重新核验网页。"
+    ],
+    "historical_evidence_ids": [
+      "A-D09"
+    ],
+    "init_status": "INITIALIZED",
+    "mode_definition_status": "PARTIALLY_SUPPORTED",
+    "relation_ids": [
+      "MAP:M011:API42:1.2.6",
+      "MAP:M011:V4:tile_shape"
+    ],
+    "analysis_note": "逐条对照原定义、输入条件和摘要；只保存下列实际候选关系，未列出的组合未逐格作语义否定。",
+    "execution_method_ids": [],
+    "execution_method_scope": "TECHNICAL_TEST_GUIDANCE_NOT_SYNC_CAUSE_CONFIRMATION",
+    "api42_ids": [
+      "1.2.6"
+    ],
+    "v4_scenario_ids": [
+      "tile_shape"
+    ],
+    "analysis_status": "REVIEWED_SPARSE_NOT_CARTESIAN",
+    "source_verified": false,
+    "hardware_validated": false,
+    "fact_inventory": {
+      "dtype_and_numeric_domain": "数值域/dtype UNKNOWN",
+      "shape_layout_stride": "固定shape未给数值",
+      "implementation_path_and_control": "scatter_报错；具体模板边界UNKNOWN",
+      "basis": "REVIEWED_ORIGINAL_DECLARATION_AND_MARKDOWN_SUMMARIES",
+      "source_ids": [
+        "SRC-0389bf920fbb65b4ad6383ef",
+        "SRC-0878353a2b749e5fcab84121",
+        "SRC-08adb86c4af00046cc4e8fda",
+        "SRC-0a4c937110db45a17f42f72a",
+        "SRC-1391723a3f376db99312c0fa",
+        "SRC-15eda5d4945097d0eb3fb126",
+        "SRC-182a754c21c63775d2ed6805",
+        "SRC-1b44f6be70ae2630539b4d9a",
+        "SRC-1fe53c32df78a2453b4d0b86",
+        "SRC-2e2c9bb83f28671018fabc53",
+        "SRC-379643568fa69a1dd317a863",
+        "SRC-38fb87837306c1514351ac2e",
+        "SRC-401ae820843b104c870dba11",
+        "SRC-59924b43dfc5dff70c97bc17",
+        "SRC-5ad847ebd9caf741235acb23",
+        "SRC-629d7404514c2f671d355856",
+        "SRC-6c9407a969dd51ab3b3e4644",
+        "SRC-701e3631ecaa1f4a4a439f62",
+        "SRC-7734005e7b0c1ad2a9d48d3d",
+        "SRC-7b1eb0ab4170505b5e91ecb6",
+        "SRC-80901b6205fdde677d2c4130",
+        "SRC-854a565870a1f202974128e7",
+        "SRC-8b1689f1cc7979dba426084d",
+        "SRC-9159eba664fe2f8e65d784ee",
+        "SRC-a081abbe49d93062ac48645c",
+        "SRC-a63cfbb9eeee3492ffd76698",
+        "SRC-a7653a8fe20a04ccfce0c9c0",
+        "SRC-af71486cac3fedc9f4200b1e",
+        "SRC-bd78449fdd641fd922dd86b7",
+        "SRC-d72230cc55643114c06fad4b",
+        "SRC-d94622d2a562c4d550d7d205",
+        "SRC-e91437dc223e01e5d0e23708",
+        "SRC-f179030e03b62e0fbe747b4a"
+      ]
+    }
+  },
+  {
+    "mode_id": "M012",
+    "mode_name": "确定性计算未实现",
+    "original_definition": "RMSNorm小算子（Pow + ReduceMean + Add +Rsqrt）实现与RMSNorm算子不同；ReduceMean的确定性未能固定",
+    "failure_mechanism": {
+      "text": "归约过程未固定确定性，导致相同图推理重复调用结果随机。",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-72c00c8db0479f6b30494648"
+      ],
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "fault_object": {
+      "text": "RMSNorm小算子组合中的ReduceMean",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-72c00c8db0479f6b30494648"
+      ],
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "input_trigger_conditions": {
+      "text": "MOE 模型入图推理",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-21022432bd12c4315a0b6db6"
+      ],
+      "verification": "DECLARATION_OR_SUMMARY_ONLY",
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "execution_trigger_conditions": {
+      "text": "两次入图推理；小算子组合",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-729b0bd78c3c67956f53dc71"
+      ],
+      "verification": "DECLARATION_OR_SUMMARY_ONLY",
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "applicable_scope": {
+      "text": "推理",
+      "origin": "SOURCE_DECLARATION",
+      "source_ids": [
+        "SRC-74ba9af9367aa82d51c7112b"
+      ],
+      "basis": "ORIGINAL_MODE_DECLARATION",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "unresolved_gaps": [
+      "W06/W07只作两个资料，不计两个故障；不与LCCL通信确定性自动合并。",
+      "冻结工作簿和28份原始快照未在本机取得；引用为Markdown转录/摘要，不是重新核验网页。"
+    ],
+    "historical_evidence_ids": [
+      "A-W06",
+      "A-W07"
+    ],
+    "init_status": "INITIALIZED",
+    "mode_definition_status": "REFINED_WITH_EVIDENCE",
+    "relation_ids": [],
+    "analysis_note": "内部非确定性优先E1，不自动归类API deterministic。",
+    "execution_method_ids": [
+      "E1"
+    ],
+    "execution_method_scope": "TECHNICAL_TEST_GUIDANCE_NOT_SYNC_CAUSE_CONFIRMATION",
+    "api42_ids": [],
+    "v4_scenario_ids": [],
+    "analysis_status": "REVIEWED_SPARSE_NOT_CARTESIAN",
+    "source_verified": false,
+    "hardware_validated": false,
+    "fact_inventory": {
+      "dtype_and_numeric_domain": "输入dtype/数据分布UNKNOWN",
+      "shape_layout_stride": "原文“32条”是请求数，不自动当tensor batch",
+      "implementation_path_and_control": "Pow/ReduceMean/Add/Rsqrt内部确定性；两次入图",
+      "basis": "REVIEWED_ORIGINAL_DECLARATION_AND_MARKDOWN_SUMMARIES",
+      "source_ids": [
+        "SRC-0c33220b9443a7d7673824b1",
+        "SRC-20bc3fa9a971ca097f87e8a5",
+        "SRC-215aeb01c5cb0089d59192bb",
+        "SRC-2495272ea1cf3198fefc2569",
+        "SRC-275bdca74ca69d84d71456eb",
+        "SRC-2cfb16edb2d073809891e544",
+        "SRC-33e90c360debae4562185320",
+        "SRC-370b1e2c1e6e609269c29a41",
+        "SRC-3bf14c96ec6f1541fbd0b6b6",
+        "SRC-4b783a5d6cc55d6f40b0a47c",
+        "SRC-4bb66c30fc614418027467b5",
+        "SRC-5cd73f51169907a503a78cb4",
+        "SRC-5d63e96995f598ac54d9afbb",
+        "SRC-5e7ce93aa50e4f56802fe9ec",
+        "SRC-62b7f3e6083b14014f57d2f3",
+        "SRC-6427a64ec40a7b771ea8365e",
+        "SRC-6504aa38b9cc5a841ed3df33",
+        "SRC-67afab458931d488c5e9e537",
+        "SRC-6b455737f5e4ec7ee822edef",
+        "SRC-72c00c8db0479f6b30494648",
+        "SRC-740cd8b29273129125076c93",
+        "SRC-746b66db0f5c1e1cc5436fbb",
+        "SRC-74ba9af9367aa82d51c7112b",
+        "SRC-7be532ca43860549798e481f",
+        "SRC-7ff13137bf40fc170901ee5a",
+        "SRC-8379f2a2670bc3b32994f7d6",
+        "SRC-8d9461dafbf2994339a2f39b",
+        "SRC-98d5ba144efbe150f0d26e63",
+        "SRC-a3ce52bc52e99440e1c6e97a",
+        "SRC-a678dea2e823441d086f1145",
+        "SRC-a8ff56aa11aaebbd6b1c3be4",
+        "SRC-a91f5c01f2fd60da65c2a191",
+        "SRC-aaf8ba0a98a15c4028de5203",
+        "SRC-ae522b031de0ca17841bd534",
+        "SRC-bb44f9dff843c668e2095869",
+        "SRC-be65ac60066d8fd1add0ddef",
+        "SRC-bf88dfb93bbfe390d8b3ae03",
+        "SRC-c250001f75f9a94593e2622b",
+        "SRC-c4c85308452f57c4f1710b32",
+        "SRC-d870fe8ed36798d2d54d541f",
+        "SRC-d982947484b1b6398038d1f9",
+        "SRC-db6d88a30a2fc4f582cbf0f9",
+        "SRC-dca2b7df052f0d47a9e7fa8b",
+        "SRC-df49d5c1f5de69ff0cf5773c",
+        "SRC-ea66d16428cd10b5ec299f7c",
+        "SRC-eb36c60c6a3c016df514c0d6",
+        "SRC-f7987ce838c0c043687ff35c"
+      ]
+    }
+  },
+  {
+    "mode_id": "M013",
+    "mode_name": "NPU适配引入额外参数",
+    "original_definition": "tik底层对coreNum特性，block_dim为scalar时支持不够导致的，需添加常量折叠配置。",
+    "failure_mechanism": {
+      "text": "原表声明scalar形式block_dim的支持不足，需要常量折叠配置。",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-3d65d6157051edd48713c3b6"
+      ],
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "fault_object": {
+      "text": "tik coreNum / block_dim参数适配",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-3d65d6157051edd48713c3b6"
+      ],
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "input_trigger_conditions": {
+      "text": "block_dim 为 scalar",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-cb0b0437fcb58738e05f229a"
+      ],
+      "verification": "DECLARATION_OR_SUMMARY_ONLY",
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "execution_trigger_conditions": {
+      "text": "310P3；ascend-toolkit 修改引入",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-fb8a927ff23796b321aec891"
+      ],
+      "verification": "DECLARATION_OR_SUMMARY_ONLY",
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "applicable_scope": {
+      "text": "推理",
+      "origin": "SOURCE_DECLARATION",
+      "source_ids": [
+        "SRC-7db2075828a774ce24e40171"
+      ],
+      "basis": "ORIGINAL_MODE_DECLARATION",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "unresolved_gaps": [
+      "D01是自动扫描的BERT精度退化，只初步定位toolkit修改，不能证明tik细节或客户事件身份。",
+      "冻结工作簿和28份原始快照未在本机取得；引用为Markdown转录/摘要，不是重新核验网页。"
+    ],
+    "historical_evidence_ids": [
+      "A-D01"
+    ],
+    "init_status": "INITIALIZED",
+    "mode_definition_status": "UNCONFIRMED",
+    "relation_ids": [],
+    "analysis_note": "coreNum/block_dim scalar与编译适配相关，不是张量rank-zero输入。",
+    "execution_method_ids": [
+      "E5"
+    ],
+    "execution_method_scope": "TECHNICAL_TEST_GUIDANCE_NOT_SYNC_CAUSE_CONFIRMATION",
+    "api42_ids": [],
+    "v4_scenario_ids": [],
+    "analysis_status": "REVIEWED_SPARSE_NOT_CARTESIAN",
+    "source_verified": false,
+    "hardware_validated": false,
+    "fact_inventory": {
+      "dtype_and_numeric_domain": "block_dim为scalar的声明，不是标量tensor实参",
+      "shape_layout_stride": "张量shape UNKNOWN",
+      "implementation_path_and_control": "tik/coreNum常量折叠、toolkit修改、310P3",
+      "basis": "REVIEWED_ORIGINAL_DECLARATION_AND_MARKDOWN_SUMMARIES",
+      "source_ids": [
+        "SRC-04e529aef2943f1babdf81d8",
+        "SRC-095c3ec19740c87651bdabe0",
+        "SRC-0c54c5d237def78b14b144ad",
+        "SRC-0c6a90d0cbc51b16453c8f10",
+        "SRC-1a4140d21f4bc6c55ec2284f",
+        "SRC-1b1b0733431f2b4d2f47dc25",
+        "SRC-230515594df0e7f1c63b274f",
+        "SRC-25ba77ef3d0e1514d5298c1f",
+        "SRC-2980b3727213d8d10a9662ce",
+        "SRC-2fc120e89e29cc2f6424025b",
+        "SRC-31a1e327bac8d0ef3b38324b",
+        "SRC-33b2ad717366924e4613fa3a",
+        "SRC-35750f2690be1d0dd84a542d",
+        "SRC-3d65d6157051edd48713c3b6",
+        "SRC-3dc14e9a5e4fd5296b3f8e1f",
+        "SRC-4355c9607a9a49e093bcb9d6",
+        "SRC-50163230abf8c94df1d22740",
+        "SRC-6ade8346c9650fc279eb4755",
+        "SRC-73b4e64bcba2c5caf25add97",
+        "SRC-792093e072842f42b1a25dc1",
+        "SRC-7db2075828a774ce24e40171",
+        "SRC-86274b020a4fe57f7b3b7983",
+        "SRC-b278a5256738cc6dc61bdd40",
+        "SRC-b992591cf691f93dae7a8005",
+        "SRC-c92f469208867cf135887454",
+        "SRC-cb3b6f993412aabf77dcb8e1",
+        "SRC-cb5e4f0a105a36a4af7ba5da",
+        "SRC-d1e7b76ee8a419f32642f7a6",
+        "SRC-d44d2ab42946f8f6725e78f3",
+        "SRC-dd7db436baf60c424aff090a",
+        "SRC-df471578ca61c33fc99f68ee",
+        "SRC-ef3d367ade35ec5a5cbaba25",
+        "SRC-fcb8570b0b069e3df702758b"
+      ]
+    }
+  },
+  {
+    "mode_id": "M014",
+    "mode_name": "tensor下标超出数值范围",
+    "original_definition": "偏移量超出INT32数值范围",
+    "failure_mechanism": {
+      "text": "地址/元素偏移超出INT32可表示范围，导致索引失真。",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-b711249e77351636e8a5f8fe"
+      ],
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "fault_object": {
+      "text": "地址偏移的窄整数算术",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-b711249e77351636e8a5f8fe"
+      ],
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "input_trigger_conditions": {
+      "text": "tensor 下标/偏移量超 INT32",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-6d7eb0ed77cdf8600f90d579"
+      ],
+      "verification": "DECLARATION_OR_SUMMARY_ONLY",
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "execution_trigger_conditions": {
+      "text": "UNKNOWN",
+      "origin": "UNKNOWN",
+      "source_ids": [
+        "SRC-0f18b958a5b68247d5d8ad0c"
+      ],
+      "verification": "DECLARATION_OR_SUMMARY_ONLY",
+      "basis": "UNKNOWN",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "applicable_scope": {
+      "text": "推理",
+      "origin": "SOURCE_DECLARATION",
+      "source_ids": [
+        "SRC-f6ec118491c8a3c76f2fff51"
+      ],
+      "basis": "ORIGINAL_MODE_DECLARATION",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "unresolved_gaps": [
+      "缺偏移公式、位宽提升位置及实际容量，不因大shape就确认溢出。",
+      "冻结工作簿和28份原始快照未在本机取得；引用为Markdown转录/摘要，不是重新核验网页。"
+    ],
+    "historical_evidence_ids": [],
+    "init_status": "INITIALIZED",
+    "mode_definition_status": "UNCONFIRMED",
+    "relation_ids": [
+      "MAP:M014:API42:1.2.4",
+      "MAP:M014:V4:huge_shape",
+      "MAP:M014:V4:index_overflow"
+    ],
+    "analysis_note": "逐条对照原定义、输入条件和摘要；只保存下列实际候选关系，未列出的组合未逐格作语义否定。",
+    "execution_method_ids": [],
+    "execution_method_scope": "TECHNICAL_TEST_GUIDANCE_NOT_SYNC_CAUSE_CONFIRMATION",
+    "api42_ids": [
+      "1.2.4"
+    ],
+    "v4_scenario_ids": [
+      "huge_shape",
+      "index_overflow"
+    ],
+    "analysis_status": "REVIEWED_SPARSE_NOT_CARTESIAN",
+    "source_verified": false,
+    "hardware_validated": false,
+    "fact_inventory": {
+      "dtype_and_numeric_domain": "地址整数超INT32声明；原载荷dtype UNKNOWN",
+      "shape_layout_stride": "shape/stride/元素或字节公式 UNKNOWN",
+      "implementation_path_and_control": "窄整数算址；未证明原42索引参数角色",
+      "basis": "REVIEWED_ORIGINAL_DECLARATION_AND_MARKDOWN_SUMMARIES",
+      "source_ids": [
+        "SRC-10398c006d4b4be9b834f556",
+        "SRC-48cb7878ef0fb60b5b66b9fb",
+        "SRC-6566837a0a1b9c3e48dcf014",
+        "SRC-6feb23310887bc68c1e7ca96",
+        "SRC-730f5eefc68de8a5e0b3250a",
+        "SRC-8418c7e0ea4a76e1852d9520",
+        "SRC-901c010d90cce55e34820049",
+        "SRC-99d7ec75438bf85443ab7987",
+        "SRC-a6b48a9d6d103ba0b39f65fe",
+        "SRC-b711249e77351636e8a5f8fe",
+        "SRC-b722b0afc20493cdac299e36",
+        "SRC-bfe4a6eaf62e2e28a7f773ca",
+        "SRC-f6ec118491c8a3c76f2fff51",
+        "SRC-f7e0250ef13b183a6db2e4d7",
+        "SRC-f8920ed06f88ddc50fd4b208"
+      ]
+    }
+  },
+  {
+    "mode_id": "M015",
+    "mode_name": "越界读写：内存踩踏覆盖",
+    "original_definition": "FIA算子踩踏reducesum的内存，导致传入残差入口（add_3算子）的数据发生误差，导致残差之后的误差会不断放大",
+    "failure_mechanism": {
+      "text": "FIA写入覆盖ReduceSum使用的内存，残差入口错误进一步放大。",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-002a5d15b67dc7d53782149b"
+      ],
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "fault_object": {
+      "text": "FIA工作区写入与ReduceSum/残差数据",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-002a5d15b67dc7d53782149b"
+      ],
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "input_trigger_conditions": {
+      "text": "UNKNOWN：上游该字段混入W08的matmul cast事件，不能用于FIA内存踩踏定义。",
+      "origin": "UNKNOWN",
+      "source_ids": [
+        "SRC-c4e573653aa4f0f868398098"
+      ],
+      "verification": "DECLARATION_OR_SUMMARY_ONLY",
+      "basis": "UNKNOWN",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "execution_trigger_conditions": {
+      "text": "UNKNOWN：上游该字段混入W08的matmul cast事件，不能用于FIA内存踩踏定义。",
+      "origin": "UNKNOWN",
+      "source_ids": [
+        "SRC-701cbfbc8f301fae7ecd5848"
+      ],
+      "verification": "DECLARATION_OR_SUMMARY_ONLY",
+      "basis": "UNKNOWN",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "applicable_scope": {
+      "text": "推理",
+      "origin": "SOURCE_DECLARATION",
+      "source_ids": [
+        "SRC-816eccba1e2f747200135acb"
+      ],
+      "basis": "ORIGINAL_MODE_DECLARATION",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "unresolved_gaps": [
+      "W08解释的是300I matmul FP32→FP16 cast，未支持FIA踩踏；剔除该证据对本模式的根因支持，保留原引用。",
+      "冻结工作簿和28份原始快照未在本机取得；引用为Markdown转录/摘要，不是重新核验网页。"
+    ],
+    "historical_evidence_ids": [
+      "A-W08"
+    ],
+    "init_status": "INITIALIZED",
+    "mode_definition_status": "UNCONFIRMED",
+    "relation_ids": [
+      "MAP:M015:V4:buffer_fit"
+    ],
+    "analysis_note": "W08与原FIA根因不同，不能继承cast/dtype标签；workspace仅技术候选。",
+    "execution_method_ids": [
+      "E2",
+      "E3"
+    ],
+    "execution_method_scope": "TECHNICAL_TEST_GUIDANCE_NOT_SYNC_CAUSE_CONFIRMATION",
+    "api42_ids": [],
+    "v4_scenario_ids": [
+      "buffer_fit"
+    ],
+    "analysis_status": "REVIEWED_SPARSE_NOT_CARTESIAN",
+    "source_verified": false,
+    "hardware_validated": false,
+    "fact_inventory": {
+      "dtype_and_numeric_domain": "原声明FIA踩踏；数值/dtype UNKNOWN",
+      "shape_layout_stride": "workspace大小/布局UNKNOWN",
+      "implementation_path_and_control": "FIA→ReduceSum→残差；W08是另一cast子问题",
+      "basis": "REVIEWED_ORIGINAL_DECLARATION_AND_MARKDOWN_SUMMARIES",
+      "source_ids": [
+        "SRC-002a5d15b67dc7d53782149b",
+        "SRC-025dda33eb6e9e26435f1423",
+        "SRC-11dc417b49a33a2e78fae255",
+        "SRC-1d4103abadc515997228876f",
+        "SRC-31f43dd2e7ead3719234a3fb",
+        "SRC-3a13f28516a31addb427ab08",
+        "SRC-3a322aaa3e913bf5c0beab1d",
+        "SRC-3adf0fb0751e2f7220d2d364",
+        "SRC-437e16d1cd2688fa32590ea3",
+        "SRC-51c45dcb4b0eb91c92611c09",
+        "SRC-7bcdaa3735e52de94e544e17",
+        "SRC-812dc69b2a8b992493a9c5e7",
+        "SRC-816eccba1e2f747200135acb",
+        "SRC-8922a29cebcf78cc3d2582f4",
+        "SRC-8a06b7047dfd22e4698ad043",
+        "SRC-99f441066decce832d46804a",
+        "SRC-b9e257deb6650f9c96bd5284",
+        "SRC-c0d2091fae3040ce5fb4207b",
+        "SRC-c47888b88a2ed1d3cbcab371",
+        "SRC-c6febc2cd19b936e552af0b8",
+        "SRC-ca771924bd7bbec8a2559dca",
+        "SRC-cc31721e1e3a07cd9e615fca",
+        "SRC-d202ecbe6e6c72d336456257",
+        "SRC-d21d56ba709c9c27977d1787",
+        "SRC-d25e9d4f2408ddbd4ad5d52e",
+        "SRC-dc8c11ed2f90180431bab4e1",
+        "SRC-dd3d08272f3266f32aa72696",
+        "SRC-e96244d6e4608915e08778f6",
+        "SRC-f708cd7c76304b34e5a94e3a",
+        "SRC-fe59268b30334625daccad8d",
+        "SRC-ff35a84c13f0d1c95b247ea9"
+      ]
+    }
+  },
+  {
+    "mode_id": "M016",
+    "mode_name": "精度溢出：特定硬件数值格式导致精度溢出",
+    "original_definition": "调用的是BNInferenceD算子，该算子在310P fp16场景有概率发生精度溢出",
+    "failure_mechanism": {
+      "text": "倒数等中间运算超出FP16表示范围，造成归一化精度溢出。",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-bbb7aba1bd94da37493ad718"
+      ],
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "fault_object": {
+      "text": "310P FP16 BNInferenceD",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-bbb7aba1bd94da37493ad718"
+      ],
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "input_trigger_conditions": {
+      "text": "310P fp16 + weight 极小",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-a26dcabdbac21fc4bfc3e4b7"
+      ],
+      "verification": "DECLARATION_OR_SUMMARY_ONLY",
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "execution_trigger_conditions": {
+      "text": "onnx→om 转换",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-b8064f3698a2fc10ed837e56"
+      ],
+      "verification": "DECLARATION_OR_SUMMARY_ONLY",
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "applicable_scope": {
+      "text": "推理",
+      "origin": "SOURCE_DECLARATION",
+      "source_ids": [
+        "SRC-71dd757b5e95e409885bea16"
+      ],
+      "basis": "ORIGINAL_MODE_DECLARATION",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "unresolved_gaps": [
+      "只在摘要所述310P、极小weight条件下支持；精确阈值及实现仍未知。",
+      "冻结工作簿和28份原始快照未在本机取得；引用为Markdown转录/摘要，不是重新核验网页。"
+    ],
+    "historical_evidence_ids": [
+      "A-W09"
+    ],
+    "init_status": "INITIALIZED",
+    "mode_definition_status": "REFINED_WITH_EVIDENCE",
+    "relation_ids": [
+      "MAP:M016:API42:1.7.4",
+      "MAP:M016:V4:near_singular",
+      "MAP:M016:V4:enum_dtype"
+    ],
+    "analysis_note": "逐条对照原定义、输入条件和摘要；只保存下列实际候选关系，未列出的组合未逐格作语义否定。",
+    "execution_method_ids": [],
+    "execution_method_scope": "TECHNICAL_TEST_GUIDANCE_NOT_SYNC_CAUSE_CONFIRMATION",
+    "api42_ids": [
+      "1.7.4"
+    ],
+    "v4_scenario_ids": [
+      "near_singular",
+      "enum_dtype"
+    ],
+    "analysis_status": "REVIEWED_SPARSE_NOT_CARTESIAN",
+    "source_verified": false,
+    "hardware_validated": false,
+    "fact_inventory": {
+      "dtype_and_numeric_domain": "310P FP16；weight极小，1/weight溢出",
+      "shape_layout_stride": "shape与实际weight值 UNKNOWN",
+      "implementation_path_and_control": "BNInferenceD/BNInfer；具体高精开关接口UNKNOWN",
+      "basis": "REVIEWED_ORIGINAL_DECLARATION_AND_MARKDOWN_SUMMARIES",
+      "source_ids": [
+        "SRC-02bf7240a3ff7564405fac4d",
+        "SRC-0c0aad40d926518b8d5cb93e",
+        "SRC-0e0a69f4fc64cfcd37a4da14",
+        "SRC-17c28f9cdb48a7b926ef37c9",
+        "SRC-1c4af977983bf2e8f88d3535",
+        "SRC-2a6e5b3f830f6b622bb6c814",
+        "SRC-2d0608dd835c7a9615d9f7bc",
+        "SRC-42f6acfc89e6683b6477eca2",
+        "SRC-4bbee7c75fc76236725831f8",
+        "SRC-53db21455a3c73ae2590d40d",
+        "SRC-5eef9cf0cdf023b3013c5237",
+        "SRC-71dd757b5e95e409885bea16",
+        "SRC-85a49194adacfe95bfa2e8ac",
+        "SRC-88f376d23999126dcd80f655",
+        "SRC-899c5efc86e51ce3a8bb91ea",
+        "SRC-8e0b76941c707403b14c3efd",
+        "SRC-963fa860f7bd9853ecb6abfc",
+        "SRC-9807fadbbc4e98e2eefe31cb",
+        "SRC-a782c5d1837b85907f6ff235",
+        "SRC-b5b8c68c4a3e4bc1e62bfe3f",
+        "SRC-b8188d8a146aa931abda5ffc",
+        "SRC-bbb7aba1bd94da37493ad718",
+        "SRC-c1fca2d123c01deafbe1373b",
+        "SRC-cbb588dde6ed8fe2cd7aca33",
+        "SRC-d65a645a701cdfafb358b7e7",
+        "SRC-da55ac42aa48552b0f274382",
+        "SRC-e5587c0f3a482546e3adfef7",
+        "SRC-ed349c4c02eee84a38aeff0f",
+        "SRC-f33b2704672ad7794c4909ae",
+        "SRC-fa5b15e985e0bd88db578e59",
+        "SRC-ff54c5a49ab45da125c40dc2"
+      ]
+    }
+  },
+  {
+    "mode_id": "M017",
+    "mode_name": "tiling切分策略不同分支处理精度不一致",
+    "original_definition": "PageAttention blockSize 不同时，会有不同的tiling选择，结果精度不能保持二进制一致",
+    "failure_mechanism": {
+      "text": "不同分块/算法更新路径产生不同舍入累加结果，不能保证跨配置二进制一致。",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-f37548c4acf7cbb9dce8cb35"
+      ],
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "fault_object": {
+      "text": "PA/FA不同Tiling与blockSize分支",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-f37548c4acf7cbb9dce8cb35"
+      ],
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "input_trigger_conditions": {
+      "text": "batch/headnum/blockSize 触发不同 tiling 分支",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-24804b52b204b09fb02f0f89"
+      ],
+      "verification": "DECLARATION_OR_SUMMARY_ONLY",
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "execution_trigger_conditions": {
+      "text": "服务化推理；batchsize 变化",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-7bef18dae4e60ada18128e37"
+      ],
+      "verification": "DECLARATION_OR_SUMMARY_ONLY",
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "applicable_scope": {
+      "text": "推理",
+      "origin": "SOURCE_DECLARATION",
+      "source_ids": [
+        "SRC-1f6e74a84ed0c99a837a4b50"
+      ],
+      "basis": "ORIGINAL_MODE_DECLARATION",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "unresolved_gaps": [
+      "W10明确符合算子精度标准；不能当作已证实Kernel Bug或同实参随机竞争。",
+      "冻结工作簿和28份原始快照未在本机取得；引用为Markdown转录/摘要，不是重新核验网页。"
+    ],
+    "historical_evidence_ids": [
+      "A-W10"
+    ],
+    "init_status": "INITIALIZED",
+    "mode_definition_status": "REFINED_WITH_EVIDENCE",
+    "relation_ids": [
+      "MAP:M017:API42:1.6.1",
+      "MAP:M017:API42:1.2.6",
+      "MAP:M017:V4:tile_shape"
+    ],
+    "analysis_note": "逐条对照原定义、输入条件和摘要；只保存下列实际候选关系，未列出的组合未逐格作语义否定。",
+    "execution_method_ids": [],
+    "execution_method_scope": "TECHNICAL_TEST_GUIDANCE_NOT_SYNC_CAUSE_CONFIRMATION",
+    "api42_ids": [
+      "1.6.1",
+      "1.2.6"
+    ],
+    "v4_scenario_ids": [
+      "tile_shape"
+    ],
+    "analysis_status": "REVIEWED_SPARSE_NOT_CARTESIAN",
+    "source_verified": false,
+    "hardware_validated": false,
+    "fact_inventory": {
+      "dtype_and_numeric_domain": "不同配置微差；摘要认为符合算子标准",
+      "shape_layout_stride": "batch/headnum/blockSize改变，具体值UNKNOWN",
+      "implementation_path_and_control": "PA/FA逐步softmax更新；缺模板阈值，不是固定实参随机性",
+      "basis": "REVIEWED_ORIGINAL_DECLARATION_AND_MARKDOWN_SUMMARIES",
+      "source_ids": [
+        "SRC-02892a03791e16277e14efdb",
+        "SRC-11c6b11b394b5f1dd2bcdf4e",
+        "SRC-1c3d2c25eb7632d4aeace328",
+        "SRC-1f6e74a84ed0c99a837a4b50",
+        "SRC-21aa190c31704ee4bee57f50",
+        "SRC-23569ad5c85cacfdc589bb35",
+        "SRC-28e354fc1e9431da524b94e1",
+        "SRC-2d2452044b43515e093cb82c",
+        "SRC-2e10d8ee8f0df0fc45e8605a",
+        "SRC-3414ed1debb26b26953da933",
+        "SRC-42bf780fef0271ad8fde7ddf",
+        "SRC-4501b39b1295287e9be05c58",
+        "SRC-453a0fc2e9dce1bc0073d745",
+        "SRC-45945679f74c38a3b8d5a81d",
+        "SRC-4dad87a7eec4ba75eb0eb6cd",
+        "SRC-53aeed0535f51c7764fd2cce",
+        "SRC-5dfddb9099c16e4657528b78",
+        "SRC-685557b95b1946cb24bd3daa",
+        "SRC-6b1d0564925b665dbc7c31cf",
+        "SRC-73b711508935e86679872b14",
+        "SRC-8fe0382dbbc5950ded3af15e",
+        "SRC-a82c98aa5e88e6939fc00e3d",
+        "SRC-b05cab796604b99e25f3a484",
+        "SRC-bc48765fde936cb52aa08398",
+        "SRC-c3d5df492751f81052ceabd9",
+        "SRC-cd42dcd9e06d9a7b9924d7f6",
+        "SRC-e3daa53d059b65e46581df43",
+        "SRC-e4196c4d0002258030eaf423",
+        "SRC-efa5d7a5186b5bea6ffa3710",
+        "SRC-f37548c4acf7cbb9dce8cb35",
+        "SRC-fdc9e23ce0410cc6a9e5aa2f"
+      ]
+    }
+  },
+  {
+    "mode_id": "M018",
+    "mode_name": "浮点数累加序不当",
+    "original_definition": "attention算子输入shape不一样导致Tiling 策略并行粒度变化，输出微小差异带来精度误差",
+    "failure_mechanism": {
+      "text": "原表将不同shape下的输出微差归因于Tiling并行粒度变化。",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-fd6787c70348dc9d6bbc5525"
+      ],
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "fault_object": {
+      "text": "Attention随shape改变的计算粒度",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-fd6787c70348dc9d6bbc5525"
+      ],
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "input_trigger_conditions": {
+      "text": "输入 shape 不同",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-6336e42582954b8c59f9d9d5"
+      ],
+      "verification": "DECLARATION_OR_SUMMARY_ONLY",
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "execution_trigger_conditions": {
+      "text": "attention 推理/训练大算子差异",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-78937f00f66ab095fa43d089"
+      ],
+      "verification": "DECLARATION_OR_SUMMARY_ONLY",
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "applicable_scope": {
+      "text": "推理",
+      "origin": "SOURCE_DECLARATION",
+      "source_ids": [
+        "SRC-1ec2c374d4a987183e499815"
+      ],
+      "basis": "ORIGINAL_MODE_DECLARATION",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "unresolved_gaps": [
+      "W11自述不再定位，没有闭环，不能确认具体累加序。",
+      "冻结工作簿和28份原始快照未在本机取得；引用为Markdown转录/摘要，不是重新核验网页。"
+    ],
+    "historical_evidence_ids": [
+      "A-W11"
+    ],
+    "init_status": "INITIALIZED",
+    "mode_definition_status": "UNCONFIRMED",
+    "relation_ids": [
+      "MAP:M018:API42:1.5.1",
+      "MAP:M018:API42:1.5.2"
+    ],
+    "analysis_note": "逐条对照原定义、输入条件和摘要；只保存下列实际候选关系，未列出的组合未逐格作语义否定。",
+    "execution_method_ids": [],
+    "execution_method_scope": "TECHNICAL_TEST_GUIDANCE_NOT_SYNC_CAUSE_CONFIRMATION",
+    "api42_ids": [
+      "1.5.1",
+      "1.5.2"
+    ],
+    "v4_scenario_ids": [],
+    "analysis_status": "REVIEWED_SPARSE_NOT_CARTESIAN",
+    "source_verified": false,
+    "hardware_validated": false,
+    "fact_inventory": {
+      "dtype_and_numeric_domain": "dtype/数据分布UNKNOWN",
+      "shape_layout_stride": "4096与91上下文，比较第92位置；不是同调用Q/KV不等",
+      "implementation_path_and_control": "attention训练/推理路径；历史未闭环",
+      "basis": "REVIEWED_ORIGINAL_DECLARATION_AND_MARKDOWN_SUMMARIES",
+      "source_ids": [
+        "SRC-049c67edc34220c08db82d28",
+        "SRC-0cc01e850a41e2807c72018e",
+        "SRC-128dcf2685b0ed399c1c84ee",
+        "SRC-19157ccbaf68044d09c9561f",
+        "SRC-1ec2c374d4a987183e499815",
+        "SRC-24e25227019b4b61b2dc2a92",
+        "SRC-4c1201b3f99e859b62dd7321",
+        "SRC-5719d4edd6516fbd63410736",
+        "SRC-57e14e73e8a60a158971567a",
+        "SRC-6f924d2f4ae7884ad59fca4f",
+        "SRC-730acc7b1eb0bd8bfff3eb9e",
+        "SRC-7f4e6256ed71a57995785818",
+        "SRC-8904bf83e4e864a6468b282c",
+        "SRC-89889e6d5d80c2d63b221996",
+        "SRC-8b0ef1a967116a48a0a16719",
+        "SRC-8deac6e9aec27e9335530399",
+        "SRC-991bc676a3363acf8cfa2f2b",
+        "SRC-a266a6de26f09cd9e1ea1cc3",
+        "SRC-c27367a97f1afefcca11f8f8",
+        "SRC-ca3b6128ead576f9fe612de3",
+        "SRC-cb5e1b7894ff756d95700a6b",
+        "SRC-cd6a2f9ae495bc41dec4a37c",
+        "SRC-d7f8e25fcd17b08c1984c109",
+        "SRC-dd55e332cb697e434c2c4f38",
+        "SRC-dee1ce9f7bc59eaf109b9b63",
+        "SRC-df4c3eaaa957aff679a469f3",
+        "SRC-ea4f3daaf6e6d1bdeeb17d13",
+        "SRC-ed9e3178e09d1d77ed4af048",
+        "SRC-ee99d2489d233737d46bab7d",
+        "SRC-f54e2e1492e2ef0bfdbd06f9",
+        "SRC-fd6787c70348dc9d6bbc5525"
+      ]
+    }
+  },
+  {
+    "mode_id": "M019",
+    "mode_name": "数学等价但计算结果不等价",
+    "original_definition": "FA反向计算时顺序不合适（数学等价）导致精度不足",
+    "failure_mechanism": {
+      "text": "数学等价的求值顺序在有限精度下不等价，导致精度不足。",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-c676fafbbc8fc31a8e890df8"
+      ],
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "fault_object": {
+      "text": "FA反向计算的等价表达式求值顺序",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-c676fafbbc8fc31a8e890df8"
+      ],
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "input_trigger_conditions": {
+      "text": "UNKNOWN",
+      "origin": "UNKNOWN",
+      "source_ids": [
+        "SRC-c44efc3c2feb8f35fe13554d"
+      ],
+      "verification": "DECLARATION_OR_SUMMARY_ONLY",
+      "basis": "UNKNOWN",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "execution_trigger_conditions": {
+      "text": "UNKNOWN",
+      "origin": "UNKNOWN",
+      "source_ids": [
+        "SRC-f932aa55a246657b628b6aff"
+      ],
+      "verification": "DECLARATION_OR_SUMMARY_ONLY",
+      "basis": "UNKNOWN",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "applicable_scope": {
+      "text": "训练",
+      "origin": "SOURCE_DECLARATION",
+      "source_ids": [
+        "SRC-2c0ea70dad313757772333f0"
+      ],
+      "basis": "ORIGINAL_MODE_DECLARATION",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "unresolved_gaps": [
+      "没有历史链接、公式与复现；不覆盖bool逻辑归约语义错误。",
+      "冻结工作簿和28份原始快照未在本机取得；引用为Markdown转录/摘要，不是重新核验网页。"
+    ],
+    "historical_evidence_ids": [],
+    "init_status": "INITIALIZED",
+    "mode_definition_status": "UNCONFIRMED",
+    "relation_ids": [
+      "MAP:M019:V4:cancellation"
+    ],
+    "analysis_note": "逐条对照原定义、输入条件和摘要；只保存下列实际候选关系，未列出的组合未逐格作语义否定。",
+    "execution_method_ids": [],
+    "execution_method_scope": "TECHNICAL_TEST_GUIDANCE_NOT_SYNC_CAUSE_CONFIRMATION",
+    "api42_ids": [],
+    "v4_scenario_ids": [
+      "cancellation"
+    ],
+    "analysis_status": "REVIEWED_SPARSE_NOT_CARTESIAN",
+    "source_verified": false,
+    "hardware_validated": false,
+    "fact_inventory": {
+      "dtype_and_numeric_domain": "浮点求值顺序声明，公式和实际值UNKNOWN",
+      "shape_layout_stride": "shape/axis UNKNOWN",
+      "implementation_path_and_control": "FA反向内部代数变换；非API操作枚举",
+      "basis": "REVIEWED_ORIGINAL_DECLARATION_AND_MARKDOWN_SUMMARIES",
+      "source_ids": [
+        "SRC-130e1bb4214b5e6f658db0e2",
+        "SRC-2c0ea70dad313757772333f0",
+        "SRC-300d6432053c8ad739ebb37e",
+        "SRC-3c59f6ed7e4826c469a355d3",
+        "SRC-432b16bf87c46cade621dfcb",
+        "SRC-4ac44948f326c3c2c788b4ab",
+        "SRC-610f2ccbc439eef96daae108",
+        "SRC-8976b6dac127446e0aef08cb",
+        "SRC-95d69b0a0f8977f76077fd8e",
+        "SRC-9a213370dc9efeafb2d372a4",
+        "SRC-c05afe429a34d81eaf559fbb",
+        "SRC-c676fafbbc8fc31a8e890df8",
+        "SRC-e74fe4c1e7eedae50a754769",
+        "SRC-e8f3252c64224c511447a6af",
+        "SRC-ee56ea49c190e89d4da06c2f"
+      ]
+    }
+  },
+  {
+    "mode_id": "M020",
+    "mode_name": "空tensor处理不当",
+    "original_definition": "embedding前向输入为空导致反向NaN",
+    "failure_mechanism": {
+      "text": "空输入的边界处理未满足后续梯度计算要求，导致NaN。",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-822d0018d96866ff063ad602"
+      ],
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "fault_object": {
+      "text": "Embedding等算子的空输入处理",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-822d0018d96866ff063ad602"
+      ],
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "input_trigger_conditions": {
+      "text": "空 tensor 输入",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-6ae765def827a1e279f3f1cc"
+      ],
+      "verification": "DECLARATION_OR_SUMMARY_ONLY",
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "execution_trigger_conditions": {
+      "text": "训练反向",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-693973a15f62259dd4fcfb2e"
+      ],
+      "verification": "DECLARATION_OR_SUMMARY_ONLY",
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "applicable_scope": {
+      "text": "训练",
+      "origin": "SOURCE_DECLARATION",
+      "source_ids": [
+        "SRC-07173b178d94fed8f79dbe7a"
+      ],
+      "basis": "ORIGINAL_MODE_DECLARATION",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "unresolved_gaps": [
+      "W12只有输入空值、总梯度NaN，未给embedding具体写回机制；输出未初始化是待扩展详情。",
+      "冻结工作簿和28份原始快照未在本机取得；引用为Markdown转录/摘要，不是重新核验网页。"
+    ],
+    "historical_evidence_ids": [
+      "A-W12"
+    ],
+    "init_status": "INITIALIZED",
+    "mode_definition_status": "PARTIALLY_SUPPORTED",
+    "relation_ids": [
+      "MAP:M020:API42:1.1.1",
+      "MAP:M020:V4:zero_extent",
+      "MAP:M020:V4:positive_extent"
+    ],
+    "analysis_note": "逐条对照原定义、输入条件和摘要；只保存下列实际候选关系，未列出的组合未逐格作语义否定。",
+    "execution_method_ids": [
+      "E3"
+    ],
+    "execution_method_scope": "TECHNICAL_TEST_GUIDANCE_NOT_SYNC_CAUSE_CONFIRMATION",
+    "api42_ids": [
+      "1.1.1"
+    ],
+    "v4_scenario_ids": [
+      "zero_extent",
+      "positive_extent"
+    ],
+    "analysis_status": "REVIEWED_SPARSE_NOT_CARTESIAN",
+    "source_verified": false,
+    "hardware_validated": false,
+    "fact_inventory": {
+      "dtype_and_numeric_domain": "摘要只称输入有空值，dtype UNKNOWN",
+      "shape_layout_stride": "空Tensor原声明；具体shape UNKNOWN",
+      "implementation_path_and_control": "Embedding仅推断；梯度收集NaN，写回机制UNKNOWN",
+      "basis": "REVIEWED_ORIGINAL_DECLARATION_AND_MARKDOWN_SUMMARIES",
+      "source_ids": [
+        "SRC-07173b178d94fed8f79dbe7a",
+        "SRC-0d0c179824a47bcf093833cc",
+        "SRC-1e6cb3500932853eb9887ca3",
+        "SRC-2973f7b99e6fc928247c242e",
+        "SRC-298cf5a9164dff7b895339c8",
+        "SRC-35300349c4e4bf026ce69d12",
+        "SRC-3532b950ed8db9c44fbc9e2a",
+        "SRC-41d9db4d19479f2da0840e7c",
+        "SRC-4bdf8a3e2b2be8d2615d3c7a",
+        "SRC-4df85b6ebae237f1269dc8b4",
+        "SRC-577c97c1539ee99ab055ffb8",
+        "SRC-6682f10c9ec55a14222d80ca",
+        "SRC-6a79cd3c13c01147f698d3ab",
+        "SRC-6cd053de40b4136098a44a9c",
+        "SRC-7b17786b37f45be0625d45a5",
+        "SRC-7dcd41b35653ae37477ffb4b",
+        "SRC-822d0018d96866ff063ad602",
+        "SRC-8519d6ebcc207a6291fc249b",
+        "SRC-90b7a8d0bb8e1c867128541c",
+        "SRC-9286a961e9de04d278ee67d4",
+        "SRC-98c7141ebf51e419cad9803d",
+        "SRC-9a7ec79866ecc8a45234fa74",
+        "SRC-9d2284106a407f434666c2da",
+        "SRC-a57b723834118c6f4be169b3",
+        "SRC-ae9fb88a94f64c317333d0b2",
+        "SRC-b85602f906988bd089297b74",
+        "SRC-ca9e57d3b182db59a8205939",
+        "SRC-cd8b97a8dfe9ae2c13b3057a",
+        "SRC-e86aafdfc20741f4550dca84",
+        "SRC-e940fc213fc5b6c408c8b9e4",
+        "SRC-f7e08fdd0a600222e37d7cd6"
+      ]
+    }
+  },
+  {
+    "mode_id": "M021",
+    "mode_name": "矩阵乘加融合后数据格式转换精度丢失",
+    "original_definition": "MatmulAtomicAddUbFusion打开矩阵乘法加法融合，特定shape下matmul算子 在线编译和二进制的输出会有精度差距",
+    "failure_mechanism": {
+      "text": "融合及编译路径改变Cast和计算顺序，导致在线编译与二进制路径输出不一致。",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-32cf3df1acb14a40aae88e3e"
+      ],
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "fault_object": {
+      "text": "MatmulAtomicAddUbFusion / Cast融合路径",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-32cf3df1acb14a40aae88e3e"
+      ],
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "input_trigger_conditions": {
+      "text": "input0[201,11008]×input1[11008,4096]",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-aaa6778011415ccf0067d6fd"
+      ],
+      "verification": "DECLARATION_OR_SUMMARY_ONLY",
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "execution_trigger_conditions": {
+      "text": "在线编译 vs 二进制编译",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-4d7f28ba36fff5728e6e02e8"
+      ],
+      "verification": "DECLARATION_OR_SUMMARY_ONLY",
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "applicable_scope": {
+      "text": "推理",
+      "origin": "SOURCE_DECLARATION",
+      "source_ids": [
+        "SRC-d671dd7082496eadd2f17de2"
+      ],
+      "basis": "ORIGINAL_MODE_DECLARATION",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "unresolved_gaps": [
+      "历史摘要同时写门禁拦截和ULP达标，应分别保留指标/判定口径；不自动推成不合格Bug。",
+      "冻结工作簿和28份原始快照未在本机取得；引用为Markdown转录/摘要，不是重新核验网页。"
+    ],
+    "historical_evidence_ids": [
+      "A-W13"
+    ],
+    "init_status": "INITIALIZED",
+    "mode_definition_status": "REFINED_WITH_EVIDENCE",
+    "relation_ids": [
+      "MAP:M021:V4:enum_dtype",
+      "MAP:M021:V4:rounding"
+    ],
+    "analysis_note": "逐条对照原定义、输入条件和摘要；只保存下列实际候选关系，未列出的组合未逐格作语义否定。",
+    "execution_method_ids": [],
+    "execution_method_scope": "TECHNICAL_TEST_GUIDANCE_NOT_SYNC_CAUSE_CONFIRMATION",
+    "api42_ids": [],
+    "v4_scenario_ids": [
+      "enum_dtype",
+      "rounding"
+    ],
+    "analysis_status": "REVIEWED_SPARSE_NOT_CARTESIAN",
+    "source_verified": false,
+    "hardware_validated": false,
+    "fact_inventory": {
+      "dtype_and_numeric_domain": "内部FP16→FP32→FP16 Cast；ULP=0.0004433<0.001",
+      "shape_layout_stride": "input0=[201,11008]；input1=[11008,4096]",
+      "implementation_path_and_control": "matmul_atomic_add_ub_fusion / matmul_cast_fusion_pass；在线vs二进制编译",
+      "basis": "REVIEWED_ORIGINAL_DECLARATION_AND_MARKDOWN_SUMMARIES",
+      "source_ids": [
+        "SRC-0f30e5efc6af8180a885b37c",
+        "SRC-17686a079dd6ba5c7990e55b",
+        "SRC-1e231c37f7d7cb368faedccd",
+        "SRC-2026650feaa5e5091c4a0821",
+        "SRC-272dd04efff73a5888c885d5",
+        "SRC-2cfeed6551a3f751d49c92e7",
+        "SRC-32cf3df1acb14a40aae88e3e",
+        "SRC-3709791271214704e98bf41b",
+        "SRC-38044bfd193a6d750adbef79",
+        "SRC-3d10c1259720dc5acd68a877",
+        "SRC-3fd1dd8c5a458d02d4a6d66f",
+        "SRC-52d7cb61898755fa66421f80",
+        "SRC-581255a0353928d6550b1cad",
+        "SRC-5b6e5b00f5fcfa0d43906c9d",
+        "SRC-6426cf974c90dcbbc4fece91",
+        "SRC-64a0e8863d5d6442d8b4b5c2",
+        "SRC-684787162c1944e6b9fbcb0e",
+        "SRC-7d1e1ccb35e5644be770026c",
+        "SRC-9f5a2a9a5df6fbaca2cc54e6",
+        "SRC-a6c51b76d8876d140988ed41",
+        "SRC-a76d0d6125da8ab00d8e15d9",
+        "SRC-b235425b8bc42af3f255558c",
+        "SRC-b711d5be5a1f9735eddc91d9",
+        "SRC-bded4dec026c0d1e84a65708",
+        "SRC-cd9c0ef8b79e688563dcd3c0",
+        "SRC-d671dd7082496eadd2f17de2",
+        "SRC-e0b9fd92ecebc4fd5e1e5bcb",
+        "SRC-e8952da74e0da5e00f5e513a",
+        "SRC-fb5e543d75c6700ab7b15775",
+        "SRC-fefa7a34f4cf0ec359c7aba5",
+        "SRC-fffbb9419689a0869eacd91d"
+      ]
+    }
+  },
+  {
+    "mode_id": "M022",
+    "mode_name": "搬运逻辑错误：blocktable有错误",
+    "original_definition": "Block Table 目前的索引和但kvCacheOut 的batch 偏移不一致",
+    "failure_mechanism": {
+      "text": "BlockTable索引与KV输出batch偏移不一致，发生错误搬运。",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-d556251025040180c6bcf998"
+      ],
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "fault_object": {
+      "text": "ATB KVSelect的BlockTable和KV cache batch偏移",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-d556251025040180c6bcf998"
+      ],
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "input_trigger_conditions": {
+      "text": "batch=143 / [2896,128,59,128]",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-6ba3efc30f71ee7f7871b732"
+      ],
+      "verification": "DECLARATION_OR_SUMMARY_ONLY",
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "execution_trigger_conditions": {
+      "text": "ATB KVSelect",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-58b2dd631a8be9b82b4b1d46"
+      ],
+      "verification": "DECLARATION_OR_SUMMARY_ONLY",
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "applicable_scope": {
+      "text": "训练",
+      "origin": "SOURCE_DECLARATION",
+      "source_ids": [
+        "SRC-ae005a77c5afb5b67f800972"
+      ],
+      "basis": "ORIGINAL_MODE_DECLARATION",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "unresolved_gaps": [
+      "D04原因分析空白，只证明特定shape精度问题，不能核实偏移根因。",
+      "冻结工作簿和28份原始快照未在本机取得；引用为Markdown转录/摘要，不是重新核验网页。"
+    ],
+    "historical_evidence_ids": [
+      "A-D04"
+    ],
+    "init_status": "INITIALIZED",
+    "mode_definition_status": "UNCONFIRMED",
+    "relation_ids": [
+      "MAP:M022:API42:1.6.1",
+      "MAP:M022:V4:position"
+    ],
+    "analysis_note": "逐条对照原定义、输入条件和摘要；只保存下列实际候选关系，未列出的组合未逐格作语义否定。",
+    "execution_method_ids": [],
+    "execution_method_scope": "TECHNICAL_TEST_GUIDANCE_NOT_SYNC_CAUSE_CONFIRMATION",
+    "api42_ids": [
+      "1.6.1"
+    ],
+    "v4_scenario_ids": [
+      "position"
+    ],
+    "analysis_status": "REVIEWED_SPARSE_NOT_CARTESIAN",
+    "source_verified": false,
+    "hardware_validated": false,
+    "fact_inventory": {
+      "dtype_and_numeric_domain": "dtype/数据分布UNKNOWN",
+      "shape_layout_stride": "原声明batch=143；DTS出现[2896,128,59,128]",
+      "implementation_path_and_control": "KVSelect BlockTable/batch偏移声明；DTS根因UNKNOWN",
+      "basis": "REVIEWED_ORIGINAL_DECLARATION_AND_MARKDOWN_SUMMARIES",
+      "source_ids": [
+        "SRC-0e962970765803eae2f0c01f",
+        "SRC-167efc4f6fbb881e902c7aed",
+        "SRC-1a2fd045f91c06f7c769089f",
+        "SRC-1c2b8d990857049e9933c80c",
+        "SRC-31a18fe6f06b18537c50b32e",
+        "SRC-33dbe3fe16402d486550d0cb",
+        "SRC-408943b8cff5353d2afbbb33",
+        "SRC-42c86c9887df9a06cfaa5a42",
+        "SRC-595c470c166126f0e3bb49d2",
+        "SRC-5e30a899d7990aed77068f38",
+        "SRC-783d9f0eeacff0a32723d6d2",
+        "SRC-856f91217ae68e9b9a7a435f",
+        "SRC-85ca5f31d030564acfcd0bc6",
+        "SRC-8a0250bfc7f0366b6d8c0465",
+        "SRC-8cc3afc85c610a8c2de1fa18",
+        "SRC-96602cc1a825327b196e054b",
+        "SRC-a54246e6f031ff7cedc4996a",
+        "SRC-a8c10cb767bd245ccb10b32e",
+        "SRC-ae005a77c5afb5b67f800972",
+        "SRC-aee5d55827cc14b96e0b3774",
+        "SRC-b59e614185503cedc27b1722",
+        "SRC-bfb3a4e82c2457e6fdde607c",
+        "SRC-c1caf1fc750f355acfab3e0a",
+        "SRC-c272cee5a9fb329e5bbbc83a",
+        "SRC-c71d0f46f4d99d9a56dd8549",
+        "SRC-cf6c72a38ab20848265c85de",
+        "SRC-d556251025040180c6bcf998",
+        "SRC-dc11ded4e1dcf77b21657d64",
+        "SRC-df45024d1c0b42b524e5249b",
+        "SRC-e57f6ae16ab04041e03e7c84",
+        "SRC-e6d7b7c86821e18bd607dbd3",
+        "SRC-ef1d1f26a69cf33cc1df1985",
+        "SRC-fec9b1bd3db265c36dd56816"
+      ]
+    }
+  },
+  {
+    "mode_id": "M023",
+    "mode_name": "tiling切分策略的逻辑异常",
+    "original_definition": "tiling逻辑计算有误，如未适配多种芯片核数，例310P3 8个核，310P1 10个核，前者能正常执行但后者报错",
+    "failure_mechanism": {
+      "text": "Tiling未正确适配不同芯片可用核数，导致特定平台执行错误。",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-0aaa41fed7b0efac00c8358a"
+      ],
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "fault_object": {
+      "text": "跨芯片核数的Tiling适配",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-0aaa41fed7b0efac00c8358a"
+      ],
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "input_trigger_conditions": {
+      "text": "310P1/310P3 核数差异",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-167c65d2404073257326a182"
+      ],
+      "verification": "DECLARATION_OR_SUMMARY_ONLY",
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "execution_trigger_conditions": {
+      "text": "多芯片核数适配",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-a676e96e6005666334e12f03"
+      ],
+      "verification": "DECLARATION_OR_SUMMARY_ONLY",
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "applicable_scope": {
+      "text": "训练",
+      "origin": "SOURCE_DECLARATION",
+      "source_ids": [
+        "SRC-e1da855b88229343eaddd793"
+      ],
+      "basis": "ORIGINAL_MODE_DECLARATION",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "unresolved_gaps": [
+      "D10无权限；上游九条未确认清单漏列此项，不能因列表遗漏视为已确认。",
+      "冻结工作簿和28份原始快照未在本机取得；引用为Markdown转录/摘要，不是重新核验网页。"
+    ],
+    "historical_evidence_ids": [
+      "A-D10"
+    ],
+    "init_status": "INITIALIZED",
+    "mode_definition_status": "UNCONFIRMED",
+    "relation_ids": [],
+    "analysis_note": "芯片核数/tiling适配属于平台与参与者情境；没有输入标签不代表模式无效。",
+    "execution_method_ids": [
+      "E5"
+    ],
+    "execution_method_scope": "TECHNICAL_TEST_GUIDANCE_NOT_SYNC_CAUSE_CONFIRMATION",
+    "api42_ids": [],
+    "v4_scenario_ids": [],
+    "analysis_status": "REVIEWED_SPARSE_NOT_CARTESIAN",
+    "source_verified": false,
+    "hardware_validated": false,
+    "fact_inventory": {
+      "dtype_and_numeric_domain": "dtype/数据分布UNKNOWN",
+      "shape_layout_stride": "310P1/310P3核数变化，不是shape实参",
+      "implementation_path_and_control": "跨SoC tiling核数适配；DTS无权限",
+      "basis": "REVIEWED_ORIGINAL_DECLARATION_AND_MARKDOWN_SUMMARIES",
+      "source_ids": [
+        "SRC-0aaa41fed7b0efac00c8358a",
+        "SRC-0d1921a1de95b7c87cb59234",
+        "SRC-156c2231627f89fb3da49d76",
+        "SRC-1da6272b493aeeb866118e24",
+        "SRC-1f937682841dcfe63660ca67",
+        "SRC-204cee16f8d6e08a7567a873",
+        "SRC-22d16116de6b0a27dbc7c563",
+        "SRC-258d8612bea5e9c71a38f733",
+        "SRC-25bca3d50380dfe46fa71493",
+        "SRC-28c04f67ddc2061bf768f522",
+        "SRC-29915dded8f3eef8da3f4c1c",
+        "SRC-3d97c802ad48189a1496c5ef",
+        "SRC-48272ab4c63ed738dc53cff0",
+        "SRC-544ec007dab70e96f178b5ec",
+        "SRC-5958724136ed293684b3271d",
+        "SRC-5ac1362ebc217f770d9ec5ea",
+        "SRC-5ad2e166c5c01763d7a2ae03",
+        "SRC-5b7aa2ef75fb6b324d304417",
+        "SRC-5ec61b586287641aea35388c",
+        "SRC-757dd7ad7bbd645f68d21adf",
+        "SRC-7a9e6553cdecf46c1607ed28",
+        "SRC-7ea90af0ef40c81416da5db8",
+        "SRC-7ece75847675956e42f9cb1c",
+        "SRC-8207fe660d5f8ce674ee2db7",
+        "SRC-8b39a1413067b19a46f3dc70",
+        "SRC-9513a8c3d666300325a58544",
+        "SRC-a87c04b9ee13c46e87b7452d",
+        "SRC-acce940c1068ad687797f608",
+        "SRC-af2b30d20f9080afca92a584",
+        "SRC-af55aaa87f9e670d9f8207b4",
+        "SRC-e1da855b88229343eaddd793",
+        "SRC-f0335725bafa4e2217ab90a7",
+        "SRC-f8d3077cd2f73295975a2095"
+      ]
+    }
+  },
+  {
+    "mode_id": "M024",
+    "mode_name": "数据排布转换错误",
+    "original_definition": "数据在内存排布转换发生错误，如NZ排布转换实现方案存在问题。",
+    "failure_mechanism": {
+      "text": "内存排布转换实现错误，改变数据对应关系。",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-f781d0e3989ef1e15543920b"
+      ],
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "fault_object": {
+      "text": "NZ等内存布局转换",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-f781d0e3989ef1e15543920b"
+      ],
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "input_trigger_conditions": {
+      "text": "NZ 排布转换路径",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-cfc1253e4643ff307fe78469"
+      ],
+      "verification": "DECLARATION_OR_SUMMARY_ONLY",
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "execution_trigger_conditions": {
+      "text": "aclnnFlashAttentionScoreGrad BNSD",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-1cd3f642de37ba016d97d379"
+      ],
+      "verification": "DECLARATION_OR_SUMMARY_ONLY",
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "applicable_scope": {
+      "text": "训练",
+      "origin": "SOURCE_DECLARATION",
+      "source_ids": [
+        "SRC-1d41dc9397b17c8fb911494b"
+      ],
+      "basis": "ORIGINAL_MODE_DECLARATION",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "unresolved_gaps": [
+      "D08只定位FAG精度问题，未说明NZ转换；附件fa.zip缺失，不能确认转换根因。",
+      "冻结工作簿和28份原始快照未在本机取得；引用为Markdown转录/摘要，不是重新核验网页。"
+    ],
+    "historical_evidence_ids": [
+      "A-D08"
+    ],
+    "init_status": "INITIALIZED",
+    "mode_definition_status": "PARTIALLY_SUPPORTED",
+    "relation_ids": [
+      "MAP:M024:API42:1.4.3",
+      "MAP:M024:API42:1.C.6",
+      "MAP:M024:V4:enum_layout"
+    ],
+    "analysis_note": "逐条对照原定义、输入条件和摘要；只保存下列实际候选关系，未列出的组合未逐格作语义否定。",
+    "execution_method_ids": [],
+    "execution_method_scope": "TECHNICAL_TEST_GUIDANCE_NOT_SYNC_CAUSE_CONFIRMATION",
+    "api42_ids": [
+      "1.4.3",
+      "1.C.6"
+    ],
+    "v4_scenario_ids": [
+      "enum_layout"
+    ],
+    "analysis_status": "REVIEWED_SPARSE_NOT_CARTESIAN",
+    "source_verified": false,
+    "hardware_validated": false,
+    "fact_inventory": {
+      "dtype_and_numeric_domain": "dtype UNKNOWN",
+      "shape_layout_stride": "NZ原声明；DTS摘要为“1,16,S1=256,S2=32,128 BNSD case”，不补写轴解释",
+      "implementation_path_and_control": "FlashAttentionScoreGrad；NZ转换根因未被DTS证明",
+      "basis": "REVIEWED_ORIGINAL_DECLARATION_AND_MARKDOWN_SUMMARIES",
+      "source_ids": [
+        "SRC-065f79e91d6d2fb0328b71ff",
+        "SRC-0ec5ae454941f1623bc8fcc1",
+        "SRC-189ecfe5c260d3066e094818",
+        "SRC-1d41dc9397b17c8fb911494b",
+        "SRC-1f23620180976b5b324a629c",
+        "SRC-2125942cb0d7d64be6b8e16d",
+        "SRC-2423f1b92c6b418d43fa3f50",
+        "SRC-3288029b436789679697377a",
+        "SRC-391f6e2434d17e6a7af846a5",
+        "SRC-39e7d99be023bf1aba61335d",
+        "SRC-3bd47b45c976d9ec0d8c7f3d",
+        "SRC-51857938a71154cdb784ee03",
+        "SRC-5b1462d21d82d6982428aeea",
+        "SRC-5ed2ee95818d822858db495d",
+        "SRC-6e23e2bd8087e68618c6db4e",
+        "SRC-6fe7b443c965e6bc3d73db0e",
+        "SRC-725177551a57288967d62438",
+        "SRC-78038c1ac65dd957cc135cd0",
+        "SRC-7e3471b68a872680baa69d5a",
+        "SRC-7fd957366b3891d3e6f11313",
+        "SRC-8317827f938d2f22752d07ad",
+        "SRC-87da660971929fd9c34ff3d8",
+        "SRC-93dca2ff19778b3f533bb2fa",
+        "SRC-9a028c9fcc41d1e52f0c7f0c",
+        "SRC-9e5ba3c877689050b3a4a96b",
+        "SRC-a5b477c57b26ea725ad4a584",
+        "SRC-b043d8b925c5d392f1ebe5f2",
+        "SRC-cb77570c2191db06f2209242",
+        "SRC-d0388f9f960e740c1b820548",
+        "SRC-d3c5448e70346235261d615d",
+        "SRC-ec18ad8aa5ce8003ef85548b",
+        "SRC-ef5f51ac705dbe4b4bb547b4",
+        "SRC-f781d0e3989ef1e15543920b"
+      ]
+    }
+  },
+  {
+    "mode_id": "M025",
+    "mode_name": "算子实现精度不一致：指数函数精度实现错误",
+    "original_definition": "Tensor.exponoential_算子实现精度不一致",
+    "failure_mechanism": {
+      "text": "采样实现/随机数生成质量差异影响推理输出和评分。",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-c96b0044562c8f9e8c0aa49e"
+      ],
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "fault_object": {
+      "text": "Tensor.exponential_随机采样",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-c96b0044562c8f9e8c0aa49e"
+      ],
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "input_trigger_conditions": {
+      "text": "vllm 采样 temperature=1 路径",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-7e834dec2867a8f2a7c107fd"
+      ],
+      "verification": "DECLARATION_OR_SUMMARY_ONLY",
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "execution_trigger_conditions": {
+      "text": "vllm 推理采样",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-807d19a7acb95ad2b12cb5fd"
+      ],
+      "verification": "DECLARATION_OR_SUMMARY_ONLY",
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "applicable_scope": {
+      "text": "推理",
+      "origin": "SOURCE_DECLARATION",
+      "source_ids": [
+        "SRC-3b141b5ec9b730b1b4b50139"
+      ],
+      "basis": "ORIGINAL_MODE_DECLARATION",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "unresolved_gaps": [
+      "原表exponoential_拼写原样保留；不把普通指数函数近似误差与随机采样实现混为一谈。",
+      "冻结工作簿和28份原始快照未在本机取得；引用为Markdown转录/摘要，不是重新核验网页。"
+    ],
+    "historical_evidence_ids": [
+      "A-W14"
+    ],
+    "init_status": "INITIALIZED",
+    "mode_definition_status": "REFINED_WITH_EVIDENCE",
+    "relation_ids": [],
+    "analysis_note": "采样随机性按随机契约分析，不使用逐次输出完全相同作为通用验收。",
+    "execution_method_ids": [
+      "E1"
+    ],
+    "execution_method_scope": "TECHNICAL_TEST_GUIDANCE_NOT_SYNC_CAUSE_CONFIRMATION",
+    "api42_ids": [],
+    "v4_scenario_ids": [],
+    "analysis_status": "REVIEWED_SPARSE_NOT_CARTESIAN",
+    "source_verified": false,
+    "hardware_validated": false,
+    "fact_inventory": {
+      "dtype_and_numeric_domain": "随机采样exponential_；分布质量而非普通exp近似",
+      "shape_layout_stride": "shape UNKNOWN；temperature=1为上游整理线索",
+      "implementation_path_and_control": "vLLM采样，曾有GPU greedy对比混淆",
+      "basis": "REVIEWED_ORIGINAL_DECLARATION_AND_MARKDOWN_SUMMARIES",
+      "source_ids": [
+        "SRC-02e8808bd31223fd733a35ec",
+        "SRC-0533b0034241999e00d343d5",
+        "SRC-0b4b43f83b18a271f750ffb0",
+        "SRC-0dc030c9dd639a59d362ff54",
+        "SRC-0f44c9eb0cd918f1fe1dd095",
+        "SRC-1e7f7004ac4360a88bf8c070",
+        "SRC-216894242ce561eec8d0bbb5",
+        "SRC-26df4e85c0d42c6f7d9942b1",
+        "SRC-37a9253b224c4a318ec7cb74",
+        "SRC-38c204f79558aedbb658a847",
+        "SRC-3b141b5ec9b730b1b4b50139",
+        "SRC-455ade47440370f5a8a96906",
+        "SRC-47666786ad85b9de6907fc6a",
+        "SRC-4bbdc5f0a9135692a40315e9",
+        "SRC-4d3d69c76e0f43bdcd0d4e17",
+        "SRC-50e8f6352c97898ab89775ce",
+        "SRC-53cf271ccf09c0bb953891ec",
+        "SRC-636b8078058d99692285d193",
+        "SRC-7f20ea93c05d07272572eb2a",
+        "SRC-807c6c5613e5e2b048228e94",
+        "SRC-8f6c046dd67152a0ca9a8373",
+        "SRC-92332a93d1855799724e66e4",
+        "SRC-9bfe77d98cc3b18edf4abed4",
+        "SRC-a2cd92319e39a280566fd883",
+        "SRC-a4e747565ae356f92797ad24",
+        "SRC-b2a9d23eef382de0bed7cb46",
+        "SRC-c0026be2903b7134b0c106b2",
+        "SRC-c96b0044562c8f9e8c0aa49e",
+        "SRC-ccb6d28b29f2b830eb9613d5",
+        "SRC-d544564836579be28cf9c8b7",
+        "SRC-fcd34f76d37432dddc2182dd"
+      ]
+    }
+  },
+  {
+    "mode_id": "M026",
+    "mode_name": "越界读写：tiling切分策略的逻辑错误",
+    "original_definition": "测试脚本中输入的indices的tensor大小未对齐32b",
+    "discussion_classification": {
+      "recorded_on": "2026-11-11",
+      "origin": "USER_DISCUSSION",
+      "status": "RETAIN_PENDING_EVIDENCE",
+      "note": "原序第3条M026按用户指示先保留，继续收集证据；现有对齐分类保持候选，不升级为根因或越界已证实。",
+      "evidence_confirmed": false,
+      "hardware_validated": false
+    },
+    "failure_mechanism": {
+      "text": "原表声明测试脚本提供的indices大小未按32B对齐。",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-b961fd52f21dd94eb19cd215"
+      ],
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "fault_object": {
+      "text": "indices的32B对齐和测试构造",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-b961fd52f21dd94eb19cd215"
+      ],
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "input_trigger_conditions": {
+      "text": "indices 未 32B 对齐",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-ddee5a38375abbc8ad4a3ede"
+      ],
+      "verification": "DECLARATION_OR_SUMMARY_ONLY",
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "execution_trigger_conditions": {
+      "text": "ATB KVSelect BlockHashTopk",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-aa2f34dae76ede8cabc4e3c6"
+      ],
+      "verification": "DECLARATION_OR_SUMMARY_ONLY",
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "applicable_scope": {
+      "text": "训练",
+      "origin": "SOURCE_DECLARATION",
+      "source_ids": [
+        "SRC-0e3177a518d767edbeca277c"
+      ],
+      "basis": "ORIGINAL_MODE_DECLARATION",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "unresolved_gaps": [
+      "D03没有32B细节，且未证明Kernel越界；可能是测试输入契约问题，不能把触发条件当成失效机理闭环。",
+      "冻结工作簿和28份原始快照未在本机取得；引用为Markdown转录/摘要，不是重新核验网页。"
+    ],
+    "historical_evidence_ids": [
+      "A-D03"
+    ],
+    "init_status": "INITIALIZED",
+    "mode_definition_status": "UNCONFIRMED",
+    "relation_ids": [
+      "MAP:M026:API42:1.2.2",
+      "MAP:M026:V4:tile_shape",
+      "MAP:M026:V4:power_shape"
+    ],
+    "analysis_note": "逐条对照原定义、输入条件和摘要；只保存下列实际候选关系，未列出的组合未逐格作语义否定。",
+    "execution_method_ids": [],
+    "execution_method_scope": "TECHNICAL_TEST_GUIDANCE_NOT_SYNC_CAUSE_CONFIRMATION",
+    "api42_ids": [
+      "1.2.2"
+    ],
+    "v4_scenario_ids": [
+      "tile_shape",
+      "power_shape"
+    ],
+    "analysis_status": "REVIEWED_SPARSE_NOT_CARTESIAN",
+    "source_verified": false,
+    "hardware_validated": false,
+    "fact_inventory": {
+      "dtype_and_numeric_domain": "indices未32B对齐原声明；dtype UNKNOWN",
+      "shape_layout_stride": "元素数/字节换算UNKNOWN；DTS batch143",
+      "implementation_path_and_control": "KVSelect/BlockHashTopK；测试构造与Kernel越界须分开",
+      "basis": "REVIEWED_ORIGINAL_DECLARATION_AND_MARKDOWN_SUMMARIES",
+      "source_ids": [
+        "SRC-01d2cda7a65c069bc33fc152",
+        "SRC-022718aa8ff0ad01bb6e1786",
+        "SRC-065dfe7c2f2c37f81056964b",
+        "SRC-0948277eb55e871f43de0458",
+        "SRC-0b12602c4fd995df00e13147",
+        "SRC-0dc27c0427e1361b4d83301a",
+        "SRC-0decf9a57ac5ffded0c0e209",
+        "SRC-0e3177a518d767edbeca277c",
+        "SRC-1aaa2699a14c71eb1632efd1",
+        "SRC-49517104807e6b2780162512",
+        "SRC-4ef0b67a5a86f997f147ce90",
+        "SRC-50384659f945013b685ab63f",
+        "SRC-539a59eaa9329a5e5e45fb1c",
+        "SRC-5975b2fa9396dbed46d4a581",
+        "SRC-62ebb023948f7c71e74edefe",
+        "SRC-6c38c67b258296a6048f9e26",
+        "SRC-78e15c299cdacf1e866d21c5",
+        "SRC-84bf1fca6c8a88c7dc01a051",
+        "SRC-87ba23e4a7424824292d9400",
+        "SRC-89764573e5927b349e28c8a2",
+        "SRC-91af31a56666559dac4df69a",
+        "SRC-976889c3ebe31fe74fb97cc5",
+        "SRC-98a8b677c4cdef2a2d2106e6",
+        "SRC-a435dcd064b1428d5f692705",
+        "SRC-b4f793dc712dbca918eb4a57",
+        "SRC-b961fd52f21dd94eb19cd215",
+        "SRC-df36e4ced12a437c4cbc0058",
+        "SRC-e13f3604a2a29d50dc85be80",
+        "SRC-efd23d687b264f67f92499f0",
+        "SRC-f0c96f677e45eb1e20b7ed01",
+        "SRC-f4e83172121f7d9c17b23e4c",
+        "SRC-f9383ddce34364692b09022b"
+      ]
+    }
+  },
+  {
+    "mode_id": "M027",
+    "mode_name": "竞品实现不一致：特定私有数据排列格式",
+    "original_definition": "特定私有格式（NC1HWC0、NDHWC、NDC1HWC0、Z_3D）， 不支持as_strided的改变stride的view操作",
+    "failure_mechanism": {
+      "text": "私有格式未适配改变stride的view，使inplace copy未正确作用于预期数据。",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-ad9e5647bba1a4975bf52e79"
+      ],
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "fault_object": {
+      "text": "私有格式Tensor的as_strided / inplace copy",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-ad9e5647bba1a4975bf52e79"
+      ],
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "input_trigger_conditions": {
+      "text": "开启私有格式 + as_strided/copy_",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-98c18bce4ac428d81b01d901"
+      ],
+      "verification": "DECLARATION_OR_SUMMARY_ONLY",
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "execution_trigger_conditions": {
+      "text": "CANN 8.0.RC3 + Atlas 200T A2 Box16",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-fa053350e43d485d4c48cfc3"
+      ],
+      "verification": "DECLARATION_OR_SUMMARY_ONLY",
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "applicable_scope": {
+      "text": "推理",
+      "origin": "SOURCE_DECLARATION",
+      "source_ids": [
+        "SRC-0786723837f5d40b707a6746"
+      ],
+      "basis": "ORIGINAL_MODE_DECLARATION",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "unresolved_gaps": [
+      "W15中group_norm约0.002差异是排查项，不并入该根因。",
+      "冻结工作簿和28份原始快照未在本机取得；引用为Markdown转录/摘要，不是重新核验网页。"
+    ],
+    "historical_evidence_ids": [
+      "A-W15"
+    ],
+    "init_status": "INITIALIZED",
+    "mode_definition_status": "REFINED_WITH_EVIDENCE",
+    "relation_ids": [
+      "MAP:M027:API42:1.4.1",
+      "MAP:M027:API42:1.4.3",
+      "MAP:M027:API42:1.C.6",
+      "MAP:M027:V4:view_stride",
+      "MAP:M027:V4:enum_layout"
+    ],
+    "analysis_note": "逐条对照原定义、输入条件和摘要；只保存下列实际候选关系，未列出的组合未逐格作语义否定。",
+    "execution_method_ids": [],
+    "execution_method_scope": "TECHNICAL_TEST_GUIDANCE_NOT_SYNC_CAUSE_CONFIRMATION",
+    "api42_ids": [
+      "1.4.1",
+      "1.4.3",
+      "1.C.6"
+    ],
+    "v4_scenario_ids": [
+      "view_stride",
+      "enum_layout"
+    ],
+    "analysis_status": "REVIEWED_SPARSE_NOT_CARTESIAN",
+    "source_verified": false,
+    "hardware_validated": false,
+    "fact_inventory": {
+      "dtype_and_numeric_domain": "原始数值域/dtype UNKNOWN",
+      "shape_layout_stride": "NC1HWC0/NDHWC/NDC1HWC0/Z_3D；as_strided view",
+      "implementation_path_and_control": "CANN8.0.RC3 / A2；私有格式view的inplace copy_不生效",
+      "basis": "REVIEWED_ORIGINAL_DECLARATION_AND_MARKDOWN_SUMMARIES",
+      "source_ids": [
+        "SRC-044c27bd2f6cdff543e9b620",
+        "SRC-0786723837f5d40b707a6746",
+        "SRC-1767adbe2b40b26e45023d6c",
+        "SRC-199c688ac8cf17ace312cdd1",
+        "SRC-1e319a5768e6a06e8dabd26f",
+        "SRC-478167a93b0acba7d1c1c031",
+        "SRC-5f483998f9f4c9d9cb21e455",
+        "SRC-6134157272c510cf69e89ab1",
+        "SRC-6aea9390be65930ec9c20a06",
+        "SRC-74133902d3e93266bf6a7923",
+        "SRC-77eb53b852d73ae68b09f807",
+        "SRC-7f7c26bc47b3372d091ab12b",
+        "SRC-8179cb87025c0050a5463ef9",
+        "SRC-94440ac0ca7e617e0a555b20",
+        "SRC-a215c0b2b8195952b07f2913",
+        "SRC-abfc93a507d60a75d118c33f",
+        "SRC-ad9e5647bba1a4975bf52e79",
+        "SRC-b35c5b455bc12ebcb3c186e3",
+        "SRC-c8ea158d73e9d97df0410e5b",
+        "SRC-d34c3e180547469ebae869cc",
+        "SRC-d4dfca986c0553c54f2eda24",
+        "SRC-d63a8ea7882ddfe3549f3764",
+        "SRC-f037cb50218d7cdcbc7a91dc",
+        "SRC-f51f2880b4a676b34d9ac879",
+        "SRC-f5e490e276041558dcc3fb25",
+        "SRC-f833b806fe6aec392978c426",
+        "SRC-f8cfbdc1a8f791540f44d060",
+        "SRC-fb961ffbeb348cca9d6b7e7b",
+        "SRC-fdb254f97be65d65c74ca5a0",
+        "SRC-fdf24891de017b67eda464fe",
+        "SRC-ff0d31a9c3a31a4e34db2523"
+      ]
+    }
+  },
+  {
+    "mode_id": "M028",
+    "mode_name": "确定性计算未实现",
+    "original_definition": "reducescatter算子，HCCL场景支持确定性计算，LCCL场景不支持确定性计算",
+    "failure_mechanism": {
+      "text": "通信后端未实现确定性累加/执行，造成重复推理随机波动。",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-65917f4bff2a96fc2cdc8d9f"
+      ],
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "fault_object": {
+      "text": "LCCL ReduceScatter确定性路径",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-65917f4bff2a96fc2cdc8d9f"
+      ],
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "input_trigger_conditions": {
+      "text": "并行方式含 reducescatter（dp/tp/ep 组合）",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-41b52eb8558baa22fa87cae4"
+      ],
+      "verification": "DECLARATION_OR_SUMMARY_ONLY",
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "execution_trigger_conditions": {
+      "text": "MindIE 服务化；DP 上移特性",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-dfb9250c3a28b9eb16a6b7a7"
+      ],
+      "verification": "DECLARATION_OR_SUMMARY_ONLY",
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "applicable_scope": {
+      "text": "推理",
+      "origin": "SOURCE_DECLARATION",
+      "source_ids": [
+        "SRC-cc314c684ab688f1c7ad6742"
+      ],
+      "basis": "ORIGINAL_MODE_DECLARATION",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "unresolved_gaps": [
+      "W16另含MLA重复和DP上移两个子问题，不可把它们都归为ReduceScatter。",
+      "冻结工作簿和28份原始快照未在本机取得；引用为Markdown转录/摘要，不是重新核验网页。"
+    ],
+    "historical_evidence_ids": [
+      "A-W16"
+    ],
+    "init_status": "INITIALIZED",
+    "mode_definition_status": "REFINED_WITH_EVIDENCE",
+    "relation_ids": [],
+    "analysis_note": "通信backend及rank参与者属于执行情境，保持与API输入轴独立。",
+    "execution_method_ids": [
+      "E1",
+      "E5"
+    ],
+    "execution_method_scope": "TECHNICAL_TEST_GUIDANCE_NOT_SYNC_CAUSE_CONFIRMATION",
+    "api42_ids": [],
+    "v4_scenario_ids": [],
+    "analysis_status": "REVIEWED_SPARSE_NOT_CARTESIAN",
+    "source_verified": false,
+    "hardware_validated": false,
+    "fact_inventory": {
+      "dtype_and_numeric_domain": "通信结果波动；输入值和dtype UNKNOWN",
+      "shape_layout_stride": "dp/tp/ep含ReduceScatter；rank规格UNKNOWN",
+      "implementation_path_and_control": "LCCL→HCCL为backend切换，MLA/DP上移为其他子问题",
+      "basis": "REVIEWED_ORIGINAL_DECLARATION_AND_MARKDOWN_SUMMARIES",
+      "source_ids": [
+        "SRC-0d727835adbbc2414b77684e",
+        "SRC-1556bfec2132de797a4e7371",
+        "SRC-1cd0783c92ef7f055d6e6edd",
+        "SRC-1f0e04f5c65e6c0710429d67",
+        "SRC-2066bde09329268f601ba44c",
+        "SRC-3328050ba4bffce2ae9054f1",
+        "SRC-3b69516f5357baeb624ee66b",
+        "SRC-43d3c62e7aa12ca9a1d90e91",
+        "SRC-447946c0eb11c517cc7b6059",
+        "SRC-51b7bf474b7c545c6e3e7b52",
+        "SRC-65917f4bff2a96fc2cdc8d9f",
+        "SRC-66c5d976e83f4a949dd1cc48",
+        "SRC-6813eacc77e53271f9eda125",
+        "SRC-909584569ffe6c39b0ee8fd8",
+        "SRC-998931eb2025e11ef6c1629a",
+        "SRC-a17bba5eb569ef6458c37400",
+        "SRC-a77862546e11eb919411b3a8",
+        "SRC-ad3f59efcfe7b70e4083f3de",
+        "SRC-afe78dc3eaae53d4c773b036",
+        "SRC-b2b1c4f22c4e99498aa9eae5",
+        "SRC-bd3040e1c414049522b43a97",
+        "SRC-c0f31df3edea2632d651d66e",
+        "SRC-c2bae9c4f2bb018e46ba9a85",
+        "SRC-c7d4a91f4acf7989c35d2710",
+        "SRC-c892b4ab13d5653a11588ea6",
+        "SRC-cc314c684ab688f1c7ad6742",
+        "SRC-cec0985e706ace5f5313bf8d",
+        "SRC-e548e19800f468ee7403bfc6",
+        "SRC-ecb08f8373d6f08ff521da79",
+        "SRC-f8c0046badd4476c343cc5c1",
+        "SRC-ffd5dea72f0779bce3928a6f"
+      ]
+    }
+  },
+  {
+    "mode_id": "M029",
+    "mode_name": "硬件导致算子不支持未拦截",
+    "original_definition": "如300I系列机器均不支持处理fp32的dtype数据，matmul算子先将输入cast为FP16后进行计算；如310P不支持inf nan；如reshapeAndCacheNd在输入shape较大时走入了使用DataCopyPad分支，在310p上不支持该指令",
+    "failure_mechanism": {
+      "text": "原定义混列FP32不支持而降精度、Inf/NaN不支持及DataCopyPad指令不支持三种能力约束。",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-7e5dbd3d6eb75a1c3dfb20a6"
+      ],
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "fault_object": {
+      "text": "硬件/平台能力契约（原表三个子声明）",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-7e5dbd3d6eb75a1c3dfb20a6"
+      ],
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "input_trigger_conditions": {
+      "text": "300I DUO fp32 输入；310P inf/nan",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-f02427b67a839525408e8767"
+      ],
+      "verification": "DECLARATION_OR_SUMMARY_ONLY",
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "execution_trigger_conditions": {
+      "text": "tp8 推理；外积 @ 算子",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-49657917332091ac27c41313"
+      ],
+      "verification": "DECLARATION_OR_SUMMARY_ONLY",
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "applicable_scope": {
+      "text": "推理",
+      "origin": "SOURCE_DECLARATION",
+      "source_ids": [
+        "SRC-13ce7957f82e2f47ad2bb61b"
+      ],
+      "basis": "ORIGINAL_MODE_DECLARATION",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "unresolved_gaps": [
+      "W08支持cast、W17支持Inf/NaN摘要，DataCopyPad子声明未取证。分别保留，不自动拆分或把软件dtype缺支持等同于硬件不支持。",
+      "冻结工作簿和28份原始快照未在本机取得；引用为Markdown转录/摘要，不是重新核验网页。"
+    ],
+    "historical_evidence_ids": [
+      "A-W08",
+      "A-W17"
+    ],
+    "init_status": "INITIALIZED",
+    "mode_definition_status": "PARTIALLY_SUPPORTED",
+    "relation_ids": [
+      "MAP:M029:API42:1.7.2",
+      "MAP:M029:V4:special_values",
+      "MAP:M029:V4:enum_dtype"
+    ],
+    "analysis_note": "逐条对照原定义、输入条件和摘要；只保存下列实际候选关系，未列出的组合未逐格作语义否定。",
+    "execution_method_ids": [],
+    "execution_method_scope": "TECHNICAL_TEST_GUIDANCE_NOT_SYNC_CAUSE_CONFIRMATION",
+    "api42_ids": [
+      "1.7.2"
+    ],
+    "v4_scenario_ids": [
+      "special_values",
+      "enum_dtype"
+    ],
+    "analysis_status": "REVIEWED_SPARSE_NOT_CARTESIAN",
+    "source_verified": false,
+    "hardware_validated": false,
+    "fact_inventory": {
+      "dtype_and_numeric_domain": "300I FP32输入降FP16；另一310P子问题在exp/where收到Inf",
+      "shape_layout_stride": "tp8为执行配置；具体shape UNKNOWN",
+      "implementation_path_and_control": "FP32能力、Inf/NaN能力、DataCopyPad三声明分别保留",
+      "basis": "REVIEWED_ORIGINAL_DECLARATION_AND_MARKDOWN_SUMMARIES",
+      "source_ids": [
+        "SRC-0042bb64d0381193ed1941e3",
+        "SRC-01c12c52cd3c1b32e78f0e88",
+        "SRC-025dda33eb6e9e26435f1423",
+        "SRC-07f86b92dd655b3c183018d6",
+        "SRC-0ab091274725ca514e9bd3df",
+        "SRC-0c64e038a28e72ee56394426",
+        "SRC-1324997783c368400e183931",
+        "SRC-13ce7957f82e2f47ad2bb61b",
+        "SRC-1d4103abadc515997228876f",
+        "SRC-228c92147e91bad476a52ae9",
+        "SRC-3a13f28516a31addb427ab08",
+        "SRC-3adf0fb0751e2f7220d2d364",
+        "SRC-6f651049d944792e864f4ad9",
+        "SRC-79f14a2d44b4bd451f562fd5",
+        "SRC-7bcdaa3735e52de94e544e17",
+        "SRC-7e51bafa6bf2ede48d039c7a",
+        "SRC-7e5dbd3d6eb75a1c3dfb20a6",
+        "SRC-88380107477a466c68e8c02a",
+        "SRC-8f1e3cd195e1012e1110434f",
+        "SRC-96514cdb9090eb799083b246",
+        "SRC-98b2eb6bbfa74e052d5cdb64",
+        "SRC-99f441066decce832d46804a",
+        "SRC-a838a68360e3608d8e6dd45b",
+        "SRC-abb977f354971d1897322f74",
+        "SRC-b5ceb92a0f0bd02d95443b01",
+        "SRC-b9e257deb6650f9c96bd5284",
+        "SRC-c079b2ba5cce0d2b8c75411a",
+        "SRC-c0d2091fae3040ce5fb4207b",
+        "SRC-c6096d4dd1c8918d066bced2",
+        "SRC-c62806a612b0a797e73f1b1d",
+        "SRC-c6febc2cd19b936e552af0b8",
+        "SRC-c931ee7826ae5342a8d4aa10",
+        "SRC-cbcf381b88df534f5f65d9ef",
+        "SRC-cc31721e1e3a07cd9e615fca",
+        "SRC-d202ecbe6e6c72d336456257",
+        "SRC-d21d56ba709c9c27977d1787",
+        "SRC-d25e9d4f2408ddbd4ad5d52e",
+        "SRC-d44684381bf644d1cc052180",
+        "SRC-d9bb773c18a61c57076415d3",
+        "SRC-dcd3b460ffdb9c959ca20d2f",
+        "SRC-dd3d08272f3266f32aa72696",
+        "SRC-debc848da2561405ede99386",
+        "SRC-e3c70bf1335670850914fb4b",
+        "SRC-e3c8c877ca4f3d5d7932479b",
+        "SRC-e81c241fb6c111ba1dad35b9",
+        "SRC-f708cd7c76304b34e5a94e3a",
+        "SRC-fe59268b30334625daccad8d"
+      ]
+    }
+  },
+  {
+    "mode_id": "M030",
+    "mode_name": "输入数据类型强转低精丢失",
+    "original_definition": "conv2d算子在进行计算之前，会把输入的tensor强制转换成FP16格式的，因为算子内部不支持FP32格式。所以计算出的结果和onnx就不对齐",
+    "failure_mechanism": {
+      "text": "计算前将FP32输入降为FP16，损失信息并在后续argmax等非线性决策处放大。",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-b13d0b3f0eb6cf984980655c"
+      ],
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "fault_object": {
+      "text": "Conv2d输入类型适配",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-b13d0b3f0eb6cf984980655c"
+      ],
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "input_trigger_conditions": {
+      "text": "conv2d 输入含 FP32 精度需求",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-5c1322ce6879d597b5ea59b8"
+      ],
+      "verification": "DECLARATION_OR_SUMMARY_ONLY",
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "execution_trigger_conditions": {
+      "text": "encoder 小模型转 om",
+      "origin": "MODEL_DERIVED",
+      "source_ids": [
+        "SRC-0975b2d8e7bbb12c906de2db"
+      ],
+      "verification": "DECLARATION_OR_SUMMARY_ONLY",
+      "basis": "MODEL_DERIVED",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "applicable_scope": {
+      "text": "推理",
+      "origin": "SOURCE_DECLARATION",
+      "source_ids": [
+        "SRC-24df09046c74b1fbab4b13eb"
+      ],
+      "basis": "ORIGINAL_MODE_DECLARATION",
+      "source_text_independently_verified": false,
+      "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+    },
+    "unresolved_gaps": [
+      "不把其他算子输出类型/接口标记错误一律等同于输入cast。",
+      "冻结工作簿和28份原始快照未在本机取得；引用为Markdown转录/摘要，不是重新核验网页。"
+    ],
+    "historical_evidence_ids": [
+      "A-W18"
+    ],
+    "init_status": "INITIALIZED",
+    "mode_definition_status": "REFINED_WITH_EVIDENCE",
+    "relation_ids": [
+      "MAP:M030:V4:enum_dtype",
+      "MAP:M030:V4:rounding"
+    ],
+    "analysis_note": "逐条对照原定义、输入条件和摘要；只保存下列实际候选关系，未列出的组合未逐格作语义否定。",
+    "execution_method_ids": [],
+    "execution_method_scope": "TECHNICAL_TEST_GUIDANCE_NOT_SYNC_CAUSE_CONFIRMATION",
+    "api42_ids": [],
+    "v4_scenario_ids": [
+      "enum_dtype",
+      "rounding"
+    ],
+    "analysis_status": "REVIEWED_SPARSE_NOT_CARTESIAN",
+    "source_verified": false,
+    "hardware_validated": false,
+    "fact_inventory": {
+      "dtype_and_numeric_domain": "Conv2d输入FP32内部转FP16；argmax放大精度差",
+      "shape_layout_stride": "shape/临界输入值 UNKNOWN",
+      "implementation_path_and_control": "ONNX→OM encoder路径；不是输出dtype参数",
+      "basis": "REVIEWED_ORIGINAL_DECLARATION_AND_MARKDOWN_SUMMARIES",
+      "source_ids": [
+        "SRC-12ee4fabbc16b0f4ba564bcb",
+        "SRC-150e06db4e5bf3eddbd9ab6e",
+        "SRC-193f173352cd37dcc6163471",
+        "SRC-24df09046c74b1fbab4b13eb",
+        "SRC-259b43608dd803c8c89e7b2a",
+        "SRC-2f182554439f59fdc420a374",
+        "SRC-3a7739364444acaac1373d65",
+        "SRC-451286bb211a353a08756ae5",
+        "SRC-469bd695146f52b345e4647d",
+        "SRC-5a998d84b086ec06b40bf83f",
+        "SRC-5e0ba87374d4b963de5888e5",
+        "SRC-5f4b0bf75b1b765c2bde2dce",
+        "SRC-7f6eb71f6656a336cbd747dc",
+        "SRC-823890374b09d5cdfc763138",
+        "SRC-83e01f0559fce7ac1b23881e",
+        "SRC-86581f29248c3fdfcad584f4",
+        "SRC-86c084d9507d46e6d411daa1",
+        "SRC-8809833bdc274307bee75646",
+        "SRC-8e2d4ed12edbbe02223e381c",
+        "SRC-a9fdfffc4359b5fc24db8c29",
+        "SRC-b13d0b3f0eb6cf984980655c",
+        "SRC-b521ce18667e2ce8cf8d8e83",
+        "SRC-c468309767164a06a23e7128",
+        "SRC-d940ae67284a9bf7f3c238b3",
+        "SRC-e0c0bcb96f09ca70ed431606",
+        "SRC-ed9e68856b79e7d872bac7c5",
+        "SRC-f030361ce36a376448f72f5a",
+        "SRC-f1dc503d0cda9efae9d7a8bf",
+        "SRC-f2d192a0cdaf37c636852adc",
+        "SRC-fa484d6637f99245078ddef9",
+        "SRC-fe461dc17c270c2c5fefa37c"
+      ]
+    }
+  }
+]

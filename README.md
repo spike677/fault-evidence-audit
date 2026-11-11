@@ -1,6 +1,8 @@
 # Fault Evidence Audit
 
-2026-11-10：[CANN Expansion 公开技术审查包](reports/expansion-v1-20261110/README.md)已整理19条公开代码案例、23条API42/V4关系、逐项源码定位、42项测试设计索引及可重跑的离线检查。18/19/20三种API42口径独立展示；正式入库和设备执行均为0。原始Init、内部原文及现场state未提交。审查包不改变应用版本或生产流程。
+2026-11-11：[原30条API42／V4逐条总结与完整HTML](reports/baseline-30-api42-v4-20261111/README.md)已补齐，含M006／M026／M004讨论更新、原始数据Init、现有来源转录及0.1.17历史预检state。现场37f05b15数据库未找到；数据Init完成与工作流冻结状态分开，续接见包内说明。
+
+2026-11-10：[CANN Expansion 公开技术审查包](reports/expansion-v1-20261110/README.md)已整理19条公开代码案例、23条API42/V4关系、逐项源码定位、42项测试设计索引及可重跑的离线检查。18/19/20三种API42口径独立展示；正式入库和设备执行均为0。该11月10日审查包不含原始Init、内部原文及现场state；11月11日新增交付见上方链接。审查包不改变应用版本或生产流程。
 
 [完整自包含HTML结果](reports/expansion-v1-20261110/CANN_EXPANSION_FULL_RESULTS.html) · [每案最强证据](reports/expansion-v1-20261110/evidence/STRONGEST_EVIDENCE.md)。HTML下载后可在远端机器浏览器打开，不依赖本机路径或外部JSON；GitHub文件页显示源码。
 

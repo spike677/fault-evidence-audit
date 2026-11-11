@@ -1,0 +1,114 @@
+[
+  {
+    "status": "TEST_DESIGN_AVAILABLE",
+    "constructed_by": "CODEX_NEW_SYNTHETIC_DESIGN_NOT_HISTORICAL_INPUT",
+    "execution_status": "NOT_EXECUTED",
+    "execution_records": [],
+    "environment_requirements": [
+      "兼容PyTorch及torch_npu；已安装合法CANN/NPU运行环境。",
+      "由现场确认目标平台支持该API与dtype，并保存实际shape/dtype、分派和版本。"
+    ],
+    "path_coverage": "UNKNOWN_UNTIL_ACTUAL_PATH_CAPTURE",
+    "limitations": "设计可执行不等于已复现原故障；缺少目标路径时不统计路径或运行覆盖。",
+    "design_id": "DESIGN-PROD-PROMOTION",
+    "mode_id": "M001",
+    "target": "torch.prod",
+    "condition_refs": [
+      [
+        "API42",
+        "1.7.6"
+      ],
+      [
+        "API42",
+        "1.C.2"
+      ],
+      [
+        "V4",
+        "intermediate_overflow"
+      ],
+      [
+        "V4",
+        "enum_dtype"
+      ]
+    ],
+    "inputs": "x=[256,256], shape=[2], dtype=float16；请求输出dtype=float32；对照x=[128,128]。",
+    "reference": "先将实际FP16输入提升到FP32再prod；边界例为65536，普通对照为16384。",
+    "expected_failure": "晚提升的FP16中间乘积可能先变Inf；合法实现应给有限FP32参考。",
+    "acceptance": "有限性与参考精确相等（此处都是可精确表示的二次幂）；保存实际输出和路径。",
+    "code": "import torch\nimport torch_npu\nfor vals in ([128.,128.],[256.,256.]):\n    x=torch.tensor(vals,dtype=torch.float16,device='npu')\n    ref=x.cpu().float().prod()\n    got=torch.prod(x,dtype=torch.float32).cpu()\n    assert bool(torch.isfinite(got)) and bool(got==ref), (got,ref)\n",
+    "api_contract_reference_id": "EXT-DOC-PROD",
+    "api_contract_source": "https://docs.pytorch.org/docs/2.15/generated/torch.prod.html"
+  },
+  {
+    "status": "TEST_DESIGN_AVAILABLE",
+    "constructed_by": "CODEX_NEW_SYNTHETIC_DESIGN_NOT_HISTORICAL_INPUT",
+    "execution_status": "NOT_EXECUTED",
+    "execution_records": [],
+    "environment_requirements": [
+      "兼容PyTorch及torch_npu；已安装合法CANN/NPU运行环境。",
+      "由现场确认目标平台支持该API与dtype，并保存实际shape/dtype、分派和版本。"
+    ],
+    "path_coverage": "UNKNOWN_UNTIL_ACTUAL_PATH_CAPTURE",
+    "limitations": "设计可执行不等于已复现原故障；缺少目标路径时不统计路径或运行覆盖。",
+    "design_id": "DESIGN-BADDBMM-INTERMEDIATE",
+    "mode_id": "M009",
+    "target": "torch.baddbmm",
+    "condition_refs": [
+      [
+        "API42",
+        "1.7.6"
+      ],
+      [
+        "V4",
+        "intermediate_overflow"
+      ],
+      [
+        "V4",
+        "enum_dtype"
+      ]
+    ],
+    "inputs": "input=zeros[1,1,1]；batch1=batch2=256的[1,1,1] FP16；alpha=0.5,beta=1；对照128。",
+    "reference": "以实际输入转FP32求alpha*(A@B)+beta*input，再转FP16；边界65536*0.5=32768，普通对照8192。",
+    "expected_failure": "未缩放的乘积先保存FP16会溢出，但最终数学结果在FP16有限范围内。",
+    "acceptance": "有限性与此二次幂例的FP32公式参考精确相等；记录实际alpha/beta、dtype及mm/mul路径。",
+    "code": "import torch\nimport torch_npu\nfor value in (128.,256.):\n    z=torch.zeros((1,1,1),dtype=torch.float16,device='npu')\n    a=torch.full((1,1,1),value,dtype=torch.float16,device='npu')\n    b=a.clone()\n    ref=(torch.bmm(a.cpu().float(),b.cpu().float())*0.5).half()\n    got=torch.baddbmm(z,a,b,beta=1,alpha=0.5).cpu()\n    assert bool(torch.isfinite(got).all()) and torch.equal(got,ref), (got,ref)\n",
+    "api_contract_reference_id": "EXT-DOC-BADDBMM",
+    "api_contract_source": "https://docs.pytorch.org/docs/2.15/generated/torch.baddbmm.html"
+  },
+  {
+    "status": "TEST_DESIGN_AVAILABLE",
+    "constructed_by": "CODEX_NEW_SYNTHETIC_DESIGN_NOT_HISTORICAL_INPUT",
+    "execution_status": "NOT_EXECUTED",
+    "execution_records": [],
+    "environment_requirements": [
+      "兼容PyTorch及torch_npu；已安装合法CANN/NPU运行环境。",
+      "由现场确认目标平台支持该API与dtype，并保存实际shape/dtype、分派和版本。"
+    ],
+    "path_coverage": "UNKNOWN_UNTIL_ACTUAL_PATH_CAPTURE",
+    "limitations": "设计可执行不等于已复现原故障；缺少目标路径时不统计路径或运行覆盖。",
+    "design_id": "DESIGN-EMBEDDING-EMPTY",
+    "mode_id": "M020",
+    "target": "torch.nn.Embedding",
+    "condition_refs": [
+      [
+        "API42",
+        "1.1.1"
+      ],
+      [
+        "V4",
+        "zero_extent"
+      ],
+      [
+        "V4",
+        "positive_extent"
+      ]
+    ],
+    "inputs": "8×4有限确定性权重；idx为shape=[0]的int64空张量；对照idx=[0,1]；每例清零grad。",
+    "reference": "空输入out.shape=(0,4)，sum反向的weight梯度全0；非空梯度只有行0/1为1。",
+    "expected_failure": "检查空输出、梯度有限性及完整写回；不假设历史“空值”一定是此形状或此接口。",
+    "acceptance": "空/非空输出shape、所有梯度元素与CPU整数索引参考精确一致；两个调用互不继承grad。",
+    "code": "import torch\nimport torch_npu\nfor indices in ([],[0,1]):\n    layer=torch.nn.Embedding(8,4,device='npu',dtype=torch.float32)\n    with torch.no_grad(): layer.weight.copy_(torch.arange(32,device='npu').reshape(8,4).float())\n    layer.zero_grad(set_to_none=True)\n    idx=torch.tensor(indices,dtype=torch.int64,device='npu')\n    out=layer(idx)\n    out.sum().backward()\n    ref=torch.zeros((8,4))\n    for i in indices: ref[i]+=1\n    assert tuple(out.shape)==(len(indices),4)\n    assert torch.equal(layer.weight.grad.cpu(),ref)\n",
+    "api_contract_reference_id": "EXT-DOC-EMBEDDING",
+    "api_contract_source": "https://docs.pytorch.org/docs/2.15/generated/torch.nn.Embedding.html"
+  }
+]
