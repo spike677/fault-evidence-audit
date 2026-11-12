@@ -1,0 +1,469 @@
+{
+  "id": "COMMENTS-RC-036-751",
+  "task_ids": [
+    "RC-036"
+  ],
+  "tool": "mcp__codex_apps__github_fetch_issue_comments",
+  "args": {
+    "repo_full_name": "verl-project/verl",
+    "issue_number": 751
+  },
+  "captured_at": "2026-11-12T03:20:22.883Z",
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "Action completed."
+      }
+    ],
+    "structuredContent": {
+      "comments": [
+        {
+          "url": "https://github.com/verl-project/verl/issues/751#issuecomment-2750920062",
+          "body": "可以提供对应的训练脚本和数据源，这样方便项目人员复现和排查",
+          "user": {
+            "login": "AIBionics",
+            "name": "AIBionics",
+            "email": null,
+            "avatar_url": "https://avatars.githubusercontent.com/u/171009006?v=4",
+            "id": 171009006
+          },
+          "id": 2750920062,
+          "pull_request_review_id": null,
+          "in_reply_to_id": null,
+          "created_at": null,
+          "updated_at": null,
+          "review": null,
+          "side": null,
+          "line": null,
+          "start_line": null,
+          "path": null,
+          "body_html": "<p dir=\"auto\">可以提供对应的训练脚本和数据源，这样方便项目人员复现和排查</p>"
+        },
+        {
+          "url": "https://github.com/verl-project/verl/issues/751#issuecomment-2751254204",
+          "body": "Could you please try the following steps:\n- Resume the last checkpoint and make sure the nan persists\n- Resume from the last checkpoint and step save frequency to 1\n- Resume from the last checkpoint and make sure nan immediately appears in the following step\n- Add a breakpoint in the ppo_actor loss function and print old_log_probs, log_probs and ratio to find out which part in the loss computation causes nan.",
+          "user": {
+            "login": "vermouth1992",
+            "name": "vermouth1992",
+            "email": null,
+            "avatar_url": "https://avatars.githubusercontent.com/u/10685560?v=4",
+            "id": 10685560
+          },
+          "id": 2751254204,
+          "pull_request_review_id": null,
+          "in_reply_to_id": null,
+          "created_at": null,
+          "updated_at": null,
+          "review": null,
+          "side": null,
+          "line": null,
+          "start_line": null,
+          "path": null,
+          "body_html": "<p dir=\"auto\">Could you please try the following steps:</p>\n<ul dir=\"auto\">\n<li>Resume the last checkpoint and make sure the nan persists</li>\n<li>Resume from the last checkpoint and step save frequency to 1</li>\n<li>Resume from the last checkpoint and make sure nan immediately appears in the following step</li>\n<li>Add a breakpoint in the ppo_actor loss function and print old_log_probs, log_probs and ratio to find out which part in the loss computation causes nan.</li>\n</ul>"
+        },
+        {
+          "url": "https://github.com/verl-project/verl/issues/751#issuecomment-2774700868",
+          "body": "> Could you please try the following steps:\n> \n> * Resume the last checkpoint and make sure the nan persists\n> * Resume from the last checkpoint and step save frequency to 1\n> * Resume from the last checkpoint and make sure nan immediately appears in the following step\n> * Add a breakpoint in the ppo_actor loss function and print old_log_probs, log_probs and ratio to find out which part in the loss computation causes nan.\n\nHello, after careful analysis, I found that the issue lies in the calculation of `low_var_kl`. In the problematic step, the loss has normal values (without NaN or Inf), but during backpropagation, the `exp` operation in `ratio = torch.exp(kl)` within `low_var_kl` （https://github.com/volcengine/verl/blob/8cae42dc29736d0802ded43c5ecf67a809d56bd8/verl/trainer/ppo/core_algos.py#L386）causes extreme values, leading to NaN in `kl`. My temporary solution is to use `torch.clamp(kl, min=-5, max=5)` to constrain `kl` before computing `ratio`. **This approach works, but I feel uncertain about it. Could you kindly help confirm whether this is an appropriate solution?**",
+          "user": {
+            "login": "yushuiwx",
+            "name": "yushuiwx",
+            "email": null,
+            "avatar_url": "https://avatars.githubusercontent.com/u/138114252?v=4",
+            "id": 138114252
+          },
+          "id": 2774700868,
+          "pull_request_review_id": null,
+          "in_reply_to_id": null,
+          "created_at": null,
+          "updated_at": null,
+          "review": null,
+          "side": null,
+          "line": null,
+          "start_line": null,
+          "path": null,
+          "body_html": "<blockquote>\n<p dir=\"auto\">Could you please try the following steps:</p>\n<ul dir=\"auto\">\n<li>Resume the last checkpoint and make sure the nan persists</li>\n<li>Resume from the last checkpoint and step save frequency to 1</li>\n<li>Resume from the last checkpoint and make sure nan immediately appears in the following step</li>\n<li>Add a breakpoint in the ppo_actor loss function and print old_log_probs, log_probs and ratio to find out which part in the loss computation causes nan.</li>\n</ul>\n</blockquote>\n<p dir=\"auto\">Hello, after careful analysis, I found that the issue lies in the calculation of <code class=\"notranslate\">low_var_kl</code>. In the problematic step, the loss has normal values (without NaN or Inf), but during backpropagation, the <code class=\"notranslate\">exp</code> operation in <code class=\"notranslate\">ratio = torch.exp(kl)</code> within <code class=\"notranslate\">low_var_kl</code> （<a href=\"https://github.com/volcengine/verl/blob/8cae42dc29736d0802ded43c5ecf67a809d56bd8/verl/trainer/ppo/core_algos.py#L386%EF%BC%89causes\">https://github.com/volcengine/verl/blob/8cae42dc29736d0802ded43c5ecf67a809d56bd8/verl/trainer/ppo/core_algos.py#L386）causes</a> extreme values, leading to NaN in <code class=\"notranslate\">kl</code>. My temporary solution is to use <code class=\"notranslate\">torch.clamp(kl, min=-5, max=5)</code> to constrain <code class=\"notranslate\">kl</code> before computing <code class=\"notranslate\">ratio</code>. <strong>This approach works, but I feel uncertain about it. Could you kindly help confirm whether this is an appropriate solution?</strong></p>"
+        },
+        {
+          "url": "https://github.com/verl-project/verl/issues/751#issuecomment-2774711272",
+          "body": "> Could you please try the following steps:\n> \n> * Resume the last checkpoint and make sure the nan persists\n> * Resume from the last checkpoint and step save frequency to 1\n> * Resume from the last checkpoint and make sure nan immediately appears in the following step\n> * Add a breakpoint in the ppo_actor loss function and print old_log_probs, log_probs and ratio to find out which part in the loss computation causes nan.\n\nI found several similar issues [#747,](https://github.com/volcengine/verl/issues/747), [727](https://github.com/volcengine/verl/issues/727), etc . I suspect that they might be caused by the same underlying problem.",
+          "user": {
+            "login": "yushuiwx",
+            "name": "yushuiwx",
+            "email": null,
+            "avatar_url": "https://avatars.githubusercontent.com/u/138114252?v=4",
+            "id": 138114252
+          },
+          "id": 2774711272,
+          "pull_request_review_id": null,
+          "in_reply_to_id": null,
+          "created_at": null,
+          "updated_at": null,
+          "review": null,
+          "side": null,
+          "line": null,
+          "start_line": null,
+          "path": null,
+          "body_html": "<blockquote>\n<p dir=\"auto\">Could you please try the following steps:</p>\n<ul dir=\"auto\">\n<li>Resume the last checkpoint and make sure the nan persists</li>\n<li>Resume from the last checkpoint and step save frequency to 1</li>\n<li>Resume from the last checkpoint and make sure nan immediately appears in the following step</li>\n<li>Add a breakpoint in the ppo_actor loss function and print old_log_probs, log_probs and ratio to find out which part in the loss computation causes nan.</li>\n</ul>\n</blockquote>\n<p dir=\"auto\">I found several similar issues <a href=\"https://github.com/volcengine/verl/issues/747\" data-hovercard-type=\"issue\" data-hovercard-url=\"/verl-project/verl/issues/747/hovercard\">#747,</a>, <a href=\"https://github.com/volcengine/verl/issues/727\" data-hovercard-type=\"issue\" data-hovercard-url=\"/verl-project/verl/issues/727/hovercard\">727</a>, etc . I suspect that they might be caused by the same underlying problem.</p>"
+        },
+        {
+          "url": "https://github.com/verl-project/verl/issues/751#issuecomment-2781870734",
+          "body": "Welcome to read and quote our article. We have proven that in GRPO, the k2 loss is an analytical expression, which is better than the k3 loss.   When the model generates a low probability, the gradient of the k3 loss will experience exponential growth, causing the model to collapse. However, the k2 loss does not have this problem. We have also provided additional correction methods for off-policy and std in GRPO.\n[k2 loss就是比k3 loss好，以及grpo off-policy、clip_std()]https://zhuanlan.zhihu.com/p/1892008158626546312\n\n@misc{Liu2025KL,\nauthor       = {YiMing Liu},\ntitle        = {Rethinking KL Divergence in RLHF: From Single Sample to Mini-Batch to Expectation},\nyear         = {2025},\nurl          = {https://www.notion.so/Rethinking-KL-Divergence-in-RLHF-From-Single-Sample-to-Mini-Batch-to-Expectation-1c18637cdeb3800ab47cd01d3fa33ea5},\nnote         = {Notion Blog}\n}",
+          "user": {
+            "login": "LYMDLUT",
+            "name": "LYMDLUT",
+            "email": null,
+            "avatar_url": "https://avatars.githubusercontent.com/u/70597027?v=4",
+            "id": 70597027
+          },
+          "id": 2781870734,
+          "pull_request_review_id": null,
+          "in_reply_to_id": null,
+          "created_at": null,
+          "updated_at": null,
+          "review": null,
+          "side": null,
+          "line": null,
+          "start_line": null,
+          "path": null,
+          "body_html": "<p dir=\"auto\">Welcome to read and quote our article. We have proven that in GRPO, the k2 loss is an analytical expression, which is better than the k3 loss.   When the model generates a low probability, the gradient of the k3 loss will experience exponential growth, causing the model to collapse. However, the k2 loss does not have this problem. We have also provided additional correction methods for off-policy and std in GRPO.<br>\n[k2 loss就是比k3 loss好，以及grpo off-policy、clip_std()]<a href=\"https://zhuanlan.zhihu.com/p/1892008158626546312\" rel=\"nofollow\">https://zhuanlan.zhihu.com/p/1892008158626546312</a></p>\n<p dir=\"auto\"><a class=\"user-mention notranslate\" data-hovercard-type=\"user\" data-hovercard-url=\"/users/misc/hovercard\" data-octo-click=\"hovercard-link-click\" data-octo-dimensions=\"link_type:self\" href=\"https://github.com/misc\">@misc</a>{Liu2025KL,<br>\nauthor       = {YiMing Liu},<br>\ntitle        = {Rethinking KL Divergence in RLHF: From Single Sample to Mini-Batch to Expectation},<br>\nyear         = {2025},<br>\nurl          = {<a href=\"https://www.notion.so/Rethinking-KL-Divergence-in-RLHF-From-Single-Sample-to-Mini-Batch-to-Expectation-1c18637cdeb3800ab47cd01d3fa33ea5%7D\" rel=\"nofollow\">https://www.notion.so/Rethinking-KL-Divergence-in-RLHF-From-Single-Sample-to-Mini-Batch-to-Expectation-1c18637cdeb3800ab47cd01d3fa33ea5}</a>,<br>\nnote         = {Notion Blog}<br>\n}</p>"
+        },
+        {
+          "url": "https://github.com/verl-project/verl/issues/751#issuecomment-2781950892",
+          "body": "> Welcome to read and quote our article. We have proven that in GRPO, the k2 loss is an analytical expression, which is better than the k3 loss. When the model generates a low probability, the gradient of the k3 loss will experience exponential growth, causing the model to collapse. However, the k2 loss does not have this problem. We have also provided additional correction methods for off-policy and std in GRPO. [k2 loss就是比k3 loss好，以及grpo off-policy、clip_std()]https://zhuanlan.zhihu.com/p/1892008158626546312\n> \n> [@misc](https://github.com/misc){Liu2025KL, author = {YiMing Liu}, title = {Rethinking KL Divergence in RLHF: From Single Sample to Mini-Batch to Expectation}, year = {2025}, url = {[https://www.notion.so/Rethinking-KL-Divergence-in-RLHF-From-Single-Sample-to-Mini-Batch-to-Expectation-1c18637cdeb3800ab47cd01d3fa33ea5}](https://www.notion.so/Rethinking-KL-Divergence-in-RLHF-From-Single-Sample-to-Mini-Batch-to-Expectation-1c18637cdeb3800ab47cd01d3fa33ea5%7D), note = {Notion Blog} }\n\nhow to use k2 loss in verl",
+          "user": {
+            "login": "chuangzhidan",
+            "name": "chuangzhidan",
+            "email": null,
+            "avatar_url": "https://avatars.githubusercontent.com/u/62476420?v=4",
+            "id": 62476420
+          },
+          "id": 2781950892,
+          "pull_request_review_id": null,
+          "in_reply_to_id": null,
+          "created_at": null,
+          "updated_at": null,
+          "review": null,
+          "side": null,
+          "line": null,
+          "start_line": null,
+          "path": null,
+          "body_html": "<blockquote>\n<p dir=\"auto\">Welcome to read and quote our article. We have proven that in GRPO, the k2 loss is an analytical expression, which is better than the k3 loss. When the model generates a low probability, the gradient of the k3 loss will experience exponential growth, causing the model to collapse. However, the k2 loss does not have this problem. We have also provided additional correction methods for off-policy and std in GRPO. [k2 loss就是比k3 loss好，以及grpo off-policy、clip_std()]<a href=\"https://zhuanlan.zhihu.com/p/1892008158626546312\" rel=\"nofollow\">https://zhuanlan.zhihu.com/p/1892008158626546312</a></p>\n<p dir=\"auto\"><a href=\"https://github.com/misc\">@misc</a>{Liu2025KL, author = {YiMing Liu}, title = {Rethinking KL Divergence in RLHF: From Single Sample to Mini-Batch to Expectation}, year = {2025}, url = {<a href=\"https://www.notion.so/Rethinking-KL-Divergence-in-RLHF-From-Single-Sample-to-Mini-Batch-to-Expectation-1c18637cdeb3800ab47cd01d3fa33ea5%7D\" rel=\"nofollow\">https://www.notion.so/Rethinking-KL-Divergence-in-RLHF-From-Single-Sample-to-Mini-Batch-to-Expectation-1c18637cdeb3800ab47cd01d3fa33ea5}</a>, note = {Notion Blog} }</p>\n</blockquote>\n<p dir=\"auto\">how to use k2 loss in verl</p>"
+        },
+        {
+          "url": "https://github.com/verl-project/verl/issues/751#issuecomment-2782050296",
+          "body": "> > Could you please try the following steps:\n> > \n> > * Resume the last checkpoint and make sure the nan persists\n> > * Resume from the last checkpoint and step save frequency to 1\n> > * Resume from the last checkpoint and make sure nan immediately appears in the following step\n> > * Add a breakpoint in the ppo_actor loss function and print old_log_probs, log_probs and ratio to find out which part in the loss computation causes nan.\n> \n> Hello, after careful analysis, I found that the issue lies in the calculation of `low_var_kl`. In the problematic step, the loss has normal values (without NaN or Inf), but during backpropagation, the `exp` operation in `ratio = torch.exp(kl)` within `low_var_kl` （[https://github.com/volcengine/verl/blob/8cae42dc29736d0802ded43c5ecf67a809d56bd8/verl/trainer/ppo/core_algos.py#L386）causes](https://github.com/volcengine/verl/blob/8cae42dc29736d0802ded43c5ecf67a809d56bd8/verl/trainer/ppo/core_algos.py#L386%EF%BC%89causes) extreme values, leading to NaN in `kl`. My temporary solution is to use `torch.clamp(kl, min=-5, max=5)` to constrain `kl` before computing `ratio`. **This approach works, but I feel uncertain about it. Could you kindly help confirm whether this is an appropriate solution?**\n\ncurrent code in main branch is this,is this ok?\n    if kl_penalty == 'low_var_kl':\n        kl = ref_logprob - logprob\n        ratio = torch.exp(kl)\n        kld = (ratio - kl - 1).contiguous()\n        return torch.clamp(kld, min=-10, max=10)",
+          "user": {
+            "login": "chuangzhidan",
+            "name": "chuangzhidan",
+            "email": null,
+            "avatar_url": "https://avatars.githubusercontent.com/u/62476420?v=4",
+            "id": 62476420
+          },
+          "id": 2782050296,
+          "pull_request_review_id": null,
+          "in_reply_to_id": null,
+          "created_at": null,
+          "updated_at": null,
+          "review": null,
+          "side": null,
+          "line": null,
+          "start_line": null,
+          "path": null,
+          "body_html": "<blockquote>\n<blockquote>\n<p dir=\"auto\">Could you please try the following steps:</p>\n<ul dir=\"auto\">\n<li>Resume the last checkpoint and make sure the nan persists</li>\n<li>Resume from the last checkpoint and step save frequency to 1</li>\n<li>Resume from the last checkpoint and make sure nan immediately appears in the following step</li>\n<li>Add a breakpoint in the ppo_actor loss function and print old_log_probs, log_probs and ratio to find out which part in the loss computation causes nan.</li>\n</ul>\n</blockquote>\n<p dir=\"auto\">Hello, after careful analysis, I found that the issue lies in the calculation of <code class=\"notranslate\">low_var_kl</code>. In the problematic step, the loss has normal values (without NaN or Inf), but during backpropagation, the <code class=\"notranslate\">exp</code> operation in <code class=\"notranslate\">ratio = torch.exp(kl)</code> within <code class=\"notranslate\">low_var_kl</code> （<a href=\"https://github.com/volcengine/verl/blob/8cae42dc29736d0802ded43c5ecf67a809d56bd8/verl/trainer/ppo/core_algos.py#L386%EF%BC%89causes\">https://github.com/volcengine/verl/blob/8cae42dc29736d0802ded43c5ecf67a809d56bd8/verl/trainer/ppo/core_algos.py#L386）causes</a> extreme values, leading to NaN in <code class=\"notranslate\">kl</code>. My temporary solution is to use <code class=\"notranslate\">torch.clamp(kl, min=-5, max=5)</code> to constrain <code class=\"notranslate\">kl</code> before computing <code class=\"notranslate\">ratio</code>. <strong>This approach works, but I feel uncertain about it. Could you kindly help confirm whether this is an appropriate solution?</strong></p>\n</blockquote>\n<p dir=\"auto\">current code in main branch is this,is this ok?<br>\nif kl_penalty == 'low_var_kl':<br>\nkl = ref_logprob - logprob<br>\nratio = torch.exp(kl)<br>\nkld = (ratio - kl - 1).contiguous()<br>\nreturn torch.clamp(kld, min=-10, max=10)</p>"
+        },
+        {
+          "url": "https://github.com/verl-project/verl/issues/751#issuecomment-2783931978",
+          "body": "> > > Could you please try the following steps:\n> > > \n> > > * Resume the last checkpoint and make sure the nan persists\n> > > * Resume from the last checkpoint and step save frequency to 1\n> > > * Resume from the last checkpoint and make sure nan immediately appears in the following step\n> > > * Add a breakpoint in the ppo_actor loss function and print old_log_probs, log_probs and ratio to find out which part in the loss computation causes nan.\n> > \n> > \n> > Hello, after careful analysis, I found that the issue lies in the calculation of `low_var_kl`. In the problematic step, the loss has normal values (without NaN or Inf), but during backpropagation, the `exp` operation in `ratio = torch.exp(kl)` within `low_var_kl` （[https://github.com/volcengine/verl/blob/8cae42dc29736d0802ded43c5ecf67a809d56bd8/verl/trainer/ppo/core_algos.py#L386）causes](https://github.com/volcengine/verl/blob/8cae42dc29736d0802ded43c5ecf67a809d56bd8/verl/trainer/ppo/core_algos.py#L386%EF%BC%89causes) extreme values, leading to NaN in `kl`. My temporary solution is to use `torch.clamp(kl, min=-5, max=5)` to constrain `kl` before computing `ratio`. **This approach works, but I feel uncertain about it. Could you kindly help confirm whether this is an appropriate solution?**\n> \n> current code in main branch is this,is this ok? if kl_penalty == 'low_var_kl': kl = ref_logprob - logprob ratio = torch.exp(kl) kld = (ratio - kl - 1).contiguous() return torch.clamp(kld, min=-10, max=10)\n\nkl_penalty == \"mse\"\n\nIf it is effective after the modification, please let me know.",
+          "user": {
+            "login": "LYMDLUT",
+            "name": "LYMDLUT",
+            "email": null,
+            "avatar_url": "https://avatars.githubusercontent.com/u/70597027?v=4",
+            "id": 70597027
+          },
+          "id": 2783931978,
+          "pull_request_review_id": null,
+          "in_reply_to_id": null,
+          "created_at": null,
+          "updated_at": null,
+          "review": null,
+          "side": null,
+          "line": null,
+          "start_line": null,
+          "path": null,
+          "body_html": "<blockquote>\n<blockquote>\n<blockquote>\n<p dir=\"auto\">Could you please try the following steps:</p>\n<ul dir=\"auto\">\n<li>Resume the last checkpoint and make sure the nan persists</li>\n<li>Resume from the last checkpoint and step save frequency to 1</li>\n<li>Resume from the last checkpoint and make sure nan immediately appears in the following step</li>\n<li>Add a breakpoint in the ppo_actor loss function and print old_log_probs, log_probs and ratio to find out which part in the loss computation causes nan.</li>\n</ul>\n</blockquote>\n<p dir=\"auto\">Hello, after careful analysis, I found that the issue lies in the calculation of <code class=\"notranslate\">low_var_kl</code>. In the problematic step, the loss has normal values (without NaN or Inf), but during backpropagation, the <code class=\"notranslate\">exp</code> operation in <code class=\"notranslate\">ratio = torch.exp(kl)</code> within <code class=\"notranslate\">low_var_kl</code> （<a href=\"https://github.com/volcengine/verl/blob/8cae42dc29736d0802ded43c5ecf67a809d56bd8/verl/trainer/ppo/core_algos.py#L386%EF%BC%89causes\">https://github.com/volcengine/verl/blob/8cae42dc29736d0802ded43c5ecf67a809d56bd8/verl/trainer/ppo/core_algos.py#L386）causes</a> extreme values, leading to NaN in <code class=\"notranslate\">kl</code>. My temporary solution is to use <code class=\"notranslate\">torch.clamp(kl, min=-5, max=5)</code> to constrain <code class=\"notranslate\">kl</code> before computing <code class=\"notranslate\">ratio</code>. <strong>This approach works, but I feel uncertain about it. Could you kindly help confirm whether this is an appropriate solution?</strong></p>\n</blockquote>\n<p dir=\"auto\">current code in main branch is this,is this ok? if kl_penalty == 'low_var_kl': kl = ref_logprob - logprob ratio = torch.exp(kl) kld = (ratio - kl - 1).contiguous() return torch.clamp(kld, min=-10, max=10)</p>\n</blockquote>\n<p dir=\"auto\">kl_penalty == \"mse\"</p>\n<p dir=\"auto\">If it is effective after the modification, please let me know.</p>"
+        },
+        {
+          "url": "https://github.com/verl-project/verl/issues/751#issuecomment-2784104880",
+          "body": "> > > > Could you please try the following steps:\n> > > > \n> > > > * Resume the last checkpoint and make sure the nan persists\n> > > > * Resume from the last checkpoint and step save frequency to 1\n> > > > * Resume from the last checkpoint and make sure nan immediately appears in the following step\n> > > > * Add a breakpoint in the ppo_actor loss function and print old_log_probs, log_probs and ratio to find out which part in the loss computation causes nan.\n> > > \n> > > \n> > > Hello, after careful analysis, I found that the issue lies in the calculation of `low_var_kl`. In the problematic step, the loss has normal values (without NaN or Inf), but during backpropagation, the `exp` operation in `ratio = torch.exp(kl)` within `low_var_kl` （[https://github.com/volcengine/verl/blob/8cae42dc29736d0802ded43c5ecf67a809d56bd8/verl/trainer/ppo/core_algos.py#L386）causes](https://github.com/volcengine/verl/blob/8cae42dc29736d0802ded43c5ecf67a809d56bd8/verl/trainer/ppo/core_algos.py#L386%EF%BC%89causes) extreme values, leading to NaN in `kl`. My temporary solution is to use `torch.clamp(kl, min=-5, max=5)` to constrain `kl` before computing `ratio`. **This approach works, but I feel uncertain about it. Could you kindly help confirm whether this is an appropriate solution?**\n> > \n> > \n> > current code in main branch is this,is this ok? if kl_penalty == 'low_var_kl': kl = ref_logprob - logprob ratio = torch.exp(kl) kld = (ratio - kl - 1).contiguous() return torch.clamp(kld, min=-10, max=10)\n> \n> kl_penalty == \"mse\"\n> \n> If it is effective after the modification, please let me know.\n\nworks for reinforece++ and grpo ? 只需要改参数设置取值，不改代码？我试下",
+          "user": {
+            "login": "chuangzhidan",
+            "name": "chuangzhidan",
+            "email": null,
+            "avatar_url": "https://avatars.githubusercontent.com/u/62476420?v=4",
+            "id": 62476420
+          },
+          "id": 2784104880,
+          "pull_request_review_id": null,
+          "in_reply_to_id": null,
+          "created_at": null,
+          "updated_at": null,
+          "review": null,
+          "side": null,
+          "line": null,
+          "start_line": null,
+          "path": null,
+          "body_html": "<blockquote>\n<blockquote>\n<blockquote>\n<blockquote>\n<p dir=\"auto\">Could you please try the following steps:</p>\n<ul dir=\"auto\">\n<li>Resume the last checkpoint and make sure the nan persists</li>\n<li>Resume from the last checkpoint and step save frequency to 1</li>\n<li>Resume from the last checkpoint and make sure nan immediately appears in the following step</li>\n<li>Add a breakpoint in the ppo_actor loss function and print old_log_probs, log_probs and ratio to find out which part in the loss computation causes nan.</li>\n</ul>\n</blockquote>\n<p dir=\"auto\">Hello, after careful analysis, I found that the issue lies in the calculation of <code class=\"notranslate\">low_var_kl</code>. In the problematic step, the loss has normal values (without NaN or Inf), but during backpropagation, the <code class=\"notranslate\">exp</code> operation in <code class=\"notranslate\">ratio = torch.exp(kl)</code> within <code class=\"notranslate\">low_var_kl</code> （<a href=\"https://github.com/volcengine/verl/blob/8cae42dc29736d0802ded43c5ecf67a809d56bd8/verl/trainer/ppo/core_algos.py#L386%EF%BC%89causes\">https://github.com/volcengine/verl/blob/8cae42dc29736d0802ded43c5ecf67a809d56bd8/verl/trainer/ppo/core_algos.py#L386）causes</a> extreme values, leading to NaN in <code class=\"notranslate\">kl</code>. My temporary solution is to use <code class=\"notranslate\">torch.clamp(kl, min=-5, max=5)</code> to constrain <code class=\"notranslate\">kl</code> before computing <code class=\"notranslate\">ratio</code>. <strong>This approach works, but I feel uncertain about it. Could you kindly help confirm whether this is an appropriate solution?</strong></p>\n</blockquote>\n<p dir=\"auto\">current code in main branch is this,is this ok? if kl_penalty == 'low_var_kl': kl = ref_logprob - logprob ratio = torch.exp(kl) kld = (ratio - kl - 1).contiguous() return torch.clamp(kld, min=-10, max=10)</p>\n</blockquote>\n<p dir=\"auto\">kl_penalty == \"mse\"</p>\n<p dir=\"auto\">If it is effective after the modification, please let me know.</p>\n</blockquote>\n<p dir=\"auto\">works for reinforece++ and grpo ? 只需要改参数设置取值，不改代码？我试下</p>"
+        },
+        {
+          "url": "https://github.com/verl-project/verl/issues/751#issuecomment-2784146113",
+          "body": "> > > > > Could you please try the following steps:\n> > > > > \n> > > > > * Resume the last checkpoint and make sure the nan persists\n> > > > > * Resume from the last checkpoint and step save frequency to 1\n> > > > > * Resume from the last checkpoint and make sure nan immediately appears in the following step\n> > > > > * Add a breakpoint in the ppo_actor loss function and print old_log_probs, log_probs and ratio to find out which part in the loss computation causes nan.\n> > > > \n> > > > \n> > > > Hello, after careful analysis, I found that the issue lies in the calculation of `low_var_kl`. In the problematic step, the loss has normal values (without NaN or Inf), but during backpropagation, the `exp` operation in `ratio = torch.exp(kl)` within `low_var_kl` （[https://github.com/volcengine/verl/blob/8cae42dc29736d0802ded43c5ecf67a809d56bd8/verl/trainer/ppo/core_algos.py#L386）causes](https://github.com/volcengine/verl/blob/8cae42dc29736d0802ded43c5ecf67a809d56bd8/verl/trainer/ppo/core_algos.py#L386%EF%BC%89causes) extreme values, leading to NaN in `kl`. My temporary solution is to use `torch.clamp(kl, min=-5, max=5)` to constrain `kl` before computing `ratio`. **This approach works, but I feel uncertain about it. Could you kindly help confirm whether this is an appropriate solution?**\n> > > \n> > > \n> > > current code in main branch is this,is this ok? if kl_penalty == 'low_var_kl': kl = ref_logprob - logprob ratio = torch.exp(kl) kld = (ratio - kl - 1).contiguous() return torch.clamp(kld, min=-10, max=10)\n> > \n> > \n> > kl_penalty == \"mse\"\n> > If it is effective after the modification, please let me know.\n> \n> works for reinforece++ and grpo ? 只需要改参数设置取值，不改代码？我试下\n\n![Image](https://github.com/user-attachments/assets/4a44aa50-607f-4765-a01e-3d31cfd8a366)\n先试试再说吧，排除一下变量\n\n可能有别的问题，但先这么处理下试试，等您结果反馈",
+          "user": {
+            "login": "LYMDLUT",
+            "name": "LYMDLUT",
+            "email": null,
+            "avatar_url": "https://avatars.githubusercontent.com/u/70597027?v=4",
+            "id": 70597027
+          },
+          "id": 2784146113,
+          "pull_request_review_id": null,
+          "in_reply_to_id": null,
+          "created_at": null,
+          "updated_at": null,
+          "review": null,
+          "side": null,
+          "line": null,
+          "start_line": null,
+          "path": null,
+          "body_html": "<blockquote>\n<blockquote>\n<blockquote>\n<blockquote>\n<blockquote>\n<p dir=\"auto\">Could you please try the following steps:</p>\n<ul dir=\"auto\">\n<li>Resume the last checkpoint and make sure the nan persists</li>\n<li>Resume from the last checkpoint and step save frequency to 1</li>\n<li>Resume from the last checkpoint and make sure nan immediately appears in the following step</li>\n<li>Add a breakpoint in the ppo_actor loss function and print old_log_probs, log_probs and ratio to find out which part in the loss computation causes nan.</li>\n</ul>\n</blockquote>\n<p dir=\"auto\">Hello, after careful analysis, I found that the issue lies in the calculation of <code class=\"notranslate\">low_var_kl</code>. In the problematic step, the loss has normal values (without NaN or Inf), but during backpropagation, the <code class=\"notranslate\">exp</code> operation in <code class=\"notranslate\">ratio = torch.exp(kl)</code> within <code class=\"notranslate\">low_var_kl</code> （<a href=\"https://github.com/volcengine/verl/blob/8cae42dc29736d0802ded43c5ecf67a809d56bd8/verl/trainer/ppo/core_algos.py#L386%EF%BC%89causes\">https://github.com/volcengine/verl/blob/8cae42dc29736d0802ded43c5ecf67a809d56bd8/verl/trainer/ppo/core_algos.py#L386）causes</a> extreme values, leading to NaN in <code class=\"notranslate\">kl</code>. My temporary solution is to use <code class=\"notranslate\">torch.clamp(kl, min=-5, max=5)</code> to constrain <code class=\"notranslate\">kl</code> before computing <code class=\"notranslate\">ratio</code>. <strong>This approach works, but I feel uncertain about it. Could you kindly help confirm whether this is an appropriate solution?</strong></p>\n</blockquote>\n<p dir=\"auto\">current code in main branch is this,is this ok? if kl_penalty == 'low_var_kl': kl = ref_logprob - logprob ratio = torch.exp(kl) kld = (ratio - kl - 1).contiguous() return torch.clamp(kld, min=-10, max=10)</p>\n</blockquote>\n<p dir=\"auto\">kl_penalty == \"mse\"<br>\nIf it is effective after the modification, please let me know.</p>\n</blockquote>\n<p dir=\"auto\">works for reinforece++ and grpo ? 只需要改参数设置取值，不改代码？我试下</p>\n</blockquote>\n<p dir=\"auto\"><a target=\"_blank\" rel=\"noopener noreferrer\" href=\"https://private-user-images.githubusercontent.com/70597027/431055769-4a44aa50-607f-4765-a01e-3d31cfd8a366.png?jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3OTQ0NTM5MjQsIm5iZiI6MTc5NDQ1MzYyNCwicGF0aCI6Ii83MDU5NzAyNy80MzEwNTU3NjktNGE0NGFhNTAtNjA3Zi00NzY1LWEwMWUtM2QzMWNmZDhhMzY2LnBuZz9YLUFtei1BbGdvcml0aG09QVdTNC1ITUFDLVNIQTI1NiZYLUFtei1DcmVkZW50aWFsPUFLSUFWQ09EWUxTQTUzUFFLNFpBJTJGMjAyNjExMTIlMkZ1cy1lYXN0LTElMkZzMyUyRmF3czRfcmVxdWVzdCZYLUFtei1EYXRlPTIwMjYxMTEyVDAzMjAyNFomWC1BbXotRXhwaXJlcz0zMDAmWC1BbXotU2lnbmF0dXJlPWJkYmIwNjVmYjdkMTQyMDdmZjZhZTM5NTEzMDU0ZTY2MGY1M2EyZmRkY2U3NDg4ZWRhMjBmZDFhYmJmZmY3N2ImWC1BbXotU2lnbmVkSGVhZGVycz1ob3N0JnJlc3BvbnNlLWNvbnRlbnQtdHlwZT1pbWFnZSUyRnBuZyJ9.DZbEaKFWeSH0iFoE2a_cUOIj4AOQzsaWuGQhViRu0JQ\"><img src=\"https://private-user-images.githubusercontent.com/70597027/431055769-4a44aa50-607f-4765-a01e-3d31cfd8a366.png?jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3OTQ0NTM5MjQsIm5iZiI6MTc5NDQ1MzYyNCwicGF0aCI6Ii83MDU5NzAyNy80MzEwNTU3NjktNGE0NGFhNTAtNjA3Zi00NzY1LWEwMWUtM2QzMWNmZDhhMzY2LnBuZz9YLUFtei1BbGdvcml0aG09QVdTNC1ITUFDLVNIQTI1NiZYLUFtei1DcmVkZW50aWFsPUFLSUFWQ09EWUxTQTUzUFFLNFpBJTJGMjAyNjExMTIlMkZ1cy1lYXN0LTElMkZzMyUyRmF3czRfcmVxdWVzdCZYLUFtei1EYXRlPTIwMjYxMTEyVDAzMjAyNFomWC1BbXotRXhwaXJlcz0zMDAmWC1BbXotU2lnbmF0dXJlPWJkYmIwNjVmYjdkMTQyMDdmZjZhZTM5NTEzMDU0ZTY2MGY1M2EyZmRkY2U3NDg4ZWRhMjBmZDFhYmJmZmY3N2ImWC1BbXotU2lnbmVkSGVhZGVycz1ob3N0JnJlc3BvbnNlLWNvbnRlbnQtdHlwZT1pbWFnZSUyRnBuZyJ9.DZbEaKFWeSH0iFoE2a_cUOIj4AOQzsaWuGQhViRu0JQ\" alt=\"Image\" style=\"max-width: 100%;\"></a><br>\n先试试再说吧，排除一下变量</p>\n<p dir=\"auto\">可能有别的问题，但先这么处理下试试，等您结果反馈</p>"
+        },
+        {
+          "url": "https://github.com/verl-project/verl/issues/751#issuecomment-2791305922",
+          "body": "也不行",
+          "user": {
+            "login": "chuangzhidan",
+            "name": "chuangzhidan",
+            "email": null,
+            "avatar_url": "https://avatars.githubusercontent.com/u/62476420?v=4",
+            "id": 62476420
+          },
+          "id": 2791305922,
+          "pull_request_review_id": null,
+          "in_reply_to_id": null,
+          "created_at": null,
+          "updated_at": null,
+          "review": null,
+          "side": null,
+          "line": null,
+          "start_line": null,
+          "path": null,
+          "body_html": "<p dir=\"auto\">也不行</p>"
+        },
+        {
+          "url": "https://github.com/verl-project/verl/issues/751#issuecomment-2791385775",
+          "body": "都试过了还是不行，有什么最新的解决方案么",
+          "user": {
+            "login": "Xia723",
+            "name": "Xia723",
+            "email": null,
+            "avatar_url": "https://avatars.githubusercontent.com/u/165642411?v=4",
+            "id": 165642411
+          },
+          "id": 2791385775,
+          "pull_request_review_id": null,
+          "in_reply_to_id": null,
+          "created_at": null,
+          "updated_at": null,
+          "review": null,
+          "side": null,
+          "line": null,
+          "start_line": null,
+          "path": null,
+          "body_html": "<p dir=\"auto\">都试过了还是不行，有什么最新的解决方案么</p>"
+        },
+        {
+          "url": "https://github.com/verl-project/verl/issues/751#issuecomment-2797069927",
+          "body": "Same issue here. we set `kl_coeff = 0`, but still failed.",
+          "user": {
+            "login": "koalazf99",
+            "name": "koalazf99",
+            "email": null,
+            "avatar_url": "https://avatars.githubusercontent.com/u/37338733?v=4",
+            "id": 37338733
+          },
+          "id": 2797069927,
+          "pull_request_review_id": null,
+          "in_reply_to_id": null,
+          "created_at": null,
+          "updated_at": null,
+          "review": null,
+          "side": null,
+          "line": null,
+          "start_line": null,
+          "path": null,
+          "body_html": "<p dir=\"auto\">Same issue here. we set <code class=\"notranslate\">kl_coeff = 0</code>, but still failed.</p>"
+        },
+        {
+          "url": "https://github.com/verl-project/verl/issues/751#issuecomment-2858304300",
+          "body": "我用vllm 0.8.2 + 2节点跑的时候也遇到这个问题，经人提醒，将vllm的v1引擎关掉之后，一切正常了。\n具体操作是，设置export VLLM_USE_V1=0，并且训练参数里面不要使用设置\n        actor_rollout_ref.rollout.enforce_eager=False \\\n        actor_rollout_ref.rollout.free_cache_engine=False \\\n就可以了",
+          "user": {
+            "login": "takagi97",
+            "name": "takagi97",
+            "email": null,
+            "avatar_url": "https://avatars.githubusercontent.com/u/59441900?v=4",
+            "id": 59441900
+          },
+          "id": 2858304300,
+          "pull_request_review_id": null,
+          "in_reply_to_id": null,
+          "created_at": null,
+          "updated_at": null,
+          "review": null,
+          "side": null,
+          "line": null,
+          "start_line": null,
+          "path": null,
+          "body_html": "<p dir=\"auto\">我用vllm 0.8.2 + 2节点跑的时候也遇到这个问题，经人提醒，将vllm的v1引擎关掉之后，一切正常了。<br>\n具体操作是，设置export VLLM_USE_V1=0，并且训练参数里面不要使用设置<br>\nactor_rollout_ref.rollout.enforce_eager=False <br>\nactor_rollout_ref.rollout.free_cache_engine=False <br>\n就可以了</p>"
+        },
+        {
+          "url": "https://github.com/verl-project/verl/issues/751#issuecomment-2869608779",
+          "body": "> 我用vllm 0.8.2 + 2节点跑的时候也遇到这个问题，经人提醒，将vllm的v1引擎关掉之后，一切正常了。 具体操作是，设置export VLLM_USE_V1=0，并且训练参数里面不要使用设置 actor_rollout_ref.rollout.enforce_eager=False actor_rollout_ref.rollout.free_cache_engine=False 就可以了\n\nThis doesn't work for me. :(",
+          "user": {
+            "login": "zihaolucky",
+            "name": "zihaolucky",
+            "email": null,
+            "avatar_url": "https://avatars.githubusercontent.com/u/4514568?v=4",
+            "id": 4514568
+          },
+          "id": 2869608779,
+          "pull_request_review_id": null,
+          "in_reply_to_id": null,
+          "created_at": null,
+          "updated_at": null,
+          "review": null,
+          "side": null,
+          "line": null,
+          "start_line": null,
+          "path": null,
+          "body_html": "<blockquote>\n<p dir=\"auto\">我用vllm 0.8.2 + 2节点跑的时候也遇到这个问题，经人提醒，将vllm的v1引擎关掉之后，一切正常了。 具体操作是，设置export VLLM_USE_V1=0，并且训练参数里面不要使用设置 actor_rollout_ref.rollout.enforce_eager=False actor_rollout_ref.rollout.free_cache_engine=False 就可以了</p>\n</blockquote>\n<p dir=\"auto\">This doesn't work for me. :(</p>"
+        },
+        {
+          "url": "https://github.com/verl-project/verl/issues/751#issuecomment-2999250700",
+          "body": "> > 我用vllm 0.8.2 + 2节点跑的时候也遇到这个问题，经人提醒，将vllm的v1引擎关掉之后，一切正常了。 具体操作是，设置export VLLM_USE_V1=0，并且训练参数里面不要使用设置 actor_rollout_ref.rollout.enforce_eager=False actor_rollout_ref.rollout.free_cache_engine=False 就可以了\n> \n> This doesn't work for me. :(\n\nme too\n",
+          "user": {
+            "login": "qilong-zhang",
+            "name": "qilong-zhang",
+            "email": null,
+            "avatar_url": "https://avatars.githubusercontent.com/u/30571468?v=4",
+            "id": 30571468
+          },
+          "id": 2999250700,
+          "pull_request_review_id": null,
+          "in_reply_to_id": null,
+          "created_at": null,
+          "updated_at": null,
+          "review": null,
+          "side": null,
+          "line": null,
+          "start_line": null,
+          "path": null,
+          "body_html": "<blockquote>\n<blockquote>\n<p dir=\"auto\">我用vllm 0.8.2 + 2节点跑的时候也遇到这个问题，经人提醒，将vllm的v1引擎关掉之后，一切正常了。 具体操作是，设置export VLLM_USE_V1=0，并且训练参数里面不要使用设置 actor_rollout_ref.rollout.enforce_eager=False actor_rollout_ref.rollout.free_cache_engine=False 就可以了</p>\n</blockquote>\n<p dir=\"auto\">This doesn't work for me. :(</p>\n</blockquote>\n<p dir=\"auto\">me too</p>"
+        },
+        {
+          "url": "https://github.com/verl-project/verl/issues/751#issuecomment-3006122752",
+          "body": "similar problem, outputting '!' even no metric is NaN",
+          "user": {
+            "login": "zhenghaoxu-gatech",
+            "name": "zhenghaoxu-gatech",
+            "email": null,
+            "avatar_url": "https://avatars.githubusercontent.com/u/124721020?v=4",
+            "id": 124721020
+          },
+          "id": 3006122752,
+          "pull_request_review_id": null,
+          "in_reply_to_id": null,
+          "created_at": null,
+          "updated_at": null,
+          "review": null,
+          "side": null,
+          "line": null,
+          "start_line": null,
+          "path": null,
+          "body_html": "<p dir=\"auto\">similar problem, outputting '!' even no metric is NaN</p>"
+        },
+        {
+          "url": "https://github.com/verl-project/verl/issues/751#issuecomment-3026651678",
+          "body": "> 我用vllm 0.8.2 + 2节点跑的时候也遇到这个问题，经人提醒，将vllm的v1引擎关掉之后，一切正常了。 具体操作是，设置export VLLM_USE_V1=0，并且训练参数里面不要使用设置 actor_rollout_ref.rollout.enforce_eager=False actor_rollout_ref.rollout.free_cache_engine=False 就可以了\n\n@takagi97 请问是指要把actor_rollout_ref.rollout.enforce_eager=False actor_rollout_ref.rollout.free_cache_engine=False这两个参数设为False，还是不设置保留默认的True呢",
+          "user": {
+            "login": "Yux1angJi",
+            "name": "Yux1angJi",
+            "email": null,
+            "avatar_url": "https://avatars.githubusercontent.com/u/35283956?v=4",
+            "id": 35283956
+          },
+          "id": 3026651678,
+          "pull_request_review_id": null,
+          "in_reply_to_id": null,
+          "created_at": null,
+          "updated_at": null,
+          "review": null,
+          "side": null,
+          "line": null,
+          "start_line": null,
+          "path": null,
+          "body_html": "<blockquote>\n<p dir=\"auto\">我用vllm 0.8.2 + 2节点跑的时候也遇到这个问题，经人提醒，将vllm的v1引擎关掉之后，一切正常了。 具体操作是，设置export VLLM_USE_V1=0，并且训练参数里面不要使用设置 actor_rollout_ref.rollout.enforce_eager=False actor_rollout_ref.rollout.free_cache_engine=False 就可以了</p>\n</blockquote>\n<p dir=\"auto\"><a class=\"user-mention notranslate\" data-hovercard-type=\"user\" data-hovercard-url=\"/users/takagi97/hovercard\" data-octo-click=\"hovercard-link-click\" data-octo-dimensions=\"link_type:self\" href=\"https://github.com/takagi97\">@takagi97</a> 请问是指要把actor_rollout_ref.rollout.enforce_eager=False actor_rollout_ref.rollout.free_cache_engine=False这两个参数设为False，还是不设置保留默认的True呢</p>"
+        },
+        {
+          "url": "https://github.com/verl-project/verl/issues/751#issuecomment-3092369057",
+          "body": "请问解决了吗",
+          "user": {
+            "login": "xjtupy",
+            "name": "xjtupy",
+            "email": null,
+            "avatar_url": "https://avatars.githubusercontent.com/u/13305604?v=4",
+            "id": 13305604
+          },
+          "id": 3092369057,
+          "pull_request_review_id": null,
+          "in_reply_to_id": null,
+          "created_at": null,
+          "updated_at": null,
+          "review": null,
+          "side": null,
+          "line": null,
+          "start_line": null,
+          "path": null,
+          "body_html": "<p dir=\"auto\">请问解决了吗</p>"
+        },
+        {
+          "url": "https://github.com/verl-project/verl/issues/751#issuecomment-4871763514",
+          "body": "中文：目前不建议把这个 issue 当作已解决关闭。#789 只是在 `grad_norm` 非有限时跳过更新，属于防止异常权重更新的保护措施，并不能证明 `!` 输出 / KL NaN 的根因已经修复。相关 #891 仍是 open，评论里也有用户反馈 clamp、关闭 KL 或关闭 vLLM V1 并不总是有效。\n\n当前 main 相对 2025 年 3-4 月已有一些相关变化：`low_var_kl/k3` 会在 `exp` 前 clamp `ref_logprob - logprob`，文档也支持 `low_var_kl+` / `k3+`，用于保持 k3 前向值但用 k2 梯度做 straight-through。建议先在最新 main 或最新 release 上确认是否仍复现，并说明使用的是 `low_var_kl`、`low_var_kl+`、`mse/k2` 还是关闭 actor KL loss。\n\n继续定位需要基于当前代码的最小复现：完整启动命令/配置、verl commit 或版本、vLLM 版本、是否设置 `VLLM_USE_V1`、rollout 后端和 mode、模型与可共享的小数据样本；同时请贴出出问题 step 前后 `old_log_probs`、`log_probs`、`ref_logprob`、`actor/kl_loss`、`actor/ppo_kl`、`actor/entropy_loss`、`actor/grad_norm` 的非有限值检查结果。\n\nEnglish: I would not treat this issue as resolved yet. #789 only skips the optimizer update when `grad_norm` is non-finite; it is a guard against applying a bad update, not evidence that the root cause of `!` outputs / KL NaN is fixed. The related #891 is still open, and several comments report that clamp, disabling KL, or disabling vLLM V1 are not universal fixes.\n\nCurrent main has changed since the March-April 2025 reports: `low_var_kl/k3` now clamps `ref_logprob - logprob` before `exp`, and the docs support `low_var_kl+` / `k3+`, which keeps the k3 forward value while using the k2 gradient via a straight-through trick. Please first check whether the problem still reproduces on latest main or latest release, and state whether the run uses `low_var_kl`, `low_var_kl+`, `mse/k2`, or disables actor KL loss.\n\nTo continue debugging, we need a minimal reproduction on current code: full launch command/config, verl commit or version, vLLM version, whether `VLLM_USE_V1` is set, rollout backend and mode, model plus a shareable small data sample. Please also include finite/NaN checks around the first failing step for `old_log_probs`, `log_probs`, `ref_logprob`, `actor/kl_loss`, `actor/ppo_kl`, `actor/entropy_loss`, and `actor/grad_norm`.\n\nThis response was generated by a scheduled Codex GPT5.5 issue processing task.\n",
+          "user": {
+            "login": "Kirrito-k423",
+            "name": "Kirrito-k423",
+            "email": null,
+            "avatar_url": "https://avatars.githubusercontent.com/u/44373239?v=4",
+            "id": 44373239
+          },
+          "id": 4871763514,
+          "pull_request_review_id": null,
+          "in_reply_to_id": null,
+          "created_at": null,
+          "updated_at": null,
+          "review": null,
+          "side": null,
+          "line": null,
+          "start_line": null,
+          "path": null,
+          "body_html": "<p dir=\"auto\">中文：目前不建议把这个 issue 当作已解决关闭。<a class=\"issue-link js-issue-link\" data-error-text=\"Failed to load title\" data-id=\"2952213840\" data-permission-text=\"Title is private\" data-url=\"https://github.com/verl-project/verl/issues/789\" data-hovercard-type=\"pull_request\" data-hovercard-url=\"/verl-project/verl/pull/789/hovercard\" href=\"https://github.com/verl-project/verl/pull/789\">#789</a> 只是在 <code class=\"notranslate\">grad_norm</code> 非有限时跳过更新，属于防止异常权重更新的保护措施，并不能证明 <code class=\"notranslate\">!</code> 输出 / KL NaN 的根因已经修复。相关 <a class=\"issue-link js-issue-link\" data-error-text=\"Failed to load title\" data-id=\"2968702289\" data-permission-text=\"Title is private\" data-url=\"https://github.com/verl-project/verl/issues/891\" data-hovercard-type=\"issue\" data-hovercard-url=\"/verl-project/verl/issues/891/hovercard\" href=\"https://github.com/verl-project/verl/issues/891\">#891</a> 仍是 open，评论里也有用户反馈 clamp、关闭 KL 或关闭 vLLM V1 并不总是有效。</p>\n<p dir=\"auto\">当前 main 相对 2025 年 3-4 月已有一些相关变化：<code class=\"notranslate\">low_var_kl/k3</code> 会在 <code class=\"notranslate\">exp</code> 前 clamp <code class=\"notranslate\">ref_logprob - logprob</code>，文档也支持 <code class=\"notranslate\">low_var_kl+</code> / <code class=\"notranslate\">k3+</code>，用于保持 k3 前向值但用 k2 梯度做 straight-through。建议先在最新 main 或最新 release 上确认是否仍复现，并说明使用的是 <code class=\"notranslate\">low_var_kl</code>、<code class=\"notranslate\">low_var_kl+</code>、<code class=\"notranslate\">mse/k2</code> 还是关闭 actor KL loss。</p>\n<p dir=\"auto\">继续定位需要基于当前代码的最小复现：完整启动命令/配置、verl commit 或版本、vLLM 版本、是否设置 <code class=\"notranslate\">VLLM_USE_V1</code>、rollout 后端和 mode、模型与可共享的小数据样本；同时请贴出出问题 step 前后 <code class=\"notranslate\">old_log_probs</code>、<code class=\"notranslate\">log_probs</code>、<code class=\"notranslate\">ref_logprob</code>、<code class=\"notranslate\">actor/kl_loss</code>、<code class=\"notranslate\">actor/ppo_kl</code>、<code class=\"notranslate\">actor/entropy_loss</code>、<code class=\"notranslate\">actor/grad_norm</code> 的非有限值检查结果。</p>\n<p dir=\"auto\">English: I would not treat this issue as resolved yet. <a class=\"issue-link js-issue-link\" data-error-text=\"Failed to load title\" data-id=\"2952213840\" data-permission-text=\"Title is private\" data-url=\"https://github.com/verl-project/verl/issues/789\" data-hovercard-type=\"pull_request\" data-hovercard-url=\"/verl-project/verl/pull/789/hovercard\" href=\"https://github.com/verl-project/verl/pull/789\">#789</a> only skips the optimizer update when <code class=\"notranslate\">grad_norm</code> is non-finite; it is a guard against applying a bad update, not evidence that the root cause of <code class=\"notranslate\">!</code> outputs / KL NaN is fixed. The related <a class=\"issue-link js-issue-link\" data-error-text=\"Failed to load title\" data-id=\"2968702289\" data-permission-text=\"Title is private\" data-url=\"https://github.com/verl-project/verl/issues/891\" data-hovercard-type=\"issue\" data-hovercard-url=\"/verl-project/verl/issues/891/hovercard\" href=\"https://github.com/verl-project/verl/issues/891\">#891</a> is still open, and several comments report that clamp, disabling KL, or disabling vLLM V1 are not universal fixes.</p>\n<p dir=\"auto\">Current main has changed since the March-April 2025 reports: <code class=\"notranslate\">low_var_kl/k3</code> now clamps <code class=\"notranslate\">ref_logprob - logprob</code> before <code class=\"notranslate\">exp</code>, and the docs support <code class=\"notranslate\">low_var_kl+</code> / <code class=\"notranslate\">k3+</code>, which keeps the k3 forward value while using the k2 gradient via a straight-through trick. Please first check whether the problem still reproduces on latest main or latest release, and state whether the run uses <code class=\"notranslate\">low_var_kl</code>, <code class=\"notranslate\">low_var_kl+</code>, <code class=\"notranslate\">mse/k2</code>, or disables actor KL loss.</p>\n<p dir=\"auto\">To continue debugging, we need a minimal reproduction on current code: full launch command/config, verl commit or version, vLLM version, whether <code class=\"notranslate\">VLLM_USE_V1</code> is set, rollout backend and mode, model plus a shareable small data sample. Please also include finite/NaN checks around the first failing step for <code class=\"notranslate\">old_log_probs</code>, <code class=\"notranslate\">log_probs</code>, <code class=\"notranslate\">ref_logprob</code>, <code class=\"notranslate\">actor/kl_loss</code>, <code class=\"notranslate\">actor/ppo_kl</code>, <code class=\"notranslate\">actor/entropy_loss</code>, and <code class=\"notranslate\">actor/grad_norm</code>.</p>\n<p dir=\"auto\">This response was generated by a scheduled Codex GPT5.5 issue processing task.</p>"
+        }
+      ],
+      "url": "https://github.com/verl-project/verl/issues/751",
+      "title": "verl-project/verl Issue #751 comments",
+      "display_url": "https://github.com/verl-project/verl/issues/751",
+      "display_title": "verl-project/verl Issue #751 comments"
+    },
+    "isError": false
+  }
+}

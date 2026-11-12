@@ -1,0 +1,52 @@
+From 661b7f932f6286ae3418c269d64200586f91cb39 Mon Sep 17 00:00:00 2001
+From: PXTang <tangpeixin1@huawei.com>
+Date: Fri, 6 Nov 2026 11:26:40 +0800
+Subject: [PATCH] fix(inductor): populate template fusion metadata before
+ render
+
+NPUTritonScheduling.codegen_template reimplements the template codegen path
+but never called _compute_fusion_metadata, so store_output always saw
+has_epilogue_fusion as False and skipped the fp32 -> output dtype truncation
+cast for fused epilogues.
+
+Call it before render() so fused template GEMMs with fp16/bf16 outputs round
+the accumulator at the same point as the unfused path.
+
+Also align codegen_template with upstream's parameter order (prologue_nodes
+third, only_gen_src_code keyword-only) and reject prologue fusion explicitly.
+This path only implements epilogue fusion, and the old signature let a
+non-empty prologue list bind to only_gen_src_code.
+
+Co-Authored-By: Claude Code <noreply@anthropic.com>
+---
+ torch_npu/_inductor/codegen/scheduling.py | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
+
+diff --git a/torch_npu/_inductor/codegen/scheduling.py b/torch_npu/_inductor/codegen/scheduling.py
+index 2241d7b2893..209b79408d8 100644
+--- a/torch_npu/_inductor/codegen/scheduling.py
++++ b/torch_npu/_inductor/codegen/scheduling.py
+@@ -368,7 +368,11 @@ class NPUTritonScheduling(TritonScheduling):
+ 
+         self.scheduler.free_buffers()
+ 
+-    def codegen_template(self, template_node, epilogue_nodes, only_gen_src_code=False):
++    def codegen_template(self, template_node, epilogue_nodes, prologue_nodes=(), *, only_gen_src_code=False):
++        if prologue_nodes:
++            raise NotImplementedError(
++                "NPU Triton templates do not support prologue fusion"
++            )
+         if isinstance(
+             template_node.node,
+             FlexAttentionDispatchTemplateBuffer,
+@@ -385,6 +389,7 @@ class NPUTritonScheduling(TritonScheduling):
+         assert rnumel == 1
+         kernel, render = template_node.node.make_kernel_render(template_node.node)
+         with kernel:
++            kernel._compute_fusion_metadata(self, epilogue_nodes, prologue_nodes, {})
+             if not only_gen_src_code:
+                 for node in [template_node, *epilogue_nodes]:
+                     node.mark_run()
+-- 
+GitCode
+

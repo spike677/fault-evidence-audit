@@ -1,0 +1,3154 @@
+@@ -56,3 +56,6 @@ ignore_missing_imports = True
+ [mypy-vllm.v1.kv_offload.*]
+ ignore_missing_imports = True
+ 
++[mypy-cann_ops_transformer.*]
++ignore_missing_imports = True
++
+@@ -0,0 +1,116 @@
++# SPDX-License-Identifier: Apache-2.0
++# SPDX-FileCopyrightText: Copyright contributors to the vllm-ascend project
++"""A5/CANN validation of QFA's strided K/V and six-dimensional scales."""
++
++from dataclasses import replace
++from types import SimpleNamespace
++
++import pytest
++import torch
++import torch_npu
++from cann_ops_transformer.ops import quant_flash_attn, quant_flash_attn_metadata
++from vllm.v1.kv_cache_interface import FullAttentionSpec
++
++from vllm_ascend.attention.attention_c8_mxfp import (
++    fill_mxfp_v_scale_cache,
++    mxfp_cache_spec,
++    mxfp_cache_views_for_spec,
++    mxfp_k_scale_slot_index,
++    scatter_mxfp_k_scale_cache,
++    scatter_mxfp_pa_nz_kv_cache,
++)
++from vllm_ascend.ops.triton.triton_utils import init_device_properties_triton
++from vllm_ascend.worker.utils import AscendKVBlockZeroer
++
++
++@pytest.mark.parametrize("query_tokens", [1, 64])
++@pytest.mark.parametrize("ratio", [1, 2])
++def test_qfa_strided_scales_match_contiguous_reference(query_tokens, ratio):
++    init_device_properties_triton()
++    torch.manual_seed(42)
++    device = torch.device("npu")
++    spec = mxfp_cache_spec(
++        FullAttentionSpec(
++            block_size=512 * ratio,
++            num_kv_heads=1,
++            head_size=256,
++            dtype=torch.float8_e4m3fn,
++        )
++    )
++    # Exercise both an aligned allocation slice and trailing page padding.
++    page_size = spec.page_size_bytes + ratio * 256
++    spec = replace(spec, page_size_padded=page_size)
++    backing = torch.full((128 + 3 * page_size + 256,), 91, dtype=torch.int8, device=device)
++    caches = mxfp_cache_views_for_spec(backing[128:-256], spec, 512)
++    num_tokens = 529  # cross a kernel-block boundary
++    slots = torch.arange(num_tokens, dtype=torch.int64, device=device)
++    key, key_scale = torch_npu.npu_dynamic_mx_quant(
++        torch.randn(num_tokens, 1, 256, dtype=torch.bfloat16, device=device),
++        dst_type=torch.float8_e4m3fn,
++    )
++    value = torch.randint(0, 112, key.shape, dtype=torch.int8, device=device).view(torch.float8_e4m3fn)
++    scatter_mxfp_pa_nz_kv_cache(key, value, caches[0], caches[1], slots)
++    scatter_mxfp_k_scale_cache(key_scale, caches[2], mxfp_k_scale_slot_index(slots, 512))
++    fill_mxfp_v_scale_cache(torch.full((256,), 127, dtype=torch.uint8, device=device), caches[3])
++    query, query_scale = torch_npu.npu_dynamic_mx_quant(
++        torch.randn(query_tokens, 2, 256, dtype=torch.bfloat16, device=device),
++        dst_type=torch.float8_e4m3fn,
++    )
++    layout_q_descale = "N2TGD" if query_tokens == 1 else "TND"
++    if query_tokens == 1:
++        query_scale = query_scale.view(torch.uint8).view(query_tokens, 1, 2, 4, 2).permute(1, 0, 2, 3, 4).contiguous()
++    query_scale = query_scale.view(torch.float8_e8m0fnu)
++    mask_mode = 0 if query_tokens == 1 else 3
++    lengths = dict(
++        cu_seqlens_q=torch.tensor([0, query_tokens], dtype=torch.int32, device=device),
++        cu_seqlens_kv=None,
++        seqused_q=None,
++        seqused_kv=torch.tensor([num_tokens], dtype=torch.int32, device=device),
++    )
++    attrs = dict(
++        max_seqlen_q=query_tokens,
++        max_seqlen_kv=-1,
++        mask_mode=mask_mode,
++        win_left=-1,
++        win_right=-1,
++        layout_q="TND",
++        layout_q_descale=layout_q_descale,
++        layout_kv="PA_NZ",
++        layout_out="TND",
++    )
++    metadata = quant_flash_attn_metadata(2, 1, 256, 1, **lengths, **attrs)
++    mask = None if mask_mode == 0 else torch.triu(torch.ones(2048, 2048, dtype=torch.int8, device=device), diagonal=1)
++
++    def run(views):
++        result = quant_flash_attn(
++            query,
++            views[0],
++            views[1],
++            query_scale,
++            views[2].view(torch.float8_e8m0fnu),
++            views[3].view(torch.float8_e8m0fnu),
++            1,
++            block_table=torch.tensor([[0, 1]], dtype=torch.int32, device=device),
++            p_scale=None,
++            sinks=None,
++            attn_mask=mask,
++            metadata=metadata,
++            softmax_scale=256**-0.5,
++            return_softmax_lse=False,
++            **lengths,
++            **attrs,
++        )
++        return result[0] if isinstance(result, tuple) else result
++
++    contiguous = tuple(view.view(torch.uint8).contiguous().view(view.dtype) for view in caches)
++    torch.testing.assert_close(run(caches), run(contiguous), rtol=1e-3, atol=1e-3)
++    static_scale_before = caches[3].clone()
++    zeroer = AscendKVBlockZeroer(device, pin_memory=False)
++    group = SimpleNamespace(kv_cache_spec=spec, kv_cache_group_id=0, layer_names=["attn"])
++    zeroer.init_meta([group], [512], "mxfp8", set(), {"attn": SimpleNamespace(kv_cache=caches)})
++    zeroer.zero_block_ids([2])
++    torch.npu.synchronize()
++    assert torch.equal(caches[3], static_scale_before)
++    for cache in caches[:3]:
++        assert (cache[2 * ratio :].view(torch.uint8) == 0).all()
++    assert (backing[:128] == 91).all() and (backing[-256:] == 91).all()
+@@ -0,0 +1,320 @@
++from types import SimpleNamespace
++from unittest.mock import MagicMock, patch
++
++import torch
++
++from tests.ut.base import TestBase
++from vllm_ascend.attention.attention_c8_mxfp import AscendC8MXFPAttentionBackendImpl
++
++
++class TestC8MXFPQfaQueryPlan(TestBase):
++    """What the two QFA operators are planned against for one step.
++
++    max_seqlen_q is the longest single query, not the batch total: the
++    metadata op seeds querySeqSize with it and then raises it with
++    max(attr, per-request length), so an inflated attr is never walked back.
++    The q scale layout then picks the kernel -- TND compiles the prefill
++    template, N2TGD the decode one -- and both operators must be given the
++    same one.
++    """
++
++    NUM_KV_HEADS = 2
++    GROUP_SIZE = 4
++    NUM_HEADS = NUM_KV_HEADS * GROUP_SIZE
++    D_GROUPS = 2  # head_dim // 64
++
++    def setUp(self):
++        self.impl = object.__new__(AscendC8MXFPAttentionBackendImpl)
++        self.impl.sliding_window = None
++        self.impl.num_heads = self.NUM_HEADS
++        self.impl.num_kv_heads = self.NUM_KV_HEADS
++
++    def _forward(self, query_start_loc, max_query_len):
++        """Run one step and report what each operator was handed."""
++        num_tokens = int(query_start_loc[-1])
++        # Distinct value per (token, head, group, element) so the N2TGD
++        # permutation can be checked entry by entry.
++        scale = (
++            torch.arange(num_tokens * self.NUM_HEADS * self.D_GROUPS * 2, dtype=torch.int32)
++            .remainder(251)
++            .to(torch.uint8)
++            .view(num_tokens, self.NUM_HEADS, self.D_GROUPS, 2)
++        )
++        attn_metadata = SimpleNamespace(
++            causal=True,
++            query_start_loc_gpu=torch.tensor(query_start_loc, dtype=torch.int32),
++            seq_lens_gpu=torch.ones(len(query_start_loc) - 1, dtype=torch.int32),
++            max_query_len=max_query_len,
++        )
++        seen = {"source_scale": scale}
++
++        def fake_metadata(_self, _metadata, *, cu_seqlens_q, seqused_kv, max_seqlen_q, mask_mode, layout_q_descale):
++            seen["metadata_max_seqlen_q"] = max_seqlen_q
++            seen["metadata_mask_mode"] = mask_mode
++            seen["metadata_layout"] = layout_q_descale
++            return MagicMock()
++
++        def fake_run(
++            _self,
++            _query,
++            query_scale,
++            _kv_cache,
++            _attn_metadata,
++            *,
++            max_seqlen_q,
++            mask_mode,
++            layout_q_descale,
++            output,
++            **kwargs,
++        ):
++            seen["max_seqlen_q"] = max_seqlen_q
++            seen["mask_mode"] = mask_mode
++            seen["layout"] = layout_q_descale
++            seen["scale"] = query_scale
++            return output
++
++        with (
++            patch.object(AscendC8MXFPAttentionBackendImpl, "_get_qfa_metadata", fake_metadata),
++            patch.object(AscendC8MXFPAttentionBackendImpl, "_run_qfa", fake_run),
++        ):
++            self.impl._forward_mxfp8_attention(
++                torch.zeros(num_tokens, self.NUM_HEADS, 8, dtype=torch.uint8),
++                scale,
++                (MagicMock(), MagicMock(), MagicMock(), MagicMock()),
++                attn_metadata,
++                torch.zeros(num_tokens, self.NUM_HEADS, 8),
++            )
++
++        # A plan computed for one kernel must not be fed to the other.
++        self.assertEqual(seen["metadata_max_seqlen_q"], seen["max_seqlen_q"])
++        self.assertEqual(seen["metadata_layout"], seen["layout"])
++        self.assertEqual(seen["metadata_mask_mode"], seen["mask_mode"])
++        return seen
++
++    # --- max_seqlen_q -----------------------------------------------------
++
++    def test_uniform_decode_does_not_declare_the_batch_total(self):
++        # 4 requests, one query token each: the old code declared 4.
++        self.assertEqual(self._forward([0, 1, 2, 3, 4], max_query_len=1)["max_seqlen_q"], 1)
++
++    def test_mtp_decode_uses_the_draft_query_length(self):
++        # 3 requests x 2 tokens (1 + 1 draft): the old code declared 6.
++        self.assertEqual(self._forward([0, 2, 4, 6], max_query_len=2)["max_seqlen_q"], 2)
++
++    def test_mixed_batch_uses_the_longest_prefill(self):
++        # One 5-token prefill plus 3 decodes; the longest query is the prefill.
++        self.assertEqual(self._forward([0, 5, 6, 7, 8], max_query_len=5)["max_seqlen_q"], 5)
++
++    def test_missing_max_query_len_falls_back_to_the_token_count(self):
++        self.assertEqual(self._forward([0, 1, 2, 3, 4], max_query_len=None)["max_seqlen_q"], 4)
++
++    # --- q scale layout ---------------------------------------------------
++
++    def test_decode_sends_the_scale_as_n2tgd(self):
++        seen = self._forward([0, 1, 2, 3, 4], max_query_len=1)
++        self.assertEqual(seen["layout"], "N2TGD")
++        num_tokens = seen["source_scale"].shape[0]
++        self.assertEqual(
++            tuple(seen["scale"].shape),
++            (self.NUM_KV_HEADS, num_tokens, self.GROUP_SIZE, self.D_GROUPS, 2),
++        )
++
++    def test_n2tgd_keeps_every_head_scale_with_its_kv_head(self):
++        seen = self._forward([0, 1, 2, 3, 4], max_query_len=1)
++        source, permuted = seen["source_scale"], seen["scale"]
++        for token in range(source.shape[0]):
++            for head in range(self.NUM_HEADS):
++                # Query heads are GQA-contiguous: head n serves kv head n // G.
++                kv_head, group = divmod(head, self.GROUP_SIZE)
++                self.assertTrue(
++                    torch.equal(permuted[kv_head, token, group], source[token, head]),
++                    f"token={token} head={head} lost its scale",
++                )
++
++    def test_prefill_keeps_the_scale_in_tnd_untouched(self):
++        # G=4, so a 21-token query crosses the operator's G*Q_S boundary.
++        seen = self._forward([0, 21], max_query_len=21)
++        self.assertEqual(seen["layout"], "TND")
++        self.assertIs(seen["scale"], seen["source_scale"])
++
++    def test_boundary_value_still_takes_the_decode_layout(self):
++        # G*Q_S == 80 exactly; the operator doc recommends N2TGD at or below.
++        self.assertEqual(self._forward([0, 20], max_query_len=20)["layout"], "N2TGD")
++
++    def test_mtp_verify_queries_take_the_decode_layout(self):
++        # MTP verify steps are SpecDecoding with 1+spec query tokens each;
++        # the layout decision reads the query shape, not the scheduler
++        # state, so the decode kernel applies here too. Regression guard
++        # against keying this on attn_state == DecodeOnly, which never
++        # fires once MTP is enabled.
++        seen = self._forward([0, 4, 8], max_query_len=4)
++        self.assertEqual(seen["layout"], "N2TGD")
++        self.assertEqual(seen["max_seqlen_q"], 4)
++
++    def test_non_divisible_heads_stay_in_tnd(self):
++        # MTP draft layers can run a head count that does not split into
++        # whole kv-head groups; the group reshape would miscount elements
++        # and raise, so the guard falls back to TND instead.
++        self.impl.num_kv_heads = 3  # 8 % 3 != 0
++        seen = self._forward([0, 1, 2, 3, 4], max_query_len=1)
++        self.assertEqual(seen["layout"], "TND")
++        self.assertIs(seen["scale"], seen["source_scale"])
++
++    def test_zero_kv_heads_stay_in_tnd(self):
++        # Degenerate layers must not hit a ZeroDivisionError in the guard.
++        self.impl.num_kv_heads = 0
++        seen = self._forward([0, 1, 2, 3, 4], max_query_len=1)
++        self.assertEqual(seen["layout"], "TND")
++        self.assertIs(seen["scale"], seen["source_scale"])
++
++    # --- mask mode --------------------------------------------------------
++
++    def test_uniform_decode_drops_the_mask(self):
++        # One query row per request: CAUSAL constrains nothing there (the KV
++        # range is bounded by seqused_kv), and NO_MASK is a separate tiling
++        # key whose kernel never reads the mask.
++        self.assertEqual(self._forward([0, 1, 2, 3, 4], max_query_len=1)["mask_mode"], 0)
++
++    def test_mtp_verify_keeps_the_causal_mask(self):
++        # 1 + num_spec query rows per request: row 0 must not see row 1's KV.
++        self.assertEqual(self._forward([0, 2, 4, 6], max_query_len=2)["mask_mode"], 3)
++
++    def test_prefill_keeps_the_causal_mask(self):
++        self.assertEqual(self._forward([0, 5, 6, 7, 8], max_query_len=5)["mask_mode"], 3)
++
++    def test_unknown_query_length_keeps_the_causal_mask(self):
++        # max_query_len absent falls back to the token total, which is only
++        # 1 for a genuinely single-token step -- never a silent NO_MASK.
++        self.assertEqual(self._forward([0, 1, 2, 3, 4], max_query_len=None)["mask_mode"], 3)
++
++
++class TestC8MXFPPerStepDerivations(TestBase):
++    """Per-step quantities are derived once, not once per layer.
++
++    cu_seqlens_q / seqused_kv and the K-scale slot decomposition depend only
++    on the runner's per-step buffers, but a step walks 23 full-attention
++    layers. Caching them on the shared AscendMetadata is what keeps that from
++    being ~200 redundant device ops a decode step, so the reuse is the thing
++    worth pinning.
++    """
++
++    def setUp(self):
++        self.impl = object.__new__(AscendC8MXFPAttentionBackendImpl)
++        self.attn_metadata = SimpleNamespace(
++            query_start_loc_gpu=torch.tensor([0, 4, 8], dtype=torch.int32),
++            seq_lens_gpu=torch.tensor([10, 20], dtype=torch.int32),
++        )
++
++    def test_lengths_are_derived_once_per_step(self):
++        first = self.impl._qfa_step_lengths(self.attn_metadata, 8)
++        second = self.impl._qfa_step_lengths(self.attn_metadata, 8)
++        # Same tensor objects, so later layers add no ops to the graph.
++        self.assertIs(first[0], second[0])
++        self.assertIs(first[1], second[1])
++
++    def test_lengths_are_sanitized(self):
++        # -1 padding clamps to 0, and cummax keeps the boundaries monotonic
++        # so cu_seqlens_q[-1] still equals the token total.
++        self.attn_metadata.query_start_loc_gpu = torch.tensor([0, 4, 8, -1, -1], dtype=torch.int32)
++        self.attn_metadata.seq_lens_gpu = torch.tensor([10, 20, 0, 0], dtype=torch.int32)
++        cu_seqlens_q, seqused_kv = self.impl._qfa_step_lengths(self.attn_metadata, 8)
++        self.assertEqual(cu_seqlens_q.tolist(), [0, 4, 8, 8, 8])
++        self.assertEqual(seqused_kv.tolist(), [10, 20, 1, 1])
++
++    def test_k_scale_slot_index_is_derived_once_per_step(self):
++        slots = torch.tensor([2, 5, -1], dtype=torch.int64)
++        first = self.impl._qfa_k_scale_slot_index(self.attn_metadata, slots, 4)
++        second = self.impl._qfa_k_scale_slot_index(self.attn_metadata, slots, 4)
++        for a, b in zip(first, second):
++            self.assertIs(a, b)
++
++    def test_k_scale_slot_index_decomposes_slots(self):
++        # block_size 4, K-scale token fragment 16: slot 5 -> block 1,
++        # offset 1 -> segment 0, fragment 1. The padded row clamps to slot 0,
++        # the null block's, which keeps every shape static without a mask.
++        slots = torch.tensor([2, 5, -1], dtype=torch.int64)
++        block_ids, seg_ids, frag_ids = self.impl._qfa_k_scale_slot_index(self.attn_metadata, slots, 4)
++        self.assertEqual(block_ids.tolist(), [0, 1, 0])
++        self.assertEqual(seg_ids.tolist(), [0, 0, 0])
++        self.assertEqual(frag_ids.tolist(), [2, 1, 0])
++
++    def test_the_two_derivations_do_not_collide_in_the_step_cache(self):
++        lengths = self.impl._qfa_step_lengths(self.attn_metadata, 8)
++        slots = self.impl._qfa_k_scale_slot_index(self.attn_metadata, torch.tensor([2, 5, -1], dtype=torch.int64), 4)
++        self.assertIs(self.impl._qfa_step_lengths(self.attn_metadata, 8)[0], lengths[0])
++        self.assertIs(
++            self.impl._qfa_k_scale_slot_index(self.attn_metadata, torch.tensor([2, 5, -1], dtype=torch.int64), 4)[0],
++            slots[0],
++        )
++
++
++class TestC8MXFPQfaMetadataPlan(TestBase):
++    """One AICPU metadata plan a step, capture included.
++
++    The plan's inputs are head counts, head dim, quant mode, the two length
++    tensors, mask mode, window and layouts -- nothing layer-specific -- and
++    the main operator declares ``metadata`` a read-only Input. So the step's
++    full-attention layers share one plan instead of each paying an
++    AICore-to-AICPU round trip. That holds while a graph is captured too: the
++    deriving call is recorded inside the captured region, ahead of every read
++    of its output.
++    """
++
++    LAYERS_PER_STEP = 23
++
++    def setUp(self):
++        self.impl = object.__new__(AscendC8MXFPAttentionBackendImpl)
++        self.impl.num_heads = 8
++        self.impl.num_kv_heads = 2
++        self.impl.head_size = 128
++
++    def _plans(self, calls):
++        """Issue one step's worth of plans; return (plans, operator calls)."""
++        attn_metadata = SimpleNamespace()
++        invocations = []
++
++        def metadata_op(*args, **kwargs):
++            invocations.append((args, kwargs))
++            return MagicMock()
++
++        defaults = {
++            "cu_seqlens_q": torch.tensor([0, 1, 2], dtype=torch.int32),
++            "seqused_kv": torch.tensor([10, 20], dtype=torch.int32),
++            "max_seqlen_q": 1,
++            "mask_mode": 0,
++            "layout_q_descale": "N2TGD",
++        }
++        ops_module = MagicMock(quant_flash_attn_metadata=metadata_op)
++        with patch.dict("sys.modules", {"cann_ops_transformer.ops": ops_module}):
++            plans = [self.impl._get_qfa_metadata(attn_metadata, **{**defaults, **call}) for call in calls]
++        return plans, invocations
++
++    def test_one_plan_serves_every_layer(self):
++        plans, invocations = self._plans([{}] * self.LAYERS_PER_STEP)
++        self.assertEqual(len(invocations), 1)
++        for plan in plans[1:]:
++            self.assertIs(plan, plans[0])
++
++    def test_capture_shares_the_plan_too(self):
++        # Regression guard for the code this replaced: the old design
++        # bypassed the cache whenever a capture was in flight, which put one
++        # AICPU op per layer into the captured graph and replayed all of
++        # them every step. The shared derivation now runs inside the
++        # captured region by construction -- there is no bypass path left.
++        plans, invocations = self._plans([{}] * self.LAYERS_PER_STEP)
++        self.assertEqual(len(invocations), 1)
++        for plan in plans[1:]:
++            self.assertIs(plan, plans[0])
++
++    def test_a_different_non_tensor_input_gets_its_own_plan(self):
++        for override in ({"layout_q_descale": "TND"}, {"mask_mode": 3}, {"max_seqlen_q": 2}):
++            with self.subTest(**override):
++                plans, invocations = self._plans([{}, override])
++                self.assertEqual(len(invocations), 2)
++                self.assertIsNot(plans[0], plans[1])
++
++    def test_the_step_mask_mode_reaches_the_operator(self):
++        # The plan is a schedule for one kernel variant, so the mask mode it
++        # was built for has to be the one the main call then uses.
++        _, invocations = self._plans([{"mask_mode": 3}])
++        self.assertEqual(invocations[0][1]["mask_mode"], 3)
+@@ -0,0 +1,166 @@
++# SPDX-License-Identifier: Apache-2.0
++# SPDX-FileCopyrightText: Copyright contributors to the vllm-ascend project
++
++from dataclasses import replace
++from types import SimpleNamespace
++
++import pytest
++import torch
++from vllm.v1.core.kv_cache_utils import KVCacheBlockCopy
++from vllm.v1.kv_cache_interface import FullAttentionSpec
++
++from vllm_ascend.attention.attention_c8_mxfp import (
++    mxfp_cache_spec,
++    mxfp_cache_views_for_spec,
++    mxfp_packet_section_sizes,
++    mxfp_packet_size_bytes,
++    mxfp_paged_cache_views,
++)
++from vllm_ascend.worker.utils import AscendKVBlockZeroer, copy_kv_cache_blocks_inplace
++
++
++def _spec(ratio=1, heads=1, v_dim=256, padding=0):
++    spec = mxfp_cache_spec(
++        FullAttentionSpec(
++            block_size=512 * ratio,
++            num_kv_heads=heads,
++            head_size=256,
++            head_size_v=v_dim,
++            dtype=torch.float16,
++        )
++    )
++    return replace(spec, page_size_padded=spec.page_size_bytes + padding * ratio)
++
++
++@pytest.mark.parametrize("ratio", [1, 2, 8])
++@pytest.mark.parametrize("heads", [1, 3])
++@pytest.mark.parametrize("v_dim", [128, 256])
++@pytest.mark.parametrize("padding", [0, 256])
++def test_page_views_partition_payload_and_preserve_padding(ratio, heads, v_dim, padding):
++    spec = _spec(ratio, heads, v_dim, padding)
++    offset, num_pages, guard = 137, 2, 97
++    backing = torch.full((offset + num_pages * spec.page_size_bytes + guard,), 93, dtype=torch.int8)
++    raw = backing[offset:-guard]
++    k, v, ks, vs = mxfp_cache_views_for_spec(raw, spec, 512)
++    pitch = spec.page_size_bytes // ratio
++    k_bytes, ks_bytes, v_bytes, vs_bytes = mxfp_packet_section_sizes(heads, 512, 256, v_dim)
++    assert k.shape == (num_pages * ratio, heads, 8, 512, 32)
++    assert ks.shape == (num_pages * ratio, heads, 32, 4, 16, 2)
++    assert vs.shape == (num_pages * ratio, heads, v_dim // 16, 8, 16, 2)
++    assert [t.storage_offset() for t in (k, ks, v, vs)] == [
++        offset,
++        offset + k_bytes,
++        offset + k_bytes + ks_bytes,
++        offset + k_bytes + ks_bytes + v_bytes,
++    ]
++    for marker, view in enumerate((k, ks, v, vs), start=1):
++        assert view.stride(0) == pitch
++        assert view[0].is_contiguous()
++        view.view(torch.uint8).fill_(marker)
++    pages = raw.view(num_pages * ratio, pitch)
++    start = 0
++    for marker, size in enumerate((k_bytes, ks_bytes, v_bytes, vs_bytes), start=1):
++        assert (pages[:, start : start + size] == marker).all()
++        start += size
++    assert (pages[:, start:] == 93).all()
++    assert (backing[:offset] == 93).all()
++    assert (backing[-guard:] == 93).all()
++
++
++def test_spec_keeps_real_head_dimensions_and_metadata():
++    original = FullAttentionSpec(
++        block_size=512, num_kv_heads=1, head_size=256, head_size_v=128, dtype=torch.float16, non_causal=True
++    )
++    spec = mxfp_cache_spec(original)
++    assert type(spec) is FullAttentionSpec
++    assert (spec.head_size, spec.head_size_v) == (256, 128)
++    assert spec.non_causal is True
++    assert spec.state_content_bytes == 396
++    assert spec.page_size_bytes == 512 * 396
++    assert original.state_content_bytes is None
++
++
++def test_d256_page_budget_includes_both_scales_once():
++    assert mxfp_packet_size_bytes(1, 512, 256, 256) == 270336
++    assert _spec().page_size_bytes == 270336
++
++
++@pytest.mark.parametrize("ratio", [1, 2, 8])
++def test_cyclic_copy_moves_all_four_payloads_with_nonzero_offset(ratio):
++    spec = _spec(ratio, padding=256)
++    offset, guard = 128, 256
++    backing = torch.full((offset + 3 * spec.page_size_bytes + guard,), 91, dtype=torch.int8)
++    raw = backing[offset:-guard]
++    views = mxfp_cache_views_for_spec(raw, spec, 512)
++    pitch = spec.page_size_bytes // ratio
++    for section, view in enumerate(views):
++        for block in range(3 * ratio):
++            view[block].view(torch.uint8).fill_(section * 17 + block + 1)
++    before = [t.view(torch.uint8).clone().unflatten(0, (3, ratio)) for t in views]
++    copies = [KVCacheBlockCopy(src_block_id=0, dst_block_id=2), KVCacheBlockCopy(src_block_id=2, dst_block_id=0)]
++    # Duplicated entries catch repeated copies of an aliased region in a cycle.
++    copy_kv_cache_blocks_inplace([views, views], 3, copies)
++    for view, snapshot in zip(views, before):
++        pages = view.view(torch.uint8).unflatten(0, (3, ratio))
++        assert torch.equal(pages[0], snapshot[2])
++        assert torch.equal(pages[2], snapshot[0])
++        assert torch.equal(pages[1], snapshot[1])
++    payload = mxfp_packet_size_bytes(1, 512, 256, 256)
++    assert (raw.view(3 * ratio, pitch)[:, payload:] == 91).all()
++    assert (backing[:offset] == 91).all() and (backing[-guard:] == 91).all()
++
++
++@pytest.mark.parametrize("ratio", [1, 2, 8])
++def test_zero_metadata_excludes_padding_and_static_v_scale(ratio):
++    spec = _spec(ratio, padding=256)
++    offset, guard = 128, 256
++    backing = torch.full((offset + 2 * spec.page_size_bytes + guard,), 89, dtype=torch.int8)
++    raw = backing[offset:-guard]
++    views = mxfp_cache_views_for_spec(raw, spec, 512)
++    views[3].fill_(127)
++    before = backing.clone()
++    zeroer = AscendKVBlockZeroer(torch.device("cpu"), pin_memory=False)
++    group = SimpleNamespace(kv_cache_spec=spec, kv_cache_group_id=0, layer_names=["attn"])
++    zeroer.init_meta([group], [512], "mxfp8", set(), {"attn": SimpleNamespace(kv_cache=views)})
++    addresses, sizes, _, _, count = zeroer._meta
++    assert count == 3 * ratio
++    assert zeroer._seg_page_strides.tolist() == [spec.page_size_bytes // 4] * count
++    # Execute the byte ranges described by the production metadata on CPU.
++    for addr, size, stride in zip(addresses.tolist(), sizes.tolist(), zeroer._seg_page_strides.tolist()):
++        start = addr - backing.data_ptr() + 4 * stride  # scheduler page 1
++        backing[start : start + size * 4].zero_()
++    for view in views[:3]:
++        assert (view[ratio:].view(torch.uint8) == 0).all()
++    assert (views[3] == 127).all()
++    assert torch.equal(backing[: offset + spec.page_size_bytes], before[: offset + spec.page_size_bytes])
++    pitch = spec.page_size_bytes // ratio
++    payload = mxfp_packet_size_bytes(1, 512, 256, 256)
++    assert (raw.view(2 * ratio, pitch)[:, payload:] == 89).all()
++    assert torch.equal(backing[-guard:], before[-guard:])
++
++
++@pytest.mark.parametrize("case", ["raw_short", "pitch_short", "raw_stride", "bad_v_dim", "bad_k_dim"])
++def test_invalid_views_fail_before_as_strided(case):
++    raw = torch.zeros(2 * 270336, dtype=torch.int8)
++    kwargs = dict(num_kernel_blocks=2, num_kv_heads=1, k_dim=256, v_dim=256, block_size=512)
++    if case == "raw_short":
++        raw = raw[:-1]
++    elif case == "pitch_short":
++        kwargs["page_stride_bytes"] = 270335
++    elif case == "raw_stride":
++        raw = raw[::2]
++    elif case == "bad_v_dim":
++        kwargs["v_dim"] = 129
++    else:
++        kwargs["k_dim"] = 255
++    with pytest.raises(ValueError):
++        mxfp_paged_cache_views(raw, **kwargs)
++
++
++def test_invalid_scheduler_geometry_is_rejected():
++    with pytest.raises(ValueError, match="whole number"):
++        mxfp_cache_views_for_spec(torch.empty(1, dtype=torch.int8), _spec(), 1024)
++    with pytest.raises(ValueError, match="whole pages"):
++        mxfp_cache_views_for_spec(torch.empty(1, dtype=torch.int8), _spec(), 512)
++    with pytest.raises(ValueError, match="smaller"):
++        mxfp_cache_spec(replace(_spec(), page_size_padded=1))
+@@ -563,6 +563,65 @@ def test_c8_kv_cache_type_returns_mapper(self):
+             "model.layers.0.attn.v_cache_offset",
+         )
+ 
++    @staticmethod
++    def _mxfp8_dtype():
++        # C8-MXFP is enabled with --kv-cache-dtype mxfp8; the config property
++        # reads the current vllm config, which tests must provide.
++        return patch(
++            "vllm_ascend.quantization.configs.modelslim_config.get_current_vllm_config_or_none",
++            return_value=SimpleNamespace(cache_config=SimpleNamespace(cache_dtype="mxfp8")),
++        )
++
++    def test_mxfp_c8_recipe_detected_from_per_layer_quant_type(self):
++        # Newer ModelSlim checkpoints drop the model-wide kv_cache_type and
++        # state the recipe per layer instead; only full-attention layers of a
++        # hybrid model carry one. The recipe is detected, but the switch is
++        # the dtype: without it the config stays off.
++        config = AscendModelSlimConfig(
++            {
++                "model.layers.3.self_attn.quant_type": "QK_MXFP8_DYNAMIC_V_MXFP8_PER_CHANNEL",
++                "model.layers.0.linear_attn.quant_type": "W8A8_DYNAMIC",
++            }
++        )
++        self.assertTrue(config._has_mxfp_c8_recipe)
++        self.assertFalse(config.enable_mxfp_c8_quant)
++
++        with self._mxfp8_dtype():
++            self.assertTrue(config.enable_mxfp_c8_quant)
++            mapper = config.get_cache_scale_mapper()
++        self.assertEqual(
++            mapper._map_name("model.layers.3.self_attn.fa_v.scale"),
++            "model.layers.3.self_attn.attn.v_cache_scale",
++        )
++
++    def test_mxfp_c8_stands_fa_quant_down(self):
++        # Both recipes declared for the same layer: MXFP8 has to win, or the
++        # FAKQuant regex renames fa_v.scale into an MLA submodule a dense model
++        # does not have and the scale is silently dropped.
++        config = AscendModelSlimConfig(
++            {
++                "kv_cache_type": "K_DYNAMIC_V_STATIC_MXFP8_PER_CHANNEL",
++                "fa_quant_type": "FAKQuant",
++                "model.layers.3.self_attn.fa_k.scale": "FAKQuant",
++            }
++        )
++        self.assertTrue(config._has_mxfp_c8_recipe)
++
++        with self._mxfp8_dtype():
++            mapper = config.get_cache_scale_mapper()
++            self.assertFalse(config.enable_fa_quant)
++            self.assertEqual(
++                mapper._map_name("model.layers.3.self_attn.fa_v.scale"),
++                "model.layers.3.self_attn.attn.v_cache_scale",
++            )
++            # Q/K are quantized dynamically and V has no offset. Drop legacy
++            # FAKQuant tensors at the mapper, before weight loading.
++            for suffix in (".fa_k.scale", ".fa_q.scale", ".fa_k.offset", ".fa_q.offset", ".fa_v.offset"):
++                with self.subTest(suffix=suffix):
++                    self.assertIsNone(mapper._map_name(f"model.layers.3.self_attn{suffix}"))
++            for suffix in (".fa_k.scale", ".fa_q.scale", ".fa_k.offset", ".fa_q.offset"):
++                self.assertIn(suffix, config._ignore_unexpected_suffixes)
++
+     def test_fa_quant_returns_mapper(self):
+         config = AscendModelSlimConfig(
+             {
+@@ -0,0 +1,557 @@
++from types import SimpleNamespace
++from unittest.mock import patch
++
++import torch
++from torch.utils._python_dispatch import TorchDispatchMode
++
++import vllm_ascend.attention.attention_c8_mxfp as mxfp_kv_cache
++from tests.ut.base import TestBase
++from vllm_ascend.attention.attention_c8_mxfp import (
++    MXFP8_GROUP_SIZE,
++    MXFP_K_SCALE_NZ_TOKEN_FRAG,
++    MXFP_KV_SCALE_GROUP_SIZE,
++    fill_mxfp_v_scale_cache,
++    mxfp_k_scale_cache_shape,
++    mxfp_k_scale_page_bytes,
++    mxfp_k_scale_slot_index,
++    mxfp_packet_size_bytes,
++    mxfp_paged_cache_views,
++    mxfp_v_scale_cache_shape,
++    mxfp_v_scale_page_bytes,
++    scatter_mxfp_k_scale_cache,
++    scatter_mxfp_pa_nz_kv_cache,
++)
++from vllm_ascend.quantization.methods.kv_cache.mxfp_c8 import (
++    AscendC8MXFPKVCacheAttentionMethod,
++    _quant_weight_loader,
++)
++
++
++class _RecordOps(TorchDispatchMode):
++    """Record the aten ops a block dispatches, views aside.
++
++    Every recorded op is a device kernel on the NPU -- one line in a profile,
++    one node in a captured graph -- whereas views launch nothing.
++    """
++
++    _VIEWS = frozenset(
++        {"view", "_unsafe_view", "reshape", "slice", "select", "expand", "unsqueeze", "squeeze", "alias", "detach"}
++    )
++
++    def __init__(self):
++        super().__init__()
++        self.kernels: list[str] = []
++
++    def __torch_dispatch__(self, func, types, args=(), kwargs=None):
++        name = func.overloadpacket.__name__
++        if name not in self._VIEWS:
++            self.kernels.append(name)
++        return func(*args, **(kwargs or {}))
++
++
++class TestMXFPScaleCacheShapes(TestBase):
++    """Shape/byte-budget formulas for the C8-MXFP E8M0 scale caches."""
++
++    def test_k_scale_cache_shape_d256_bs512(self):
++        # PA_NZ: [Bn, N, Bs//16, D//64, 16, 2] (golden quant_flash_attn_golden.py).
++        shape = mxfp_k_scale_cache_shape(num_blocks=8, block_size=512, num_kv_heads=4, head_dim=256)
++        self.assertEqual(shape, (8, 4, 32, 4, 16, 2))
++
++    def test_v_scale_cache_shape_d256_bs512(self):
++        # PA_NZ: [Bn, N, D//16, Bs//64, 16, 2].
++        shape = mxfp_v_scale_cache_shape(num_blocks=8, block_size=512, num_kv_heads=4, head_dim=256)
++        self.assertEqual(shape, (8, 4, 16, 8, 16, 2))
++
++    def test_scale_page_bytes_are_equal_for_k_and_v(self):
++        k_bytes = mxfp_k_scale_page_bytes(num_kv_heads=4, block_size=512, head_dim=256)
++        v_bytes = mxfp_v_scale_page_bytes(num_kv_heads=4, block_size=512, head_dim=256)
++        self.assertEqual(k_bytes, 4 * 512 * 256 // MXFP8_GROUP_SIZE)
++        self.assertEqual(k_bytes, v_bytes)
++
++    def test_head_dim_must_align_to_scale_group(self):
++        with self.assertRaises(ValueError):
++            mxfp_k_scale_cache_shape(num_blocks=1, block_size=512, num_kv_heads=1, head_dim=100)
++
++
++class TestScatterMXFPPaNzKvCache(TestBase):
++    """PA_NZ KV scatter hands npu_scatter_pa_kv_cache the FIA C8 contract.
++
++    torch_npu is a MagicMock here, so what is checkable on CPU is the call
++    contract -- the shapes, dtypes and slot handling the operator is given.
++    That is also the whole substance of the change: the operator itself is
++    validated on-device by the FIA C8 path, which makes this exact call.
++    """
++
++    BLOCK_SIZE = 64
++    NUM_KV_HEADS = 2
++    HEAD_DIM = 64  # D//32 = 2 fragments
++    NUM_BLOCKS = 2
++
++    def setUp(self):
++        raw = torch.zeros(
++            self.NUM_BLOCKS
++            * (mxfp_packet_size_bytes(self.NUM_KV_HEADS, self.BLOCK_SIZE, self.HEAD_DIM, self.HEAD_DIM)),
++            dtype=torch.int8,
++        )
++        self.key_cache, self.value_cache, _, _ = mxfp_paged_cache_views(
++            raw,
++            self.NUM_BLOCKS,
++            self.NUM_KV_HEADS,
++            self.HEAD_DIM,
++            self.HEAD_DIM,
++            self.BLOCK_SIZE,
++        )
++
++    def _scatter(self, num_tokens=3, slots=None, dtype=torch.uint8):
++        key = (
++            torch.arange(num_tokens * self.NUM_KV_HEADS * self.HEAD_DIM, dtype=torch.int32)
++            .remainder(251)
++            .to(torch.uint8)
++            .reshape(num_tokens, self.NUM_KV_HEADS, self.HEAD_DIM)
++        )
++        if dtype != torch.uint8:
++            key = key.view(dtype)
++        if slots is None:
++            slots = torch.tensor([2, 5, -1][:num_tokens], dtype=torch.int64)
++        with patch.object(mxfp_kv_cache.torch_npu, "npu_scatter_pa_kv_cache") as op:
++            scatter_mxfp_pa_nz_kv_cache(key, key.clone(), self.key_cache, self.value_cache, slots)
++        return op, key, slots
++
++    def test_caches_reach_the_operator_as_the_nz_five_d_strided_view(self):
++        op, _, _ = self._scatter()
++        op.assert_called_once()
++        packet = mxfp_packet_size_bytes(self.NUM_KV_HEADS, self.BLOCK_SIZE, self.HEAD_DIM, self.HEAD_DIM)
++        for name in ("key_cache", "value_cache"):
++            cache = op.call_args.kwargs[name]
++            self.assertEqual(
++                tuple(cache.shape),
++                (
++                    self.NUM_BLOCKS,
++                    self.NUM_KV_HEADS,
++                    self.HEAD_DIM // 32,
++                    self.BLOCK_SIZE,
++                    32,
++                ),
++                f"{name} must reach the operator as (Bn, KV_N, D/32, Bs, 32)",
++            )
++            # The operator's tiling reads dim0 stride as the block stride;
++            # it must be the packet size, not the contiguous-layout value.
++            self.assertEqual(cache.stride(0), packet)
++
++    def test_pa_nz_cache_mode_is_declared(self):
++        # Scenario 1 of the ScatterPaKvCache contract is selected by
++        # cache_mode; without it the operator reads the caches as "Norm"
++        # ([num_blocks, block_size, num_head, head_size]) and rejects the
++        # NZ axis order on dim2.
++        op, _, _ = self._scatter()
++        self.assertEqual(op.call_args.kwargs["cache_mode"], "PA_NZ")
++
++    def test_payload_keeps_its_token_row_shape(self):
++        op, key, _ = self._scatter()
++        for name in ("key", "value"):
++            self.assertEqual(tuple(op.call_args.kwargs[name].shape), tuple(key.shape))
++
++    def test_everything_reaches_the_operator_as_one_byte_int8(self):
++        # The FIA C8 path feeds int8; erasing the dtype here is what keeps the
++        # FP8 payload out of the operator's type check. The bitcast is a
++        # same-itemsize view, so it preserves the packet strides.
++        op, _, _ = self._scatter(dtype=torch.float8_e4m3fn)
++        packet = mxfp_packet_size_bytes(self.NUM_KV_HEADS, self.BLOCK_SIZE, self.HEAD_DIM, self.HEAD_DIM)
++        for name in ("key", "value", "key_cache", "value_cache"):
++            self.assertEqual(op.call_args.kwargs[name].dtype, torch.int8, name)
++        for name in ("key_cache", "value_cache"):
++            self.assertEqual(op.call_args.kwargs[name].stride(0), packet)
++
++    def test_negative_slots_are_left_for_the_operator(self):
++        # No clamp, no filtering: the operator skips PAD_SLOT_ID itself, and
++        # keeping the tensor untouched is what keeps shapes static under
++        # graph capture.
++        op, _, slots = self._scatter()
++        passed = op.call_args.kwargs["slot_mapping"]
++        self.assertIs(passed, slots)
++        self.assertTrue(bool((passed < 0).any()), "fixture should include a padded row")
++
++    def test_empty_batch_does_not_call_the_operator(self):
++        with patch.object(mxfp_kv_cache.torch_npu, "npu_scatter_pa_kv_cache") as op:
++            scatter_mxfp_pa_nz_kv_cache(
++                torch.zeros(0, self.NUM_KV_HEADS, self.HEAD_DIM, dtype=torch.uint8),
++                torch.zeros(0, self.NUM_KV_HEADS, self.HEAD_DIM, dtype=torch.uint8),
++                self.key_cache,
++                self.value_cache,
++                torch.zeros(0, dtype=torch.int64),
++            )
++        op.assert_not_called()
++
++
++class TestFillMXFPVScaleCache(TestBase):
++    """V's static per-channel scale, spread over its whole paged cache.
++
++    Unlike K's, this scale never changes at inference, so it is written once
++    at KV cache setup instead of being scattered per step. Every block, every
++    token group and both halves of the even/odd pair get the same
++    (kv head, channel) byte.
++    """
++
++    NUM_BLOCKS = 2
++    NUM_KV_HEADS = 2
++    BLOCK_SIZE = 128
++
++    def _fill(self, head_dim):
++        cache = torch.zeros(
++            mxfp_v_scale_cache_shape(self.NUM_BLOCKS, self.BLOCK_SIZE, self.NUM_KV_HEADS, head_dim),
++            dtype=torch.uint8,
++        )
++        # Distinct byte per (kv head, channel) so a transposed or collapsed
++        # axis cannot pass by accident, and none of them zero so an untouched
++        # slot stays distinguishable from a written one.
++        value_scale = (
++            torch.arange(self.NUM_KV_HEADS * head_dim, dtype=torch.int32).remainder(251).add(1).to(torch.uint8)
++        )
++        fill_mxfp_v_scale_cache(value_scale, cache)
++        return value_scale, cache
++
++    def test_every_slot_carries_its_channel_scale(self):
++        head_dim = 64
++        value_scale, cache = self._fill(head_dim)
++        num_token_groups = cache.shape[3]
++        for block in range(self.NUM_BLOCKS):
++            for token_group in range(num_token_groups):
++                for half in range(2):
++                    self.assertEqual(
++                        cache[block, :, :, token_group, :, half].reshape(-1).tolist(),
++                        value_scale.tolist(),
++                    )
++
++    def test_the_cache_supplies_the_head_dim(self):
++        # A model whose V head dim differs from Q/K's must still land
++        # correctly, which is why the shapes are read off the cache.
++        value_scale, cache = self._fill(32)
++        self.assertEqual(cache.shape[2], 32 // 16)
++        self.assertEqual(cache[0, :, :, 0, :, 0].reshape(-1).tolist(), value_scale.tolist())
++
++    def test_no_slot_is_left_untouched(self):
++        # Zero is the failure signature of the bug this replaced: a scale
++        # cache that stayed at its allocation value dequantizes V to ~0 and
++        # attention returns exactly zero. The fixture has no zero scales, so
++        # any zero left in the cache is a slot the fill missed.
++        _, cache = self._fill(64)
++        self.assertTrue(bool((cache != 0).all()))
++
++
++class TestScatterMXFPKScaleCache(TestBase):
++    """Scatter writes valid slots and parks padded (-1) rows in the null block.
++
++    Slot 0 is block 0, which vLLM's BlockPool reserves as the null block and
++    never hands to a request, so nothing a real token owns lives there. Parking
++    padded rows on it is what lets the scatter be one write per layer instead
++    of a read, a select and a write.
++    """
++
++    def setUp(self):
++        torch.manual_seed(0)
++        self.block_size = 512
++        self.num_kv_heads = 2
++        self.head_dim = MXFP_KV_SCALE_GROUP_SIZE
++        self.key_scale_cache = torch.zeros(
++            (
++                2,
++                self.num_kv_heads,
++                self.block_size // MXFP_K_SCALE_NZ_TOKEN_FRAG,
++                self.head_dim // MXFP_KV_SCALE_GROUP_SIZE,
++                MXFP_K_SCALE_NZ_TOKEN_FRAG,
++                2,
++            ),
++            dtype=torch.uint8,
++        )
++
++    def _at(self, slot):
++        """(block, seg, frag) coordinates of a slot in the PA_NZ cache."""
++        block, offset = slot // self.block_size, slot % self.block_size
++        return block, offset // MXFP_K_SCALE_NZ_TOKEN_FRAG, offset % MXFP_K_SCALE_NZ_TOKEN_FRAG
++
++    def _scatter(self, key_scale, slot_mapping, cache=None):
++        cache = self.key_scale_cache if cache is None else cache
++        scatter_mxfp_k_scale_cache(key_scale, cache, mxfp_k_scale_slot_index(slot_mapping, self.block_size))
++        return cache
++
++    def _read_modify_write_reference(self, key_scale, slot_mapping, cache):
++        """The scatter this replaced: padded rows rewrite what they read."""
++        slots = slot_mapping.to(torch.long)
++        valid = slots >= 0
++        safe = torch.where(valid, slots, torch.zeros_like(slots))
++        block, offset = safe // self.block_size, safe % self.block_size
++        seg, frag = offset // MXFP_K_SCALE_NZ_TOKEN_FRAG, offset % MXFP_K_SCALE_NZ_TOKEN_FRAG
++        cached = cache[block, :, seg, :, frag, :]
++        cache[block, :, seg, :, frag, :] = torch.where(valid.view(-1, 1, 1, 1), key_scale, cached)
++        return cache
++
++    def _without_null_slot(self, cache):
++        cache = cache.clone()
++        block, seg, frag = self._at(0)
++        cache[block, :, seg, :, frag] = 0
++        return cache
++
++    def test_scatter_valid_and_padded_slots(self):
++        key_scale = torch.full((3, self.num_kv_heads, 1, 2), 130, dtype=torch.uint8)
++        key_scale[2] = 77  # the padded row's own (meaningless) scale
++        # slot 2 -> block 0, offset 2; slot 513 -> block 1, offset 1; -1 -> padding.
++        self._scatter(key_scale, torch.tensor([2, 513, -1], dtype=torch.int64))
++
++        block, seg, frag = self._at(2)
++        self.assertTrue(torch.all(self.key_scale_cache[block, :, seg, :, frag] == 130))
++        block, seg, frag = self._at(513)
++        self.assertTrue(torch.all(self.key_scale_cache[block, :, seg, :, frag] == 130))
++        # The padded row is parked on the null block's slot 0 ...
++        block, seg, frag = self._at(0)
++        self.assertTrue(torch.all(self.key_scale_cache[block, :, seg, :, frag] == 77))
++        # ... and neighbours of every written slot stay untouched.
++        for slot in (1, 3, 512, 514):
++            block, seg, frag = self._at(slot)
++            self.assertTrue(torch.all(self.key_scale_cache[block, :, seg, :, frag] == 0))
++
++    def test_scatter_all_padding_rows_touch_only_the_null_slot(self):
++        """A pure-padding batch (all -1, e.g. a dummy run) must leave every
++        slot a request can own alone."""
++        key_scale = torch.full((2, self.num_kv_heads, 1, 2), 130, dtype=torch.uint8)
++        self._scatter(key_scale, torch.tensor([-1, -1], dtype=torch.int64))
++        self.assertTrue(torch.all(self._without_null_slot(self.key_scale_cache) == 0))
++
++    def test_scatter_padding_and_real_at_nonzero_slot_coexist(self):
++        key_scale = torch.zeros((2, self.num_kv_heads, 1, 2), dtype=torch.uint8)
++        key_scale[0] = 200  # real token at slot 3
++        key_scale[1] = 77  # padding row
++        self._scatter(key_scale, torch.tensor([3, -1], dtype=torch.int64))
++
++        block, seg, frag = self._at(3)
++        self.assertTrue(torch.all(self.key_scale_cache[block, :, seg, :, frag] == 200))
++        expected = torch.zeros_like(self.key_scale_cache)
++        expected[block, :, seg, :, frag] = 200
++        self.assertTrue(torch.equal(self._without_null_slot(self.key_scale_cache), expected))
++
++    # The two phases are judged separately on purpose: they do not get the
++    # same guarantee, and only one of them ever sees a padded row.
++
++    def test_prefill_shaped_batch_is_bit_identical_to_the_read_modify_write(self):
++        # Eager batches are sliced to num_actual_tokens, so they carry no -1
++        # rows and the old read + select was an identity there.
++        slots = torch.randperm(2 * self.block_size)[:300]
++        key_scale = torch.randint(1, 255, (300, self.num_kv_heads, 1, 2), dtype=torch.uint8)
++        new = self._scatter(key_scale, slots, torch.zeros_like(self.key_scale_cache))
++        old = self._read_modify_write_reference(key_scale, slots, torch.zeros_like(self.key_scale_cache))
++        self.assertTrue(torch.equal(new, old))
++
++    def test_padded_decode_batch_differs_only_in_the_null_slot(self):
++        # FULL-graph replays pad the batch up to the captured size with -1.
++        # Real slots start past block 0: the pool never hands block 0 out.
++        real = self.block_size + torch.randperm(self.block_size)[:5]
++        slots = torch.cat([real, torch.full((11,), -1)])
++        key_scale = torch.randint(1, 255, (16, self.num_kv_heads, 1, 2), dtype=torch.uint8)
++        new = self._scatter(key_scale, slots, torch.zeros_like(self.key_scale_cache))
++        old = self._read_modify_write_reference(key_scale, slots, torch.zeros_like(self.key_scale_cache))
++        self.assertFalse(torch.equal(new, old))
++        self.assertTrue(torch.equal(self._without_null_slot(new), self._without_null_slot(old)))
++
++    def test_scatter_is_one_write_and_no_read(self):
++        # The point of parking padded rows: this runs once per full-attention
++        # layer per step, and used to be a gather, a select and a write.
++        slot_index = mxfp_k_scale_slot_index(torch.tensor([2, 513, -1]), self.block_size)
++        key_scale = torch.full((3, self.num_kv_heads, 1, 2), 130, dtype=torch.uint8)
++        with _RecordOps() as ops:
++            scatter_mxfp_k_scale_cache(key_scale, self.key_scale_cache, slot_index)
++        self.assertEqual([op for op in ops.kernels if "index_put" in op], ["index_put_"])
++        self.assertEqual([op for op in ops.kernels if op in ("index", "where")], [])
++
++    def test_slot_index_needs_no_validity_mask(self):
++        slots = torch.tensor([2, 513, -1], dtype=torch.int32)
++        with _RecordOps() as ops:
++            block_ids, seg_ids, frag_ids = mxfp_k_scale_slot_index(slots, self.block_size)
++        self.assertEqual(block_ids.tolist(), [0, 1, 0])
++        self.assertEqual(seg_ids.tolist(), [0, 0, 0])
++        self.assertEqual(frag_ids.tolist(), [2, 1, 0])
++        self.assertEqual([op for op in ops.kernels if op in ("ge", "where", "zeros_like")], [])
++        self.assertLessEqual(len(ops.kernels), 6)
++
++
++class TestAscendC8MXFPKVCacheAttentionMethod(TestBase):
++    """Quant-method wiring: V scale loading and backend installation."""
++
++    def _make_layer(self, with_impl: bool = False):
++        from vllm_ascend.attention.attention_c8_mxfp import AscendC8MXFPAttentionBackendImpl
++
++        layer = torch.nn.Module()
++        layer.num_kv_heads = 2
++        layer.head_size_v = 4
++        if with_impl:
++            layer.impl = object.__new__(AscendC8MXFPAttentionBackendImpl.__base__)
++        return layer
++
++    def test_missing_checkpoint_v_scale_defaults_to_neutral(self):
++        layer = self._make_layer()
++        method = AscendC8MXFPKVCacheAttentionMethod({}, "layer")
++        method.create_weights(layer)
++        self.assertTrue(torch.equal(layer.v_cache_scale, torch.full((8,), 127, dtype=torch.uint8)))
++
++    def test_weight_loader_accepts_column_vector_checkpoint_layout(self):
++        """ModelSlim exports v_scale as [hidden, 1]; the parameter is 1-D.
++        The loader must squeeze the trailing size-1 dims before comparing."""
++        from vllm_ascend.quantization.methods.kv_cache.mxfp_c8 import _quant_weight_loader
++
++        param = torch.full((512,), 127, dtype=torch.uint8)
++        column_vector_weight = torch.full((512, 1), 119, dtype=torch.uint8)
++
++        _quant_weight_loader(param, column_vector_weight)
++
++        self.assertTrue(torch.equal(param, torch.full((512,), 119, dtype=torch.uint8)))
++
++    def test_weight_loader_slices_replicated_heads_under_tp(self):
++        """The loader delivers the FULL-width scale on every rank (attention
++        params bypass ColumnParallelLinear sharding). Under GQA TP with
++        num_kv_heads < tp_size, vLLM replicates each KV head across
++        tp_size // num_kv_heads ranks; rank r owns the head-dim slice of
++        head r // (tp_size // num_kv_heads). TP4 over 2 heads: ranks 0/1 ->
++        head 0, ranks 2/3 -> head 1. When num_kv_heads == tp_size it
++        degenerates to the plain contiguous narrow (TP2: rank 0 -> [0,256),
++        rank 1 -> [256,512))."""
++        from unittest.mock import patch
++
++        import torch as _torch
++
++        from vllm_ascend.quantization.methods.kv_cache.mxfp_c8 import _quant_weight_loader
++
++        loader_mod = "vllm_ascend.quantization.methods.kv_cache.mxfp_c8"
++
++        def _head_val(head: int) -> int:
++            return 100 + head  # head 0 -> 100s, head 1 -> 101s...
++
++        full = _torch.cat([_torch.full((256,), _head_val(h), dtype=_torch.uint8) for h in range(2)])
++        param = _torch.zeros(256, dtype=_torch.uint8)
++
++        # TP4 rank 3 -> head 1
++        with (
++            patch(f"{loader_mod}.get_tensor_model_parallel_rank", return_value=3),
++            patch(f"{loader_mod}.get_tensor_model_parallel_world_size", return_value=4),
++        ):
++            _quant_weight_loader(param, full)
++        self.assertTrue(_torch.equal(param, _torch.full((256,), 101, dtype=_torch.uint8)))
++
++        # TP2 rank 1 -> head 1 (plain narrow case)
++        with (
++            patch(f"{loader_mod}.get_tensor_model_parallel_rank", return_value=1),
++            patch(f"{loader_mod}.get_tensor_model_parallel_world_size", return_value=2),
++        ):
++            _quant_weight_loader(param, full)
++        self.assertTrue(_torch.equal(param, _torch.full((256,), 101, dtype=_torch.uint8)))
++
++        # TP4 rank 0 -> head 0
++        with (
++            patch(f"{loader_mod}.get_tensor_model_parallel_rank", return_value=0),
++            patch(f"{loader_mod}.get_tensor_model_parallel_world_size", return_value=4),
++        ):
++            _quant_weight_loader(param, full)
++        self.assertTrue(_torch.equal(param, _torch.full((256,), 100, dtype=_torch.uint8)))
++
++    def test_loaded_v_scale_produces_expected_reciprocal(self):
++        method = AscendC8MXFPKVCacheAttentionMethod.__new__(AscendC8MXFPKVCacheAttentionMethod)
++        layer = torch.nn.Module()
++        layer.num_kv_heads = 2
++        layer.head_size_v = 4
++        method.create_weights(layer)
++        self.assertEqual(layer.v_cache_scale.dtype, torch.uint8)
++        self.assertEqual(layer.v_cache_scale.shape, (8,))
++        checkpoint_scale = torch.full((8,), 128, dtype=torch.uint8)
++        layer.v_cache_scale.weight_loader(layer.v_cache_scale, checkpoint_scale)
++        self.assertTrue(torch.equal(layer.v_cache_scale, checkpoint_scale))
++
++        vllm_config = SimpleNamespace(model_config=SimpleNamespace(dtype=torch.bfloat16))
++        with patch(
++            "vllm_ascend.quantization.methods.kv_cache.mxfp_c8.get_current_vllm_config",
++            return_value=vllm_config,
++        ):
++            method.process_weights_after_loading(layer)
++
++        # E8M0 128 represents 2.0, whose reciprocal is 0.5.
++        self.assertTrue(torch.equal(layer.v_cache_scale_float_reciprocal, torch.full((8,), 0.5, dtype=torch.bfloat16)))
++
++    def test_installs_c8_backend_with_512_token_blocks(self):
++        from vllm_ascend.attention.attention_c8_mxfp import (
++            AscendC8MXFPAttentionBackend,
++            AscendC8MXFPAttentionBackendImpl,
++        )
++        from vllm_ascend.attention.attention_v1 import AscendAttentionBackend
++
++        method = AscendC8MXFPKVCacheAttentionMethod({}, prefix="model.layers.3")
++        layer = self._make_layer(with_impl=True)
++
++        method.create_weights(layer)
++
++        self.assertIs(layer.attn_backend, AscendC8MXFPAttentionBackend)
++        self.assertIsInstance(layer.impl, AscendC8MXFPAttentionBackendImpl)
++        self.assertFalse(layer.impl.enable_hamming_sparse)
++        self.assertEqual(AscendAttentionBackend.get_supported_kernel_block_sizes(), [128])
++        self.assertEqual(AscendC8MXFPAttentionBackend.get_supported_kernel_block_sizes(), [512])
++
++
++class TestQuantWeightLoader(TestBase):
++    """How the static V-cache scale is spread over TP ranks.
++
++    The scale is one E8M0 byte per (kv_head, channel), so the split is counted
++    in KV heads. Dividing the tensor by tp_size instead breaks in both
++    directions: a checkpoint that shares one set of channel scales across heads
++    has nothing to divide, and a model whose total_kv_heads is below tp_size
++    replicates a KV head rather than sharding it.
++    """
++
++    HEAD_SIZE_V = 4
++
++    def _load(self, *, param_heads, ckpt_heads, tp_rank, tp_size):
++        head = self.HEAD_SIZE_V
++        param = torch.full((param_heads * head,), 127, dtype=torch.uint8)
++        # Byte value encodes the head index, so the result names its source.
++        loaded = torch.arange(ckpt_heads * head, dtype=torch.int32).div(head, rounding_mode="floor")
++        with (
++            patch(
++                "vllm_ascend.quantization.methods.kv_cache.mxfp_c8.get_tensor_model_parallel_rank",
++                return_value=tp_rank,
++            ),
++            patch(
++                "vllm_ascend.quantization.methods.kv_cache.mxfp_c8.get_tensor_model_parallel_world_size",
++                return_value=tp_size,
++            ),
++        ):
++            _quant_weight_loader(param, loaded.to(torch.uint8))
++        return param[::head].tolist()
++
++    def test_shared_scale_is_tiled_over_kv_heads(self):
++        # One set of channel scales for every KV head: TP=1 has to see it twice.
++        self.assertEqual(self._load(param_heads=2, ckpt_heads=1, tp_rank=0, tp_size=1), [0, 0])
++
++    def test_shared_scale_survives_tp_split(self):
++        # Each rank holds one head, and both heads use the same set.
++        for rank in range(2):
++            self.assertEqual(self._load(param_heads=1, ckpt_heads=1, tp_rank=rank, tp_size=2), [0])
++
++    def test_per_head_scale_is_sharded_by_rank(self):
++        self.assertEqual(self._load(param_heads=1, ckpt_heads=2, tp_rank=0, tp_size=2), [0])
++        self.assertEqual(self._load(param_heads=1, ckpt_heads=2, tp_rank=1, tp_size=2), [1])
++
++    def test_per_head_scale_follows_replicated_kv_heads(self):
++        # total_kv_heads=2 under TP=4: ranks 0/1 share head 0, ranks 2/3 head 1.
++        self.assertEqual(
++            [self._load(param_heads=1, ckpt_heads=2, tp_rank=r, tp_size=4)[0] for r in range(4)], [0, 0, 1, 1]
++        )
++
++    def test_trailing_axis_from_modelslim_is_accepted(self):
++        param = torch.full((8,), 127, dtype=torch.uint8)
++        loaded = torch.full((8, 1), 130, dtype=torch.uint8)
++        with (
++            patch(
++                "vllm_ascend.quantization.methods.kv_cache.mxfp_c8.get_tensor_model_parallel_rank",
++                return_value=0,
++            ),
++            patch(
++                "vllm_ascend.quantization.methods.kv_cache.mxfp_c8.get_tensor_model_parallel_world_size",
++                return_value=1,
++            ),
++        ):
++            _quant_weight_loader(param, loaded)
++        self.assertTrue(torch.equal(param, torch.full((8,), 130, dtype=torch.uint8)))
+@@ -539,14 +539,22 @@ def test_pre_register_and_update_with_parser(self, mock_quant_config, mock_adapt
+         mock_parser = MagicMock()
+         mock_action = MagicMock()
+         mock_action.choices = ["awq", "gptq"]
+-        mock_parser._option_string_actions = {"--quantization": mock_action}
++        dtype_action = MagicMock()
++        dtype_action.choices = ["auto"]
++        mock_parser._option_string_actions = {
++            "--quantization": mock_action,
++            "--kv-cache-dtype": dtype_action,
++        }
+ 
+         self.platform.pre_register_and_update(mock_parser)
+ 
+         mock_adapt_patch.assert_called_once_with(is_global_patch=True)
+ 
+         self.assertTrue(ASCEND_QUANTIZATION_METHOD in mock_action.choices)
+         self.assertEqual(len(mock_action.choices), 3)  # original 2 + ascend
++        self.assertIn("int8", dtype_action.choices)
++        self.assertIn("mxfp8", dtype_action.choices)
++        self.assertEqual(dtype_action.choices.count("auto"), 1)
+ 
+     @patch("vllm_ascend.utils.adapt_patch")
+     @patch("vllm_ascend.quantization.configs.modelslim_config.AscendModelSlimConfig")
+@@ -861,6 +861,41 @@ def test_enabled_by_both_switches(self):
+             self.assertTrue(utils.is_rl_weight_update_enabled(self._vllm_config(SimpleNamespace(backend="npu_ipc"))))
+ 
+ 
++class TestRefreshBlockSizeC8MXFP(TestBase):
++    def _config(self, block_size, *, is_hybrid=False, user_specified=False):
++        return SimpleNamespace(
++            cache_config=SimpleNamespace(
++                block_size=block_size,
++                cache_dtype="mxfp8",
++                user_specified_block_size=user_specified,
++                mamba_page_size_padded=123456,
++                mamba_block_size=32768,
++            ),
++            model_config=SimpleNamespace(is_hybrid=is_hybrid),
++            scheduler_config=SimpleNamespace(),
++            speculative_config=None,
++        )
++
++    def test_default_block_size_becomes_kernel_size(self):
++        for hybrid in (False, True):
++            config = self._config(128, is_hybrid=hybrid)
++            utils.refresh_block_size(config)
++            self.assertEqual(config.cache_config.block_size, 512)
++
++    def test_scheduler_block_can_contain_multiple_kernel_blocks(self):
++        for size in (512, 1024, 4096):
++            config = self._config(size, is_hybrid=True, user_specified=True)
++            utils.refresh_block_size(config)
++            self.assertEqual(config.cache_config.block_size, size)
++            self.assertEqual(config.cache_config.mamba_page_size_padded, 123456)
++            self.assertEqual(config.cache_config.mamba_block_size, 32768)
++
++    def test_invalid_explicit_block_size_is_rejected(self):
++        config = self._config(768, user_specified=True)
++        with self.assertRaisesRegex(ValueError, "multiple of 512"):
++            utils.refresh_block_size(config)
++
++
+ @pytest.fixture
+ def physical_device_lookup():
+     with mock.patch("vllm.platforms.current_platform") as platform:
+@@ -58,6 +58,7 @@ def test_standardized_sfa_allocation_preserves_layerwise_aliases(reuse, indexer_
+         else None
+     )
+     vllm_config = SimpleNamespace(
++        cache_config=SimpleNamespace(cache_dtype="auto"),
+         kv_transfer_config=connector,
+         model_config=SimpleNamespace(get_num_layers=lambda _: 4),
+         parallel_config=None,
+@@ -1,7 +1,7 @@
+ import unittest
+ from collections import deque
+ from contextlib import nullcontext
+-from dataclasses import fields
++from dataclasses import fields, replace
+ from types import SimpleNamespace
+ from unittest.mock import MagicMock, call, patch
+ 
+@@ -29,6 +29,11 @@
+ 
+ from vllm_ascend.ascend_config import FinegrainedTPConfig
+ from vllm_ascend.ascend_forward_context import MoECommType
++from vllm_ascend.attention.attention_c8_mxfp import (
++    AscendC8MXFPAttentionBackendImpl,
++    mxfp_cache_spec,
++    mxfp_v_scale_cache_shape,
++)
+ from vllm_ascend.attention.attention_v1 import AscendAttentionBackend
+ from vllm_ascend.attention.mla_v1 import AscendMLABackend
+ from vllm_ascend.attention.utils import get_sfa_qsfa_packed_head_dim
+@@ -1621,6 +1626,17 @@ def test_v41_dspark_shares_four_backings_after_rank_shrink(self):
+             assert (caches[target][1] == 2).all()
+             assert (caches[draft][0] == 0).all()
+ 
++    def test_c8_mxfp_cache_selection_excludes_mla(self):
++        runner = self._build_runner()
++        runner.vllm_config.cache_config.cache_dtype = "mxfp8"
++        for spec_type in (FullAttentionSpec, MLAAttentionSpec, AscendMLAAttentionSpec, AscendSFAIndexerCacheSpec):
++            with self.subTest(spec_type=spec_type):
++                spec = spec_type(block_size=512, num_kv_heads=1, head_size=128, dtype=torch.float8_e4m3fn)
++                self.assertEqual(runner._is_c8_mxfp_kv_cache(spec), spec_type is FullAttentionSpec)
++        runner.vllm_config.cache_config.cache_dtype = "auto"
++        spec = FullAttentionSpec(block_size=512, num_kv_heads=1, head_size=128, dtype=torch.bfloat16)
++        self.assertFalse(runner._is_c8_mxfp_kv_cache(spec))
++
+     def test_allocate_kv_cache_uses_layer_spec_for_draft_gqa(self):
+         runner = self._build_runner()
+         runner.sparse_kv_offload_enabled = False
+@@ -3461,5 +3477,111 @@ def forward(*_args, **_kwargs):
+                 )
+ 
+ 
++class TestC8MXFPVScaleCacheFill(unittest.TestCase):
++    """The static V scale is written at KV cache setup, not in forward.
++
++    Filling it lazily during attention meant the write could be recorded into
++    an ACL graph instead of executed, which left the draft model's V scale at
++    zero and collapsed MTP acceptance. Doing it here happens before any
++    capture, replay or request, so no execution order can skip it.
++    """
++
++    NUM_BLOCKS = 2
++    NUM_KV_HEADS = 2
++    BLOCK_SIZE = 128
++    HEAD_DIM = 64
++
++    def _runner(self, layers):
++        runner = NPUModelRunner.__new__(NPUModelRunner)
++        runner.compilation_config = SimpleNamespace(static_forward_context=layers)
++        runner.vllm_config = SimpleNamespace(
++            cache_config=SimpleNamespace(cache_dtype="mxfp8"),
++            compilation_config=runner.compilation_config,
++        )
++        return runner
++
++    def _c8_layer(self):
++        layer = SimpleNamespace(
++            v_cache_scale=torch.arange(self.NUM_KV_HEADS * self.HEAD_DIM, dtype=torch.int32)
++            .remainder(251)
++            .to(torch.uint8),
++            impl=object.__new__(AscendC8MXFPAttentionBackendImpl),
++        )
++        return layer
++
++    def _c8_cache(self):
++        v_scale = torch.zeros(
++            mxfp_v_scale_cache_shape(self.NUM_BLOCKS, self.BLOCK_SIZE, self.NUM_KV_HEADS, self.HEAD_DIM),
++            dtype=torch.uint8,
++        )
++        return (MagicMock(), MagicMock(), MagicMock(), v_scale)
++
++    def test_every_c8_mxfp_layer_is_filled(self):
++        layers = {f"layer.{i}": self._c8_layer() for i in range(3)}
++        kv_caches = {name: self._c8_cache() for name in layers}
++        self._runner(layers)._fill_c8_mxfp_v_scale_caches(kv_caches)
++        for name, layer in layers.items():
++            self.assertEqual(
++                kv_caches[name][3][0, :, :, 0, :, 0].reshape(-1).tolist(),
++                layer.v_cache_scale.tolist(),
++            )
++
++    def test_other_backends_are_left_alone(self):
++        # Non-C8 layers hand out plain (k, v) pairs; indexing them as a
++        # four-tuple would be the bug, so they must not be touched at all.
++        layers = {"plain": SimpleNamespace(impl=object())}
++        kv_caches = {"plain": (MagicMock(), MagicMock())}
++        self._runner(layers)._fill_c8_mxfp_v_scale_caches(kv_caches)
++
++    def test_a_layer_without_a_forward_context_entry_is_skipped(self):
++        self._runner({})._fill_c8_mxfp_v_scale_caches({"stray": (MagicMock(), MagicMock())})
++
++    def test_cache_setup_hands_back_a_filled_cache(self):
++        # The wiring, not just the helper: nothing downstream of
++        # initialize_kv_cache_tensors fills this cache, so if the call site
++        # ever goes away the scales are zero for the life of the process.
++        layers = {"layer.0": self._c8_layer()}
++        kv_caches = {"layer.0": self._c8_cache()}
++        runner = self._runner(layers)
++        runner.shared_kv_cache_layers = {}
++        runner.kv_caches = []
++        runner.model_config = SimpleNamespace(hf_text_config=SimpleNamespace(model_type="qwen3"))
++        with (
++            patch.object(NPUModelRunner, "_allocate_kv_cache_tensors", return_value={}),
++            patch.object(NPUModelRunner, "_reshape_kv_cache_tensors", return_value=kv_caches),
++            patch("vllm.v1.worker.utils.bind_kv_cache"),
++        ):
++            returned = runner.initialize_kv_cache_tensors(MagicMock())
++        self.assertEqual(
++            returned["layer.0"][3][0, :, :, 0, :, 0].reshape(-1).tolist(),
++            layers["layer.0"].v_cache_scale.tolist(),
++        )
++
++    def test_v1_reshape_uses_flat_kernel_size_and_physical_page_padding(self):
++        runner = self._runner({})
++        spec = mxfp_cache_spec(
++            FullAttentionSpec(
++                block_size=1024,
++                num_kv_heads=1,
++                head_size=256,
++                dtype=torch.float8_e4m3fn,
++            )
++        )
++        spec = replace(spec, page_size_padded=spec.page_size_bytes + 512)
++        group = SimpleNamespace(kv_cache_spec=spec, kv_cache_group_id=0, layer_names=["attn"], backend=MagicMock())
++        runner._get_layer_kv_cache_specs = MagicMock(return_value={"attn": spec})
++        runner._kv_cache_spec_attn_group_iterator = MagicMock(return_value=iter([group]))
++        runner.runner_only_attn_layers = set()
++        raw = torch.zeros(128 + 2 * spec.page_size_bytes, dtype=torch.int8)[128:]
++        caches = runner._reshape_kv_cache_tensors(SimpleNamespace(num_blocks=2), {"attn": raw}, [512])
++        k, v, ks, vs = caches["attn"]
++        self.assertEqual(k.shape, (4, 1, 8, 512, 32))
++        self.assertEqual(ks.shape, (4, 1, 32, 4, 16, 2))
++        self.assertEqual(vs.shape, (4, 1, 16, 8, 16, 2))
++        self.assertEqual(k.storage_offset(), 128)
++        self.assertTrue(all(view.stride(0) == spec.page_size_bytes // 2 for view in (k, v, ks, vs)))
++        group.backend.get_kv_cache_shape.assert_not_called()
++
++
+ if __name__ == "__main__":
+     unittest.main()
+@@ -0,0 +1,923 @@
++#
++# Copyright (c) 2025 Huawei Technologies Co., Ltd. All Rights Reserved.
++#
++# Licensed under the Apache License, Version 2.0 (the "License");
++# you may not use this file except in compliance with the License.
++# You may obtain a copy of the License at
++#
++#     http://www.apache.org/licenses/LICENSE-2.0
++#
++# Unless required by applicable law or agreed to in writing, software
++# distributed under the License is distributed on an "AS IS" BASIS,
++# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++# See the License for the specific language governing permissions and
++# limitations under the License.
++# This file is a part of the vllm-ascend project.
++#
++"""C8-MXFP (MXFP8) KV cache attention backend (QFA dual-operator interface).
++
++Installed per layer by the ModelSlim C8 quantization method
++(quantization/methods/kv_cache/mxfp_c8.py) instead of being resolved through
++the backend registry: create_weights assigns ``layer.attn_backend`` and swaps
++``layer.impl.__class__``, so importing this module is only required on the
++C8 path. Also carries the KV cache layout primitives (packet-packed page
++layout, scale-cache shapes, PA_NZ scatter/fill, strided view construction)
++shared by the backend and the model runner.
++"""
++
++import math
++from dataclasses import replace
++from typing import TYPE_CHECKING
++
++import torch
++import torch_npu
++from vllm.config import VllmConfig
++from vllm.v1.attention.backend import (  # type: ignore
++    AttentionCGSupport,
++    AttentionLayer,
++)
++
++from vllm_ascend.attention.attention_v1 import (
++    AscendAttentionBackend,
++    AscendAttentionBackendImpl,
++    AscendAttentionMetadataBuilder,
++    AscendMetadata,
++)
++from vllm_ascend.attention.utils import enable_dcp, enable_pcp, notify_kv_cache_written
++from vllm_ascend.distributed.kv_transfer.kv_pool.ascend_store.attention_fence import (
++    record_attention_compute_start,
++)
++from vllm_ascend.utils import uses_mooncake_connector
++
++if TYPE_CHECKING:
++    from vllm.v1.kv_cache_interface import FullAttentionSpec
++
++
++# KV cache MXFP8 scale layouts, PA_NZ flavor (QFA layout_kv="PA_NZ"; golden
++# reference: quant_flash_attn_golden.py "PA_NZ: fp8=[Bn,N,D//32,Bs,32],
++# Kscale=[Bn,N,Bs//16,D//64,16,2], Vscale=[Bn,N,D//16,Bs//64,16,2]"). The
++# One kernel block owns [K | K_scale | V | V_scale | padding]. All four
++# views share the physical block pitch. Scale tensors retain their own
++# six-dimensional shape; operator stride support requires NPU validation.
++# The trailing 2 stores even/odd 32-element MX scale groups.
++# K scale token:  [num_tokens, num_kv_heads, head_dim // 64, 2]
++# K scale cache:  [num_blocks, num_kv_heads, block_size // 16, head_dim // 64, 16, 2]
++# V scale token (axis=0 quant): [cdiv(num_tokens, 64), num_kv_heads, head_dim, 2]
++# V scale cache:  [num_blocks, num_kv_heads, head_dim // 16, block_size // 64, 16, 2]
++MXFP_KV_SCALE_GROUP_SIZE = 64
++MXFP_KV_SCALE_VALUES_PER_GROUP = 2
++MXFP_KV_NZ_DIM_FRAG = 32
++MXFP_K_SCALE_NZ_TOKEN_FRAG = 16
++MXFP_V_SCALE_NZ_DIM_FRAG = 16
++# Unified per-block scale bytes: num_kv_heads * block_size * head_dim / MXFP8_GROUP_SIZE (K and V).
++MXFP8_GROUP_SIZE = 32
++# E8M0 scale elements are always 1 byte in KV cache budgeting.
++MXFP_SCALE_DTYPE_SIZE = 1
++
++
++def validate_mxfp_k_scale_head_dim(head_dim: int) -> None:
++    if head_dim % MXFP_KV_SCALE_GROUP_SIZE != 0:
++        raise ValueError(
++            f"C8_MXFP K scale cache requires head_dim divisible by {MXFP_KV_SCALE_GROUP_SIZE}, got {head_dim}."
++        )
++
++
++def validate_mxfp_v_scale_block_size(block_size: int) -> None:
++    if block_size % MXFP_KV_SCALE_GROUP_SIZE != 0:
++        raise ValueError(
++            f"C8_MXFP V scale cache requires block_size divisible by {MXFP_KV_SCALE_GROUP_SIZE}, got {block_size}."
++        )
++
++
++def mxfp_kv_scale_groups(head_dim: int) -> int:
++    validate_mxfp_k_scale_head_dim(head_dim)
++    return head_dim // MXFP_KV_SCALE_GROUP_SIZE
++
++
++def mxfp_kv_block_scale_groups(block_size: int) -> int:
++    validate_mxfp_v_scale_block_size(block_size)
++    return block_size // MXFP_KV_SCALE_GROUP_SIZE
++
++
++def mxfp_k_scale_page_bytes(num_kv_heads: int, block_size: int, head_dim: int) -> int:
++    """Bytes per block for k_scale cache."""
++    validate_mxfp_k_scale_head_dim(head_dim)
++    return num_kv_heads * block_size * head_dim // MXFP8_GROUP_SIZE
++
++
++def mxfp_v_scale_page_bytes(num_kv_heads: int, block_size: int, head_dim: int) -> int:
++    """Bytes per block for v_scale cache."""
++    validate_mxfp_v_scale_block_size(block_size)
++    return num_kv_heads * block_size * head_dim // MXFP8_GROUP_SIZE
++
++
++def mxfp_k_scale_cache_shape(
++    num_blocks: int,
++    block_size: int,
++    num_kv_heads: int,
++    head_dim: int,
++) -> tuple[int, int, int, int, int, int]:
++    return (
++        num_blocks,
++        num_kv_heads,
++        block_size // MXFP_K_SCALE_NZ_TOKEN_FRAG,
++        mxfp_kv_scale_groups(head_dim),
++        MXFP_K_SCALE_NZ_TOKEN_FRAG,
++        MXFP_KV_SCALE_VALUES_PER_GROUP,
++    )
++
++
++def mxfp_v_scale_cache_shape(
++    num_blocks: int,
++    block_size: int,
++    num_kv_heads: int,
++    head_dim: int,
++) -> tuple[int, int, int, int, int, int]:
++    if head_dim <= 0 or head_dim % MXFP_KV_NZ_DIM_FRAG:
++        raise ValueError(f"MXFP V head_dim must be a positive multiple of 32, got {head_dim}.")
++    return (
++        num_blocks,
++        num_kv_heads,
++        head_dim // MXFP_V_SCALE_NZ_DIM_FRAG,
++        mxfp_kv_block_scale_groups(block_size),
++        MXFP_V_SCALE_NZ_DIM_FRAG,
++        MXFP_KV_SCALE_VALUES_PER_GROUP,
++    )
++
++
++def mxfp_kv_page_size_bytes(
++    block_size: int,
++    num_kv_heads: int,
++    k_dim: int,
++    v_dim: int,
++    kv_dtype_size: int,
++) -> int:
++    """Bytes per KV cache page for C8_MXFP (FP8 K/V tensors + E8M0 scale caches)."""
++    kv_bytes = block_size * num_kv_heads * (k_dim + v_dim) * kv_dtype_size
++    scale_bytes = (
++        mxfp_k_scale_page_bytes(num_kv_heads, block_size, k_dim)
++        + mxfp_v_scale_page_bytes(num_kv_heads, block_size, v_dim)
++    ) * MXFP_SCALE_DTYPE_SIZE
++    return kv_bytes + scale_bytes
++
++
++def mxfp_packet_section_sizes(num_kv_heads: int, block_size: int, k_dim: int, v_dim: int) -> tuple[int, int, int, int]:
++    """Byte sizes in physical order: K, K_scale, V, V_scale."""
++    if num_kv_heads <= 0:
++        raise ValueError("MXFP cache requires at least one KV head.")
++    mxfp_v_scale_cache_shape(1, block_size, num_kv_heads, v_dim)
++    return (
++        num_kv_heads * block_size * k_dim,
++        mxfp_k_scale_page_bytes(num_kv_heads, block_size, k_dim),
++        num_kv_heads * block_size * v_dim,
++        mxfp_v_scale_page_bytes(num_kv_heads, block_size, v_dim),
++    )
++
++
++def mxfp_packet_size_bytes(num_kv_heads: int, block_size: int, k_dim: int, v_dim: int) -> int:
++    return sum(mxfp_packet_section_sizes(num_kv_heads, block_size, k_dim, v_dim))
++
++
++def mxfp_cache_spec(spec: "FullAttentionSpec") -> "FullAttentionSpec":
++    """Budget scales through upstream state_content_bytes, preserving real D."""
++    k_dim, v_dim = spec.head_size, spec.head_size_v
++    if spec.tokens_per_state != 1 or spec.num_heads != spec.num_kv_heads:
++        raise ValueError("MXFP cache requires one stored state per token and one slot per KV head.")
++    mxfp_packet_section_sizes(spec.num_kv_heads, spec.block_size, k_dim, v_dim)
++    result = replace(
++        spec, dtype=torch.float8_e4m3fn, state_content_bytes=k_dim + v_dim + (k_dim + v_dim) // MXFP8_GROUP_SIZE
++    )
++    if result.page_size_padded is not None and result.page_size_padded < result.unpadded_page_size_bytes:
++        raise ValueError("MXFP padded page is smaller than its K/V and scale payload.")
++    return result
++
++
++def mxfp_paged_cache_views(
++    raw_tensor: torch.Tensor,
++    num_kernel_blocks: int,
++    num_kv_heads: int,
++    k_dim: int,
++    v_dim: int,
++    block_size: int,
++    *,
++    page_stride_bytes: int | None = None,
++) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
++    """Construct four views without allocating a temporary cache tensor."""
++    if raw_tensor.ndim != 1 or raw_tensor.dtype != torch.int8 or raw_tensor.stride(0) != 1:
++        raise ValueError("MXFP raw cache must be a contiguous 1-D int8 view.")
++    if num_kernel_blocks <= 0:
++        raise ValueError("MXFP cache requires at least one kernel block.")
++    k_bytes, ks_bytes, v_bytes, vs_bytes = mxfp_packet_section_sizes(num_kv_heads, block_size, k_dim, v_dim)
++    payload_bytes = k_bytes + ks_bytes + v_bytes + vs_bytes
++    pitch = payload_bytes if page_stride_bytes is None else page_stride_bytes
++    if pitch < payload_bytes or raw_tensor.numel() < num_kernel_blocks * pitch:
++        raise ValueError("MXFP raw cache or physical page pitch is smaller than the payload.")
++    shapes = (
++        (num_kernel_blocks, num_kv_heads, k_dim // MXFP_KV_NZ_DIM_FRAG, block_size, MXFP_KV_NZ_DIM_FRAG),
++        (num_kernel_blocks, num_kv_heads, v_dim // MXFP_KV_NZ_DIM_FRAG, block_size, MXFP_KV_NZ_DIM_FRAG),
++        mxfp_k_scale_cache_shape(num_kernel_blocks, block_size, num_kv_heads, k_dim),
++        mxfp_v_scale_cache_shape(num_kernel_blocks, block_size, num_kv_heads, v_dim),
++    )
++    offsets = (0, k_bytes + ks_bytes, k_bytes, k_bytes + ks_bytes + v_bytes)
++    dtypes = (torch.float8_e4m3fn, torch.float8_e4m3fn, torch.uint8, torch.uint8)
++    views = []
++    for shape, offset, dtype in zip(shapes, offsets, dtypes):
++        # All elements are one byte. as_strided uses an absolute storage offset,
++        # even when raw_tensor is a slice of an aligned/shared allocation.
++        strides = (pitch, *(math.prod(shape[i + 1 :]) for i in range(1, len(shape))))
++        views.append(
++            torch.as_strided(
++                raw_tensor.view(dtype), shape, strides, storage_offset=raw_tensor.storage_offset() + offset
++            )
++        )
++    return tuple(views)
++
++
++def mxfp_cache_views_for_spec(raw_tensor: torch.Tensor, spec: "FullAttentionSpec", kernel_block_size: int):
++    """Translate scheduler pages (including padding) into kernel block views."""
++    if kernel_block_size <= 0 or spec.block_size % kernel_block_size:
++        raise ValueError("MXFP scheduler block must contain a whole number of kernel blocks.")
++    ratio = spec.block_size // kernel_block_size
++    page_bytes = spec.page_size_bytes
++    if page_bytes % ratio or raw_tensor.numel() % page_bytes:
++        raise ValueError("MXFP raw allocation and physical pitch must contain whole pages.")
++    return mxfp_paged_cache_views(
++        raw_tensor,
++        raw_tensor.numel() // page_bytes * ratio,
++        spec.num_kv_heads,
++        spec.head_size,
++        spec.head_size_v,
++        kernel_block_size,
++        page_stride_bytes=page_bytes // ratio,
++    )
++
++
++def scatter_mxfp_pa_nz_kv_cache(
++    quant_key: torch.Tensor,
++    quant_value: torch.Tensor,
++    key_cache: torch.Tensor,
++    value_cache: torch.Tensor,
++    slot_mapping: torch.Tensor,
++) -> None:
++    """Scatter quantized K/V into the packet-packed paged caches (QFA PA_NZ).
++
++    ``key_cache``/``value_cache`` are the 5-D PA_NZ strided views built by
++    :func:`mxfp_paged_cache_views`: ``(kernel_blocks, num_head, head_size//32,
++    block_size, 32)`` with dim0 stride equal to the packet size. The
++    operator's tiling reads that dim0 stride as the block stride
++    (ScatterPaKvCache scenario 1), so it writes each kernel block's K/V into
++    the right packet section.
++
++    Scenario 1 of the ScatterPaKvCache contract::
++
++        key/value   [batch * seq_len, num_head, head_size]
++        key/valueCache
++                    [num_blocks, num_head, head_size // last_dim, block_size, last_dim]
++        slotMapping [batch * seq_len]
++        cacheMode   "PA_NZ"
++        last_dim = 32 / sizeof(dtype)     -> 32 for any 1-byte dtype
++        (head_size * sizeof(dtype)) % 32 == 0
++
++    A scheduler slot maps to a kernel block by ``slot // kernel_block_size``
++    (a hybrid scheduler block of 4096 tokens spans exactly 8 kernel blocks,
++    so the division lands on the right kernel-block row). Both sides go
++    through int8 views: the operator accepts FLOAT8_E4M3FN only on
++    950PR/950DT, while INT8 is accepted everywhere and writes identical
++    bytes. Negative slots (PAD_SLOT_ID) are skipped by the operator itself,
++    keeping the shapes static for graph capture.
++    """
++    if slot_mapping.numel() == 0:
++        return
++
++    def _as_bytes(t: torch.Tensor) -> torch.Tensor:
++        # Bitcast for scatter only: FP8 values are not requantized to INT8.
++        # Same-itemsize dtype views are legal on strided tensors.
++        return t if t.dtype == torch.int8 else t.view(torch.int8)
++
++    torch_npu.npu_scatter_pa_kv_cache(
++        key=_as_bytes(quant_key),
++        value=_as_bytes(quant_value),
++        key_cache=_as_bytes(key_cache),
++        value_cache=_as_bytes(value_cache),
++        slot_mapping=slot_mapping,
++        cache_mode="PA_NZ",
++    )
++
++
++def fill_mxfp_v_scale_cache(value_scale: torch.Tensor, value_scale_cache: torch.Tensor) -> None:
++    """Broadcast V's static per-channel E8M0 scale over its whole paged cache.
++
++    ``value_scale`` is the checkpoint's flat ``(num_kv_heads * head_dim,)``
++    E8M0 byte vector, ``value_scale_cache`` the PA_NZ 6-D cache
++    ``[num_blocks, num_kv_heads, head_dim // 16, block_size // 64, 16, 2]``.
++    Reshaping the source to ``(num_kv_heads, head_dim // 16, 1, 16, 1)`` lines
++    its channel axis up with the cache's fragment split and lets the block,
++    token-group and even/odd axes broadcast. Head count and V head dim are
++    read from the cache so a model whose V head dim differs from Q/K's stays
++    correct. A one-time fill (run once the caches exist, before any request,
++    capture or replay) rather than a per-step scatter.
++    """
++    num_kv_heads = value_scale_cache.shape[1]
++    v_dim_frags = value_scale_cache.shape[2]
++    v_dim_frag_size = value_scale_cache.shape[4]
++    value_scale_cache.copy_(value_scale.view(num_kv_heads, v_dim_frags, 1, v_dim_frag_size, 1))
++
++
++def mxfp_k_scale_slot_index(
++    slot_mapping: torch.Tensor,
++    block_size: int,
++) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
++    """Decompose slots into the index tensors the K-scale scatter indexes with.
++
++    Returns ``(block_ids, seg_ids, frag_ids)`` for the PA_NZ K-scale cache,
++    where a token at in-block offset ``o`` lands at
++    ``[block, n, o // 16, :, o % 16, :]``. Derived once per step and shared
++    across layers (capture-safe for the same reason as the other per-step
++    quantities; see ``_qfa_k_scale_slot_index``).
++
++    Padded rows (slot -1) are clamped to slot 0, keeping the shapes static
++    for graph capture; slot 0 is the null block's, see
++    scatter_mxfp_k_scale_cache.
++    """
++    safe_slots = slot_mapping.to(torch.long).clamp(min=0)
++    block_ids = safe_slots // block_size
++    offsets = safe_slots % block_size
++    return block_ids, offsets // MXFP_K_SCALE_NZ_TOKEN_FRAG, offsets % MXFP_K_SCALE_NZ_TOKEN_FRAG
++
++
++def scatter_mxfp_k_scale_cache(
++    key_scale: torch.Tensor,
++    key_scale_cache: torch.Tensor,
++    slot_index: tuple[torch.Tensor, torch.Tensor, torch.Tensor],
++) -> None:
++    """Scatter per-token K scales into the paged K-scale cache.
++
++    ``key_scale`` shape: ``[num_tokens, num_kv_heads, head_dim // 64, 2]``
++    (any 1-byte dtype; callers pass a uint8 view of the E8M0 scale).
++    ``key_scale_cache`` shape (PA_NZ): ``[num_blocks, num_kv_heads,
++    block_size // 16, head_dim // 64, 16, 2]``.
++
++    ``slot_index`` comes from :func:`mxfp_k_scale_slot_index` and is shared
++    across the step's layers; only the write below is per-layer. Capture
++    safe: no host-device sync and no data-dependent shapes.
++
++    Padded rows arrive clamped to slot 0 and are simply written there: slot 0
++    belongs to block 0, the null block BlockPool never hands to a request, so
++    only dummy padding requests (whose output is discarded) read it back.
++    """
++    block_ids, seg_ids, frag_ids = slot_index
++    if block_ids.numel() == 0:
++        return
++    key_scale_cache[block_ids, :, seg_ids, :, frag_ids, :] = key_scale
++
++
++class AscendC8MXFPAttentionBackend(AscendAttentionBackend):
++    """Backend for C8-MXFP KV cache layers (QFA dual-operator interface).
++
++    C8-MXFP QFA requires 512-token pages (the D=256 requirement doc allows
++    512/1024). This must not be advertised by the generic backend because
++    hybrid BF16 models (e.g. Qwen3.5/3.6 linear-attention mixes) use its
++    128-token logical block layout when reshaping their KV cache.
++    """
++
++    @staticmethod
++    def get_impl_cls() -> type["AscendC8MXFPAttentionBackendImpl"]:
++        if enable_pcp() or enable_dcp():
++            raise NotImplementedError("C8_MXFP attention does not support PCP/DCP yet.")
++        return AscendC8MXFPAttentionBackendImpl
++
++    @staticmethod
++    def get_builder_cls() -> type["AscendC8MXFPMetadataBuilder"]:
++        if enable_pcp() or enable_dcp():
++            raise NotImplementedError("C8_MXFP attention does not support PCP/DCP yet.")
++        return AscendC8MXFPMetadataBuilder
++
++    @staticmethod
++    def get_supported_kernel_block_sizes() -> list[int]:
++        return [512]
++
++
++class AscendC8MXFPMetadataBuilder(AscendAttentionMetadataBuilder):
++    """Metadata builder for the C8-MXFP (QFA) backend.
++
++    The generic Ascend builder sizes its block-table width with the
++    128-token generic block; this backend uses 512-token kernel blocks.
++
++    Cudagraph support (final form, no .out wrapper variant needed):
++    - PIECEWISE: QFA executes outside the compiled region as a plain call.
++    - FULL / FULL_DECODE_ONLY: npugraph_ex captures the allocating QFA
++      wrapper plus the in-graph metadata op natively (golden-test
++      GRAPH_PATH=7 methodology). Replay correctness relies on the model
++      runner's persistent length buffers (query_start_loc_gpu /
++      seq_lens_gpu), which the impl derives QFA's cu_seqlens/seqused from
++      through captured device-side ops, so every replay re-reads the
++      current step's lengths.
++    """
++
++    @classmethod
++    def get_cudagraph_support(
++        cls,
++        vllm_config: VllmConfig,
++        kv_cache_spec,
++    ) -> AttentionCGSupport:
++        mode = vllm_config.compilation_config.cudagraph_mode
++        if mode.has_piecewise_cudagraphs() and not mode.has_full_cudagraphs():
++            # PIECEWISE: QFA runs outside the compiled region as a plain
++            # call (validated on-device). UNIFORM_BATCH is the support
++            # level the other piecewise-capable Ascend backends report
++            # (e.g. mla_v1); AttentionCGSupport has no PARTIAL member.
++            return AttentionCGSupport.UNIFORM_BATCH
++        # FULL (incl. FULL_DECODE_ONLY): npugraph_ex captures the
++        # allocating QFA wrapper natively (golden-test GRAPH_PATH=7).
++        # Spec decode (MTP) included: the draft graph is a plain
++        # torch.npu.graph ACLGraphWrapper capture whose metadata goes
++        # through the same builder.build() (field passthrough) and whose
++        # per-step lengths live in the proposer's persistent buffers,
++        # refreshed in place before each draft replay -- the same
++        # stable-address contract as the main-model graphs. During draft
++        # capture _EXTRA_CTX.capturing is set by the ACLGraphWrapper
++        # (shared forward-context object), so the QFA metadata op is
++        # still executed inline inside the captured region.
++        return AttentionCGSupport.ALWAYS
++
++
++QFA_QUANT_MODE_MXFP8 = 1
++QFA_MASK_MODE_NO_MASK = 0
++QFA_MASK_MODE_CAUSAL = 3
++QFA_LAYOUT_TND = "TND"
++QFA_LAYOUT_N2TGD = "N2TGD"
++QFA_LAYOUT_PA_NZ = "PA_NZ"
++# MXFP8 takes the q scale in one of two layouts, and the choice selects the
++# kernel: TND (Q_T, Q_N, D/64, 2) compiles the prefill template, N2TGD
++# (KV_N, Q_T, G, D/64, 2) the decode one, which merges the S1 and G axes.
++# The operator doc puts the boundary at G*Q_S, recommending N2TGD at or below
++# this value. Both layouts hold the same scales, so the split is a performance
++# choice, not a correctness one.
++QFA_QSCALE_N2TGD_MAX_G_TIMES_QS = 80
++
++
++def _build_qfa_cu_seqlens(cumulative_seq_lengths: list[int], device: torch.device) -> torch.Tensor:
++    """Build QFA ``cu_seqlens``: int32 (B+1,) with a leading 0.
++
++    FIA-style ``actual_seq_lengths`` are B cumulative entries; QFA expects the
++    cumulative sums prefixed with 0 so batch i spans
++    ``[cu_seqlens[i], cu_seqlens[i + 1])`` (QFA requirement doc, sequence
++    length conversion rules).
++    """
++    return torch.tensor([0, *cumulative_seq_lengths], dtype=torch.int32, device=device)
++
++
++class AscendC8MXFPAttentionBackendImpl(AscendAttentionBackendImpl):
++    """MXFP8 KV cache backend computed by the QFA dual-operator interface.
++
++    forward() quantizes Q/K dynamically (``npu_dynamic_mx_quant``, FP8 E4M3 +
++    per-token-group E8M0 scales) and V statically (the checkpoint's
++    per-channel E8M0 scale), scatters the quantized K/V plus their scale
++    caches into the paged cache, and calls the QFA metadata + main operators
++    directly on the paged cache.
++
++    Layout: PA_NZ, packet-packed. One ``[K | K_scale | V | V_scale]``
++    packet per 512-token kernel block; the four caches are strided views
++    over the packets (K/V in the NZ 5-D shape
++    ``(kernel_blocks, num_kv_heads, head_dim//32, block_size, 32)``,
++    scales in the PA_NZ 6-D shapes), built once at allocation. The scatter
++    writes through the views and QFA reads them directly.
++
++    One QFA call per step for the whole batch (decode and prefill alike); a
++    step whose every query is one row long drops the mask (NO_MASK), which is
++    equivalent there and picks a cheaper kernel.
++
++    Graph capture: handled natively by npugraph_ex (golden-test GRAPH_PATH=7).
++    Replay safety relies on every per-step input being a stable-address
++    tensor refreshed outside Python: block_table / slot_mapping come from the
++    runner's persistent buffers, and cu_seqlens_q / seqused_kv are derived
++    in-graph from the runner's persistent query_start_loc / seq_lens buffers.
++    Speculative decoding (MTP) uses the same derivation chain.
++
++    NOTE: the QFA wrapper's signature (verified on-device, CANN 9.2.0)
++    differs from the requirement doc's torch_npu example: positional
++    q_descale/k_descale/v_descale/quant_mode, p_scale instead of
++    quant_scale_p, an extra layout_q_descale, and no pa_block_size. The
++    metadata op takes no v_descale (removed from the delivered signature).
++    """
++
++    # Installed via ``layer.impl.__class__`` assignment, which does not call
++    # this subclass's constructor. Class-level defaults are therefore
++    # required for objects that predate the class swap.
++    enable_hamming_sparse: bool = False
++
++    def _qfa_step_cache(self, attn_metadata: AscendMetadata) -> dict:
++        cache = getattr(attn_metadata, "qfa_metadata_cache", None)
++        if cache is None:
++            cache = {}
++            attn_metadata.qfa_metadata_cache = cache
++        return cache
++
++    def _qfa_step_lengths(self, attn_metadata: AscendMetadata, num_tokens: int) -> tuple[torch.Tensor, torch.Tensor]:
++        """Return this step's (cu_seqlens_q, seqused_kv), derived once.
++
++        Derived in-graph by the first full-attention layer; every other layer
++        consumes the recorded tensors, and each replay re-executes that one
++        derivation against the refreshed buffers.
++        """
++        cache = self._qfa_step_cache(attn_metadata)
++        lengths = cache.get("lengths")
++        if lengths is None:
++            # Clamp sanitizes the tail: unused query_start_loc slots carry -1
++            # (FIA padding convention) and may hold stale entries from larger
++            # earlier steps; cummax restores monotonicity, turning the tail
++            # into zero-length requests. seq_lens clamp(min=1) matches the
++            # dummy-request convention (block 0, one token).
++            lengths = (
++                attn_metadata.query_start_loc_gpu.clamp(min=0, max=num_tokens).cummax(dim=0).values,
++                attn_metadata.seq_lens_gpu.clamp(min=1),
++            )
++            cache["lengths"] = lengths
++        return lengths
++
++    def _qfa_k_scale_slot_index(
++        self, attn_metadata: AscendMetadata, slot_mapping: torch.Tensor, block_size: int
++    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
++        """Return this step's K-scale slot decomposition, derived once.
++
++        Same story as _qfa_step_lengths: six device ops over slot_mapping
++        that every layer used to repeat, cached inside the captured region so
++        replay re-derives them exactly once.
++        """
++        cache = self._qfa_step_cache(attn_metadata)
++        slot_index = cache.get("k_scale_slots")
++        if slot_index is None:
++            slot_index = mxfp_k_scale_slot_index(slot_mapping, block_size)
++            cache["k_scale_slots"] = slot_index
++        return slot_index
++
++    def _get_qfa_metadata(
++        self,
++        attn_metadata: AscendMetadata,
++        *,
++        cu_seqlens_q: torch.Tensor,
++        seqused_kv: torch.Tensor,
++        max_seqlen_q: int,
++        mask_mode: int,
++        layout_q_descale: str,
++    ):
++        """Return the QFA metadata plan (AICPU op output), derived once a step.
++
++        The plan's inputs are all non-layer-specific (head counts, lengths,
++        mask mode, layouts), so one plan serves every full-attention layer of
++        a step. Sharing is safe under graph capture for the same reason as
++        _qfa_step_lengths: the deriving call runs inside the captured region,
++        ahead of every QFA call that reads its output, and the main operator
++        treats ``metadata`` as a read-only input.
++        """
++        cache = self._qfa_step_cache(attn_metadata)
++        plan_key = (
++            self.num_heads,
++            self.num_kv_heads,
++            self.head_size,
++            max_seqlen_q,
++            mask_mode,
++            layout_q_descale,
++        )
++        metadata = cache.get(plan_key)
++        if metadata is None:
++            # TND + PA: pass cu_seqlens_q only; the KV side is addressed via
++            # block_table + seqused_kv. batch_size must NOT be passed with a
++            # TND layout_q (the checker rejects it).
++            from cann_ops_transformer.ops import quant_flash_attn_metadata
++
++            metadata = quant_flash_attn_metadata(
++                self.num_heads,
++                self.num_kv_heads,
++                self.head_size,
++                QFA_QUANT_MODE_MXFP8,
++                cu_seqlens_q=cu_seqlens_q,
++                cu_seqlens_kv=None,
++                seqused_q=None,
++                seqused_kv=seqused_kv,
++                max_seqlen_q=max_seqlen_q,
++                max_seqlen_kv=-1,
++                mask_mode=mask_mode,
++                win_left=-1,
++                win_right=-1,
++                layout_q=QFA_LAYOUT_TND,
++                layout_q_descale=layout_q_descale,
++                layout_kv=QFA_LAYOUT_PA_NZ,
++                layout_out=QFA_LAYOUT_TND,
++            )
++            cache[plan_key] = metadata
++        return metadata
++
++    def _qfa_int8_mask(self, attn_metadata: AscendMetadata) -> torch.Tensor | None:
++        """QFA's attn_mask is INT8/UINT8/bool; the shared builder already
++        hands out an int8 causal mask, so only convert other sources."""
++        if attn_metadata.attn_mask is None:
++            return None
++        if attn_metadata.attn_mask.dtype == torch.int8:
++            return attn_metadata.attn_mask
++        return attn_metadata.attn_mask.to(torch.int8)
++
++    def _qfa_query_scale_for_layout(self, query_scale: torch.Tensor, max_seqlen_q: int) -> tuple[torch.Tensor, str]:
++        """Return the q scale in the layout that selects the right QFA kernel.
++
++        TND ``(Q_T, Q_N, D/64, 2)`` compiles the prefill template; N2TGD
++        ``(KV_N, Q_T, G, D/64, 2)`` the decode one (the query-head axis
++        split into ``(KV_N, G)``, KV-head half hoisted in front of the token
++        axis; query heads are GQA-contiguous, so the split is a reshape and
++        a permute). The split is a throughput choice -- both layouts carry
++        identical scales -- following the operator doc's G*Q_S boundary.
++
++        The decision reads the query shape, not the scheduler state, so MTP
++        verify steps take the decode layout too.
++        """
++        # Head counts that do not split into whole kv-head groups (possible
++        # on MTP draft layers) cannot be reshaped; keep TND instead.
++        if self.num_kv_heads == 0 or query_scale.shape[1] % self.num_kv_heads != 0:
++            return query_scale, QFA_LAYOUT_TND
++        group_size = query_scale.shape[1] // self.num_kv_heads
++        if group_size * max_seqlen_q > QFA_QSCALE_N2TGD_MAX_G_TIMES_QS:
++            return query_scale, QFA_LAYOUT_TND
++        # Permute through a uint8 byte view: float8 transpose/contiguous fall
++        # back to AICPU. _run_qfa bitcasts back to E8M0 at the call boundary.
++        scale_bytes = query_scale.view(torch.uint8)
++        num_tokens = scale_bytes.shape[0]
++        n2tgd = (
++            scale_bytes.view(num_tokens, self.num_kv_heads, group_size, *scale_bytes.shape[2:])
++            .permute(1, 0, 2, 3, 4)
++            .contiguous()
++        )
++        return n2tgd, QFA_LAYOUT_N2TGD
++
++    def _run_qfa(
++        self,
++        quant_query: torch.Tensor,
++        query_scale: torch.Tensor,
++        kv_cache: tuple[torch.Tensor, ...],
++        attn_metadata: AscendMetadata,
++        *,
++        cu_seqlens_q: torch.Tensor,
++        seqused_kv: torch.Tensor,
++        qfa_metadata,
++        max_seqlen_q: int,
++        mask_mode: int,
++        layout_q_descale: str,
++        num_tokens: int,
++        output: torch.Tensor,
++    ) -> torch.Tensor:
++        key, value, key_scale, value_scale = kv_cache
++        # The K/V caches are already the packet-packed PA_NZ 5-D strided
++        # views (dim0 = kernel block, dim0 stride = packet size; built once
++        # at allocation). The scale caches are uint8 strided views
++        # (index_put_ on float8 falls back to AICPU); QFA's checker wants
++        # E8M0, so bitcast at the call boundary (1:1 byte reinterpretation
++        # with the torch dtype -- torch_npu.float8_e8m0fnu is an integer ID
++        # here, not a dtype; same-itemsize views keep strides).
++        key_scale = key_scale.view(torch.float8_e8m0fnu)
++        value_scale = value_scale.view(torch.float8_e8m0fnu)
++        query_scale = query_scale.view(torch.float8_e8m0fnu)
++        from cann_ops_transformer.ops import quant_flash_attn
++
++        # cann_ops_transformer delivery signature (verified on-device): the
++        # allocating wrapper is capture-safe under npugraph_ex (ops-transformer
++        # golden tests capture exactly this call, GRAPH_PATH=7).
++        result = quant_flash_attn(
++            quant_query,
++            key,
++            value,
++            query_scale,
++            key_scale,
++            value_scale,
++            QFA_QUANT_MODE_MXFP8,
++            block_table=attn_metadata.block_tables,
++            p_scale=None,
++            cu_seqlens_q=cu_seqlens_q,
++            cu_seqlens_kv=None,
++            seqused_q=None,
++            seqused_kv=seqused_kv,
++            sinks=None,
++            # The doc forbids attn_mask under NO_MASK and requires it under
++            # CAUSAL, so the two travel together.
++            attn_mask=(None if mask_mode == QFA_MASK_MODE_NO_MASK else self._qfa_int8_mask(attn_metadata)),
++            metadata=qfa_metadata,
++            softmax_scale=self.scale,
++            mask_mode=mask_mode,
++            win_left=-1,
++            win_right=-1,
++            max_seqlen_q=max_seqlen_q,
++            max_seqlen_kv=-1,
++            layout_q=QFA_LAYOUT_TND,
++            layout_q_descale=layout_q_descale,
++            layout_kv=QFA_LAYOUT_PA_NZ,
++            layout_out=QFA_LAYOUT_TND,
++            return_softmax_lse=False,
++        )
++        # return_softmax_lse=False yields an empty LSE tensor in the
++        # cann_ops flavor; tolerate both tuple and single-tensor returns.
++        attn_output = result[0] if isinstance(result, tuple) else result
++        attn_output = attn_output.view(num_tokens, self.num_heads, self.head_size)
++        output[:num_tokens] = attn_output
++        return output
++
++    def _forward_mxfp8_attention(
++        self,
++        quant_query: torch.Tensor,
++        query_scale: torch.Tensor,
++        kv_cache: tuple[torch.Tensor, ...],
++        attn_metadata: AscendMetadata,
++        output: torch.Tensor,
++    ) -> torch.Tensor:
++        """One QFA call per step for the whole batch (decode + prefill alike).
++
++        The causal mask covers decode rows as well, so the per-subset split of
++        the FIA-based design is unnecessary. PrefillNoCache is included:
++        reshape_and_cache has already written this step's K/V into the paged
++        cache before attention runs.
++
++        Graph capture (npugraph_ex, GRAPH_PATH=7): cu_seqlens_q / seqused_kv
++        are derived on device from the runner's persistent buffers, so every
++        replay re-executes the derivation and sees the current step's lengths.
++        """
++        if not attn_metadata.causal:
++            raise NotImplementedError("C8_MXFP attention does not support non-causal attention yet.")
++        if self.sliding_window is not None:
++            raise NotImplementedError("C8_MXFP attention does not support sliding window attention yet.")
++
++        # T as QFA sees it: the query rows actually fed to the operator
++        # (forward slices query[:num_actual_tokens] before quantizing), so
++        # the TND constraint cu_seqlens_q[-1] == T, the view/output row
++        # counts and the sanitize clamp bound below all share one source.
++        # At graph capture this is the bucket size; eagerly it is the real
++        # token count -- both stay clean where actual_seq_lengths_q[-1]
++        # may carry stale tail entries (padded batches).
++        num_tokens = quant_query.shape[0]
++        if num_tokens <= 0:
++            return output
++
++        qsl_gpu = attn_metadata.query_start_loc_gpu
++        seq_lens_gpu = attn_metadata.seq_lens_gpu
++        if qsl_gpu is None or seq_lens_gpu is None:
++            raise RuntimeError(
++                "C8_MXFP attention requires the GPU-side length sources "
++                "(query_start_loc_gpu / seq_lens_gpu) on AscendMetadata."
++            )
++        cu_seqlens_q, seqused_kv = self._qfa_step_lengths(attn_metadata, num_tokens)
++        # The longest single query in the batch -- NOT the batch token total.
++        # The metadata op seeds querySeqSize with this attr and only ever
++        # raises it, so an inflated value is never walked back.
++        max_seqlen_q = attn_metadata.max_query_len or num_tokens
++
++        # Drop the mask entirely when every request contributes a single query
++        # row. hasAttenMask is one of the tiling-key axes, so NO_MASK selects
++        # a kernel template that never reads the mask; at Q_S == 1 that is
++        # exactly equivalent to CAUSAL (the KV range is bounded by seqused_kv).
++        # MTP verify steps (Q_S = 1 + num_spec) keep CAUSAL.
++        mask_mode = QFA_MASK_MODE_NO_MASK if max_seqlen_q == 1 else QFA_MASK_MODE_CAUSAL
++
++        # Both operators have to agree on the q scale layout: it is what
++        # picks the kernel, and the metadata plan is computed for that kernel.
++        query_scale, layout_q_descale = self._qfa_query_scale_for_layout(query_scale, max_seqlen_q)
++
++        qfa_metadata = self._get_qfa_metadata(
++            attn_metadata,
++            cu_seqlens_q=cu_seqlens_q,
++            seqused_kv=seqused_kv,
++            max_seqlen_q=max_seqlen_q,
++            mask_mode=mask_mode,
++            layout_q_descale=layout_q_descale,
++        )
++        return self._run_qfa(
++            quant_query,
++            query_scale,
++            kv_cache,
++            attn_metadata,
++            cu_seqlens_q=cu_seqlens_q,
++            seqused_kv=seqused_kv,
++            qfa_metadata=qfa_metadata,
++            max_seqlen_q=max_seqlen_q,
++            mask_mode=mask_mode,
++            layout_q_descale=layout_q_descale,
++            num_tokens=num_tokens,
++            output=output,
++        )
++
++    # KV cache writes happen in reshape_and_cache(), invoked from forward()
++    # when key/value are present. This hook is only reached when attention is
++    # split from cache update (forward_includes_kv_cache_update=False);
++    # AscendAttentionBackend keeps it True, so normal inference never calls
++    # this.
++    def do_kv_cache_update(
++        self,
++        layer: torch.nn.Module,
++        key: torch.Tensor,
++        value: torch.Tensor,
++        kv_cache: list[torch.Tensor],
++        slot_mapping: torch.Tensor,
++    ) -> None:
++        raise NotImplementedError("C8_MXFP KV cache update is only supported via reshape_and_cache in forward().")
++
++    def reshape_and_cache(  # type: ignore[override]
++        self,
++        quant_key: torch.Tensor,
++        quant_value: torch.Tensor,
++        key_scale: torch.Tensor,
++        kv_cache: tuple[torch.Tensor, ...],
++        attn_metadata: AscendMetadata,
++    ) -> None:
++        num_actual_tokens = quant_key.shape[0]
++        slot_mapping = attn_metadata.slot_mapping[:num_actual_tokens]
++        key_cache, value_cache = kv_cache[0], kv_cache[1]
++        # 5-D PA_NZ packet-packed views: (kernel_blocks, N, D//32, Bs, 32).
++        block_size = key_cache.shape[3]
++
++        # Scatter the K/V payloads through the strided packet views; the
++        # operator's tiling consumes the dim0 stride as the block stride.
++        scatter_mxfp_pa_nz_kv_cache(
++            quant_key,
++            quant_value,
++            key_cache,
++            value_cache,
++            slot_mapping,
++        )
++
++        # Only K's scale is per-token; V's static scale is filled once at KV
++        # cache setup by NPUModelRunner._fill_c8_mxfp_v_scale_caches.
++        scatter_mxfp_k_scale_cache(
++            # Byte view: index_put_ on float8 falls back to AICPU.
++            key_scale.view(torch.uint8) if key_scale.dtype != torch.uint8 else key_scale,
++            kv_cache[2],
++            self._qfa_k_scale_slot_index(attn_metadata, slot_mapping, block_size),
++        )
++        notify_kv_cache_written()
++
++    def forward(
++        self,
++        layer: AttentionLayer,
++        query: torch.Tensor,
++        key: torch.Tensor,
++        value: torch.Tensor,
++        kv_cache: tuple[torch.Tensor],
++        attn_metadata: AscendMetadata,
++        output: torch.Tensor | None = None,
++        output_scale: torch.Tensor | None = None,
++        output_block_scale: torch.Tensor | None = None,
++    ) -> torch.Tensor:
++        assert output is not None, "Output tensor must be provided."
++        if output_scale is not None or output_block_scale is not None:
++            raise NotImplementedError(
++                "fused output quantization is not yet supported for AscendC8MXFPAttentionBackendImpl"
++            )
++        if attn_metadata is None:
++            return output.fill_(0)
++        if getattr(self, "enable_hamming_sparse", False):
++            raise NotImplementedError("C8_MXFP attention does not support hamming sparse KV compression yet.")
++        if self.vllm_config.kv_transfer_config is not None and not uses_mooncake_connector(
++            self.vllm_config.kv_transfer_config
++        ):
++            # Other connectors move only the K/V pair and would silently drop
++            # the scale caches.
++            raise NotImplementedError(
++                "C8_MXFP v1 PD disaggregation (kv_transfer) is only supported with "
++                "MooncakeConnectorV1, whose block-level transfer registers and moves "
++                "every per-layer cache tensor (FP8 K/V plus both E8M0 scale caches) "
++                "as raw blocks."
++            )
++        if kv_cache is None or len(kv_cache) < 4:
++            raise RuntimeError(
++                "C8_MXFP attention requires a (k, v, k_scale, v_scale) KV cache "
++                f"tuple, got: {type(kv_cache)} with length "
++                f"{len(kv_cache) if kv_cache is not None else 0}."
++            )
++
++        record_attention_compute_start()
++
++        query_mxfp8, query_scale = torch_npu.npu_dynamic_mx_quant(
++            query[: attn_metadata.num_actual_tokens],
++            dst_type=torch.float8_e4m3fn,
++        )
++
++        # KV-sharing consumer layers reuse another layer's cache; writing
++        # their (dummy) K/V would corrupt the shared slots, so only the
++        # owner layer quantizes and scatters K/V.
++        if key is not None and value is not None and self.kv_sharing_target_layer_name is None:
++            key_mxfp8, key_scale = torch_npu.npu_dynamic_mx_quant(
++                key[: attn_metadata.num_actual_tokens],
++                dst_type=torch.float8_e4m3fn,
++            )
++
++            original_value_shape = value.shape
++            value = value.view(original_value_shape[0], -1)
++            value_mxfp8 = torch_npu.npu_quantize(
++                value[: attn_metadata.num_actual_tokens],
++                layer.v_cache_scale_float_reciprocal,
++                None,
++                torch.float8_e4m3fn,
++                -1,
++                False,
++            )
++            value_mxfp8 = value_mxfp8.view((attn_metadata.num_actual_tokens, *original_value_shape[1:]))
++
++            self.reshape_and_cache(key_mxfp8, value_mxfp8, key_scale, kv_cache, attn_metadata)
++
++        # PA_NZ: QFA reads the packet-packed strided cache views directly
++        # (built once at allocation) -- no transpose, no storage copy.
++        return self._forward_mxfp8_attention(query_mxfp8, query_scale, kv_cache, attn_metadata, output)
+@@ -15,7 +15,7 @@
+ # This file is a part of the vllm-ascend project.
+ #
+ 
+-from dataclasses import dataclass
++from dataclasses import dataclass, field
+ from enum import Enum
+ from typing import Any
+ 
+@@ -117,13 +117,13 @@ def swap_blocks(
+         dst_kv_cache: list[torch.Tensor],
+         src_to_dst: torch.Tensor,
+     ) -> None:
+-        src_key_cache, src_value_cache = src_kv_cache[0], src_kv_cache[1]
+-        dst_key_cache, dst_value_cache = dst_kv_cache[0], dst_kv_cache[1]
+         src_indices = src_to_dst[:, 0]
+         dst_indices = src_to_dst[:, 1]
+ 
+-        dst_key_cache[dst_indices] = src_key_cache[src_indices].to(dst_key_cache.device)
+-        dst_value_cache[dst_indices] = src_value_cache[src_indices].to(dst_key_cache.device)
++        # C8-MXFP layers carry (k, v, k_scale, v_scale) tuples; generalize to
++        # any cache tuple length so scale caches are swapped alongside K/V.
++        for src_cache, dst_cache in zip(src_kv_cache, dst_kv_cache):
++            dst_cache[dst_indices] = src_cache[src_indices].to(dst_cache.device)
+ 
+     @staticmethod
+     def copy_blocks(
+@@ -134,10 +134,8 @@ def copy_blocks(
+         dst_indices = src_to_dists[:, 1]
+ 
+         for kv_cache in kv_caches:
+-            key_caches = kv_cache[0]
+-            value_caches = kv_cache[1]
+-            key_caches[dst_indices] = key_caches[src_indices]
+-            value_caches[dst_indices] = value_caches[src_indices]
++            for cache in kv_cache:
++                cache[dst_indices] = cache[src_indices]
+ 
+     @staticmethod
+     def get_supported_kernel_block_sizes() -> list[int]:
+@@ -188,6 +186,16 @@ class AscendMetadata:
+     # Maximum query length in the batch (None for decoding).
+     max_query_len: int | None = None
+ 
++    # Persistent GPU-side length sources, refreshed in place by the model
++    # runner every step: query_start_loc_gpu is the 0-prefixed cumulative
++    # query boundaries (int32) and seq_lens_gpu the per-request KV lengths
++    # (int32). Graph-capturing backends must source cu_seqlens/seqused from
++    # these instead of the CPU lists above -- ACL-graph replay re-executes
++    # only device work, so Python-side refreshes of hand-managed buffers
++    # never run again after capture.
++    query_start_loc_gpu: torch.Tensor = None
++    seq_lens_gpu: torch.Tensor = None
++
+     # ********************** KV Cache Related Properties ********************* #
+     # Block addresses per sequence (Seq id -> list of physical block).
+     # (batch_size, max_blocks_per_seq)
+@@ -205,6 +213,14 @@ class AscendMetadata:
+     # prefill reshape_and_cache event
+     reshape_cache_event: torch.npu.Event = None
+ 
++    # Per-step scratch for C8-MXFP (QFA) layers. The builder creates one
++    # AscendMetadata per step shared by all attention layers, so the QFA
++    # metadata operator output is computed once per step instead of once
++    # per layer. Key: layout_q_descale -> QFA metadata tensor, because that
++    # layout is what selects the prefill or decode kernel the plan is computed
++    # for. Only used on the eager path -- graph capture bypasses the cache so
++    # the metadata op executes inside the captured region.
++    qfa_metadata_cache: dict = field(default_factory=dict)
+     pcp_local_num_input_tokens: int | None = None
+ 
+ 
+@@ -385,6 +401,8 @@ def build(
+             num_decode_tokens=num_decode_tokens,
+             block_tables=block_table,
+             query_start_loc=query_start_loc,
++            query_start_loc_gpu=common_attn_metadata.query_start_loc,
++            seq_lens_gpu=common_attn_metadata.seq_lens,
+             seq_lens=seq_lens,
+             seq_lens_cpu=seq_lens,
+             seq_lens_list=seq_lens_list,
+@@ -549,7 +567,11 @@ def __init__(
+         if self.kv_cache_dtype in [torch.float16, torch.bfloat16, torch.float32]:
+             self.enable_c8_quant = False
+         else:
+-            if not self.enable_c8_quant:
++            from vllm_ascend.utils import is_c8_mxfp_kv_quant
++
++            # MXFP8 is switched on by --kv-cache-dtype itself, so it must
++            # not be gated by the recipe-derived C8 flag.
++            if not self.enable_c8_quant and not is_c8_mxfp_kv_quant(self.vllm_config):
+                 raise ValueError(
+                     "The current GQA‑related models adopt static quantization. "
+                     "KV quantization is configured via `--kv‑cache‑dtype` upon service startup, "
+@@ -46,10 +46,11 @@
+ from vllm.logger import logger
+ 
+ # The upstream Literal that gates ``cache_dtype``. We widen it to also accept
+-# ``"int8"`` (DeepSeek V4 Ascend MLA KV cache dtype). Keep the existing
+-# members verbatim so non-int8 behavior is unchanged.
++# ``"int8"`` (DeepSeek V4 Ascend MLA KV cache dtype) and ``"mxfp8"`` (C8-MXFP
++# KV cache on the QFA path). Keep the existing members verbatim so other
++# behavior is unchanged.
+ _ORIG_CACHE_DTYPE = _cache_mod.CacheDType
+-_CACHE_DTYPE_WITH_INT8 = typing.Literal[
++_CACHE_DTYPE_WITH_ASCEND = typing.Literal[
+     "auto",
+     "float16",
+     "bfloat16",
+@@ -68,11 +69,12 @@
+     "nvfp4",
+     "nvfp4_4over6",
+     "int8",
++    "mxfp8",
+ ]
+ 
+ 
+ def _apply_kv_cache_dtype_int8_patch() -> None:
+-    """Widen ``CacheConfig.cache_dtype`` to accept ``"int8"``.
++    """Widen ``CacheConfig.cache_dtype`` to accept ``"int8"`` and ``"mxfp8"``.
+ 
+     A pydantic dataclass caches its core schema / validator at class-build
+     time from the field annotations. Mutating the annotation alone is not
+@@ -96,12 +98,12 @@ def _apply_kv_cache_dtype_int8_patch() -> None:
+     """
+     # Idempotency: if int8 is already accepted, nothing to do.
+     existing_args = getattr(_ORIG_CACHE_DTYPE, "__args__", ())
+-    if "int8" in existing_args:
++    if "int8" in existing_args and "mxfp8" in existing_args:
+         return
+ 
+-    _cache_mod.CacheDType = _CACHE_DTYPE_WITH_INT8
+-    CacheConfig.__annotations__["cache_dtype"] = _CACHE_DTYPE_WITH_INT8
+-    CacheConfig.__dataclass_fields__["cache_dtype"].type = _CACHE_DTYPE_WITH_INT8
++    _cache_mod.CacheDType = _CACHE_DTYPE_WITH_ASCEND
++    CacheConfig.__annotations__["cache_dtype"] = _CACHE_DTYPE_WITH_ASCEND
++    CacheConfig.__dataclass_fields__["cache_dtype"].type = _CACHE_DTYPE_WITH_ASCEND
+ 
+     # Rebuild the pydantic dataclass schema so the new Literal is enforced.
+     # ``_parent_namespace_depth=1`` makes pydantic resolve types against this
+@@ -112,7 +114,7 @@ def _apply_kv_cache_dtype_int8_patch() -> None:
+         raise_errors=True,
+         _parent_namespace_depth=1,
+     )
+-    logger.info("Patched CacheConfig.cache_dtype to accept 'int8' (DeepSeek V4 Ascend MLA KV cache dtype).")
++    logger.info("Patched CacheConfig.cache_dtype to accept 'int8' and 'mxfp8' (Ascend KV cache dtypes).")
+ 
+ 
+ _apply_kv_cache_dtype_int8_patch()
+@@ -62,7 +62,7 @@ def _apply_fp8_kv_cache_dtype_flip() -> None:
+ 
+ 
+ def _widen_cache_dtype_literal_for_worker() -> None:
+-    """Widen ``CacheConfig.cache_dtype`` to accept ``"int8"`` in the worker.
++    """Widen ``CacheConfig.cache_dtype`` to accept ``"int8"``/``"mxfp8"`` in the worker.
+ 
+     Mirrors ``patch/platform/patch_kv_cache_dtype.py``: update the module-level
+     Literal, the ``CacheConfig`` annotation and dataclass field type, then
+@@ -85,10 +85,11 @@ def _widen_cache_dtype_literal_for_worker() -> None:
+     from vllm.config.cache import CacheConfig
+ 
+     existing_args = getattr(_cache_mod.CacheDType, "__args__", ())
+-    if "int8" not in existing_args:
+-        # Derive from the current upstream Literal and append "int8" so no
+-        # upstream member is dropped.
+-        widened = typing.Literal[*existing_args + ("int8",)]  # type: ignore[valid-type]
++    missing = tuple(d for d in ("int8", "mxfp8") if d not in existing_args)
++    if missing:
++        # Derive from the current upstream Literal and append the Ascend-only
++        # dtypes so no upstream member is dropped.
++        widened = typing.Literal[*existing_args + missing]  # type: ignore[valid-type]
+ 
+         _cache_mod.CacheDType = widened
+         CacheConfig.__annotations__["cache_dtype"] = widened
+@@ -105,6 +106,12 @@ def _widen_cache_dtype_literal_for_worker() -> None:
+         # inherited via fork; nothing to patch here.
+         widened = _cache_mod.CacheDType
+ 
++    # The C8-MXFP path stores FP8 KV payloads; the generic impl constructor
++    # resolves the dtype string before the C8 backend swaps the class, so the
++    # mapping must exist even though the C8 caches are allocated as raw int8
++    # bytes.
++    _torch_utils.STR_DTYPE_TO_TORCH_DTYPE.setdefault("mxfp8", torch.float8_e4m3fn)
++
+     # Unconditional rebind: the selector's module-global CacheDType must point
+     # at the widened Literal regardless of import order / fork inheritance.
+     try:
+@@ -20,7 +20,7 @@
+ import math
+ import os
+ from importlib import import_module, util
+-from typing import TYPE_CHECKING, Any
++from typing import TYPE_CHECKING, Any, get_args
+ from uuid import uuid4
+ 
+ import torch
+@@ -327,6 +327,16 @@ def pre_register_and_update(cls, parser: FlexibleArgumentParser | None = None) -
+             if quant_action and hasattr(quant_action, "choices") and quant_action.choices:
+                 if ASCEND_QUANTIZATION_METHOD not in quant_action.choices:
+                     quant_action.choices.append(ASCEND_QUANTIZATION_METHOD)
++            # Same pattern for --kv-cache-dtype: the argparse choices were
++            # built from the upstream CacheDType Literal before this patch
++            # widened it, so append the Ascend-only dtypes here.
++            dtype_action = parser._option_string_actions.get("--kv-cache-dtype")
++            if dtype_action and hasattr(dtype_action, "choices") and dtype_action.choices:
++                from vllm.config.cache import CacheConfig
++
++                for dtype in get_args(CacheConfig.__dataclass_fields__["cache_dtype"].type):
++                    if dtype not in dtype_action.choices:
++                        dtype_action.choices.append(dtype)
+ 
+         if get_current_hardware_profile().quantization_backend_family is QuantizationBackendFamily.STANDARD:
+             from vllm_ascend.quantization import (  # noqa: F401
+@@ -31,7 +31,7 @@
+ import regex as re
+ import torch
+ from transformers import PretrainedConfig
+-from vllm.config import get_current_vllm_config
++from vllm.config import get_current_vllm_config, get_current_vllm_config_or_none
+ from vllm.logger import logger
+ from vllm.model_executor.layers.attention_layer_base import AttentionLayerBase
+ from vllm.model_executor.layers.linear import LinearBase
+@@ -43,6 +43,7 @@
+ from vllm_ascend.device.hardware_profile import HardwareCapability, get_current_hardware_profile
+ from vllm_ascend.utils import (
+     ASCEND_QUANTIZATION_METHOD,
++    C8_MXFP_KV_CACHE_DTYPE,
+     calc_split_factor,
+ )
+ 
+@@ -54,6 +55,25 @@
+     "w2_scale_bias": "w2_scale",
+ }
+ 
++# Older ModelSlim checkpoints declare the MXFP8 KV cache once, model-wide, as
++# ``kv_cache_type``. Newer ones drop that key and state the recipe per layer
++# instead, which is also how a hybrid model says that only its full-attention
++# layers have a KV cache at all. We still enable the scheme model-wide, since
++# the backend has no per-layer switch, and the linear-attention layers never
++# reach it.
++_MXFP_C8_KV_CACHE_TYPE = "K_DYNAMIC_V_STATIC_MXFP8_PER_CHANNEL"
++_MXFP_C8_LAYER_QUANT_TYPE_SUFFIX = ".self_attn.quant_type"
++_MXFP_C8_LAYER_QUANT_TYPES = ("QK_MXFP8_DYNAMIC_V_MXFP8_PER_CHANNEL",)
++# FAKQuant parameters that MXFP8 has no home for: K and Q are quantized
++# dynamically at runtime, so their checkpoint scales have no parameter to land
++# on. Without these AutoWeightsLoader rejects the checkpoint outright.
++_MXFP_C8_UNUSED_FA_SUFFIXES = (
++    ".fa_q.scale",
++    ".fa_k.scale",
++    ".fa_q.offset",
++    ".fa_k.offset",
++)
++
+ 
+ def _make_modelslim_moe_weight_loader(
+     weight_loader: Callable[..., bool | None],
+@@ -342,6 +362,16 @@ class AscendModelSlimConfig(QuantizationConfig):
+     quantized using the ModelSlim tool.
+     """
+ 
++    # Assigned in _add_kvcache_quant_metadata; declared here so the types
++    # resolve regardless of method order (get_cache_scale_mapper reads and
++    # conditionally rewrites enable_fa_quant before the assignment site).
++    enable_fa_quant: bool
++    kvcache_quant_layers: list[int]
++    enable_indexer_quant: bool
++    indexer_quant_layers: list[int]
++    enable_c8_quant: bool
++    c8_quant_layers: list[int]
++
+     def __init__(self, quant_config: dict[str, Any] | None = None):
+         super().__init__()
+         # This will be updated by upstream vLLM with model-specific mappings.
+@@ -429,8 +459,24 @@ def apply_vllm_mapper(self, hf_to_vllm_mapper: "WeightsMapper"):
+ 
+     def get_cache_scale_mapper(self) -> "WeightsMapper":
+         """Upstream use staticmethod, but we need to use instance attribute"""
+-        suffix_map = {}
++        suffix_map: dict[str, str | None] = {}
+         regex_map = {}
++        if self._has_mxfp_c8_recipe and not self.enable_mxfp_c8_quant:
++            logger.warning_once(
++                "[quantization] The checkpoint carries an MXFP8 KV recipe, but "
++                "--kv-cache-dtype is not 'mxfp8'; the recipe is not enabled. "
++                "Pass --kv-cache-dtype mxfp8 to serve with C8-MXFP."
++            )
++        if self.enable_mxfp_c8_quant and self.enable_fa_quant:
++            # A checkpoint can carry fa_quant_type alongside an MXFP8 KV
++            # recipe; FAKQuant would win every shared dispatch and rename
++            # fa_v.scale into an MLA submodule this dense model does not
++            # have, silently dropping the scale. Stand FAKQuant down.
++            logger.warning_once(
++                "[quantization] fa_quant_type=%s is declared alongside an MXFP8 KV cache; ignoring FAKQuant.",
++                self.quant_description.get("fa_quant_type", ""),
++            )
++            self.enable_fa_quant = False
+         if self.enable_c8_quant:
+             suffix_map.update(
+                 {
+@@ -440,6 +486,14 @@ def get_cache_scale_mapper(self) -> "WeightsMapper":
+                     ".v_proj.kv_cache_offset": ".attn.v_cache_offset",
+                 }
+             )
++        if self.enable_mxfp_c8_quant:
++            # MXFP C8 quantizes K dynamically, but V uses the static E8M0
++            # per-channel scale stored in the ModelSlim checkpoint
++            # (fa_v.scale, reusing FAKQuant's key for a different recipe).
++            suffix_map[".fa_v.scale"] = ".attn.v_cache_scale"
++            # The remaining FAKQuant legacy tensors have no MXFP8 consumer.
++            suffix_map[".fa_v.offset"] = None
++            suffix_map.update(dict.fromkeys(_MXFP_C8_UNUSED_FA_SUFFIXES, None))
+         if self.enable_fa_quant:
+             # Some models (e.g., Kimi-K2.6) have a nested module and call AutoWeightsLoader twice, to avoid double
+             # mapping, we use regex mapping.
+@@ -668,6 +722,20 @@ def get_quant_method(self, layer: torch.nn.Module, prefix: str, tid2eid=None) ->
+ 
+                 scheme = AscendC8KVCacheAttentionMethod(self.quant_description, prefix)
+                 logger.debug("Select AscendKVCacheMethod(C8) for %s (layer=%s)", prefix, "AttentionLayerBase[C8]")
++            elif self.enable_mxfp_c8_quant and self._is_full_attention_layer(layer):
++                if self._has_mxfp_c8_recipe is False:
++                    logger.warning_once(
++                        "[quantization] --kv-cache-dtype mxfp8 is set but the checkpoint "
++                        "carries no MXFP8 KV recipe; V scales fall back to the neutral default."
++                    )
++                else:
++                    logger.info_once("[quantization] C8 MXFP8 KV cache enabled (--kv-cache-dtype mxfp8).")
++                from ..methods.kv_cache.mxfp_c8 import AscendC8MXFPKVCacheAttentionMethod
++
++                scheme = AscendC8MXFPKVCacheAttentionMethod(self.quant_description, prefix)
++                logger.debug(
++                    "Select AscendKVCacheMethod(C8-MXFP) for %s (layer=%s)", prefix, "AttentionLayerBase[C8-MXFP]"
++                )
+             else:
+                 # Unquantized attention layer
+                 return None
+@@ -729,7 +797,58 @@ def is_c8_quant_layer(self, prefix):
+                 return True
+         return False
+ 
++    @staticmethod
++    def _is_full_attention_layer(layer: torch.nn.Module) -> bool:
++        """C8-MXFP only applies to standard full-attention ``Attention``
++        layers. Other AttentionLayerBase subclasses (GDN/Mamba, encoder
++        attention, ...) must not get the MXFP KV-cache method: they have no
++        ``num_kv_heads``/``head_size_v`` and install the QFA backend on the
++        wrong layer type."""
++        from vllm.model_executor.layers.attention import Attention
++
++        return isinstance(layer, Attention)
++
++    @property
++    def enable_mxfp_c8_quant(self) -> bool:
++        """C8-MXFP is enabled with ``--kv-cache-dtype mxfp8``.
++
++        A Model-config-time query: returns False while the engine config is
++        still being assembled or absent (e.g. unit tests without a
++        ``set_current_vllm_config`` context), so no quant-config constructor
++        or mapper may take a C8 decision through this switch.
++        """
++        vllm_config = get_current_vllm_config_or_none()
++        if vllm_config is None:
++            return False
++        return vllm_config.cache_config.cache_dtype == C8_MXFP_KV_CACHE_DTYPE
++
++    @property
++    def _has_mxfp_c8_recipe(self) -> bool:
++        """Whether the checkpoint carries an MXFP8 KV recipe (model-wide
++        ``kv_cache_type`` or a per-layer ``quant_type``). This is NOT the
++        switch -- ``--kv-cache-dtype mxfp8`` is; the recipe only decides
++        whether the fa_v.scale weights are expected."""
++        kv_quant_type = self.quant_description.get("kv_cache_type", "")
++        return kv_quant_type == _MXFP_C8_KV_CACHE_TYPE or any(
++            key.endswith(_MXFP_C8_LAYER_QUANT_TYPE_SUFFIX) and value in _MXFP_C8_LAYER_QUANT_TYPES
++            for key, value in self.quant_description.items()
++        )
++
++    @property
++    def _ignore_unexpected_suffixes(self) -> tuple[str, ...]:
++        base = QuantizationConfig._ignore_unexpected_suffixes
++        if self.enable_mxfp_c8_quant:
++            # FAKQuant parameters that MXFP8 has no home for: K and Q are
++            # quantized dynamically at runtime, so their checkpoint scales
++            # have no parameter to land on. Without these AutoWeightsLoader
++            # rejects the checkpoint outright.
++            return (*base, *_MXFP_C8_UNUSED_FA_SUFFIXES)
++        return base
++
+     def get_kv_quant_dtype(self, layer_name, cache_dtype, model_config):
++        # Note: C8-MXFP models never reach this hook — its only caller in
++        # model_runner_v1 is gated by enable_fa_quant(), and the C8-MXFP
++        # cache dtype comes from the rebuilt fp8 spec in get_kv_cache_spec.
+         if self.enable_fa_quant and self.is_fa_quant_layer(layer_name):
+             ori_dtype = model_config.dtype
+             quant_dtype = (
+@@ -858,7 +977,6 @@ def _apply_extra_quant_adaptations(self) -> None:
+         weight_packed mappings.
+         """
+         if "hc_head_fn" in self.quant_description:
+-            # TODO
+             extra_quant_dict = {}
+             for name in self.quant_description:
+                 new_name = name
+@@ -0,0 +1,120 @@
++import torch
++from vllm.config import get_current_vllm_config
++from vllm.distributed import get_tensor_model_parallel_rank, get_tensor_model_parallel_world_size
++
++from ..base import AscendAttentionScheme
++
++
++def _quant_weight_loader(param: torch.Tensor, loaded_weight: torch.Tensor):
++    if param.numel() == 1 and loaded_weight.numel() == 1:
++        param.data.fill_(loaded_weight.item())
++    else:
++        # ModelSlim exports the per-channel V cache scale as a column vector
++        # ([hidden, 1]); flatten it first. The loader delivers the FULL-width
++        # scale on every rank (attention-module parameters bypass the
++        # ColumnParallelLinear sharding), so slice it here following the same
++        # rule vLLM uses to replicate KV heads under GQA TP: with
++        # num_kv_heads < tp_size each head is replicated across
++        # tp_size // num_kv_heads ranks and rank r owns the slice of
++        # head r // (tp_size // num_kv_heads); otherwise a plain narrow.
++        # Some recipes store one set of per-channel scales shared by every KV
++        # head; tile it out to this rank's head count first.
++        if loaded_weight.dim() != 1:
++            loaded_weight = loaded_weight.flatten()
++        if loaded_weight.numel() < param.numel() and param.numel() % loaded_weight.numel() == 0:
++            loaded_weight = loaded_weight.repeat(param.numel() // loaded_weight.numel())
++        if loaded_weight.numel() != param.numel():
++            tp_rank = get_tensor_model_parallel_rank()
++            tp_size = get_tensor_model_parallel_world_size()
++            head_dim = param.numel()  # this rank's full (possibly replicated) head width
++            total = loaded_weight.numel()
++            num_heads_total = total // head_dim if total % head_dim == 0 else None
++            if num_heads_total is None or num_heads_total < 1:
++                raise AssertionError(
++                    "[vllm-ascend/MXFP8_PER_CHANNEL] Cannot map V cache scale of "
++                    f"{total} elements onto a per-rank head width of {head_dim} "
++                    f"(TP size {tp_size}, TP rank {tp_rank})."
++                )
++            heads_per_rank_group = max(1, tp_size // num_heads_total)
++            src_head = tp_rank // heads_per_rank_group
++            loaded_weight = loaded_weight.narrow(0, src_head * head_dim, head_dim)
++        assert param.numel() == loaded_weight.numel(), (
++            "[vllm-ascend/MXFP8_PER_CHANNEL] V cache scale size mismatch: parameter "
++            f"has {param.numel()} elements but the sliced weight has "
++            f"{loaded_weight.numel()} (TP size "
++            f"{get_tensor_model_parallel_world_size()}, TP rank "
++            f"{get_tensor_model_parallel_rank()})."
++        )
++        param.data.copy_(loaded_weight.view_as(param))
++
++
++class AscendC8MXFPKVCacheAttentionMethod(AscendAttentionScheme):
++    """MXFP8 KV cache storage for dense-attention models.
++
++    K/V are cached as FP8 E4M3 and their E8M0 scales are stored in extra
++    cache tensors: K uses dynamic per-token-group scales written at scatter
++    time, V uses the static per-channel E8M0 scale stored in the ModelSlim
++    checkpoint. Enabled with ``--kv-cache-dtype mxfp8``.
++    """
++
++    def __init__(self, quant_description: dict, prefix: str):
++        self.quant_description = quant_description
++        self.prefix = prefix
++
++    def create_weights(self, layer: torch.nn.Module) -> None:
++        layer.kv_cache_torch_dtype = torch.float8_e4m3fn
++        if hasattr(layer, "impl"):
++            from vllm_ascend.attention.attention_c8_mxfp import (
++                AscendC8MXFPAttentionBackend,
++                AscendC8MXFPAttentionBackendImpl,
++            )
++
++            layer.attn_backend = AscendC8MXFPAttentionBackend
++            layer.impl.__class__ = AscendC8MXFPAttentionBackendImpl
++            # Changing __class__ does not invoke the new class's __init__, so
++            # initialize the state the impl relies on here.
++            layer.impl.enable_hamming_sparse = False
++
++        # The checkpoint supplies the static V-cache scale.
++        hidden_size = layer.num_kv_heads * layer.head_size_v
++        weight_param = torch.nn.Parameter(
++            torch.full((hidden_size,), 127, dtype=torch.uint8),
++            requires_grad=False,
++        )
++        layer.register_parameter("v_cache_scale", weight_param)
++        # When loading weights, segment them according to TP
++        weight_param.weight_loader = _quant_weight_loader
++
++    def process_weights_after_loading(self, layer: torch.nn.Module) -> None:
++        vllm_config = get_current_vllm_config()
++        target_dtype = vllm_config.model_config.dtype
++        raw = layer.v_cache_scale.data
++        # A minmax calibrator emits 0 for a channel whose absmax was 0;
++        # sanitize to the neutral 127 so both consumers (the reciprocal below
++        # and the raw bytes broadcast into the V-scale cache) stay neutral.
++        if bool((raw == 0).any()):
++            raw[raw == 0] = 127
++        exponent = raw.to(torch.float32) - 127
++        # Only the reciprocal is consumed (npu_quantize needs 1/scale); the
++        # raw E8M0 bytes are broadcast into the V-scale cache as-is.
++        layer.v_cache_scale_float_reciprocal = torch.nn.Parameter(
++            (1 / torch.exp2(exponent)).to(target_dtype),
++            requires_grad=False,
++        )
++
++    def apply(
++        self,
++        layer: torch.nn.Module,
++        query: torch.Tensor,
++        key: torch.Tensor,
++        value: torch.Tensor,
++        kv_cache,
++        attn_metadata,
++        attn_type,
++        scale,
++        output,
++    ) -> torch.Tensor:
++        raise RuntimeError(
++            "AscendC8MXFPKVCacheAttentionMethod.apply should not be called. "
++            "C8_MXFP KV cache quantization is handled by the attention backend."
++        )
+@@ -1340,6 +1340,20 @@ def has_layer_idx(model_instance: torch.nn.Module) -> bool:
+     return hasattr(model_instance, "model") and hasattr(model_instance.model, "start_layer")
+ 
+ 
++# C8_MXFP (FP8 KV + E8M0 scales) on Ascend A5 uses 512-token kernel blocks for
++# the QFA path (the QFA D=256 requirement doc allows block sizes 512/1024).
++A5_C8_MXFP_KV_CACHE_BLOCK_SIZE = 512
++
++# Enabled with ``--kv-cache-dtype mxfp8``, like the other Ascend C8 KV cache
++# flavors. The ModelSlim checkpoint recipe (fa_v.scale weights) is loaded when
++# present; it is not the switch.
++C8_MXFP_KV_CACHE_DTYPE = "mxfp8"
++
++
++def is_c8_mxfp_kv_quant(vllm_config: VllmConfig) -> bool:
++    return vllm_config.cache_config.cache_dtype == C8_MXFP_KV_CACHE_DTYPE
++
++
+ def refresh_block_size(vllm_config):
+     """
+     Refresh the block size in cache config.
+@@ -1365,6 +1379,16 @@ def refresh_block_size(vllm_config):
+     if cache_config.block_size is None:
+         cache_config.block_size = 128
+ 
++    # Hybrid page padding is handled by the upstream cache planner. C8 only
++    # constrains the scheduler block to contain whole 512-token kernel blocks.
++    if is_c8_mxfp_kv_quant(vllm_config):
++        kernel_size = A5_C8_MXFP_KV_CACHE_BLOCK_SIZE
++        if cache_config.block_size % kernel_size:
++            if getattr(cache_config, "user_specified_block_size", False):
++                raise ValueError(f"C8_MXFP requires --block-size to be a multiple of {kernel_size}.")
++            cache_config.block_size = kernel_size
++        return
++
+     if not scheduler_config or not model_config:
+         return
+ 
+@@ -122,6 +122,12 @@
+ 
+ # yapf: enable
+ from vllm_ascend.ascend_config import get_ascend_config
++from vllm_ascend.attention.attention_c8_mxfp import (
++    AscendC8MXFPAttentionBackendImpl,
++    fill_mxfp_v_scale_cache,
++    mxfp_cache_spec,
++    mxfp_cache_views_for_spec,
++)
+ from vllm_ascend.attention.attention_v1 import AscendAttentionBackend, AscendAttentionState
+ from vllm_ascend.attention.context_parallel.dsa_cp import AscendDSACPMetadataBuilder
+ from vllm_ascend.attention.context_parallel.sfa_cp import AscendSFADCPMetadataBuilder
+@@ -204,6 +210,7 @@
+     get_c_env,
+     get_kv_cache_tensor_layers,
+     global_stream,
++    is_c8_mxfp_kv_quant,
+     is_hidden_state_cache_spec,
+     is_score_encoder_cache_manager,
+     kv_cache_spec_uses_sparse_sfa_c8,
+@@ -4687,6 +4694,16 @@ def _align_memory(self, tensor: torch.Tensor, alignment: int) -> torch.Tensor:
+         offset = (aligned_addr - data_ptr) // tensor.element_size()
+         return tensor[int(offset) :]
+ 
++    def _is_c8_mxfp_kv_cache(self, spec: AttentionSpec) -> bool:
++        return type(spec) is FullAttentionSpec and is_c8_mxfp_kv_quant(self.vllm_config)
++
++    def _fill_c8_mxfp_v_scale_caches(self, kv_caches: dict[str, Any]) -> None:
++        """Fill static V scales once, before graph capture or any request."""
++        for layer_name, cache in kv_caches.items():
++            layer = self.compilation_config.static_forward_context.get(layer_name)
++            if isinstance(getattr(layer, "impl", None), AscendC8MXFPAttentionBackendImpl):
++                fill_mxfp_v_scale_cache(layer.v_cache_scale, cache[3])
++
+     def initialize_kv_cache_tensors(
+         self,
+         kv_cache_config: KVCacheConfig,
+@@ -4717,6 +4734,8 @@ def initialize_kv_cache_tensors(
+             logger.debug("%s reuses KV cache of %s", layer_name, target_layer_name)
+             kv_caches[layer_name] = kv_caches[target_layer_name]
+ 
++        self._fill_c8_mxfp_v_scale_caches(kv_caches)
++
+         if any(
+             isinstance(self.compilation_config.static_forward_context.get(name), v41_cache_layer_type)
+             for name in kv_caches
+@@ -5353,6 +5372,13 @@ def _reshape_kv_cache_tensors(
+                     group_kernel_block_size or current_kv_cache_spec.block_size
+                 )
+ 
++                if self._is_c8_mxfp_kv_cache(current_kv_cache_spec):
++                    raw = kv_cache_raw_tensors[layer_name]
++                    if not isinstance(raw, torch.Tensor):
++                        raise ValueError("C8_MXFP requires one combined raw allocation per layer.")
++                    kv_caches[layer_name] = mxfp_cache_views_for_spec(raw, current_kv_cache_spec, kernel_block_size)
++                    continue
++
+                 if layer_name in layer_tuple_strides:
+                     block_stride = layer_tuple_strides[layer_name]
+                     initial_offset = 0
+@@ -6102,6 +6128,8 @@ def get_kv_cache_spec(self) -> dict[str, KVCacheSpec]:
+                     kv_cache_spec[layer_name] = spec
+             elif isinstance(attn_module, Attention):
+                 if spec := attn_module.get_kv_cache_spec(self.vllm_config):
++                    if self._is_c8_mxfp_kv_cache(spec):
++                        spec = mxfp_cache_spec(spec)
+                     kv_cache_spec[layer_name] = spec
+                     attn_layer_names.add(layer_name)
+             elif isinstance(attn_module, MLAAttention):
+@@ -1,6 +1,5 @@
+ from collections.abc import Iterable, Iterator, Sequence
+ from contextlib import contextmanager
+-from itertools import product as iprod
+ from typing import Any
+ 
+ import torch
+@@ -55,6 +54,10 @@ def copy_kv_cache_blocks_inplace(
+     for tensor in cache_tensors:
+         assert tensor.device == device
+         assert tensor.shape[0] % num_blocks == 0
++        # FP8 is storage here. NPU stack/index operators need byte views;
++        # same-size bitcasts preserve the non-contiguous page geometry.
++        if tensor.dtype == torch.float8_e4m3fn:
++            tensor = tensor.view(torch.int8)
+         blocks = tensor.unflatten(0, (num_blocks, tensor.shape[0] // num_blocks))
+         source_blocks = torch.stack([blocks[copy.src_block_id] for copy in kv_cache_block_copies])
+         for index, copy in enumerate(kv_cache_block_copies):
+@@ -82,6 +85,7 @@ def _zero_kv_blocks_kernel(
+     seg_page_sizes_ptr,
+     block_ids_ptr,
+     n_blocks,
++    seg_page_strides_ptr,
+     N_SEGS: tl.constexpr,
+     MAX_CHUNKS: tl.constexpr,
+     BLOCK_SIZE: tl.constexpr,
+@@ -94,9 +98,9 @@ def _zero_kv_blocks_kernel(
+     buffer.  For backends where K/V is outermost (block_dim=1) there are
+     two segments per buffer (one for K, one for V).
+ 
+-    Segments may have different page sizes. Each segment's page size is
+-    read from seg_page_sizes_ptr; work items beyond a segment's page size
+-    are skipped.
++    Segment payload sizes and physical page strides are independent.
++    Payload sizes bound writes; page strides advance scheduler block IDs
++    past neighboring caches and padding.
+ 
+     seg_addrs_ptr holds absolute byte addresses (int64) for each segment,
+     allowing segments to live in different CUDA allocations.
+@@ -116,7 +120,8 @@ def _zero_kv_blocks_kernel(
+             block_id = tl.load(block_ids_ptr + block_index)
+             seg_addr = tl.load(seg_addrs_ptr + seg_index)
+             ptr = tl.cast(seg_addr, tl.pointer_type(tl.int32))
+-            offset = block_id.to(tl.int64) * page_size_el.to(tl.int64) + chunk_index.to(tl.int64) * BLOCK_SIZE
++            page_stride_el = tl.load(seg_page_strides_ptr + seg_index)
++            offset = block_id.to(tl.int64) * page_stride_el.to(tl.int64) + chunk_index.to(tl.int64) * BLOCK_SIZE
+             cols = tl.arange(0, BLOCK_SIZE).to(tl.int64)
+             tl.store(ptr + offset + cols, tl.zeros([BLOCK_SIZE], dtype=tl.int32))
+ 
+@@ -133,6 +138,7 @@ def __init__(self, device: torch.device, pin_memory: bool) -> None:
+         self.device = device
+         self.pin_memory = pin_memory
+         self._meta: tuple[torch.Tensor, torch.Tensor, int, int, int] | None = None
++        self._seg_page_strides: torch.Tensor | None = None
+         self._id_cap: int = 0
+         self._ids_pinned: torch.Tensor | None = None
+         self._ids_gpu: torch.Tensor | None = None
+@@ -161,6 +167,7 @@ def init_meta(
+         seen_ptrs: set[int] = set()
+         seg_addrs: list[int] = []
+         seg_page_sizes: list[int] = []
++        seg_page_strides: list[int] = []
+ 
+         for group in attn_groups_iter:
+             spec = group.kv_cache_spec
+@@ -169,36 +176,42 @@ def init_meta(
+             if group.kv_cache_group_id >= len(kernel_block_sizes):
+                 continue
+             kernel_bs = kernel_block_sizes[group.kv_cache_group_id]
++            assert kernel_bs > 0 and spec.block_size % kernel_bs == 0
+             ratio = spec.block_size // kernel_bs
+-            block_dim = 0
+ 
+             for layer_name in group.layer_names:
+                 if layer_name in runner_only_attn_layers:
+                     continue
+                 kv_tuple = static_forward_context[layer_name].kv_cache
+-                assert len(kv_tuple) == 2, "K and V are not stored separately"
++                if cache_dtype == "mxfp8" and len(kv_tuple) == 4:
++                    # V scales are checkpoint constants, initialized before
++                    # capture. Clearing a recycled block must preserve them.
++                    kv_tuple = kv_tuple[:3]
++                else:
++                    assert len(kv_tuple) == 2, "K and V are not stored separately"
+                 for kv in kv_tuple:
+-                    block_dim = 0
+                     dp = kv.data_ptr()
+                     if dp in seen_ptrs:
+                         continue
+                     seen_ptrs.add(dp)
+ 
+                     el = kv.element_size()
+-                    cur_bytes = kv.stride(block_dim) * el
+-                    assert cur_bytes % 4 == 0
+-                    kernel_block_el = cur_bytes // 4
+-                    cur_page_el = kernel_block_el * ratio
+-                    block_stride_bytes = cur_bytes
+-                    outer_dims = [d for d in range(block_dim) if kv.stride(d) * el > block_stride_bytes]
+-                    outer_strides = [kv.stride(d) * el for d in outer_dims]
+-                    for outer in iprod(*(range(kv.shape[d]) for d in outer_dims)):
+-                        off_bytes = sum(i * s for i, s in zip(outer, outer_strides))
+-                        seg_addrs.append(dp + off_bytes)
+-                        seg_page_sizes.append(cur_page_el)
++                    payload_bytes = kv[0].numel() * el
++                    stride_bytes = kv.stride(0) * el
++                    assert kv[0].is_contiguous(), "KV block payload must be contiguous"
++                    assert payload_bytes % 4 == 0 and stride_bytes % 4 == 0
++                    # A physical stride may include other caches and padding.
++                    # Only clear the payload. Contiguous subblocks can be
++                    # coalesced; strided subblocks need one segment each.
++                    contiguous = payload_bytes == stride_bytes
++                    for subblock in range(1 if contiguous else ratio):
++                        seg_addrs.append(dp + subblock * stride_bytes)
++                        seg_page_sizes.append(payload_bytes * (ratio if contiguous else 1) // 4)
++                        seg_page_strides.append(stride_bytes * ratio // 4)
+ 
+         if not seg_addrs:
+             self._meta = None
++            self._seg_page_strides = None
+             return
+ 
+         # _zero_kv_blocks_kernel will use int64 zeros, to meet the UB size, we use blk_size=64B/8B=8192
+@@ -214,6 +227,7 @@ def init_meta(
+             pin_memory=self.pin_memory,
+         )
+         self._ids_gpu = torch.empty(self._id_cap, dtype=torch.int64, device=self.device)
++        self._seg_page_strides = torch.tensor(seg_page_strides, dtype=torch.int64, device=self.device)
+         self._meta = (
+             torch.tensor(seg_addrs, dtype=torch.uint64, device=self.device),
+             torch.tensor(seg_page_sizes, dtype=torch.int64, device=self.device),
+@@ -249,6 +263,7 @@ def zero_block_ids(self, block_ids: list[int]) -> None:
+             seg_page_sizes,
+             idx,
+             n_blocks,
++            self._seg_page_strides if self._seg_page_strides is not None else seg_page_sizes,
+             N_SEGS=n_segs,
+             MAX_CHUNKS=max_chunks,
+             BLOCK_SIZE=blk_size,

@@ -1,0 +1,83 @@
+{
+  "id": "SEARCH-R2-RC-044",
+  "task_ids": [
+    "RC-044"
+  ],
+  "round": 2,
+  "question": "\"log_prob\" Ascend",
+  "tool": "mcp__codex_apps__github_search_issues",
+  "args": {
+    "query": "is:issue \"log_prob\" Ascend",
+    "repository_full_name": "verl-project/verl",
+    "topn": 3
+  },
+  "started_at": "2026-11-12T03:16:59.596Z",
+  "captured_at": "2026-11-12T03:17:00.735Z",
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "Action completed."
+      }
+    ],
+    "structuredContent": {
+      "issues": [
+        {
+          "url": "https://github.com/verl-project/verl/issues/693",
+          "title": "How to profile the system level and kernel level analysis?",
+          "issue_number": 693,
+          "body": "Hello, could you please let me know if you support any tools like pytorch profiler that could provide the traces in json to view the system and kernel level performance?",
+          "state": null,
+          "user": null,
+          "assignees": null,
+          "labels": null,
+          "milestone": null,
+          "state_reason": null,
+          "comments": null,
+          "created_at": null,
+          "updated_at": null,
+          "closed_at": null,
+          "display_url": "https://github.com/verl-project/verl/issues/693",
+          "display_title": "How to profile the system level and kernel level analysis?"
+        },
+        {
+          "url": "https://github.com/verl-project/verl/issues/6758",
+          "title": "[Usage Question] 首次运行 GRPO demo，启动参数含义不理解，求解释说明",
+          "issue_number": 6758,
+          "body": " **actor_rollout_ref 相关参数** — actor、rollout、ref 三层结构各自的作用是什么？`ppo_mini_batch_size` vs `ppo_micro_batch_size_per_gpu` vs `log_prob_micro_batch_size_per_gpu` 之间的关系？\n### 环境信息\n\n- **verl 版本：** v0.7.1\n- **硬件平台：** Ascend 910B\n- **模型：** Qwen2.5-0.5B-Instruct\n- **数据集：** GSM8K\n",
+          "state": null,
+          "user": null,
+          "assignees": null,
+          "labels": null,
+          "milestone": null,
+          "state_reason": null,
+          "comments": null,
+          "created_at": null,
+          "updated_at": null,
+          "closed_at": null,
+          "display_url": "https://github.com/verl-project/verl/issues/6758",
+          "display_title": "[Usage Question] 首次运行 GRPO demo，启动参数含义不理解，求解释说明"
+        },
+        {
+          "url": "https://github.com/verl-project/verl/issues/6261",
+          "title": "'Tensor' object has no attribute 'offsets' in main_ppo_sync & transfer_queue",
+          "issue_number": 6261,
+          "body": "### System Info\n\ncommit id: 365df242f448b25c862f17fc6aa92ee52561d9ca\n\n### Information\n\n- [ ] The official example scripts\n- [x] My own modified scripts\n\n### Tasks\n\n- [x] An officially supported task in the `examples` folder (such as GLUE/SQuAD, ...)\n- [ ] My own task or dataset (give details below)\n\n### Reproduction\n\ntests/special_npu/run_qwen2_5_05b_grpo.sh\npython3 -m verl.trainer.main_ppo > python3 -m verl.trainer.main_ppo_sync\n\n```bash\nray.exceptions.RayTaskError(AttributeError): ray::WorkerDict.actor_rollout_ref_update_actor() (pid=3617595, ip=175.100.2.6, actor_id=3c36b7c1a4150a9271420bcc01000000, repr=<verl.single_controller.ray.base.WorkerDict object at 0xffcf94f50310>)\n  File \"/usr/local/python3.11.13/lib/python3.11/concurrent/futures/_base.py\", line 456, in result\n    return self.__get_result()\n           ^^^^^^^^^^^^^^^^^^^\n  File \"/usr/local/python3.11.13/lib/python3.11/concurrent/futures/_base.py\", line 401, in __get_result\n    raise self._exception\n           ^^^^^^^^^^^^^^^^^^^^^\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/huxiaobo/verl/verl/single_controller/ray/base.py\", line 933, in func\n    return getattr(self.worker_dict[key], name)(*args, **kwargs)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/huxiaobo/verl/verl/single_controller/base/decorator.py\", line 431, in inner\n    return func(*args, **kwargs)\n           ^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/huxiaobo/verl/verl/utils/transferqueue_utils.py\", line 350, in inner\n    output = func(*args, **kwargs)\n             ^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/huxiaobo/verl/verl/utils/profiler/profile.py\", line 183, in wrapper\n    return func(self_instance, *args, **kwargs_inner)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/huxiaobo/verl/verl/workers/engine_workers.py\", line 68, in wrapper\n    return func(self, data, *args, **kwargs)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/huxiaobo/verl/verl/workers/engine_workers.py\", line 649, in update_actor\n    output = self.actor.train_mini_batch(data=data)\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/huxiaobo/verl/verl/single_controller/base/decorator.py\", line 431, in inner\n    return func(*args, **kwargs)\n           ^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/huxiaobo/verl/verl/utils/transferqueue_utils.py\", line 329, in inner\n    return func(*args, **kwargs)\n           ^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/huxiaobo/verl/verl/workers/engine_workers.py\", line 303, in train_mini_batch\n    actor_output = self.train_batch(mini_batch_td)\n                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/huxiaobo/verl/verl/single_controller/base/decorator.py\", line 431, in inner\n    return func(*args, **kwargs)\n           ^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/huxiaobo/verl/verl/utils/transferqueue_utils.py\", line 329, in inner\n    return func(*args, **kwargs)\n           ^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/huxiaobo/verl/verl/utils/profiler/profile.py\", line 183, in wrapper\n    return func(self_instance, *args, **kwargs_inner)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/huxiaobo/verl/verl/workers/engine_workers.py\", line 352, in train_batch\n    output = self.engine.train_batch(data, loss_function=self.loss_fn)\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/huxiaobo/verl/verl/workers/engine/base.py\", line 126, in train_batch\n    outputs = self.forward_backward_batch(data, loss_function, forward_only=False)\n              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/huxiaobo/verl/verl/workers/engine/fsdp/transformer_impl.py\", line 613, in forward_backward_batch\n    loss, meta_info = self.forward_step(micro_batch, loss_function=loss_function, forward_only=forward_only)\n                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/huxiaobo/verl/verl/workers/engine/fsdp/transformer_impl.py\", line 1153, in forward_step\n    loss, metrics = loss_function(\n                    ^^^^^^^^^^^^^^\n  File \"/home/huxiaobo/verl/verl/workers/utils/losses.py\", line 60, in ppo_loss\n    log_prob = no_padding_2_padding(model_output[\"log_probs\"], data)\n               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/huxiaobo/verl/verl/workers/utils/padding.py\", line 119, in no_padding_2_padding\n    response_lens = response_ids.offsets().diff()\n                    ^^^^^^^^^^^^^^^^^^^^\nAttributeError: 'Tensor' object has no attribute 'offsets'\n```\n\n### Expected behavior\ncompleted training successfully\n",
+          "state": null,
+          "user": null,
+          "assignees": null,
+          "labels": null,
+          "milestone": null,
+          "state_reason": null,
+          "comments": null,
+          "created_at": null,
+          "updated_at": null,
+          "closed_at": null,
+          "display_url": "https://github.com/verl-project/verl/issues/6261",
+          "display_title": "'Tensor' object has no attribute 'offsets' in main_ppo_sync & transfer_queue"
+        }
+      ]
+    },
+    "isError": false
+  }
+}

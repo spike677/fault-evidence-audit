@@ -1,0 +1,226 @@
+{
+  "observations": [
+    {
+      "resource_id": "GC-ISSUE-cann-ops-transformer-5514",
+      "url": "https://gitcode.com/cann/ops-transformer/issues/5514",
+      "title": "FIA算子存在未同步数据竞争问题",
+      "task_ids": [
+        "RC-008"
+      ],
+      "observed_at": "2026-11-12T03:13:09.369Z",
+      "read_scope": "MAIN_TEXT_READ",
+      "selected_quote": "incre_flash_attention_preload_mla.h第2815行与第2928行代码存在读后写数据竞争问题",
+      "notes": [],
+      "body_capture": "SELECTED_AGENT_TRANSCRIPTION_NOT_FULL_DOM_OR_ATTACHMENT_CAPTURE",
+      "attachments_read": false,
+      "method": "CUA_SIDE_NATIVE_DOM"
+    },
+    {
+      "resource_id": "GC-ISSUE-cann-ops-nn-3365",
+      "url": "https://gitcode.com/cann/ops-nn/issues/3365",
+      "title": "repeatInterleave边界shape int32类型溢出",
+      "task_ids": [
+        "RC-065"
+      ],
+      "observed_at": "2026-11-12T03:13:10.918Z",
+      "read_scope": "MAIN_TEXT_READ",
+      "selected_quote": "（int32_mat, 1,1,1）dim=0,repeats=3",
+      "notes": [],
+      "body_capture": "SELECTED_AGENT_TRANSCRIPTION_NOT_FULL_DOM_OR_ATTACHMENT_CAPTURE",
+      "attachments_read": false,
+      "method": "CUA_SIDE_NATIVE_DOM"
+    },
+    {
+      "resource_id": "GC-ISSUE-cann-ops-transformer-4290",
+      "url": "https://gitcode.com/cann/ops-transformer/issues/4290",
+      "title": "LI存在地址踩踏 压测会出现索引溢出",
+      "task_ids": [
+        "RC-066"
+      ],
+      "observed_at": "2026-11-12T03:13:12.386Z",
+      "read_scope": "MAIN_TEXT_READ",
+      "selected_quote": "LI存在地址踩踏 压测会出现索引溢出",
+      "notes": [],
+      "body_capture": "SELECTED_AGENT_TRANSCRIPTION_NOT_FULL_DOM_OR_ATTACHMENT_CAPTURE",
+      "attachments_read": false,
+      "method": "CUA_SIDE_NATIVE_DOM"
+    },
+    {
+      "resource_id": "GC-ISSUE-cann-ops-math-2757",
+      "url": "https://gitcode.com/cann/ops-math/issues/2757",
+      "title": "在CANN8.5.1 下执行社区master下移植的RadixTopk算子在某些shape下出现精度与CANN8.5.1下自带的TopK精度不一致",
+      "task_ids": [
+        "RC-022"
+      ],
+      "observed_at": "2026-11-12T03:22:23.972Z",
+      "read_scope": "MAIN_TEXT_READ",
+      "selected_quote": "一个shape单独执行无问题，正常\n多个shape一起执行时，输出结果 与cann包自带torch.topk对比 报错精度不匹配",
+      "notes": [
+        "但这还不能直接证明 RadixTopK 存在跨调用状态污染：如果每个参数用例都重新随机生成输入，多 shape 和单 shape 两种运行方式会消费不同的随机数序列，因此最后一个 shape 实际拿到的可能不是同一份 tensor。"
+      ],
+      "body_capture": "SELECTED_AGENT_TRANSCRIPTION_NOT_FULL_DOM_OR_ATTACHMENT_CAPTURE",
+      "attachments_read": false,
+      "method": "CUA_SIDE_NATIVE_DOM"
+    },
+    {
+      "resource_id": "GC-ISSUE-cann-ops-math-3007",
+      "url": "https://gitcode.com/cann/ops-math/issues/3007",
+      "title": "RadixTopK未预留Ascend C API所需workspace导致精度问题",
+      "task_ids": [
+        "RC-022"
+      ],
+      "observed_at": "2026-11-12T03:22:25.866Z",
+      "read_scope": "MAIN_TEXT_READ",
+      "selected_quote": "x = torch.randn(2, 1210809681, dtype=torch.float16, device=\"npu:0\")",
+      "notes": [
+        "原示例velue_golden存在拼写错误，本轮未运行示例，不以Closed代表复现通过。"
+      ],
+      "body_capture": "SELECTED_AGENT_TRANSCRIPTION_NOT_FULL_DOM_OR_ATTACHMENT_CAPTURE",
+      "attachments_read": false,
+      "method": "CUA_SIDE_NATIVE_DOM"
+    },
+    {
+      "resource_id": "GC-ISSUE-Ascend-pytorch-1921",
+      "url": "https://gitcode.com/Ascend/pytorch/issues/1921",
+      "title": "A5代际随机数API对齐pytorch",
+      "task_ids": [
+        "RC-017",
+        "RC-102",
+        "RC-127"
+      ],
+      "observed_at": "2026-11-12T03:20:43.753Z",
+      "read_scope": "MAIN_TEXT_READ",
+      "selected_quote": "本提案目标是将torch_npu上的随机数生成 API（Dropout、均匀分布 uniform 、指数分布 exponential ）在A5代际与 PyTorch 原生行为对齐。",
+      "notes": [
+        "Dropout反向对齐依赖底层实现，计划放在下个版本完成",
+        "RFC中大量设计章节为模板；Closed不证明原客户评分问题修复。"
+      ],
+      "body_capture": "SELECTED_AGENT_TRANSCRIPTION_NOT_FULL_DOM_OR_ATTACHMENT_CAPTURE",
+      "attachments_read": false,
+      "method": "CUA_SIDE_NATIVE_DOM"
+    },
+    {
+      "resource_id": "GC-ISSUE-Ascend-pytorch-1507",
+      "url": "https://gitcode.com/Ascend/pytorch/issues/1507",
+      "title": "npu_rms_norm_backward_meta行为与实际算子不符",
+      "task_ids": [
+        "RC-108"
+      ],
+      "observed_at": "2026-11-12T03:20:45.245Z",
+      "read_scope": "MAIN_TEXT_READ",
+      "selected_quote": "当前实现dgamma返回值的dtype复用了输入gamma，但是实际算子返回是固定fp32的",
+      "notes": [
+        "op-plugin 7.3.0；未给具体修复PR/commit，不能当作原数值反向事件已确认。"
+      ],
+      "body_capture": "SELECTED_AGENT_TRANSCRIPTION_NOT_FULL_DOM_OR_ATTACHMENT_CAPTURE",
+      "attachments_read": false,
+      "method": "CUA_SIDE_NATIVE_DOM"
+    },
+    {
+      "resource_id": "GC-ISSUE-Ascend-pytorch-5880",
+      "url": "https://gitcode.com/Ascend/pytorch/issues/5880",
+      "title": "npu._npu_dropout 未加入 rand_ops，fallback_random=True 时会被 fx_graph_cse 错误合并",
+      "task_ids": [
+        "RC-102",
+        "RC-127"
+      ],
+      "observed_at": "2026-11-12T03:24:01.942Z",
+      "read_scope": "SELECTED_MAIN_SECTIONS_READ",
+      "selected_quote": "npu._npu_dropout 没有 seed 入参、内部使用 RNG，不是确定性算子。",
+      "notes": [
+        "纯推理路径和 fallback_random=False 默认路径不受影响。"
+      ],
+      "body_capture": "SELECTED_AGENT_TRANSCRIPTION_NOT_FULL_DOM_OR_ATTACHMENT_CAPTURE",
+      "attachments_read": false,
+      "method": "CUA_SIDE_NATIVE_DOM"
+    },
+    {
+      "resource_id": "GC-ISSUE-Ascend-pytorch-5790",
+      "url": "https://gitcode.com/Ascend/pytorch/issues/5790",
+      "title": "A3 上 bucketize(right=True) 直接 SIGSEGV，bincount(f64 weights) / histogram(range) 同族报 FuncError",
+      "task_ids": [
+        "RC-051",
+        "RC-083"
+      ],
+      "observed_at": "2026-11-12T03:24:03.391Z",
+      "read_scope": "SELECTED_MAIN_SECTIONS_READ",
+      "selected_quote": "torch.bucketize(..., right=True)",
+      "notes": [
+        "CANN 9.2.1、torch 2.11.0、torch_npu 2.11.0rc1；是崩溃报告，没有确认原histc替换或分桶精度事件根因。"
+      ],
+      "body_capture": "SELECTED_AGENT_TRANSCRIPTION_NOT_FULL_DOM_OR_ATTACHMENT_CAPTURE",
+      "attachments_read": false,
+      "method": "CUA_SIDE_NATIVE_DOM"
+    },
+    {
+      "resource_id": "GC-ISSUE-cann-ops-nn-90",
+      "url": "https://gitcode.com/cann/ops-nn/issues/90",
+      "title": "embedding_dense_grad_v2 atomic清零风格建议",
+      "task_ids": [
+        "RC-071",
+        "RC-082",
+        "RC-100",
+        "RC-110",
+        "RC-128"
+      ],
+      "observed_at": "2026-11-12T03:27:43.144Z",
+      "read_scope": "MAIN_TEXT_AND_MAINTAINER_RESPONSE_READ",
+      "selected_quote": "你好，由于该算子涉及到多核累加场景，因此清零操作在算子执行前已完成，可以参考embedding_dense_grad_v2.cpp的内容实现",
+      "notes": [
+        "不能只取标题中的未清零建议；维护者指出前置清零。尚未审读cpp全路径，不能据此确认/排除空输入路径缺陷。"
+      ],
+      "body_capture": "SELECTED_AGENT_TRANSCRIPTION_NOT_FULL_DOM_OR_ATTACHMENT_CAPTURE",
+      "attachments_read": false,
+      "method": "CUA_SIDE_NATIVE_DOM"
+    },
+    {
+      "resource_id": "GC-ISSUE-Ascend-MindIE-SD-328",
+      "url": "https://gitcode.com/Ascend/MindIE-SD/issues/328",
+      "title": "frequency_regulator plugin异步语义与资源生命周期管理不一致",
+      "task_ids": [
+        "RC-032"
+      ],
+      "observed_at": "2026-11-12T03:30:30.786Z",
+      "read_scope": "MAIN_TEXT_READ",
+      "selected_quote": "支持连续异步调用，最后统一同步时不发生异常。",
+      "notes": [
+        "Issue描述风险和预期；PR声明3次/100次验证为作者报告，不是本轮设备执行。"
+      ],
+      "body_capture": "SELECTED_AGENT_TRANSCRIPTION_NOT_FULL_DOM_OR_ATTACHMENT_CAPTURE",
+      "attachments_read": false,
+      "method": "CUA_SIDE_NATIVE_DOM"
+    },
+    {
+      "resource_id": "GC-ISSUE-cann-ops-math-3344",
+      "url": "https://gitcode.com/cann/ops-math/issues/3344",
+      "title": "reduce prod bool输出时，产生精度问题",
+      "task_ids": [
+        "RC-069"
+      ],
+      "observed_at": "2026-11-12T03:30:32.389Z",
+      "read_scope": "MAIN_TEXT_READ",
+      "selected_quote": "reduce prod bool输出时，产生精度问题",
+      "notes": [
+        "未提供客户图像输入丢失的事件身份或模型调用链。"
+      ],
+      "body_capture": "SELECTED_AGENT_TRANSCRIPTION_NOT_FULL_DOM_OR_ATTACHMENT_CAPTURE",
+      "attachments_read": false,
+      "method": "CUA_SIDE_NATIVE_DOM"
+    },
+    {
+      "resource_id": "GC-ISSUE-Ascend-op-plugin-32",
+      "url": "https://gitcode.com/Ascend/op-plugin/issues/32",
+      "title": "op-plugin 仓相关 issue 请在 pytorch 仓提交",
+      "task_ids": [],
+      "observed_at": "2026-11-12",
+      "read_scope": "ROUTING_GUIDANCE_MAIN_TEXT_READ",
+      "selected_quote": "op-plugin 仓旨在为 torch_npu 提供运行所需要的算子适配文件，自身无法独立运作。发现问题时请将 issue 提交到 pytorch代码仓 ，方便进行统一追踪和管理。",
+      "notes": [
+        "https://gitcode.com/Ascend/pytorch/issues/"
+      ],
+      "body_capture": "SELECTED_AGENT_TRANSCRIPTION_NOT_FULL_DOM_OR_ATTACHMENT_CAPTURE",
+      "attachments_read": false,
+      "method": "CUA_SIDE_NATIVE_DOM"
+    }
+  ]
+}

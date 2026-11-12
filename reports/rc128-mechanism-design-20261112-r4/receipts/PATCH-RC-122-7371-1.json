@@ -1,0 +1,28 @@
+{
+  "id": "PATCH-RC-122-7371-1",
+  "task_ids": [
+    "RC-122"
+  ],
+  "tool": "mcp__codex_apps__github_fetch_pr_file_patch",
+  "args": {
+    "repo_full_name": "deepspeedai/DeepSpeed",
+    "pr_number": 7371,
+    "path": "deepspeed/runtime/zero/stage_1_and_2.py"
+  },
+  "captured_at": "2026-11-12T03:28:31.718Z",
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "Action completed."
+      }
+    ],
+    "structuredContent": {
+      "patch": {
+        "filename": "deepspeed/runtime/zero/stage_1_and_2.py",
+        "patch": "@@ -995,6 +995,9 @@ def reduce_independent_p_g_buckets_and_remove_grads(self, param, i):\n             self.report_ipg_memory_usage(\"In ipg_remove_grads before reduce_ipg_grads\", param.numel(), param.dtype)\n             self.reduce_ipg_grads()\n             if self.contiguous_gradients and self.overlap_comm:\n+                if not get_accelerator().resolves_data_dependency():\n+                    self.reduction_stream.wait_stream(get_accelerator().current_stream())\n+                    get_accelerator().current_stream().wait_stream(self.reduction_stream)\n                 # Swap index between 0 and 1\n                 bucket.index = 1 - bucket.index\n             self.report_ipg_memory_usage(\"In ipg_remove_grads after reduce_ipg_grads\", param.numel(), param.dtype)"
+      }
+    },
+    "isError": false
+  }
+}

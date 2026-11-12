@@ -1,0 +1,84 @@
+{
+  "id": "SEARCH-R1-RC-025",
+  "task_ids": [
+    "RC-025"
+  ],
+  "round": 1,
+  "question": "npu_transpose_quant_batchmatmul",
+  "tool": "mcp__codex_apps__github_search_prs",
+  "args": {
+    "query": "npu_transpose_quant_batchmatmul",
+    "repository_full_name": "vllm-project/vllm-ascend",
+    "topn": 3,
+    "state": "all"
+  },
+  "started_at": "2026-11-12T03:02:42.221Z",
+  "captured_at": "2026-11-12T03:02:43.334Z",
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "Action completed."
+      }
+    ],
+    "structuredContent": {
+      "issues": [
+        {
+          "url": "https://github.com/vllm-project/vllm-ascend/pull/19674",
+          "title": "[BugFix][Quantization] Fix ModelSlim DeepSeek-V4 wo_a grouped MXFP8 layout",
+          "issue_number": 19674,
+          "body": "### What this PR does / why we need it?\r\n\r\nModelSlim DeepSeek-V4 checkpoints can quantize `wo_a` as `W8A8_MXFP8` even when the checkpoint is otherwise W4A4. The generic MXFP8 loader leaves its weight as a 2D matrix, while attention calls `npu_transpose_quant_batchmatmul` with `perm_x2=(0, 1, 2)`. A `[4096, 16384]` weight consequently raises `IndexError: Dimension out of range (expected to be in range of [-2, 1], but got 2)`.\r\n\r\nPrepare grouped weights and MX scales before allocating persistent inference buffers, retain ND storage for this BMM, and restore checkpoint layouts for reloads while preserving captured buffer addresses. Identify grouped `wo_a` by the configured `o_lora_rank` and layer suffix without requiring a particular `model_type`. Other projections and models without this configuration retain their ordinary linear layouts.\r\n\r\nGrouped `wo_a` output shards are gathered along dimension 0 (groups) during weight switching; ordinary transposed linear output shards keep dimension 1. Select this per layer so grouped processing cannot change another layer's gather axis. Share one checkpoint-row conversion helper across ModelSlim MXFP8, native FP8, and BF16 loading/reloading, deriving local groups from the loaded shard and avoiding intermediate transpose copies.\r\n\r\n### Does this PR introduce _any_ user-facing change?\r\n\r\nFixes ModelSlim grouped `wo_a` loading and its output-sharded weight-switch layout. No new serving arguments or environment variables.\r\n\r\n### How was this patch tested?\r\n\r\n- **21 targeted tests passed** remotely using the exact candidate helper and quantization classes with installed Ascend image dependencies in an isolated process; serving packages were not replaced. This is not the full repository test suite.\r\n- The pre-review implementation fails the new gather-axis assertions for simulated world sizes 2 and 4. The candidate reconstructs exact full weight/scale contents and switches back to the original local shards twice; ordinary output layers retain dimension 1 on the same scheme.\r\n- Coverage includes loading without a DeepSeek-specific model type, BF16 row mapping, native FP8 shard layout, local groups 1/2/16, skipped NZ conversion, checkpoint restoration, graph buffer address stability, other projections, and incomplete output groups.\r\n- Earlier PR revision: actual checkpoint layer-0 tensors passed 4 eager/ACL-graph numerical cases on Ascend (batch sizes 1 and 6, explicitly dequantized FP32 reference, `atol=0.02`, `rtol=0.02`); original 2D error independently reproduced. Those operator cases were not rerun for this review update.\r\n- `ruff check`, `ruff format --check`, Python syntax checks, and `git diff --check` passed. Local `bash format.sh ci` could not run because Bash is unavailable on the Windows host; the repository pre-commit workflow will validate the new commits.\r\n- Full-model PD/DeepSWE and live multi-rank CP/PCP communication have not been rerun with this revision; the gather regression uses a simulated collective.\r\n\r\n\n- vLLM main: https://github.com/vllm-project/vllm/commit/c0b6f74bee518aeaf5d72b200a0216e72fbb5e7c\n",
+          "state": null,
+          "user": null,
+          "assignees": null,
+          "labels": null,
+          "milestone": null,
+          "state_reason": null,
+          "comments": null,
+          "created_at": null,
+          "updated_at": null,
+          "closed_at": null,
+          "display_url": "https://github.com/vllm-project/vllm-ascend/pull/19674",
+          "display_title": "[BugFix][Quantization] Fix ModelSlim DeepSeek-V4 wo_a grouped MXFP8 layout"
+        },
+        {
+          "url": "https://github.com/vllm-project/vllm-ascend/pull/19675",
+          "title": "[v0.30.0][BugFix][Quantization] Fix ModelSlim DeepSeek-V4 wo_a grouped MXFP8 layout",
+          "issue_number": 19675,
+          "body": "Backport of #19674 for `releases/v0.30.0`.\r\n\r\n### What this PR does / why we need it?\r\n\r\nModelSlim DeepSeek-V4 checkpoints can quantize `wo_a` as `W8A8_MXFP8` even when the checkpoint is otherwise W4A4. The generic MXFP8 loader leaves its weight as a 2D matrix, while attention calls `npu_transpose_quant_batchmatmul` with `perm_x2=(0, 1, 2)`. A `[4096, 16384]` weight consequently raises `IndexError: Dimension out of range (expected to be in range of [-2, 1], but got 2)`.\r\n\r\nPrepare grouped weights and MX scales before allocating persistent inference buffers, retain ND storage for this BMM, and restore checkpoint layouts for reloads while preserving captured buffer addresses. Identify grouped `wo_a` by the configured `o_lora_rank` and layer suffix without requiring a particular `model_type`. Other projections and models without this configuration retain their ordinary linear layouts.\r\n\r\nGrouped `wo_a` output shards are gathered along dimension 0 (groups) during weight switching; ordinary transposed linear output shards keep dimension 1. Select this per layer so grouped processing cannot change another layer's gather axis. Share one checkpoint-row conversion helper across ModelSlim MXFP8, native FP8, and BF16 loading/reloading, deriving local groups from the loaded shard and avoiding intermediate transpose copies.\r\n\r\n### Does this PR introduce _any_ user-facing change?\r\n\r\nFixes ModelSlim grouped `wo_a` loading and its output-sharded weight-switch layout. No new serving arguments or environment variables.\r\n\r\n### How was this patch tested?\r\n\r\n- **27 targeted tests passed** remotely using the exact candidate helper and quantization classes with installed Ascend image dependencies in an isolated process; serving packages were not replaced. This is not the full repository test suite.\r\n- The pre-review implementation fails the new gather-axis assertions for simulated world sizes 2 and 4. The candidate reconstructs exact full weight/scale contents and switches back to the original local shards twice; ordinary output layers retain dimension 1 on the same scheme.\r\n- Coverage includes loading without a DeepSeek-specific model type, BF16 row mapping, native FP8 shard layout, local groups 1/2/16, skipped NZ conversion, checkpoint restoration, graph buffer address stability, other projections, and incomplete output groups.\r\n- Earlier PR revision: actual checkpoint layer-0 tensors passed 4 eager/ACL-graph numerical cases on Ascend (batch sizes 1 and 6, explicitly dequantized FP32 reference, `atol=0.02`, `rtol=0.02`); original 2D error independently reproduced. Those operator cases were not rerun for this review update.\r\n- `ruff check`, `ruff format --check`, Python syntax checks, and `git diff --check` passed. Local `bash format.sh ci` could not run because Bash is unavailable on the Windows host; the repository pre-commit workflow will validate the new commits.\r\n- Full-model PD/DeepSWE and live multi-rank CP/PCP communication have not been rerun with this revision; the gather regression uses a simulated collective.\r\n\r\n\n- vLLM main: https://github.com/vllm-project/vllm/commit/ced6857afa0ea7b2e3f0846a62e1394e90f15607\n",
+          "state": null,
+          "user": null,
+          "assignees": null,
+          "labels": null,
+          "milestone": null,
+          "state_reason": null,
+          "comments": null,
+          "created_at": null,
+          "updated_at": null,
+          "closed_at": null,
+          "display_url": "https://github.com/vllm-project/vllm-ascend/pull/19675",
+          "display_title": "[v0.30.0][BugFix][Quantization] Fix ModelSlim DeepSeek-V4 wo_a grouped MXFP8 layout"
+        },
+        {
+          "url": "https://github.com/vllm-project/vllm-ascend/pull/12254",
+          "title": "[Attention][Feature] Support FP8-quantized o_proj path with oproj_tp on Ascend A5",
+          "issue_number": 12254,
+          "body": "Backport of #12081 to `releases/v0.23.0`.\n\nCherry-pick of ccd05ca3 applies cleanly (one auto-merge in `dsa_v1.py`, no conflicts). Verified that the pre-change baseline of both `vllm_ascend/quantization/methods/fp8.py` and `vllm_ascend/attention/dsa_v1.py` on `releases/v0.23.0` is identical to that on `main`, so the net diff is byte-identical to the original PR (4 files, 237+/41-).\n\n---\n\nTwo issues prevented the A5 FP8 o_proj path from working under oproj_tp:\n\n* fp8.py: \\`AscendW8A8MXFP8DSDynamicLinearMethod\\` reshaped wo_a into \\`n_groups // tp_size\\` groups, ignoring the OTP (DP-sub) group that oproj_tp splits the o-group output dim along. When oproj_tp is on it forces \\`tensor_parallel_size == 1\\` and each OTP rank only holds \\`n_groups // oproj_tensor_parallel_size\\` groups; the wo_a weight_loader narrows wo_a (and its weight_scale) accordingly, so the wo_a reshape in \\`process_weights_after_loading\\` must divide by the per-rank group count or hit a numel mismatch. Compute \\`n_local_groups\\` inside \\`process_weights_after_loading\\` as \\`n_groups // layer.tp_size\\`: \\`layer.tp_size\\` is the layer's active TP-style size (standard TP, or the OTP group size when oproj_tp is on), set in \\`AscendColumnParallelLinear.__init__\\` via \\`get_parallel_op\\` -- the same source the BF16 path already trusts. This avoids recomputing it in \\`__init__\\`, where the quant method has no per-layer prefix/TP context.\n\n* dsa_v1.py: the A5 single-card FP8 o_proj branch previously won unconditionally on A5, so A5 + oproj_tp could not compose. Extract the wo_a transpose batch matmul into \\`_wo_a_bmm\\` (A5 runs the FP8 quantized matmul, others run BF16) and route both the single-card path and the oproj_tp path through it. The dispatch is now by communication mode (oproj_tp / olora_tp / single-card), with the FP8-vs-BF16 choice in one place instead of an A5 branch that pre-empts oproj_tp. Quantization is local per rank, so it composes with the surrounding BF16 all_to_all / reduce_scatter without touching the communication buffers.\n\nCo-Authored-By: Claude <noreply@anthropic.com>\n- vLLM version: v0.23.0\n- vLLM main: https://github.com/vllm-project/vllm/commit/ee0da84ab9e04ac7610e28580af62c365e898389\n",
+          "state": null,
+          "user": null,
+          "assignees": null,
+          "labels": null,
+          "milestone": null,
+          "state_reason": null,
+          "comments": null,
+          "created_at": null,
+          "updated_at": null,
+          "closed_at": null,
+          "display_url": "https://github.com/vllm-project/vllm-ascend/pull/12254",
+          "display_title": "[Attention][Feature] Support FP8-quantized o_proj path with oproj_tp on Ascend A5"
+        }
+      ]
+    },
+    "isError": false
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "id": "PATCH-RC-099-15613-3",
+  "task_ids": [
+    "RC-099"
+  ],
+  "tool": "mcp__codex_apps__github_fetch_pr_file_patch",
+  "args": {
+    "repo_full_name": "vllm-project/vllm-ascend",
+    "pr_number": 15613,
+    "path": "vllm_ascend/ops/fused_moe/router/grouped_topk_router.py"
+  },
+  "captured_at": "2026-11-12T03:28:31.365Z",
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "Action completed."
+      }
+    ],
+    "structuredContent": {
+      "patch": {
+        "filename": "vllm_ascend/ops/fused_moe/router/grouped_topk_router.py",
+        "patch": "@@ -119,7 +119,14 @@ def _compute_routing(\n             topk_weights = topk_weights + self.e_score_correction_bias\n \n         topk_weights, topk_ids = topk_weights.topk(self.top_k, dim=-1)\n-        topk_weights = topk_weights.to(hidden_states.dtype)\n+        # Keep routing weights in a floating compute dtype: the MoE\n+        # sequence-parallel prepare (`_prepare_with_ep_group`) may have already\n+        # quantized hidden_states (int8 / float8_e4m3fn / uint8), and\n+        # quantized weights break downstream ops and the renormalization below.\n+        if hidden_states.dtype in (torch.float32, torch.float16, torch.bfloat16):\n+            topk_weights = topk_weights.to(hidden_states.dtype)\n+        else:\n+            topk_weights = topk_weights.to(torch.float32)\n \n         # Required by npu_moe_init_routing\n         topk_ids = topk_ids.to(torch.int32)"
+      }
+    },
+    "isError": false
+  }
+}

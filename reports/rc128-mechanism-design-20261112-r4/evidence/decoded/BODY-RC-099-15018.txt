@@ -1,0 +1,21 @@
+### What this PR does / why we need it?
+This PR introduces an `activation_dtype` parameter to `_select_experts` in `vllm_ascend/ops/fused_moe/routed_experts.py` to ensure routing weights are aligned with the pre-quantization model activation dtype. This prevents type promotion errors (such as Float8 promotion failures) when `hidden_states` is replaced by a quantized tensor during `moe_comm_method.prepare()`.
+
+Additionally, we suggest adding a robust guard to ensure `activation_dtype` is never a quantized or float8 dtype, falling back to `topk_weights.dtype` if a quantized dtype is detected, to prevent potential type promotion errors during routing weight operations.
+
+**The background information is as follows:**
+When running the DeepSeek-V4-Flash model on an A5 machine with the configuration of TP=4, DP=1, the following error occurs.
+>File ".../vllm_ascend/ops/fused_moe/token_dispatcher.py", line 417, in token_dispatch
+      topk_weights = topk_weights * mask
+  RuntimeError: Promotion for Float8 Types is not supported,
+                attempted to promote Float8_e4m3fn and Bool
+
+The routing operator moe_gating_top_k_hash correctly returns topk_weights in bf16. In its meta implementation, y uses x.options(), and the TORCH_CHECK restricts x to only fp16/fp32/bf16 types.
+### Does this PR introduce _any_ user-facing change?
+no
+
+### How was this patch tested?
+
+
+- vLLM version: v0.27.1
+- vLLM main: https://github.com/vllm-project/vllm/commit/ba07e4a48fc951300d97eb506217dd530583dea3

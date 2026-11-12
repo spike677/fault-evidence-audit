@@ -1,0 +1,83 @@
+{
+  "id": "SEARCH-R1-RC-126",
+  "task_ids": [
+    "RC-126"
+  ],
+  "round": 1,
+  "question": "Qwen3 embedding different",
+  "tool": "mcp__codex_apps__github_search_issues",
+  "args": {
+    "query": "is:issue Qwen3 embedding different",
+    "repository_full_name": "vllm-project/vllm-ascend",
+    "topn": 3
+  },
+  "started_at": "2026-11-12T03:08:11.027Z",
+  "captured_at": "2026-11-12T03:08:11.930Z",
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "Action completed."
+      }
+    ],
+    "structuredContent": {
+      "issues": [
+        {
+          "url": "https://github.com/vllm-project/vllm-ascend/issues/10938",
+          "title": "[Usage]: Inconsistent Embedding Outputs for Qwen3-Embedding-0.6B Across vLLM Versions – How to Fix/Pin Unique Vector Values",
+          "issue_number": 10938,
+          "body": "### Your current environment\n\nThe output of `python collect_env.py`\n\n### How would you like to use vllm on ascend\n\nI am deploying the Qwen3-Embedding-0.6B model using vllm serve. I noticed that when using different versions of vLLM to serve the exact same model with identical inputs, the output embedding vectors are slightly different, resulting in a cosine similarity of less than 1.0.\nSince embedding models should be deterministic, I would like to understand the root cause of this discrepancy and find a reliable way to fix/pin the unique vector values",
+          "state": null,
+          "user": null,
+          "assignees": null,
+          "labels": null,
+          "milestone": null,
+          "state_reason": null,
+          "comments": null,
+          "created_at": null,
+          "updated_at": null,
+          "closed_at": null,
+          "display_url": "https://github.com/vllm-project/vllm-ascend/issues/10938",
+          "display_title": "[Usage]: Inconsistent Embedding Outputs for Qwen3-Embedding-0.6B Across vLLM Versions – How to Fix/Pin Unique Vector Values"
+        },
+        {
+          "url": "https://github.com/vllm-project/vllm-ascend/issues/14410",
+          "title": "[Bug]: VL models in text-only mode incorrectly skip first-layer SP AllGather with FlashComm1",
+          "issue_number": 14410,
+          "body": "### Your current environment\n\n<details>\n<summary>The output of `python collect_env.py`</summary>\n\n```text\nYour output of above commands here\n```\n\n</details>\n\n\n### 🐛 Describe the bug\n\nWhen FlashComm1 / sequence parallelism (SP) is enabled for a vision-language model, the first language-model attention layer always skips the SP AllGather based on the static model architecture (`is_vl_model()`).\n\nThis is incorrect when the VL model is running in a text-only configuration, such as `--language-model-only`, where the first-layer input may come from the model's own embedding layer.\n\nIn this case, the embedding output is ReduceScatter-ed by the SP path before entering the first transformer layer, so the first-layer input is already TP-sharded and must be AllGather-ed before the column-parallel attention projection.\n\nThe issue is not model-specific. We reproduced the same behavior with both Qwen3.5 and MiniMax-M3.\n\n## Current behavior\n\nThe current implementation in `SequenceColumnParallelOp.apply_impl()` is:\n\n```python\nneed_all_gather = not (\n    extract_layer_index(self.layer.prefix) == 0\n    and is_vl_model()\n    and \"attn\" in self.prefix\n)\n```\n\nTherefore, for any VL architecture, the first attention layer skips AllGather regardless of the actual runtime layout of `input_`.\n\nHowever, `is_vl_model()` only describes the model architecture. It does not indicate whether the current first-layer input is:\n\n1. an SP-sharded tensor produced by the model embedding layer, or\n2. a full-sequence precomputed embedding produced by the multimodal input path.\n\nThese two cases require different collective behavior.\n\n---\n\n## Reproduction with Qwen3.5\n\nThe issue can be reproduced with Qwen3.5 in language-model-only mode with FlashComm1 enabled.\n\nExample configuration:\n\n```bash\nexport ASCEND_RT_VISIBLE_DEVICES=0,1\nexport PYTORCH_NPU_ALLOC_CONF=expandable_segments:True\nexport HCCL_OP_EXPANSION_MODE=\"AIV\"\nexport HCCL_BUFFSIZE=1024\nexport OMP_NUM_THREADS=1\nexport TASK_QUEUE_ENABLE=1\n\nvllm serve /path/to/Qwen3.5-35B-A3B-w8a8-mtp \\\n  --host 0.0.0.0 \\\n  --port 8000 \\\n  --data-parallel-size 1 \\\n  --tensor-parallel-size 2 \\\n  --enable-expert-parallel \\\n  --seed 1024 \\\n  --quantization ascend \\\n  --served-model-name qwen3.5 \\\n  --max-num-seqs 128 \\\n  --max-model-len 262144 \\\n  --max-num-batched-tokens 2048 \\\n  --trust-remote-code \\\n  --gpu-memory-utilization 0.90 \\\n  --enable-prefix-caching \\\n  --enforce-eager \\\n  --additional-config '{\n      \"enable_cpu_binding\": true,\n      \"enable_flashcomm1\": true,\n      \"multistream_overlap_shared_expert\": false\n  }' \\\n  --language-model-only\n```\n\nWith `--language-model-only`, multimodal inputs are disabled, but the resolved architecture is still a VL architecture, so `is_vl_model()` remains true.\n\nWith TP=2 and FlashComm1 enabled, the model embedding output goes through SP ReduceScatter.\n\nObserved tensor flow:\n\n```text\nEmbedding output:\n(128, 2048)\n\nAfter SP ReduceScatter:\n(64, 2048)\n\nFirst-layer SequenceColumnParallelOp input:\n(64, 2048)\n\nis_vl_model():\nTrue\n\nCurrent need_all_gather:\nFalse\n```\n\nThe first layer therefore keeps the sharded tensor instead of restoring the full token dimension.\n\nThe execution later fails because different parts of the model operate on inconsistent token dimensions.\n\nFor example, in our reproduction:\n\n```text\n[SP_DEBUG_RS]\ninput.shape=(128, 2048)\noutput.shape=(64, 2048)\neffective_sp=True\n\n[SP_DEBUG_COL_BEFORE]\nprefix=language_model.model.layers.0.linear_attn.in_proj_qkvz\ninput.shape=(64, 2048)\nis_vl=True\nneed_all_gather=False\n```\n\nA later MoE operation then encounters inconsistent token dimensions.\n\nIf the first-layer AllGather is temporarily forced on for diagnosis, the expected shape is restored:\n\n```text\n(64, 2048)\n    |\n    | TP AllGather\n    v\n(128, 2048)\n```\n\nand the text-only inference path can proceed normally.\n\n---\n\n## Cross-model reproduction with MiniMax-M3\n\nThe same issue was also reproduced with MiniMax-M3 under TP=4.\n\nFor a text-only configuration, the observed flow was:\n\n```text\nBefore embedding SP communication:\nhidden_states = (1024, 6144)\n\nAfter embedding ReduceScatter:\nhidden_states = (256, 6144)\n\npositions = (1024,)\n```\n\nAt the first attention layer:\n\n```text\ninput.shape=(256, 6144)\nis_vl=True\nneed_all_gather=False\n```\n\nThe missing AllGather causes the attention tensors to remain on the local SP shard while `positions` still describes the full token sequence:\n\n```text\npositions.shape      = (1024,)\nhidden_states.shape  = (256, 6144)\nqkv.shape            = (256, 2304)\n```\n\nThis eventually results in a RoPE/token-dimension mismatch.\n\nThe RoPE failure is only a downstream symptom. The actual problem occurs earlier when the first-layer SP AllGather is incorrectly skipped.\n\n---\n\n## Why AllGather cannot simply be enabled unconditionally\n\nThe opposite case also exists.\n\nWhen the multimodal path is enabled, the model runner can provide precomputed `inputs_embeds`. In this case, the first language-model layer already receives the full token sequence.\n\nFor example, with MiniMax-M3 TP=4:\n\n```text\nFirst-layer input:\n(64, 6144)\n```\n\nIf AllGather is forced unconditionally:\n\n```text\n(64, 6144)\n    |\n    | TP AllGather\n    v\n(256, 6144)\n```\n\nwhile:\n\n```text\npositions.shape = (64,)\n```\n\nThis again produces an invalid token layout.\n\nSimilarly, with Qwen3.5 TP=2, forcing AllGather for a normal multimodal input changes:\n\n```text\n(128, 2048)\n    |\n    | TP AllGather\n    v\n(256, 2048)\n```\n\neven though the input was already full-sequence.\n\nTherefore neither of the following is correct:\n\n```text\nAlways skip first-layer AllGather for VL models\n```\n\nor:\n\n```text\nAlways perform first-layer AllGather for VL models\n```\n\n---\n\n## Expected behavior\n\nThe first-layer collective should depend on the runtime layout/source of the first-layer input rather than only on whether the architecture is a VL model.\n\nThe expected behavior is:\n\n| First-layer input path | Runtime layout | FlashComm1/SP | First-layer AllGather |\n| --- | --- | --- | --- |\n| Model embedding | SP-sharded | Enabled | Required |\n| Precomputed `inputs_embeds` | Full sequence | Enabled | Must be skipped |\n\nConceptually:\n\n```text\nText-only / model-embedding path:\n\ninput_ids\n   |\n   v\nmodel embedding\n   |\n   v\nSP ReduceScatter\n   |\n   v\n[N / TP, hidden]\n   |\n   | first-layer AllGather\n   v\n[N, hidden]\n```\n\nwhile the precomputed embedding path is:\n\n```text\nprecomputed inputs_embeds\n   |\n   v\n[N, hidden]\n   |\n   | no first-layer AllGather\n   v\n[N, hidden]\n```\n\nThe decision therefore needs a runtime signal describing whether the first-layer input is actually SP-sharded.\n\n---\n\n## Summary\n\nThe current first-layer optimization uses:\n\n```text\nis_vl_model()\n```\n\nas a proxy for the runtime layout of the first-layer input.\n\nThis assumption does not hold when the same VL architecture can run through both:\n\n- a model-embedding/text-only path, and\n- a precomputed-embedding/multimodal path.\n\nAs a result:\n\n```text\nVL architecture + model embedding + FlashComm1/SP\n```\n\ncan incorrectly skip the required first-layer AllGather and fail because of downstream token-dimension mismatches.\n\nThis appears to be a framework-level issue rather than a MiniMax-M3- or Qwen3.5-specific issue.",
+          "state": null,
+          "user": null,
+          "assignees": null,
+          "labels": null,
+          "milestone": null,
+          "state_reason": null,
+          "comments": null,
+          "created_at": null,
+          "updated_at": null,
+          "closed_at": null,
+          "display_url": "https://github.com/vllm-project/vllm-ascend/issues/14410",
+          "display_title": "[Bug]: VL models in text-only mode incorrectly skip first-layer SP AllGather with FlashComm1"
+        },
+        {
+          "url": "https://github.com/vllm-project/vllm-ascend/issues/5670",
+          "title": "[Performance]: The qwen3-vl model does not enable the mrope fusion operator.",
+          "issue_number": 5670,
+          "body": "### Proposal to improve performance\n\n#### Mrope Section Info\n| model | mrope section | reference link |\n| - | - | - |\n| Qwen2.5-VL-7B-Instruct | [16, 24, 24] | https://huggingface.co/Qwen/Qwen2.5-VL-7B-Instruct/blob/main/config.json#L54-L58 |\n| Qwen3-VL-8B-Instruct | [24, 20, 20] | https://huggingface.co/Qwen/Qwen3-VL-8B-Instruct/blob/main/config.json#L26-L30 |\n\n#### Codes\nhttps://github.com/vllm-project/vllm-ascend/blob/1b5d5abf865f57742aab2d22dd6737af719c124a/vllm_ascend/ops/rotary_embedding.py#L504-L506\n\n#### Problem\nAt present, the mrope operator only supports the mrope section of qwen2.5-vl, but the mrope section of qwen3-vl is different, and the inability to use the mrope operator will result in rollback. We hope to increase the shape of qwen3-vl so that the qwen3-vl model can also use the mrope operator\n\n### Report of performance regression\nCompare the performance of qwen3-vl-8b model before and after using mrope operator\n### before\n| images num | QPS |\n| - | - | \n|1 | 0.90|\n|5 |0.52|\n|10| 0.45|\n\nPerformance after PR modification #5673 \n#### after\n| images num | QPS |\n| - | - | \n|1 | 1.46|\n|5 |1.1|\n|10| 0.84|\n\n\n### Misc discussion on performance\n\n_No response_\n\n### Your current environment (if you think it is necessary)\n\n```text\nThe output of `python collect_env.py`\n```\n",
+          "state": null,
+          "user": null,
+          "assignees": null,
+          "labels": null,
+          "milestone": null,
+          "state_reason": null,
+          "comments": null,
+          "created_at": null,
+          "updated_at": null,
+          "closed_at": null,
+          "display_url": "https://github.com/vllm-project/vllm-ascend/issues/5670",
+          "display_title": "[Performance]: The qwen3-vl model does not enable the mrope fusion operator."
+        }
+      ]
+    },
+    "isError": false
+  }
+}

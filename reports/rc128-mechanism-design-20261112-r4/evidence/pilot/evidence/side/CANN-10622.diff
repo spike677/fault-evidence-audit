@@ -1,0 +1,31 @@
+diff --git a/matmul/batch_mat_mul_v3/op_host/op_api/aclnn_baddbmm.cpp b/matmul/batch_mat_mul_v3/op_host/op_api/aclnn_baddbmm.cpp
+index 9dcac1ee101d26a264474af6f0b8e21482dc9845..5a8a4396fb1cf092b2d520a0a7d51d3d6e0cb9cb 100644
+--- a/matmul/batch_mat_mul_v3/op_host/op_api/aclnn_baddbmm.cpp
++++ b/matmul/batch_mat_mul_v3/op_host/op_api/aclnn_baddbmm.cpp
+@@ -316,7 +316,10 @@ public:
+         auto npuArch = op::GetCurrentPlatformInfo().GetCurNpuArch();
+         bool isSupportNpuArch = (npuArch == NpuArch::DAV_2201);
+         if (CheckGemmV3WithAlphaBeta(bias, matA, matB, cubeMathType) && isSupportNpuArch) {
+-            const aclTensor* bmmOut = ExecGemmV3WithAlphaBetaOp(bias, matA, matB, alpha, beta, executor);
++            bool enableGemm16In32Out = NeedEnableFp32Output(matA->GetDataType(), matB->GetDataType(),
++                                                            output->GetDataType(), cubeMathType);
++            const aclTensor* bmmOut = ExecGemmV3WithAlphaBetaOp(bias, matA, matB, alpha, beta, executor,
++                                                                enableGemm16In32Out);
+             CHECK_RET(bmmOut != nullptr, ACLNN_ERR_INNER_NULLPTR);
+             convOut = bmmOut;
+             return ACLNN_SUCCESS;
+diff --git a/matmul/mat_mul_v3/op_host/op_api/aclnn_addmm.cpp b/matmul/mat_mul_v3/op_host/op_api/aclnn_addmm.cpp
+index 7b0830ca17a02ea57a17dd9675227db0fa798ae2..92eda526cc3f70763a415b494687a87706efaae6 100644
+--- a/matmul/mat_mul_v3/op_host/op_api/aclnn_addmm.cpp
++++ b/matmul/mat_mul_v3/op_host/op_api/aclnn_addmm.cpp
+@@ -633,7 +633,9 @@ public:
+         auto npuArch = op::GetCurrentPlatformInfo().GetCurNpuArch();
+         bool isSupportNpuArch = (npuArch == NpuArch::DAV_2201);
+         if (CheckGemmV3WithAlphaBeta(bias, matA, matB, cubeMathType) && isSupportNpuArch) {
+-            auto outGemmV3 = ExecGemmV3WithAlphaBetaOp(bias, matA, matB, alpha, beta, executor);
++            bool enableGemm16In32Out = NeedEnableFp32Output(matA->GetDataType(), matB->GetDataType(),
++                                                            output->GetDataType(), cubeMathType);
++            auto outGemmV3 = ExecGemmV3WithAlphaBetaOp(bias, matA, matB, alpha, beta, executor, enableGemm16In32Out);
+             CHECK_RET(outGemmV3 != nullptr, ACLNN_ERR_INNER_NULLPTR);
+             convOut = outGemmV3;
+             return ACLNN_SUCCESS;

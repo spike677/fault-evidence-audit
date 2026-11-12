@@ -1,0 +1,2408 @@
+[
+  {
+    "scheme": "ORIGINAL42",
+    "definition_version": "ORIGINAL42:69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+    "id": "1.1.1",
+    "name": "Zero dimension",
+    "definition": "某维 shape=0。\nRequires: `CON-SHAPE` on tensor-like.  \r\nGenerator: shape 含 0。",
+    "requires": [
+      "任一 `TEN-*` 带 `CON-SHAPE`，或控制循环次数的 `scalar`/`attr`，或 `TEN-MOE-ROUTE` / `SEM-MOE-DIST`。",
+      "`CON-SHAPE` on tensor-like."
+    ],
+    "skip_if": [
+      "算子无张量 shape、无循环计数、无路由——无可退化对象。"
+    ],
+    "construction_ids": [],
+    "constructions": [],
+    "source_file": "sources/original/api42_trigger_library_original.md",
+    "source_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+    "source_quote": "`[ / ]` **1.1.1 Zero dimension** — 某维 shape=0。  \r\nRequires: `CON-SHAPE` on tensor-like.  \r\nGenerator: shape 含 0。\r\n"
+  },
+  {
+    "scheme": "ORIGINAL42",
+    "definition_version": "ORIGINAL42:69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+    "id": "1.1.2",
+    "name": "Zero repeat/loop count",
+    "definition": "repeat/loop/r=0。\nRequires: `SEM-SCALAR-COEFF` 或相关 attr/scalar 表示次数。  \r\nSkip if: 无此类参数。",
+    "requires": [
+      "任一 `TEN-*` 带 `CON-SHAPE`，或控制循环次数的 `scalar`/`attr`，或 `TEN-MOE-ROUTE` / `SEM-MOE-DIST`。",
+      "`SEM-SCALAR-COEFF` 或相关 attr/scalar 表示次数。"
+    ],
+    "skip_if": [
+      "算子无张量 shape、无循环计数、无路由——无可退化对象。",
+      "无此类参数。"
+    ],
+    "construction_ids": [],
+    "constructions": [],
+    "source_file": "sources/original/api42_trigger_library_original.md",
+    "source_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+    "source_quote": "`[ / ]` **1.1.2 Zero repeat/loop count** — repeat/loop/r=0。  \r\nRequires: `SEM-SCALAR-COEFF` 或相关 attr/scalar 表示次数。  \r\nSkip if: 无此类参数。\r\n"
+  },
+  {
+    "scheme": "ORIGINAL42",
+    "definition_version": "ORIGINAL42:69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+    "id": "1.1.3",
+    "name": "All-zero rows/blocks",
+    "definition": "shape 非空但值全 0。\nRequires: 浮点/量化相关 `TEN-PRIMARY`（或参与 ReduceMax/scale 的张量）。  \r\nSkip if: 无数据张量或纯布尔逻辑且无数值归约。",
+    "requires": [
+      "任一 `TEN-*` 带 `CON-SHAPE`，或控制循环次数的 `scalar`/`attr`，或 `TEN-MOE-ROUTE` / `SEM-MOE-DIST`。",
+      "浮点/量化相关 `TEN-PRIMARY`（或参与 ReduceMax/scale 的张量）。"
+    ],
+    "skip_if": [
+      "算子无张量 shape、无循环计数、无路由——无可退化对象。",
+      "无数据张量或纯布尔逻辑且无数值归约。"
+    ],
+    "construction_ids": [],
+    "constructions": [],
+    "source_file": "sources/original/api42_trigger_library_original.md",
+    "source_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+    "source_quote": "`[ / ]` **1.1.3 All-zero rows/blocks** — shape 非空但值全 0。  \r\nRequires: 浮点/量化相关 `TEN-PRIMARY`（或参与 ReduceMax/scale 的张量）。  \r\nSkip if: 无数据张量或纯布尔逻辑且无数值归约。\r\n"
+  },
+  {
+    "scheme": "ORIGINAL42",
+    "definition_version": "ORIGINAL42:69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+    "id": "1.1.4",
+    "name": "Empty expert (MoE)",
+    "definition": "某 expert token 数=0。\nRequires: `TEN-MOE-ROUTE` 或 `SEM-MOE-DIST`。  \r\nSkip if: 非 MoE。",
+    "requires": [
+      "任一 `TEN-*` 带 `CON-SHAPE`，或控制循环次数的 `scalar`/`attr`，或 `TEN-MOE-ROUTE` / `SEM-MOE-DIST`。",
+      "`TEN-MOE-ROUTE` 或 `SEM-MOE-DIST`。"
+    ],
+    "skip_if": [
+      "算子无张量 shape、无循环计数、无路由——无可退化对象。",
+      "非 MoE。"
+    ],
+    "construction_ids": [],
+    "constructions": [],
+    "source_file": "sources/original/api42_trigger_library_original.md",
+    "source_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+    "source_quote": "`[ / ]` **1.1.4 Empty expert (MoE)** — 某 expert token 数=0。  \r\nRequires: `TEN-MOE-ROUTE` 或 `SEM-MOE-DIST`。  \r\nSkip if: 非 MoE。\r\n"
+  },
+  {
+    "scheme": "ORIGINAL42",
+    "definition_version": "ORIGINAL42:69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+    "id": "1.1.5",
+    "name": "Empty partition/shard",
+    "definition": "分核后某核 0 数据（靠 shape 间接）。\nRequires: `CON-SHAPE` + 多核切分可能（大/怪 shape）。",
+    "requires": [
+      "任一 `TEN-*` 带 `CON-SHAPE`，或控制循环次数的 `scalar`/`attr`，或 `TEN-MOE-ROUTE` / `SEM-MOE-DIST`。",
+      "`CON-SHAPE` + 多核切分可能（大/怪 shape）。"
+    ],
+    "skip_if": [
+      "算子无张量 shape、无循环计数、无路由——无可退化对象。"
+    ],
+    "construction_ids": [],
+    "constructions": [],
+    "source_file": "sources/original/api42_trigger_library_original.md",
+    "source_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+    "source_quote": "`[ / ]` **1.1.5 Empty partition/shard** — 分核后某核 0 数据（靠 shape 间接）。  \r\nRequires: `CON-SHAPE` + 多核切分可能（大/怪 shape）。  \r\n"
+  },
+  {
+    "scheme": "ORIGINAL42",
+    "definition_version": "ORIGINAL42:69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+    "id": "1.2.1",
+    "name": "Minimal dimension (M/N/K=1)",
+    "definition": "核心维=1。\nRequires: 存在可解释为 M/N/K/L 的 shape 维。",
+    "requires": [
+      "任一 tensor-like 的 `CON-SHAPE-*`，或 `SEM-GEOM`（卷积组合）。",
+      "存在可解释为 M/N/K/L 的 shape 维。"
+    ],
+    "skip_if": [
+      "无 shape 可配（极罕见）。"
+    ],
+    "construction_ids": [],
+    "constructions": [],
+    "source_file": "sources/original/api42_trigger_library_original.md",
+    "source_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+    "source_quote": "`[ / ]` **1.2.1 Minimal dimension (M/N/K=1)** — 核心维=1。  \r\nRequires: 存在可解释为 M/N/K/L 的 shape 维。\r\n"
+  },
+  {
+    "scheme": "ORIGINAL42",
+    "definition_version": "ORIGINAL42:69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+    "id": "1.2.2",
+    "name": "Tail-block misalignment",
+    "definition": "维长 ∉ 对齐（16/32/64/128/256）。\nValues: 1,3,7,13,17,33,65,69,127,129,255,257。",
+    "requires": [
+      "任一 tensor-like 的 `CON-SHAPE-*`，或 `SEM-GEOM`（卷积组合）。"
+    ],
+    "skip_if": [
+      "无 shape 可配（极罕见）。"
+    ],
+    "construction_ids": [],
+    "constructions": [],
+    "source_file": "sources/original/api42_trigger_library_original.md",
+    "source_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+    "source_quote": "`[ / ]` **1.2.2 Tail-block misalignment** — 维长 ∉ 对齐（16/32/64/128/256）。  \r\nValues: 1,3,7,13,17,33,65,69,127,129,255,257。\r\n"
+  },
+  {
+    "scheme": "ORIGINAL42",
+    "definition_version": "ORIGINAL42:69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+    "id": "1.2.3",
+    "name": "Split count exceeds limit",
+    "definition": "split/chunk 数超内部数组。\nRequires: `SEM-SLICE` / split 类 attr 或可推导 split 的 shape。  \r\nSkip if: 无 split。",
+    "requires": [
+      "任一 tensor-like 的 `CON-SHAPE-*`，或 `SEM-GEOM`（卷积组合）。",
+      "`SEM-SLICE` / split 类 attr 或可推导 split 的 shape。"
+    ],
+    "skip_if": [
+      "无 shape 可配（极罕见）。",
+      "无 split。"
+    ],
+    "construction_ids": [],
+    "constructions": [],
+    "source_file": "sources/original/api42_trigger_library_original.md",
+    "source_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+    "source_quote": "`[ / ]` **1.2.3 Split count exceeds limit** — split/chunk 数超内部数组。  \r\nRequires: `SEM-SLICE` / split 类 attr 或可推导 split 的 shape。  \r\nSkip if: 无 split。\r\n"
+  },
+  {
+    "scheme": "ORIGINAL42",
+    "definition_version": "ORIGINAL42:69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+    "id": "1.2.4",
+    "name": "Very large dimension (int overflow)",
+    "definition": "近 uint16/int32/2^24。\nValues: 65535, 65536, 16777217, 2^31 边界。  \r\n代码信号: 窄整型存 offset。",
+    "requires": [
+      "任一 tensor-like 的 `CON-SHAPE-*`，或 `SEM-GEOM`（卷积组合）。"
+    ],
+    "skip_if": [
+      "无 shape 可配（极罕见）。"
+    ],
+    "construction_ids": [],
+    "constructions": [],
+    "source_file": "sources/original/api42_trigger_library_original.md",
+    "source_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+    "source_quote": "`[ / ]` **1.2.4 Very large dimension (int overflow)** — 近 uint16/int32/2^24。  \r\nValues: 65535, 65536, 16777217, 2^31 边界。  \r\n代码信号: 窄整型存 offset。\r\n"
+  },
+  {
+    "scheme": "ORIGINAL42",
+    "definition_version": "ORIGINAL42:69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+    "id": "1.2.5",
+    "name": "Broadcast degeneration",
+    "definition": "广播维=1 / stride 0。\nRequires: ≥2 个可广播 tensor 操作数（PRIMARY+OTHER 或列表）。",
+    "requires": [
+      "任一 tensor-like 的 `CON-SHAPE-*`，或 `SEM-GEOM`（卷积组合）。",
+      "≥2 个可广播 tensor 操作数（PRIMARY+OTHER 或列表）。"
+    ],
+    "skip_if": [
+      "无 shape 可配（极罕见）。"
+    ],
+    "construction_ids": [],
+    "constructions": [],
+    "source_file": "sources/original/api42_trigger_library_original.md",
+    "source_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+    "source_quote": "`[ / ]` **1.2.5 Broadcast degeneration** — 广播维=1 / stride 0。  \r\nRequires: ≥2 个可广播 tensor 操作数（PRIMARY+OTHER 或列表）。\r\n"
+  },
+  {
+    "scheme": "ORIGINAL42",
+    "definition_version": "ORIGINAL42:69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+    "id": "1.2.6",
+    "name": "Tiling template boundary (off-by-one)",
+    "definition": "落在模板选择边界 ±1。\nRequires: 从 src 读出边界常量 + `CON-SHAPE`。",
+    "requires": [
+      "任一 tensor-like 的 `CON-SHAPE-*`，或 `SEM-GEOM`（卷积组合）。",
+      "从 src 读出边界常量 + `CON-SHAPE`。"
+    ],
+    "skip_if": [
+      "无 shape 可配（极罕见）。"
+    ],
+    "construction_ids": [],
+    "constructions": [],
+    "source_file": "sources/original/api42_trigger_library_original.md",
+    "source_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+    "source_quote": "`[ / ]` **1.2.6 Tiling template boundary (off-by-one)** — 落在模板选择边界 ±1。  \r\nRequires: 从 src 读出边界常量 + `CON-SHAPE`。\r\n"
+  },
+  {
+    "scheme": "ORIGINAL42",
+    "definition_version": "ORIGINAL42:69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+    "id": "1.2.7",
+    "name": "Convolution special shape combo",
+    "definition": "input×kernel×stride×dilation×pad。\nRequires: `SEM-GEOM`（attrs/attr_tuple）+ 特征/权重张量。  \r\nSkip if: 非 conv/pool 几何类。",
+    "requires": [
+      "任一 tensor-like 的 `CON-SHAPE-*`，或 `SEM-GEOM`（卷积组合）。",
+      "`SEM-GEOM`（attrs/attr_tuple）+ 特征/权重张量。"
+    ],
+    "skip_if": [
+      "无 shape 可配（极罕见）。",
+      "非 conv/pool 几何类。"
+    ],
+    "construction_ids": [],
+    "constructions": [],
+    "source_file": "sources/original/api42_trigger_library_original.md",
+    "source_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+    "source_quote": "`[ / ]` **1.2.7 Convolution special shape combo** — input×kernel×stride×dilation×pad。  \r\nRequires: `SEM-GEOM`（attrs/attr_tuple）+ 特征/权重张量。  \r\nSkip if: 非 conv/pool 几何类。\r\n"
+  },
+  {
+    "scheme": "ORIGINAL42",
+    "definition_version": "ORIGINAL42:69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+    "id": "1.2.8",
+    "name": "Output dim < minimum transfer granularity",
+    "definition": "输出 < 32B 等。\nRequires: 可推出 output 元素数与 dtype 宽度。",
+    "requires": [
+      "任一 tensor-like 的 `CON-SHAPE-*`，或 `SEM-GEOM`（卷积组合）。",
+      "可推出 output 元素数与 dtype 宽度。"
+    ],
+    "skip_if": [
+      "无 shape 可配（极罕见）。"
+    ],
+    "construction_ids": [],
+    "constructions": [],
+    "source_file": "sources/original/api42_trigger_library_original.md",
+    "source_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+    "source_quote": "`[ / ]` **1.2.8 Output dim < minimum transfer granularity** — 输出 < 32B 等。  \r\nRequires: 可推出 output 元素数与 dtype 宽度。\r\n"
+  },
+  {
+    "scheme": "ORIGINAL42",
+    "definition_version": "ORIGINAL42:69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+    "id": "1.3.1",
+    "name": "Index OOB / extreme",
+    "definition": "0, -1, MAX_INT, ≥dim。\nRequires: `TEN-INDEX`（dtype 多为 int32/64）。",
+    "requires": [
+      "- `TEN-INDEX` 或 `tensor_tuple` 索引，或\n- `TEN-MOE-ROUTE` 中的 expert/token 下标，或\n- `SEM-INDEX-CTRL` / `SEM-SLICE`（begin/end/window）且参与地址映射。",
+      "`TEN-INDEX`（dtype 多为 int32/64）。"
+    ],
+    "skip_if": [
+      "仅有 `TEN-PRIMARY` 等数据张量、无任何索引/下标/窗映射实参 —— 禁止给 1.3 分配预算。\n（这是「张量输入不会有 index 触发」的形式化表述。）"
+    ],
+    "construction_ids": [],
+    "constructions": [],
+    "source_file": "sources/original/api42_trigger_library_original.md",
+    "source_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+    "source_quote": "`[ / ]` **1.3.1 Index OOB / extreme** — 0, -1, MAX_INT, ≥dim。  \r\nRequires: `TEN-INDEX`（dtype 多为 int32/64）。\r\n"
+  },
+  {
+    "scheme": "ORIGINAL42",
+    "definition_version": "ORIGINAL42:69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+    "id": "1.3.2",
+    "name": "Offset overflow (>uint16 / >int32)",
+    "definition": "算址偏移溢出。\nRequires: shape/index 使 offset 公式 > 阈值；常与 1.2.4 组合。",
+    "requires": [
+      "- `TEN-INDEX` 或 `tensor_tuple` 索引，或\n- `TEN-MOE-ROUTE` 中的 expert/token 下标，或\n- `SEM-INDEX-CTRL` / `SEM-SLICE`（begin/end/window）且参与地址映射。",
+      "shape/index 使 offset 公式 > 阈值；常与 1.2.4 组合。"
+    ],
+    "skip_if": [
+      "仅有 `TEN-PRIMARY` 等数据张量、无任何索引/下标/窗映射实参 —— 禁止给 1.3 分配预算。\n（这是「张量输入不会有 index 触发」的形式化表述。）"
+    ],
+    "construction_ids": [],
+    "constructions": [],
+    "source_file": "sources/original/api42_trigger_library_original.md",
+    "source_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+    "source_quote": "`[ / ]` **1.3.2 Offset overflow (>uint16 / >int32)** — 算址偏移溢出。  \r\nRequires: shape/index 使 offset 公式 > 阈值；常与 1.2.4 组合。\r\n"
+  },
+  {
+    "scheme": "ORIGINAL42",
+    "definition_version": "ORIGINAL42:69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+    "id": "1.3.3",
+    "name": "Sliding window / attention window boundary",
+    "definition": "窗起止非法。\nRequires: `SEM-ATTN-STRUCT` / `SEM-GEOM` 窗参数或 mask 窗。  \r\nSkip if: 无窗。",
+    "requires": [
+      "- `TEN-INDEX` 或 `tensor_tuple` 索引，或\n- `TEN-MOE-ROUTE` 中的 expert/token 下标，或\n- `SEM-INDEX-CTRL` / `SEM-SLICE`（begin/end/window）且参与地址映射。",
+      "`SEM-ATTN-STRUCT` / `SEM-GEOM` 窗参数或 mask 窗。"
+    ],
+    "skip_if": [
+      "仅有 `TEN-PRIMARY` 等数据张量、无任何索引/下标/窗映射实参 —— 禁止给 1.3 分配预算。\n（这是「张量输入不会有 index 触发」的形式化表述。）",
+      "无窗。"
+    ],
+    "construction_ids": [],
+    "constructions": [],
+    "source_file": "sources/original/api42_trigger_library_original.md",
+    "source_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+    "source_quote": "`[ / ]` **1.3.3 Sliding window / attention window boundary** — 窗起止非法。  \r\nRequires: `SEM-ATTN-STRUCT` / `SEM-GEOM` 窗参数或 mask 窗。  \r\nSkip if: 无窗。\r\n"
+  },
+  {
+    "scheme": "ORIGINAL42",
+    "definition_version": "ORIGINAL42:69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+    "id": "1.3.4",
+    "name": "Expert/routing index combo (MoE)",
+    "definition": "极端/全同/重复路由。\nRequires: `TEN-MOE-ROUTE` 或 `SEM-MOE-DIST`。  \r\nSkip if: 非 MoE。",
+    "requires": [
+      "- `TEN-INDEX` 或 `tensor_tuple` 索引，或\n- `TEN-MOE-ROUTE` 中的 expert/token 下标，或\n- `SEM-INDEX-CTRL` / `SEM-SLICE`（begin/end/window）且参与地址映射。",
+      "`TEN-MOE-ROUTE` 或 `SEM-MOE-DIST`。"
+    ],
+    "skip_if": [
+      "仅有 `TEN-PRIMARY` 等数据张量、无任何索引/下标/窗映射实参 —— 禁止给 1.3 分配预算。\n（这是「张量输入不会有 index 触发」的形式化表述。）",
+      "非 MoE。"
+    ],
+    "construction_ids": [],
+    "constructions": [],
+    "source_file": "sources/original/api42_trigger_library_original.md",
+    "source_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+    "source_quote": "`[ / ]` **1.3.4 Expert/routing index combo (MoE)** — 极端/全同/重复路由。  \r\nRequires: `TEN-MOE-ROUTE` 或 `SEM-MOE-DIST`。  \r\nSkip if: 非 MoE。\r\n"
+  },
+  {
+    "scheme": "ORIGINAL42",
+    "definition_version": "ORIGINAL42:69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+    "id": "1.4.1",
+    "name": "Non-contiguous tensor",
+    "definition": "`[not testable]` — 除非 schema 暴露 stride。",
+    "requires": [
+      "`SEM-LAYOUT`，或 `SEM-TRANSPOSE` 导致非平凡 stride，或 schema 暴露 format/stride，或 `CON-ALIGN`。"
+    ],
+    "skip_if": [
+      "固定 ND、无 format/transpose/align 实参且框架不可控 stride（多项标 `[not testable]`）。"
+    ],
+    "construction_ids": [],
+    "constructions": [],
+    "source_file": "sources/original/api42_trigger_library_original.md",
+    "source_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+    "source_quote": "`[ / ]` **1.4.1 Non-contiguous tensor** `[not testable]` — 除非 schema 暴露 stride。  \r\n"
+  },
+  {
+    "scheme": "ORIGINAL42",
+    "definition_version": "ORIGINAL42:69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+    "id": "1.4.2",
+    "name": "Large stride (>65535)",
+    "definition": "由 shape 推出使 stride>65535。\nRequires: 高维大尾维 + 地址按 stride 计算的实现。",
+    "requires": [
+      "`SEM-LAYOUT`，或 `SEM-TRANSPOSE` 导致非平凡 stride，或 schema 暴露 format/stride，或 `CON-ALIGN`。",
+      "高维大尾维 + 地址按 stride 计算的实现。"
+    ],
+    "skip_if": [
+      "固定 ND、无 format/transpose/align 实参且框架不可控 stride（多项标 `[not testable]`）。"
+    ],
+    "construction_ids": [],
+    "constructions": [],
+    "source_file": "sources/original/api42_trigger_library_original.md",
+    "source_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+    "source_quote": "`[ / ]` **1.4.2 Large stride (>65535)** — 由 shape 推出使 stride>65535。  \r\nRequires: 高维大尾维 + 地址按 stride 计算的实现。  \r\n"
+  },
+  {
+    "scheme": "ORIGINAL42",
+    "definition_version": "ORIGINAL42:69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+    "id": "1.4.3",
+    "name": "Special format (NZ, TND)",
+    "definition": "Requires: `SEM-LAYOUT` 可选 NZ/TND 等。  \r\nSkip if: 仅 ND。",
+    "requires": [
+      "`SEM-LAYOUT`，或 `SEM-TRANSPOSE` 导致非平凡 stride，或 schema 暴露 format/stride，或 `CON-ALIGN`。",
+      "`SEM-LAYOUT` 可选 NZ/TND 等。"
+    ],
+    "skip_if": [
+      "固定 ND、无 format/transpose/align 实参且框架不可控 stride（多项标 `[not testable]`）。",
+      "仅 ND。"
+    ],
+    "construction_ids": [],
+    "constructions": [],
+    "source_file": "sources/original/api42_trigger_library_original.md",
+    "source_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+    "source_quote": "`[ / ]` **1.4.3 Special format (NZ, TND)** —  \r\nRequires: `SEM-LAYOUT` 可选 NZ/TND 等。  \r\nSkip if: 仅 ND。\r\n"
+  },
+  {
+    "scheme": "ORIGINAL42",
+    "definition_version": "ORIGINAL42:69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+    "id": "1.5.1",
+    "name": "Non-aligned sequence length",
+    "definition": "seq ∉ 16/32/64/128 倍数。",
+    "requires": [
+      "`SEM-SEQ-LEN` / `TEN-SEQ-META` / `SEM-ATTN-STRUCT` / `TEN-ATTN-QKV` 上可解释的 seq/head 维。"
+    ],
+    "skip_if": [
+      "无序列维语义（纯点对点 elemwise 且无 seq）。"
+    ],
+    "construction_ids": [],
+    "constructions": [],
+    "source_file": "sources/original/api42_trigger_library_original.md",
+    "source_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+    "source_quote": "`[ / ]` **1.5.1 Non-aligned sequence length** — seq ∉ 16/32/64/128 倍数。  \r\n"
+  },
+  {
+    "scheme": "ORIGINAL42",
+    "definition_version": "ORIGINAL42:69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+    "id": "1.5.2",
+    "name": "Very long sequence",
+    "definition": "2048/4096/8192…",
+    "requires": [
+      "`SEM-SEQ-LEN` / `TEN-SEQ-META` / `SEM-ATTN-STRUCT` / `TEN-ATTN-QKV` 上可解释的 seq/head 维。"
+    ],
+    "skip_if": [
+      "无序列维语义（纯点对点 elemwise 且无 seq）。"
+    ],
+    "construction_ids": [],
+    "constructions": [],
+    "source_file": "sources/original/api42_trigger_library_original.md",
+    "source_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+    "source_quote": "`[ / ]` **1.5.2 Very long sequence** — 2048/4096/8192…  \r\n"
+  },
+  {
+    "scheme": "ORIGINAL42",
+    "definition_version": "ORIGINAL42:69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+    "id": "1.5.3",
+    "name": "Decode-length (seq_len=1)",
+    "definition": "单步 decode 路径。",
+    "requires": [
+      "`SEM-SEQ-LEN` / `TEN-SEQ-META` / `SEM-ATTN-STRUCT` / `TEN-ATTN-QKV` 上可解释的 seq/head 维。"
+    ],
+    "skip_if": [
+      "无序列维语义（纯点对点 elemwise 且无 seq）。"
+    ],
+    "construction_ids": [],
+    "constructions": [],
+    "source_file": "sources/original/api42_trigger_library_original.md",
+    "source_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+    "source_quote": "`[ / ]` **1.5.3 Decode-length (seq_len=1)** — 单步 decode 路径。  \r\n"
+  },
+  {
+    "scheme": "ORIGINAL42",
+    "definition_version": "ORIGINAL42:69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+    "id": "1.5.4",
+    "name": "Head dim not aligned",
+    "definition": "dSize 非标准对齐。\nRequires: head 维存在（ATTN-STRUCT 或 QKV shape）。",
+    "requires": [
+      "`SEM-SEQ-LEN` / `TEN-SEQ-META` / `SEM-ATTN-STRUCT` / `TEN-ATTN-QKV` 上可解释的 seq/head 维。",
+      "head 维存在（ATTN-STRUCT 或 QKV shape）。"
+    ],
+    "skip_if": [
+      "无序列维语义（纯点对点 elemwise 且无 seq）。"
+    ],
+    "construction_ids": [],
+    "constructions": [],
+    "source_file": "sources/original/api42_trigger_library_original.md",
+    "source_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+    "source_quote": "`[ / ]` **1.5.4 Head dim not aligned** — dSize 非标准对齐。  \r\nRequires: head 维存在（ATTN-STRUCT 或 QKV shape）。\r\n"
+  },
+  {
+    "scheme": "ORIGINAL42",
+    "definition_version": "ORIGINAL42:69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+    "id": "1.6.1",
+    "name": "Batch > 1",
+    "definition": "batch=2/4 激活不同 offset/workspace。",
+    "requires": [
+      "shape 上存在 batch/sample 维，或 MoE token 分配。"
+    ],
+    "skip_if": [
+      "无 batch 概念的标量核。"
+    ],
+    "construction_ids": [],
+    "constructions": [],
+    "source_file": "sources/original/api42_trigger_library_original.md",
+    "source_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+    "source_quote": "`[ / ]` **1.6.1 Batch > 1** — batch=2/4 激活不同 offset/workspace。  \r\n"
+  },
+  {
+    "scheme": "ORIGINAL42",
+    "definition_version": "ORIGINAL42:69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+    "id": "1.6.2",
+    "name": "Uneven expert/token allocation",
+    "definition": "Requires: MoE 路由实参（同 1.1.4/1.3.4）。  \r\nSkip if: 非 MoE。",
+    "requires": [
+      "shape 上存在 batch/sample 维，或 MoE token 分配。",
+      "MoE 路由实参（同 1.1.4/1.3.4）。"
+    ],
+    "skip_if": [
+      "无 batch 概念的标量核。",
+      "非 MoE。"
+    ],
+    "construction_ids": [],
+    "constructions": [],
+    "source_file": "sources/original/api42_trigger_library_original.md",
+    "source_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+    "source_quote": "`[ / ]` **1.6.2 Uneven expert/token allocation** —  \r\nRequires: MoE 路由实参（同 1.1.4/1.3.4）。  \r\nSkip if: 非 MoE。\r\n"
+  },
+  {
+    "scheme": "ORIGINAL42",
+    "definition_version": "ORIGINAL42:69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+    "id": "1.7.1",
+    "name": "All-zero → div-by-zero (scale=INF)",
+    "definition": "`constant(0)`；常与动态量化 attr 联用。",
+    "requires": [
+      "至少一数值型 `TEN-PRIMARY` / `OTHER-OPERAND` / `WEIGHT` / `SCALE-ZP` / `SEM-SCALAR-COEFF`（浮点或会转浮点）。"
+    ],
+    "skip_if": [
+      "无数值载荷（纯 shape 推导算子且无 data）。"
+    ],
+    "construction_ids": [],
+    "constructions": [],
+    "source_file": "sources/original/api42_trigger_library_original.md",
+    "source_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+    "source_quote": "`[ / ]` **1.7.1 All-zero → div-by-zero (scale=INF)** — `constant(0)`；常与动态量化 attr 联用。  \r\n"
+  },
+  {
+    "scheme": "ORIGINAL42",
+    "definition_version": "ORIGINAL42:69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+    "id": "1.7.2",
+    "name": "NaN / Inf",
+    "definition": "Requires: `CON-BOUNDARY-INFNAN` 或 dtype 为浮点。",
+    "requires": [
+      "至少一数值型 `TEN-PRIMARY` / `OTHER-OPERAND` / `WEIGHT` / `SCALE-ZP` / `SEM-SCALAR-COEFF`（浮点或会转浮点）。"
+    ],
+    "skip_if": [
+      "无数值载荷（纯 shape 推导算子且无 data）。"
+    ],
+    "construction_ids": [],
+    "constructions": [],
+    "source_file": "sources/original/api42_trigger_library_original.md",
+    "source_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+    "source_quote": "`[ / ]` **1.7.2 NaN / Inf** — Requires: `CON-BOUNDARY-INFNAN` 或 dtype 为浮点。  \r\n"
+  },
+  {
+    "scheme": "ORIGINAL42",
+    "definition_version": "ORIGINAL42:69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+    "id": "1.7.3",
+    "name": "Extreme large values",
+    "definition": "近 FP 上限 / exp 溢出区。",
+    "requires": [
+      "至少一数值型 `TEN-PRIMARY` / `OTHER-OPERAND` / `WEIGHT` / `SCALE-ZP` / `SEM-SCALAR-COEFF`（浮点或会转浮点）。"
+    ],
+    "skip_if": [
+      "无数值载荷（纯 shape 推导算子且无 data）。"
+    ],
+    "construction_ids": [],
+    "constructions": [],
+    "source_file": "sources/original/api42_trigger_library_original.md",
+    "source_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+    "source_quote": "`[ / ]` **1.7.3 Extreme large values** — 近 FP 上限 / exp 溢出区。  \r\n"
+  },
+  {
+    "scheme": "ORIGINAL42",
+    "definition_version": "ORIGINAL42:69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+    "id": "1.7.4",
+    "name": "Near-zero denominator",
+    "definition": "scale/除数 ~0。\nRequires: 除数角色张量或 scalar。",
+    "requires": [
+      "至少一数值型 `TEN-PRIMARY` / `OTHER-OPERAND` / `WEIGHT` / `SCALE-ZP` / `SEM-SCALAR-COEFF`（浮点或会转浮点）。",
+      "除数角色张量或 scalar。"
+    ],
+    "skip_if": [
+      "无数值载荷（纯 shape 推导算子且无 data）。"
+    ],
+    "construction_ids": [],
+    "constructions": [],
+    "source_file": "sources/original/api42_trigger_library_original.md",
+    "source_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+    "source_quote": "`[ / ]` **1.7.4 Near-zero denominator** — scale/除数 ~0。  \r\nRequires: 除数角色张量或 scalar。  \r\n"
+  },
+  {
+    "scheme": "ORIGINAL42",
+    "definition_version": "ORIGINAL42:69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+    "id": "1.7.5",
+    "name": "Log-domain instability",
+    "definition": "概率近 0/1。\nRequires: 进入 log/softmax 的输入。",
+    "requires": [
+      "至少一数值型 `TEN-PRIMARY` / `OTHER-OPERAND` / `WEIGHT` / `SCALE-ZP` / `SEM-SCALAR-COEFF`（浮点或会转浮点）。",
+      "进入 log/softmax 的输入。"
+    ],
+    "skip_if": [
+      "无数值载荷（纯 shape 推导算子且无 data）。"
+    ],
+    "construction_ids": [],
+    "constructions": [],
+    "source_file": "sources/original/api42_trigger_library_original.md",
+    "source_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+    "source_quote": "`[ / ]` **1.7.5 Log-domain instability** — 概率近 0/1。  \r\nRequires: 进入 log/softmax 的输入。  \r\n"
+  },
+  {
+    "scheme": "ORIGINAL42",
+    "definition_version": "ORIGINAL42:69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+    "id": "1.7.6",
+    "name": "Intermediate overflow (mul before div)",
+    "definition": "大值触发中间溢出。",
+    "requires": [
+      "至少一数值型 `TEN-PRIMARY` / `OTHER-OPERAND` / `WEIGHT` / `SCALE-ZP` / `SEM-SCALAR-COEFF`（浮点或会转浮点）。"
+    ],
+    "skip_if": [
+      "无数值载荷（纯 shape 推导算子且无 data）。"
+    ],
+    "construction_ids": [],
+    "constructions": [],
+    "source_file": "sources/original/api42_trigger_library_original.md",
+    "source_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+    "source_quote": "`[ / ]` **1.7.6 Intermediate overflow (mul before div)** — 大值触发中间溢出。\r\n"
+  },
+  {
+    "scheme": "ORIGINAL42",
+    "definition_version": "ORIGINAL42:69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+    "id": "1.8.1",
+    "name": "Packed variable-length sequence",
+    "definition": "batchSizes/packed 实参。\nRequires: pack 相关 attr 或 SEQ-LEN 数组。",
+    "requires": [
+      "`TEN-MASK` / `SEM-SPARSE-MASK` / `SEM-PADDED-MODE` / packed 相关 attr / `SEM-GEOM` 负 padding。",
+      "pack 相关 attr 或 SEQ-LEN 数组。"
+    ],
+    "skip_if": [
+      "无 mask、无 pack/pad 组织、无 crop。"
+    ],
+    "construction_ids": [],
+    "constructions": [],
+    "source_file": "sources/original/api42_trigger_library_original.md",
+    "source_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+    "source_quote": "`[ / ]` **1.8.1 Packed variable-length sequence** — batchSizes/packed 实参。  \r\nRequires: pack 相关 attr 或 SEQ-LEN 数组。  \r\n"
+  },
+  {
+    "scheme": "ORIGINAL42",
+    "definition_version": "ORIGINAL42:69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+    "id": "1.8.2",
+    "name": "Mask type/combination",
+    "definition": "causal/SWA/custom + GQA 等。\nRequires: `TEN-MASK` 或 `SEM-SPARSE-MASK`。",
+    "requires": [
+      "`TEN-MASK` / `SEM-SPARSE-MASK` / `SEM-PADDED-MODE` / packed 相关 attr / `SEM-GEOM` 负 padding。",
+      "`TEN-MASK` 或 `SEM-SPARSE-MASK`。"
+    ],
+    "skip_if": [
+      "无 mask、无 pack/pad 组织、无 crop。"
+    ],
+    "construction_ids": [],
+    "constructions": [],
+    "source_file": "sources/original/api42_trigger_library_original.md",
+    "source_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+    "source_quote": "`[ / ]` **1.8.2 Mask type/combination** — causal/SWA/custom + GQA 等。  \r\nRequires: `TEN-MASK` 或 `SEM-SPARSE-MASK`。  \r\n"
+  },
+  {
+    "scheme": "ORIGINAL42",
+    "definition_version": "ORIGINAL42:69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+    "id": "1.8.3",
+    "name": "Negative padding (crop)",
+    "definition": "Requires: `SEM-GEOM` padding 允许负值。",
+    "requires": [
+      "`TEN-MASK` / `SEM-SPARSE-MASK` / `SEM-PADDED-MODE` / packed 相关 attr / `SEM-GEOM` 负 padding。",
+      "`SEM-GEOM` padding 允许负值。"
+    ],
+    "skip_if": [
+      "无 mask、无 pack/pad 组织、无 crop。"
+    ],
+    "construction_ids": [],
+    "constructions": [],
+    "source_file": "sources/original/api42_trigger_library_original.md",
+    "source_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+    "source_quote": "`[ / ]` **1.8.3 Negative padding (crop)** —  \r\nRequires: `SEM-GEOM` padding 允许负值。\r\n"
+  },
+  {
+    "scheme": "ORIGINAL42",
+    "definition_version": "ORIGINAL42:69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+    "id": "1.C.1",
+    "name": "动态/静态量化、quant 粒度",
+    "definition": "动态/静态量化、quant 粒度",
+    "requires": [
+      "`SEM-QUANT`",
+      "仅当 schema/`inputs` 暴露对应 attr 时 applicable。"
+    ],
+    "skip_if": [],
+    "construction_ids": [],
+    "constructions": [],
+    "source_file": "sources/original/api42_trigger_library_original.md",
+    "source_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+    "source_quote": "| **1.C.1** | 动态/静态量化、quant 粒度    | `SEM-QUANT`                                 | 1.7.1      |\r\n"
+  },
+  {
+    "scheme": "ORIGINAL42",
+    "definition_version": "ORIGINAL42:69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+    "id": "1.C.2",
+    "name": "输出低精度 / out dtype",
+    "definition": "输出低精度 / out dtype",
+    "requires": [
+      "`SEM-DTYPE-OUT` / `SEM-QUANT`",
+      "仅当 schema/`inputs` 暴露对应 attr 时 applicable。"
+    ],
+    "skip_if": [],
+    "construction_ids": [],
+    "constructions": [],
+    "source_file": "sources/original/api42_trigger_library_original.md",
+    "source_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+    "source_quote": "| **1.C.2** | 输出低精度 / out dtype       | `SEM-DTYPE-OUT` / `SEM-QUANT`               | 1.7        |\r\n"
+  },
+  {
+    "scheme": "ORIGINAL42",
+    "definition_version": "ORIGINAL42:69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+    "id": "1.C.3",
+    "name": "cubeMathType / KEEP_DTYPE",
+    "definition": "cubeMathType / KEEP_DTYPE",
+    "requires": [
+      "`SEM-MATH-MODE`",
+      "仅当 schema/`inputs` 暴露对应 attr 时 applicable。"
+    ],
+    "skip_if": [],
+    "construction_ids": [],
+    "constructions": [],
+    "source_file": "sources/original/api42_trigger_library_original.md",
+    "source_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+    "source_quote": "| **1.C.3** | cubeMathType / KEEP_DTYPE    | `SEM-MATH-MODE`                             | 1.2, 1.7   |\r\n"
+  },
+  {
+    "scheme": "ORIGINAL42",
+    "definition_version": "ORIGINAL42:69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+    "id": "1.C.4",
+    "name": "RoPE / sink / dual-IO 等模式",
+    "definition": "RoPE / sink / dual-IO 等模式",
+    "requires": [
+      "`SEM-ATTN-STRUCT` 等",
+      "仅当 schema/`inputs` 暴露对应 attr 时 applicable。"
+    ],
+    "skip_if": [],
+    "construction_ids": [],
+    "constructions": [],
+    "source_file": "sources/original/api42_trigger_library_original.md",
+    "source_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+    "source_quote": "| **1.C.4** | RoPE / sink / dual-IO 等模式 | `SEM-ATTN-STRUCT` 等                        | 1.5, 1.8   |\r\n"
+  },
+  {
+    "scheme": "ORIGINAL42",
+    "definition_version": "ORIGINAL42:69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+    "id": "1.C.5",
+    "name": "deterministic / accumulate",
+    "definition": "deterministic / accumulate",
+    "requires": [
+      "`SEM-DETERMINISTIC` / `SEM-INDEX-CTRL`",
+      "仅当 schema/`inputs` 暴露对应 attr 时 applicable。"
+    ],
+    "skip_if": [],
+    "construction_ids": [],
+    "constructions": [],
+    "source_file": "sources/original/api42_trigger_library_original.md",
+    "source_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+    "source_quote": "| **1.C.5** | deterministic / accumulate   | `SEM-DETERMINISTIC` / `SEM-INDEX-CTRL`      | 1.3        |\r\n"
+  },
+  {
+    "scheme": "ORIGINAL42",
+    "definition_version": "ORIGINAL42:69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+    "id": "1.C.6",
+    "name": "format / NZ",
+    "definition": "format / NZ",
+    "requires": [
+      "`SEM-LAYOUT`",
+      "仅当 schema/`inputs` 暴露对应 attr 时 applicable。"
+    ],
+    "skip_if": [],
+    "construction_ids": [],
+    "constructions": [],
+    "source_file": "sources/original/api42_trigger_library_original.md",
+    "source_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+    "source_quote": "| **1.C.6** | format / NZ                  | `SEM-LAYOUT`                                | 1.4        |\r\n"
+  },
+  {
+    "scheme": "ORIGINAL42",
+    "definition_version": "ORIGINAL42:69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+    "id": "1.C.7",
+    "name": "reduction / dim / transpose",
+    "definition": "reduction / dim / transpose",
+    "requires": [
+      "`SEM-REDUCE` / `SEM-AXIS` / `SEM-TRANSPOSE`",
+      "仅当 schema/`inputs` 暴露对应 attr 时 applicable。"
+    ],
+    "skip_if": [],
+    "construction_ids": [],
+    "constructions": [],
+    "source_file": "sources/original/api42_trigger_library_original.md",
+    "source_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+    "source_quote": "| **1.C.7** | reduction / dim / transpose  | `SEM-REDUCE` / `SEM-AXIS` / `SEM-TRANSPOSE` | 1.2        |\r\n"
+  },
+  {
+    "scheme": "V4",
+    "definition_version": "V4:e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+    "id": "D1",
+    "name": "省略输入（Omitted Input）",
+    "definition": "对接口允许省略的输入，构造省略、契约认可的 null、显式默认值及显式非默认值，比较缺省行为与参数生效后的路径。",
+    "requires": [
+      "接口有可选 bias、mask、scale、padding_idx 或辅助状态。"
+    ],
+    "skip_if": [
+      "所有参数均必填，或执行器不能保留省略与显式传值的差别。"
+    ],
+    "construction_ids": [
+      "optional_absent",
+      "optional_present"
+    ],
+    "constructions": [
+      {
+        "id": "optional_absent",
+        "name": "optional输入省略 / null",
+        "definition": "仅按契约省略参数或传null，以检验缺省路径。",
+        "source_quote": [
+          {
+            "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\knowledge\\precision_trigger_knowledge_v4.md",
+            "line_start": 48,
+            "line_end": 48,
+            "source_quote": "  - `optional_absent` — **optional输入省略 / null**：仅按契约省略参数或传null，以检验缺省路径。"
+          }
+        ]
+      },
+      {
+        "id": "optional_present",
+        "name": "optional输入显式提供",
+        "definition": "显式提供有效可选参数并与缺省对照，以检验启用该输入后的路径。",
+        "source_quote": [
+          {
+            "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\knowledge\\precision_trigger_knowledge_v4.md",
+            "line_start": 49,
+            "line_end": 49,
+            "source_quote": "  - `optional_present` — **optional输入显式提供**：显式提供有效可选参数并与缺省对照，以检验启用该输入后的路径。"
+          }
+        ]
+      }
+    ],
+    "source_file": "sources/original/precision_trigger_knowledge_v4.md",
+    "source_sha256": "e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+    "source_quote": "### D1 省略输入（Omitted Input）\r\n\r\n- **条件定义**：对接口允许省略的输入，构造省略、契约认可的 null、显式默认值及显式非默认值，比较缺省行为与参数生效后的路径。\r\n- **检验目的**：检验缺省路径与显式输入路径是否使用了不同的初始化和地址处理。\r\n- **适用前提（Requires）**：接口有可选 bias、mask、scale、padding_idx 或辅助状态。\r\n- **跳过/能力限制（Skip if）**：所有参数均必填，或执行器不能保留省略与显式传值的差别。\r\n\r\n- 具体构造方式\r\n  - `optional_absent` — **optional输入省略 / null**：仅按契约省略参数或传null，以检验缺省路径。\r\n  - `optional_present` — **optional输入显式提供**：显式提供有效可选参数并与缺省对照，以检验启用该输入后的路径。\r\n\r\n#### 参考案例\r\n\r\n1. **D1-01**：**可选 bias 与加法旁路。** 若代码按 bias 是否存在选择初始化或加法分支，固定非对称输入，对照省略 bias、全零 bias、逐通道不同的 bias。无 bias 等价加零时比较前两组；第三组检查通道映射与加法是否生效。\r\n2. **D1-02**：**可选过滤参数：mask / padding_idx。** 若代码从可选参数生成有效集合，用同一套方法构造“省略—显式全有效—显式过滤部分位置”。mask 按布尔或加性编码准备；padding_idx 分别选未出现在索引中的合法位置、实际出现的位置。检查被保留与被过滤位置的结果。EmbeddingBag #646 的缺省 padding_idx 案例可用于参考这一构造。\r\n3. **D1-03**：**可选 scale / 初始状态。** 若省略时走默认初始化或由数据推导参数，先算出该默认结果，再提供等价显式值和非默认值。scale 可按行设置为不同数，状态可用非零初值，检查默认路径与显式路径的输出及状态更新。\r\n4. **D1-04**：**多个可选输入的组合。** 若源码按 `hasBias`、`hasResidual` 等存在标志选择不同融合路径，在接口允许时测试两者均省略、仅 bias、仅 residual、两者都有。bias 用逐通道值，residual 用逐位置值，便于识别某条分支漏读、错读或重复相加。\r\n5. **D1-05**：**Conv bias：未初始化与清零后搬入。** 在确实将 bias 载入 L1 的卷积分支，对照无 bias、零 bias、逐通道不同的非零 bias，令卷积项可独立核算。检查 bias 对应有效区域及物理尾部的处理，并配合 E2 改变前序调用。ops-nn#2328 是缺少清零；#3376 是清零与后续搬入之间缺少顺序保证。两者使用相近输入入口，但应分别验证初始化和依赖；原报告未给出可通用于所有 Conv 的 shape 阈值，先确认实际 tiling。"
+  },
+  {
+    "scheme": "V4",
+    "definition_version": "V4:e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+    "id": "D2",
+    "name": "退化控制值（Degenerate Control Values）",
+    "definition": "将合法控制量取0、1、负值或-1哨兵；只在接口契约允许时使用。",
+    "requires": [
+      "有次数、系数、概率、步长、推断维或哨兵等控制实参。"
+    ],
+    "skip_if": [
+      "参数没有退化取值，或候选值越出合法域。"
+    ],
+    "construction_ids": [
+      "zero_scalar",
+      "unit_scalar",
+      "negative_control",
+      "minus_one"
+    ],
+    "constructions": [
+      {
+        "id": "zero_scalar",
+        "name": "控制标量为0",
+        "definition": "将合法次数、阈值、系数或零点设为0，以检验提前返回与零值分支。",
+        "source_quote": [
+          {
+            "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\knowledge\\precision_trigger_knowledge_v4.md",
+            "line_start": 67,
+            "line_end": 67,
+            "source_quote": "  - `zero_scalar` — **控制标量为0**：将合法次数、阈值、系数或零点设为0，以检验提前返回与零值分支。"
+          }
+        ]
+      },
+      {
+        "id": "unit_scalar",
+        "name": "控制标量为1 / 概率端点",
+        "definition": "取合法的1及其邻域，概率参数取0/1端点，以检验恒等路径和端点处理。",
+        "source_quote": [
+          {
+            "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\knowledge\\precision_trigger_knowledge_v4.md",
+            "line_start": 68,
+            "line_end": 68,
+            "source_quote": "  - `unit_scalar` — **控制标量为1 / 概率端点**：取合法的1及其邻域，概率参数取0/1端点，以检验恒等路径和端点处理。"
+          }
+        ]
+      },
+      {
+        "id": "negative_control",
+        "name": "负阈值 / 负步长参数 / 负覆盖系数",
+        "definition": "在允许负值的控制参数上对比负数、零与正数，以检验符号相关分支。",
+        "source_quote": [
+          {
+            "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\knowledge\\precision_trigger_knowledge_v4.md",
+            "line_start": 69,
+            "line_end": 69,
+            "source_quote": "  - `negative_control` — **负阈值 / 负步长参数 / 负覆盖系数**：在允许负值的控制参数上对比负数、零与正数，以检验符号相关分支。"
+          }
+        ]
+      },
+      {
+        "id": "minus_one",
+        "name": "-1：推断维度 / 动态标记 / 哨兵",
+        "definition": "在合法推断维、动态标记、负轴或哨兵位置使用-1，以检验其解释与规范化。",
+        "source_quote": [
+          {
+            "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\knowledge\\precision_trigger_knowledge_v4.md",
+            "line_start": 70,
+            "line_end": 70,
+            "source_quote": "  - `minus_one` — **-1：推断维度 / 动态标记 / 哨兵**：在合法推断维、动态标记、负轴或哨兵位置使用-1，以检验其解释与规范化。"
+          },
+          {
+            "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\knowledge\\precision_trigger_knowledge_v4.md",
+            "line_start": 442,
+            "line_end": 442,
+            "source_quote": "  - `minus_one` — **-1：推断维度 / 动态标记 / 哨兵**：在合法推断维、动态标记、负轴或哨兵位置使用-1，以检验其解释与规范化。"
+          }
+        ]
+      }
+    ],
+    "source_file": "sources/original/precision_trigger_knowledge_v4.md",
+    "source_sha256": "e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+    "source_quote": "### D2 退化控制值（Degenerate Control Values）\r\n\r\n- **条件定义**：将合法控制量取0、1、负值或-1哨兵；只在接口契约允许时使用。\r\n- **检验目的**：检验提前返回、恒等操作、动态推断和符号分支。\r\n- **适用前提（Requires）**：有次数、系数、概率、步长、推断维或哨兵等控制实参。\r\n- **跳过/能力限制（Skip if）**：参数没有退化取值，或候选值越出合法域。\r\n\r\n- 具体构造方式\r\n  - `zero_scalar` — **控制标量为0**：将合法次数、阈值、系数或零点设为0，以检验提前返回与零值分支。\r\n  - `unit_scalar` — **控制标量为1 / 概率端点**：取合法的1及其邻域，概率参数取0/1端点，以检验恒等路径和端点处理。\r\n  - `negative_control` — **负阈值 / 负步长参数 / 负覆盖系数**：在允许负值的控制参数上对比负数、零与正数，以检验符号相关分支。\r\n  - `minus_one` — **-1：推断维度 / 动态标记 / 哨兵**：在合法推断维、动态标记、负轴或哨兵位置使用-1，以检验其解释与规范化。\r\n\r\n#### 参考案例\r\n\r\n1. **D2-01**：**次数为 0 / 1。** 若代码有 `repeat==0`、`repeat==1`、循环次数或提前返回判断，构造 0、1、2 次，对照空输出、恒等结果与重复顺序。TopK 的 `k==1` 特化可用 k=1 和相邻合法 k 对照，输入取不同值。\r\n2. **D2-02**：**系数为 0 / 1。** 对 `alpha*x+beta*y`，固定可区分的 x、y，测试 `(alpha,beta)=(0,1)、(1,0)、(1,1)` 及普通系数。若代码按系数走初始化或旁路，检查各项被消去、保留和相加后的结果。\r\n3. **D2-03**：**零范数控制。** 若 norm 参数 p=0 选择非零计数分支，构造 `[0,1,-2,0]`，再移动零的位置并改变归约轴。LpNormV2 #235 提供 p=0 的线索；检查计数、输出 dtype 和 keepdim 形状。\r\n4. **D2-04**：**概率端点。** 若训练/采样路径包含 `p==0`、`p==1` 特判，按 p 的保留/丢弃含义测试 0、1 与一个内部值。端点检查预期输出与缩放，内部值按随机算子的分布或种子规则比较。\r\n5. **D2-05**：**负步长。** 对支持反向遍历的切片/序列参数，固定输入 `[0,1,2,3,4]`，使用合法负步长与对应起止点，再对照手工选出的元素序列。检查端点包含关系、输出长度和最后一次访问。\r\n6. **D2-06**：**推断标记与缺省哨兵。** 若代码解释 -1 或其他负标记，分别构造合法标记与显式推导参数，记录其对应的轴、长度或缺省行为。让推导维出现在不同位置，检查标记解释与归一化顺序。"
+  },
+  {
+    "scheme": "V4",
+    "definition_version": "V4:e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+    "id": "I1",
+    "name": "负数索引（Negative Indices）",
+    "definition": "构造合法负轴、负索引、负坐标，以及动态形状、推断维和缺省参数中的负值标记。",
+    "requires": [
+      "参数允许负轴、负索引、负坐标或 -1/-2 等推断/缺省标记。"
+    ],
+    "skip_if": [
+      "参数没有合法负轴、负下标、负坐标或负值标记。"
+    ],
+    "construction_ids": [
+      "axis_order",
+      "minus_one"
+    ],
+    "constructions": [
+      {
+        "id": "minus_one",
+        "name": "-1：推断维度 / 动态标记 / 哨兵",
+        "definition": "在合法推断维、动态标记、负轴或哨兵位置使用-1，以检验其解释与规范化。",
+        "source_quote": [
+          {
+            "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\knowledge\\precision_trigger_knowledge_v4.md",
+            "line_start": 70,
+            "line_end": 70,
+            "source_quote": "  - `minus_one` — **-1：推断维度 / 动态标记 / 哨兵**：在合法推断维、动态标记、负轴或哨兵位置使用-1，以检验其解释与规范化。"
+          },
+          {
+            "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\knowledge\\precision_trigger_knowledge_v4.md",
+            "line_start": 442,
+            "line_end": 442,
+            "source_quote": "  - `minus_one` — **-1：推断维度 / 动态标记 / 哨兵**：在合法推断维、动态标记、负轴或哨兵位置使用-1，以检验其解释与规范化。"
+          }
+        ]
+      },
+      {
+        "id": "axis_order",
+        "name": "维序 / rank / 归约轴选择",
+        "definition": "切换合法首末轴、负轴与轴组合，以检验轴规范化、秩和视图索引路径。",
+        "source_quote": [
+          {
+            "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\knowledge\\precision_trigger_knowledge_v4.md",
+            "line_start": 441,
+            "line_end": 441,
+            "source_quote": "  - `axis_order` — **维序 / rank / 归约轴选择**：切换合法首末轴、负轴与轴组合，以检验轴规范化、秩和视图索引路径。"
+          },
+          {
+            "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\knowledge\\precision_trigger_knowledge_v4.md",
+            "line_start": 558,
+            "line_end": 558,
+            "source_quote": "  - `axis_order` — **维序 / rank / 归约轴选择**：切换合法首末轴、负轴与轴组合，以检验轴规范化、秩和视图索引路径。"
+          }
+        ]
+      }
+    ],
+    "source_file": "sources/original/precision_trigger_knowledge_v4.md",
+    "source_sha256": "e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+    "source_quote": "### I1 负数索引（Negative Indices）\r\n\r\n- **条件定义**：构造合法负轴、负索引、负坐标，以及动态形状、推断维和缺省参数中的负值标记。\r\n- **检验目的**：检验负值规范化、推断规则、哨兵解释及相应地址映射。\r\n- **适用前提（Requires）**：参数允许负轴、负索引、负坐标或 -1/-2 等推断/缺省标记。\r\n- **跳过/能力限制（Skip if）**：参数没有合法负轴、负下标、负坐标或负值标记。\r\n\r\n- 具体构造方式\r\n  - `axis_order` — **维序 / rank / 归约轴选择**：切换合法首末轴、负轴与轴组合，以检验轴规范化、秩和视图索引路径。\r\n  - `minus_one` — **-1：推断维度 / 动态标记 / 哨兵**：在合法推断维、动态标记、负轴或哨兵位置使用-1，以检验其解释与规范化。\r\n\r\n#### 参考案例\r\n\r\n1. **I1-01**：**负轴规范化。** 若代码执行 `axis+=rank` 或等价逻辑，rank=3 时对照 dim=-1/2、-3/0；LpNormV2 #219 的 axes=[-2] 可参考中间轴，检查 keepdim 后形状与值。\r\n2. **I1-02**：**负下标。** 接口允许负索引时比较 -1 与 N-1、-N 与 0；输入每个位置取不同值，检查归一化后地址。越界位置按接口校验规则单独测试。\r\n3. **I1-03**：**动态/推断维。** 若 shape 处理包含 -1/-2 标记，按接口定义对照标记与显式推导值；例如 reshape 的 [-1,3] 对照 [2,3]，检查推导位置与总元素数。\r\n4. **I1-04**：**缺省哨兵。** 若框架将缺省参数下沉为 -1，构造省略、显式合法位置及边界位置，检查哨兵对应的默认行为。EmbeddingBag #646 可参考 padding_idx 缺省标记的处理。\r\n5. **I1-05**：**连续坐标的负值。** 对支持归一化负坐标的采样接口，在合法坐标域内选择靠近下界、零点两侧及边界映射后的半格点。固定边界模式，按坐标变换公式计算参考，检查符号、取整和延拓三步。"
+  },
+  {
+    "scheme": "V4",
+    "definition_version": "V4:e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+    "id": "D3",
+    "name": "退化形状（Degenerate Shapes）",
+    "definition": "构造零长度轴、零元素输入、shape=[]和最小非空输入。",
+    "requires": [
+      "支持标量、空输入或有效长度为 0 的张量接口。"
+    ],
+    "skip_if": [
+      "接口不支持目标空形状或标量形状。"
+    ],
+    "construction_ids": [
+      "zero_extent",
+      "rank_zero",
+      "positive_extent"
+    ],
+    "constructions": [
+      {
+        "id": "zero_extent",
+        "name": "某维长度为0 / 零元素张量",
+        "definition": "将合法轴或有效序列长度设为0，以检验零元素输入的初始化与返回路径。",
+        "source_quote": [
+          {
+            "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\knowledge\\precision_trigger_knowledge_v4.md",
+            "line_start": 89,
+            "line_end": 89,
+            "source_quote": "  - `zero_extent` — **某维长度为0 / 零元素张量**：将合法轴或有效序列长度设为0，以检验零元素输入的初始化与返回路径。"
+          }
+        ]
+      },
+      {
+        "id": "rank_zero",
+        "name": "无轴标量",
+        "definition": "对比合法的shape=[]、[1]和[0]，以区分无轴标量、单元素向量与零元素张量的秩处理。",
+        "source_quote": [
+          {
+            "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\knowledge\\precision_trigger_knowledge_v4.md",
+            "line_start": 90,
+            "line_end": 90,
+            "source_quote": "  - `rank_zero` — **无轴标量**：对比合法的shape=[]、[1]和[0]，以区分无轴标量、单元素向量与零元素张量的秩处理。"
+          }
+        ]
+      },
+      {
+        "id": "positive_extent",
+        "name": "空与非空对照",
+        "definition": "对照合法空输入与正元素数输入，并保持同case其他条件，以检验空/非空路径切换。",
+        "source_quote": [
+          {
+            "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\knowledge\\precision_trigger_knowledge_v4.md",
+            "line_start": 91,
+            "line_end": 91,
+            "source_quote": "  - `positive_extent` — **空与非空对照**：对照合法空输入与正元素数输入，并保持同case其他条件，以检验空/非空路径切换。"
+          }
+        ]
+      }
+    ],
+    "source_file": "sources/original/precision_trigger_knowledge_v4.md",
+    "source_sha256": "e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+    "source_quote": "### D3 退化形状（Degenerate Shapes）\r\n\r\n- **条件定义**：构造零长度轴、零元素输入、shape=[]和最小非空输入。\r\n- **检验目的**：区分无轴标量、零元素张量和空/非空路径。\r\n- **适用前提（Requires）**：支持标量、空输入或有效长度为 0 的张量接口。\r\n- **跳过/能力限制（Skip if）**：接口不支持目标空形状或标量形状。\r\n\r\n- 具体构造方式\r\n  - `zero_extent` — **某维长度为0 / 零元素张量**：将合法轴或有效序列长度设为0，以检验零元素输入的初始化与返回路径。\r\n  - `rank_zero` — **无轴标量**：对比合法的shape=[]、[1]和[0]，以区分无轴标量、单元素向量与零元素张量的秩处理。\r\n  - `positive_extent` — **空与非空对照**：对照合法空输入与正元素数输入，并保持同case其他条件，以检验空/非空路径切换。\r\n\r\n#### 参考案例\r\n\r\n1. **D3-01**：**标量与空轴。** 若代码依赖 rank、numel 或 `shape.size()`，对照 `[]`、`[1]`、`[0]`，检查输出形状与内容：前两者各含一个元素，[0] 含零个元素。\r\n2. **D3-02**：**零轴的位置。** 对空输入返回/归约初始化路径，使用 `[0,3]`、`[3,0]`、`[2,0,3]`，分别沿零轴与非零轴归约；以相同位置的首个非空 shape 作对照，核对返回 shape、dtype 及空集合结果。\r\n3. **D3-03**：**空索引或空成员。** 若代码有 `index.numel()==0` 或成员长度为零的处理，构造空 index 与单个合法 index；IndexFill #3065 可参考空 index 应保留原值的情形。列表接口还可把空成员放在首、中、末，检查后续非空成员继续处理。\r\n4. **D3-04**：**零归约长度。** 对支持 K=0 的矩阵乘，构造 `[M,0]×[0,N]`，令 bias/初始输出非零，并与 K=1 对照；检查空乘积、bias 和累加模式的初始化。GroupedMatMul #524 的 K=0 情景提供了该入口。\r\n5. **D3-05**：**空 source 仍须返回 self。** 对支持空 source 的 IndexAddV2，使用非零、逐位置不同的 self，将被索引轴的 source 长度和 index 长度同时置零，其他轴与接口约束一致；与一个合法索引的非空 source 对照。输出应按契约保留 self，不能仅凭返回成功通过。若支持独立 out，配合 E3 预填不同于 self 的哨兵。ops-nn#6633 摘要明确指出空分支没有回填 out。\r\n6. **D3-06**：**空量化输入的非空辅助输出。** 若 DynamicQuant 接口允许零元素输入且 scale/offset 仍非空，按该版本 InferShape 建立输出，与首个非空输入对照。检查主输出之外的每一个辅助输出；该案摘要要求 scale/offset 回填零，使用其他版本时先确认其空输入语义。配合 E3 检查它们是否残留预填值，不能把“主输出没有元素”当作整个调用无须校验。\r\n7. **D3-07**：**空上游梯度与非空输入梯度。** 在接口允许时令 gradOutput、grid、ROI 数或有效样本数为零，同时保留由原输入尺寸确定的非空 gradInput。先从该反向算子的语义确认零梯度，再用 E3 将输出预填 1234 和 -7，检查全部有效元素归零。ops-math#3553/#3360 与 ops-cv#1431/#1252/#1247/#1243/#1230/#1156 的摘要给出这类漏写；各接口分别构造合法 shape，不把非法输入/输出形状不一致的早退混入。"
+  },
+  {
+    "scheme": "V4",
+    "definition_version": "V4:e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+    "id": "D4",
+    "name": "覆盖收缩（Collapsed Coverage）",
+    "definition": "缩小数值区间的宽度，或减少索引实际覆盖的不同目标，直至退化为单点。",
+    "requires": [
+      "存在数值区间、重复索引更新或低多样性输入。"
+    ],
+    "skip_if": [
+      "没有区间宽度或目标覆盖语义。"
+    ],
+    "construction_ids": [
+      "range_collapsed",
+      "index_repeat"
+    ],
+    "constructions": [
+      {
+        "id": "range_collapsed",
+        "name": "数值区间收缩",
+        "definition": "令区间两端相等或非常接近，构造零宽或窄区间。 检验缩放、归一化、插值和边界处理对非零区间宽度的假设。",
+        "source_quote": [
+          {
+            "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\knowledge\\precision_trigger_knowledge_v4.md",
+            "line_start": 111,
+            "line_end": 111,
+            "source_quote": "  - `range_collapsed` — **数值区间收缩**：令区间两端相等或非常接近，构造零宽或窄区间。 检验缩放、归一化、插值和边界处理对非零区间宽度的假设。"
+          }
+        ]
+      },
+      {
+        "id": "index_repeat",
+        "name": "索引目标集中",
+        "definition": "让多个合法索引集中指向少量目标或同一目标，覆盖相邻位置和跨块重复。 检验重复目标下的累加、覆盖、去重与更新顺序。",
+        "source_quote": [
+          {
+            "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\knowledge\\precision_trigger_knowledge_v4.md",
+            "line_start": 112,
+            "line_end": 112,
+            "source_quote": "  - `index_repeat` — **索引目标集中**：让多个合法索引集中指向少量目标或同一目标，覆盖相邻位置和跨块重复。 检验重复目标下的累加、覆盖、去重与更新顺序。"
+          }
+        ]
+      }
+    ],
+    "source_file": "sources/original/precision_trigger_knowledge_v4.md",
+    "source_sha256": "e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+    "source_quote": "### D4 覆盖收缩（Collapsed Coverage）\r\n\r\n- **条件定义**：缩小数值区间的宽度，或减少索引实际覆盖的不同目标，直至退化为单点。\r\n- **检验目的**：检验实现对非零区间宽度或目标唯一性的假设，以及退化后的数值计算和重复更新处理。\r\n- **适用前提（Requires）**：存在数值区间、重复索引更新或低多样性输入。\r\n- **跳过/能力限制（Skip if）**：没有区间宽度或目标覆盖语义。\r\n\r\n- 具体构造方式\r\n  - `range_collapsed` — **数值区间收缩**：令区间两端相等或非常接近，构造零宽或窄区间。 检验缩放、归一化、插值和边界处理对非零区间宽度的假设。\r\n  - `index_repeat` — **索引目标集中**：让多个合法索引集中指向少量目标或同一目标，覆盖相邻位置和跨块重复。 检验重复目标下的累加、覆盖、去重与更新顺序。\r\n\r\n#### 参考案例\r\n\r\n1. **D4-01**：**数值区间收缩。** 若代码计算 `max-min`、区间归一化或桶宽，测试 min=max、相邻可表示端点、普通宽区间。HistogramV2 #681 涉及零宽及极窄区间，可沿实现的范围重估条件构造阈值两侧，检查桶计数。\r\n2. **D4-02**：**重复索引的集中程度。** 对按索引累加/覆盖的实现，使用全不同、成对重复、全部指向同一目标的合法索引；更新值设为 `[1,2,4,8]` 等可追踪数据。按接口的更新规则检查每个目标结果。\r\n3. **D4-03**：**重复目标跨块。** 若代码检查相邻块首尾是否有同一目标，如 `CheckHasSameIndices`，把同一重复目标分别放在同块内部与相邻块首尾。保持索引和更新值配对，比较分组求和；EmbeddingDenseGradV2 #1568 可参考这一组合。\r\n4. **D4-04**：**取值支持集减少。** 对统计、去重、排序或相等值分支，逐步从多种值收缩为两种值、全常数，保持 shape 不变。检查方差、不同值计数与并列值处理，并以少量扰动恢复多样性作为对照。\r\n\r\n## N 数值敏感模式"
+  },
+  {
+    "scheme": "V4",
+    "definition_version": "V4:e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+    "id": "N1",
+    "name": "极值与特殊值（Extreme and Special Values）",
+    "definition": "取类型/算法上限、NaN、±Inf、±0、次正规值和最大有限值。",
+    "requires": [
+      "数值 dtype 或控制标量允许特殊值、类型极限或算法上限。"
+    ],
+    "skip_if": [
+      "无数值载荷，或候选特殊值在契约中未定义。"
+    ],
+    "construction_ids": [
+      "scalar_limit",
+      "special_values"
+    ],
+    "constructions": [
+      {
+        "id": "scalar_limit",
+        "name": "控制标量取类型极限或算法上限",
+        "definition": "取合法类型/算法上限及其邻域，以检验上限处理；区分参数上限和存储类型上限。",
+        "source_quote": [
+          {
+            "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\knowledge\\precision_trigger_knowledge_v4.md",
+            "line_start": 131,
+            "line_end": 131,
+            "source_quote": "  - `scalar_limit` — **控制标量取类型极限或算法上限**：取合法类型/算法上限及其邻域，以检验上限处理；区分参数上限和存储类型上限。"
+          }
+        ]
+      },
+      {
+        "id": "special_values",
+        "name": "NaN、±Inf、±0、次正规及最大有限值",
+        "definition": "在部分或全部元素注入NaN、±Inf、±0、次正规值或最大有限值，以检验特殊浮点数传播。",
+        "source_quote": [
+          {
+            "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\knowledge\\precision_trigger_knowledge_v4.md",
+            "line_start": 132,
+            "line_end": 132,
+            "source_quote": "  - `special_values` — **NaN、±Inf、±0、次正规及最大有限值**：在部分或全部元素注入NaN、±Inf、±0、次正规值或最大有限值，以检验特殊浮点数传播。"
+          }
+        ]
+      }
+    ],
+    "source_file": "sources/original/precision_trigger_knowledge_v4.md",
+    "source_sha256": "e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+    "source_quote": "### N1 极值与特殊值（Extreme and Special Values）\r\n\r\n- **条件定义**：取类型/算法上限、NaN、±Inf、±0、次正规值和最大有限值。\r\n- **检验目的**：检验特殊值传播、范围边界和异常值处理。\r\n- **适用前提（Requires）**：数值 dtype 或控制标量允许特殊值、类型极限或算法上限。\r\n- **跳过/能力限制（Skip if）**：无数值载荷，或候选特殊值在契约中未定义。\r\n\r\n- 具体构造方式\r\n  - `scalar_limit` — **控制标量取类型极限或算法上限**：取合法类型/算法上限及其邻域，以检验上限处理；区分参数上限和存储类型上限。\r\n  - `special_values` — **NaN、±Inf、±0、次正规及最大有限值**：在部分或全部元素注入NaN、±Inf、±0、次正规值或最大有限值，以检验特殊浮点数传播。\r\n\r\n#### 参考案例\r\n\r\n1. **N1-01**：**NaN 的位置与传播。** 若代码有 `isnan`、选择或归约逻辑，把 NaN 分别放在首、中、尾，再构造全 NaN。按接口的传播/忽略规则比较输出 NaN 掩码；返回索引的算子同时检查索引语义。\r\n2. **N1-02**：**正负无穷的组合。** 对允许 Inf 的算子，分别测试单个 +Inf、单个 -Inf、同号全 Inf 和正负 Inf 混合，其他位置放普通有限值。检查归约、比较或中间相减产生的 Inf/NaN 及其符号。\r\n3. **N1-03**：**最大有限值。** 对平方、范数、指数或乘积路径，取目标 dtype 最大有限值及前驱，另设较小幅值对照。LpNormV2 #697 涉及接近 FP32 最大值的输入，可检查输入有限而中间求幂超范围的路径。\r\n4. **N1-04**：**正负零。** 若代码含符号提取、倒数、比较或按符号选分支，构造 +0、-0 与两侧可表示小量。根据算子契约检查零的符号、比较结果或倒数符号，并记录输入转换后的位表示。\r\n5. **N1-05**：**正规数与次正规数交界。** 若代码通过指数位或零判定计算 scale，围绕最小正规值取前驱、本值、后继，再加入可表示次正规值。RotateQuant #3757 的约 1e-38 值域可作线索，比较实际载荷、scale 与输出。\r\n6. **N1-06**：**控制量上限。** 若参数经过窄整数转换或与上限 L 比较，在合法域内取 L-1、L 及其邻域，固定其余参数。检查上限分支、计数和返回结构，并注明 L 的单位和声明类型。\r\n7. **N1-07**：**当前有限值与前序 NaN 污染。** 对进入 mode4 且存在 A 尾部补齐的 MatMulV3，当前调用只用有限、幅值适中的输入。按 E2 分别在干净进程、普通前序计算、允许 NaN 的前序计算之后执行同一个目标，按有限值参考检查目标输出的 NaN 掩码与数值。ops-nn#6698 摘要指出 A 尾部未初始化；NaN 位于前序调用，不能偷换成当前输入自然传播 NaN。报告未给出前序操作及分配复用方案，须记录实际复用路径；本条是构造入口。"
+  },
+  {
+    "scheme": "V4",
+    "definition_version": "V4:e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+    "id": "N2",
+    "name": "近零值（Near-Zero Values）",
+    "definition": "构造小范数、低方差及接近定义域边界的值。",
+    "requires": [
+      "除法、归一化、范数、方差、log/sqrt 或数据驱动 scale 路径。"
+    ],
+    "skip_if": [
+      "数值没有进入近奇异量，或构造直接违反定义域。"
+    ],
+    "construction_ids": [
+      "near_singular"
+    ],
+    "constructions": [
+      {
+        "id": "near_singular",
+        "name": "归一化量趋零 / 除零或定义域边界",
+        "definition": "构造低方差、小范数或靠近log/sqrt定义域边界的输入，在合法域内检查近奇异量及其邻域。",
+        "source_quote": [
+          {
+            "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\knowledge\\precision_trigger_knowledge_v4.md",
+            "line_start": 152,
+            "line_end": 152,
+            "source_quote": "  - `near_singular` — **归一化量趋零 / 除零或定义域边界**：构造低方差、小范数或靠近log/sqrt定义域边界的输入，在合法域内检查近奇异量及其邻域。"
+          }
+        ]
+      }
+    ],
+    "source_file": "sources/original/precision_trigger_knowledge_v4.md",
+    "source_sha256": "e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+    "source_quote": "### N2 近零值（Near-Zero Values）\r\n\r\n- **条件定义**：构造小范数、低方差及接近定义域边界的值。\r\n- **检验目的**：检验除零保护、epsilon、归一化稳定项和定义域边界。\r\n- **适用前提（Requires）**：除法、归一化、范数、方差、log/sqrt 或数据驱动 scale 路径。\r\n- **跳过/能力限制（Skip if）**：数值没有进入近奇异量，或构造直接违反定义域。\r\n\r\n- 具体构造方式\r\n  - `near_singular` — **归一化量趋零 / 除零或定义域边界**：构造低方差、小范数或靠近log/sqrt定义域边界的输入，在合法域内检查近奇异量及其邻域。\r\n\r\n#### 参考案例\r\n\r\n1. **N2-01**：**低方差。** 若归一化实现使用 `variance+eps`，构造 `x=c+δ*v`，v 含正负扰动，扫描 δ 使实际方差分别小于、接近、大于 eps。记录转换后的方差，比较归一化结果。\r\n2. **N2-02**：**小范数分母。** 若表达式为 `x/norm(x)` 或带稳定项的变体，令 `x=δ*[1,-1,2,-2]`，按量级缩小 δ。固定 epsilon，记录实际范数和有效分母，比较不同 δ 下输出方向与幅值。\r\n3. **N2-03**：**极小动态 scale。** 若 scale 来自组内最大幅值，构造一组极小非零值、一组普通值和一组全零值，各组相互区分。参考 RotateQuant #3757 的极小幅值路径，检查 scale 归零判据、组间参数和反量化结果。\r\n4. **N2-04**：**log / sqrt 定义域边缘。** 遇到 log、sqrt、rsqrt 等表达式时，在合法域内构造最小正数、相邻正数及普通正数；接口定义零点时另测零。比较近零区域绝对误差及特殊值行为。\r\n5. **N2-05**：**极小距离的梯度。** 若后向使用 `diff/distance` 或前向结果作除数，构造输入 dtype 下仍可区分的两个近邻点。CdistGrad #2096 涉及前向距离下溢为零的情形，需同时检查前向距离、零距离位置和后向结果。"
+  },
+  {
+    "scheme": "V4",
+    "definition_version": "V4:e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+    "id": "N3",
+    "name": "稀疏分布（Sparse Distributions）",
+    "definition": "构造全零、大部分为零、整行/整块为零及少量重复值。",
+    "requires": [
+      "数值张量、统计/排序输入或产生稀疏命中的 mask。"
+    ],
+    "skip_if": [
+      "接口仅处理 shape 等元数据，没有数值或有效位置分布。"
+    ],
+    "construction_ids": [
+      "zeros",
+      "constant_repeat"
+    ],
+    "constructions": [
+      {
+        "id": "zeros",
+        "name": "全0 / 稀疏 / 特定行列或分块为0",
+        "definition": "构造全零、稀疏或整行/列/尾块为零，以检验零分布对应的退化路径。",
+        "source_quote": [
+          {
+            "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\knowledge\\precision_trigger_knowledge_v4.md",
+            "line_start": 170,
+            "line_end": 170,
+            "source_quote": "  - `zeros` — **全0 / 稀疏 / 特定行列或分块为0**：构造全零、稀疏或整行/列/尾块为零，以检验零分布对应的退化路径。"
+          }
+        ]
+      },
+      {
+        "id": "constant_repeat",
+        "name": "全等 / 大量重复 / 相等值并列",
+        "definition": "构造全等、少数值大量重复或跨块重复，以检验并列值处理和低多样性统计。",
+        "source_quote": [
+          {
+            "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\knowledge\\precision_trigger_knowledge_v4.md",
+            "line_start": 171,
+            "line_end": 171,
+            "source_quote": "  - `constant_repeat` — **全等 / 大量重复 / 相等值并列**：构造全等、少数值大量重复或跨块重复，以检验并列值处理和低多样性统计。"
+          }
+        ]
+      }
+    ],
+    "source_file": "sources/original/precision_trigger_knowledge_v4.md",
+    "source_sha256": "e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+    "source_quote": "### N3 稀疏分布（Sparse Distributions）\r\n\r\n- **条件定义**：构造全零、大部分为零、整行/整块为零及少量重复值。\r\n- **检验目的**：检验稀疏路径、退化统计和重复值处理。\r\n- **适用前提（Requires）**：数值张量、统计/排序输入或产生稀疏命中的 mask。\r\n- **跳过/能力限制（Skip if）**：接口仅处理 shape 等元数据，没有数值或有效位置分布。\r\n\r\n- 具体构造方式\r\n  - `zeros` — **全0 / 稀疏 / 特定行列或分块为0**：构造全零、稀疏或整行/列/尾块为零，以检验零分布对应的退化路径。\r\n  - `constant_repeat` — **全等 / 大量重复 / 相等值并列**：构造全等、少数值大量重复或跨块重复，以检验并列值处理和低多样性统计。\r\n\r\n#### 参考案例\r\n\r\n1. **N3-01**：**全零与单非零。** 若代码通过最大值、和或非零计数生成 scale/统计量，构造非空全零输入，并以一个非零值作对照，检查 scale、分母及输出初始化。\r\n2. **N3-02**：**稀疏比例与零块。** 对按行/块归约或读取的实现，分别使用每行一个非零、整行零、整列零、尾块零；保持非零值幅度相同，检查零比例和零块位置对结果的影响。\r\n3. **N3-03**：**全等与并列值。** 若代码有相等值选择或索引更新，构造全等值、两个值重复、并列值跨块。检查值与索引对应；Cummin #2011 的全 NaN 索引情形可作为特殊并列分支的参考。\r\n4. **N3-04**：**mask 产生的稀疏载荷。** 固定原始输入和有效位数量，构造有效位置集中在一个块、均匀分散、整行失效三种模式。检查有效贡献及过滤后统计量，用稠密全有效作为对照。"
+  },
+  {
+    "scheme": "V4",
+    "definition_version": "V4:e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+    "id": "N4",
+    "name": "抵消与吸收（Cancellation and Absorption）",
+    "definition": "构造接近大数相减、正负项抵消，或极大/极小幅值混合的累加累乘；对照不同求值顺序。",
+    "requires": [
+      "浮点加减、长归约、乘加链或量级差异明显的中间表达式。"
+    ],
+    "skip_if": [
+      "纯拷贝/索引等不执行浮点运算的路径。"
+    ],
+    "construction_ids": [
+      "cancellation",
+      "intermediate_overflow"
+    ],
+    "constructions": [
+      {
+        "id": "cancellation",
+        "name": "正负抵消 / 近消减 / 计算顺序敏感",
+        "definition": "构造接近的大数相减或正负成对抵消，以暴露有效位丢失与求值顺序敏感性。",
+        "source_quote": [
+          {
+            "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\knowledge\\precision_trigger_knowledge_v4.md",
+            "line_start": 188,
+            "line_end": 188,
+            "source_quote": "  - `cancellation` — **正负抵消 / 近消减 / 计算顺序敏感**：构造接近的大数相减或正负成对抵消，以暴露有效位丢失与求值顺序敏感性。"
+          }
+        ]
+      },
+      {
+        "id": "intermediate_overflow",
+        "name": "中间乘加溢出 / 大小量级混合",
+        "definition": "组合大小幅值、符号和系数，并形成浮点累加/累乘，以检验中间范围和小量吞没。",
+        "source_quote": [
+          {
+            "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\knowledge\\precision_trigger_knowledge_v4.md",
+            "line_start": 189,
+            "line_end": 189,
+            "source_quote": "  - `intermediate_overflow` — **中间乘加溢出 / 大小量级混合**：组合大小幅值、符号和系数，并形成浮点累加/累乘，以检验中间范围和小量吞没。"
+          }
+        ]
+      }
+    ],
+    "source_file": "sources/original/precision_trigger_knowledge_v4.md",
+    "source_sha256": "e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+    "source_quote": "### N4 抵消与吸收（Cancellation and Absorption）\r\n\r\n- **条件定义**：构造接近大数相减、正负项抵消，或极大/极小幅值混合的累加累乘；对照不同求值顺序。\r\n- **检验目的**：检验浮点求值顺序、正负抵消、小量吸收以及中间溢出/下溢对结果的影响。\r\n- **适用前提（Requires）**：浮点加减、长归约、乘加链或量级差异明显的中间表达式。\r\n- **跳过/能力限制（Skip if）**：纯拷贝/索引等不执行浮点运算的路径。\r\n\r\n- 具体构造方式\r\n  - `cancellation` — **正负抵消 / 近消减 / 计算顺序敏感**：构造接近的大数相减或正负成对抵消，以暴露有效位丢失与求值顺序敏感性。\r\n  - `intermediate_overflow` — **中间乘加溢出 / 大小量级混合**：组合大小幅值、符号和系数，并形成浮点累加/累乘，以检验中间范围和小量吞没。\r\n\r\n#### 参考案例\r\n\r\n1. **N4-01**：**正负抵消。** 若代码按顺序/分块归约，使用 `[A,δ,-A]` 与 `[A,-A,δ]`，A、δ 均在输入 dtype 中可表示，且 δ 远小于 A。参考从实际输入提升精度求和，比较排列与块长变化后的误差。\r\n2. **N4-02**：**近大数相减。** 对 `a-b`、方差差分或相近几何量，令两个大数仅差少量可表示间隔，扫描相对间距。比较结果的绝对误差和剩余有效位，记录输入转换后两数是否仍不同。\r\n3. **N4-03**：**大数吸收小量。** 若表达式有 `1+x` 后接 log，或大基值反复加小增量，构造小项被吞没的幅值比，并对照分段累计。LogAddExp #2084 的极小修正项可参考这一构造，比较稳定高精度表达式。\r\n4. **N4-04**：**中间溢出与运算次序。** 对 `a*b/c`、连续乘加或累乘，选择高精度最终值有限而低精度中间乘积超范围的参数，再同比缩小幅值。检查中间值与最终值，并对照不同分块/归约长度。"
+  },
+  {
+    "scheme": "V4",
+    "definition_version": "V4:e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+    "id": "N5",
+    "name": "舍入与转换损失（Rounding and Conversion Loss）",
+    "definition": "取舍入中点两侧、相邻可表示数、转换临界值及接近量化格点/饱和端点的值。",
+    "requires": [
+      "cast、布尔转换、量化、整数取整或低精度输出。"
+    ],
+    "skip_if": [
+      "没有转换或可辨别的舍入路径。"
+    ],
+    "construction_ids": [
+      "rounding",
+      "nonzero_truth",
+      "quant_scale"
+    ],
+    "constructions": [
+      {
+        "id": "rounding",
+        "name": "舍入临界值",
+        "definition": "取相邻可表示数a、b及中点(a+b)/2两侧，或窄化转换临界值，以检验舍入与有效位丢失；用更高精度生成中点。",
+        "source_quote": [
+          {
+            "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\knowledge\\precision_trigger_knowledge_v4.md",
+            "line_start": 206,
+            "line_end": 206,
+            "source_quote": "  - `rounding` — **舍入临界值**：取相邻可表示数a、b及中点(a+b)/2两侧，或窄化转换临界值，以检验舍入与有效位丢失；用更高精度生成中点。"
+          }
+        ]
+      },
+      {
+        "id": "nonzero_truth",
+        "name": "非零小数的真假语义 / 小数转整数",
+        "definition": "取接近0但非0的小数及正负非零值，以检验转整数后变0与直接转布尔的语义差异。",
+        "source_quote": [
+          {
+            "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\knowledge\\precision_trigger_knowledge_v4.md",
+            "line_start": 207,
+            "line_end": 207,
+            "source_quote": "  - `nonzero_truth` — **非零小数的真假语义 / 小数转整数**：取接近0但非0的小数及正负非零值，以检验转整数后变0与直接转布尔的语义差异。"
+          }
+        ]
+      },
+      {
+        "id": "quant_scale",
+        "name": "量化scale / 零点 / 饱和边界",
+        "definition": "改变合法scale和zero point，使变换值靠近舍入或clip边界，以检验量化数值误差；区分共享与分组scale。",
+        "source_quote": [
+          {
+            "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\knowledge\\precision_trigger_knowledge_v4.md",
+            "line_start": 208,
+            "line_end": 208,
+            "source_quote": "  - `quant_scale` — **量化scale / 零点 / 饱和边界**：改变合法scale和zero point，使变换值靠近舍入或clip边界，以检验量化数值误差；区分共享与分组scale。"
+          },
+          {
+            "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\knowledge\\precision_trigger_knowledge_v4.md",
+            "line_start": 671,
+            "line_end": 671,
+            "source_quote": "  - `quant_scale` — **量化scale / 零点 / 饱和边界**：改变合法scale和zero point，使变换值靠近舍入或clip边界，以检验量化数值误差；区分共享与分组scale。"
+          }
+        ]
+      }
+    ],
+    "source_file": "sources/original/precision_trigger_knowledge_v4.md",
+    "source_sha256": "e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+    "source_quote": "### N5 舍入与转换损失（Rounding and Conversion Loss）\r\n\r\n- **条件定义**：取舍入中点两侧、相邻可表示数、转换临界值及接近量化格点/饱和端点的值。\r\n- **检验目的**：检验舍入、窄化转换、量化舍入和饱和造成的有效位损失。\r\n- **适用前提（Requires）**：cast、布尔转换、量化、整数取整或低精度输出。\r\n- **跳过/能力限制（Skip if）**：没有转换或可辨别的舍入路径。\r\n\r\n- 具体构造方式\r\n  - `rounding` — **舍入临界值**：取相邻可表示数a、b及中点(a+b)/2两侧，或窄化转换临界值，以检验舍入与有效位丢失；用更高精度生成中点。\r\n  - `nonzero_truth` — **非零小数的真假语义 / 小数转整数**：取接近0但非0的小数及正负非零值，以检验转整数后变0与直接转布尔的语义差异。\r\n  - `quant_scale` — **量化scale / 零点 / 饱和边界**：改变合法scale和zero point，使变换值靠近舍入或clip边界，以检验量化数值误差；区分共享与分组scale。\r\n\r\n#### 参考案例\r\n\r\n1. **N5-01**：**cast 中点与舍入模式。** 若代码含 `Cast`、`CAST_CEIL`、`CAST_RINT` 或等效模式，选目标 dtype 相邻数 a,b，在更高精度中构造中点及两侧。Sqrt #1505 的 sqrt(2) 转 FP16 案例可参考上取整与最近舍入差异；按代码规定的模式建立参考。\r\n2. **N5-02**：**非零小数转布尔。** 若真假判断前存在转换，输入 `[-0.5,-0.01,0,0.01,0.5]`，按直接转 bool 的契约检查。ReduceAll #1178 提供非零小数被误判的线索，分别观察逐元素真假值与最终归约。\r\n3. **N5-03**：**小数转整数。** 若接口规定 trunc/floor/ceil 等转换，取正负整数及相邻小数，例如 -1.1、-1、-0.9、0.9、1、1.1，按对应模式建立整数参考。比较零附近、负数及整数点两侧的结果。\r\n4. **N5-04**：**量化半格点。** 固定合法 s>0 与零点 z，根据实现的量化公式反推 x，使实际变换值处于 k+0.5 及两侧。选择正负 k 和奇偶 k，检查舍入模式、整数码及反量化误差。\r\n5. **N5-05**：**量化饱和边界。** 固定 scale/零点，使实际转换值位于 qmin/qmax 的前驱、端点、后继，另设远离边界的普通值。记录 round 与 clip 顺序，检查饱和掩码和端点码值。\r\n6. **N5-06**：**坐标取整。** 若采样地址由浮点坐标转整数，测试 -1 两侧、-0.5、0、0.5 以及末端坐标。输入用逐位置不同数据，按 floor/toward-zero 等规定计算采样点和权重，检查负坐标路径。\r\n7. **N5-07**：**整数经浮点中转。** 若索引或计数先转浮点再回写，围绕该浮点类型可精确表示连续整数的边界取相邻整数；例如明确经 FP32 中转时考察 2^24 附近。输入始终以整数生成，比较中转前后整数值及对应地址。"
+  },
+  {
+    "scheme": "V4",
+    "definition_version": "V4:e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+    "id": "C5",
+    "name": "阈值边界（Threshold Boundaries）",
+    "definition": "在控制分段阈值及其两侧构造合法参数或数据；选取极小或极大的操作系数、scale及其邻域，使缩放结果接近数值或分支边界。",
+    "requires": [
+      "有已知分段阈值、特殊函数参数或 scale/系数导致的数值边界。"
+    ],
+    "skip_if": [
+      "不知道阈值含义，或扰动转换后落在同一个可表示值上。"
+    ],
+    "construction_ids": [
+      "scalar_branch",
+      "activation_boundary",
+      "quant_scale"
+    ],
+    "constructions": [
+      {
+        "id": "quant_scale",
+        "name": "量化scale / 零点 / 饱和边界",
+        "definition": "改变合法scale和zero point，使变换值靠近舍入或clip边界，以检验量化数值误差；区分共享与分组scale。",
+        "source_quote": [
+          {
+            "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\knowledge\\precision_trigger_knowledge_v4.md",
+            "line_start": 208,
+            "line_end": 208,
+            "source_quote": "  - `quant_scale` — **量化scale / 零点 / 饱和边界**：改变合法scale和zero point，使变换值靠近舍入或clip边界，以检验量化数值误差；区分共享与分组scale。"
+          },
+          {
+            "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\knowledge\\precision_trigger_knowledge_v4.md",
+            "line_start": 671,
+            "line_end": 671,
+            "source_quote": "  - `quant_scale` — **量化scale / 零点 / 饱和边界**：改变合法scale和zero point，使变换值靠近舍入或clip边界，以检验量化数值误差；区分共享与分组scale。"
+          }
+        ]
+      },
+      {
+        "id": "scalar_branch",
+        "name": "特殊函数参数",
+        "definition": "使已知控制参数取p=2等特殊值，或使beta*x跨越已知阈值，以检验算子特定分支。",
+        "source_quote": [
+          {
+            "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\knowledge\\precision_trigger_knowledge_v4.md",
+            "line_start": 669,
+            "line_end": 669,
+            "source_quote": "  - `scalar_branch` — **特殊函数参数**：使已知控制参数取p=2等特殊值，或使beta*x跨越已知阈值，以检验算子特定分支。"
+          }
+        ]
+      },
+      {
+        "id": "activation_boundary",
+        "name": "函数实参分段",
+        "definition": "使函数实参跨零、激活分段、指数饱和点或特定角度邻域，以检验输入驱动的函数分支。",
+        "source_quote": [
+          {
+            "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\knowledge\\precision_trigger_knowledge_v4.md",
+            "line_start": 670,
+            "line_end": 670,
+            "source_quote": "  - `activation_boundary` — **函数实参分段**：使函数实参跨零、激活分段、指数饱和点或特定角度邻域，以检验输入驱动的函数分支。"
+          }
+        ]
+      }
+    ],
+    "source_file": "sources/original/precision_trigger_knowledge_v4.md",
+    "source_sha256": "e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+    "source_quote": "### C5 阈值边界（Threshold Boundaries）\r\n\r\n- **条件定义**：在控制分段阈值及其两侧构造合法参数或数据；选取极小或极大的操作系数、scale及其邻域，使缩放结果接近数值或分支边界。\r\n- **检验目的**：检验分段比较、特殊参数分支，以及缩放后的舍入、下溢与饱和处理。\r\n- **适用前提（Requires）**：有已知分段阈值、特殊函数参数或 scale/系数导致的数值边界。\r\n- **跳过/能力限制（Skip if）**：不知道阈值含义，或扰动转换后落在同一个可表示值上。\r\n\r\n- 具体构造方式\r\n  - `scalar_branch` — **特殊函数参数**：使已知控制参数取p=2等特殊值，或使beta*x跨越已知阈值，以检验算子特定分支。\r\n  - `activation_boundary` — **函数实参分段**：使函数实参跨零、激活分段、指数饱和点或特定角度邻域，以检验输入驱动的函数分支。\r\n  - `quant_scale` — **量化scale / 零点 / 饱和边界**：改变合法scale和zero point，使变换值靠近舍入或clip边界，以检验量化数值误差；区分共享与分组scale。\r\n\r\n#### 参考案例\r\n\r\n1. **C5-01**：**比较阈值三点。** 若代码有 `x<t` 或 `beta*x>threshold`，在实际比较 dtype 中取阈值前驱、阈值和后继；对于缩放表达式反推 x 后再确认实际 beta*x，检查边界包含关系与输出。\r\n2. **C5-02**：**特殊函数参数。** 若 norm 的 p=0/1/2、激活参数等选择特定公式，在合法域内对照特殊值与附近普通值，使用同一组含正负/零的数据；每个参数值使用自己的参考。\r\n3. **C5-03**：**缩放后的舍入/饱和。** 若 scale/zero point 决定 clip 边界，固定 x 扫 s，或固定 s 扫 x，使实际变换值处在 qmin/qmax 两侧。检查饱和掩码、整数码与反量化误差。\r\n4. **C5-04**：**极大或极小系数。** 若表达式包含 x/alpha、alpha*x 等，固定正负 x，扫描合法系数跨多个量级。CeluV2 #3900 的大 alpha 场景可用于检查 x/alpha 趋零时的精度，采用稳定高精度公式作参考。\r\n5. **C5-05**：**不同阈值的并发调用串值。** ThresholdBackward 使用 self=linspace(-1,1,512) FP32、grad 全 1，两组 threshold=0 和 0.5；每个调用单独参考，self[256]≈0.002 时两组分别应为 1、0。先做串行对照，再按 E4 的四线程、每批 32 次 GetWorkspaceSize 构造交错。ops-nn#7026 在 910B2/CANN 9.2.0 的根因是进程全局 thresholdVal_ 被其他调用覆盖，不能靠单线程扫描阈值覆盖，也不能归为 Device 流水依赖。"
+  },
+  {
+    "scheme": "V4",
+    "definition_version": "V4:e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+    "id": "N6",
+    "name": "位置相关不均（Positional Imbalance）",
+    "definition": "让不同行、块、尾部或mask位置具有不同数据分布；改变归约顺序，或构造有序、乱序、非降序及严格递增的索引。",
+    "requires": [
+      "行/列/块、mask 位、索引顺序或分组 scale 具有位置语义。"
+    ],
+    "skip_if": [
+      "输入对称到无法辨别位置，且未提供位置差异构造。"
+    ],
+    "construction_ids": [
+      "position",
+      "mask_pattern",
+      "index_order"
+    ],
+    "constructions": [
+      {
+        "id": "position",
+        "name": "按行 / 按块分布不均，顺序与位置敏感",
+        "definition": "安排可区分的行、列、块和特殊尾值，或改变升降序，以暴露位置与处理顺序错误。",
+        "source_quote": [
+          {
+            "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\knowledge\\precision_trigger_knowledge_v4.md",
+            "line_start": 228,
+            "line_end": 228,
+            "source_quote": "  - `position` — **按行 / 按块分布不均，顺序与位置敏感**：安排可区分的行、列、块和特殊尾值，或改变升降序，以暴露位置与处理顺序错误。"
+          }
+        ]
+      },
+      {
+        "id": "mask_pattern",
+        "name": "mask按位打包 / 部分有效的块内分布",
+        "definition": "在块内混合有效/无效位，或让打包mask跨字节/块边界，以检验掩码读取，并明确布尔/加性编码。",
+        "source_quote": [
+          {
+            "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\knowledge\\precision_trigger_knowledge_v4.md",
+            "line_start": 229,
+            "line_end": 229,
+            "source_quote": "  - `mask_pattern` — **mask按位打包 / 部分有效的块内分布**：在块内混合有效/无效位，或让打包mask跨字节/块边界，以检验掩码读取，并明确布尔/加性编码。"
+          }
+        ]
+      },
+      {
+        "id": "index_order",
+        "name": "索引排列 / 乱序 / 分段累计边界",
+        "definition": "构造合法有序/乱序索引及非降序或严格递增的分段边界，以检验遍历与前缀和契约。",
+        "source_quote": [
+          {
+            "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\knowledge\\precision_trigger_knowledge_v4.md",
+            "line_start": 230,
+            "line_end": 230,
+            "source_quote": "  - `index_order` — **索引排列 / 乱序 / 分段累计边界**：构造合法有序/乱序索引及非降序或严格递增的分段边界，以检验遍历与前缀和契约。"
+          }
+        ]
+      }
+    ],
+    "source_file": "sources/original/precision_trigger_knowledge_v4.md",
+    "source_sha256": "e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+    "source_quote": "### N6 位置相关不均（Positional Imbalance）\r\n\r\n- **条件定义**：让不同行、块、尾部或mask位置具有不同数据分布；改变归约顺序，或构造有序、乱序、非降序及严格递增的索引。\r\n- **检验目的**：检验位置敏感处理、归约次序和量化scale空间分布，以及索引排序假设、前缀和与分段偏移。\r\n- **适用前提（Requires）**：行/列/块、mask 位、索引顺序或分组 scale 具有位置语义。\r\n- **跳过/能力限制（Skip if）**：输入对称到无法辨别位置，且未提供位置差异构造。\r\n\r\n- 具体构造方式\r\n  - `position` — **按行 / 按块分布不均，顺序与位置敏感**：安排可区分的行、列、块和特殊尾值，或改变升降序，以暴露位置与处理顺序错误。\r\n  - `mask_pattern` — **mask按位打包 / 部分有效的块内分布**：在块内混合有效/无效位，或让打包mask跨字节/块边界，以检验掩码读取，并明确布尔/加性编码。\r\n  - `index_order` — **索引排列 / 乱序 / 分段累计边界**：构造合法有序/乱序索引及非降序或严格递增的分段边界，以检验遍历与前缀和契约。\r\n\r\n#### 参考案例\r\n\r\n1. **N6-01**：**按行/块编码。** 若 offset、workspace 或搬运地址随行/块推进，让每块内容不同，例如小规模 `x[i,j]=10*i+j`，并在最后一个元素放独特值。对照统一常数，定位错行、错块或尾部复用。\r\n2. **N6-02**：**分组量化参数。** 若代码按组读取 scale/offset，设置 scale 为 `[0.5,1,2,4]`，各组载荷相近，再以统一 scale 作对照。ExtendConvTranspose #2593 涉及组间误共享量化参数，比较每组输出即可暴露错用。\r\n3. **N6-03**：**mask 的位位置。** 看到位打包或 `offset/8` 一类寻址时，围绕 7/8/9、15/16/17 位安排单个有效位与交替位；固定有效位数，检查跨字节和跨块读取。对 bool 数组与打包 mask 分别按各自表示构造。\r\n4. **N6-04**：**索引排列。** 对允许任意顺序的 gather/index，构造相同合法索引的升序、降序与随机置换。参考同步置换，检查误差跟随索引值还是输入位置；排序优化路径可额外对照已排序和乱序输入。\r\n5. **N6-05**：**分段累计边界。** 若元数据是段长或前缀和，使用段长 `[1,3,2]` 和 `[3,1,2]`，按契约生成对应累计边界；允许空段时插入 0。各段赋不同值，检查首段、空段后首元素及最后边界。\r\n6. **N6-06**：**Welford 缓存跨轮的行标记。** 对 arch35 LayerNormV3/V4 的 Welford 缓存路径，从源码取得缓存容量 A 与刷新计数，构造处理轮数跨越 A 前后边界的合法 shape。每轮使用不同均值、相同非零方差的数据，并在缓存交界行加入可追踪扰动；比较每行归一化结果及接口暴露的统计量。ops-nn#3377 将 GM 偏移叠加进局部索引且晚一轮刷新；它是索引/计数逻辑错误，不因出现“刷新时机”就归为同步竞态。\r\n\r\n## S 形状"
+  },
+  {
+    "scheme": "V4",
+    "definition_version": "V4:e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+    "id": "S1",
+    "name": "微小形状（Tiny Shapes）",
+    "definition": "让整个输入块小于一个处理/搬运单元，关键轴取1、2、4。",
+    "requires": [
+      "有关键 shape 轴及最小处理/搬运粒度。"
+    ],
+    "skip_if": [
+      "没有 shape 可控项，或执行器自动补齐后无法保留目标小尺寸。"
+    ],
+    "construction_ids": [
+      "small_axis",
+      "subunit"
+    ],
+    "constructions": [
+      {
+        "id": "small_axis",
+        "name": "小形状：关键轴取1、2、4",
+        "definition": "分别将batch、归约或分组等关键轴设为1、2、4并与邻近尺寸对照，以检验微小维度特殊路径。",
+        "source_quote": [
+          {
+            "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\knowledge\\precision_trigger_knowledge_v4.md",
+            "line_start": 251,
+            "line_end": 251,
+            "source_quote": "  - `small_axis` — **小形状：关键轴取1、2、4**：分别将batch、归约或分组等关键轴设为1、2、4并与邻近尺寸对照，以检验微小维度特殊路径。"
+          }
+        ]
+      },
+      {
+        "id": "subunit",
+        "name": "数据量小于一个搬运 / 分块单元",
+        "definition": "使行或输入/输出小于一个搬运/处理单元，并区分元素和字节单位，以检验不足整单元的处理。",
+        "source_quote": [
+          {
+            "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\knowledge\\precision_trigger_knowledge_v4.md",
+            "line_start": 252,
+            "line_end": 252,
+            "source_quote": "  - `subunit` — **数据量小于一个搬运 / 分块单元**：使行或输入/输出小于一个搬运/处理单元，并区分元素和字节单位，以检验不足整单元的处理。"
+          }
+        ]
+      }
+    ],
+    "source_file": "sources/original/precision_trigger_knowledge_v4.md",
+    "source_sha256": "e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+    "source_quote": "### S1 微小形状（Tiny Shapes）\r\n\r\n- **条件定义**：让整个输入块小于一个处理/搬运单元，关键轴取1、2、4。\r\n- **检验目的**：检验短输入、单块和不足最小粒度的路径。\r\n- **适用前提（Requires）**：有关键 shape 轴及最小处理/搬运粒度。\r\n- **跳过/能力限制（Skip if）**：没有 shape 可控项，或执行器自动补齐后无法保留目标小尺寸。\r\n\r\n- 具体构造方式\r\n  - `small_axis` — **小形状：关键轴取1、2、4**：分别将batch、归约或分组等关键轴设为1、2、4并与邻近尺寸对照，以检验微小维度特殊路径。\r\n  - `subunit` — **数据量小于一个搬运 / 分块单元**：使行或输入/输出小于一个搬运/处理单元，并区分元素和字节单位，以检验不足整单元的处理。\r\n\r\n#### 参考案例\r\n\r\n1. **S1-01**：**关键轴为 1。** 若代码有 `ifKEqual1`、M=1 或 N=1 特化，分别令 M、N、K 取 1、2、4，其余轴保持不对称。Bmm #846 出现 K=1 的 Mul 路径，可与 K=2 的普通路径各自参考对照。\r\n2. **S1-02**：**不足搬运粒度。** 若搬运按 G 字节对齐、元素宽度为 b，围绕 G/b 取合法元素数。以 G=32B、b=2B 为示例，测 1、15、16、17 个元素，检查尾部与有效输出。\r\n3. **S1-03**：**小排序轴。** 若 TopK/排序选择短轴专用实现，沿目标轴取 1、2、4 与相邻长度，k 在合法范围内变化。TopK #2244 可参考 `[4,15,25]`、k=1、dim=0，输入各位置取不同值，检查值和索引。\r\n4. **S1-04**：**小输出写回。** 若归约或索引操作输入较大但只输出 1–数个元素，令输出字节数不足一个传输单元，并改变输出 dtype；检查写回长度、shape 与每个有效元素。\r\n5. **S1-05**：**单元素优化器更新也会暴露依赖缺口。** InplaceApplyMomentum 可从 FP32 的 var=[1]、accum=[0.5]、lr=[0.01]、grad=[0.1]、momentum=[0.9] 开始，按普通非 Nesterov 更新语义检查 accum_out≈0.55、var_out≈0.9945。每轮恢复初始状态后重复执行 E1，再以支持的 FP16/BF16 路径和较大 shape 对照。ops-nn#4737 报告于 950/CANN 9.0.0，单元素曾输出 var_out=0；PR 同时调整队列和 UB 预算，不能仅凭通过就归因于一条屏障。\r\n6. **S1-06**：**broadcast 内层乘积为 1 的 L0B 路径。** 对 BatchMatmulV3，读取 broadcast 折叠公式，令其内层 batch 乘积分别为 1、2，矩阵维保持非对称且合法，各 batch 用不同有限值。确认走到对应 BL0 batch-count 路径，再与逐 batch 矩阵乘参考比较；必要时配合 E2 观察历史值。ops-nn#4097 摘要指出乘积为 1 时读取 L0B 脏数据，不能把这里的“1”直接替换成矩阵 K=1。\r\n7. **S1-07**：**小 tile 的广播占用与清零依赖。** LightningIndexerKLLoss 从报告的 shape=(1,1) 入口核对实际参数名与 tiling，围绕 tileLen=8 比较合法的 7/8/9，并保留 tileLen<8 路径。用有限、非对称数据核算损失，按 E1 重复执行；报告在 910B/CANN 9.0.0 使用确定性测试 5000 次。ops-transformer#5285 同时有 Brcb 固定展开超过 ubReduceSum 容量和 GM 清零保护不足：分别检查实际广播 footprint 与清零依赖，不能把二者合成“加同步即可”。"
+  },
+  {
+    "scheme": "V4",
+    "definition_version": "V4:e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+    "id": "S2",
+    "name": "超大形状（Oversized Shapes）",
+    "definition": "增大单维、元素总数、地址跨度和工作集，跨越UB/L1/L0或表示范围。",
+    "requires": [
+      "shape 可扩大，且实现存在容量/表示范围/大规模分支。"
+    ],
+    "skip_if": [
+      "可用存储或执行器范围无法承载目标规模；记录可达规模和内存需求。"
+    ],
+    "construction_ids": [
+      "huge_shape",
+      "buffer_fit"
+    ],
+    "constructions": [
+      {
+        "id": "huge_shape",
+        "name": "超大维度 / 元素数 / 地址跨度",
+        "definition": "围绕相关位宽或地址跨度边界构造合法大形状，以检验超大单维、总元素数及字节跨度。",
+        "source_quote": [
+          {
+            "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\knowledge\\precision_trigger_knowledge_v4.md",
+            "line_start": 272,
+            "line_end": 272,
+            "source_quote": "  - `huge_shape` — **超大维度 / 元素数 / 地址跨度**：围绕相关位宽或地址跨度边界构造合法大形状，以检验超大单维、总元素数及字节跨度。"
+          }
+        ]
+      },
+      {
+        "id": "buffer_fit",
+        "name": "工作集跨越片上缓冲 / 临时空间容量",
+        "definition": "使工作集位于UB/L1/L0或临时空间容量两侧，并保留字节数公式，以检验容量估计与空间分配。",
+        "source_quote": [
+          {
+            "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\knowledge\\precision_trigger_knowledge_v4.md",
+            "line_start": 273,
+            "line_end": 273,
+            "source_quote": "  - `buffer_fit` — **工作集跨越片上缓冲 / 临时空间容量**：使工作集位于UB/L1/L0或临时空间容量两侧，并保留字节数公式，以检验容量估计与空间分配。"
+          }
+        ]
+      }
+    ],
+    "source_file": "sources/original/precision_trigger_knowledge_v4.md",
+    "source_sha256": "e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+    "source_quote": "### S2 超大形状（Oversized Shapes）\r\n\r\n- **条件定义**：增大单维、元素总数、地址跨度和工作集，跨越UB/L1/L0或表示范围。\r\n- **检验目的**：检验大输入、容量估计、地址范围和大规模分支。\r\n- **适用前提（Requires）**：shape 可扩大，且实现存在容量/表示范围/大规模分支。\r\n- **跳过/能力限制（Skip if）**：可用存储或执行器范围无法承载目标规模；记录可达规模和内存需求。\r\n\r\n- 具体构造方式\r\n  - `huge_shape` — **超大维度 / 元素数 / 地址跨度**：围绕相关位宽或地址跨度边界构造合法大形状，以检验超大单维、总元素数及字节跨度。\r\n  - `buffer_fit` — **工作集跨越片上缓冲 / 临时空间容量**：使工作集位于UB/L1/L0或临时空间容量两侧，并保留字节数公式，以检验容量估计与空间分配。\r\n\r\n#### 参考案例\r\n\r\n1. **S2-01**：**单轴上限。** 若实现有长度阈值 L 或固定层数归约，取 L-1、L、L+1 的合法 shape。SoftmaxBackward #2938 涉及归约长度 16384 附近的路径，可在资源允许时取 16383/16384/16385，固定幅值与 dtype。\r\n2. **S2-02**：**总量乘积。** 若分支使用 numel、batch*rows 或多轴乘积，让各单维保持中等而总量跨阈值；另构造总量接近但轴分布不同的样本，检查单维条件与总量条件。\r\n3. **S2-03**：**工作集跨容量。** 看到 UB/L1/L0 容量计算时，列出输入、输出、临时量、对齐与缓冲份数，求 W(shape,dtype)。选择 W 位于容量边界两侧的 shape，记录实际分块与结果完整性。\r\n4. **S2-04**：**大跨度存储。** 若索引类型按地址跨度选择，在底层容量足够时扩大 stride/offset，比较连续与大跨度的同值输入。执行前估算显存与临时空间，按可用资源选择能达到的边界。\r\n5. **S2-05**：**输出或临时量膨胀。** 若输入规模较小但 repeat、展开窗口或分桶数量放大输出/workspace，固定输入，改变放大参数使输出工作集跨容量阈值。分别计算输入、输出和临时量字节数，检查分配、输出总数和最后一段数据。\r\n6. **S2-06**：**长索引排序的本地缓冲复用。** 对进入 SortLocalRuns 的 ScatterMax/Min/Mul/Div，逐步增大合法 updates 数量，直到核内出现多轮排序；索引始终落在 var 范围内，分轮安排可追踪值。max/min 可用互异有限值，mul/div 则控制幅值并避开零分母，按各自语义检查更新结果。ops-nn#5682 报告 950 上 M 约 5375 万、var 约 628 万行，小规模难触发；资源不足时记录未覆盖该规模。配合 E1 重复，关注上一轮 MTE3 读本地缓冲与下一轮 Sort/Adds/标量补哨兵的冲突，这是核内跨流水依赖。\r\n7. **S2-07**：**A 预载挤占 WeightL1。** WeightQuantBatchMatmulV2 使用 BF16 x、INT4 转置 weight 和 per-channel scale；报告给出 950/CANN 9.2.0 上 M/K/N=256/6144/6912（限 16 或 22 核），以及 80/1632/9216（eager）两组入口。分别满足该版本打包和 scale 形状规则，以逐通道不同的权重/scale 计算解量化参考。记录 A 预载、WeightL1、对齐及缓冲份数的实际总占用，沿合法 shape/选路跨剩余容量边界。ops-nn#7357 是空间覆盖；核数与 eager 是上下文，按 E5 保存，不当成普通张量参数。"
+  },
+  {
+    "scheme": "V4",
+    "definition_version": "V4:e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+    "id": "S3",
+    "name": "细长与不规则形状（Skinny and Irregular Shapes）",
+    "definition": "让某轴远大于另一轴，或令相关轴不等；包括关键轴为1的细长结构。",
+    "requires": [
+      "矩阵、空间维或多输入长度存在可独立变化的轴。"
+    ],
+    "skip_if": [
+      "契约强制相关轴相等，无法构造合法不规则关系。"
+    ],
+    "construction_ids": [
+      "aspect",
+      "unequal_axes"
+    ],
+    "constructions": [
+      {
+        "id": "aspect",
+        "name": "长条 / 各轴强烈不均衡",
+        "definition": "构造M远大于N、N远大于M或悬殊输入/输出空间尺寸，以暴露均衡形状假设。",
+        "source_quote": [
+          {
+            "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\knowledge\\precision_trigger_knowledge_v4.md",
+            "line_start": 293,
+            "line_end": 293,
+            "source_quote": "  - `aspect` — **长条 / 各轴强烈不均衡**：构造M远大于N、N远大于M或悬殊输入/输出空间尺寸，以暴露均衡形状假设。"
+          }
+        ]
+      },
+      {
+        "id": "unequal_axes",
+        "name": "轴长 / 输入长度不相等，暴露维度混用",
+        "definition": "构造相关轴长不等并与相等形状对照，以暴露维度混用，同时覆盖相近但不同与比例悬殊的轴长。",
+        "source_quote": [
+          {
+            "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\knowledge\\precision_trigger_knowledge_v4.md",
+            "line_start": 294,
+            "line_end": 294,
+            "source_quote": "  - `unequal_axes` — **轴长 / 输入长度不相等，暴露维度混用**：构造相关轴长不等并与相等形状对照，以暴露维度混用，同时覆盖相近但不同与比例悬殊的轴长。"
+          }
+        ]
+      }
+    ],
+    "source_file": "sources/original/precision_trigger_knowledge_v4.md",
+    "source_sha256": "e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+    "source_quote": "### S3 细长与不规则形状（Skinny and Irregular Shapes）\r\n\r\n- **条件定义**：让某轴远大于另一轴，或令相关轴不等；包括关键轴为1的细长结构。\r\n- **检验目的**：检验不均衡维度、维度复用和非方形假设。\r\n- **适用前提（Requires）**：矩阵、空间维或多输入长度存在可独立变化的轴。\r\n- **跳过/能力限制（Skip if）**：契约强制相关轴相等，无法构造合法不规则关系。\r\n\r\n- 具体构造方式\r\n  - `aspect` — **长条 / 各轴强烈不均衡**：构造M远大于N、N远大于M或悬殊输入/输出空间尺寸，以暴露均衡形状假设。\r\n  - `unequal_axes` — **轴长 / 输入长度不相等，暴露维度混用**：构造相关轴长不等并与相等形状对照，以暴露维度混用，同时覆盖相近但不同与比例悬殊的轴长。\r\n\r\n#### 参考案例\r\n\r\n1. **S3-01**：**细长矩阵。** 对假定 M/N 接近或复用维长的实现，使用 `(M,N)=(1,257)、(257,1)、(17,19)`，固定 K，输入按行列编码。MatMul #3980 的 M 与 N 悬殊情形可用于定位基本块及步长选择。\r\n2. **S3-02**：**空间长宽不均。** 若图像路径按 H/W 推进窗口，对比 H=3,W=257 与 H=257,W=3，并按轴同步变换几何参数；使用渐变图检查错误方向与边缘。\r\n3. **S3-03**：**Q/KV 长度不等。** 对允许不等长的 attention，取 `(Lq,Lkv)=(1,129)、(17,129)、(129,17)`，配合法定 mask，逐一检查 Q 与 KV 的循环上限、有效位置和归约范围。\r\n4. **S3-04**：**相近但不同的轴。** 若变量名或偏移公式可能混用两条轴，对照 M=N=17 与 M=17,N=19；用最后一行、最后一列非零的数据，快速定位漏算或索引互换。"
+  },
+  {
+    "scheme": "V4",
+    "definition_version": "V4:e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+    "id": "S4",
+    "name": "二次幂对齐（Power-of-Two Alignment）",
+    "definition": "围绕2^n−1、2^n、2^n+1及相关倍数采样。",
+    "requires": [
+      "源码或契约给出二次幂敏感的处理粒度/边界。"
+    ],
+    "skip_if": [
+      "仅样例恰好含 16/32/128 等数字而没有对应语义。"
+    ],
+    "construction_ids": [
+      "power_shape"
+    ],
+    "constructions": [
+      {
+        "id": "power_shape",
+        "name": "二次幂边界附近、倍数与非对齐",
+        "definition": "采样合法2ⁿ−1、2ⁿ、2ⁿ+1及倍数，以检验二次幂敏感路径，并核对它实际代表对齐还是位宽。",
+        "source_quote": [
+          {
+            "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\knowledge\\precision_trigger_knowledge_v4.md",
+            "line_start": 311,
+            "line_end": 311,
+            "source_quote": "  - `power_shape` — **二次幂边界附近、倍数与非对齐**：采样合法2ⁿ−1、2ⁿ、2ⁿ+1及倍数，以检验二次幂敏感路径，并核对它实际代表对齐还是位宽。"
+          }
+        ]
+      }
+    ],
+    "source_file": "sources/original/precision_trigger_knowledge_v4.md",
+    "source_sha256": "e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+    "source_quote": "### S4 二次幂对齐（Power-of-Two Alignment）\r\n\r\n- **条件定义**：围绕2^n−1、2^n、2^n+1及相关倍数采样。\r\n- **检验目的**：检验二次幂敏感的对齐、位宽和分支边界。\r\n- **适用前提（Requires）**：源码或契约给出二次幂敏感的处理粒度/边界。\r\n- **跳过/能力限制（Skip if）**：仅样例恰好含 16/32/128 等数字而没有对应语义。\r\n\r\n- 具体构造方式\r\n  - `power_shape` — **二次幂边界附近、倍数与非对齐**：采样合法2ⁿ−1、2ⁿ、2ⁿ+1及倍数，以检验二次幂敏感路径，并核对它实际代表对齐还是位宽。\r\n\r\n#### 参考案例\r\n\r\n1. **S4-01**：**二次幂阈值三点。** 若代码有 `1<<n`、二分归约层数或按 2^n 选择模板，取 A-1、A、A+1。例如 A=128 时测 127/128/129，把非零贡献放到最后一项。\r\n2. **S4-02**：**整除与多块。** 看到按位取模或对齐公式时，再测 2A-1、2A、2A+1，比较边界位置与多块衔接。记录 A 对应元素数还是字节数，并按 dtype 换算。\r\n3. **S4-03**：**双元素打包。** 若实现按两个低比特元素一字节组织，覆盖接口支持的奇偶长度及补齐尾部。BatchMatMulV3 #2771 的 `singleCoreNSplit` 对齐到 2 可作为分核后奇偶关系的线索，检查各核实际子块长度。\r\n4. **S4-04**：**二分归约容量。** 若归约结构只能处理到 2^n，分别令长度低于、等于、高于该边界，使用全 1 与仅末项非零两种分布。SoftmaxBackward #2938 的 2^14 长度线索可帮助选择有依据的 n。"
+  },
+  {
+    "scheme": "V4",
+    "definition_version": "V4:e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+    "id": "S5",
+    "name": "分块对齐（Tiling Alignment）",
+    "definition": "围绕具体tile/partition大小构造整块、非对齐和不足一块。",
+    "requires": [
+      "有可确认的 tile/block/bucket/partition 尺寸或尾块谓词。"
+    ],
+    "skip_if": [
+      "没有分块证据；只有猜测时记为候选用例。"
+    ],
+    "construction_ids": [
+      "tile_shape"
+    ],
+    "constructions": [
+      {
+        "id": "tile_shape",
+        "name": "tile / block / 分桶边界与尾块",
+        "definition": "围绕场景内的tile/partition尺寸A取kA−1、kA、kA+1及不足一块的量，以检验边界和尾块处理。",
+        "source_quote": [
+          {
+            "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\knowledge\\precision_trigger_knowledge_v4.md",
+            "line_start": 328,
+            "line_end": 328,
+            "source_quote": "  - `tile_shape` — **tile / block / 分桶边界与尾块**：围绕场景内的tile/partition尺寸A取kA−1、kA、kA+1及不足一块的量，以检验边界和尾块处理。"
+          },
+          {
+            "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\knowledge\\precision_trigger_knowledge_v4.md",
+            "line_start": 648,
+            "line_end": 648,
+            "source_quote": "  - `tile_shape` — **tile / block / 分桶边界与尾块**：围绕场景内的tile/partition尺寸A取kA−1、kA、kA+1及不足一块的量，以检验边界和尾块处理。"
+          }
+        ]
+      }
+    ],
+    "source_file": "sources/original/precision_trigger_knowledge_v4.md",
+    "source_sha256": "e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+    "source_quote": "### S5 分块对齐（Tiling Alignment）\r\n\r\n- **条件定义**：围绕具体tile/partition大小构造整块、非对齐和不足一块。\r\n- **检验目的**：检验分块边界、尾块和切分后的块间衔接。\r\n- **适用前提（Requires）**：有可确认的 tile/block/bucket/partition 尺寸或尾块谓词。\r\n- **跳过/能力限制（Skip if）**：没有分块证据；只有猜测时记为候选用例。\r\n\r\n- 具体构造方式\r\n  - `tile_shape` — **tile / block / 分桶边界与尾块**：围绕场景内的tile/partition尺寸A取kA−1、kA、kA+1及不足一块的量，以检验边界和尾块处理。\r\n\r\n#### 参考案例\r\n\r\n1. **S5-01**：**M/N 基本块：`baseM/baseN`。** 读取实际 tiling，分别取 M=k*baseM-1、k*baseM、k*baseM+1，以及 N 对应三点。先单轴尾，再双轴尾，给首块和末块不同值；每次确认实际块长，检查二维衔接与最后行列。\r\n2. **S5-02**：**K 归约块：`baseK`。** 若矩阵乘沿 K 分段，取 K=k*baseK±1 和整块，把唯一非零乘积放在最后一个 K 位置。再使用正负混合值对照，分别检查尾项是否参与和分段累加误差。\r\n3. **S5-03**：**基本块乘积与 workspace。** 若偏移依赖 `baseM_*baseN_` 或对齐后面积，选择不同 tiling 使该乘积变化，记录每块跨度。QuantBatchMatMulV4 #1298 涉及偏离硬编码 32768 的情形；让各块数据可区分，检查 workspace 是否重叠或错位。\r\n4. **S5-04**：**单核范围：`singleCoreM/singleCoreN/singleCoreK`。** 通过输入 M/N/K 让单核范围小于、等于、大于对应基本块，并覆盖最后一个核。BatchMatMulV3 #2935 的 `singleCoreN>baseN` 可作线索，检查核内循环次数与各子块首尾。\r\n5. **S5-05**：**多轮分核：`totalBlockCnt/aicNum/mBlockCnt`。** 若分派包含 `totalBlockCnt>aicNum`、`mBlockCnt!=1` 和全载条件，构造单轮、多轮整尾、多轮非整尾的合法输入并记录完整谓词。QuantBatchMatMulV3 #1426 提供该组合线索，检查最后一轮及未参与计算的核。\r\n6. **S5-06**：**UB 余数为零：`ubFactor/ubTail/colTail`。** 对 `ubTail=gatherSize%ubFactor` 或 `tail=colTail%ubFactor`，测 k*ubFactor-1、k*ubFactor、k*ubFactor+1，令 k 至少覆盖单块和多块。GatherNd #2153、RmsNorm #3158 可参考整除时末块处理，最后一块放非零标记。\r\n7. **S5-07**：**向量循环末块：`tileLength/tileNum/lastTileLength`。** 若实现分别保存完整 tile 与最后 tile 长度，构造不足一块、恰好一块、多块加一元素，以及多块整除。核对循环上限和最后一次搬运长度，比较末元素与输出周边可观察区域。\r\n8. **S5-08**：**低比特子分片：`singleCoreNSplit`。** 若两元素共用一个字节，通过合法 shape 让分核后的子片接近奇偶边界。BatchMatMulV3 #2771 的 43/43/43/41 子分片与对齐到 2 的处理可作参考，按支持的形状规则检查相邻核交界和解包后的最后元素。\r\n9. **S5-09**：**物理块与写出粒度：`n0/N0` 及 G 字节。** 对 NZ 内块与输出搬运，分别固定逻辑 N 改物理对齐、固定块配置改输出 dtype，并取输出尾长位于 G 字节两侧。FusedQuantMatMul #1695 的非 32B 尾输出可作线索，检查有效列、填充区和最终写回长度。\r\n10. **S5-10**：**off_value 的最后一个整块必须写出。** 对相应填充/OneHot 路径，取得每核负责的 off_value 元素数 L 与 UB 块长 A，构造 L=A、2A、2A±1 的合法输入，使最后一块含应保持 off_value 的位置。off_value、on_value 和 E3 输出哨兵取三个可区分的值。ops-math#3224 摘要指出 L%A=0 时最后整块被当成长度 0，检查末块每个有效元素而非只看写回成功。"
+  },
+  {
+    "scheme": "V4",
+    "definition_version": "V4:e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+    "id": "C4",
+    "name": "自适应控制（Adaptive Control）",
+    "definition": "根据显式行为模式、shape、容量、分块规模或过滤结果，构造实现分派条件两侧的合法输入。",
+    "requires": [
+      "有显式行为模式，或可追踪的 shape/过滤结果到实现分派的完整谓词。"
+    ],
+    "skip_if": [
+      "实现没有可识别的模式选择或输入驱动分派条件。"
+    ],
+    "construction_ids": [
+      "tile_shape",
+      "index_mask",
+      "enum_behavior"
+    ],
+    "constructions": [
+      {
+        "id": "tile_shape",
+        "name": "tile / block / 分桶边界与尾块",
+        "definition": "围绕场景内的tile/partition尺寸A取kA−1、kA、kA+1及不足一块的量，以检验边界和尾块处理。",
+        "source_quote": [
+          {
+            "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\knowledge\\precision_trigger_knowledge_v4.md",
+            "line_start": 328,
+            "line_end": 328,
+            "source_quote": "  - `tile_shape` — **tile / block / 分桶边界与尾块**：围绕场景内的tile/partition尺寸A取kA−1、kA、kA+1及不足一块的量，以检验边界和尾块处理。"
+          },
+          {
+            "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\knowledge\\precision_trigger_knowledge_v4.md",
+            "line_start": 648,
+            "line_end": 648,
+            "source_quote": "  - `tile_shape` — **tile / block / 分桶边界与尾块**：围绕场景内的tile/partition尺寸A取kA−1、kA、kA+1及不足一块的量，以检验边界和尾块处理。"
+          }
+        ]
+      },
+      {
+        "id": "index_mask",
+        "name": "索引命中或避开mask / padding / 无效位置",
+        "definition": "固定mask或有效域并构造全命中、全避开、混合命中，以检验筛选和跳过行为。",
+        "source_quote": [
+          {
+            "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\knowledge\\precision_trigger_knowledge_v4.md",
+            "line_start": 496,
+            "line_end": 496,
+            "source_quote": "  - `index_mask` — **索引命中或避开mask / padding / 无效位置**：固定mask或有效域并构造全命中、全避开、混合命中，以检验筛选和跳过行为。"
+          },
+          {
+            "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\knowledge\\precision_trigger_knowledge_v4.md",
+            "line_start": 649,
+            "line_end": 649,
+            "source_quote": "  - `index_mask` — **索引命中或避开mask / padding / 无效位置**：固定mask或有效域并构造全命中、全避开、混合命中，以检验筛选和跳过行为。"
+          }
+        ]
+      },
+      {
+        "id": "enum_behavior",
+        "name": "训练、排序、累加等语义开关",
+        "definition": "选择合法训练、排序、累加或确定性选项，以检验行为相关路径。",
+        "source_quote": [
+          {
+            "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\knowledge\\precision_trigger_knowledge_v4.md",
+            "line_start": 603,
+            "line_end": 603,
+            "source_quote": "  - `enum_behavior` — **训练、排序、累加等语义开关**：选择合法训练、排序、累加或确定性选项，以检验行为相关路径。"
+          },
+          {
+            "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\knowledge\\precision_trigger_knowledge_v4.md",
+            "line_start": 650,
+            "line_end": 650,
+            "source_quote": "  - `enum_behavior` — **训练、排序、累加等语义开关**：选择合法训练、排序、累加或确定性选项，以检验行为相关路径。"
+          }
+        ]
+      }
+    ],
+    "source_file": "sources/original/precision_trigger_knowledge_v4.md",
+    "source_sha256": "e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+    "source_quote": "### C4 自适应控制（Adaptive Control）\r\n\r\n- **条件定义**：根据显式行为模式、shape、容量、分块规模或过滤结果，构造实现分派条件两侧的合法输入。\r\n- **检验目的**：检验分派谓词、派生控制量与所选实现是否匹配输入条件。\r\n- **适用前提（Requires）**：有显式行为模式，或可追踪的 shape/过滤结果到实现分派的完整谓词。\r\n- **跳过/能力限制（Skip if）**：实现没有可识别的模式选择或输入驱动分派条件。\r\n\r\n- 具体构造方式\r\n  - `tile_shape` — **tile / block / 分桶边界与尾块**：围绕场景内的tile/partition尺寸A取kA−1、kA、kA+1及不足一块的量，以检验边界和尾块处理。\r\n  - `index_mask` — **索引命中或避开mask / padding / 无效位置**：固定mask或有效域并构造全命中、全避开、混合命中，以检验筛选和跳过行为。\r\n  - `enum_behavior` — **训练、排序、累加等语义开关**：选择合法训练、排序、累加或确定性选项，以检验行为相关路径。\r\n\r\n#### 参考案例\r\n\r\n1. **C4-01**：**完整规模分派。** 若选择条件是 `inputSize>L || outputSize>L || gridSize>L`，分别只让一项跨阈值，再测全不跨阈值，记录实际选择。GridSample #325 提供该三项判据的线索，可检查遗漏其中一项时的路径。\r\n2. **C4-02**：**容量与全载。** 若代码按工作集 W≤C 或 `FullLoadMode` 选择实现，构造边界两侧及单/多轮，记录实际选择的 tile 与缓冲模式；固定数据分布，检查路径切换后的输出。\r\n3. **C4-03**：**自动模式与固定模式。** 若 API 暴露自动选择及固定策略，使用相同合法输入分别调用，再改变一个决定分派的轴，观察自动模式是否切换；对每条可用路径建立对应参考。\r\n4. **C4-04**：**过滤后有效规模。** 若有效元素数 m 决定处理路径，固定 shape，仅改变合法 mask 使 m 位于分派阈值两侧。检查有效计数、最终路径与输出，保留普通稠密输入作对照。\r\n5. **C4-05**：**确定性、无 mask 与 sink 输出的模板交叉。** 对于支持 sink 及其梯度输出的接口，固定合法非零 sink 和其他输入，构造确定性开/关 × mask 省略/显式合法 mask 的组合，并逐组计算对应参考；等价全有效 mask 仅在契约认可时作等价对照。按实际模板记录是否支持 sink，单独核对 dsinkOut 的值和完整写回，配合 E3。ops-transformer#6521 摘要指出确定性且无 mask 时选中了不支持 sink 的模板；应检查选路与功能完整性，而不是给结果加等待。\r\n6. **C4-06**：**补零搬运 repeat 字段的表示边界。** 对 Conv WeightUbTrans 的 NDDMA 路径，从合法 shape/tiling 推导 loopRpSize，在能保持同一路径时覆盖 254/255/256；输入全部有限且幅值适中，检查输出 NaN 掩码、卷积数值以及补零区域是否参与有效计算。ops-nn#4168 摘要给出 loopRpSize>255 时部分补零未执行并出现 NaN。loopRpSize 是内部派生量，不能把它伪装成 API 参数；若无法驱动边界，记录未覆盖并保存推导式。"
+  },
+  {
+    "scheme": "V4",
+    "definition_version": "V4:e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+    "id": "S6",
+    "name": "窗口几何（Window Geometry）",
+    "definition": "构造有效窗口贴边、跨边、覆盖不足或步长跳过的合法形状。",
+    "requires": [
+      "卷积、池化、滑窗、裁剪或有几何含义的切片。"
+    ],
+    "skip_if": [
+      "算子无窗口几何；非法输出尺寸仅属契约校验。"
+    ],
+    "construction_ids": [
+      "geometry"
+    ],
+    "constructions": [
+      {
+        "id": "geometry",
+        "name": "卷积 / 切片 / 窗口的边缘几何",
+        "definition": "构造贴边或跨边窗口，以及合法的大小、步长、padding、dilation组合，以检验有效覆盖范围和裁切。",
+        "source_quote": [
+          {
+            "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\knowledge\\precision_trigger_knowledge_v4.md",
+            "line_start": 351,
+            "line_end": 351,
+            "source_quote": "  - `geometry` — **卷积 / 切片 / 窗口的边缘几何**：构造贴边或跨边窗口，以及合法的大小、步长、padding、dilation组合，以检验有效覆盖范围和裁切。"
+          }
+        ]
+      }
+    ],
+    "source_file": "sources/original/precision_trigger_knowledge_v4.md",
+    "source_sha256": "e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+    "source_quote": "### S6 窗口几何（Window Geometry）\r\n\r\n- **条件定义**：构造有效窗口贴边、跨边、覆盖不足或步长跳过的合法形状。\r\n- **检验目的**：检验padding、dilation、stride和边缘裁切。\r\n- **适用前提（Requires）**：卷积、池化、滑窗、裁剪或有几何含义的切片。\r\n- **跳过/能力限制（Skip if）**：算子无窗口几何；非法输出尺寸仅属契约校验。\r\n\r\n- 具体构造方式\r\n  - `geometry` — **卷积 / 切片 / 窗口的边缘几何**：构造贴边或跨边窗口，以及合法的大小、步长、padding、dilation组合，以检验有效覆盖范围和裁切。\r\n\r\n#### 参考案例\r\n\r\n1. **S6-01**：**窗口贴边。** 看到窗口末点或有效核计算，先求 `Keff=dilation*(K-1)+1`，选择最后窗口恰好贴边及相差一个元素的输入。普通 floor 模式按 `floor((L+pL+pR-Keff)/stride)+1` 计算输出，其他模式使用对应公式。\r\n2. **S6-02**：**非对称 padding。** 若左右/上下 padding 独立参与坐标公式，固定核、stride 与 dilation，选择不同的合法 pL/pR，再交换两者。输入用渐变值，分别检查输出首尾和边缘有效贡献。\r\n3. **S6-03**：**负 padding 裁剪。** 对支持负 padding 的接口，分别裁左、裁右和双边裁剪，再选择裁剪后只剩最小合法长度的边界。逐坐标计算参考，检查新的起点、输出长度与末次访问。\r\n4. **S6-04**：**步长与膨胀。** 固定核，改变 stride/dilation，使窗口重叠、衔接或有间隔。Conv2DV2 #1934 出现 padding=0、stride=64、dilation=1 的窗口，可按其几何关系构造小规模可计算对照。\r\n5. **S6-05**：**窗口与通道尾部组合。** 若实现把几何与通道对齐同时作为路径条件，先测 1×1/3×3 核，再逐个改变输入、输出通道对齐。Conv2DV2 #4866 的 3×3 与通道尾部条件可用于组合，检查边缘空间位置和尾通道。\r\n6. **S6-06**：**STFT 窗口几何与 workspace 生产消费。** 对支持的 STFT 接口，以 n_fft=7、hop_length=1、win_length=4、onesided=false 构造实数与复数输入，使用接口要求的窗口及长度；先逐帧按明确的补齐、中心化和归一化语义计算参考。对照 E1 重复与 E2 调用序列，检查零帧、帧间错位与复数实虚部。ops-math#2868 在 950PR 涉及 workspace 的 MTE3→Cube、FIX→MTE2 两条依赖；报告对首次/单跑的叙述不完全一致，因此两种执行次序都记录，不规定“首次一定通过”。\r\n7. **S6-07**：**池化反向的 W/NC 尾块。** 在 arch35 NCHW scalar kernel 的 MaxPoolGradWithArgmaxV3 中，令 W 或 N*C 跨实际分块边界，先单轴尾再组合尾；从合法前向池化产生 argmax，并设置可区分的上游梯度。按索引散射累加建立参考，检查尾部和重叠窗口，覆盖支持的 FP16/BF16/FP32。ops-nn#4642 报告固定输入偶发错误；E1 重复时保留 Vector 清零→Scalar 累加→Vector Cast 的实际路径，最终修复是 V_S/S_V 事件。\r\n8. **S6-08**：**反向卷积拆核后没有贡献的位置。** 对 Conv3D 反向输入中确实启用 kernel-split 的合法 stride/pad/kernel 组合，利用稀疏上游梯度计算每个输入位置的贡献计数，区分应为零的空洞与非零覆盖位置。配合 E3 用非零值预填可写输出，检查空洞清零及邻近非零梯度；用未拆分路径作语义参考。ops-nn#6851 摘要指出该区域漏清零，具体 shape 与 kernel-split 阈值需从待测实现取得。"
+  },
+  {
+    "scheme": "V4",
+    "definition_version": "V4:e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+    "id": "S7",
+    "name": "形状不匹配（Shape Mismatch）",
+    "definition": "构造不同输入之间合法的shape不一致与广播；或使输入输出shape不同，通过特殊插值/外推位置进行重采样。",
+    "requires": [
+      "有广播、多输入轴对应、scale 辅助形状或重采样关系。"
+    ],
+    "skip_if": [
+      "目标形状关系不在接口允许的广播、轴对应或重采样范围内。"
+    ],
+    "construction_ids": [
+      "resize_coordinates",
+      "broadcast",
+      "scale_structure"
+    ],
+    "constructions": [
+      {
+        "id": "resize_coordinates",
+        "name": "插值采样边界",
+        "definition": "改变输出尺寸/缩放比例，使采样坐标靠近整数点或边缘，并对照支持的align_corners模式，以检验取整、插值权重及边缘延拓。",
+        "source_quote": [
+          {
+            "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\knowledge\\precision_trigger_knowledge_v4.md",
+            "line_start": 372,
+            "line_end": 372,
+            "source_quote": "  - `resize_coordinates` — **插值采样边界**：改变输出尺寸/缩放比例，使采样坐标靠近整数点或边缘，并对照支持的align_corners模式，以检验取整、插值权重及边缘延拓。"
+          }
+        ]
+      },
+      {
+        "id": "broadcast",
+        "name": "广播轴为1或跨输入shape不一致",
+        "definition": "在支持广播的不同输入轴上设1并组合广播，以检验输出shape与广播索引。",
+        "source_quote": [
+          {
+            "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\knowledge\\precision_trigger_knowledge_v4.md",
+            "line_start": 373,
+            "line_end": 373,
+            "source_quote": "  - `broadcast` — **广播轴为1或跨输入shape不一致**：在支持广播的不同输入轴上设1并组合广播，以检验输出shape与广播索引。"
+          }
+        ]
+      },
+      {
+        "id": "scale_structure",
+        "name": "scale形状对应",
+        "definition": "构造合法per-tensor/token/channel/group的scale形状，并配合转置或共享batch，以检验辅助shape与载荷轴匹配。",
+        "source_quote": [
+          {
+            "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\knowledge\\precision_trigger_knowledge_v4.md",
+            "line_start": 374,
+            "line_end": 374,
+            "source_quote": "  - `scale_structure` — **scale形状对应**：构造合法per-tensor/token/channel/group的scale形状，并配合转置或共享batch，以检验辅助shape与载荷轴匹配。"
+          }
+        ]
+      }
+    ],
+    "source_file": "sources/original/precision_trigger_knowledge_v4.md",
+    "source_sha256": "e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+    "source_quote": "### S7 形状不匹配（Shape Mismatch）\r\n\r\n- **条件定义**：构造不同输入之间合法的shape不一致与广播；或使输入输出shape不同，通过特殊插值/外推位置进行重采样。\r\n- **检验目的**：检验形状对应、广播索引，以及重采样坐标取整、插值权重和边缘延拓；两种场景的具体构造在子项中区分。\r\n- **适用前提（Requires）**：有广播、多输入轴对应、scale 辅助形状或重采样关系。\r\n- **跳过/能力限制（Skip if）**：目标形状关系不在接口允许的广播、轴对应或重采样范围内。\r\n\r\n- 具体构造方式\r\n  - `resize_coordinates` — **插值采样边界**：改变输出尺寸/缩放比例，使采样坐标靠近整数点或边缘，并对照支持的align_corners模式，以检验取整、插值权重及边缘延拓。\r\n  - `broadcast` — **广播轴为1或跨输入shape不一致**：在支持广播的不同输入轴上设1并组合广播，以检验输出shape与广播索引。\r\n  - `scale_structure` — **scale形状对应**：构造合法per-tensor/token/channel/group的scale形状，并配合转置或共享batch，以检验辅助shape与载荷轴匹配。\r\n\r\n#### 参考案例\r\n\r\n1. **S7-01**：**多轴广播。** 若偏移代码按广播维使用零步长或固定索引，取 A=[2,1,3]、B=[1,4,1]，输出 [2,4,3]；各轴赋不同值，与显式展开参考比较。\r\n2. **S7-02**：**批量矩阵与 bias 对应。** 若 batch 维从多输入推导，取 A=[4,20,32]、B=[32,64]、bias=[64]，在接口支持时逐 batch 计算参考；FusedMatMul #2972 的这组形状可作为共享 B/bias 的入口。\r\n3. **S7-03**：**scale 的轴对应。** 看到 per-channel/per-group scale 索引时，构造各组不同的 scale，再改变转置或共享 batch；核对 scale shape 与逻辑轴。ExtendConvTranspose #2593 可参考每组量化参数被误共享的情形。\r\n4. **S7-04**：**输入输出分辨率。** 对重采样坐标公式，取输入长度 3、输出 5，再测输出长度 1，逐个计算各模式采样点。围绕整数点、半格点与末端检查取整、权重及延拓。\r\n5. **S7-05**：**rank 对齐与前导广播。** 若实现从末轴对齐多个输入，比较 `[3]` 与 `[2,1,3]`、`[1,3]` 与 `[2,4,3]` 等合法组合。各输入按轴编码，与显式扩展参考对照，检查补入的前导轴和原有长度为 1 的轴是否分别寻址。"
+  },
+  {
+    "scheme": "V4",
+    "definition_version": "V4:e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+    "id": "S8",
+    "name": "不均匀分组结构（Uneven Group Structure）",
+    "definition": "让多输入成员、有效序列、group/head/expert/shard的大小或数量不一致。",
+    "requires": [
+      "有 group/head/expert/shard、变长序列或 tensor list 语义。"
+    ],
+    "skip_if": [
+      "接口没有分组、成员或变长结构，或不支持相应组间大小关系。"
+    ],
+    "construction_ids": [
+      "group_shape",
+      "unequal_sequence",
+      "tuple_size"
+    ],
+    "constructions": [
+      {
+        "id": "group_shape",
+        "name": "分组大小关系",
+        "definition": "在契约允许时改变组数、每组长度及整除关系，含最后一组，以检验分组计数与偏移，记录实际组间对应关系。",
+        "source_quote": [
+          {
+            "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\knowledge\\precision_trigger_knowledge_v4.md",
+            "line_start": 392,
+            "line_end": 392,
+            "source_quote": "  - `group_shape` — **分组大小关系**：在契约允许时改变组数、每组长度及整除关系，含最后一组，以检验分组计数与偏移，记录实际组间对应关系。"
+          }
+        ]
+      },
+      {
+        "id": "unequal_sequence",
+        "name": "Q/KV或有效序列长度不相等",
+        "definition": "构造Q/KV或不同batch有效长度不等，并保持容量契约，以检验长度对应及分段偏移。",
+        "source_quote": [
+          {
+            "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\knowledge\\precision_trigger_knowledge_v4.md",
+            "line_start": 393,
+            "line_end": 393,
+            "source_quote": "  - `unequal_sequence` — **Q/KV或有效序列长度不相等**：构造Q/KV或不同batch有效长度不等，并保持容量契约，以检验长度对应及分段偏移。"
+          }
+        ]
+      },
+      {
+        "id": "tuple_size",
+        "name": "张量列表 / 元组成员数量",
+        "definition": "改变支持的列表成员数或构造成员shape不等，以检验成员遍历和独立计数，逐成员记录形状和长度。",
+        "source_quote": [
+          {
+            "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\knowledge\\precision_trigger_knowledge_v4.md",
+            "line_start": 394,
+            "line_end": 394,
+            "source_quote": "  - `tuple_size` — **张量列表 / 元组成员数量**：改变支持的列表成员数或构造成员shape不等，以检验成员遍历和独立计数，逐成员记录形状和长度。"
+          }
+        ]
+      }
+    ],
+    "source_file": "sources/original/precision_trigger_knowledge_v4.md",
+    "source_sha256": "e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+    "source_quote": "### S8 不均匀分组结构（Uneven Group Structure）\r\n\r\n- **条件定义**：让多输入成员、有效序列、group/head/expert/shard的大小或数量不一致。\r\n- **检验目的**：检验每组计数、独立 offset、最后成员与异构输入的遍历处理。\r\n- **适用前提（Requires）**：有 group/head/expert/shard、变长序列或 tensor list 语义。\r\n- **跳过/能力限制（Skip if）**：接口没有分组、成员或变长结构，或不支持相应组间大小关系。\r\n\r\n- 具体构造方式\r\n  - `group_shape` — **分组大小关系**：在契约允许时改变组数、每组长度及整除关系，含最后一组，以检验分组计数与偏移，记录实际组间对应关系。\r\n  - `unequal_sequence` — **Q/KV或有效序列长度不相等**：构造Q/KV或不同batch有效长度不等，并保持容量契约，以检验长度对应及分段偏移。\r\n  - `tuple_size` — **张量列表 / 元组成员数量**：改变支持的列表成员数或构造成员shape不等，以检验成员遍历和独立计数，逐成员记录形状和长度。\r\n\r\n#### 参考案例\r\n\r\n1. **S8-01**：**组长与前缀和。** 若各组独立计算 offset，对照 `[3,3,3]` 与 `[1,3,5]`，允许空组时加 `[0,3,6]`，保持总量并重算前缀和。各组用不同值，检查首组、空组及最后组。\r\n2. **S8-02**：**有效序列长度。** 对 packed/变长接口，容量相同但有效长度取 `[1,7,3]`，再重排样本并同步元数据。逐样本计算参考，检查 Q/KV 各自长度与累计边界。\r\n3. **S8-03**：**Q/KV 头映射。** 若实现按头数比例映射，选择支持的 Q:KV 比例 8:2、8:1，每个 KV 头取不同值；保持序列长度一致，先隔离头映射，再配合变长输入检查各自 offset。\r\n4. **S8-04**：**不均子分片。** 若分组/分核允许末片较短，比较均匀长度与同总量的不均长度，并把短片放在实际支持的位置。BatchMatMulV3 #2771 的 43/43/43/41 可作线索，各片用不同值检查独立计数与最后片。\r\n5. **S8-05**：**列表成员。** 若接口接受 tensor list/tuple，选 1、2、3 个成员，各成员形状和数据不同；支持空成员时放在中间或末尾。检查每个成员自己的循环范围与输出结构。\r\n6. **S8-06**：**MoE 专家分配。** 对路由实参可控的 MoE，使用每专家均匀 token、单专家热点、一个或多个空专家三种分配，保持总 token 数与路由合法。同步生成计数/前缀和/恢复索引，检查空专家后偏移、热点累积及 token 还原。\r\n7. **S8-07**：**不等长 Q/K 的有效 TopK 数量。** LightningIndexerV2 报告入口：950/CANN 9.2.0，Q BF16[4096,32,128]、K BF16[2048,1,128]、weights FP32[4096,32]，TND；cu_seqlens_q=[0,298,4096]、cu_seqlens_k=[0,149,2048]、cmp_residual_k=[0,0]，cmp_ratio=2、mask_mode=3、topk=512、return_value=1。使用报告范围 Q∈[-33.5,35.5]、K∈[-2.47,2.66]、weights∈[-0.013,0.017] 生成合成输入，按 E1 保存种子与实际输入。每行按 mask/压缩语义算出有效候选数，核对有效 idx 数、范围、重复、padding 及值索引配对；只有候选足够的行才要求 512 项。ops-transformer#5925 在 500 次中报告两次有效数量不足，不能靠浮点容差放宽通过。\r\n8. **S8-08**：**SparseFlashMla 的压缩/原始 KV 双序列。** ops-transformer#6633 的 case16312 为 HCA/CFA、BF16、TND/TND：B=2，N1=N2=1，D=512，Q 累计长度 [0,1,2]，原始 KV [0,65536,131072]，压缩 KV [0,512,1024]，cmp_ratio=128，cmp_residual_kv=[0,0]，seqused_cmp_kv=[512,512]；原始/压缩 mask_mode=4/3，原始窗口 left=127、right=0，softmax_scale=0.044194173824159216。按报告执行器的 ori_stride_padding 规则落实存储，数据范围 [-5,5]，压缩稀疏索引采用 full 语义，原始/压缩 KV 的 topk_mode 均为 no；保存实际元数据。先核对两套有效集合，再按对应 HCA 语义建立参考，并配合 E1。报告同时给出精度失败与同一 bmm2ResUb 上两次 Vector DataCopy 的 WAR；不能用普通 dense attention 参考替代该接口语义。"
+  },
+  {
+    "scheme": "V4",
+    "definition_version": "V4:e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+    "id": "S9",
+    "name": "重复与批处理（Repetition and Batching）",
+    "definition": "构造大batch、大规模归约和需要多轮处理的输入。",
+    "requires": [
+      "输入规模引起多 batch、多轮处理或长归约。"
+    ],
+    "skip_if": [
+      "单次调用中没有随输入规模变化的批次、轮次或归约长度。"
+    ],
+    "construction_ids": [
+      "nondegenerate",
+      "long_reduce"
+    ],
+    "constructions": [
+      {
+        "id": "nondegenerate",
+        "name": "多轮处理",
+        "definition": "将相关规模从单次扩至多次并继续增大，覆盖合法中间空批次和最后一轮，以检验循环推进与批次偏移。",
+        "source_quote": [
+          {
+            "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\knowledge\\precision_trigger_knowledge_v4.md",
+            "line_start": 415,
+            "line_end": 415,
+            "source_quote": "  - `nondegenerate` — **多轮处理**：将相关规模从单次扩至多次并继续增大，覆盖合法中间空批次和最后一轮，以检验循环推进与批次偏移。"
+          }
+        ]
+      },
+      {
+        "id": "long_reduce",
+        "name": "长归约 / 大K导致累计误差或归约路径切换",
+        "definition": "增大已确定归约轴，并在实现切换点两侧对照，以检验长归约累计误差和分段处理。",
+        "source_quote": [
+          {
+            "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\knowledge\\precision_trigger_knowledge_v4.md",
+            "line_start": 416,
+            "line_end": 416,
+            "source_quote": "  - `long_reduce` — **长归约 / 大K导致累计误差或归约路径切换**：增大已确定归约轴，并在实现切换点两侧对照，以检验长归约累计误差和分段处理。"
+          }
+        ]
+      }
+    ],
+    "source_file": "sources/original/precision_trigger_knowledge_v4.md",
+    "source_sha256": "e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+    "source_quote": "### S9 重复与批处理（Repetition and Batching）\r\n\r\n- **条件定义**：构造大batch、大规模归约和需要多轮处理的输入。\r\n- **检验目的**：检验循环推进、批次偏移、尾轮处理和长归约累计误差。\r\n- **适用前提（Requires）**：输入规模引起多 batch、多轮处理或长归约。\r\n- **跳过/能力限制（Skip if）**：单次调用中没有随输入规模变化的批次、轮次或归约长度。\r\n\r\n- 具体构造方式\r\n  - `nondegenerate` — **多轮处理**：将相关规模从单次扩至多次并继续增大，覆盖合法中间空批次和最后一轮，以检验循环推进与批次偏移。\r\n  - `long_reduce` — **长归约 / 大K导致累计误差或归约路径切换**：增大已确定归约轴，并在实现切换点两侧对照，以检验长归约累计误差和分段处理。\r\n\r\n#### 参考案例\r\n\r\n1. **S9-01**：**多 batch 的偏移推进。** 若单次调用按 batch 循环，令 batch=1、2、4，再跨越一轮可处理数量；每个 batch 用不同值，检查第二个 batch 与末轮输出。\r\n2. **S9-02**：**长归约。** 若 K 影响分段归约或累加路径，围绕切换点取样，先同号小值，再正负抵消。FusedMatMul #511 的 K>1万可作规模线索，记录实际路径与误差随 K 的变化。\r\n3. **S9-03**：**输出重复扩展。** 对 RepeatInterleave/Tile 等参数，测试 repeats=1、2、3，支持数组时使用不同重复次数；小样本手工展开，较大样本检查输出总数与最后一段。\r\n4. **S9-04**：**多轮中的空成员。** 若列表/分组调用的循环中可能遇到空组，把空组夹在两个非空组之间；后组放非零数据，检查早退分支之后是否继续处理。\r\n5. **S9-05**：**归约尾缓冲跨轮覆写。** BNTrainingUpdateGrad 在 arch35 ND、R=1 时，以实际 VL_FP32 为单位构造 N<2*VL、N=2*VL 及邻近合法 N，并确认 tailG/tailP 复用轮数。每轮设置不同的有限值，使丢/重计 lane 对部分和可见；依据该梯度公式计算参考，配合 E1 重复。ops-nn#6021 的关键是 Vector ReduceSum 尚未读完而 Scalar 写下一轮，不能用当前源码的顺序执行假设代替 V_S 依赖。\r\n6. **S9-06**：**Gather 非尾轴的多轮输出。** 以 GatherElementsV2 的 x FP32[8192,128]、index[8192,8]、dim=0 为入口，index 在 [0,8192) 内；令输入按行编码，逐元素参考为 x[index[i,j],j]。报告给出 INT32 索引路径，但框架/CPU 参考接口可能要求 INT64，须分别满足契约并确认目标仍命中待测 kernel。配合 E1，覆盖多轮与较小对照，检查输出首尾行。ops-nn#1542 的缺边为上一轮 MTE3 搬出与下一轮 Vector 复用 UB 之间的 MTE3_V。\r\n7. **S9-07**：**EmbeddingBag sum 的循环累加。** 对 950 的 EmbeddingBag 1D sum 路径，用合法 offsets/indices 构造多个 bag，长度跨核内循环阈值；每个 embedding 行用可精确求和的小整数，包含重复索引但不越界。按 bag 逐项求和，E1 中每轮重新设置所有可变状态。ops-nn#1748 报告重复输出 MD5 不同并补 V_S；数值校验应依据 sum 契约，不能仅把 MD5 改变认作精度失败。\r\n8. **S9-08**：**RadixTopK 多 shape 调用序列。** ops-math#2757 给出按顺序执行 (1,908209),k=1254 → (1,7847955),k=3796 → (1,67815225),k=3802 的入口，报告单独执行最后一组正常而串行批跑失败。按 E2 比较独立进程、原顺序与重排顺序；每组使用保存的有限输入，核对选中集合、值索引配对与排序契约。估算显存后执行原规模，缩小后须重新确认仍触发。这里的“批跑”是多个调用，不是增大张量 batch 维；同 PR 的系统 workspace 容量问题 #3007 另行处理。\r\n9. **S9-09**：**AllGatherMatmul 的 scale stage 环回。** 在 A2/A3 的 AllGatherMatmulV2 反量化路径，使用接口支持的 per-channel、per-token 与双 scale 组合，让相邻 token/通道 scale 不同。通过合法 shape 使 stage 完成首次装入、至少一次环回和末次消费，并记录 stage 数与循环次数；各 rank 使用不同数据，按真实拼接轴构造 AllGather 后矩阵乘参考。ops-transformer#5916 是 MTE2 在 Vector 读完 scale 前覆写 stage；按 E5 保存 rank 拓扑，单卡模拟结果不能代替通信路径的同步覆盖。\r\n10. **S9-10**：**TopKV2 排名约束与队列复用。** 对 950/CANN 9.1.0 TopKV2，先用互异有限值构造会经过多轮排序的合法 shape/k，按 E1 重复；再加并列值并按接口允许的 tie 规则校验。检查每个返回值对应其索引、选中集合是否为 TopK，以及 sorted 模式下的单调性。ops-math#2641 报告排名违反，修复包含队列生命周期和 S_V/V_S 两部分；单纯并列元素换序不是该精度失败判据，精确历史 shape 尚缺。\r\n\r\n## I 索引模式"
+  },
+  {
+    "scheme": "V4",
+    "definition_version": "V4:e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+    "id": "T3",
+    "name": "格式转换（Format Conversion）",
+    "definition": "特意构造输入/输出格式不同、转置和轴顺序替换。",
+    "requires": [
+      "存在格式、轴顺序、表示或 dtype 写出转换。"
+    ],
+    "skip_if": [
+      "调用过程没有目标格式、维序或类型转换。"
+    ],
+    "construction_ids": [
+      "axis_order",
+      "enum_layout"
+    ],
+    "constructions": [
+      {
+        "id": "axis_order",
+        "name": "维序 / rank / 归约轴选择",
+        "definition": "切换合法首末轴、负轴与轴组合，以检验轴规范化、秩和视图索引路径。",
+        "source_quote": [
+          {
+            "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\knowledge\\precision_trigger_knowledge_v4.md",
+            "line_start": 441,
+            "line_end": 441,
+            "source_quote": "  - `axis_order` — **维序 / rank / 归约轴选择**：切换合法首末轴、负轴与轴组合，以检验轴规范化、秩和视图索引路径。"
+          },
+          {
+            "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\knowledge\\precision_trigger_knowledge_v4.md",
+            "line_start": 558,
+            "line_end": 558,
+            "source_quote": "  - `axis_order` — **维序 / rank / 归约轴选择**：切换合法首末轴、负轴与轴组合，以检验轴规范化、秩和视图索引路径。"
+          }
+        ]
+      },
+      {
+        "id": "enum_layout",
+        "name": "layout / format / 转置模式",
+        "definition": "选择合法layout、format或转置模式并提供对应存储，以检验格式相关路径。",
+        "source_quote": [
+          {
+            "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\knowledge\\precision_trigger_knowledge_v4.md",
+            "line_start": 535,
+            "line_end": 535,
+            "source_quote": "  - `enum_layout` — **layout / format / 转置模式**：选择合法layout、format或转置模式并提供对应存储，以检验格式相关路径。"
+          },
+          {
+            "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\knowledge\\precision_trigger_knowledge_v4.md",
+            "line_start": 559,
+            "line_end": 559,
+            "source_quote": "  - `enum_layout` — **layout / format / 转置模式**：选择合法layout、format或转置模式并提供对应存储，以检验格式相关路径。"
+          }
+        ]
+      }
+    ],
+    "source_file": "sources/original/precision_trigger_knowledge_v4.md",
+    "source_sha256": "e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+    "source_quote": "### T3 格式转换（Format Conversion）\r\n\r\n- **条件定义**：特意构造输入/输出格式不同、转置和轴顺序替换。\r\n- **检验目的**：检验格式转换是否同步更新shape、stride、scale和输出解释。\r\n- **适用前提（Requires）**：存在格式、轴顺序、表示或 dtype 写出转换。\r\n- **跳过/能力限制（Skip if）**：调用过程没有目标格式、维序或类型转换。\r\n\r\n- 具体构造方式\r\n  - `axis_order` — **维序 / rank / 归约轴选择**：切换合法首末轴、负轴与轴组合，以检验轴规范化、秩和视图索引路径。\r\n  - `enum_layout` — **layout / format / 转置模式**：选择合法layout、format或转置模式并提供对应存储，以检验格式相关路径。\r\n\r\n#### 参考案例\r\n\r\n1. **T3-01**：**输入输出格式不同。** 若 descriptor 从输入/输出读取格式，选择接口允许的转换对，形状和数据都不对称；解码输出后比较。Conv3DV2 #1058 涉及输出格式不同于输入时的 descriptor 读取，可检查输出 shape 与存储解释。\r\n2. **T3-02**：**转置同时变更辅助参数。** 若 transA/transB 改变 K/N 内外轴，用同一数学矩阵构造各存储形式，并给 scale/bias 非均匀值。QuantBatchMatMulV3 #1062 的 transB 与 scale 搬运关系可参考这一组合。\r\n3. **T3-03**：**不同字节宽度写出。** 若输出 cast/搬运长度依赖 dtype，构造合法输入输出混合类型，把尾元素设为独特值，检查声明类型、实际编码和写回长度。Reduce #171 提供输入输出字节数不一致时搬出的线索。\r\n4. **T3-04**：**重排往返。** 若实现执行 permute、ND↔NZ 或轴顺序转换，准备各轴不同的输入，做支持的正反转换并比较有效元素。带量化/cast 的转换则按相应精度标准比较数值，并检查 scale 轴与有效区域。\r\n5. **T3-05**：**格式转换后使用输出。** 若转换结果继续进入归约或矩阵乘，选择非对称 shape，先检查转换后的逻辑值，再用转换结果执行一个有清晰参考的下游操作。检查 descriptor、shape、stride 和 scale 轴是否与真实输出一致。\r\n\r\n## C 控制"
+  },
+  {
+    "scheme": "V4",
+    "definition_version": "V4:e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+    "id": "I2",
+    "name": "索引端点（Index Endpoints）",
+    "definition": "覆盖0、1、N−1、padding边界、block边界及允许的N/N+1语义。",
+    "requires": [
+      "存在显式索引、切片端点或可由 shape/几何推导的地址边界。"
+    ],
+    "skip_if": [
+      "接口与实现中没有目标有效域或端点映射。"
+    ],
+    "construction_ids": [
+      "index_edge"
+    ],
+    "constructions": [
+      {
+        "id": "index_edge",
+        "name": "索引0、1、-1及N边界邻域",
+        "definition": "覆盖首末合法索引与允许的负索引/哨兵，以检验有效域端点；越界值另作校验测试。",
+        "source_quote": [
+          {
+            "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\knowledge\\precision_trigger_knowledge_v4.md",
+            "line_start": 460,
+            "line_end": 460,
+            "source_quote": "  - `index_edge` — **索引0、1、-1及N边界邻域**：覆盖首末合法索引与允许的负索引/哨兵，以检验有效域端点；越界值另作校验测试。"
+          }
+        ]
+      }
+    ],
+    "source_file": "sources/original/precision_trigger_knowledge_v4.md",
+    "source_sha256": "e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+    "source_quote": "### I2 索引端点（Index Endpoints）\r\n\r\n- **条件定义**：覆盖0、1、N−1、padding边界、block边界及允许的N/N+1语义。\r\n- **检验目的**：检验有效域、padding 和分块边界的端点处理。\r\n- **适用前提（Requires）**：存在显式索引、切片端点或可由 shape/几何推导的地址边界。\r\n- **跳过/能力限制（Skip if）**：接口与实现中没有目标有效域或端点映射。\r\n\r\n- 具体构造方式\r\n  - `index_edge` — **索引0、1、-1及N边界邻域**：覆盖首末合法索引与允许的负索引/哨兵，以检验有效域端点；越界值另作校验测试。\r\n\r\n#### 参考案例\r\n\r\n1. **I2-01**：**首末有效索引。** 对 gather/index 的边界判断，在 N≥2 时取 0、1、N-1，数据逐位置不同；接口支持负下标时加入 -1，检查首尾读取与写入。\r\n2. **I2-02**：**切片开闭端点。** 若 end 为半开区间端点，比较 end=N 与 N-1，允许时测试 begin=end；用明确序列验证输出长度与末元素。\r\n3. **I2-03**：**块边界邻域。** 若下标按 A 分块，对照 A-1、A、A+1 与末个合法位置。TrilTriu #1553 的 diagonal 与搬入行在 32B 边界附近的情形可参考几何端点和块端点共同变化。\r\n4. **I2-04**：**padding 与延拓端点。** 若窗口或采样允许边界延拓，分别让派生坐标落在 N-1、N、N+1，按裁切/填充规则计算参考；检查零权重位置、边缘读取和最后一项。\r\n5. **I2-05**：**多维索引的角点与进位。** 若 gather/scatter 接受多维索引，取全零、各轴末位置和最后角点，再选择相邻逻辑位置跨越一行的索引对。用坐标编码数据，按各轴合法范围检查展平乘积与跨轴进位。"
+  },
+  {
+    "scheme": "V4",
+    "definition_version": "V4:e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+    "id": "I3",
+    "name": "地址溢出（Address Overflow）",
+    "definition": "增大参与地址计算的合法维度和offset乘积。",
+    "requires": [
+      "shape/stride/index 进入内部窄整数计数、乘积或字节偏移计算。"
+    ],
+    "skip_if": [
+      "实现不存在相应位宽边界，或资源不足以承载目标地址跨度。"
+    ],
+    "construction_ids": [
+      "index_overflow"
+    ],
+    "constructions": [
+      {
+        "id": "index_overflow",
+        "name": "大张量引起内部索引 / 地址乘积溢出",
+        "definition": "增大参与地址计算的轴并检查乘积与累计offset，以检验合法寻址中的内部索引位宽。",
+        "source_quote": [
+          {
+            "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\knowledge\\precision_trigger_knowledge_v4.md",
+            "line_start": 478,
+            "line_end": 478,
+            "source_quote": "  - `index_overflow` — **大张量引起内部索引 / 地址乘积溢出**：增大参与地址计算的轴并检查乘积与累计offset，以检验合法寻址中的内部索引位宽。"
+          }
+        ]
+      }
+    ],
+    "source_file": "sources/original/precision_trigger_knowledge_v4.md",
+    "source_sha256": "e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+    "source_quote": "### I3 地址溢出（Address Overflow）\r\n\r\n- **条件定义**：增大参与地址计算的合法维度和offset乘积。\r\n- **检验目的**：检验内部索引、计数、乘积及累计地址偏移的位宽范围。\r\n- **适用前提（Requires）**：shape/stride/index 进入内部窄整数计数、乘积或字节偏移计算。\r\n- **跳过/能力限制（Skip if）**：实现不存在相应位宽边界，或资源不足以承载目标地址跨度。\r\n\r\n- 具体构造方式\r\n  - `index_overflow` — **大张量引起内部索引 / 地址乘积溢出**：增大参与地址计算的轴并检查乘积与累计offset，以检验合法寻址中的内部索引位宽。\r\n\r\n#### 参考案例\r\n\r\n1. **I3-01**：**线性索引乘积。** 看到 `int32` 等窄整数保存下标时，写出 `off=Σ(index_i*stride_i)`，围绕真实位宽上限选择合法 shape 与末端 index。Index #900 涉及长度 2147483649 的 bool 输入，可在资源允许时检验末端地址。\r\n2. **I3-02**：**元素偏移转字节。** 若 `offset*itemsize` 用窄类型计算，固定元素规模改变 dtype 宽度，比较乘字节数前后是否跨边界。TopKV2 #1238 的大 shape/workspace 地址可参考这种乘积。\r\n3. **I3-03**：**乘法发生在类型提升之前。** 对 `int64_offset = a*b+c`，确认 a*b 的运算类型，选择乘积超过其范围而宽类型可表示的参数。用宽整数计算所有中间值，再检查实际地址与数据。\r\n4. **I3-04**：**分块 workspace 偏移。** 若公式为 `block_id*workspace_stride`，分别增大块数、块大小或对齐后跨度，使中间乘积跨阈值。分配前核算底层容量；资源不足时保留公式级样本和所需内存估计。\r\n5. **I3-05**：**累计偏移溢出。** 若地址来自组长前缀和而非单次乘积，构造每组长度均能表示、累计长度接近内部类型上限的输入。用宽整数计算每个累计边界，检查溢出发生前后各组起点；执行前按累计长度核算底层容量。"
+  },
+  {
+    "scheme": "V4",
+    "definition_version": "V4:e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+    "id": "I4",
+    "name": "有效命中（Valid Coverage）",
+    "definition": "构造部分有效、全部有效、全部被mask和混合命中。",
+    "requires": [
+      "mask/padding/有效索引集合、过滤或内部有效块选择存在。"
+    ],
+    "skip_if": [
+      "没有有效/无效集合或跳过语义。"
+    ],
+    "construction_ids": [
+      "index_mask"
+    ],
+    "constructions": [
+      {
+        "id": "index_mask",
+        "name": "索引命中或避开mask / padding / 无效位置",
+        "definition": "固定mask或有效域并构造全命中、全避开、混合命中，以检验筛选和跳过行为。",
+        "source_quote": [
+          {
+            "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\knowledge\\precision_trigger_knowledge_v4.md",
+            "line_start": 496,
+            "line_end": 496,
+            "source_quote": "  - `index_mask` — **索引命中或避开mask / padding / 无效位置**：固定mask或有效域并构造全命中、全避开、混合命中，以检验筛选和跳过行为。"
+          },
+          {
+            "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\knowledge\\precision_trigger_knowledge_v4.md",
+            "line_start": 649,
+            "line_end": 649,
+            "source_quote": "  - `index_mask` — **索引命中或避开mask / padding / 无效位置**：固定mask或有效域并构造全命中、全避开、混合命中，以检验筛选和跳过行为。"
+          }
+        ]
+      }
+    ],
+    "source_file": "sources/original/precision_trigger_knowledge_v4.md",
+    "source_sha256": "e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+    "source_quote": "### I4 有效命中（Valid Coverage）\r\n\r\n- **条件定义**：构造部分有效、全部有效、全部被mask和混合命中。\r\n- **检验目的**：检验筛选、跳过、padding和有效位置处理。\r\n- **适用前提（Requires）**：mask/padding/有效索引集合、过滤或内部有效块选择存在。\r\n- **跳过/能力限制（Skip if）**：没有有效/无效集合或跳过语义。\r\n\r\n- 具体构造方式\r\n  - `index_mask` — **索引命中或避开mask / padding / 无效位置**：固定mask或有效域并构造全命中、全避开、混合命中，以检验筛选和跳过行为。\r\n\r\n#### 参考案例\r\n\r\n1. **I4-01**：**命中比例。** 若代码按有效索引集合过滤，构造全命中、全跳过、混合命中；使用合法 padding/过滤标记，检查有效输出与被跳过位置。\r\n2. **I4-02**：**跳过后继续。** 看到 `continue/break` 或提前返回分支时，把过滤项放在首、中、尾，后续安排非零有效更新。EmbeddingDenseGradV2 #1182 可参考 padding 项后仍需推进并处理有效数据的情形。\r\n3. **I4-03**：**全 mask 与部分 mask。** 对 attention/归约输入构造全有效、部分有效、全遮蔽行，明确布尔或加性编码。分别按接口规定检查有效值与全遮蔽结果。\r\n4. **I4-04**：**无效块后的有效块。** 若分核调度逐轮判断有效性，按实际调度公式构造某轮无效、后轮有效的 shape；每块用不同数据，检查后续块是否执行。Conv3DBackpropInputV2 #1027 可参考这一循环场景。\r\n\r\n## T 存储"
+  },
+  {
+    "scheme": "V4",
+    "definition_version": "V4:e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+    "id": "T1",
+    "name": "步长视图（Strided Views）",
+    "definition": "用转置、步进切片、零步长广播和非零offset构造合法view。",
+    "requires": [
+      "调用入口与执行器都能保留合法 stride/storage_offset。"
+    ],
+    "skip_if": [
+      "调用入口或执行器将输入统一实体化，无法保留目标 stride/offset。"
+    ],
+    "construction_ids": [
+      "view_stride"
+    ],
+    "constructions": [
+      {
+        "id": "view_stride",
+        "name": "视图寻址变化",
+        "definition": "以合法切片、转置、零步长广播或非零offset构造视图，并保证底层存储足够，以检验非标准寻址。",
+        "source_quote": [
+          {
+            "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\knowledge\\precision_trigger_knowledge_v4.md",
+            "line_start": 515,
+            "line_end": 515,
+            "source_quote": "  - `view_stride` — **视图寻址变化**：以合法切片、转置、零步长广播或非零offset构造视图，并保证底层存储足够，以检验非标准寻址。"
+          }
+        ]
+      }
+    ],
+    "source_file": "sources/original/precision_trigger_knowledge_v4.md",
+    "source_sha256": "e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+    "source_quote": "### T1 步长视图（Strided Views）\r\n\r\n- **条件定义**：用转置、步进切片、零步长广播和非零offset构造合法view。\r\n- **检验目的**：检验shape/stride/offset寻址；view可连续，offset不必然表示非连续。\r\n- **适用前提（Requires）**：调用入口与执行器都能保留合法 stride/storage_offset。\r\n- **跳过/能力限制（Skip if）**：调用入口或执行器将输入统一实体化，无法保留目标 stride/offset。\r\n\r\n- 具体构造方式\r\n  - `view_stride` — **视图寻址变化**：以合法切片、转置、零步长广播或非零offset构造视图，并保证底层存储足够，以检验非标准寻址。\r\n\r\n#### 参考案例\r\n\r\n1. **T1-01**：**转置 view。** 若代码按 shape/stride 计算地址，使用非方形二维张量的 transpose view，并以同逻辑值的 contiguous 副本对照。Matmul #2707 可参考非连续转置输入路径。\r\n2. **T1-02**：**步进切片。** 构造底层容量足够的 `x[...,::2]`，记录调用时 stride，与连续副本比较。Concat #2165 涉及把 shape 当作 stride 的偏移问题，成员之间使用不同步长更容易显露。\r\n3. **T1-03**：**零步长广播。** 若只读输入支持 expand，构造某轴 stride=0，与显式复制的同值 tensor 对照；检查广播索引、地址推进和重复读取。\r\n4. **T1-04**：**非零 storage_offset。** 选择连续子区间 `x[1:]` 和非连续子视图，分别与 offset=0 的同值副本比较；检查首地址与步长两部分计算，记录设备搬运后的实际元数据。\r\n5. **T1-05**：**多轴非标准 stride。** 若寻址同时使用多个 stride，构造三维输入的合法 permute 后步进切片，记录每轴 stride 和 offset，与同值连续副本比较。使用不等轴长，检查外层推进与内层步进的组合。\r\n6. **T1-06**：**输出视图写回。** 若接口支持具有显式 stride 的非重叠 out tensor，在更大底层存储中选择有间隔的合法输出 view，初始化非目标区域为哨兵。检查目标位置值及周边区域，分别改变输出 stride 和起点 offset。\r\n7. **T1-07**：**零 stride 索引与行累加依赖。** ScatterAddWithSorted 的报告入口为 FP32 self[256,3]、src[512,3]，index INT64[512,3]、stride=[1,0]。用 rows=randperm(512)%256，再 expand 成三列；src=arange(1536).reshape(512,3)%128，self 初始为零。按每行两个更新精确求和，每次恢复 self 后执行 E1，并以同值连续 index 对照。ops-nn#6782 在 910B3/CANN 9.1.0 的确定性模式仍失败；报告区分了 UB→UB DataCopy 后缺 PIPE_V 的错算与索引重填缺 S_MTE2 的 WAR。保留到设备上的实际 stride，不为测试便利自动 contiguous。"
+  },
+  {
+    "scheme": "V4",
+    "definition_version": "V4:e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+    "id": "T2",
+    "name": "布局与打包格式（Layout and Packing Formats）",
+    "definition": "选择ND/NCHW/NHWC/NZ及接口支持的物理打包格式，并提供匹配storage。",
+    "requires": [
+      "API 支持多 layout/format 或物理打包表示，且可构造匹配存储。"
+    ],
+    "skip_if": [
+      "接口或执行器不支持目标布局及对应物理存储。"
+    ],
+    "construction_ids": [
+      "enum_layout"
+    ],
+    "constructions": [
+      {
+        "id": "enum_layout",
+        "name": "layout / format / 转置模式",
+        "definition": "选择合法layout、format或转置模式并提供对应存储，以检验格式相关路径。",
+        "source_quote": [
+          {
+            "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\knowledge\\precision_trigger_knowledge_v4.md",
+            "line_start": 535,
+            "line_end": 535,
+            "source_quote": "  - `enum_layout` — **layout / format / 转置模式**：选择合法layout、format或转置模式并提供对应存储，以检验格式相关路径。"
+          },
+          {
+            "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\knowledge\\precision_trigger_knowledge_v4.md",
+            "line_start": 559,
+            "line_end": 559,
+            "source_quote": "  - `enum_layout` — **layout / format / 转置模式**：选择合法layout、format或转置模式并提供对应存储，以检验格式相关路径。"
+          }
+        ]
+      }
+    ],
+    "source_file": "sources/original/precision_trigger_knowledge_v4.md",
+    "source_sha256": "e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+    "source_quote": "### T2 布局与打包格式（Layout and Packing Formats）\r\n\r\n- **条件定义**：选择ND/NCHW/NHWC/NZ及接口支持的物理打包格式，并提供匹配storage。\r\n- **检验目的**：检验逻辑shape、物理shape、块填充和位宽打包的一致性。\r\n- **适用前提（Requires）**：API 支持多 layout/format 或物理打包表示，且可构造匹配存储。\r\n- **跳过/能力限制（Skip if）**：接口或执行器不支持目标布局及对应物理存储。\r\n\r\n- 具体构造方式\r\n  - `enum_layout` — **layout / format / 转置模式**：选择合法layout、format或转置模式并提供对应存储，以检验格式相关路径。\r\n\r\n#### 参考案例\r\n\r\n1. **T2-01**：**二维图像布局：NCHW/NHWC。** 若 `data_format` 改变通道位置，从同一逻辑图像构造接口支持的两种存储，令 C/H/W 不同并同步权重和属性。Conv2DV2 #2569 提供布局线索，输出还原到同一逻辑顺序后检查通道与边缘。\r\n2. **T2-02**：**三维图像布局：NCDHW/NDHWC。** 对支持的 3D 布局，令 D/H/W/C 取不同合法长度，逐轴编码，再同步转换核/梯度参数。ConvolutionBackward #1584 提供 NCDHW 路径线索，重点检查深度轴与通道轴的步长。\r\n3. **T2-03**：**ND/FRACTAL_NZ 输入组合。** 若实现区分 `isNzA/isNzB/weightNZ`，分别构造支持的 A/B 格式组合，采用非整块逻辑尺寸和独特尾值。BatchMatMulV3 #2935 可参考 A=ND、B=FRACTAL_NZ，检查物理补齐及有效输出。\r\n4. **T2-04**：**物理格式与转置组合。** 固定同一数学矩阵，对支持的 NZ/ND 分别切换 aTrans/bTrans，按模式准备匹配存储。QbmmV3 #1576 的 NZ 与 aTrans 组合可作线索；给各 batch 不同值，检查转置后的批次偏移与辅助参数轴。\r\n5. **T2-05**：**定长序列布局：BSH/BNSD。** 若接口支持这些布局，按其定义令 H=N*D，用可区分的 B/S/N/D 构造同一逻辑 QKV 并重排。先固定各样本序列长度，比较还原后的结果及头映射。\r\n6. **T2-06**：**packed 序列布局：TND/NTD。** 在接口支持时用不等有效长度准备 token 拼接及累计边界，按布局定义放置 N/D 轴。FlashAttentionScoreGrad #1540 和 Common #734 提供 TND/NTD 线索；检查各样本首 token、尾 token 和跨样本边界。\r\n7. **T2-07**：**INT4/FP4 半字节打包。** 若两个低位宽元素共用一字节，令高低半字节编码不同，覆盖正负值及合法末尾长度。IndexerQuantCache #4137 的 MX-FP4 headDim/stride 偶数关系可作线索，核对位序、符号和解包后的最后元素。\r\n8. **T2-08**：**块缩放载荷布局。** 若 MX/FP8 数据与块 scale 分开存储，给相邻数据块不同幅值和 scale，按接口的分组轴准备物理载荷，覆盖完整块与尾块。解包后逐块计算参考，检查 scale 偏移与数据块对应。\r\n9. **T2-09**：**按位 mask 存储。** 若布尔有效性打包到字节/字，构造单有效位、交替位及跨字节/字边界的有效区间，长度覆盖完整单元与余位。比较解码后的有效集合，检查位序、末单元填充和地址单位。\r\n10. **T2-10**：**KV 变长、Q 使用其他布局时的空 batch。** 在支持 KV=TND、Q 为另一种布局的 attention 接口中，构造中间 KV 有效长度为 0、两侧非空的 batch，并同步生成合法累计长度及 Q 元数据。仅在该版本允许空 KV 且规定对应非空输出的初始化语义时执行；用 E3 检查该 batch 的有效输出，同时核对后续 batch。ops-transformer#4160 摘要指出按错误的变长标志跳过清零，旧值残留；本条固定布局组合，再改变 KV 长度以隔离选路条件。"
+  },
+  {
+    "scheme": "V4",
+    "definition_version": "V4:e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+    "id": "C1",
+    "name": "低精度与混合精度（Low and Mixed Precision）",
+    "definition": "组合低精度dtype、输入/输出/累加dtype和量化模式，配合长归约、抵消和尾块。",
+    "requires": [
+      "接口支持低位宽或混合输入/输出/累加 dtype、量化载荷。"
+    ],
+    "skip_if": [
+      "接口只提供固定精度，且没有低位宽或混合类型组合。"
+    ],
+    "construction_ids": [
+      "enum_dtype",
+      "enum_quant",
+      "enum_compute"
+    ],
+    "constructions": [
+      {
+        "id": "enum_dtype",
+        "name": "dtype：低位宽与混合输入/输出类型",
+        "definition": "选择接口合法dtype及混合输入/输出组合，以检验对应精度与表示范围。",
+        "source_quote": [
+          {
+            "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\knowledge\\precision_trigger_knowledge_v4.md",
+            "line_start": 579,
+            "line_end": 579,
+            "source_quote": "  - `enum_dtype` — **dtype：低位宽与混合输入/输出类型**：选择接口合法dtype及混合输入/输出组合，以检验对应精度与表示范围。"
+          }
+        ]
+      },
+      {
+        "id": "enum_quant",
+        "name": "量化方法、位宽与粒度",
+        "definition": "选择合法量化方法、位宽、粒度与后处理，以检验各离散量化路径。",
+        "source_quote": [
+          {
+            "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\knowledge\\precision_trigger_knowledge_v4.md",
+            "line_start": 580,
+            "line_end": 580,
+            "source_quote": "  - `enum_quant` — **量化方法、位宽与粒度**：选择合法量化方法、位宽、粒度与后处理，以检验各离散量化路径。"
+          },
+          {
+            "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\knowledge\\precision_trigger_knowledge_v4.md",
+            "line_start": 602,
+            "line_end": 602,
+            "source_quote": "  - `enum_quant` — **量化方法、位宽与粒度**：选择合法量化方法、位宽、粒度与后处理，以检验各离散量化路径。"
+          }
+        ]
+      },
+      {
+        "id": "enum_compute",
+        "name": "计算精度 / 舍入模式",
+        "definition": "选择合法计算精度或舍入模式，以检验同一操作的不同数值实现。",
+        "source_quote": [
+          {
+            "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\knowledge\\precision_trigger_knowledge_v4.md",
+            "line_start": 581,
+            "line_end": 581,
+            "source_quote": "  - `enum_compute` — **计算精度 / 舍入模式**：选择合法计算精度或舍入模式，以检验同一操作的不同数值实现。"
+          },
+          {
+            "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\knowledge\\precision_trigger_knowledge_v4.md",
+            "line_start": 601,
+            "line_end": 601,
+            "source_quote": "  - `enum_compute` — **计算精度 / 舍入模式**：选择合法计算精度或舍入模式，以检验同一操作的不同数值实现。"
+          }
+        ]
+      }
+    ],
+    "source_file": "sources/original/precision_trigger_knowledge_v4.md",
+    "source_sha256": "e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+    "source_quote": "### C1 低精度与混合精度（Low and Mixed Precision）\r\n\r\n- **条件定义**：组合低精度dtype、输入/输出/累加dtype和量化模式，配合长归约、抵消和尾块。\r\n- **检验目的**：检验表示精度、类型转换、量化打包和计算精度不匹配。\r\n- **适用前提（Requires）**：接口支持低位宽或混合输入/输出/累加 dtype、量化载荷。\r\n- **跳过/能力限制（Skip if）**：接口只提供固定精度，且没有低位宽或混合类型组合。\r\n\r\n- 具体构造方式\r\n  - `enum_dtype` — **dtype：低位宽与混合输入/输出类型**：选择接口合法dtype及混合输入/输出组合，以检验对应精度与表示范围。\r\n  - `enum_quant` — **量化方法、位宽与粒度**：选择合法量化方法、位宽、粒度与后处理，以检验各离散量化路径。\r\n  - `enum_compute` — **计算精度 / 舍入模式**：选择合法计算精度或舍入模式，以检验同一操作的不同数值实现。\r\n\r\n#### 参考案例\r\n\r\n1. **C1-01**：**FP16 与 BF16 输入。** 从同一生成源转换为接口支持的两种低精度输入，分别构造接近可表示间隔、较大动态范围和普通值的样本。参考从各自实际输入提升精度计算，检查表示精度与计算结果。\r\n2. **C1-02**：**输入输出类型不同。** 若 API 支持混合输入/输出 dtype，固定数学运算，枚举合法组合并加入尾块和独特末值。MatMul #3980 的 FP16/BF16 输出路径可作线索，分别检查数值转换、输出编码与搬运长度。\r\n3. **C1-03**：**低位宽整数乘法：A8W8/A8W4。** 对支持的整数载荷组合，使用正负值、不同 scale 和非整块 M/N/K。QuantBatchMatMulV4 #1298 提供 A8W4 与 workspace 分块线索，参考显式解量化后计算，检查分组及打包尾部。\r\n4. **C1-04**：**浮点激活与整数权重。** 若接口支持 A16W8 等混合载荷，固定浮点激活，令不同权重通道/组使用不同 scale，再覆盖 bias 与输出类型。检查权重解量化、混合乘法和后处理的类型及轴对应。\r\n5. **C1-05**：**FP8 载荷。** 对接口支持的 FP8 格式，构造可表示范围边缘、小量与普通值，并为各通道/组准备匹配 scale。显式解码实际输入后计算参考，分别观察输入量化损失与计算误差。\r\n6. **C1-06**：**MXFP4 与块 scale。** 若模板使用低位宽数据和指数 scale，令相邻块幅值不同并覆盖转置和末块。QuantBatchMatMulV3 #1062 中的 `FLOAT4-E2M1` 数据与 `FLOAT8-E8M0` scale 可作具体组合线索，检查分组编码和实际 scale。\r\n7. **C1-07**：**累加与计算精度。** 若调用参数或模板决定乘积/累加精度，固定输入输出 dtype，构造长 K、大小量级混合和正负抵消。BatchMatMul #351 的 FP16/BF16 与 `KEEP_DTYPE` 条件可作选项线索，分别记录计算路径并按策略参考比较。"
+  },
+  {
+    "scheme": "V4",
+    "definition_version": "V4:e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+    "id": "C2",
+    "name": "数值策略（Numerical Policies）",
+    "definition": "选择计算精度、舍入、量化、累加、确定性和排序策略。",
+    "requires": [
+      "数值实现选项作为 API 参数暴露，如 compute/round/quant/accumulate/sort。"
+    ],
+    "skip_if": [
+      "数值策略既未作为 API 实参暴露，也无法通过合法实参选择相应路径。"
+    ],
+    "construction_ids": [
+      "enum_compute",
+      "enum_quant",
+      "enum_behavior"
+    ],
+    "constructions": [
+      {
+        "id": "enum_quant",
+        "name": "量化方法、位宽与粒度",
+        "definition": "选择合法量化方法、位宽、粒度与后处理，以检验各离散量化路径。",
+        "source_quote": [
+          {
+            "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\knowledge\\precision_trigger_knowledge_v4.md",
+            "line_start": 580,
+            "line_end": 580,
+            "source_quote": "  - `enum_quant` — **量化方法、位宽与粒度**：选择合法量化方法、位宽、粒度与后处理，以检验各离散量化路径。"
+          },
+          {
+            "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\knowledge\\precision_trigger_knowledge_v4.md",
+            "line_start": 602,
+            "line_end": 602,
+            "source_quote": "  - `enum_quant` — **量化方法、位宽与粒度**：选择合法量化方法、位宽、粒度与后处理，以检验各离散量化路径。"
+          }
+        ]
+      },
+      {
+        "id": "enum_compute",
+        "name": "计算精度 / 舍入模式",
+        "definition": "选择合法计算精度或舍入模式，以检验同一操作的不同数值实现。",
+        "source_quote": [
+          {
+            "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\knowledge\\precision_trigger_knowledge_v4.md",
+            "line_start": 581,
+            "line_end": 581,
+            "source_quote": "  - `enum_compute` — **计算精度 / 舍入模式**：选择合法计算精度或舍入模式，以检验同一操作的不同数值实现。"
+          },
+          {
+            "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\knowledge\\precision_trigger_knowledge_v4.md",
+            "line_start": 601,
+            "line_end": 601,
+            "source_quote": "  - `enum_compute` — **计算精度 / 舍入模式**：选择合法计算精度或舍入模式，以检验同一操作的不同数值实现。"
+          }
+        ]
+      },
+      {
+        "id": "enum_behavior",
+        "name": "训练、排序、累加等语义开关",
+        "definition": "选择合法训练、排序、累加或确定性选项，以检验行为相关路径。",
+        "source_quote": [
+          {
+            "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\knowledge\\precision_trigger_knowledge_v4.md",
+            "line_start": 603,
+            "line_end": 603,
+            "source_quote": "  - `enum_behavior` — **训练、排序、累加等语义开关**：选择合法训练、排序、累加或确定性选项，以检验行为相关路径。"
+          },
+          {
+            "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\knowledge\\precision_trigger_knowledge_v4.md",
+            "line_start": 650,
+            "line_end": 650,
+            "source_quote": "  - `enum_behavior` — **训练、排序、累加等语义开关**：选择合法训练、排序、累加或确定性选项，以检验行为相关路径。"
+          }
+        ]
+      }
+    ],
+    "source_file": "sources/original/precision_trigger_knowledge_v4.md",
+    "source_sha256": "e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+    "source_quote": "### C2 数值策略（Numerical Policies）\r\n\r\n- **条件定义**：选择计算精度、舍入、量化、累加、确定性和排序策略。\r\n- **检验目的**：检验同一操作下不同数值实现和累加顺序。\r\n- **适用前提（Requires）**：数值实现选项作为 API 参数暴露，如 compute/round/quant/accumulate/sort。\r\n- **跳过/能力限制（Skip if）**：数值策略既未作为 API 实参暴露，也无法通过合法实参选择相应路径。\r\n\r\n- 具体构造方式\r\n  - `enum_compute` — **计算精度 / 舍入模式**：选择合法计算精度或舍入模式，以检验同一操作的不同数值实现。\r\n  - `enum_quant` — **量化方法、位宽与粒度**：选择合法量化方法、位宽、粒度与后处理，以检验各离散量化路径。\r\n  - `enum_behavior` — **训练、排序、累加等语义开关**：选择合法训练、排序、累加或确定性选项，以检验行为相关路径。\r\n\r\n#### 参考案例\r\n\r\n1. **C2-01**：**`cubeMathType` 计算策略。** 若接口暴露 `KEEP_DTYPE`、`USE_FP16` 等策略，固定输入输出 dtype，用普通值、长归约和正负抵消分别对照合法选项。BatchMatMul #351、ConvolutionBackward #2026 提供选项线索；按当前接口枚举与精度语义建立参考。\r\n2. **C2-02**：**HF32 相关分派。** 若源码中 HF32 路径由调用实参和形状共同选择，覆盖使其生效与退出的完整条件。MatMulV3 #1365 的 M=1 退出线索可参考 M=1/2 对照，选能区分计算精度的数据并记录实际路径。\r\n3. **C2-03**：**舍入策略与转换实现。** 若接口暴露 rounding 属性，选择其支持的最近舍入、向零或有向舍入，在半格点两侧及正负坐标上比较各自参考；若选项只体现为内核 `CAST_CEIL/CAST_RINT/CAST_NONE`，通过 dtype/操作分派构造能进入该路径的实参。Sqrt #1505 和 MoeInitRoutingQuantV2 #613 可参考对应转换线索。\r\n4. **C2-04**：**动态与静态量化。** 对 API 允许的动态/静态选项，分别提供数据驱动或显式 scale，构造普通幅值、全零组与孤立大值。按各模式规则计算 scale 和量化码，检查选择路径、分母和饱和结果。\r\n5. **C2-05**：**量化粒度。** 若策略支持 per-tensor/per-token/per-channel/per-group，使用各轴可区分的数据及不同 scale。MlaPrologV3 #1783 的 KV per-tensor 与 GroupedMatmulSwigluQuantV2 #3880 的 weightScale 末维关系可作线索，分别准备合法形状并检查 scale 索引。\r\n6. **C2-06**：**MX 模式选择。** 若 `quantMode` 决定 MXFP4/MXFP8 等路径，给每种模式准备规定的数据编码、块 scale 和可选参数。MoeInitRoutingV3 #3097 的 MXFP4（该案 quantMode=9）可作入口线索，检查模式选择、输出结构及解码后的值。\r\n7. **C2-07**：**累加与覆盖：`accumulate`。** 若 API 支持选择累加/覆盖，目标先设非零值，索引先用唯一目标，再对支持重复目标的模式构造冲突。分别按该模式契约计算参考，检查初始值是否参与和更新次数。\r\n8. **C2-08**：**输出排序：`sorted`。** 对暴露 sorted 的 TopK 等接口，先用互异值比较排序/非排序输出，再加入并列值。校验值与索引配对、选中集合和排序模式要求；非排序模式按允许的输出顺序判定。\r\n9. **C2-09**：**并列稳定性：`stable`。** 若接口暴露稳定排序选项，构造带可追踪原始位置的重复值，并把相等值放在不同分块。稳定模式检查相等值的原始顺序，其他模式按对应契约检查值序和索引集合。\r\n10. **C2-10**：**确定性选项。** 若确定性作为调用参数暴露，在同一组重复索引或归约输入上切换选项，分别检查参考误差，并重复执行记录结果一致性。IndexAdd #1444 提供确定性路径线索；保存选项值、输入与实际执行路径。"
+  },
+  {
+    "scheme": "V4",
+    "definition_version": "V4:e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+    "id": "C3",
+    "name": "操作策略（Operation Policies）",
+    "definition": "选择reduce、norm、activation、interpolate、boundary和fusion变体。",
+    "requires": [
+      "输入属性选择 reduce/norm/activation/interpolate/boundary/fusion 等操作。"
+    ],
+    "skip_if": [
+      "接口没有操作、融合或有效区域的模式参数。"
+    ],
+    "construction_ids": [
+      "enum_operation",
+      "enum_mask"
+    ],
+    "constructions": [
+      {
+        "id": "enum_operation",
+        "name": "操作种类 / 融合路径",
+        "definition": "选择合法操作种类、算法变体或融合路径并使用对应参考，以检验各操作语义。",
+        "source_quote": [
+          {
+            "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\knowledge\\precision_trigger_knowledge_v4.md",
+            "line_start": 626,
+            "line_end": 626,
+            "source_quote": "  - `enum_operation` — **操作种类 / 融合路径**：选择合法操作种类、算法变体或融合路径并使用对应参考，以检验各操作语义。"
+          }
+        ]
+      },
+      {
+        "id": "enum_mask",
+        "name": "mask / 稀疏 / 边界模式",
+        "definition": "选择合法mask、稀疏或边缘模式，以检验模式规定的有效区域。",
+        "source_quote": [
+          {
+            "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\knowledge\\precision_trigger_knowledge_v4.md",
+            "line_start": 627,
+            "line_end": 627,
+            "source_quote": "  - `enum_mask` — **mask / 稀疏 / 边界模式**：选择合法mask、稀疏或边缘模式，以检验模式规定的有效区域。"
+          }
+        ]
+      }
+    ],
+    "source_file": "sources/original/precision_trigger_knowledge_v4.md",
+    "source_sha256": "e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+    "source_quote": "### C3 操作策略（Operation Policies）\r\n\r\n- **条件定义**：选择reduce、norm、activation、interpolate、boundary和fusion变体。\r\n- **检验目的**：检验操作语义、有效区域和融合中间结果。\r\n- **适用前提（Requires）**：输入属性选择 reduce/norm/activation/interpolate/boundary/fusion 等操作。\r\n- **跳过/能力限制（Skip if）**：接口没有操作、融合或有效区域的模式参数。\r\n\r\n- 具体构造方式\r\n  - `enum_operation` — **操作种类 / 融合路径**：选择合法操作种类、算法变体或融合路径并使用对应参考，以检验各操作语义。\r\n  - `enum_mask` — **mask / 稀疏 / 边界模式**：选择合法mask、稀疏或边缘模式，以检验模式规定的有效区域。\r\n\r\n#### 参考案例\r\n\r\n1. **C3-01**：**归约种类。** 若属性选择 sum/mean/max 等，使用正负混合、含零与并列最大值输入，逐个按操作计算参考；检查归约轴、输出 shape 与对应数值。\r\n2. **C3-02**：**范数种类。** 若参数选择 p=0/1/2 或接口支持的其他范数，对同一组含零、正负与不同幅值的数据分别计算参考。检查特殊公式分支、缩放以及输出类型。\r\n3. **C3-03**：**融合操作：`fused_op_type/fusedOpType`。** 若接口支持空操作、add、mul、relu 等分支，构造各分支能区分的结果：正负输出、非零附加项、不同乘数。MatMul #1405 的 relu 和 FusedMatMul #511 的操作值集可作线索；同时满足该操作对应 dtype/compute 约束，再与分步语义参考比较。\r\n4. **C3-04**：**插值方式。** 对支持 nearest/bilinear 等模式的接口，固定输入分辨率和坐标配置，取整数点、半格点及边缘位置。按各自取整/权重公式计算参考，检查模式实际生效。\r\n5. **C3-05**：**边界延拓方式。** 若属性选择填充、截断或反射等模式，固定采样方式，构造靠近边界及需要延拓的合法坐标；用首尾不同的数据，逐模式检查边缘值和有效范围。\r\n6. **C3-06**：**mask、稀疏与裁切模式。** 若属性选择 causal/window/custom、dropPadMode 等有效区域，构造窗口贴边、部分有效与全遮蔽行，逐模式核对有效集合及输出；让模式改变真实访问区域。\r\n7. **C3-07**：**双转置 ReLU 融合的搬出路径。** FusedMatmul 可使用 FP32 ND x1[2,526]、x2[5407,2]、bias[5407]，transpose_x1=true、transpose_x2=true、fused_op_type=relu、cubemathtype=3；逻辑乘法为 [526,2]×[2,5407]。构造融合前结果同时含正负值，参考为 relu(x1.T@x2.T+bias)，检查符号切换位置并配合 E1。ops-nn#1405 缺少 ReLU→MTE3 搬出的 V_MTE3，跨核等待路径也有调整；设备信息未给出，先核对目标接口对该组合的支持。\r\n8. **C3-08**：**Rasterizer 初始化后的覆盖与未覆盖像素。** 以顶点数 7695、面片数 4470、屏幕 480×640 为报告入口，按实际 Rasterizer 的坐标、深度及面片索引契约生成合法几何，安排已知覆盖区域、背景区域和有唯一深度胜者的重叠区域。保存几何与参考光栅结果，按 E1 重复，分别检查三类像素。ops-cv#233 在 910B/CANN 8.5.0 报告初始化后依赖不足；原坐标/连接关系未提供，以上是替代构造，不能声称已复现历史输入。该案 PIPE_ALL 的证据不等价于跨核同步。"
+  }
+]

@@ -1,0 +1,47 @@
+{
+  "id": "SEARCH-R1-RC-115",
+  "task_ids": [
+    "RC-115"
+  ],
+  "round": 1,
+  "question": "NaN hardware",
+  "tool": "mcp__codex_apps__github_search_issues",
+  "args": {
+    "query": "is:issue NaN hardware",
+    "repository_full_name": "Ascend/pytorch",
+    "topn": 3
+  },
+  "started_at": "2026-11-12T03:08:11.027Z",
+  "captured_at": "2026-11-12T03:08:11.853Z",
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "Action completed."
+      }
+    ],
+    "structuredContent": {
+      "issues": [
+        {
+          "url": "https://github.com/Ascend/pytorch/issues/186",
+          "title": "Nondeterministic output from repeated identical einsum + masked-softmax sequence (torch_npu 2.10.0, CANN 9.2.1, 950DT)",
+          "issue_number": 186,
+          "body": "### Environment\n\n- Hardware: Atlas 950DT (Ascend 950DT, 8x96GB HBM)\n- torch_npu: 2.10.0.post7, CANN 9.2.1 (docker image quay.nju.edu.cn/ascend/vllm-ascend:v0.30.0-a5), Python 3.12, aarch64\n- Mode: eager, single NPU\n\n### Steps to reproduce\n\nThe script below runs the same fp32 attention-like computation (einsum -> masked_fill(-inf) -> softmax -> nan_to_num -> einsum) 10 times on identical inputs. Outputs are not deterministic: repeats fall into 2-3 distinct result variants.\n\n```python\nimport logging\n\nimport torch\nimport torch_npu\n\n\ndef keep_set(selected_key_ids, query_start, query_count, key_count, window, sink, device):\n    query_positions = query_start + torch.arange(query_count, device=device)\n    key_positions = torch.arange(key_count, device=device)\n    read_mask = torch.zeros(query_count, key_count, dtype=torch.bool, device=device)\n    read_mask.scatter_(\n        1,\n        selected_key_ids.clamp_min(0).long(),\n        selected_key_ids != -1,\n    )\n    read_mask |= (query_positions[:, None] - key_positions[None, :] < window) | (\n        key_positions[None, :] < sink\n    )\n    read_mask &= query_positions[:, None] >= key_positions[None, :]\n    return read_mask\n\n\ndef topk_attention(q, k, v, selected_key_ids, window, sink, scale, query_start=0, query_block_size=128):\n    batch_size, query_count, query_head_count, head_dim = q.shape\n    key_count = k.shape[1]\n    kv_head_count = k.shape[2]\n    query_to_kv_head = torch.arange(query_head_count, device=q.device) // (query_head_count // kv_head_count)\n    output = torch.empty_like(q)\n    for batch_index in range(batch_size):\n        keys_by_query_head = k[batch_index].float()[:, query_to_kv_head, :]\n        values_by_query_head = v[batch_index].float()[:, query_to_kv_head, :]\n        for query_block_start in range(0, query_count, query_block_size):\n            query_block_end = min(query_block_start + query_block_size, query_count)\n            read_mask = keep_set(\n                selected_key_ids[batch_index, query_block_start:query_block_end],\n                query_start + query_block_start,\n                query_block_end - query_block_start,\n                key_count,\n                window,\n                sink,\n                q.device,\n            )\n            attention_logits = (\n                torch.einsum(\n                    \"qhd,shd->qhs\",\n                    q[batch_index, query_block_start:query_block_end].float(),\n                    keys_by_query_head,\n                )\n                * scale\n            )\n            attention_probabilities = torch.softmax(\n                attention_logits.masked_fill(~read_mask[:, None, :], float(\"-inf\")),\n                dim=-1,\n            )\n            output[batch_index, query_block_start:query_block_end] = torch.einsum(\n                \"qhs,shd->qhd\",\n                torch.nan_to_num(attention_probabilities),\n                values_by_query_head,\n            ).to(q.dtype)\n    return output\n\n\nlogging.basicConfig(level=logging.INFO, format=\"%(asctime)s %(message)s\")\ntorch.manual_seed(101)\nDEV = \"npu\"\nB, TQ, HQ, HKV, D = 2, 64, 8, 2, 64\nTK, WINDOW, SINK, BUDGET = 4096, 128, 0, 64\nSCALE = D ** -0.5\n\nq = torch.randn(B, TQ, HQ, D).to(DEV, torch.bfloat16)\nk = torch.randn(B, TK, HKV, D).to(DEV, torch.bfloat16)\nv = torch.randn(B, TK, HKV, D).to(DEV, torch.bfloat16)\nsel = torch.randint(0, TK - TQ, (B, TQ, BUDGET), dtype=torch.int32).to(DEV)\nsel[:, :, : BUDGET // 8] = -1\n\nouts = []\nfor i in range(10):\n    outs.append(topk_attention(q, k, v, sel, WINDOW, SINK, SCALE, query_start=TK - TQ))\n    torch.npu.synchronize()\n\nmx = max((outs[0].float() - outs[i].float()).abs().max().item() for i in range(1, 10))\nlogging.info(\"max diff across 10 repeats: %.5f\", mx)\n```\n\n### Observed behavior\n\n- Repeats produce distinct outputs: most runs land on one of two stable variants. Typical per-repeat max diff vs the first call: 0.0155 (21 of 128 query rows differ), occasionally 0.0259 (34 rows). Max diff across 10 repeats: **0.0259** (bf16 outputs, values order ~0.7).\n- Deviations appear on a small subset of query rows only and look like single softmax keys losing their weight (error magnitude ~ one key's contribution).\n- Not a seeding issue: inputs are created once and reused; only the op sequence is repeated.\n- A near-identical inline reimplementation of the same math (same shapes, same dtype flow, same masking) is fully deterministic across 10 repeats (max diff 0.0000) — the nondeterminism appears sensitive to how the mask / intermediate tensors are constructed (e.g. the extra `| (key_positions < sink)` term or tensor lifetime/layout), which suggests a varying kernel selection or a race rather than a mathematical property.\n\n### Expected behavior\n\nRepeated evaluation of the same deterministic fp32 computation on identical inputs should return identical results (up to fixed reduction order). The variation seen here (1e-2 absolute on ~0.7-magnitude outputs) breaks use as a reference/oracle implementation for parity testing.\n",
+          "state": null,
+          "user": null,
+          "assignees": null,
+          "labels": null,
+          "milestone": null,
+          "state_reason": null,
+          "comments": null,
+          "created_at": null,
+          "updated_at": null,
+          "closed_at": null,
+          "display_url": "https://github.com/Ascend/pytorch/issues/186",
+          "display_title": "Nondeterministic output from repeated identical einsum + masked-softmax sequence (torch_npu 2.10.0, CANN 9.2.1, 950DT)"
+        }
+      ]
+    },
+    "isError": false
+  }
+}

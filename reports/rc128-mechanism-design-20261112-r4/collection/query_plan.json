@@ -1,0 +1,2811 @@
+[
+  {
+    "task_id": "RC-001",
+    "route": "P",
+    "repository": "Ascend/pytorch",
+    "query": "rms_norm precision",
+    "source_quote": {
+      "description": "qwen3-1.7B模型推理结果mindie与torch_npu差异较多",
+      "reported_root_cause": "初步计划引导客户计算精度与模型效果分开看，但是需要一个昇腾背书的全面的报告说明这个误差在合理的范围之内 当前进展： 1、排查到ATB rms_norm算子有一个升精度后乘的操作，需要ATB算子进行接入。 2、排查到apply_rotary_pos_emb的实现有区别，需要对比transformers和mindie实现的区别，修改ROPE的实现。",
+      "status": "初步计划引导客户计算精度与模型效果分开看，但是需要一个昇腾背书的全面的报告说明这个误差在合理的范围之内 当前进展： 1、排查到ATB rms_norm算子有一个升精度后乘的操作，需要ATB算子进行接入。 2、排查到apply_rotary_pos_emb的实现有区别，需要对比transformers和mindie实现的区别，修改ROPE的实现。",
+      "weekly_progress": "客户340个问题在MindIE和Torch复现结果已出，只看answer部分，有58%的case不一致，语义不同占比31%，语义相同mindie有示例torch无示例占比15%，语义相同mindie无示例torch有示例占比11%，语义相同结构不同占比1%；",
+      "operator_or_function": [
+        "qwen3",
+        "torch_npu",
+        "ATB",
+        "rms_norm",
+        "apply_rotary_pos_emb",
+        "ROPE"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  },
+  {
+    "task_id": "RC-002",
+    "route": "REUSE",
+    "repository": "Ascend/pytorch",
+    "query": "pilot RC-002",
+    "source_quote": {
+      "description": "【九天】推理图差异",
+      "reported_root_cause": "2025/5/30：baddbmm升fp32后推理结果正常，现场已给算子同事提单 2025/5/28：baddbmm算子在同样的输入下npu计算后出现inf，但gpu正常，算子同事建议转fp32，实验中 2025/5/27: dump数据比对，发现latent输入有差异，torch.randn转cpu",
+      "status": "2025/5/30：baddbmm升fp32后推理结果正常，现场已给算子同事提单 2025/5/28：baddbmm算子在同样的输入下npu计算后出现inf，但gpu正常，算子同事建议转fp32，实验中 2025/5/27: dump数据比对，发现latent输入有差异，torch.randn转cpu",
+      "weekly_progress": "某一个训练模型，从gpu推理迁移到npu推理，出现很多噪声",
+      "operator_or_function": [
+        "baddbmm",
+        "latent",
+        "randn"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": [
+      {
+        "link": "https://gitcode.com/cann/ops-nn/pull/10622",
+        "title": "fix addmm and baddbmm beta = 0, precision error #10622",
+        "function": "",
+        "before": "",
+        "after": "",
+        "trigger": "",
+        "tests": "",
+        "validation": "",
+        "diff_capture": "RAW_DIFF_PARTIAL",
+        "diff_chars": "3042",
+        "support": "DIRECT_SUPPORT",
+        "missing": "未见新增测试文件；测试结果为 PR 评论口头补充"
+      }
+    ]
+  },
+  {
+    "task_id": "RC-003",
+    "route": "REUSE",
+    "repository": "vllm-project/vllm-ascend",
+    "query": "pilot RC-003",
+    "source_quote": {
+      "description": "ds-r1 0528权重推理偶现推理结果复读",
+      "reported_root_cause": "",
+      "status": "",
+      "weekly_progress": "100条相同请求并发，会有5-7条请求回答复读",
+      "operator_or_function": []
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  },
+  {
+    "task_id": "RC-004",
+    "route": "I",
+    "repository": "vllm-project/vllm-ascend",
+    "query": "Ring NaN",
+    "source_quote": {
+      "description": "ring-1T模型vllm推理出现NaN",
+      "reported_root_cause": "",
+      "status": "",
+      "weekly_progress": "",
+      "operator_or_function": [
+        "ring"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  },
+  {
+    "task_id": "RC-005",
+    "route": "I",
+    "repository": "vllm-project/vllm-ascend",
+    "query": "long running precision",
+    "source_quote": {
+      "description": "推理服务化长稳精度问题",
+      "reported_root_cause": "",
+      "status": "",
+      "weekly_progress": "",
+      "operator_or_function": []
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  },
+  {
+    "task_id": "RC-006",
+    "route": "P",
+    "repository": "Ascend/pytorch",
+    "query": "rms_norm dtype",
+    "source_quote": {
+      "description": "智创qwen-vl 2b grad norm 偶现nan",
+      "reported_root_cause": "2026/8/14：通过is_nan获取api溢出tensor结果，然后使用nan_test来采集tensor会导致问题现象消失，单纯通过统计量采集不会影响问题复现 2026/8/11：对rmsnorm去掉npu_patch，870步未nan，补充，仅把npu_rms_norm输出做to(x.dtype)现象也能消失 2026/8/10：L0 dump会导致450步问题不复现，L1 dump能复现",
+      "status": "2026/8/14：通过is_nan获取api溢出tensor结果，然后使用nan_test来采集tensor会导致问题现象消失，单纯通过统计量采集不会影响问题复现 2026/8/11：对rmsnorm去掉npu_patch，870步未nan，补充，仅把npu_rms_norm输出做to(x.dtype)现象也能消失 2026/8/10：L0 dump会导致450步问题不复现，L1 dump能复现",
+      "weekly_progress": "平均100步出4次nan",
+      "operator_or_function": [
+        "qwen",
+        "grad",
+        "norm",
+        "is_nan",
+        "tensor",
+        "nan_test"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  },
+  {
+    "task_id": "RC-007",
+    "route": "I",
+    "repository": "Ascend/MindSpeed-LLM",
+    "query": "FP8 attention loss",
+    "source_quote": {
+      "description": "dsv3低精度预训练loss差异大",
+      "reported_root_cause": "2026/10/19：消融实验确定是attn中低精前反向贡献了主要差异（attn前反向改高精后差异明显缩小），但单算子精度是达标的",
+      "status": "2026/10/19：消融实验确定是attn中低精前反向贡献了主要差异（attn前反向改高精后差异明显缩小），但单算子精度是达标的",
+      "weekly_progress": "128k序列长度下和bf16差异千分之6。8k序列长度是千分之二，256k序列长度是千分之1.6",
+      "operator_or_function": [
+        "dsv3",
+        "attn"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  },
+  {
+    "task_id": "RC-008",
+    "route": "DIRECT",
+    "repository": "vllm-project/vllm-ascend",
+    "query": "original FA synchronization PRs",
+    "source_quote": {
+      "description": "【云道】【四野】同代码开确定性，拉两次任务，loss有差异",
+      "reported_root_cause": "8.1.RC1上FA算子内部竞争导致，数据搬迁操作前后未添加同步机制导致结果出现差异",
+      "status": "2025/8/7：FA算子内部存在竞争，替换修复版.o后loss一致 2025/7/25：已采集到FA输入一致输出一致的tensor数据，但单算子暂未复现。 2025/7/23：16步的36卡的FA输入md5完全一致输出不一致，针对FA同时采md5+tensor 2025/7/21：客户缩小规模后复现步数往后延，采前5步没采到数据，建议直接采所有步的数据 2025/7/15: 客户按照吴征仁的经验自行缩小规模做复现实验中 2025/7/10：尝试只采forward的md5会卡住报通信超时，先缩规模 2025/7/9: 15卡rmsnorm、31卡matmul、25卡FA（看着output1\\2中间结果已不一致）、29卡的add，存在输入一致输出不一致 2025/7/7: 采L1数据中 2025/7/3：加流同步可复现，加工具采集mix同步/异步dump复现不了，采L0 grad几十亿且看不到前向区别-》只对L0挂hook，看下能sleep不？，只采L1数据 2025/7/2：加流同步仍存在不确定，排队+采集耗时太长客户自行尝试缩小规模中 2025/7/1: 加流同步实验，由于云道80卡排队很久，还在排队等卡 2025/6/30：已采第2遍L0数据和第3遍mix数据，与第1遍mix数据比对，发现第2遍和第1遍自定义overlap_1f1b函数输入输出存在差异，但1和3比对前16卡目前暂无看到差异。 2025/6/27：已采一遍dump数据，采第2遍是由于云道排队等待+显存溢出报错目前还没才下来。 2025/6/26：monitor数据step0 grad完全一致，step1 dp2的反向所有卡grad unreduce前都不一致，看日志step1前向loss就有差异，先采2遍数据 2025/6/25：已让客户用monitor采集权重梯度数据",
+      "weekly_progress": "80卡训练，第一步loss不一致",
+      "operator_or_function": [
+        "RC1"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": [
+      {
+        "link": "https://gitcode.com/cann/ops-transformer/pull/12509",
+        "title": "修复FIA_Kernel同步问题 #12509",
+        "function": "",
+        "before": "",
+        "after": "",
+        "trigger": "",
+        "tests": "",
+        "validation": "",
+        "diff_capture": "RAW_DIFF_PARTIAL",
+        "diff_chars": "6000",
+        "support": "PARTIAL_SUPPORT",
+        "missing": "IFA 与 FA 是否同一缺陷未证明；无测试"
+      },
+      {
+        "link": "https://gitcode.com/cann/ops-transformer/pull/12716",
+        "title": "修复FIA_Kernel同步问题 #12716",
+        "function": "",
+        "before": "",
+        "after": "",
+        "trigger": "",
+        "tests": "",
+        "validation": "",
+        "diff_capture": "RAW_DIFF_PARTIAL",
+        "diff_chars": "6000",
+        "support": "PARTIAL_SUPPORT",
+        "missing": "同上"
+      }
+    ]
+  },
+  {
+    "task_id": "RC-009",
+    "route": "REUSE",
+    "repository": "Ascend/pytorch",
+    "query": "pilot RC-009",
+    "source_quote": {
+      "description": "M12模型训练单机gnorm spike",
+      "reported_root_cause": "aclnn框架rmsnorm处host-tiling-cache逻辑错误引入,同一算子非连续输入和连续输入常见多次执行，缓存互相混用。连续常见匹配非连续缓存。",
+      "status": "",
+      "weekly_progress": "开确定性，有概率出现某几次训练gnorm spike 加工具降低复现概率",
+      "operator_or_function": [
+        "M12",
+        "gnorm",
+        "spike",
+        "aclnn",
+        "rmsnorm",
+        "host"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  },
+  {
+    "task_id": "RC-010",
+    "route": "DIRECT",
+    "repository": "Ascend/pytorch",
+    "query": "cann/opbase/279 TPipe ctrl",
+    "source_quote": {
+      "description": "fsdp训练loss nan",
+      "reported_root_cause": "极致头开销模板取消TPipe，导致TPipe的构造函数中设置ctrl寄存器操作缺失，从而造成精度问题。 换了个解决TPipe问题的cann版本，histc和问题单里的算子就都没问题了",
+      "status": "调整了专家分配地方的逻辑，由histc改成了bincount，不出现nan了 #Step 2: 统计每个专家的 token 数量 tokens_per_expert = torch.histc( top_k_indices.flatten(), bins=self.num_experts, min=0, max=self.num_experts ) #tokens_per_expert = torch.bincount( # top_k_indices.reshape(-1).to(torch.int64), # minlength=self.num_experts, #).to(torch.int64)",
+      "weekly_progress": "",
+      "operator_or_function": [
+        "fsdp",
+        "TPipe",
+        "ctrl",
+        "histc"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  },
+  {
+    "task_id": "RC-011",
+    "route": "I",
+    "repository": "Ascend/pytorch",
+    "query": "equal precision",
+    "source_quote": {
+      "description": "【南京悠阔电气】图像配准小模型精度异常",
+      "reported_root_cause": "2025/2/7：从equal算子往前找，从工具侧发现各个算子各项指标都符合工具侧的准出标准，较难通过工具进行定位。考虑手动对涉及到的相关算子进行单算子验证，目前涉及到的算子有conv，maxpool，relu，softmax。以验证conv算子没问题，其余算子待算子侧给出验证结果。 2025/1/24：针对该问题确定的新的精度标准，也即不只看cos相似度，需要将各种指标一起看，因为误差太小，余弦相似度不太能反应问题根因。 2025/1/22：经算子侧验证，认为equal算子的输入是没有对齐的，大概有百分之1的相对误差，因此导致输出有差异。也即equal算子也是将累计误差放大的地方，非首错算子，需要继续往上找。 2025/1/21：偶现输出不一致问题非精度问题，认为是硬件导致，更换卡后已解决。equal算子的输入dump数据现在是缺失的，算子希望工具这边提供一下equal的输入，看下输入的",
+      "status": "2025/2/7：从equal算子往前找，从工具侧发现各个算子各项指标都符合工具侧的准出标准，较难通过工具进行定位。考虑手动对涉及到的相关算子进行单算子验证，目前涉及到的算子有conv，maxpool，relu，softmax。以验证conv算子没问题，其余算子待算子侧给出验证结果。 2025/1/24：针对该问题确定的新的精度标准，也即不只看cos相似度，需要将各种指标一起看，因为误差太小，余弦相似度不太能反应问题根因。 2025/1/22：经算子侧验证，认为equal算子的输入是没有对齐的，大概有百分之1的相对误差，因此导致输出有差异。也即equal算子也是将累计误差放大的地方，非首错算子，需要继续往上找。 2025/1/21：偶现输出不一致问题非精度问题，认为是硬件导致，更换卡后已解决。equal算子的输入dump数据现在是缺失的，算子希望工具这边提供一下equal的输入，看下输入的精度是否在合理范围内，然后再进行比对。目前工具侧已经修改了代码，能够dump输入数据。待算子侧验证。 2025/1/16：equal算子单算子验证存在偶现问题，不清楚是否为根因，在拉算子的人去看。另外需要和topk算子的开发确定下该误差是否为根因。 2025/1/14：使用用户真实case进行测试，发现equal算子精度掉的更多，从0.99调到0.97，目前正在跟算子进行单算子验证。 2025/1/13：从topk往前查，发现equal算子的精度从0.999下降至0.992，认为可能为潜在的问题点，正在排查。 2025/1/9：关闭融合后，在atc转换的时候topk算子报错，认为该算子或之前的算子有问题，目前正在以其为排查特征进一步定位。 2025/1/8：通过比对表格发现om模型存在大量的算子精度异常，考虑是某个多次调用的算子有问题，为了使结果清晰，关闭融合规则后再跑测看下结果。",
+      "weekly_progress": "和onnx相比，om模型的输出不一致",
+      "operator_or_function": [
+        "equal",
+        "conv",
+        "maxpool",
+        "relu",
+        "softmax"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  },
+  {
+    "task_id": "RC-012",
+    "route": "I",
+    "repository": "Ascend/MindIE-LLM",
+    "query": "load balance precision",
+    "source_quote": {
+      "description": "A3 deepSeek 大EP精度问题",
+      "reported_root_cause": "1、 MindIE 2.0.T33.B050 + CANN 8.1.T33.B010 , curl 回答乱码； 2、 MindIE 2.0.T33.B020 + CANN 8.1.T33.B010, curl 回答正常； 初步分析是MindIE B020 之后的版本有精度问题，当前2个版本对应userconf.json 和 boot.sh 有差异，正在做对比实验排查userconfig配置的差异； 目前定位到是 prefill 阶段开启负载均衡导致curl 返回乱码，正在和毛琦、李盛勇对齐解决方案，经过dump发现alltoall+gmm算子精度问题",
+      "status": "1、 MindIE 2.0.T33.B050 + CANN 8.1.T33.B010 , curl 回答乱码； 2、 MindIE 2.0.T33.B020 + CANN 8.1.T33.B010, curl 回答正常； 初步分析是MindIE B020 之后的版本有精度问题，当前2个版本对应userconf.json 和 boot.sh 有差异，正在做对比实验排查userconfig配置的差异； 目前定位到是 prefill 阶段开启负载均衡导致curl 返回乱码，正在和毛琦、李盛勇对齐解决方案，经过dump发现alltoall+gmm算子精度问题",
+      "weekly_progress": "DeepSeek R1, 32+32, 基于 MindIE 2.0.T33.B050 + CANN 8.1.T33.B010版本，直接使用curl 命令，返回乱码",
+      "operator_or_function": [
+        "deepSeek",
+        "T33",
+        "B050",
+        "B010",
+        "curl",
+        "B020"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  },
+  {
+    "task_id": "RC-013",
+    "route": "I",
+    "repository": "vllm-project/vllm-ascend",
+    "query": "GLM-4-32B accuracy",
+    "source_quote": {
+      "description": "【智谱】GLM-4-32B-0414-w8a16量化精度问题",
+      "reported_root_cause": "910B测modetest纯模型bf16得分为0.55左右，量化为0.55左右，均无法达到客户自己脚本测的0.87，且浮点和量化在NPU上得分差距较大； 下一步计划： 1、测试其他数据集（CEval、MMLU），看是否有浮点和量化差距较大的情况；--6.11日晚上测完 @丁建军 2、使用竞品GPU+modetest测试浮点精度得分，分析实际误差，若差距大于1%则进行挑选badecase进行（GPU和NPU）dump分析算子精度问题。若误差小于1%，则认为浮点模型精度达标。 3、待解决完纯模型浮点精度问题后，再解决量化精度问题：浮点和量化在NPU上dump操作，分析算子精度问题。",
+      "status": "910B测modetest纯模型bf16得分为0.55左右，量化为0.55左右，均无法达到客户自己脚本测的0.87，且浮点和量化在NPU上得分差距较大； 下一步计划： 1、测试其他数据集（CEval、MMLU），看是否有浮点和量化差距较大的情况；--6.11日晚上测完 @丁建军 2、使用竞品GPU+modetest测试浮点精度得分，分析实际误差，若差距大于1%则进行挑选badecase进行（GPU和NPU）dump分析算子精度问题。若误差小于1%，则认为浮点模型精度达标。 3、待解决完纯模型浮点精度问题后，再解决量化精度问题：浮点和量化在NPU上dump操作，分析算子精度问题。",
+      "weekly_progress": "GLM-4-32B-0414基于msit工具量化后，精度掉点严重",
+      "operator_or_function": [
+        "GLM",
+        "w8a16",
+        "modetest",
+        "bf16",
+        "CEval",
+        "MMLU"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  },
+  {
+    "task_id": "RC-014",
+    "route": "I",
+    "repository": "Ascend/pytorch",
+    "query": "310 attention precision",
+    "source_quote": {
+      "description": "【需求】310B qwen3精度问题",
+      "reported_root_cause": "目前在对比atb与torch_npu的tensor，发现在算子sdpa之前的tensor都是对齐的，目前怀疑self attention内部的matmal算子精度有问题，定位中",
+      "status": "目前在对比atb与torch_npu的tensor，发现在算子sdpa之前的tensor都是对齐的，目前怀疑self attention内部的matmal算子精度有问题，定位中",
+      "weekly_progress": "0.6B GSM8K_edge不达标, 4B BoolQ_edge不达标",
+      "operator_or_function": [
+        "qwen3",
+        "torch_npu",
+        "tensor",
+        "sdpa",
+        "self",
+        "matmal"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  },
+  {
+    "task_id": "RC-015",
+    "route": "I",
+    "repository": "Ascend/MindIE-LLM",
+    "query": "aime precision",
+    "source_quote": {
+      "description": "【BOSS客户】【MindIE 2.1.RC1.B050】 版本测试 aime 精度劣化",
+      "reported_root_cause": "问题已提单，正在定位中",
+      "status": "问题已提单，正在定位中",
+      "weekly_progress": "deepseek A2单机精度,数据集aime,相邻版本精度差异超10% 25.1.RC1.B030版本精度值 80.00 25.1.RC1.B050版本精度值 66.67",
+      "operator_or_function": [
+        "BOSS",
+        "RC1",
+        "B050",
+        "aime"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  },
+  {
+    "task_id": "RC-016",
+    "route": "I",
+    "repository": "Ascend/MindIE-LLM",
+    "query": "lmhead precision",
+    "source_quote": {
+      "description": "B080版本qwen，llama等模型blooq和ceval精度批量不达标",
+      "reported_root_cause": "1、B070 CANN精度达标，而B080 CANN不达标； 2、BOOLQ和CEval不达标，补测MMLU； 3、dump算子精度问题，定位到Lmhead输入达标输出不达标，可能是误差逐层累计导致的，正在整网分析精度指标",
+      "status": "1、B070 CANN精度达标，而B080 CANN不达标； 2、BOOLQ和CEval不达标，补测MMLU； 3、dump算子精度问题，定位到Lmhead输入达标输出不达标，可能是误差逐层累计导致的，正在整网分析精度指标",
+      "weekly_progress": "\"版本：MindIE 2.1.RC1.B080 环境：800I A2 32G 和64G 模型：qwen、llama等模型 现象：blooq和ceval精度不达标\"",
+      "operator_or_function": [
+        "B080",
+        "qwen",
+        "llama",
+        "blooq",
+        "ceval",
+        "B070"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  },
+  {
+    "task_id": "RC-017",
+    "route": "P",
+    "repository": "Ascend/pytorch",
+    "query": "exponential precision",
+    "source_quote": {
+      "description": "思必驰vllm推理评分相比gpu差异过大",
+      "reported_root_cause": "npu的Tensor.exponential_算子生成的数据质量低，影响评分 目前暂时用.cpu()的方式规避，评分回升",
+      "status": "npu的Tensor.exponential_算子生成的数据质量低，影响评分 目前暂时用.cpu()的方式规避，评分回升",
+      "weekly_progress": "vllm推理Temperature设置为1，npu vs gpu评分差异很大（38% vs 60%），temperature设置为0，评分接近（60.04% vs 60.66%）",
+      "operator_or_function": [
+        "Tensor",
+        "exponential_"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  },
+  {
+    "task_id": "RC-018",
+    "route": "I",
+    "repository": "Ascend/pytorch",
+    "query": "HCCL_DETERMINISTIC",
+    "source_quote": {
+      "description": "【客户】： 【版本】：MindIE 2.0.RC1",
+      "reported_root_cause": "配置HCCL_DETERMINISTIC=true（其他确定性环境变量均不开启，随机种子不设置，其他配置均对齐）：NPU(vllm-ascend)与GPU(vllm)在指定测试集(271条case)上的得分差异都是0.424左右，差异小于1%。",
+      "status": "配置HCCL_DETERMINISTIC=true（其他确定性环境变量均不开启，随机种子不设置，其他配置均对齐）：NPU(vllm-ascend)与GPU(vllm)在指定测试集(271条case)上的得分差异都是0.424左右，差异小于1%。",
+      "weekly_progress": "背景： 客户在GPU和NPU环境上，进行Qwen2.5-VL-72B多模态模型的推理。 问题： 部署相同开源模型权重Qwen2.5-VL-72B，使用相同客户私有测试集（271条），在vllm(GPU)、vllm-ascend(NPU)、mindie(NPU)上测试精度得分，均不相同。其中vllm(GPU)得分0.410，vllm-ascend(NPU)上得分0.370、mindie(NPU)上得分0.365。无论是vllm-ascend还是mindie与vllm(GPU)环境得分差异均超过1%。 尝试排查： 1. 使用vllm-ascend(NPU)与vllm(GPU)版本对齐，服务化参数对",
+      "operator_or_function": [
+        "RC1",
+        "HCCL_DETERMINISTIC",
+        "true",
+        "ascend"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  },
+  {
+    "task_id": "RC-019",
+    "route": "I",
+    "repository": "Ascend/pytorch",
+    "query": "allgather nan",
+    "source_quote": {
+      "description": "【客户】： 【版本】：MindIE",
+      "reported_root_cause": "x86架构，使用双卡跑模型，有精度问题。dump tensor定位后，发现在wordEmbedding层的allgather算子后出现nan值，分析后发现原因是无法拿到对方张卡的数据，导致精度问题。通过hccl test发现两张卡之间的通信存在问题。目前定位到是研扬科技的主板BIOS和服务器的有差别，目前需要研扬自己修改BIOS代码。使用单卡推理Qwen3-32B/Deepseek-R1-Distill-32B模型，吞吐量大概在6.8token/s左右，无法满足8token/s的要求。",
+      "status": "x86架构，使用双卡跑模型，有精度问题。dump tensor定位后，发现在wordEmbedding层的allgather算子后出现nan值，分析后发现原因是无法拿到对方张卡的数据，导致精度问题。通过hccl test发现两张卡之间的通信存在问题。目前定位到是研扬科技的主板BIOS和服务器的有差别，目前需要研扬自己修改BIOS代码。使用单卡推理Qwen3-32B/Deepseek-R1-Distill-32B模型，吞吐量大概在6.8token/s左右，无法满足8token/s的要求。",
+      "weekly_progress": "单机双卡场景，跑模型精度正常，双机双卡异常（无think）",
+      "operator_or_function": [
+        "tensor",
+        "wordEmbedding",
+        "allgather",
+        "hccl",
+        "test",
+        "BIOS"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  },
+  {
+    "task_id": "RC-020",
+    "route": "I",
+    "repository": "vllm-project/vllm-omni",
+    "query": "Qwen Image BF16",
+    "source_quote": {
+      "description": "【vLLM-Omni】Qwen-Image-Edit",
+      "reported_root_cause": "A2/A3硬件不支持BF16数据，BF16算子内部会自动Cast to FP32,导致linear算子输出与GPU算子存在精度差异。同时使用的权重是在GPU上微调得到，尚未训练充分，鲁棒性不足",
+      "status": "",
+      "weekly_progress": "预期生成狗脸图片，实际生成人脸图片",
+      "operator_or_function": [
+        "Omni",
+        "Qwen",
+        "Image",
+        "Edit",
+        "BF16",
+        "Cast"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  },
+  {
+    "task_id": "RC-021",
+    "route": "P",
+    "repository": "vllm-project/vllm-ascend",
+    "query": "causal_conv1d A5",
+    "source_quote": {
+      "description": "【vllm】【A5】Qwen3.5",
+      "reported_root_cause": "A5上无法使用A3用的npu_causal_conv1d_custom算子，改用了有精度问题causal_conv1d_fn实现",
+      "status": "",
+      "weekly_progress": "描述图片时输出乱码，首token不一致",
+      "operator_or_function": [
+        "Qwen3",
+        "npu_causal_conv1d_custom",
+        "causal_conv1d_fn"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  },
+  {
+    "task_id": "RC-022",
+    "route": "DIRECT",
+    "repository": "vllm-project/vllm-ascend",
+    "query": "original topk PR",
+    "source_quote": {
+      "description": "GLM5",
+      "reported_root_cause": "逐层比对的余弦相似度差异根因，以及对精度的影响 1. TOPK专家选择结果，GPU和NPU有明显差异，影响算子为gating_moe_topk算子以及门控相关的MM算子 2. topk算子实现逻辑差异，得分计算精度可对齐GPU，专家得分权重一致，但TOPK索引排序逻辑NPU为稳定排序，GPU为非稳定，某些场景下推理结果可能有差异，需要看实测效果 3. mm算子由于硬件架构差异，累加序无法保持一致，但是精度水平和保持一致，对模型影响可控",
+      "status": "",
+      "weekly_progress": "同一条请求，GPU与NPU prefill阶段强对齐排查",
+      "operator_or_function": [
+        "GLM5",
+        "TOPK",
+        "gating_moe_topk"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": [
+      {
+        "link": "https://gitcode.com/cann/ops-math/pull/4871",
+        "title": "修复RadixTopK同步错误并预留AscendC API所需workspace #4871",
+        "function": "",
+        "before": "",
+        "after": "",
+        "trigger": "",
+        "tests": "",
+        "validation": "",
+        "diff_capture": "RAW_DIFF_PARTIAL",
+        "diff_chars": "6000",
+        "support": "PARTIAL_SUPPORT",
+        "missing": "未证明与周报 TOPK 同一实现"
+      }
+    ]
+  },
+  {
+    "task_id": "RC-023",
+    "route": "DIRECT",
+    "repository": "vllm-project/vllm-ascend",
+    "query": "original unpermute grad dtype PR then forward-index gap",
+    "source_quote": {
+      "description": "【vllm】【A5】HY-V3",
+      "reported_root_cause": "CANN B087版本，使用的token_unpermute算子不支持含小于0元素的sorted_indices参数传入，因此模型代码中对sorted_indices进行了abs处理，使得所有专家都被认为是激活专家。又因为未被激活专家不进行MLP计算，其输出不可控，包含NAN异常值，则导致专家输出总为NAN，吐出的token一直是！",
+      "status": "",
+      "weekly_progress": "持续输出!,直到截断，第二个token就是！",
+      "operator_or_function": [
+        "B087",
+        "token_unpermute",
+        "sorted_indices",
+        "MLP"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": [
+      {
+        "link": "https://gitcode.com/Ascend/op-plugin/pull/4833",
+        "title": "fix: correct grad_probs dtype in npu_moe_token_unpermute_grad to match probs dtype #4833",
+        "function": "",
+        "before": "",
+        "after": "",
+        "trigger": "",
+        "tests": "",
+        "validation": "",
+        "diff_capture": "RAW_DIFF_PARTIAL",
+        "diff_chars": "6000",
+        "support": "DIRECT_SUPPORT",
+        "missing": "周报根因（负索引）无代码修复；PR 只覆盖 dtype 子问题"
+      }
+    ]
+  },
+  {
+    "task_id": "RC-024",
+    "route": "DIRECT",
+    "repository": "vllm-project/vllm-ascend",
+    "query": "original compressor PRs",
+    "source_quote": {
+      "description": "【vllm】【A3】DeepSeek-V4-Pro",
+      "reported_root_cause": "compressor算子内存读写越界，导致KV中出现NaN",
+      "status": "",
+      "weekly_progress": "请求回复空",
+      "operator_or_function": [
+        "DeepSeek",
+        "compressor"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": [
+      {
+        "link": "https://gitcode.com/cann/ops-transformer/pull/8365",
+        "title": "修复NsaCompAtten内存检测问题【商分】 #8365",
+        "function": "",
+        "before": "",
+        "after": "",
+        "trigger": "",
+        "tests": "",
+        "validation": "",
+        "diff_capture": "RAW_DIFF_PARTIAL",
+        "diff_chars": "5125",
+        "support": "DIRECT_SUPPORT",
+        "missing": "无测试；无回归结果"
+      },
+      {
+        "link": "https://gitcode.com/cann/ops-transformer/pull/8367",
+        "title": "修复NsaCompAtten内存检测问题 #8367",
+        "function": "",
+        "before": "",
+        "after": "",
+        "trigger": "",
+        "tests": "",
+        "validation": "",
+        "diff_capture": "RAW_DIFF_PARTIAL",
+        "diff_chars": "5125",
+        "support": "DIRECT_SUPPORT",
+        "missing": "同上"
+      }
+    ]
+  },
+  {
+    "task_id": "RC-025",
+    "route": "P",
+    "repository": "vllm-project/vllm-ascend",
+    "query": "npu_transpose_quant_batchmatmul",
+    "source_quote": {
+      "description": "【vllm】【A5】DeepSeek-V4-Flash",
+      "reported_root_cause": "torch_npu.npu_transpose_quant_batchmatmul算子存在精度问题",
+      "status": "",
+      "weekly_progress": "回复中后段开始复读",
+      "operator_or_function": [
+        "DeepSeek",
+        "Flash",
+        "torch_npu",
+        "npu_transpose_quant_batchmatmul"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  },
+  {
+    "task_id": "RC-026",
+    "route": "P",
+    "repository": "vllm-project/vllm-ascend",
+    "query": "qkv_rmsnorm_rope prefill",
+    "source_quote": {
+      "description": "【vllm】【A5】HY-V3",
+      "reported_root_cause": "开启Decode图模式后，Prefill阶段也会进行torch.compile，从而使用了有精度问题的qkv_rmsnorm_rope融合算子",
+      "status": "",
+      "weekly_progress": "开启图模式后，在文本理解数据集上精度测评分数从0.6下降至0.42，但badcase逻辑正常",
+      "operator_or_function": [
+        "Decode",
+        "Prefill",
+        "compile",
+        "qkv_rmsnorm_rope"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  },
+  {
+    "task_id": "RC-027",
+    "route": "DIRECT",
+    "repository": "vllm-project/vllm-ascend",
+    "query": "original quant_sparse_flash_attention PR",
+    "source_quote": {
+      "description": "【龙虾】【vllm】【A5】GLM 5",
+      "reported_root_cause": "quant_sparse_flash_attention算子只支持FP8的KV Cache，不支持mxfp8类型。使能dsa_cp时，KV Cache是通过小算子拼接（dsa_cp适配代码）计算得到，数据类型是mxfp8；关闭dsa_cp时，KV Cache是通过mla_prolog_v3融合算子计算得到，数据类型是FP8",
+      "status": "",
+      "weekly_progress": "首token为！，单batch稳定复现",
+      "operator_or_function": [
+        "GLM",
+        "quant_sparse_flash_attention",
+        "FP8",
+        "Cache",
+        "mxfp8",
+        "dsa_cp"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": [
+      {
+        "link": "https://gitcode.com/cann/ops-nn/pull/7443",
+        "title": "DEBUG: 删除foreach_copy A5 #7443",
+        "function": "",
+        "before": "",
+        "after": "",
+        "trigger": "",
+        "tests": "",
+        "validation": "",
+        "diff_capture": "RAW_DIFF_PARTIAL",
+        "diff_chars": "6000",
+        "support": "NO_SUPPORT",
+        "missing": "删除意图不明；无替代实现；无测试"
+      }
+    ]
+  },
+  {
+    "task_id": "RC-028",
+    "route": "I",
+    "repository": "Ascend/pytorch",
+    "query": "all_reduce precision",
+    "source_quote": {
+      "description": "【vllm】【A5】HY-V3",
+      "reported_root_cause": "CANN 9.1.0的all_reduce算子存在精度问题",
+      "status": "",
+      "weekly_progress": "首token即乱码，非！",
+      "operator_or_function": [
+        "all_reduce"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  },
+  {
+    "task_id": "RC-029",
+    "route": "DIRECT",
+    "repository": "vllm-project/vllm-ascend",
+    "query": "cann/ops-transformer/8005 V scale",
+    "source_quote": {
+      "description": "【vllm】【A5】HY-V3",
+      "reported_root_cause": "FP8 Atten算子对静态量化的V scale读取有问题",
+      "status": "",
+      "weekly_progress": "FP8 Attention路线首token乱码，BF16 Attention路线正确",
+      "operator_or_function": [
+        "FP8",
+        "Atten",
+        "scale"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  },
+  {
+    "task_id": "RC-030",
+    "route": "REUSE",
+    "repository": "vllm-project/vllm-ascend",
+    "query": "pilot RC-030",
+    "source_quote": {
+      "description": "HY-V3 W8A8量化回答乱码",
+      "reported_root_cause": "在输出维度未对齐64时npu_dequant_swiglu_quant算子存在精度问题",
+      "status": "2026/7/13：把torch.ops._C_ascend.npu_dequant_swiglu_quant算子替换成小算子回答正常",
+      "weekly_progress": "TP16回答乱码，TP8回答正常，首token不一样",
+      "operator_or_function": [
+        "W8A8",
+        "npu_dequant_swiglu_quant"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": [
+      {
+        "link": "https://gitcode.com/cann/ops-transformer/pull/8752",
+        "title": "modify a2 a8w4 workspace k<n/2 #8752",
+        "function": "",
+        "before": "",
+        "after": "",
+        "trigger": "",
+        "tests": "",
+        "validation": "",
+        "diff_capture": "RAW_DIFF_PARTIAL",
+        "diff_chars": "6000",
+        "support": "PARTIAL_SUPPORT",
+        "missing": "无测试；无回归"
+      },
+      {
+        "link": "https://gitcode.com/cann/ops-transformer/pull/8766",
+        "title": "修复mega_moe在K2大于K的时候两个gmmA矩阵复用导致的问题 #8766",
+        "function": "",
+        "before": "",
+        "after": "",
+        "trigger": "",
+        "tests": "",
+        "validation": "",
+        "diff_capture": "RAW_DIFF_PARTIAL",
+        "diff_chars": "6000",
+        "support": "DIRECT_SUPPORT",
+        "missing": "无测试；无回归"
+      }
+    ]
+  },
+  {
+    "task_id": "RC-031",
+    "route": "P",
+    "repository": "vllm-project/vllm-ascend",
+    "query": "split_qkv_rmsnorm_rope",
+    "source_quote": {
+      "description": "A5 MiniMax-M3精度对齐",
+      "reported_root_cause": "1、回答长度不一致是split_qkv_rmsnorm_rope确定性没固定住",
+      "status": "采集首token的具体计算数据，发现中间计算结果不一致",
+      "weekly_progress": "1.并发4次，每次回答长度不一样,单curl验证，每次长度也不一样 2.aime25数据集上评分比vllm gpu低，验证后gpu也存在波动，非问题",
+      "operator_or_function": [
+        "MiniMax",
+        "split_qkv_rmsnorm_rope"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  },
+  {
+    "task_id": "RC-032",
+    "route": "DIRECT",
+    "repository": "Ascend/MindIE-LLM",
+    "query": "original MindIE-SD PR",
+    "source_quote": {
+      "description": "HYImage3.5 调频算子接入后内存报错",
+      "reported_root_cause": "mindie-sd接入算子 aclnn两阶段封装过程内存分配存在问题",
+      "status": "",
+      "weekly_progress": "推理性能因为降频出现性能波动，加入frequency_regulator调频算子后出现coredump报错",
+      "operator_or_function": [
+        "HYImage3",
+        "aclnn"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": [
+      {
+        "link": "https://gitcode.com/Ascend/MindIE-SD/pull/548",
+        "title": "[Bugfix][ops]修复调频plugin异步执行资源管理问题 #548",
+        "function": "",
+        "before": "",
+        "after": "",
+        "trigger": "",
+        "tests": "",
+        "validation": "",
+        "diff_capture": "RAW_DIFF_PARTIAL",
+        "diff_chars": "6000",
+        "support": "DIRECT_SUPPORT",
+        "missing": "无回归测试；无客户现场验证"
+      }
+    ]
+  },
+  {
+    "task_id": "RC-033",
+    "route": "I",
+    "repository": "Ascend/pytorch",
+    "query": "310P setitem",
+    "source_quote": {
+      "description": "fg-clip2 纯模型推理精度比cpu差",
+      "reported_root_cause": "310p上setitem没有适配，需要给pta提需求",
+      "status": "",
+      "weekly_progress": "",
+      "operator_or_function": [
+        "clip2",
+        "setitem"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  },
+  {
+    "task_id": "RC-034",
+    "route": "I",
+    "repository": "Ascend/pytorch",
+    "query": "matmul batch precision",
+    "source_quote": {
+      "description": "【|推理】模型推理token序列在bs2对齐，bs1不对齐",
+      "reported_root_cause": "2026/1/14：目前定位到matmul算子计算精度在gpu和npu上不一致，对齐该算子输出后，得到模型输出token序列结果在bs1/2/4/8均与GPU一致，客户与matmul算子精度接口人对齐结果后再同步信息",
+      "status": "2026/1/14：目前定位到matmul算子计算精度在gpu和npu上不一致，对齐该算子输出后，得到模型输出token序列结果在bs1/2/4/8均与GPU一致，客户与matmul算子精度接口人对齐结果后再同步信息",
+      "weekly_progress": "",
+      "operator_or_function": [
+        "matmul"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  },
+  {
+    "task_id": "RC-035",
+    "route": "I",
+    "repository": "Ascend/MindSpeed-LLM",
+    "query": "Ling NaN",
+    "source_quote": {
+      "description": "Ling-V2.5 首步反向gnorm nan",
+      "reported_root_cause": "2026/1/22：17K数据下训练第二个micro_step loss为nan，通过.cpu操作添加解决，解决后反向gn依然为nan，未解决，怀疑是attention使用的triton算子与前置的qkv计算算子不处于同一条流，流间同步未设置导致的 1K数据下拉起stream sanitizer，运行三次没有有效结果，今天找毛晨看下",
+      "status": "2026/1/22：17K数据下训练第二个micro_step loss为nan，通过.cpu操作添加解决，解决后反向gn依然为nan，未解决，怀疑是attention使用的triton算子与前置的qkv计算算子不处于同一条流，流间同步未设置导致的 1K数据下拉起stream sanitizer，运行三次没有有效结果，今天找毛晨看下",
+      "weekly_progress": "",
+      "operator_or_function": [
+        "Ling",
+        "gnorm",
+        "micro_step",
+        "triton",
+        "stream",
+        "sanitizer"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  },
+  {
+    "task_id": "RC-036",
+    "route": "I",
+    "repository": "verl-project/verl",
+    "query": "DeepSeek GRPO NaN",
+    "source_quote": {
+      "description": "Deepseekv3.2 GRPO训练loss nan",
+      "reported_root_cause": "",
+      "status": "",
+      "weekly_progress": "512卡首loss nan",
+      "operator_or_function": [
+        "Deepseekv3",
+        "GRPO"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  },
+  {
+    "task_id": "RC-037",
+    "route": "I",
+    "repository": "vllm-project/vllm-omni",
+    "query": "Qwen Image accuracy",
+    "source_quote": {
+      "description": "qwen-image-edit模型basecase",
+      "reported_root_cause": "",
+      "status": "",
+      "weekly_progress": "预期生成狗脸图片，实际生成人脸图片",
+      "operator_or_function": [
+        "qwen",
+        "image",
+        "edit",
+        "basecase"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  },
+  {
+    "task_id": "RC-038",
+    "route": "I",
+    "repository": "Ascend/pytorch",
+    "query": "NaN launch_blocking",
+    "source_quote": {
+      "description": "模型训练反向出现nan",
+      "reported_root_cause": "2026/2/25：缩减到单卡场景开launch_blocking依然复现，在问题算子前后加打印，输入正常，输出异常，但是单算子复现不了",
+      "status": "2026/2/25：缩减到单卡场景开launch_blocking依然复现，在问题算子前后加打印，输入正常，输出异常，但是单算子复现不了",
+      "weekly_progress": "",
+      "operator_or_function": [
+        "launch_blocking"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  },
+  {
+    "task_id": "RC-039",
+    "route": "I",
+    "repository": "Ascend/pytorch",
+    "query": "cat precision",
+    "source_quote": {
+      "description": "推荐模型训练A5送测效果不达标",
+      "reported_root_cause": "2026/03/21: 定位到cat算子输入正常输出量级异常",
+      "status": "2026/03/21: 定位到cat算子输入正常输出量级异常",
+      "weekly_progress": "eval bs512推理异常",
+      "operator_or_function": []
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  },
+  {
+    "task_id": "RC-040",
+    "route": "I",
+    "repository": "Ascend/MindSpeed-LLM",
+    "query": "M12 gnorm",
+    "source_quote": {
+      "description": "M12模型训练单机gnorm spike",
+      "reported_root_cause": "",
+      "status": "",
+      "weekly_progress": "开确定性，有概率出现某几次训练gnorm spike 加工具降低复现概率",
+      "operator_or_function": [
+        "M12",
+        "gnorm",
+        "spike"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  },
+  {
+    "task_id": "RC-041",
+    "route": "I",
+    "repository": "Ascend/MindSpeed-LLM",
+    "query": "M12 NaN",
+    "source_quote": {
+      "description": "M12模型训练单机/多机gnorm Nan",
+      "reported_root_cause": "",
+      "status": "",
+      "weekly_progress": "368卡和单机都能复现",
+      "operator_or_function": [
+        "M12",
+        "gnorm"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  },
+  {
+    "task_id": "RC-042",
+    "route": "P",
+    "repository": "Ascend/MindSpeed",
+    "query": "seg_reduce empty",
+    "source_quote": {
+      "description": "智创seedance2.0 512卡训练首step出现loss nan",
+      "reported_root_cause": "2026/3/12：融合算子seg_reduce在处理空tensor（0*4的shape）时，没有处理输出tensor，输出tensor是empty出的占位数据，可能会包含nan",
+      "status": "2026/3/12：融合算子seg_reduce在处理空tensor（0*4的shape）时，没有处理输出tensor，输出tensor是empty出的占位数据，可能会包含nan",
+      "weekly_progress": "launch_blocking设置为1后问题不复现，加了工具后也不复现",
+      "operator_or_function": [
+        "seedance2",
+        "step",
+        "seg_reduce",
+        "tensor",
+        "shape",
+        "empty"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  },
+  {
+    "task_id": "RC-043",
+    "route": "I",
+    "repository": "Ascend/MindSpeed",
+    "query": "M8 deterministic",
+    "source_quote": {
+      "description": "M8模型确定性固定不住",
+      "reported_root_cause": "",
+      "status": "",
+      "weekly_progress": "单机能固定住，千卡任务上固定不住，4k卡前10步就能复现",
+      "operator_or_function": []
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  },
+  {
+    "task_id": "RC-044",
+    "route": "I",
+    "repository": "verl-project/verl",
+    "query": "DeepSeek training inference",
+    "source_quote": {
+      "description": "dsv3.2 grpo长稳训崩",
+      "reported_root_cause": "现在进展是定位到可以明确训练和推理的融合算子输出不一致",
+      "status": "现在进展是定位到可以明确训练和推理的融合算子输出不一致",
+      "weekly_progress": "40步 reward开始下降,推理跑的图模式",
+      "operator_or_function": [
+        "dsv3",
+        "grpo"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  },
+  {
+    "task_id": "RC-045",
+    "route": "P",
+    "repository": "vllm-project/vllm-ascend",
+    "query": "causal_conv1d",
+    "source_quote": {
+      "description": "，Qwen3.5",
+      "reported_root_cause": "2026/4/22：将causal_conv1d_fn算子改成npu_causal_conv1d，回复正确",
+      "status": "2026/4/22：将causal_conv1d_fn算子改成npu_causal_conv1d，回复正确",
+      "weekly_progress": "多模态理解回答不正确",
+      "operator_or_function": [
+        "Qwen3",
+        "causal_conv1d_fn",
+        "npu_causal_conv1d"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  },
+  {
+    "task_id": "RC-046",
+    "route": "P",
+    "repository": "Ascend/pytorch",
+    "query": "setitem precision",
+    "source_quote": {
+      "description": "A5训练送测",
+      "reported_root_cause": "2026/3/30：定位到是setitem算子问题，修复后训练loss和gnrom贴合",
+      "status": "2026/3/30：定位到是setitem算子问题，修复后训练loss和gnrom贴合",
+      "weekly_progress": "qwen 256k 8p 训练在A3和A5上开始训练时gnorm有明显分层，差异达到15%以上，loss到后面也有分层。",
+      "operator_or_function": [
+        "setitem",
+        "gnrom"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  },
+  {
+    "task_id": "RC-047",
+    "route": "I",
+    "repository": "Ascend/pytorch",
+    "query": "sum precision",
+    "source_quote": {
+      "description": "A5训练送测",
+      "reported_root_cause": "2026/3/25：定位到是sum算子问题，但仅在特定卡计算错误，换卡后问题消失",
+      "status": "2026/3/25：定位到是sum算子问题，但仅在特定卡计算错误，换卡后问题消失",
+      "weekly_progress": "A5 128k qwen gnorm 出现INF报错",
+      "operator_or_function": []
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  },
+  {
+    "task_id": "RC-048",
+    "route": "I",
+    "repository": "Ascend/pytorch",
+    "query": "embedding scatter topk",
+    "source_quote": {
+      "description": "A5训练送测",
+      "reported_root_cause": "2026/3/12：定位到embedding、scatter、topk等算子问题",
+      "status": "2026/3/12：定位到embedding、scatter、topk等算子问题",
+      "weekly_progress": "ds、qwen和longcat确定性固定不住",
+      "operator_or_function": [
+        "embedding",
+        "scatter",
+        "topk"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  },
+  {
+    "task_id": "RC-049",
+    "route": "DIRECT",
+    "repository": "Ascend/MindSpeed-LLM",
+    "query": "original code clue requires attribution check",
+    "source_quote": {
+      "description": "m8 gnorm spike",
+      "reported_root_cause": "2026/4/1： 趋势可视化分析，前向差异已经过大，尖刺步第一层v_weight最先出现最小值差异导致。 1230加载42step同样ckpt也有尖刺，确定是前面步数累计的weight差异导致，下一步用monitor参数监测采集并分析。",
+      "status": "2026/4/1： 趋势可视化分析，前向差异已经过大，尖刺步第一层v_weight最先出现最小值差异导致。 1230加载42step同样ckpt也有尖刺，确定是前面步数累计的weight差异导致，下一步用monitor参数监测采集并分析。",
+      "weekly_progress": "m8模型 330CANN有grad norm尖刺 去年1230没有",
+      "operator_or_function": [
+        "gnorm",
+        "spike",
+        "v_weight",
+        "step",
+        "ckpt",
+        "weight"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": [
+      {
+        "link": "https://gitcode.com/cann/ops-nn/pull/2285",
+        "title": "拦截bias变化导致进入matmul v3kernel bin找不到的问题 #2285",
+        "function": "",
+        "before": "",
+        "after": "",
+        "trigger": "",
+        "tests": "",
+        "validation": "",
+        "diff_capture": "RAW_DIFF_PARTIAL",
+        "diff_chars": "1094",
+        "support": "PARTIAL_SUPPORT",
+        "missing": "无测试；无精度回归"
+      }
+    ]
+  },
+  {
+    "task_id": "RC-050",
+    "route": "INPUT_GAP",
+    "repository": "Ascend/MindSpeed-LLM",
+    "query": "1230 is not an identifiable public version; no operator or model",
+    "source_quote": {
+      "description": "切1230版本 反向nan",
+      "reported_root_cause": "",
+      "status": "",
+      "weekly_progress": "",
+      "operator_or_function": []
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  },
+  {
+    "task_id": "RC-051",
+    "route": "P",
+    "repository": "Ascend/pytorch",
+    "query": "histc bincount",
+    "source_quote": {
+      "description": "fsdp训练loss nan",
+      "reported_root_cause": "调整了专家分配地方的逻辑，由histc改成了bincount，不出现nan了 #Step 2: 统计每个专家的 token 数量 tokens_per_expert = torch.histc( top_k_indices.flatten(), bins=self.num_experts, min=0, max=self.num_experts ) #tokens_per_expert = torch.bincount( # top_k_indices.reshape(-1).to(torch.int64), # minlength=self.num_experts, #).to(torch.int64)",
+      "status": "调整了专家分配地方的逻辑，由histc改成了bincount，不出现nan了 #Step 2: 统计每个专家的 token 数量 tokens_per_expert = torch.histc( top_k_indices.flatten(), bins=self.num_experts, min=0, max=self.num_experts ) #tokens_per_expert = torch.bincount( # top_k_indices.reshape(-1).to(torch.int64), # minlength=self.num_experts, #).to(torch.int64)",
+      "weekly_progress": "",
+      "operator_or_function": [
+        "fsdp",
+        "histc",
+        "bincount",
+        "Step",
+        "tokens_per_expert",
+        "top_k_indices"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  },
+  {
+    "task_id": "RC-052",
+    "route": "INPUT_GAP",
+    "repository": "Ascend/MindSpeed-LLM",
+    "query": "xxx model step7 no operator or public identity",
+    "source_quote": {
+      "description": "xxx训练gnorm nan",
+      "reported_root_cause": "step7就报错了 没出gradnorm和loss",
+      "status": "step7就报错了 没出gradnorm和loss",
+      "weekly_progress": "grad不正常，但是nan是在bwd内部",
+      "operator_or_function": [
+        "gnorm",
+        "step7",
+        "gradnorm"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  },
+  {
+    "task_id": "RC-053",
+    "route": "P",
+    "repository": "vllm-project/vllm-ascend",
+    "query": "npu_transpose_batchmatmul",
+    "source_quote": {
+      "description": "dsv4-RL logpdiffmean 跳变",
+      "reported_root_cause": "2026/5/28: 1、减4层&全层首步的logpdiffmean在千分水平，在对齐部分训推差异点后，优先做权重替换实验 2、在训练过程替换woa以及wob模块之外的其他模块为hf原始权重，发现pdiffmean无变化为0.3左右，替换woa以及wob模块权重，pdiffmean降至0.017，单独替换woa权重，pdiffmean为0.03 3、打开woa实现，推理侧走的是pta的npu_transpose_batchmatmul，训练是小算子einsum实现，推理替换为训练实现后，推理的ppl无变化，意味着这里替换实现，但是最后的logits基本不变，此处有一个待确认的点——训练实现和推理不确定哪个可为baseline，训练没做过推理验证",
+      "status": "2026/5/28: 1、减4层&全层首步的logpdiffmean在千分水平，在对齐部分训推差异点后，优先做权重替换实验 2、在训练过程替换woa以及wob模块之外的其他模块为hf原始权重，发现pdiffmean无变化为0.3左右，替换woa以及wob模块权重，pdiffmean降至0.017，单独替换woa权重，pdiffmean为0.03 3、打开woa实现，推理侧走的是pta的npu_transpose_batchmatmul，训练是小算子einsum实现，推理替换为训练实现后，推理的ppl无变化，意味着这里替换实现，但是最后的logits基本不变，此处有一个待确认的点——训练实现和推理不确定哪个可为baseline，训练没做过推理验证",
+      "weekly_progress": "",
+      "operator_or_function": [
+        "dsv4",
+        "logpdiffmean",
+        "pdiffmean",
+        "npu_transpose_batchmatmul",
+        "einsum",
+        "logits"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  },
+  {
+    "task_id": "RC-054",
+    "route": "I",
+    "repository": "Ascend/MindSpeed-LLM",
+    "query": "GLM5 log_prob",
+    "source_quote": {
+      "description": "GLM5",
+      "reported_root_cause": "采集减层mix数据，逐层比对训推的模块实现，将全层的log_prob_diff_mean从0.15降到0.014；推理开图模式，走full_decode_only",
+      "status": "采集减层mix数据，逐层比对训推的模块实现，将全层的log_prob_diff_mean从0.15降到0.014；推理开图模式，走full_decode_only",
+      "weekly_progress": "全层第0步训推指标log_prob_diff_mean0.15较大，推理rollout存在乱码情况",
+      "operator_or_function": [
+        "GLM5",
+        "log_prob_diff_mean",
+        "full_decode_only"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  },
+  {
+    "task_id": "RC-055",
+    "route": "I",
+    "repository": "vllm-project/vllm-ascend",
+    "query": "HY graph accuracy",
+    "source_quote": {
+      "description": "HY-V3",
+      "reported_root_cause": "",
+      "status": "",
+      "weekly_progress": "开启图模式后，在文本理解数据集上精度测评分数从0.6下降至0.42，但badcase逻辑正常",
+      "operator_or_function": []
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  },
+  {
+    "task_id": "RC-056",
+    "route": "I",
+    "repository": "vllm-project/vllm-ascend",
+    "query": "GLM5 first token",
+    "source_quote": {
+      "description": "【龙虾】GLM 5",
+      "reported_root_cause": "",
+      "status": "",
+      "weekly_progress": "首token为！，单batch稳定复现",
+      "operator_or_function": [
+        "GLM"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  },
+  {
+    "task_id": "RC-057",
+    "route": "I",
+    "repository": "vllm-project/vllm-ascend",
+    "query": "HY garbled",
+    "source_quote": {
+      "description": "HY-V3",
+      "reported_root_cause": "",
+      "status": "",
+      "weekly_progress": "首token即乱码，非！",
+      "operator_or_function": []
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  },
+  {
+    "task_id": "RC-058",
+    "route": "DIRECT",
+    "repository": "Ascend/MindSpeed-LLM",
+    "query": "original precision progress and PRs",
+    "source_quote": {
+      "description": "sd2.0 pro loss nan",
+      "reported_root_cause": "32卡多step采集，看到step 8 loss nan，step6 dump采下来数据看到rank0的all2all输出nan，输入正常→ 排查其他卡的同一个all2all，发现rank3和rank7的这个all2all输入有nan→ 往上找发现两个rank都是在truediv反向出的nan，但是输入有nan 找对应代码看到是pool里的反向进来就nan→ 看前向代码，pool后面跟了几个自定义算子，然后这一段在dump数据里是缺失的，最近能对应上dump数据的是index select的反向数据，这个跟在几个自定义算子之后，它反向数据正常→ 给这几个自定义算子的正向输出tensor挂grad hook，遇到nan就报日志→ 发现grad最早出现在attn的gradv上→确定算子在attn的反向 →对attn反向的中间tensor挂grad hook，用相同方式加nan检测打印→发现结果",
+      "status": "32卡多step采集，看到step 8 loss nan，step6 dump采下来数据看到rank0的all2all输出nan，输入正常→ 排查其他卡的同一个all2all，发现rank3和rank7的这个all2all输入有nan→ 往上找发现两个rank都是在truediv反向出的nan，但是输入有nan 找对应代码看到是pool里的反向进来就nan→ 看前向代码，pool后面跟了几个自定义算子，然后这一段在dump数据里是缺失的，最近能对应上dump数据的是index select的反向数据，这个跟在几个自定义算子之后，它反向数据正常→ 给这几个自定义算子的正向输出tensor挂grad hook，遇到nan就报日志→ 发现grad最早出现在attn的gradv上→确定算子在attn的反向 →对attn反向的中间tensor挂grad hook，用相同方式加nan检测打印→发现结果无影响→确定是里面的大反向算子（torch.ops自定义反向）出的问题→给自定义反向前后加nan检测，nan检测到直接保存exit→保存下来构建单算子用例→单算子用例复现->",
+      "weekly_progress": "",
+      "operator_or_function": [
+        "step",
+        "step6",
+        "rank0",
+        "all2all",
+        "rank3",
+        "rank7"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": [
+      {
+        "link": "https://gitcode.com/cann/ops-transformer/pull/3901",
+        "title": "bugfix unaligned scene oom #3901",
+        "function": "",
+        "before": "",
+        "after": "",
+        "trigger": "",
+        "tests": "",
+        "validation": "",
+        "diff_capture": "RAW_DIFF_PARTIAL",
+        "diff_chars": "2731",
+        "support": "PARTIAL_SUPPORT",
+        "missing": "无测试；无数值回归"
+      },
+      {
+        "link": "https://gitcode.com/cann/ops-transformer/pull/4152",
+        "title": "FlashAttentionScoreGrad修复空tensor场景oom问题 #4152",
+        "function": "",
+        "before": "",
+        "after": "",
+        "trigger": "",
+        "tests": "",
+        "validation": "",
+        "diff_capture": "RAW_DIFF_PARTIAL",
+        "diff_chars": "927",
+        "support": "PARTIAL_SUPPORT",
+        "missing": "无测试；无数值回归"
+      }
+    ]
+  },
+  {
+    "task_id": "RC-059",
+    "route": "INPUT_GAP",
+    "repository": "Ascend/MindSpeed-LLM",
+    "query": "xxx gnorm only; no model operator version",
+    "source_quote": {
+      "description": "xxx gnorm跑飞",
+      "reported_root_cause": "",
+      "status": "",
+      "weekly_progress": "",
+      "operator_or_function": [
+        "gnorm"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  },
+  {
+    "task_id": "RC-060",
+    "route": "P",
+    "repository": "vllm-project/vllm-ascend",
+    "query": "FP8 v_scale",
+    "source_quote": {
+      "description": "HY-V3",
+      "reported_root_cause": "2026/06/27： dump比对分析： （1）整网dump数据来看，首个差异点是attn输出 （2）load BF16 attn输出后，下游输出全部对齐，直到下一个attn计算 （3）对key, value, k_scale进行[1:]切片后，前N（N>30）个token对齐，后续出现\"需要注意\"复读 算子侧定位现状： （1）单算子脚本的FIA输出与整网FIA输出二进制一致 （2）单算子脚本，与CPU标杆相比，精度达标元素比例为70%，远低于99.5%标准 （3）暂未发现CPU标杆实现有问题 （4）将v_scale手动修改为1后，单算子测试Pass",
+      "status": "2026/06/27： dump比对分析： （1）整网dump数据来看，首个差异点是attn输出 （2）load BF16 attn输出后，下游输出全部对齐，直到下一个attn计算 （3）对key, value, k_scale进行[1:]切片后，前N（N>30）个token对齐，后续出现\"需要注意\"复读 算子侧定位现状： （1）单算子脚本的FIA输出与整网FIA输出二进制一致 （2）单算子脚本，与CPU标杆相比，精度达标元素比例为70%，远低于99.5%标准 （3）暂未发现CPU标杆实现有问题 （4）将v_scale手动修改为1后，单算子测试Pass",
+      "weekly_progress": "FP8 Attention路线首token乱码，BF16 Attention路线正确",
+      "operator_or_function": [
+        "attn",
+        "load",
+        "BF16",
+        "value",
+        "k_scale",
+        "FIA"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  },
+  {
+    "task_id": "RC-061",
+    "route": "I",
+    "repository": "vllm-project/vllm-ascend",
+    "query": "FP8 attention synchronization",
+    "source_quote": {
+      "description": "HY-V3",
+      "reported_root_cause": "2026/06/29： （1）加工具问题消失 （2）FIA算子前同步后问题消失。 （3）FP16 Attention路线有torch.tensor操作，无意中引入同步，修改后，FP16 Attention路线也复现确定性问题",
+      "status": "2026/06/29： （1）加工具问题消失 （2）FIA算子前同步后问题消失。 （3）FP16 Attention路线有torch.tensor操作，无意中引入同步，修改后，FP16 Attention路线也复现确定性问题",
+      "weekly_progress": "FP8 Attention路线确定性固定不住",
+      "operator_or_function": [
+        "FIA",
+        "tensor"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  },
+  {
+    "task_id": "RC-062",
+    "route": "P",
+    "repository": "verl-project/verl",
+    "query": "rotary sin cos",
+    "source_quote": {
+      "description": "verl后rollout的结果有乱码,vllm单推结果正常问题",
+      "reported_root_cause": "2026/7/7：定位到切pe、nope的入参sin、cos在verl中初始化为全0，单推为正常数值 2026/7/6：没机器，等待",
+      "status": "2026/7/7：定位到切pe、nope的入参sin、cos在verl中初始化为全0，单推为正常数值 2026/7/6：没机器，等待",
+      "weekly_progress": "",
+      "operator_or_function": [
+        "verl",
+        "rollout",
+        "nope"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  },
+  {
+    "task_id": "RC-063",
+    "route": "DIRECT",
+    "repository": "verl-project/verl",
+    "query": "original SparseFAG event PRs cannot inherit forward fault",
+    "source_quote": {
+      "description": "DS v3.2 speciale verl推理结果异常",
+      "reported_root_cause": "",
+      "status": "",
+      "weekly_progress": "vllm单推结果正常",
+      "operator_or_function": [
+        "speciale",
+        "verl"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": [
+      {
+        "link": "https://gitcode.com/cann/ops-transformer/pull/8443",
+        "title": "修复SFAG同步问题与潜在风险【商分】 #8443",
+        "function": "",
+        "before": "",
+        "after": "",
+        "trigger": "",
+        "tests": "",
+        "validation": "",
+        "diff_capture": "RAW_DIFF_PARTIAL",
+        "diff_chars": "6000",
+        "support": "DIRECT_SUPPORT",
+        "missing": "记录 W29 为空页，无独立验证；无测试"
+      },
+      {
+        "link": "https://gitcode.com/cann/ops-transformer/pull/8445",
+        "title": "修复SFAG同步问题与潜在风险 #8445",
+        "function": "",
+        "before": "",
+        "after": "",
+        "trigger": "",
+        "tests": "",
+        "validation": "",
+        "diff_capture": "RAW_DIFF_PARTIAL",
+        "diff_chars": "6000",
+        "support": "DIRECT_SUPPORT",
+        "missing": "同上"
+      }
+    ]
+  },
+  {
+    "task_id": "RC-064",
+    "route": "DIRECT",
+    "repository": "vllm-project/vllm-ascend",
+    "query": "original ATB FLA PR",
+    "source_quote": {
+      "description": "Ling-V2.5 vllm适配推理乱码",
+      "reported_root_cause": "2026/1/15：对齐ring_mla和小算子输出但乱码问题依然存在； 发现只输出一个token的话，第一个token是能对上的，怀疑decode有问题，多采两个token看看，定位到decode时FLA未读取中间计算结果 2026/1/14：发现ring_mla融合算子与客户提供的小算子实现有差异",
+      "status": "2026/1/15：对齐ring_mla和小算子输出但乱码问题依然存在； 发现只输出一个token的话，第一个token是能对上的，怀疑decode有问题，多采两个token看看，定位到decode时FLA未读取中间计算结果 2026/1/14：发现ring_mla融合算子与客户提供的小算子实现有差异",
+      "weekly_progress": "transformers+NPU推理结果正常，vllm乱码",
+      "operator_or_function": [
+        "Ling",
+        "ring_mla",
+        "decode",
+        "FLA"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": [
+      {
+        "link": "https://gitcode.com/cann/ascend-transformer-boost/pull/2207",
+        "title": "fix name spelling error #2207",
+        "function": "",
+        "before": "",
+        "after": "",
+        "trigger": "",
+        "tests": "",
+        "validation": "",
+        "diff_capture": "RAW_DIFF_PARTIAL",
+        "diff_chars": "6000",
+        "support": "NO_SUPPORT",
+        "missing": "ring_mla 乱码的真实修复未找到"
+      }
+    ]
+  },
+  {
+    "task_id": "RC-065",
+    "route": "DIRECT",
+    "repository": "Ascend/MindSpeed-LLM",
+    "query": "original repeat_interleave routing PR",
+    "source_quote": {
+      "description": "【智谱】qwen-image-edit模型NPU训练效果不达标",
+      "reported_root_cause": "2026/8/19：两边首步gnorm不一致的原因是npu上使用的repeat_interleave算子反向使用fp32计算，精度更高，gpu使用bf16计算，rmsnorm小算子没有升fp32计算，gpu升fp32算然后再to bf16。效果不达标的原因是gpu和npu代码存在差异，npu代码使用了ema，2k步时ema权重有82%的比例是原始权重，gpu ema没有生效，所以导致gpu推理图像编辑有效果，npu没有效果",
+      "status": "2026/8/19：两边首步gnorm不一致的原因是npu上使用的repeat_interleave算子反向使用fp32计算，精度更高，gpu使用bf16计算，rmsnorm小算子没有升fp32计算，gpu升fp32算然后再to bf16。效果不达标的原因是gpu和npu代码存在差异，npu代码使用了ema，2k步时ema权重有82%的比例是原始权重，gpu ema没有生效，所以导致gpu推理图像编辑有效果，npu没有效果",
+      "weekly_progress": "npu图像编辑没有效果",
+      "operator_or_function": [
+        "qwen",
+        "image",
+        "edit",
+        "gnorm",
+        "repeat_interleave",
+        "bf16"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": [
+      {
+        "link": "https://gitcode.com/cann/ops-nn/pull/6170",
+        "title": "repeat_interleave支持边界shape #6170",
+        "function": "",
+        "before": "",
+        "after": "",
+        "trigger": "",
+        "tests": "",
+        "validation": "",
+        "diff_capture": "RAW_DIFF_PARTIAL",
+        "diff_chars": "2868",
+        "support": "PARTIAL_SUPPORT",
+        "missing": "无测试；无精度回归"
+      }
+    ]
+  },
+  {
+    "task_id": "RC-066",
+    "route": "DIRECT",
+    "repository": "Ascend/MindSpeed-LLM",
+    "query": "original LightningIndexer PR",
+    "source_quote": {
+      "description": "mindspeed-llm dsv4训练确定性固定不住",
+      "reported_root_cause": "2026/8/12：加工具采集md5，xorsum（开async dump），统计量（开async dump）问题都不复现",
+      "status": "2026/8/12：加工具采集md5，xorsum（开async dump），统计量（开async dump）问题都不复现",
+      "weekly_progress": "",
+      "operator_or_function": [
+        "mindspeed",
+        "dsv4",
+        "xorsum",
+        "async"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": [
+      {
+        "link": "https://gitcode.com/cann/ops-transformer/pull/9834",
+        "title": "LI UB duplicate fix #9834",
+        "function": "",
+        "before": "",
+        "after": "",
+        "trigger": "",
+        "tests": "",
+        "validation": "",
+        "diff_capture": "RAW_DIFF_PARTIAL",
+        "diff_chars": "4986",
+        "support": "DIRECT_SUPPORT",
+        "missing": "无测试；无回归"
+      }
+    ]
+  },
+  {
+    "task_id": "RC-067",
+    "route": "DIRECT",
+    "repository": "Ascend/MindSpeed-LLM",
+    "query": "original Gather scalar-copy PR",
+    "source_quote": {
+      "description": "minimax-h3模型训练gpu npu精度未对齐",
+      "reported_root_cause": "",
+      "status": "",
+      "weekly_progress": "初始几步 loss 接近，lr=0时精度对齐，lr非0时后续loss逐步放大。定位到截图代码处的grad norm差异有2倍",
+      "operator_or_function": [
+        "minimax"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": [
+      {
+        "link": "https://gitcode.com/cann/ops-nn/pull/1562",
+        "title": "修复算子bug&&修改aclnnIndexSelect中的文档 #1562",
+        "function": "",
+        "before": "",
+        "after": "",
+        "trigger": "",
+        "tests": "",
+        "validation": "",
+        "diff_capture": "RAW_DIFF_PARTIAL",
+        "diff_chars": "3908",
+        "support": "PARTIAL_SUPPORT",
+        "missing": "周报根因（反向升精）无代码修复"
+      }
+    ]
+  },
+  {
+    "task_id": "RC-068",
+    "route": "I",
+    "repository": "Ascend/MindSpeed-LLM",
+    "query": "Qwen3.5 NaN SFT",
+    "source_quote": {
+      "description": "Qwen3.5 SFT gnorm为NaN",
+      "reported_root_cause": "",
+      "status": "",
+      "weekly_progress": "首步gnorm为NaN",
+      "operator_or_function": [
+        "Qwen3",
+        "SFT",
+        "gnorm"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  },
+  {
+    "task_id": "RC-069",
+    "route": "DIRECT",
+    "repository": "Ascend/MindSpeed-LLM",
+    "query": "original BOOL reduction PR then missing image input",
+    "source_quote": {
+      "description": "dpskv4-flash-vision训推不一致",
+      "reported_root_cause": "2026/9/30：用skill，发现Megatron 前向中 DSV4 图像输入丢失",
+      "status": "2026/9/30：用skill，发现Megatron 前向中 DSV4 图像输入丢失",
+      "weekly_progress": "首步logpdiff为0.404，训推两侧差异较大",
+      "operator_or_function": [
+        "dpskv4",
+        "flash",
+        "vision",
+        "skill",
+        "Megatron",
+        "DSV4"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": [
+      {
+        "link": "https://gitcode.com/cann/ops-math/pull/6026",
+        "title": "fix：reduce prod bool输出改用ReduceAll，对齐GPU逻辑和语义 #6026",
+        "function": "",
+        "before": "",
+        "after": "",
+        "trigger": "",
+        "tests": "",
+        "validation": "",
+        "diff_capture": "RAW_DIFF_PARTIAL",
+        "diff_chars": "5540",
+        "support": "PARTIAL_SUPPORT",
+        "missing": "无测试；无回归结果"
+      }
+    ]
+  },
+  {
+    "task_id": "RC-070",
+    "route": "P",
+    "repository": "Ascend/MindSpeed-LLM",
+    "query": "mul dtype",
+    "source_quote": {
+      "description": "minimax H3模型训练loss和gpu差异大",
+      "reported_root_cause": "2026/10/15：比对首步loss，gnorm差异，发现mul计算dtype的处理和gpu不一样，对齐后，800步相对误差1.2%",
+      "status": "2026/10/15：比对首步loss，gnorm差异，发现mul计算dtype的处理和gpu不一样，对齐后，800步相对误差1.2%",
+      "weekly_progress": "使用原仓diffsync-studio 框架对齐精度过程中，zero2/zero3 loss误差大，相对误差2.7%",
+      "operator_or_function": [
+        "minimax",
+        "gnorm",
+        "dtype"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  },
+  {
+    "task_id": "RC-071",
+    "route": "I",
+    "repository": "Ascend/pytorch",
+    "query": "EmbeddingDenseGrad NaN",
+    "source_quote": {
+      "description": "【训练】moe模型训练随机步数出现NaN",
+      "reported_root_cause": "2025/12/17：monitor nan/极大值检测到embedidng权重梯度首次输出NaN，cann版本为8.5.T.B067，加dump工具只采embedding性能增加5倍，建议手动挂hook并打印embedding输入shape",
+      "status": "2025/12/17：monitor nan/极大值检测到embedidng权重梯度首次输出NaN，cann版本为8.5.T.B067，加dump工具只采embedding性能增加5倍，建议手动挂hook并打印embedding输入shape",
+      "weekly_progress": "已固定确定性",
+      "operator_or_function": [
+        "monitor",
+        "embedidng",
+        "B067",
+        "embedding",
+        "hook",
+        "shape"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  },
+  {
+    "task_id": "RC-072",
+    "route": "P",
+    "repository": "Ascend/MindSpeed-LLM",
+    "query": "attention head MLA",
+    "source_quote": {
+      "description": "ling-V2.5 grpo训练30步后reward和gpu出现差异",
+      "reported_root_cause": "2026/1/27：通过megatron 与huggingface前向比对，发现两者在 MLA 层的attention_head 参数设置有差异，修复后 logp_diff 从0.02 降低到 0.01 （接近ring v2基线0.008, 本次GPU基线为0.0009）, 其他未发现显著bug级别差异，目前已跑 24步，reward指标暂未崩溃，需继续观察到40步。",
+      "status": "2026/1/27：通过megatron 与huggingface前向比对，发现两者在 MLA 层的attention_head 参数设置有差异，修复后 logp_diff 从0.02 降低到 0.01 （接近ring v2基线0.008, 本次GPU基线为0.0009）, 其他未发现显著bug级别差异，目前已跑 24步，reward指标暂未崩溃，需继续观察到40步。",
+      "weekly_progress": "",
+      "operator_or_function": [
+        "ling",
+        "grpo",
+        "reward",
+        "megatron",
+        "huggingface",
+        "MLA"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  },
+  {
+    "task_id": "RC-073",
+    "route": "P",
+    "repository": "Ascend/MindSpeed",
+    "query": "TELayerNormColumnParallelLinear",
+    "source_quote": {
+      "description": "-NBG-Loop精度问题定位",
+      "reported_root_cause": "2026/2/11:目前进展是发现gpu走了融合算子telayernormcolumnparallellinear（TE算子），npu这边layernorm和selfattention是分开做的，建议npu这边也走对应的MindSpeedTELayerNormColumnParallelLinear试一试先",
+      "status": "2026/2/11:目前进展是发现gpu走了融合算子telayernormcolumnparallellinear（TE算子），npu这边layernorm和selfattention是分开做的，建议npu这边也走对应的MindSpeedTELayerNormColumnParallelLinear试一试先",
+      "weekly_progress": "GPU和NPU长稳loss对不齐",
+      "operator_or_function": [
+        "BOSS",
+        "NBG",
+        "Loop",
+        "telayernormcolumnparallellinear",
+        "layernorm",
+        "selfattention"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  },
+  {
+    "task_id": "RC-074",
+    "route": "CONTRACT",
+    "repository": "microsoft/onnxruntime",
+    "query": "reuse CANN execution provider precision_mode source",
+    "source_quote": {
+      "description": "onnx推理结果inf",
+      "reported_root_cause": "2026/4/22：1. 出现inf的原因：onnxrutime-cann的默认配置会将所有数据使用fp16计算，ReduceMean输出不一致 -> Sub后输入变大 -> Mul后出现大数在fp16溢出。修改配置按照原dytpe进行推理inf消失，精度差异大。本质原因还是ReduceMean计算错误导致后续差异。",
+      "status": "2026/4/22：1. 出现inf的原因：onnxrutime-cann的默认配置会将所有数据使用fp16计算，ReduceMean输出不一致 -> Sub后输入变大 -> Mul后出现大数在fp16溢出。修改配置按照原dytpe进行推理inf消失，精度差异大。本质原因还是ReduceMean计算错误导致后续差异。",
+      "weekly_progress": "onnx模型在npu上推理结果为inf",
+      "operator_or_function": [
+        "onnx",
+        "onnxrutime",
+        "ReduceMean",
+        "dytpe"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  },
+  {
+    "task_id": "RC-075",
+    "route": "CONTRACT",
+    "repository": "microsoft/onnxruntime",
+    "query": "reuse CANN execution provider precision_mode source",
+    "source_quote": {
+      "description": "onnx推理结果nan",
+      "reported_root_cause": "2026/4/22：onnxruntime-cann的默认配置会使用fp16进行计算，网络中的matmul输出在fp16溢出，修改配置为保持原dtype进行推理，精度基本和cpu一致",
+      "status": "2026/4/22：onnxruntime-cann的默认配置会使用fp16进行计算，网络中的matmul输出在fp16溢出，修改配置为保持原dtype进行推理，精度基本和cpu一致",
+      "weekly_progress": "onnx模型在npu上推理结果我为nan",
+      "operator_or_function": [
+        "onnx",
+        "onnxruntime",
+        "matmul",
+        "dtype"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  },
+  {
+    "task_id": "RC-076",
+    "route": "I",
+    "repository": "vllm-project/vllm-ascend",
+    "query": "DeepSeek prompt accuracy",
+    "source_quote": {
+      "description": "dsv4 单curl精度问题",
+      "reported_root_cause": "2026/6/12：用户测的prompt语义存在问题 6.9：与同事确认，出问题的case，用户构造的输入语义存在问题，非问题，不继续处理。 6.2：41,42层attention后，经过rmsnorm都是能上升一部分的；但是43层attention后，rmsnorm之前，余弦从0.99降到0.84，中间存在hs_post和hc_pre操作，计划通过torchsave保存定位",
+      "status": "2026/6/12：用户测的prompt语义存在问题 6.9：与同事确认，出问题的case，用户构造的输入语义存在问题，非问题，不继续处理。 6.2：41,42层attention后，经过rmsnorm都是能上升一部分的；但是43层attention后，rmsnorm之前，余弦从0.99降到0.84，中间存在hs_post和hc_pre操作，计划通过torchsave保存定位",
+      "weekly_progress": "",
+      "operator_or_function": [
+        "dsv4",
+        "curl",
+        "prompt",
+        "rmsnorm",
+        "hs_post",
+        "hc_pre"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  },
+  {
+    "task_id": "RC-077",
+    "route": "P",
+    "repository": "vllm-project/vllm-ascend",
+    "query": "allreduce graph",
+    "source_quote": {
+      "description": "0.20版本图模式中英文乱码，egaer模式正常，0.18版本图模式，eager都正常",
+      "reported_root_cause": "2026/7/15：aclgraph L1采集有问题，定位中 2026/7/14：通过profile结果可以清楚看到图和非图两边不一致，非图最后有个allreduce操作，图模式没有；采集下图和非图的dump数据看下； 2026/7/13：可以采集下profile看下图和非图走的算子是否一致",
+      "status": "2026/7/15：aclgraph L1采集有问题，定位中 2026/7/14：通过profile结果可以清楚看到图和非图两边不一致，非图最后有个allreduce操作，图模式没有；采集下图和非图的dump数据看下； 2026/7/13：可以采集下profile看下图和非图走的算子是否一致",
+      "weekly_progress": "0.20版本图模式中英文乱码，egaer模式正常，0.18版本图模式，eager都正常",
+      "operator_or_function": [
+        "egaer",
+        "eager",
+        "aclgraph",
+        "profile",
+        "allreduce"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  },
+  {
+    "task_id": "RC-078",
+    "route": "I",
+    "repository": "Ascend/MindSpeed-MM",
+    "query": "Qwen3 Omni dataloader",
+    "source_quote": {
+      "description": "Qwen3 Omni MindSpeed-MM迁移客户框架loss对不齐",
+      "reported_root_cause": "2026/7/14：dump首step 数据，发现embedding输入shape就不一样，先排查dataloader逻辑",
+      "status": "2026/7/14：dump首step 数据，发现embedding输入shape就不一样，先排查dataloader逻辑",
+      "weekly_progress": "",
+      "operator_or_function": [
+        "Qwen3",
+        "Omni",
+        "MindSpeed",
+        "step",
+        "embedding",
+        "shape"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  },
+  {
+    "task_id": "RC-079",
+    "route": "I",
+    "repository": "verl-project/verl",
+    "query": "qwen3_vl gradient",
+    "source_quote": {
+      "description": "verl qwen3_vl 使用自定义算子>1000梯度尖刺",
+      "reported_root_cause": "2026/7/28：客户机器拿去做其他实验了，具体什么样的算子调用采集不下来不清楚，把代码先拿到 2026/7/23：想确认异常自定义算子，使用自定义算子采集功能，目前还未采到数据。",
+      "status": "2026/7/28：客户机器拿去做其他实验了，具体什么样的算子调用采集不下来不清楚，把代码先拿到 2026/7/23：想确认异常自定义算子，使用自定义算子采集功能，目前还未采到数据。",
+      "weekly_progress": "",
+      "operator_or_function": [
+        "verl",
+        "qwen3_vl"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  },
+  {
+    "task_id": "RC-080",
+    "route": "I",
+    "repository": "Ascend/MindSpeed-MM",
+    "query": "Gemma RMSNorm",
+    "source_quote": {
+      "description": "智创gemma4 loss grad长稳对不齐",
+      "reported_root_cause": "2026/8/3:修复了timestamp（step_embedder）和rmsnorm问题（把npu rmsnorm小算子tocpu）后，首步gpu 318，npu 312，到50步后gnorm还是有明显差异 2026/7/31：还在分析数据中，先对齐前向过程数据",
+      "status": "2026/8/3:修复了timestamp（step_embedder）和rmsnorm问题（把npu rmsnorm小算子tocpu）后，首步gpu 318，npu 312，到50步后gnorm还是有明显差异 2026/7/31：还在分析数据中，先对齐前向过程数据",
+      "weekly_progress": "首步grad norm差异>2%(GPU 318，npu 335)",
+      "operator_or_function": [
+        "gemma4",
+        "grad",
+        "timestamp",
+        "step_embedder",
+        "rmsnorm",
+        "tocpu"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  },
+  {
+    "task_id": "RC-081",
+    "route": "I",
+    "repository": "Ascend/MindSpeed-LLM",
+    "query": "FusedSwiGlu",
+    "source_quote": {
+      "description": "Telechat-29b 训推一致性输入token的logits误差较大",
+      "reported_root_cause": "2026/10/19：采集了L0级别的dump数据，使用skill分析了得到了几个可疑节点 2026/10/20：skill分析mhc的权重精度有问题，将推理侧权重mhc改为fp32的权重验证，推理侧原dtype bf16，改回fp32后，pearson系数从0.93提升到0.97 2026/10/22：客户指标要求发生变化，285B指标比29B更差，目前定位285B模型，使用skill得到可疑节点，对应实现模块输入一致，输出norm差异在十分位（FusedSwiGlu 5.90625 vs AscendSiluAndMul 5.875），验证中",
+      "status": "2026/10/19：采集了L0级别的dump数据，使用skill分析了得到了几个可疑节点 2026/10/20：skill分析mhc的权重精度有问题，将推理侧权重mhc改为fp32的权重验证，推理侧原dtype bf16，改回fp32后，pearson系数从0.93提升到0.97 2026/10/22：客户指标要求发生变化，285B指标比29B更差，目前定位285B模型，使用skill得到可疑节点，对应实现模块输入一致，输出norm差异在十分位（FusedSwiGlu 5.90625 vs AscendSiluAndMul 5.875），验证中",
+      "weekly_progress": "推理vllm-ascend，训练mindformers，第一次前向得到输入token的logits误差较大",
+      "operator_or_function": [
+        "Telechat",
+        "logits",
+        "skill",
+        "dtype",
+        "bf16",
+        "pearson"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  },
+  {
+    "task_id": "RC-082",
+    "route": "P",
+    "repository": "Ascend/pytorch",
+    "query": "EmbeddingDenseGrad empty",
+    "source_quote": {
+      "description": "EmbeddingDenseGrad/CANN",
+      "reported_root_cause": "输入为空shape的情况下，反向存在异常",
+      "status": "Q1 C21",
+      "weekly_progress": "输入为空shape的情况下，反向存在异常",
+      "operator_or_function": [
+        "EmbeddingDenseGrad",
+        "shape"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  },
+  {
+    "task_id": "RC-083",
+    "route": "I",
+    "repository": "Ascend/pytorch",
+    "query": "bucketize accuracy",
+    "source_quote": {
+      "description": "分桶算子精度越界",
+      "reported_root_cause": "2026/8/11：已经尝试使用sanitizer工具扫描是否出现踩踏问题，没有扫描出来，当前通过profiling查看没有异常",
+      "status": "2026/8/11：已经尝试使用sanitizer工具扫描是否出现踩踏问题，没有扫描出来，当前通过profiling查看没有异常",
+      "weekly_progress": "分桶算子优化以后，多流模式下（trainpipeline）会出现越界现象（分桶算子输出的值明显大于正常值，导致后续index add算子输入异常报错），单流模式不报错，在python侧算子执行后加npu.sync就不越界了",
+      "operator_or_function": [
+        "sanitizer",
+        "profiling"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  },
+  {
+    "task_id": "RC-084",
+    "route": "I",
+    "repository": "vllm-project/vllm-ascend",
+    "query": "GLM topk NaN graph",
+    "source_quote": {
+      "description": "【内部 预ITR】GLM5.3 Flash长稳挂死",
+      "reported_root_cause": "2026/9/12：根据调试信息，topk算子input数据存在大量Nan和Inf，workspace中的数据也是混乱的，怀疑存在内存踩踏 2026/9/14：aclgraph场景暂无内存监控能力，计划先尝试加dump",
+      "status": "2026/9/12：根据调试信息，topk算子input数据存在大量Nan和Inf，workspace中的数据也是混乱的，怀疑存在内存踩踏 2026/9/14：aclgraph场景暂无内存监控能力，计划先尝试加dump",
+      "weekly_progress": "概现topk算子报错",
+      "operator_or_function": [
+        "ITR",
+        "GLM5",
+        "Flash",
+        "topk",
+        "input",
+        "workspace"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  },
+  {
+    "task_id": "RC-085",
+    "route": "I",
+    "repository": "Ascend/MindIE-LLM",
+    "query": "CodeLlama precision",
+    "source_quote": {
+      "description": "【深圳海上智云科技】Codellama-70B 推理精度问题",
+      "reported_root_cause": "2024/7/16：客户提供原始权重比对数据，发现有两个层精度对比异常，相对欧式距离误差大于7%，待客户提供dump数据进一步定位具体问题 2024/7/11：CUDA 是双卡推理，需要重新 dump 数据 2024/7/9：由于客户更改过模型，需等杨逸飞在原模型上测试，再与客户提供的数据做比较，确认误差是否由客户更改引入 2024/7/8：使用客户提供数据定位MLP层算子输出误差大于1e-1 2024/7/5：已定位dump数据存在误差，需要确认具体是哪个算子出现问题",
+      "status": "2024/7/16：客户提供原始权重比对数据，发现有两个层精度对比异常，相对欧式距离误差大于7%，待客户提供dump数据进一步定位具体问题 2024/7/11：CUDA 是双卡推理，需要重新 dump 数据 2024/7/9：由于客户更改过模型，需等杨逸飞在原模型上测试，再与客户提供的数据做比较，确认误差是否由客户更改引入 2024/7/8：使用客户提供数据定位MLP层算子输出误差大于1e-1 2024/7/5：已定位dump数据存在误差，需要确认具体是哪个算子出现问题",
+      "weekly_progress": "使用msit compare工具比对CodeLlama 70B在cuda和ATB推理的数据，发现相对欧式距离误差持续累积超过5%，但模型推理结果正常可以通过客户测试",
+      "operator_or_function": [
+        "Codellama",
+        "CUDA",
+        "MLP"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  },
+  {
+    "task_id": "RC-086",
+    "route": "P",
+    "repository": "Ascend/pytorch",
+    "query": "matmul bias precision",
+    "source_quote": {
+      "description": "【盘古】盘古7B/38B/135B系列精度问题",
+      "reported_root_cause": "2024/10/18: 导出第一次出现误差的数据交给盘古的同事进行后续分析 2024/10/16: 和献智哥重新对齐以后，需分析开关融合算子前后matmul+add和matmul+bias的输出结果对比 2024/10/15: 经盘古同事分析得知，135B和7B上都存在attn_linear的matmul+bias误差较大的情况，接下来需进一步分析 2024/10/12:比对135BV2 pass开关前后，matmul+bias误差最大的结果，并绘制误差和调用顺序曲线图 2024/10/11:将触发融合开关后误差最大的结果给海思的同事，分析其输入输出是否符合精度标准。接下来需dump 135BV2开关融合算子的数据进行比对，看是否存在相同的问题。 2024/10/10: 和献智对齐之后，确认融合开关前后触发了97次matmul+bias的情况，找出误差最大的结果。 2024/10/09:",
+      "status": "2024/10/18: 导出第一次出现误差的数据交给盘古的同事进行后续分析 2024/10/16: 和献智哥重新对齐以后，需分析开关融合算子前后matmul+add和matmul+bias的输出结果对比 2024/10/15: 经盘古同事分析得知，135B和7B上都存在attn_linear的matmul+bias误差较大的情况，接下来需进一步分析 2024/10/12:比对135BV2 pass开关前后，matmul+bias误差最大的结果，并绘制误差和调用顺序曲线图 2024/10/11:将触发融合开关后误差最大的结果给海思的同事，分析其输入输出是否符合精度标准。接下来需dump 135BV2开关融合算子的数据进行比对，看是否存在相同的问题。 2024/10/10: 和献智对齐之后，确认融合开关前后触发了97次matmul+bias的情况，找出误差最大的结果。 2024/10/09: 分析dump pass优化前后的数据 查看余弦相似度，MatMul.MatMul_134.算子的余弦相似度最差，该算子位于token3的第26层， 下一步查看该算子的输入输出 pass前后的差异，以及该层的激活函数的输入输出差异 2024/10/08: dump 7Bv2pass优化前后的数据；dump badcase入图和不入图的数据",
+      "weekly_progress": "compile根因分析遗留问题：matmul+bias的融合开关会影响7B盘古模型8分的精度，但是对135B没有影响，需要定位根因",
+      "operator_or_function": [
+        "matmul",
+        "bias",
+        "attn_linear",
+        "BV2",
+        "pass"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  },
+  {
+    "task_id": "RC-087",
+    "route": "I",
+    "repository": "Ascend/MindIE-LLM",
+    "query": "attention_mask tokenizer",
+    "source_quote": {
+      "description": "多模态误差累计",
+      "reported_root_cause": "2024/10/12:80B模型print确定了tokenizer和attention_mask的差异，修改后badcase推理结果对齐，正在跑整数据集的评分 2024/10/10:85B环境回收，权重无法拷贝，家里和现场都无法复现,80B语言模型存在精度问题，正在进行dump实验 2024/10/09:单算子验证精度OK，待验证NPU单算子输出与整网输出是否一致。",
+      "status": "2024/10/12:80B模型print确定了tokenizer和attention_mask的差异，修改后badcase推理结果对齐，正在跑整数据集的评分 2024/10/10:85B环境回收，权重无法拷贝，家里和现场都无法复现,80B语言模型存在精度问题，正在进行dump实验 2024/10/09:单算子验证精度OK，待验证NPU单算子输出与整网输出是否一致。",
+      "weekly_progress": "算子比对，余弦相似度随层数加深恶化",
+      "operator_or_function": [
+        "print",
+        "tokenizer",
+        "attention_mask",
+        "badcase"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  },
+  {
+    "task_id": "RC-088",
+    "route": "I",
+    "repository": "Ascend/pytorch",
+    "query": "P2POp llama",
+    "source_quote": {
+      "description": "【B站】客户自行修改的llama70B模型精度问题",
+      "reported_root_cause": "2024/10/22: 客户侧人力被调动去别的事务，当前问题暂时搁置 2024/10/18: 手动比对attention_flash算子精度问题 2024/10/17： 客户磁盘空间不足，dump device 0的数据无法完成比对，建议dump中间层的完整layer进行比对 2024-10-14：根据异常调用栈，建议客户打印P2POp中的op类型",
+      "status": "2024/10/22: 客户侧人力被调动去别的事务，当前问题暂时搁置 2024/10/18: 手动比对attention_flash算子精度问题 2024/10/17： 客户磁盘空间不足，dump device 0的数据无法完成比对，建议dump中间层的完整layer进行比对 2024-10-14：根据异常调用栈，建议客户打印P2POp中的op类型",
+      "weekly_progress": "输入长文本精度差异大，短文本差异小，怀疑是lm_head模块精度误差，需要dump数据定位根因",
+      "operator_or_function": [
+        "llama70B",
+        "attention_flash",
+        "device",
+        "layer",
+        "P2POp"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  },
+  {
+    "task_id": "RC-089",
+    "route": "I",
+    "repository": "Ascend/MindIE-LLM",
+    "query": "internlm accuracy",
+    "source_quote": {
+      "description": "【复旦大学附属中山医院】internlm2.5-20 在MedBench NPU推理结果不如GPU",
+      "reported_root_cause": "2024/11/27：客户在NV离线服务回答其中一个case，回答错误，和之前测出最高得分的那个answer不match，已挂起，没有复现环境且客户暂不关注； 2024/11/26：目前模型配置；，后处理参数都已对齐；和客户确定一下tgi框架是否走ATB模型那一套，是否用融合算子。 2024/11/25：纯模型的logits比对，把精度工具给到工具，客户提供gpu侧数据，我们自己采npu的；目前客户正在协调机器，待机器就位采集logits进行比对 2024/11/20：与客户对齐了npu/gpu的参数配置，整理一个参数列表 2024/11/18：与客户对齐medbench精度测试指标，文本相似度如何npu和gpu如何进行对比",
+      "status": "2024/11/27：客户在NV离线服务回答其中一个case，回答错误，和之前测出最高得分的那个answer不match，已挂起，没有复现环境且客户暂不关注； 2024/11/26：目前模型配置；，后处理参数都已对齐；和客户确定一下tgi框架是否走ATB模型那一套，是否用融合算子。 2024/11/25：纯模型的logits比对，把精度工具给到工具，客户提供gpu侧数据，我们自己采npu的；目前客户正在协调机器，待机器就位采集logits进行比对 2024/11/20：与客户对齐了npu/gpu的参数配置，整理一个参数列表 2024/11/18：与客户对齐medbench精度测试指标，文本相似度如何npu和gpu如何进行对比",
+      "weekly_progress": "客户用mindie推理验证medbench数据，有些数据集精度指标不如a800",
+      "operator_or_function": [
+        "internlm2",
+        "MedBench",
+        "match",
+        "ATB",
+        "logits"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  },
+  {
+    "task_id": "RC-090",
+    "route": "I",
+    "repository": "microsoft/onnxruntime",
+    "query": "CANN segmentation",
+    "source_quote": {
+      "description": "分割模型推理精度问题",
+      "reported_root_cause": "2024/12/3：onnx模型同样存在问题，需内部对齐排查原因 2024/12/2：下一步：对齐输出情况下查看最终抠图结果是否一致。 2024/11/30：对齐230帧的输入和不对齐输入分别对比整网数据精度，不对齐情况下指标略低 2024/11/28: 将短视频反复跑两遍，第二遍230帧出现问题，但是输出余弦相似度曲线走势与第一遍基本一致，无法判定累计误差问题 2024/11/27：算子侧同事确认transdata和Conv不存在精度问题，目前怀疑是累积误差的问题，需要进一步定位； 2024/11/26：查看onnx和om模型比对结果，发现transdata和Conv算子可能存在精度问题，输入正常的情况下，输出的余弦相似度会发生骤降，目前正在找算子的人定位；",
+      "status": "2024/12/3：onnx模型同样存在问题，需内部对齐排查原因 2024/12/2：下一步：对齐输出情况下查看最终抠图结果是否一致。 2024/11/30：对齐230帧的输入和不对齐输入分别对比整网数据精度，不对齐情况下指标略低 2024/11/28: 将短视频反复跑两遍，第二遍230帧出现问题，但是输出余弦相似度曲线走势与第一遍基本一致，无法判定累计误差问题 2024/11/27：算子侧同事确认transdata和Conv不存在精度问题，目前怀疑是累积误差的问题，需要进一步定位； 2024/11/26：查看onnx和om模型比对结果，发现transdata和Conv算子可能存在精度问题，输入正常的情况下，输出的余弦相似度会发生骤降，目前正在找算子的人定位；",
+      "weekly_progress": "现象：分割模型，会出现人物抠图不完整的情况 【云道】【云会议服务域项目群】【贵阳一，modelarts】【转换onnx模型到om模型进行推理，调测发现模型转换的精度对不齐，误差累积推理效果差】",
+      "operator_or_function": [
+        "onnx",
+        "transdata",
+        "Conv"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  },
+  {
+    "task_id": "RC-091",
+    "route": "I",
+    "repository": "mindspore-ai/mindspore",
+    "query": "AIR ONNX precision",
+    "source_quote": {
+      "description": "【山东能源】模型ckpt-air-om存在精度问题",
+      "reported_root_cause": "2024/12/18: 初步认为ckpt-onnx路线存在问题，尝试使用mindspore lite推理，目前已跑通 2024/12/17：ckpt-air-om路线air不维护了，所以现在在尝试ckpt-onnx-om路线是否存在精度问题 2024/12/10：在c86+7.0.rc1的训练和推理环境上测试了少量的视频，精度在测试数据上正常 2024/12/09：将CANN版本和HDK版本和训练对齐，进行推理测试 2024/12/06：定位ckpt-air这一步路线是否存在精度问题，由于air目前已不维护，下一步通过将CANN版本和HDK版本和训练对齐测试推理结果是否正常",
+      "status": "2024/12/18: 初步认为ckpt-onnx路线存在问题，尝试使用mindspore lite推理，目前已跑通 2024/12/17：ckpt-air-om路线air不维护了，所以现在在尝试ckpt-onnx-om路线是否存在精度问题 2024/12/10：在c86+7.0.rc1的训练和推理环境上测试了少量的视频，精度在测试数据上正常 2024/12/09：将CANN版本和HDK版本和训练对齐，进行推理测试 2024/12/06：定位ckpt-air这一步路线是否存在精度问题，由于air目前已不维护，下一步通过将CANN版本和HDK版本和训练对齐测试推理结果是否正常",
+      "weekly_progress": "现象：模型训练精度正常，推理在ckpt-air-om存在精度问题",
+      "operator_or_function": [
+        "ckpt",
+        "onnx",
+        "mindspore",
+        "lite",
+        "HDK"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  },
+  {
+    "task_id": "RC-092",
+    "route": "I",
+    "repository": "Ascend/pytorch",
+    "query": "310P nan where",
+    "source_quote": {
+      "description": "语音zipformer小模型推理精度问题",
+      "reported_root_cause": "2024/12/30：改图后输出正常，待验证整测试集 2024/12/28：算子同事确认310P不支持infnan，需修改图结构防止溢出 2024/12/27：比对关闭融合的算子输出，where算子输出异常 2024/12/26：构建随机输入compare整网算子输出，发现mul_sub_sub可疑算子（输出inf） 2024/12/25：关闭融合规则转成om模型以及升级cann包版本之后存在相同的问题 2024/12/23：待保存模型输入数据、关闭融合之后的om模型结果 2024/12/20：客户业务流代码进行流式推理，前32音频帧无识别问题，从第33帧开始出现精度问题",
+      "status": "2024/12/30：改图后输出正常，待验证整测试集 2024/12/28：算子同事确认310P不支持infnan，需修改图结构防止溢出 2024/12/27：比对关闭融合的算子输出，where算子输出异常 2024/12/26：构建随机输入compare整网算子输出，发现mul_sub_sub可疑算子（输出inf） 2024/12/25：关闭融合规则转成om模型以及升级cann包版本之后存在相同的问题 2024/12/23：待保存模型输入数据、关闭融合之后的om模型结果 2024/12/20：客户业务流代码进行流式推理，前32音频帧无识别问题，从第33帧开始出现精度问题",
+      "weekly_progress": "现象：流式推理模型，msit compare单轮验证无精度问题，随着流式推理进行，误差累积出现精度问题",
+      "operator_or_function": [
+        "zipformer",
+        "infnan",
+        "where",
+        "compare",
+        "mul_sub_sub"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  },
+  {
+    "task_id": "RC-093",
+    "route": "P",
+    "repository": "vllm-project/vllm-ascend",
+    "query": "rope_scaling",
+    "source_quote": {
+      "description": "【讯飞X1】DeepSeek-Distill-0528-Qwen3-8B精度问题",
+      "reported_root_cause": "模型config中默认配置'rope_scaling'长序列参数，在本身版本中一旦检测到此参数会默认走长序列配置，导致短序列精度不能对其，建议客户在跑短序列的时候删除此字段以此来规避",
+      "status": "模型config中默认配置'rope_scaling'长序列参数，在本身版本中一旦检测到此参数会默认走长序列配置，导致短序列精度不能对其，建议客户在跑短序列的时候删除此字段以此来规避",
+      "weekly_progress": "模型推理对话与竞品不能对齐",
+      "operator_or_function": [
+        "DeepSeek",
+        "Distill",
+        "Qwen3",
+        "config",
+        "rope_scaling"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  },
+  {
+    "task_id": "RC-094",
+    "route": "DIRECT",
+    "repository": "vllm-project/vllm-ascend",
+    "query": "existing a3a3d38 commit hint and original subissue",
+    "source_quote": {
+      "description": "比拼vLLM-Ascend",
+      "reported_root_cause": "1、正向源码定位：通过走读代码，代码打点排查rope、fia、kv_rms_norm_rope_cache 等算子的输入，排查是否有不符合预期的场景； -- 袁林风 2、二分定位：从vllm 0.7.3 版本开始二分，找到一个精度OK的基线版本； -- 李庚远 3、利用工具dump分析：挑选 用例7的badcase，同时dump MindIE和VLLM来进行对比； -- 陈帆、贺坤坤",
+      "status": "1、正向源码定位：通过走读代码，代码打点排查rope、fia、kv_rms_norm_rope_cache 等算子的输入，排查是否有不符合预期的场景； -- 袁林风 2、二分定位：从vllm 0.7.3 版本开始二分，找到一个精度OK的基线版本； -- 李庚远 3、利用工具dump分析：挑选 用例7的badcase，同时dump MindIE和VLLM来进行对比； -- 陈帆、贺坤坤",
+      "weekly_progress": "使用aisbench 测试 MMLU、GPQA、gsm8k、AIME、Math500、ceval 数据集，GPQA 精度 58.08%（论文71.5%），AIME2024 精度 36.67%（论文 79.8%），精度不达标；",
+      "operator_or_function": [
+        "Ascend",
+        "rope",
+        "kv_rms_norm_rope_cache",
+        "badcase",
+        "FIA",
+        "interleave_rope"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  },
+  {
+    "task_id": "RC-095",
+    "route": "I",
+    "repository": "Ascend/MindIE-LLM",
+    "query": "DeepSeek distill precision",
+    "source_quote": {
+      "description": "deepseek distill qwen 14B模型推理结果mindie与torch_npu差异较多",
+      "reported_root_cause": "dump 算子问题中",
+      "status": "dump 算子问题中",
+      "weekly_progress": "同样的prompt和输入，使用torch_npu和mindie推理结果差异很大",
+      "operator_or_function": [
+        "deepseek",
+        "distill",
+        "qwen",
+        "torch_npu"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  },
+  {
+    "task_id": "RC-096",
+    "route": "I",
+    "repository": "vllm-project/vllm-ascend",
+    "query": "DeepSeek PD language",
+    "source_quote": {
+      "description": "vLLM-Ascend DSR1 PD分离场景，出现think过程多国语言混杂的精度问题",
+      "reported_root_cause": "dump算子定位中",
+      "status": "dump算子定位中",
+      "weekly_progress": "5月8号拉出来的vLLM-Ascend分支，出现think过程出现多国语言混杂情况；630版本的vLLM-Ascend也有问题的，但是客户无法用630版本上线因为要进行灰度；",
+      "operator_or_function": [
+        "Ascend",
+        "DSR1",
+        "think"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  },
+  {
+    "task_id": "RC-097",
+    "route": "I",
+    "repository": "Ascend/MindIE-LLM",
+    "query": "output shape batch",
+    "source_quote": {
+      "description": "百度数字人模型onnx转om后出现精度问题",
+      "reported_root_cause": "Msit工具比的没问题，客户自己推理接口写的有问题输出shape变大为BS倍",
+      "status": "Msit工具比的没问题，客户自己推理接口写的有问题输出shape变大为BS倍",
+      "weekly_progress": "单次推理精度都是对齐的，多个推理请求导致内存方面的问题",
+      "operator_or_function": [
+        "onnx",
+        "Msit",
+        "shape"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  },
+  {
+    "task_id": "RC-098",
+    "route": "I",
+    "repository": "vllm-project/vllm-ascend",
+    "query": "QwQ LiveCodeBench",
+    "source_quote": {
+      "description": "【精度工厂】【MindIE 2.1.T20.B091】【质量加固：vllm质量加固】A2 单机，QWQ_32B_LiveCodeBench数据集精度测试，vllm测试版本：vLLM-Ascecnd 2.1.T20.B091，精度64.55，",
+      "reported_root_cause": "-已测试vllm_ascend商用版本v0.9.1，存在同样现象 -不止qwq_32b模型有次现象，qwen3_32b、deepseek_r1_w8a8等模型都有 -与mindie联调找golden，暂时仍未找到，阻塞状态",
+      "status": "-已测试vllm_ascend商用版本v0.9.1，存在同样现象 -不止qwq_32b模型有次现象，qwen3_32b、deepseek_r1_w8a8等模型都有 -与mindie联调找golden，暂时仍未找到，阻塞状态",
+      "weekly_progress": "1:A2上有问题，A3上没问题，初步断定是算子问题（用的一套推理框架，只有kernel包不一样，但是不好定位是哪个算子） 2：缺少标杆，之前没有测过A2，第一次测，历史版本均有此现象，无法作为基线；mindie--B152商用版本也有同样的问题。",
+      "operator_or_function": [
+        "T20",
+        "B091",
+        "QWQ_32B_LiveCodeBench",
+        "Ascecnd",
+        "vllm_ascend",
+        "qwq_32b"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  },
+  {
+    "task_id": "RC-099",
+    "route": "P",
+    "repository": "vllm-project/vllm-ascend",
+    "query": "topk_weights dtype",
+    "source_quote": {
+      "description": "DeepSeek-V3-Base 671B模型推理异常",
+      "reported_root_cause": "2025/6/4:ascend_vllm仓库已知bug，topk_weight的dtype不一致会导致数值出现很大差异但不报错，详见工单记录",
+      "status": "2025/6/4:ascend_vllm仓库已知bug，topk_weight的dtype不一致会导致数值出现很大差异但不报错，详见工单记录",
+      "weekly_progress": "vllm推理huggingface的权重推理会出现乱码",
+      "operator_or_function": [
+        "DeepSeek",
+        "ascend_vllm",
+        "topk_weight",
+        "dtype",
+        "tp2ep32",
+        "swiglu"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  },
+  {
+    "task_id": "RC-100",
+    "route": "I",
+    "repository": "Ascend/pytorch",
+    "query": "EmbeddingDenseGrad NaN",
+    "source_quote": {
+      "description": "【训练】moe模型训练随机步数出现NaN",
+      "reported_root_cause": "2025/12/17：monitor nan/极大值检测到embedidng权重梯度首次输出NaN，cann版本为8.5.T.B067，加dump工具只采embedding性能增加5倍，建议手动挂hook并打印embedding输入shape",
+      "status": "2025/12/17：monitor nan/极大值检测到embedidng权重梯度首次输出NaN，cann版本为8.5.T.B067，加dump工具只采embedding性能增加5倍，建议手动挂hook并打印embedding输入shape",
+      "weekly_progress": "已固定确定性",
+      "operator_or_function": [
+        "monitor",
+        "embedidng",
+        "B067",
+        "embedding",
+        "hook",
+        "shape"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  },
+  {
+    "task_id": "RC-101",
+    "route": "INPUT_GAP",
+    "repository": "Ascend/pytorch",
+    "query": "HCCL replacement without op version symptom or configuration",
+    "source_quote": {
+      "description": "替换hccl算子后训练任务效果劣化",
+      "reported_root_cause": "",
+      "status": "",
+      "weekly_progress": "",
+      "operator_or_function": [
+        "hccl"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  },
+  {
+    "task_id": "RC-102",
+    "route": "I",
+    "repository": "Ascend/MindSpeed",
+    "query": "dropout precision",
+    "source_quote": {
+      "description": "m8 模型 Dropout 精度对齐问题",
+      "reported_root_cause": "通过对比多组对比实验的下游任务打分以及loss，grad_norm，提出两套解决措施： 1. 关闭 FA dropout 开启 MLP dropout 并增大其概率 2. 使用伪随机算子代替 Dropout 算子，提高性能的同时，不影响模型效果 详情：",
+      "status": "通过对比多组对比实验的下游任务打分以及loss，grad_norm，提出两套解决措施： 1. 关闭 FA dropout 开启 MLP dropout 并增大其概率 2. 使用伪随机算子代替 Dropout 算子，提高性能的同时，不影响模型效果 详情：",
+      "weekly_progress": "用户为提升性能，关闭m8模型dropout，下游任务打分低于开启dropout",
+      "operator_or_function": [
+        "Dropout",
+        "grad_norm",
+        "MLP",
+        "https",
+        "domains"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  },
+  {
+    "task_id": "RC-103",
+    "route": "P",
+    "repository": "Ascend/pytorch",
+    "query": "ReduceSum precision",
+    "source_quote": {
+      "description": "【车BU】 训练loss nan问题",
+      "reported_root_cause": "算子问题：cann 7.0 reducesum算子计算问题，替换到最新8.0cann包，问题解决",
+      "status": "算子问题：cann 7.0 reducesum算子计算问题，替换到最新8.0cann包，问题解决",
+      "weekly_progress": "训练loss nan问题",
+      "operator_or_function": [
+        "reducesum"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  },
+  {
+    "task_id": "RC-104",
+    "route": "P",
+    "repository": "Ascend/MindSpeed-LLM",
+    "query": "packing labels",
+    "source_quote": {
+      "description": "pack微调精度对齐及loss nan问题",
+      "reported_root_cause": "脚本问题： 1、gpu-llamafactory会对linear层先做转fp32升精度处理，计算完毕后再转回bf16,。精度上与npu-modellink的matmul+bias不等价 2、多轮对话训练中，需要对过去数据和现在数据进行拼接，npu-modellink代码实现中现在数据会被mask 3、pack模式下gpu和npu的token和label输入存在差异，导致精度出现误差 4、数据集如果无法被gbs整除mindspeed-llm和llamafactory处理会有差异，造成每个epoch开始时loss无法对齐",
+      "status": "脚本问题： 1、gpu-llamafactory会对linear层先做转fp32升精度处理，计算完毕后再转回bf16,。精度上与npu-modellink的matmul+bias不等价 2、多轮对话训练中，需要对过去数据和现在数据进行拼接，npu-modellink代码实现中现在数据会被mask 3、pack模式下gpu和npu的token和label输入存在差异，导致精度出现误差 4、数据集如果无法被gbs整除mindspeed-llm和llamafactory处理会有差异，造成每个epoch开始时loss无法对齐",
+      "weekly_progress": "pack微调精度对齐loss",
+      "operator_or_function": [
+        "pack",
+        "llamafactory",
+        "linear",
+        "bf16",
+        "modellink",
+        "matmul"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  },
+  {
+    "task_id": "RC-105",
+    "route": "P",
+    "repository": "Ascend/pytorch",
+    "query": "deterministic buffer",
+    "source_quote": {
+      "description": "zp切分整网确定性计算固定不住问题",
+      "reported_root_cause": "框架适配问题：pta新增通信buffer配置代码时覆盖确定性计算配置，导致reducescatter未进入确定性计算分支，rc1已修复",
+      "status": "框架适配问题：pta新增通信buffer配置代码时覆盖确定性计算配置，导致reducescatter未进入确定性计算分支，rc1已修复",
+      "weekly_progress": "zp切分整网确定性计算固定不住问题",
+      "operator_or_function": [
+        "buffer",
+        "reducescatter"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  },
+  {
+    "task_id": "RC-106",
+    "route": "P",
+    "repository": "Ascend/pytorch",
+    "query": "matmul format",
+    "source_quote": {
+      "description": "九天16b多模态stage2 loss无法对齐",
+      "reported_root_cause": "脚本问题：代码未对齐，导致matmul在输入排布方式不同时，进而影响计算精度",
+      "status": "脚本问题：代码未对齐，导致matmul在输入排布方式不同时，进而影响计算精度",
+      "weekly_progress": "九天16b多模态stage2 loss无法对齐",
+      "operator_or_function": [
+        "stage2",
+        "matmul"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  },
+  {
+    "task_id": "RC-107",
+    "route": "INPUT_GAP",
+    "repository": "Ascend/MindSpeed",
+    "query": "unnamed customer custom fused operator; public code cannot be identified",
+    "source_quote": {
+      "description": "RC2.2镜像精度问题定位",
+      "reported_root_cause": "算子问题：确认客户自定义融合算子不支持确定性计算",
+      "status": "算子问题：确认客户自定义融合算子不支持确定性计算",
+      "weekly_progress": "RC2.2镜像精度问题定位",
+      "operator_or_function": [
+        "RC2"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  },
+  {
+    "task_id": "RC-108",
+    "route": "P",
+    "repository": "Ascend/pytorch",
+    "query": "rms_norm backward",
+    "source_quote": {
+      "description": "M8多规格模型交付精度定位",
+      "reported_root_cause": "算子问题： 1、npu rms norm算子反向计算异常 2、用户自定义xpu反向特定shape存在计算问题",
+      "status": "算子问题： 1、npu rms norm算子反向计算异常 2、用户自定义xpu反向特定shape存在计算问题",
+      "weekly_progress": "M8多规格模型交付精度定位",
+      "operator_or_function": [
+        "norm",
+        "shape"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  },
+  {
+    "task_id": "RC-109",
+    "route": "I",
+    "repository": "Ascend/MindSpeed",
+    "query": "flash attention backward NaN",
+    "source_quote": {
+      "description": "【m8方舟】第二步grad norm nan",
+      "reported_root_cause": "算子问题：客户自定义fa算子反向计算异常",
+      "status": "算子问题：客户自定义fa算子反向计算异常",
+      "weekly_progress": "第二步grad norm nan",
+      "operator_or_function": [
+        "grad",
+        "norm"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  },
+  {
+    "task_id": "RC-110",
+    "route": "P",
+    "repository": "Ascend/pytorch",
+    "query": "EmbeddingDenseGrad null",
+    "source_quote": {
+      "description": "M8模型梯度nan问题",
+      "reported_root_cause": "算子问题：CANN 8.0.RC1.B010 EmbeddingDenseGrad在前向输入为null的情况下，反向输出为未初始化的空间，导致精度问题，RC1已修复",
+      "status": "算子问题：CANN 8.0.RC1.B010 EmbeddingDenseGrad在前向输入为null的情况下，反向输出为未初始化的空间，导致精度问题，RC1已修复",
+      "weekly_progress": "M8模型梯度nan问题",
+      "operator_or_function": [
+        "RC1",
+        "B010",
+        "EmbeddingDenseGrad",
+        "null"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  },
+  {
+    "task_id": "RC-111",
+    "route": "REUSE",
+    "repository": "Ascend/pytorch",
+    "query": "pilot RC-111",
+    "source_quote": {
+      "description": "中关村学院RenoVLM模型loss为NAN问题定位",
+      "reported_root_cause": "脚本问题：FA算子迁移问题，迁移时都使用了默认的scale入参，但是GPU的默认值为1/sqrt(d)，而NPU的默认值为1",
+      "status": "脚本问题：FA算子迁移问题，迁移时都使用了默认的scale入参，但是GPU的默认值为1/sqrt(d)，而NPU的默认值为1",
+      "weekly_progress": "中关村学院RenoVLM模型loss为NAN问题定位",
+      "operator_or_function": [
+        "RenoVLM",
+        "scale",
+        "sqrt"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  },
+  {
+    "task_id": "RC-112",
+    "route": "P",
+    "repository": "Ascend/pytorch",
+    "query": "matmul tiling precision",
+    "source_quote": {
+      "description": "【商汤】推理评分不如GPU",
+      "reported_root_cause": "算子问题：mm算子tiling策略问题",
+      "status": "算子问题：mm算子tiling策略问题",
+      "weekly_progress": "推理评分不如GPU",
+      "operator_or_function": [
+        "tiling"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  },
+  {
+    "task_id": "RC-113",
+    "route": "I",
+    "repository": "Ascend/MindSpeed-MM",
+    "query": "dataloader allreduce",
+    "source_quote": {
+      "description": "mindspeed-opensora精度问题",
+      "reported_root_cause": "脚本问题：monitor数据分析在layernorm层输入存在异常，客户确认dataloader导致卡并行间数据不一致，layernorm层前做allreduce，从而导致layernorm输入norm异常",
+      "status": "脚本问题：monitor数据分析在layernorm层输入存在异常，客户确认dataloader导致卡并行间数据不一致，layernorm层前做allreduce，从而导致layernorm输入norm异常",
+      "weekly_progress": "mindspeed-opensora精度问题",
+      "operator_or_function": [
+        "mindspeed",
+        "opensora",
+        "monitor",
+        "layernorm",
+        "dataloader",
+        "allreduce"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  },
+  {
+    "task_id": "RC-114",
+    "route": "I",
+    "repository": "Ascend/pytorch",
+    "query": "mm349",
+    "source_quote": {
+      "description": "【百度】首次拉起模型grad_norm为nan问题",
+      "reported_root_cause": "算子问题：客户版本7.0 rc1.1，定位到kernel mm349算子计算问题， RC1已修复",
+      "status": "算子问题：客户版本7.0 rc1.1，定位到kernel mm349算子计算问题， RC1已修复",
+      "weekly_progress": "首次拉起模型grad_norm为nan问题",
+      "operator_or_function": [
+        "grad_norm",
+        "kernel",
+        "mm349",
+        "RC1"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  },
+  {
+    "task_id": "RC-115",
+    "route": "I",
+    "repository": "Ascend/pytorch",
+    "query": "NaN hardware",
+    "source_quote": {
+      "description": "m8模型精度问题定位",
+      "reported_root_cause": "硬件问题：集群中存在坏卡，压测未通过 算子问题：客户自定义融合算子在npu与gpu实现存在差异",
+      "status": "硬件问题：集群中存在坏卡，压测未通过 算子问题：客户自定义融合算子在npu与gpu实现存在差异",
+      "weekly_progress": "m8模型精度问题未对齐gpu",
+      "operator_or_function": []
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  },
+  {
+    "task_id": "RC-116",
+    "route": "I",
+    "repository": "Ascend/MindSpeed",
+    "query": "FA backward",
+    "source_quote": {
+      "description": "自定义FA反向逐步增大问题",
+      "reported_root_cause": "3.4：替换客户自定义FA问题消失，尝试定位客户自定义FA算子反向计算问题，在自定义反向中插装代码dump tensor数据 3.3：采集profiling，查看xpuFA反向计算模块；单算子复现，对比与整网的差异 2.27：观察到FA反向逐步增大，尝试单算子复现；使用npu的fa算子查看结果",
+      "status": "3.4：替换客户自定义FA问题消失，尝试定位客户自定义FA算子反向计算问题，在自定义反向中插装代码dump tensor数据 3.3：采集profiling，查看xpuFA反向计算模块；单算子复现，对比与整网的差异 2.27：观察到FA反向逐步增大，尝试单算子复现；使用npu的fa算子查看结果",
+      "weekly_progress": "当开启确定性计算时，训练反向step 0 出现nan 关闭时确定性计算正常训练。 稳定复现。 环境：1230时商发版本，torch npu 2.1 模型：M8模型",
+      "operator_or_function": [
+        "tensor",
+        "profiling",
+        "xpuFA"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  },
+  {
+    "task_id": "RC-117",
+    "route": "P",
+    "repository": "Ascend/pytorch",
+    "query": "npu_apply_adam_w copy",
+    "source_quote": {
+      "description": "【小艺】MS精度loss不收敛",
+      "reported_root_cause": "2025/3/20：使用mindspore新包（修复一个inplace copy问题），精度能够二进制对齐，从现象上看是调用torch_npu.npu_apply_adam_w后的param.data没有同步到模型权重上。 2025/3/19：问题现象：ms侧loss不收敛。dump得到权重发现不随step变化，实锤没有更新权重。继续dump torch_npu.npu_apply_adam_w发现该api调用前后的param.data有差异，说明正常调用该api",
+      "status": "2025/3/20：使用mindspore新包（修复一个inplace copy问题），精度能够二进制对齐，从现象上看是调用torch_npu.npu_apply_adam_w后的param.data没有同步到模型权重上。 2025/3/19：问题现象：ms侧loss不收敛。dump得到权重发现不随step变化，实锤没有更新权重。继续dump torch_npu.npu_apply_adam_w发现该api调用前后的param.data有差异，说明正常调用该api",
+      "weekly_progress": "msadaptor vs pytorch，msadaptor的loss不收敛",
+      "operator_or_function": [
+        "mindspore",
+        "inplace",
+        "copy",
+        "torch_npu",
+        "npu_apply_adam_w",
+        "param"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  },
+  {
+    "task_id": "RC-118",
+    "route": "P",
+    "repository": "Ascend/MindSpeed-LLM",
+    "query": "Qwen SFT dtype",
+    "source_quote": {
+      "description": "Qwen2.5-SFT loss对齐问题",
+      "reported_root_cause": "2025/3/14：改变切分策略及融合算子，找到基线（与gpu对齐） 2025/3/13：第一个epoch基本对齐；尝试从第二个epoch开始加载相同的ckpt 2025/3/12：npu上mindspeed vs gpu上llamafac，dtype对比 2025/3/10：gpu llamafactory vs npu mindspeed-llm现象是长稳训练loss差异 3.7：本地实验开源数据集qwen2.5-7b 4k场景gpu、npu llamafactory和npu mindspeed-llm 3.4：客户挑战大学习率场景下loss存在误差，和第一个epoch结束第二个epoch开始时存在误差。",
+      "status": "2025/3/14：改变切分策略及融合算子，找到基线（与gpu对齐） 2025/3/13：第一个epoch基本对齐；尝试从第二个epoch开始加载相同的ckpt 2025/3/12：npu上mindspeed vs gpu上llamafac，dtype对比 2025/3/10：gpu llamafactory vs npu mindspeed-llm现象是长稳训练loss差异 3.7：本地实验开源数据集qwen2.5-7b 4k场景gpu、npu llamafactory和npu mindspeed-llm 3.4：客户挑战大学习率场景下loss存在误差，和第一个epoch结束第二个epoch开始时存在误差。",
+      "weekly_progress": "大学习率场景下loss曲线对齐阶段存在误差。第一个epoch结束，第二个epoch开始存在误差",
+      "operator_or_function": [
+        "Qwen2",
+        "SFT",
+        "epoch",
+        "ckpt",
+        "mindspeed",
+        "llamafac"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  },
+  {
+    "task_id": "RC-119",
+    "route": "I",
+    "repository": "Ascend/pytorch",
+    "query": "FastGatherSyncBatchNorm",
+    "source_quote": {
+      "description": "【车BU】模型训练NaN问题",
+      "reported_root_cause": "2025/3/31：确认设备问题 2025/3/27：确认问题跟随rank流转，更换设备测试验证 2025/3/26：交换rank2顺序，确认是否链路问题 2025/3/24：hccl工具压测通信，采集该层mix级别数据（异步dump）；异步print 2025/3/21：同步定位rank2硬件问题，必要时采集该层详细数据分析 2025/3/20：dump+比对+可视化工具：定位到Rank2上FastGatherSyncBatchNorm模块输出先出问题。结果正在给客户沟通。 2025/3/13：排查机器问题，同步压测；缩小规模复现nan问题",
+      "status": "2025/3/31：确认设备问题 2025/3/27：确认问题跟随rank流转，更换设备测试验证 2025/3/26：交换rank2顺序，确认是否链路问题 2025/3/24：hccl工具压测通信，采集该层mix级别数据（异步dump）；异步print 2025/3/21：同步定位rank2硬件问题，必要时采集该层详细数据分析 2025/3/20：dump+比对+可视化工具：定位到Rank2上FastGatherSyncBatchNorm模块输出先出问题。结果正在给客户沟通。 2025/3/13：排查机器问题，同步压测；缩小规模复现nan问题",
+      "weekly_progress": "训练过程中日志打印NaN or Inf found in input tensor.输出loss也是NaN，相同任务多次重启训练正常，怀疑是节点问题",
+      "operator_or_function": [
+        "rank",
+        "rank2",
+        "hccl",
+        "print",
+        "FastGatherSyncBatchNorm"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  },
+  {
+    "task_id": "RC-120",
+    "route": "P",
+    "repository": "Ascend/MindSpeed",
+    "query": "distributed optimizer precision",
+    "source_quote": {
+      "description": "开关分布式优化器loss不齐",
+      "reported_root_cause": "2025/4/7：定位到是优化器问题，融合算子切小算子后，loss有提升 2025/3/31：1k步loss存在差异，查看grad_norm，采集mix数据分析 2025/3/26：分析grad_norm累加ULP距离；rank7上数值差异进一步分析 2025/3/25：查看clip_grad部分代码；grad_norm异常待排查",
+      "status": "2025/4/7：定位到是优化器问题，融合算子切小算子后，loss有提升 2025/3/31：1k步loss存在差异，查看grad_norm，采集mix数据分析 2025/3/26：分析grad_norm累加ULP距离；rank7上数值差异进一步分析 2025/3/25：查看clip_grad部分代码；grad_norm异常待排查",
+      "weekly_progress": "megatron&mindspeed 080版本开关分布式优化器loss不齐",
+      "operator_or_function": [
+        "grad_norm",
+        "ULP",
+        "rank7",
+        "clip_grad"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  },
+  {
+    "task_id": "RC-121",
+    "route": "P",
+    "repository": "Ascend/pytorch",
+    "query": "allgather matmul",
+    "source_quote": {
+      "description": "【X1】训练NaN问题",
+      "reported_root_cause": "2025/4/7：mc2算子问题内部实现ag和mm计算踩踏，待算子同事分析具体原因 2025/3/27：采集profiling等问题不复现，怀疑mc2算子，下一步打印等方式确认第一现场，分析问题具体nan现象，同步尝试协调环境复现定位 2025/3/25：分析profiling数据，确认可疑层计算逻辑；同时dump具体tensor数据分析 2025/3/31：定位到具体RowParallelLinear层，进一步dump精确mix+tensor数据分析 2025/3/14：等客户dump mix级别数据分析",
+      "status": "2025/4/7：mc2算子问题内部实现ag和mm计算踩踏，待算子同事分析具体原因 2025/3/27：采集profiling等问题不复现，怀疑mc2算子，下一步打印等方式确认第一现场，分析问题具体nan现象，同步尝试协调环境复现定位 2025/3/25：分析profiling数据，确认可疑层计算逻辑；同时dump具体tensor数据分析 2025/3/31：定位到具体RowParallelLinear层，进一步dump精确mix+tensor数据分析 2025/3/14：等客户dump mix级别数据分析",
+      "weekly_progress": "当前客户8机基于8.0,0测试mc2的性能收益 HDK: 24.1.0 1. CANN8.0.RC3 /CANN8.0.0 不使能MC2 正常 2. CANN8.0.RC3 +使能MC2 精度正常 3. CANN8.0.0+使能MC2 首个step没有跑完就出现NAN，停止了， 初步看了日志，没有异常，是客户算法检测到NAN的输出，主动停止训练，此问题8机必现。",
+      "operator_or_function": [
+        "profiling",
+        "tensor",
+        "RowParallelLinear"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  },
+  {
+    "task_id": "RC-122",
+    "route": "P",
+    "repository": "deepspeedai/DeepSpeed",
+    "query": "use_multi_rank_bucket_allreduce",
+    "source_quote": {
+      "description": "【车BU】qwen7B NAN问题",
+      "reported_root_cause": "2025/4/25: 0.14.3同样有问题，根据官仓issue，主要是use_multi_rank_bucket_allreduce的问题，暂时规避 2025/4/16: deepspeed v0.14.2bug，优化器计算未等待最后一次梯度聚合，导致nan。需要改代码/升级0.14.3验证 2025/4/14：use_multi_rank_bucket_allreduce这个改False或者加流同步能行，分析profiling 2025/4/9: 加工具影响复现",
+      "status": "2025/4/25: 0.14.3同样有问题，根据官仓issue，主要是use_multi_rank_bucket_allreduce的问题，暂时规避 2025/4/16: deepspeed v0.14.2bug，优化器计算未等待最后一次梯度聚合，导致nan。需要改代码/升级0.14.3验证 2025/4/14：use_multi_rank_bucket_allreduce这个改False或者加流同步能行，分析profiling 2025/4/9: 加工具影响复现",
+      "weekly_progress": "2卡/8卡训练一定步数后梯度NaN",
+      "operator_or_function": [
+        "qwen7B",
+        "issue",
+        "use_multi_rank_bucket_allreduce",
+        "deepspeed",
+        "False",
+        "profiling"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  },
+  {
+    "task_id": "RC-123",
+    "route": "I",
+    "repository": "pytorch/pytorch",
+    "query": "cumsum deterministic",
+    "source_quote": {
+      "description": "qwen7B trl gpu确定性问题",
+      "reported_root_cause": "2025/4/15：cumsum算子输入一致输出不一致，客户自己写for循环太慢卡死，建议转cpu就固定住了且速度基本无明显影响",
+      "status": "2025/4/15：cumsum算子输入一致输出不一致，客户自己写for循环太慢卡死，建议转cpu就固定住了且速度基本无明显影响",
+      "weekly_progress": "确定性固定不住",
+      "operator_or_function": [
+        "qwen7B",
+        "cumsum"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  },
+  {
+    "task_id": "RC-124",
+    "route": "P",
+    "repository": "Ascend/MindSpeed-MM",
+    "query": "tensor parallel weight",
+    "source_quote": {
+      "description": "mindspeed-mm评测分数低30分",
+      "reported_root_cause": "2025/4/24: 定位到tp切分中部分权重未被切分导致权重不同步，当前方案为打开确定性计算或者做梯度allreduce，待回归客户验证；开确定性+调mbs后分数达到60+",
+      "status": "2025/4/24: 定位到tp切分中部分权重未被切分导致权重不同步，当前方案为打开确定性计算或者做梯度allreduce，待回归客户验证；开确定性+调mbs后分数达到60+",
+      "weekly_progress": "TP2问题",
+      "operator_or_function": [
+        "mindspeed",
+        "allreduce"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  },
+  {
+    "task_id": "RC-125",
+    "route": "P",
+    "repository": "Ascend/pytorch",
+    "query": "matmul block_dim",
+    "source_quote": {
+      "description": "【图灵】deepseekv3 nan",
+      "reported_root_cause": "2025/4/24: 新包（cann）无问题，不再定位 2025/4/21: 采集profiling，发现matmulv3 block dim异常，跟算子同事一起看 2025/4/18: dump mix，发现Tensor.matmul输入正常，输出NaN。手动dump输入输出tensor",
+      "status": "2025/4/24: 新包（cann）无问题，不再定位 2025/4/21: 采集profiling，发现matmulv3 block dim异常，跟算子同事一起看 2025/4/18: dump mix，发现Tensor.matmul输入正常，输出NaN。手动dump输入输出tensor",
+      "weekly_progress": "训练第二步稳定复现grad nan",
+      "operator_or_function": [
+        "deepseekv3",
+        "profiling",
+        "matmulv3",
+        "block",
+        "Tensor",
+        "matmul"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  },
+  {
+    "task_id": "RC-126",
+    "route": "I",
+    "repository": "vllm-project/vllm-ascend",
+    "query": "Qwen3 embedding different",
+    "source_quote": {
+      "description": "qwen3-embedding第一次和第二次embedding结果差异大，稳定复现",
+      "reported_root_cause": "",
+      "status": "",
+      "weekly_progress": "qwen3-embedding第一次和第二次embedding结果差异大，稳定复现",
+      "operator_or_function": [
+        "qwen3",
+        "embedding"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  },
+  {
+    "task_id": "RC-127",
+    "route": "I",
+    "repository": "Ascend/MindSpeed",
+    "query": "dropout precision",
+    "source_quote": {
+      "description": "m8 模型 Dropout 精度对齐问题",
+      "reported_root_cause": "通过对比多组对比实验的下游任务打分以及loss，grad_norm，提出两套解决措施： 1. 关闭 FA dropout 开启 MLP dropout 并增大其概率 2. 使用伪随机算子代替 Dropout 算子，提供性能的同时，不影响模型效果 详细进展：",
+      "status": "已闭环",
+      "weekly_progress": "用户为提升性能，关闭m8模型dropout，下游任务打分低于开启dropout",
+      "operator_or_function": [
+        "Dropout",
+        "grad_norm",
+        "MLP",
+        "https",
+        "domains"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  },
+  {
+    "task_id": "RC-128",
+    "route": "P",
+    "repository": "Ascend/pytorch",
+    "query": "EmbeddingDenseGrad null",
+    "source_quote": {
+      "description": "CANN 8.0.RC1.B010 EmbeddingDenseGrad在前向输入为null的情况下，反向输出为初始化的空间，导致精度问题，RC1已修复",
+      "reported_root_cause": "CANN 8.0.RC1.B010 EmbeddingDenseGrad在前向输入为null的情况下，反向输出为初始化的空间，导致精度问题，RC1已修复",
+      "status": "2025-02-07 00:00:00",
+      "weekly_progress": "M8模型梯度nan",
+      "operator_or_function": [
+        "RC1",
+        "B010",
+        "EmbeddingDenseGrad",
+        "null"
+      ]
+    },
+    "query_origin": "AGENT_CURATED_FROM_RECORD; English aliases/terms are search hypotheses, not root-cause confirmation",
+    "existing_links": []
+  }
+]

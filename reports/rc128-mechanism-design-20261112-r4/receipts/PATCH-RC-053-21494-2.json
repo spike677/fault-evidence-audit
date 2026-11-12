@@ -1,0 +1,28 @@
+{
+  "id": "PATCH-RC-053-21494-2",
+  "task_ids": [
+    "RC-053"
+  ],
+  "tool": "mcp__codex_apps__github_fetch_pr_file_patch",
+  "args": {
+    "repo_full_name": "vllm-project/vllm-ascend",
+    "pr_number": 21494,
+    "path": "tests/ut/attention/test_sfa_batch_invariant_up_proj.py"
+  },
+  "captured_at": "2026-11-12T03:12:35.568Z",
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "Action completed."
+      }
+    ],
+    "structuredContent": {
+      "patch": {
+        "filename": "tests/ut/attention/test_sfa_batch_invariant_up_proj.py",
+        "patch": "@@ -0,0 +1,102 @@\n+# SPDX-License-Identifier: Apache-2.0\n+# Copyright (c) 2026 Huawei Technologies Co., Ltd. All Rights Reserved.\n+\"\"\"Batch invariance of the SFA q/kv up-projection.\n+\n+``npu_transpose_batchmatmul`` and its ``torch.bmm`` fallback do not round\n+identically, so a guard that picks between them based on the *packed* token\n+count makes a row's bits depend on how many unrelated rows share the launch.\n+These tests pin the fix in ``sfa_v1._transpose_batchmatmul_on_grid``: the fused\n+op is always used, and every launch stays on a fixed token grid well below the\n+operator's operand limit.\n+\"\"\"\n+\n+import torch\n+\n+from vllm_ascend.attention import sfa_v1\n+\n+\n+class _RecordingTBMM:\n+    \"\"\"Row-independent stand-in for ``torch_npu.npu_transpose_batchmatmul``.\n+\n+    Row ``i`` of the output only depends on row ``i`` of the input, which is the\n+    property the real fused kernel provides (and the property the batch-invariant\n+    path relies on).\n+    \"\"\"\n+\n+    def __init__(self) -> None:\n+        self.token_dims: list[int] = []\n+\n+    def __call__(self, x: torch.Tensor, w: torch.Tensor, **kwargs):\n+        self.token_dims.append(int(x.shape[0]))\n+        return x[:, :, : w.shape[-1]].clone()\n+\n+\n+def _make_inputs(num_tokens: int, num_heads: int = 2, dim: int = 4):\n+    gen = torch.Generator().manual_seed(0)\n+    x = torch.randn(num_tokens, num_heads, dim, generator=gen)\n+    w = torch.randn(num_heads, dim, dim, generator=gen)\n+    return x, w\n+\n+\n+def test_chunk_stays_under_the_operand_limit():\n+    assert 0 < sfa_v1.TRANSPOSE_BMM_CHUNK <= sfa_v1.TRANSPOSE_BMM_MAX_SUPPORTED_DIM\n+\n+\n+def test_every_launch_uses_the_fixed_grid(monkeypatch):\n+    fake = _RecordingTBMM()\n+    monkeypatch.setattr(sfa_v1.torch_npu, \"npu_transpose_batchmatmul\", fake)\n+    chunk = sfa_v1.TRANSPOSE_BMM_CHUNK\n+\n+    # One launch below the grid, and a packed batch that used to fall back to bmm.\n+    for num_tokens in (chunk - 1, chunk, chunk + 1, 65712):\n+        fake.token_dims.clear()\n+        x, w = _make_inputs(num_tokens)\n+        out = sfa_v1._transpose_batchmatmul_on_grid(x, w)\n+        assert out.shape == (num_tokens, x.shape[1], w.shape[-1])\n+        assert max(fake.token_dims) <= chunk, fake.token_dims\n+        assert len(fake.token_dims) == (num_tokens + chunk - 1) // chunk, fake.token_dims\n+\n+\n+def test_a_row_is_unaffected_by_the_packed_batch(monkeypatch):\n+    fake = _RecordingTBMM()\n+    monkeypatch.setattr(sfa_v1.torch_npu, \"npu_transpose_batchmatmul\", fake)\n+    chunk = sfa_v1.TRANSPOSE_BMM_CHUNK\n+\n+    solo_tokens = chunk // 2\n+    x_solo, w = _make_inputs(solo_tokens)\n+    solo = sfa_v1._transpose_batchmatmul_on_grid(x_solo, w)\n+\n+    # Same leading rows, but now packed with 2x more rows: crosses the old\n+    # 65536-token guard and used to switch to torch.bmm.\n+    x_packed, _ = _make_inputs(solo_tokens * 3 + 7)\n+    x_packed[:solo_tokens] = x_solo\n+    packed = sfa_v1._transpose_batchmatmul_on_grid(x_packed, w)\n+\n+    assert torch.equal(packed[:solo_tokens], solo)\n+\n+\n+def test_method_uses_the_fused_grid_not_the_bmm_fallback(monkeypatch):\n+    \"\"\"The projection must stay on the fused op for bf16, whatever the token count.\"\"\"\n+    fake = _RecordingTBMM()\n+    monkeypatch.setattr(sfa_v1.torch_npu, \"npu_transpose_batchmatmul\", fake)\n+    chunk = sfa_v1.TRANSPOSE_BMM_CHUNK\n+\n+    def _forbid_bmm(*args, **kwargs):\n+        raise AssertionError(\"q up-proj fell back to torch.bmm for a bf16 input\")\n+\n+    monkeypatch.setattr(torch, \"bmm\", _forbid_bmm)\n+\n+    impl = object.__new__(sfa_v1.AscendSFAImpl)\n+    impl.local_num_heads = 2\n+    impl.qk_head_dim = 8\n+    impl.qk_nope_head_dim = 4\n+    impl.qk_rope_head_dim = 4\n+    impl.W_UK_T = torch.zeros(2, 4, 4, dtype=torch.bfloat16)\n+    impl.q_proj = lambda x: (torch.zeros(x.shape[0], impl.local_num_heads * impl.qk_head_dim, dtype=torch.bfloat16),)\n+\n+    num_tokens = chunk + 10\n+    ql_nope, q_pe = impl._q_proj_and_k_up_proj(torch.zeros(num_tokens, impl.local_num_heads * impl.qk_head_dim))\n+\n+    assert fake.token_dims == [chunk, num_tokens - chunk], fake.token_dims\n+    assert ql_nope.shape == (num_tokens, 2, 4)\n+    assert q_pe.shape == (num_tokens, 2, 4)"
+      }
+    },
+    "isError": false
+  }
+}

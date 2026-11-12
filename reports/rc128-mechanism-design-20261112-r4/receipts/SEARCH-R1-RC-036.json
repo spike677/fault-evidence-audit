@@ -1,0 +1,83 @@
+{
+  "id": "SEARCH-R1-RC-036",
+  "task_ids": [
+    "RC-036"
+  ],
+  "round": 1,
+  "question": "DeepSeek GRPO NaN",
+  "tool": "mcp__codex_apps__github_search_issues",
+  "args": {
+    "query": "is:issue DeepSeek GRPO NaN",
+    "repository_full_name": "verl-project/verl",
+    "topn": 3
+  },
+  "started_at": "2026-11-12T03:02:42.221Z",
+  "captured_at": "2026-11-12T03:02:43.204Z",
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "Action completed."
+      }
+    ],
+    "structuredContent": {
+      "issues": [
+        {
+          "url": "https://github.com/verl-project/verl/issues/751",
+          "title": "在某一个step模型的输出突然全变为!，kl变为Nan",
+          "issue_number": 751,
+          "body": "same with \n\n- https://github.com/volcengine/verl/issues/747\n- https://github.com/volcengine/verl/issues/721\n\n\n注意到我们的模型使用的deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B，!对应的token id是0.\n\n![Image](https://github.com/user-attachments/assets/65b746e5-a24f-4db9-ab3b-6ec28eb09c11)",
+          "state": null,
+          "user": null,
+          "assignees": null,
+          "labels": null,
+          "milestone": null,
+          "state_reason": null,
+          "comments": null,
+          "created_at": null,
+          "updated_at": null,
+          "closed_at": null,
+          "display_url": "https://github.com/verl-project/verl/issues/751",
+          "display_title": "在某一个step模型的输出突然全变为!，kl变为Nan"
+        },
+        {
+          "url": "https://github.com/verl-project/verl/issues/8020",
+          "title": "With `top_p` / `top_k` / `min_p` truncation, the Geo-RS and Seq-MIS rollout-correction presets reject every sequence; proposal: replay the sampling support size",
+          "issue_number": 8020,
+          "body": "### What happens\n\nverl asks vLLM for `processed_logprobs` by default (`rollout.logprobs_mode`). With `top_p`, `top_k` or `min_p` truncating the distribution, those log-probs are normalised over the kept set, while `old_log_probs` from the actor are normalised over the full vocabulary. So `old_log_probs - rollout_log_probs` carries `log(kept mass)` at every token, with no policy change at all. #6240 raised the semantics; this issue is about what it does to training.\n\nMeasured on `main` (6093e00), GSM8K, GRPO, 32 prompts x n=4, temperature 1.0, 2-3 steps per arm, one L40. vLLM is 0.28 rather than the 0.29 the `vllm` extra pins, because this machine's driver stops at CUDA 12.6; `setup.py` accepts it.\n\n**The term is visible in the existing metrics** (Qwen2.5-0.5B-Instruct, `rollout_is=token`):\n\n| | `rollout_corr/rollout_is_mean` | `rollout_corr/kl` |\n|---|---|---|\n| `top_p=1.0` | 0.9998 - 1.0000 | 0.0007 - 0.0008 |\n| `top_p=0.8` | 0.964 - 0.968 | 0.034 - 0.039 |\n\n**With the default thresholds, two presets reject every sequence and the gradient is zero** (Qwen2.5-1.5B-Instruct, rewards 8-22%; every arm sees the same batches, and on them the uncorrected arm's advantages run from -1.5 to 1.5):\n\n| arm | `rollout_rs_seq_masked_fraction` | `actor/grad_norm` |\n|---|---|---|\n| `top_p=0.8`, no correction (control) | - | 0.345, 0.455 |\n| `decoupled_geo_rs()` defaults, `top_p=1.0` | 0.55, 0.57 | 0.151, 0.265 |\n| `decoupled_geo_rs()` defaults, `top_p=0.8` | **1.0, 1.0** | **0.0, 0.0** |\n| `decoupled_seq_is_rs()` defaults, `top_p=0.8` | **1.0, 1.0** | **0.0, 0.0** |\n\nThe 0.55 at `top_p=1.0` comes from the engine/trainer mismatch that remains without truncation in this setup (sdpa, `use_remove_padding=False`, FSDP2 with CPU offload); I have not checked it with flash-attn.\n\nThe per-token geometric-mean ratio is about 0.964, outside Geo-RS's `0.999_1.001`; summed over responses that average 257-279 tokens it is far outside Seq-MIS's `0.5_2.0` (`rollout_is_mean` 0.0012 - 0.0017 in that arm). What the user sees is `Response mask is all False, returning default advantage metrics` once per step and `critic/advantages/*` as NaN; nothing names the rejection, the preset or the truncation, and `rollout_corr_helper.py` itself has no warning path. `decoupled_k3_rs()` does not notice the term at all (0% rejected at `top_p=0.8`, 0.5B run): for a near-uniform shift K3 is second order, `r - 1 - log r` is about 0.0007 at r = 0.964, far below 0.01, but the bias is still in the weights.\n\nThe incompatibility itself is known: #8010 (score centering) accepts only `top_p=1, top_k=-1` and refuses other combinations at config validation or worker start, and #8009 lists `top_p < 1` replay as a follow-up. The presets above are where it bites without anyone opting in.\n\n### Proposal\n\n**1. A warning now.** When `rollout_rs` or `rollout_is` is set and the rollout truncates (`top_p < 1`, `top_k > 0` or `min_p > 0`), warn at config time that the ratio carries the kept mass; and warn at step time when `rollout_rs_seq_masked_fraction == 1.0`. Cheap, and it names the cause the current generic warning leaves out.\n\n**2. The fix: replay the support size, not the support.** top-k, top-p and min-p all keep a prefix of the tokens sorted by probability, so the kept set at a position is the |S_t| most likely tokens. vLLM 0.28 returns the kept ids (`return_sampling_mask=True`, vllm-project/vllm#49577); the server only needs to send `len()` per position, one integer per generated token, through the same path `rollout_log_probs` takes. The actor then computes `log_kept_mass = logsumexp(top-|S_t| logits / T) - logsumexp(logits / T)` in the same forward that produces `old_log_probs`, exactly where `calculate_sum_pi_squared` is computed today, and it is added to `rollout_log_probs` so both sides are on the full-vocabulary support.\n\nReplaying the size instead of the ids, against the exact ids, on the same sampled tokens (Qwen2.5-1.5B-Instruct, vLLM 0.28, 64 GSM8K prompts, ~14.6k tokens per arm; trainer = HF bf16):\n\n| sampling | mean \\|S\\| | trainer top-\\|S\\| == vLLM set | ratio mean / out of [0.9, 1.1]: no correction | exact ids | size only |\n|---|---|---|---|---|---|\n| `top_p=0.8` | 1.3 | 99.52% | 0.964 / 16.4% | 1.000 / 0.90% | 1.000 / 0.91% |\n| `top_p=0.95` | 2.4 | 98.37% | 0.987 / 2.6% | 1.000 / 2.04% | 1.000 / 2.03% |\n| `top_p=0.9`, T=0.7 | 1.3 | 99.65% | 0.987 / 3.8% | 0.999 / 2.34% | 0.999 / 2.35% |\n| `top_k=20` | 20 | 72.09% | 0.998 / 2.7% | 1.000 / 2.50% | 1.000 / 2.50% |\n| `min_p=0.05` | 1.7 | 99.87% | 0.982 / 5.2% | 1.000 / 1.58% | 1.000 / 1.58% |\n\nWhere the sets differ it is at the boundary, on tokens with almost no mass (mean |Δ log kept mass| 2e-6 to 2e-5). The size costs 1 integer per token; the ids cost |S| per token, and up to 1024 per token under a `top_k=1024` cap with `top_p=1.0`.\n\nTHUDM/slime#2406 (the replay #8009 points to) sends the complete top-p support, ids plus a log-prob per kept token through an SGLang patch, and renormalises the trainer over it; score centering uses the rollout distribution over the whole support, hence the log-probs. The ratio correction alone needs less: the size carries the same information for it, as the table shows.\n\nvLLM's replay has three conditions of its own (0.28, `input_processor.py` and `config/vllm.py`): temperature > 0, `top_k > 0` \"to bound sampling mask size, reduce transfer overhead, and avoid potential OOMs\", and Model Runner V2, which vLLM 0.28 picks by default for dense models and for an allow-list of MoE architectures (DeepSeek-V2/V4, Qwen2-MoE, Granite-MoE, Kimi-K3 and a few others) that does not include Qwen3-MoE or DeepSeek-V3. So a top_p-only config would need a `top_k` cap, and those MoE models would need `VLLM_USE_V2_MODEL_RUNNER=1`. Through verl's own vLLM server the flag passes as-is (`+actor_rollout_ref.rollout.engine_kwargs.vllm.return_sampling_mask=True`, Qwen2.5-0.5B-Instruct, one RTX 4090): without `top_k`, vLLM rejects every generation request with that `top_k > 0` error and the run stops; with `top_k=1024`, the run completes its 2 steps, including the per-step weight sync. With CPU offload also on, one run crashed in `offload_fsdp_optimizer` with CUDA `invalid argument`; an identical rerun passed.\n\n### Questions before a PR\n\n1. Warning, or an error for the RS presets when truncation is on?\n2. Support size as above, or the full support as in slime#2406 (exact, heavier to move through the agent loop)? If #8009 brings `top_p < 1` to score centering, one replay path could serve both, with the size as the cheap mode when only the ratio is corrected.\n3. Bypass mode: `old_log_probs = rollout_log_probs` there, so the correction has to come from π_θ's forward during the update rather than the old-log-prob pass. In scope for the first PR, or decoupled mode first?\n4. Config: `actor_rollout_ref.rollout.return_sampling_mask` (vLLM backend only for now)?\n\nI can take the PR. Scripts, the parser that turns verl logs into JSON, and the JSON behind every table above: https://github.com/GuoCheng24/batch-logprob-gap/tree/main/verl\n",
+          "state": null,
+          "user": null,
+          "assignees": null,
+          "labels": null,
+          "milestone": null,
+          "state_reason": null,
+          "comments": null,
+          "created_at": null,
+          "updated_at": null,
+          "closed_at": null,
+          "display_url": "https://github.com/verl-project/verl/issues/8020",
+          "display_title": "With `top_p` / `top_k` / `min_p` truncation, the Geo-RS and Seq-MIS rollout-correction presets reject every sequence; proposal: replay the sampling support size"
+        },
+        {
+          "url": "https://github.com/verl-project/verl/issues/8236",
+          "title": "[rollout, vllm] MXFP4 refit rejects vLLM's auto-selected Blackwell MoE backend only at the first update_weights, after ~45 min of JIT + autotune",
+          "issue_number": 8236,
+          "body": "## What happens\n\nDeepSeek-V4 (MXFP4 experts) on sm_100 with `engine_kwargs.vllm.moe_backend` left unset: vLLM 0.29 picks\n`FLASHINFER_TRTLLM_MXFP4_MXFP8`. The engine then (a) JIT-compiles `fused_moe_trtllm_sm100` (~25 min per node, single-threaded\nhost compiler), (b) autotunes `trtllm_fp4_block_scale_moe` for ~20 min at 2-6 % GPU utilisation, and only at the first\nweight sync verl raises\n\n```\nNotImplementedError: mxfp4 MoE refit does not support Mxfp4MoeBackend.FLASHINFER_TRTLLM_MXFP4_MXFP8;\nsupported: DEEPGEMM_MXFP4, MARLIN, BATCHED_MARLIN, AITER_MXFP4_BF16\n```\n\n(`verl/utils/vllm/vllm_fp4_utils.py::_refittable_mxfp4_backends`). On clusters with a GPU-idle watchdog the job is killed\nbefore it even gets there. The Flash example never sees this because the TRT-LLM path does not exist on H100.\n\n## Proposal\n\nFail (or auto-select) before the engine is built, not after the first rollout:\n\n1. in `vLLMHttpServer._preprocess_engine_kwargs` (or rollout config validation), when the checkpoint is MXFP4 and the\n   platform is sm_100+, require `moe_backend` to be one of the refittable backends and raise a clear error otherwise; or\n2. default `moe_backend=marlin` for MXFP4 checkpoints on Blackwell when the user did not set one (what every working run here\n   uses), with a log line explaining why; `deep_gemm`, when installed, is the faster refittable alternative.\n\nI can send a PR for either; (2) changes behaviour silently, so I would rather have a maintainer pick.\n\n## Environment\n\nverl `1d367a4f`, vLLM 0.29.0, flashinfer 0.6.18, GB200 (aarch64), DeepSeek-V4-Pro 4-layer truncated model (same code path\nfor the full model). Related but different: #7978 / #7987 (bf16 TRT-LLM MoE layout).\n",
+          "state": null,
+          "user": null,
+          "assignees": null,
+          "labels": null,
+          "milestone": null,
+          "state_reason": null,
+          "comments": null,
+          "created_at": null,
+          "updated_at": null,
+          "closed_at": null,
+          "display_url": "https://github.com/verl-project/verl/issues/8236",
+          "display_title": "[rollout, vllm] MXFP4 refit rejects vLLM's auto-selected Blackwell MoE backend only at the first update_weights, after ~45 min of JIT + autotune"
+        }
+      ]
+    },
+    "isError": false
+  }
+}
