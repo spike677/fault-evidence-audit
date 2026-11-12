@@ -1,0 +1,314 @@
+@@ -957,10 +957,13 @@ def test_kvpp_waits_before_native_and_fused_cache_access(self):
+             topk_num_tokens=2,
+         )
+         cases = (
+-            (PreprocessType.NATIVE, True),
+-            (PreprocessType.NATIVE, False),
+-            (PreprocessType.PROLOG_V3, True),
+-            (PreprocessType.MLAPO, True),
++            (PreprocessType.NATIVE, True, AscendAttentionState.DecodeOnly),
++            (PreprocessType.NATIVE, False, AscendAttentionState.ChunkedPrefill),
++            (PreprocessType.PROLOG_V3, True, AscendAttentionState.DecodeOnly),
++            (PreprocessType.PROLOG_V3, True, AscendAttentionState.ChunkedPrefill),
++            (PreprocessType.PROLOG_V3, False, AscendAttentionState.ChunkedPrefill),
++            (PreprocessType.PROLOG_V3, True, AscendAttentionState.PrefillCacheHit),
++            (PreprocessType.MLAPO, True, AscendAttentionState.DecodeOnly),
+         )
+         events: list[object] = []
+ 
+@@ -969,8 +972,9 @@ def record_event(name, result):
+             return result
+ 
+         width = self.impl.q_lora_rank + self.impl.kv_lora_rank + self.impl.qk_rope_head_dim
+-        for preprocess_type, has_indexer in cases:
+-            with self.subTest(preprocess_type=preprocess_type, has_indexer=has_indexer):
++        for preprocess_type, has_indexer, attn_state in cases:
++            with self.subTest(preprocess_type=preprocess_type, has_indexer=has_indexer, attn_state=attn_state):
++                metadata.attn_state = attn_state
+                 events.clear()
+                 self.impl.preprocess_type = preprocess_type
+                 self.impl.has_indexer = has_indexer
+@@ -982,6 +986,12 @@ def record_event(name, result):
+                 self.impl._get_parallel_forward_context = lambda *_args: context
+                 self.impl._prepare_native_hidden_states = lambda x, _: x
+                 self.impl.fused_qkv_a_proj = lambda _: record_event("projection", (torch.zeros(2, width),))
++                if preprocess_type == PreprocessType.PROLOG_V3:
++                    # Consumer native weights may have been disposed after
++                    # preparing the fused weights. Never re-enter that path.
++                    self.impl.fused_qkv_a_proj = MagicMock(
++                        side_effect=AssertionError("native projection weights were released")
++                    )
+                 self.impl.q_a_layernorm = torch.nn.Identity()
+                 self.impl.indexer = lambda *_args, **_kwargs: record_event(
+                     "indexer_cache", torch.zeros(2, 1, dtype=torch.int64)
+@@ -1973,3 +1973,55 @@ def fake_linear(x, w):
+         input_ids=None,
+     )
+     runner.ascend_shared_experts.forward.assert_called_once()
++
++
++@pytest.mark.parametrize("initial_comm", [MoECommType.ALLGATHER, MoECommType.MC2])
++def test_compiled_moe_forward_keeps_runtime_reduction(monkeypatch, initial_comm):
++    from torch.fx.experimental.proxy_tensor import make_fx
++
++    runner = AscendMoERunner.__new__(AscendMoERunner)
++    nn.Module.__init__(runner)
++    runner.layer_name = "test.runtime_reduction"
++    runner.moe_config = SimpleNamespace(is_sequence_parallel=False)
++    context = SimpleNamespace(moe_comm_type=initial_comm)
++    monkeypatch.setattr(fused_moe_module, "_EXTRA_CTX", context)
++    monkeypatch.setattr(
++        fused_moe_module,
++        "get_forward_context",
++        lambda: SimpleNamespace(no_compile_layers={runner.layer_name: runner}),
++    )
++    monkeypatch.setattr(
++        fused_moe_module, "tensor_model_parallel_all_reduce", lambda states: states * 4
++    )
++
++    def upstream_forward(self, hidden_states, router_logits, **kwargs):
++        return self._maybe_reduce_final_output(hidden_states.clone(), None)
++
++    monkeypatch.setattr(fused_moe_module.MoERunner, "forward", upstream_forward)
++    library = torch.library.Library("vllm", "IMPL", "CPU")
++    library.impl("ascend_moe_forward_complete", fused_moe_module._ascend_moe_forward_complete)
++    try:
++        states = torch.ones(2, 4)
++        graph = make_fx(lambda x: runner(x, x))(states)
++        # Reuse this exact graph as vLLM does, without retracing Python guards.
++        for comm in (MoECommType.ALLGATHER, MoECommType.MC2, MoECommType.ALLTOALL):
++            context.moe_comm_type = comm
++            expected = states * (4 if comm == MoECommType.ALLGATHER else 1)
++            torch.testing.assert_close(graph(states), expected)
++        assert any(
++            node.target == torch.ops.vllm.ascend_moe_forward_complete.default
++            for node in graph.graph.nodes
++        )
++    finally:
++        library._destroy()
++
++
++@pytest.mark.parametrize("shared_width", [None, 8])
++def test_complete_moe_fake_preserves_local_token_count(shared_width):
++    hidden = torch.empty(3, 4)
++    shared = torch.empty(12, shared_width) if shared_width is not None else None
++    result = fused_moe_module._ascend_moe_forward_complete_fake(
++        hidden, hidden, shared, None, "test"
++    )
++    assert result.shape == (3, shared_width or 4)
++    assert result.dtype == hidden.dtype
+@@ -26,7 +26,7 @@
+ import numpy as np
+ import pytest
+ import torch
+-from vllm.config import CUDAGraphMode
++from vllm.config import CompilationConfig, CompilationMode, CUDAGraphMode
+ from vllm.v1.kv_cache_interface import (
+     FullAttentionSpec,
+     MLAAttentionSpec,
+@@ -276,6 +276,7 @@ def mock_parent_init(
+             proposer.num_speculative_tokens = block_size
+             proposer.max_batch_size = num_reqs
+             proposer.max_num_tokens = max_num_tokens
++            proposer.input_ids = torch.zeros(max_num_tokens, dtype=torch.int32, device=device)
+             proposer.dtype = torch.float32
+             proposer.device = device
+             proposer.hidden_size = _HIDDEN_SIZE
+@@ -991,3 +992,79 @@ def test_mixed_target_and_dspark_group_creates_one_draft_attention_group(self, m
+         assert set(proposer.draft_attn_groups[0].layer_names) == set(draft_layers)
+         assert proposer.draft_attn_groups[0].kv_cache_group_id == 0
+         assert proposer._layer_group_idx == [0] * 5
++
++
++@pytest.mark.parametrize("sample_from_anchor", [True, False])
++@pytest.mark.parametrize("max_num_tokens", [256, 1024])
++def test_profile_query_inputs_cover_full_speculative_batch(sample_from_anchor, max_num_tokens):
++    """Draft queries can exceed the target token budget without truncating IDs."""
++    num_reqs, num_speculative_tokens = 64, 7
++    draft_config = SimpleNamespace(
++        hf_config=SimpleNamespace(sample_from_anchor=sample_from_anchor),
++        get_hidden_size=lambda: _HIDDEN_SIZE,
++    )
++    target_compilation = CompilationConfig(
++        mode=CompilationMode.VLLM_COMPILE,
++        cudagraph_mode=CUDAGraphMode.FULL_DECODE_ONLY,
++        cudagraph_capture_sizes=[8, 16, 32, 64, 128, 256],
++    )
++    config = SimpleNamespace(
++        speculative_config=SimpleNamespace(draft_model_config=draft_config),
++        compilation_config=target_compilation,
++    )
++
++    def parent_init(self, vllm_config, device, runner=None):
++        self.draft_model_config = draft_config
++        self.num_speculative_tokens = num_speculative_tokens
++        self.max_batch_size = num_reqs
++        self.max_num_tokens = max_num_tokens
++        self.dtype = torch.float32
++        self.device = device
++        self.input_ids = torch.zeros(max_num_tokens, dtype=torch.int32)
++        self._context_positions_buffer = torch.zeros(max_num_tokens, dtype=torch.int32)
++        self.token_indices_to_sample = torch.zeros(num_reqs * num_speculative_tokens, dtype=torch.int32)
++        self.uses_mrope = False
++        self.uses_xdrope_dim = 0
++        self.runner = runner
++        self.vllm_config = config
++
++    runner = SimpleNamespace(
++        _sync_metadata_across_dp=lambda n, **kwargs: (n, None, None),
++        dynamic_eplb=False,
++    )
++    with (
++        patch.object(AscendDSparkProposer.__base__, "__init__", parent_init),
++        patch(
++            "vllm_ascend.spec_decode.dspark_proposer.get_ascend_config",
++            return_value=SimpleNamespace(dynamic_spec_config=SimpleNamespace(method="", method_params={})),
++        ),
++    ):
++        proposer = AscendDSparkProposer(config, torch.device("cpu"), runner=runner)
++
++    # Model construction must disable draft compilation even without sequence parallelism.
++    with proposer.maybe_eager_context:
++        assert config.compilation_config.mode == CompilationMode.NONE
++        assert config.compilation_config.static_forward_context is target_compilation.static_forward_context
++        assert config.compilation_config.static_all_moe_layers is target_compilation.static_all_moe_layers
++    assert config.compilation_config is target_compilation
++    assert target_compilation.mode == CompilationMode.VLLM_COMPILE
++    assert target_compilation.cudagraph_mode == CUDAGraphMode.FULL_DECODE_ONLY
++
++    expected_queries = num_reqs * (num_speculative_tokens + (not sample_from_anchor))
++    assert proposer.input_ids.shape[0] >= max(max_num_tokens, expected_queries)
++    assert proposer.input_ids.dtype == torch.int32
++    model = MagicMock()
++
++    def check_query_shapes(*, input_ids, positions, inputs_embeds):
++        assert input_ids.shape == positions.shape == (expected_queries,)
++
++    model.side_effect = check_query_shapes
++    proposer.model = model
++
++    @contextmanager
++    def forward_context(*args, **kwargs):
++        yield
++
++    with patch("vllm_ascend.spec_decode.dspark_proposer.set_ascend_forward_context", forward_context):
++        proposer.dummy_run(num_tokens=max_num_tokens, num_reqs=num_reqs, is_profile=True)
++    model.assert_called_once()
+@@ -1585,10 +1585,13 @@ def forward(
+         actual_seq_lengths_key = parallel_context.actual_seq_lengths_key
+ 
+         fused_type: PreprocessType = self.preprocess_type
+-        if (
++        # PROLOG_V3 uses per-token cache indices for both single-token decode
++        # and multi-token verification. Do not gate it on the legacy attention
++        # state: KV consumers may already have disposed the native weights.
++        # Keep the legacy MLAPO phase and token-count restrictions.
++        if self.preprocess_type == PreprocessType.MLAPO and (
+             attn_metadata.attn_state not in (AscendAttentionState.DecodeOnly, AscendAttentionState.SpecDecoding)
+-            or self.preprocess_type == PreprocessType.MLAPO
+-            and num_input_tokens > MLAPO_MAX_SUPPORTED_TOKENS
++            or num_input_tokens > MLAPO_MAX_SUPPORTED_TOKENS
+         ):
+             fused_type = PreprocessType.NATIVE
+ 
+@@ -22,6 +22,7 @@
+     get_tp_group,
+     tensor_model_parallel_all_reduce,
+ )
++from vllm.forward_context import get_forward_context
+ from vllm.model_executor.layers.fused_moe import FusedMoEConfig, FusedMoERouter
+ from vllm.model_executor.layers.fused_moe.layer import MoERunner
+ from vllm.model_executor.layers.fused_moe.runner.moe_runner import _moe_forward_shared
+@@ -76,6 +77,47 @@ def _ascend_moe_forward_shared_sp_fake(
+ )
+ 
+ 
++def _ascend_moe_forward_complete(
++    hidden_states: torch.Tensor,
++    router_logits: torch.Tensor,
++    shared_experts_input: torch.Tensor | None,
++    input_ids: torch.Tensor | None,
++    layer_name: str,
++) -> torch.Tensor:
++    layer = get_forward_context().no_compile_layers[layer_name]
++    # Keep the communication-dependent reduction decisions inside the same
++    # opaque boundary as dispatch/combine. vLLM reuses a single Dynamo trace
++    # across ALLGATHER and MC2/ALLTOALL batches.
++    return MoERunner.forward(
++        layer,
++        hidden_states,
++        router_logits,
++        input_ids=input_ids,
++        shared_experts_input=shared_experts_input,
++    )
++
++
++def _ascend_moe_forward_complete_fake(
++    hidden_states: torch.Tensor,
++    router_logits: torch.Tensor,
++    shared_experts_input: torch.Tensor | None,
++    input_ids: torch.Tensor | None,
++    layer_name: str,
++) -> torch.Tensor:
++    output_width = (
++        shared_experts_input.shape[-1] if shared_experts_input is not None else hidden_states.shape[-1]
++    )
++    return hidden_states.new_empty((*hidden_states.shape[:-1], output_width))
++
++
++direct_register_custom_op(
++    op_name="ascend_moe_forward_complete",
++    op_func=_ascend_moe_forward_complete,
++    fake_impl=_ascend_moe_forward_complete_fake,
++    tags=(torch.Tag.needs_fixed_stride_order,),
++)
++
++
+ class AscendMoERunner(MoERunner):  # type: ignore[no-redef]
+     def __init__(
+         self,
+@@ -144,6 +186,21 @@ def __init__(
+                     persistent=False,
+                 )
+ 
++    def forward(
++        self,
++        hidden_states: torch.Tensor,
++        router_logits: torch.Tensor,
++        input_ids: torch.Tensor | None = None,
++        shared_experts_input: torch.Tensor | None = None,
++    ) -> torch.Tensor:
++        return torch.ops.vllm.ascend_moe_forward_complete(
++            hidden_states,
++            router_logits,
++            shared_experts_input,
++            input_ids,
++            self.layer_name,
++        )
++
+     @property
+     def is_internal_router(self) -> bool:
+         # main (cdc4824a21): vllm#51838 removed the gate branch in
+@@ -17,7 +17,7 @@
+ from vllm_ascend.attention.utils import enable_pcp
+ from vllm_ascend.ops.triton.spec_decode.utils import copy_and_expand_dflash_and_dspark_inputs_kernel
+ from vllm_ascend.spec_decode.dflash_proposer import AscendDflashProposer, _compute_num_programs
+-from vllm_ascend.spec_decode.utils import DynamicSpecScheduler
++from vllm_ascend.spec_decode.utils import DynamicSpecScheduler, _maybe_eager_context
+ 
+ 
+ class AscendDSparkProposer(AscendDflashProposer):
+@@ -71,8 +71,13 @@ def __init__(
+             )
+         # DSpark runs eager only (Ascend cudagraph unsupported on this path).
+         self.use_cuda_graph = False
++        self.maybe_eager_context = _maybe_eager_context(vllm_config)
+         # Max query tokens depend on whether sampling from anchor or not.
+         self.max_query_tokens = self.max_batch_size * self.num_query_per_req
++        # A full draft batch can exceed the target scheduler's token budget.
++        # Keep token IDs large enough for the query positions and expansion kernel.
++        if self.max_query_tokens > self.input_ids.shape[0]:
++            self.input_ids = self.input_ids.new_zeros(self.max_query_tokens)
+         # Position ids for the draft query block [max_query_tokens].
+         # Overrides dflash:49; v2 uses input_buffers.positions.
+         self.positions = torch.zeros(

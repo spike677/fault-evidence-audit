@@ -1,0 +1,400 @@
+{
+  "reviews": [
+    {
+      "task_id": "RC-009",
+      "candidate_mechanism": {
+        "name": "缓存适用描述／复用资格关系待核",
+        "status": "PENDING_RELATION_REVIEW",
+        "expected_relation": "缓存复用前应核对缓存适用描述与当前调用布局是否满足同一适用契约；具体字段、比较方式和失效规则待核。",
+        "known": "来源声明连续输入匹配到非连续缓存；未取得缓存匹配及修复代码。",
+        "unknown": "缓存字段、stride单位、生成／失效主体及复用谓词未知；不预断key遗漏。",
+        "alternatives": [
+          "缓存描述遗漏",
+          "比较或规范化规则错误",
+          "失效／作用域错误",
+          "来源描述尚不完整"
+        ]
+      },
+      "implementation_carrier": {
+        "description": "aclnn框架host-tiling-cache；具体实现责任待核",
+        "determines_mode_relationship": false
+      },
+      "evidence_level": {
+        "claims": [
+          {
+            "claim": "来源声明连续输入匹配到非连续缓存；未取得缓存匹配及修复代码。",
+            "basis": "SOURCE_DECLARATION",
+            "evidence_ids": [
+              "RC-009:fault:description",
+              "RC-009:fault:reported_root_cause",
+              "RC-009:fault:weekly_progress"
+            ],
+            "limitation": "转交声明／摘要，不是本轮独立根因、事件或设备确认。"
+          }
+        ],
+        "unknown": "缓存字段、stride单位、生成／失效主体及复用谓词未知；不预断key遗漏。"
+      },
+      "original30_relation": {
+        "status": "PENDING",
+        "similar_modes": [
+          {
+            "mode_id": "M011",
+            "original_definition": "tiling逻辑判断或具体条件判断错误，导致走入错误分支"
+          },
+          {
+            "mode_id": "M027",
+            "original_definition": "特定私有格式（NC1HWC0、NDHWC、NDC1HWC0、Z_3D）， 不支持as_strided的改变stride的view操作"
+          }
+        ],
+        "common": "涉及条件判断／布局适用边界。",
+        "boundary_discussion": "M011可讨论扩展，但需先定位复用资格如何被破坏；M027是特定私有格式的view限制。四问不决定归卡优先级。",
+        "priority_inferred_from_four_questions": false
+      },
+      "targeted_evidence_gap": "PR2094历史记录只改测试Golden，不能证明host-tiling-cache修复。",
+      "quantity_ids": [
+        "RC-009:QTY-01",
+        "RC-009:QTY-02",
+        "RC-009:QTY-03"
+      ],
+      "review_scope": "DRIVING_QUANTITY_REVIEW_WITH_GAPS",
+      "relation_confirmed": false,
+      "new_or_extension_confirmed": false,
+      "hardware_validated": false,
+      "formal_adoption": false
+    },
+    {
+      "task_id": "RC-010",
+      "candidate_mechanism": {
+        "name": "所需ctrl状态建立责任待核",
+        "status": "PENDING_RELATION_REVIEW",
+        "expected_relation": "所选执行模板在首次消费前应建立该设备／上下文所需的ctrl状态；编码、位、设置与复位范围待核。",
+        "known": "周报及相关摘要声明取消TPipe后缺失构造函数设置ctrl的操作；版本替换后现象消失。",
+        "unknown": "寄存器位、期望编码、实际值、责任主体和复位范围未知；初始化遗漏不等于同步或内存初始化。",
+        "alternatives": [
+          "模板未建立必要ctrl状态",
+          "其它模板副作用或配置差异"
+        ]
+      },
+      "implementation_carrier": {
+        "description": "极致头开销执行模板／TPipe；设备和上下文范围未知",
+        "determines_mode_relationship": false
+      },
+      "evidence_level": {
+        "claims": [
+          {
+            "claim": "周报及相关摘要声明取消TPipe后缺失构造函数设置ctrl的操作；版本替换后现象消失。",
+            "basis": "SOURCE_DECLARATION",
+            "evidence_ids": [
+              "RC-010:fault:description",
+              "RC-010:fault:reported_root_cause",
+              "RC-010:related_internal_facts:0:title",
+              "RC-010:related_internal_facts:0:symptom",
+              "RC-010:related_internal_facts:0:root_cause",
+              "RC-010:related_internal_facts:0:trigger",
+              "RC-010:related_internal_facts:0:fix",
+              "RC-010:related_internal_facts:0:verification",
+              "RC-010:related_internal_facts:0:quote"
+            ],
+            "limitation": "转交声明／摘要，不是本轮独立根因、事件或设备确认。"
+          }
+        ],
+        "unknown": "寄存器位、期望编码、实际值、责任主体和复位范围未知；初始化遗漏不等于同步或内存初始化。"
+      },
+      "original30_relation": {
+        "status": "PENDING",
+        "similar_modes": [
+          {
+            "mode_id": "M013",
+            "original_definition": "tik底层对coreNum特性，block_dim为scalar时支持不够导致的，需添加常量折叠配置。"
+          },
+          {
+            "mode_id": "M007",
+            "original_definition": "多核同时搬运可能会导致偶现精度问题"
+          }
+        ],
+        "common": "均涉及执行前提或适配行为。",
+        "boundary_discussion": "M013是block_dim标量支持／常量折叠；M007是多核搬运同步。不能只因初始化一词挂到内存类或A05。",
+        "priority_inferred_from_four_questions": false
+      },
+      "targeted_evidence_gap": "摘要明确给出cann/opbase#279，保留为定向补读；本轮未读取该PR。",
+      "quantity_ids": [
+        "RC-010:QTY-01",
+        "RC-010:QTY-02",
+        "RC-010:QTY-03"
+      ],
+      "review_scope": "DRIVING_QUANTITY_REVIEW_WITH_GAPS",
+      "relation_confirmed": false,
+      "new_or_extension_confirmed": false,
+      "hardware_validated": false,
+      "formal_adoption": false
+    },
+    {
+      "task_id": "RC-023",
+      "candidate_mechanism": {
+        "name": "索引有效性与槽位消费资格待核",
+        "status": "PENDING_RELATION_REVIEW",
+        "expected_relation": "索引变换应保留合同规定的有效性语义；消费者只使用合同允许且具有可用结果的专家槽位。默认填充及掩码规则待核。",
+        "known": "来源声明对sorted_indices取abs后所有专家被视为激活，并称未激活专家不执行MLP、输出含NaN。",
+        "unknown": "负值是合法标记还是非法实参、默认填充值、掩码及结果可用性未知；未执行MLP不自动证明未初始化。",
+        "alternatives": [
+          "标记语义丢失",
+          "默认填充或掩码消费不符合契约",
+          "负值不在接口合法域"
+        ]
+      },
+      "implementation_carrier": {
+        "description": "模型适配索引变换／token_unpermute输入契约",
+        "determines_mode_relationship": false
+      },
+      "evidence_level": {
+        "claims": [
+          {
+            "claim": "来源声明对sorted_indices取abs后所有专家被视为激活，并称未激活专家不执行MLP、输出含NaN。",
+            "basis": "SOURCE_DECLARATION",
+            "evidence_ids": [
+              "RC-023:fault:description",
+              "RC-023:fault:reported_root_cause",
+              "RC-023:fault:weekly_progress"
+            ],
+            "limitation": "转交声明／摘要，不是本轮独立根因、事件或设备确认。"
+          }
+        ],
+        "unknown": "负值是合法标记还是非法实参、默认填充值、掩码及结果可用性未知；未执行MLP不自动证明未初始化。"
+      },
+      "original30_relation": {
+        "status": "PENDING",
+        "similar_modes": [
+          {
+            "mode_id": "M022",
+            "original_definition": "Block Table 目前的索引和但kvCacheOut 的batch 偏移不一致"
+          },
+          {
+            "mode_id": "M020",
+            "original_definition": "embedding前向输入为空导致反向NaN"
+          }
+        ],
+        "common": "索引对象对应／边界结果传播具有相似性。",
+        "boundary_discussion": "M022是Block Table与KV batch偏移；M020是空tensor前向到反向NaN。必须先证明槽位消费资格，不能直接归类。",
+        "priority_inferred_from_four_questions": false
+      },
+      "targeted_evidence_gap": "PR4833是反向grad_probs dtype子问题，不是本条前向负值语义修复。",
+      "quantity_ids": [
+        "RC-023:QTY-01",
+        "RC-023:QTY-02",
+        "RC-023:QTY-03",
+        "RC-023:QTY-04"
+      ],
+      "review_scope": "DRIVING_QUANTITY_REVIEW_WITH_GAPS",
+      "relation_confirmed": false,
+      "new_or_extension_confirmed": false,
+      "hardware_validated": false,
+      "formal_adoption": false
+    },
+    {
+      "task_id": "RC-029",
+      "candidate_mechanism": {
+        "name": "scale实参与载荷契约关系待核",
+        "status": "PENDING_RELATION_REVIEW",
+        "expected_relation": "FlashUpdate相关调用的各scale参数应符合被消费载荷的对象、类型及数值语义契约；选段仅证实参数替换，完整契约待核。",
+        "known": "来源声明V scale读取异常。历史选段记录FlashUpdate相关参数由deScalePreVValue替换为deScaleVValue。",
+        "unknown": "两个变量的对象、类型、数值含义、定义及参数契约未知；变量名不足以确定块、时间或轴语义。",
+        "alternatives": [
+          "对象绑定差异",
+          "数值含义或类型契约差异",
+          "选段外的实现改动"
+        ]
+      },
+      "implementation_carrier": {
+        "description": "FP8 Attention内核调用参数；完整实现阶段未知",
+        "determines_mode_relationship": false
+      },
+      "evidence_level": {
+        "claims": [
+          {
+            "claim": "来源声明FP8 Attention的静态量化V scale读取异常；完整原文尚未补齐。",
+            "basis": "SOURCE_DECLARATION",
+            "evidence_ids": [
+              "RC-029:fault:description",
+              "RC-029:fault:reported_root_cause",
+              "RC-029:fault:weekly_progress",
+              "RC-029:related_internal_facts:0:title",
+              "RC-029:related_internal_facts:0:symptom",
+              "RC-029:related_internal_facts:0:root_cause",
+              "RC-029:related_internal_facts:0:operator",
+              "RC-029:related_internal_facts:0:trigger",
+              "RC-029:related_internal_facts:0:fix",
+              "RC-029:related_internal_facts:0:verification",
+              "RC-029:related_internal_facts:0:quote"
+            ],
+            "limitation": "转交声明／摘要，不是本轮独立根因、事件或设备确认。"
+          },
+          {
+            "claim": "归档选段中的FlashUpdate实参替换事实。",
+            "basis": "PRIOR_SELECTED_CODE_OBSERVATION",
+            "evidence_ids": [
+              "OBS:TC-FP8-VSCALE:1:before",
+              "OBS:TC-FP8-VSCALE:1:after"
+            ],
+            "limitation": "全文完整性未证，未核变量定义／函数合同，未执行设备验证。"
+          }
+        ],
+        "unknown": "两个变量的对象、类型、数值含义、定义及参数契约未知；变量名不足以确定块、时间或轴语义。"
+      },
+      "original30_relation": {
+        "status": "PENDING",
+        "similar_modes": [
+          {
+            "mode_id": "M010",
+            "original_definition": "图优化阶段因反量化（Dequantize）节点摆放位置错误，导致本应以纯INT8执行的融合算子退化为“反量化+高精度计算+再量化”路径，或使量化参数（scale/zero_point）传递断裂，最终引发精度异常"
+          },
+          {
+            "mode_id": "M024",
+            "original_definition": "数据在内存排布转换发生错误，如NZ排布转换实现方案存在问题。"
+          }
+        ],
+        "common": "缩放计算链或表示转换可能相关。",
+        "boundary_discussion": "M010是图中Dequantize位置，M024是内存排布。仅参数替换不能确认独立错绑机理，也不能直接归类。",
+        "priority_inferred_from_four_questions": false
+      },
+      "targeted_evidence_gap": "cann/ops-transformer#8005，commit f4f1bafc2ffefc94306e0ea6403ff362e5259331，历史文件选段589–612；完整Diff和变量定义待补。",
+      "quantity_ids": [
+        "RC-029:QTY-01",
+        "RC-029:QTY-02",
+        "RC-029:QTY-03",
+        "RC-029:QTY-04"
+      ],
+      "review_scope": "DRIVING_QUANTITY_REVIEW_WITH_GAPS",
+      "relation_confirmed": false,
+      "new_or_extension_confirmed": false,
+      "hardware_validated": false,
+      "formal_adoption": false
+    },
+    {
+      "task_id": "RC-062",
+      "candidate_mechanism": {
+        "name": "辅助张量内容／生命周期关系待核",
+        "status": "PENDING_RELATION_REVIEW",
+        "expected_relation": "在目标调用、位置及配置可比且合法域明确的前提下，sin／cos内容应符合该调用的辅助张量契约；差异产生环节待核。",
+        "known": "来源声明verl切pe／nope的sin、cos全零，单推是正常数值。当前尚未证实两侧目标调用可比。",
+        "unknown": "位置、配置、合法域和目标调用身份未知；差异可来自构造、初始化、传递、取错对象或恢复。",
+        "alternatives": [
+          "构造不同",
+          "初始化不同",
+          "传递差异",
+          "取错对象",
+          "恢复差异",
+          "目标调用本身不可比"
+        ]
+      },
+      "implementation_carrier": {
+        "description": "verl／vllm调用准备与辅助张量传递；具体层未知",
+        "determines_mode_relationship": false
+      },
+      "evidence_level": {
+        "claims": [
+          {
+            "claim": "来源声明verl切pe／nope的sin、cos全零，单推是正常数值。当前尚未证实两侧目标调用可比。",
+            "basis": "SOURCE_DECLARATION",
+            "evidence_ids": [
+              "RC-062:fault:description",
+              "RC-062:fault:reported_root_cause"
+            ],
+            "limitation": "转交声明／摘要，不是本轮独立根因、事件或设备确认。"
+          }
+        ],
+        "unknown": "位置、配置、合法域和目标调用身份未知；差异可来自构造、初始化、传递、取错对象或恢复。"
+      },
+      "original30_relation": {
+        "status": "PENDING",
+        "similar_modes": [
+          {
+            "mode_id": "M020",
+            "original_definition": "embedding前向输入为空导致反向NaN"
+          },
+          {
+            "mode_id": "M027",
+            "original_definition": "特定私有格式（NC1HWC0、NDHWC、NDC1HWC0、Z_3D）， 不支持as_strided的改变stride的view操作"
+          }
+        ],
+        "common": "边界内容或view适用性可作为对照方向。",
+        "boundary_discussion": "M020的空tensor不等于非空全零sin／cos；M027的私有格式限制未被说明。不能命名为恢复遗漏或确认CANN缺陷。",
+        "priority_inferred_from_four_questions": false
+      },
+      "targeted_evidence_gap": "现有npu_mrope DTS摘要未给根因，不支持本条辅助张量差异的产生环节。",
+      "quantity_ids": [
+        "RC-062:QTY-01",
+        "RC-062:QTY-02",
+        "RC-062:QTY-03",
+        "RC-062:QTY-04"
+      ],
+      "review_scope": "DRIVING_QUANTITY_REVIEW_WITH_GAPS",
+      "relation_confirmed": false,
+      "new_or_extension_confirmed": false,
+      "hardware_validated": false,
+      "formal_adoption": false
+    },
+    {
+      "task_id": "RC-105",
+      "candidate_mechanism": {
+        "name": "确定性请求到有效分派的传播关系待核",
+        "status": "PENDING_RELATION_REVIEW",
+        "expected_relation": "通信buffer配置更新后，确定性请求应按实际配置契约传至有效设置与分派消费者；更新规则及字段编码待核。",
+        "known": "来源声明新增buffer配置时覆盖确定性配置，未进入确定性分支，RC1修复。",
+        "unknown": "配置编码、写入主体、更新语义和具体RC1版本／提交未知；不指定结构覆盖、字段重置或位域操作。",
+        "alternatives": [
+          "配置更新传播错误",
+          "设置作用域或初始化错误",
+          "来源省略了分派条件"
+        ]
+      },
+      "implementation_carrier": {
+        "description": "PTA通信buffer配置更新与ReduceScatter分派",
+        "determines_mode_relationship": false
+      },
+      "evidence_level": {
+        "claims": [
+          {
+            "claim": "来源声明新增buffer配置时覆盖确定性配置，未进入确定性分支，RC1修复。",
+            "basis": "SOURCE_DECLARATION",
+            "evidence_ids": [
+              "RC-105:fault:description",
+              "RC-105:fault:reported_root_cause",
+              "RC-105:fault:weekly_progress"
+            ],
+            "limitation": "转交声明／摘要，不是本轮独立根因、事件或设备确认。"
+          }
+        ],
+        "unknown": "配置编码、写入主体、更新语义和具体RC1版本／提交未知；不指定结构覆盖、字段重置或位域操作。"
+      },
+      "original30_relation": {
+        "status": "PENDING",
+        "similar_modes": [
+          {
+            "mode_id": "M028",
+            "original_definition": "reducescatter算子，HCCL场景支持确定性计算，LCCL场景不支持确定性计算"
+          },
+          {
+            "mode_id": "M013",
+            "original_definition": "tik底层对coreNum特性，block_dim为scalar时支持不够导致的，需添加常量折叠配置。"
+          }
+        ],
+        "common": "确定性能力／适配控制路径具有相似性。",
+        "boundary_discussion": "M028是HCCL与LCCL能力差异，本条声明请求未传到分派；M013为标量参数适配。载体位置不能决定合并或新增。",
+        "priority_inferred_from_four_questions": false
+      },
+      "targeted_evidence_gap": "需配置更新与确定性分派修复的具体提交；只写RC1不能定位版本。",
+      "quantity_ids": [
+        "RC-105:QTY-01",
+        "RC-105:QTY-02",
+        "RC-105:QTY-03",
+        "RC-105:QTY-04"
+      ],
+      "review_scope": "DRIVING_QUANTITY_REVIEW_WITH_GAPS",
+      "relation_confirmed": false,
+      "new_or_extension_confirmed": false,
+      "hardware_validated": false,
+      "formal_adoption": false
+    }
+  ],
+  "status": "PENDING_RELATION_REVIEW"
+}

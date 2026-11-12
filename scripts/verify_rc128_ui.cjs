@@ -35,5 +35,5 @@ check('unknown_and_evidence_limits_not_hidden',()=>{const h=run('caseCard(D.resu
 check('nested_shared_evidence_card_ids_are_unique',()=>{const ids=[...run('renderView(\"cases\")').matchAll(/id=\"([^\"]+)\"/g)].map(x=>x[1]);assert.equal(ids.length,new Set(ids).size)});
 const failed=checks.filter(x=>x.status!=='PASS').length;
 const result={status:failed?'FAIL':'PASS',runtime:process.version,check_count:checks.length,failed,scope:'OFFLINE_VM_LOGIC_NOT_BROWSER_OR_DEVICE',checks};
-fs.writeFileSync(path.join(folder,'ui_validation.json'),JSON.stringify(result,null,2)+'\n');
+// Historical validation is immutable. This runner reports to stdout only.
 process.stdout.write(JSON.stringify(result,null,2)+'\n');process.exitCode=failed?1:0;

@@ -13,7 +13,16 @@ import shutil
 import sys
 
 REPO = Path(__file__).resolve().parents[1]
-DEFAULT = REPO / 'reports/rc128-evidence-review-20261111'
+LEGACY_BUNDLE = REPO / 'reports/rc128-evidence-review-20261111'
+DEFAULT = REPO / 'reports/rc128-evidence-review-20261112-r2'
+
+
+def writable_output(folder):
+    """The published R1 snapshot is immutable, including through symlinks."""
+    p = Path(folder).resolve()
+    if p == LEGACY_BUNDLE.resolve() or LEGACY_BUNDLE.resolve() in p.parents:
+        raise ValueError('Historical bundle is read-only; choose an independent output directory.')
+    return p
 
 
 def read(path):
@@ -21,7 +30,7 @@ def read(path):
 
 
 def write(path, value):
-    p = Path(path)
+    p = writable_output(path)
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text(json.dumps(value, ensure_ascii=False, indent=2) + '\n', encoding='utf-8', newline='\n')
 
@@ -35,11 +44,12 @@ def rows(path):
 
 
 def jsonl(path, values):
+    writable_output(path)
     Path(path).write_text(''.join(json.dumps(v, ensure_ascii=False, separators=(',', ':'))+'\n' for v in values), encoding='utf-8', newline='\n')
 
 
 def init(folder=DEFAULT):
-    folder = Path(folder)
+    folder = writable_output(folder)
     workspace = REPO.parent
     inputs = {
         'sources/original/handoff.jsonl': workspace / '数据/CANN_WEEKLY_EXTERNEL_SEARCH_HANDOFF_FOR_CODEX_20261111.jsonl',
@@ -261,10 +271,10 @@ def taxonomy_definitions(baseline):
     return definitions
 
 
-def build(folder=DEFAULT):
+def _build_v1(folder):
     from rc128_decisions import (CONTRACTS,DECISIONS,DECISIONS_INPUT_SHA256,EXTRA_SUBISSUES,PRIOR_CASE_LINKS,
         TEXT_DUPLICATE_CANDIDATES,TC_CONTRACTS,NEW_TECHNICAL_CASES,DIMENSIONS,CANDIDATE_FAMILIES)
-    folder=Path(folder);manifest=read(folder/'input_manifest.json')
+    folder=writable_output(folder);manifest=read(folder/'input_manifest.json')
     if sha(folder/'sources/original/handoff.jsonl')!=DECISIONS_INPUT_SHA256:
         raise ValueError('Curated review belongs to a different input SHA; new inputs require a new review, not ID-only reuse.')
     for f in manifest['files']:
@@ -351,7 +361,7 @@ def build(folder=DEFAULT):
                 mechanism_title=prof[0],object_roles=d['object_roles'] if len(parts)==1 else subject,
                 measurement_and_representation=dimensions[0],lifecycle=dimensions[1],consumers=dimensions[2],
                 dimension_status='SOURCE_DESCRIBED_WITH_UNKNOWNS'if n in DIMENSIONS else'DESIGN_QUESTIONS_NOT_ESTABLISHED_FACTS',
-                expected_relation=prof[1],actual_relation=actual,trigger_predicate='见原记录及适用条件；未给出的实参/谓词保持未知。',
+                expected_relation=expected_for_subproblem(n, contract, prof[1]),actual_relation=actual,trigger_predicate='见原记录及适用条件；未给出的实参/谓词保持未知。',
                 cause_chain=d['actual_relation'],basis=d['certainty'],evidence_ids=primary_refs,
                 evidence_scope='原记录声明/排查进展；不是本轮复现或独立根因确认。',
                 alternative_explanations=d['missing'],unresolved=[d['missing']],
@@ -685,7 +695,7 @@ def summarize(results,failures,conditions,comparisons,technical,baseline,searche
         runtime=dict(python=sys.version,executable=sys.executable,platform=platform.platform()))
 
 
-def input_budget_receipts(inputs,index,definitions,folder):
+def input_budget_receipts(inputs,index,definitions,folder,review_context=None,input_budget=160000):
     compact_defs=[{k:d[k]for k in ['system','condition_id','name','definition','requires','skip_if','class_ids','theme_ids']}for d in definitions]
     compact_modes=[dict(mode_id=m['mode_id'],name=m['name'],mechanism=m['failure_mechanism'],definition=m['original_definition'])for m in index]
     original_knowledge={name:(folder/'sources/original'/name).read_bytes().decode('utf-8-sig')for name in ['api42_trigger_library_original.md','precision_trigger_knowledge_v4.md']}
@@ -695,9 +705,12 @@ def input_budget_receipts(inputs,index,definitions,folder):
         task=dict(instruction=instruction,record=r,original30=compact_modes,classification_definitions=compact_defs,
             original_knowledge=original_knowledge,
             input_scope='完整本条转交字段、30定义、原42/V4原文及完整适用谓词；不含完整内网原文，不能声称内网全文核验。')
+        if review_context is not None:
+            task['revision_instruction']='逐驱动量回答对象、单位、生命周期四项责任及消费者；未知说明原因。语义适用与构造能力分开；四问不能替代复现或产生新增／扩展决定。'
+            task['revision_context']=review_context.get(r['task_id'],{'scope':'历史沿用或共享模板纠正，非逐驱动量复审'})
         wire=json.dumps(task,ensure_ascii=False,separators=(',',':'))
-        size=len(wire);receipts.append(dict(task_id=r['task_id'],serialized_input_chars=size,budget_chars=160000,
-            status='BLOCKED'if size>160000 else'WITHIN_BUDGET',reason='INPUT_TOO_LARGE'if size>160000 else None,
+        size=len(wire);receipts.append(dict(task_id=r['task_id'],serialized_input_chars=size,budget_chars=input_budget,
+            status='BLOCKED'if size>input_budget else'WITHIN_BUDGET',reason='INPUT_TOO_LARGE'if size>input_budget else None,
             serialized_sha256=hashlib.sha256(wire.encode()).hexdigest(),input_scope=task['input_scope']))
     return dict(receipts=receipts,instructions_included=True,serialized_data_included=True,automatic_truncation=False,
         execution_mode='CODEX_AGENT_CURATED_REVIEW_NOT_PRODUCTION_BRIDGE_SUBMISSION',
@@ -823,7 +836,7 @@ def make_manifest(folder):
         original_state_modified=False,baseline_workflow_frozen=False,formal_adoption=False))
 
 
-def verify(folder=DEFAULT,git_index=False):
+def _verify_v1(folder,git_index=False):
     import importlib.metadata
     from rc128_decisions import DECISIONS_INPUT_SHA256
     folder=Path(folder);checks=[]
@@ -911,7 +924,7 @@ def verify(folder=DEFAULT,git_index=False):
     check('budget_receipt_is_not_a_model_execution_claim',lambda:budgets['execution_mode']=='CODEX_AGENT_CURATED_REVIEW_NOT_PRODUCTION_BRIDGE_SUBMISSION'and budgets['budget_check_does_not_prove_session_untruncated'])
     check('all_frozen_input_file_bytes_preserved',lambda:all(sha(folder/x['file'])==x['sha256']for x in read(folder/'input_manifest.json')['files']))
     check('all_published_payload_sha256_match',lambda:all((folder/p).is_file()and sha(folder/p)==h for p,h in manifest['payload_sha256'].items()))
-    check('policy_code_fingerprint_current',lambda:all(sha(REPO/p)==h for p,h in manifest['analysis_code_sha256'].items()))
+    check('historical_policy_fingerprint_self_consistent',lambda:hashlib.sha256(json.dumps(manifest['analysis_code_sha256'],sort_keys=True).encode()).hexdigest()==manifest['policy_fingerprint'])
     payload=re.search(r'<script type="application/json" id="payload">(.*?)</script>',(folder/'report.html').read_text(encoding='utf-8'),re.S)
     html_data=json.loads(payload.group(1))
     check('html_contains_all_128_unmodified_results',lambda:html_data['results']==rs)
@@ -934,10 +947,31 @@ def verify(folder=DEFAULT,git_index=False):
     result=dict(status='FAIL'if failed else'PASS',checks=checks,check_count=len(checks),failed=failed,
         python=sys.version,executable=sys.executable,dependencies=dependencies,device_runs=0,
         verification_scope='OFFLINE_DATA_SOURCE_RANGE_AND_REPORT_CONSISTENCY_NOT_HARDWARE_OR_FULL_PR_SEMANTICS')
-    write(folder/'validation.json',result)
     if failed:raise ValueError(json.dumps(result,ensure_ascii=False))
-    return dict(status='PASS',check_count=len(checks),records=128,subproblems=s['weekly_subproblem_assessments'],
+    return dict(status='PASS',policy_status='HISTORICAL_POLICY_NOT_CURRENT_REVIEW',policy_fingerprint=manifest['policy_fingerprint'],read_only=True,checks=checks,check_count=len(checks),records=128,subproblems=s['weekly_subproblem_assessments'],
         independent_technical_cases=len(tech),whole_input_chars_max=max(x['serialized_input_chars']for x in budgets['receipts']),python=sys.version,dependencies=dependencies)
+
+
+def expected_for_subproblem(n, contract, fallback):
+    from rc128_six_reviews import EXPECTED
+    return EXPECTED.get(f'RC-{n:03}', fallback)
+
+
+def build(folder=DEFAULT, source_bundle=LEGACY_BUNDLE):
+    from rc128_decisions import DECISIONS_INPUT_SHA256
+    folder=writable_output(folder)
+    if (folder/'sources/original/handoff.jsonl').exists() and sha(folder/'sources/original/handoff.jsonl') != DECISIONS_INPUT_SHA256:
+        raise ValueError('Curated review belongs to a different input SHA; not ID-only reuse.')
+    from rc128_revision import build_revision
+    return build_revision(folder, Path(source_bundle))
+
+
+def verify(folder=DEFAULT,git_index=False):
+    folder=Path(folder)
+    if read(folder/'manifest.json')['schema_version']=='RC128-BUNDLE-2':
+        from rc128_revision import verify_revision
+        return verify_revision(folder,git_index)
+    return _verify_v1(folder,git_index)
 
 
 def main():
@@ -945,9 +979,10 @@ def main():
     p.add_argument('command', choices=['init', 'build', 'verify'])
     p.add_argument('folder', nargs='?', type=Path, default=DEFAULT)
     p.add_argument('--git-index',action='store_true')
+    p.add_argument('--source-bundle',type=Path,default=LEGACY_BUNDLE)
     args=p.parse_args()
     if args.command == 'init': result=init(args.folder)
-    elif args.command == 'build': result=build(args.folder)
+    elif args.command == 'build': result=build(args.folder,args.source_bundle)
     else: result=verify(args.folder,args.git_index)
     print(json.dumps(result, ensure_ascii=False, indent=2))
 

@@ -1,0 +1,1944 @@
+{
+  "cases": [
+    {
+      "technical_case_id": "TC-PLUGIN-ASYNC",
+      "title": "调频plugin异步资源生命周期不一致",
+      "operator": "frequency_regulator",
+      "functions": [
+        "frequency_regulator_impl_npu"
+      ],
+      "kernel_files": [
+        "csrc/plugin/frequency_regulator.cpp"
+      ],
+      "failure_mechanism": "手工管理的workspace/executor/ACL tensor生命周期与框架异步执行不一致，改由EXEC_NPU_CMD管理。",
+      "faulty_behavior": "手工创建/释放 workspace、executor、ACL tensor，显式同步与主机拷贝",
+      "expected_behavior": "按接口契约产生正确结果；修复意图：TensorWrapper + EXEC_NPU_CMD，由框架适配资源与异步生命周期",
+      "implementation_scope": "FRAMEWORK_PLUGIN_ENGINEERING",
+      "source_evidence_level": "CODE_LOCALIZED",
+      "test_design_ids": [
+        "DESIGN-PLUGIN-ASYNC"
+      ],
+      "entity_type": "INDEPENDENT_TECHNICAL_CASE",
+      "action": "PENDING",
+      "proposed_mode_id": null,
+      "similar_original_mode_ids": [
+        "M004",
+        "M015"
+      ],
+      "related_original_mode_ids": [],
+      "mechanism_relation": "FUNCTIONAL_OUT_OF_SCOPE",
+      "impact_status": "RESOURCE_LIFECYCLE_FAILURE_REPORTED",
+      "relation_reason": "封装生命周期问题，未证明CANN数值kernel缺陷。",
+      "trigger_predicate": "框架异步调用与手工executor/workspace释放生命周期不匹配",
+      "known_trigger_facts": [
+        "手工ACL资源处理替换为TensorWrapper/EXEC_NPU_CMD"
+      ],
+      "unresolved_gaps": [
+        "没有证明为CANN数值kernel缺陷；工程案例与精度模式范围分开"
+      ],
+      "repair_mechanism": "TensorWrapper + EXEC_NPU_CMD，由框架适配资源与异步生命周期",
+      "evidence_observation_ids": [
+        "OBS:TC-PLUGIN-ASYNC:1"
+      ],
+      "repo_pr_commit_issue": [
+        {
+          "evidence_id": "PR:Ascend/MindIE-SD#548",
+          "repo": "Ascend/MindIE-SD",
+          "pr_number": 548,
+          "pinned_urls_or_observations": [
+            "https://gitcode.com/Ascend/MindIE-SD/pull/548",
+            "https://gitcode.com/Ascend/MindIE-SD/blob/f4537472b5a9ffefb47f5c10b8b8c05843c4b92a/csrc/plugin/frequency_regulator.cpp"
+          ],
+          "commit_ids": [
+            "f4537472b5a9ffefb47f5c10b8b8c05843c4b92a"
+          ],
+          "issue_urls_observed": [],
+          "issue_ids_mentioned": [],
+          "issue_status": "NOT_RECORDED_IN_SELECTED_EVIDENCE",
+          "commit_or_issue_details": "只摘录已取得的定位；未记载的Issue保持未知，不由PR编号猜客户身份"
+        }
+      ],
+      "author_or_code_test_evidence": [
+        {
+          "evidence_id": "PR:Ascend/MindIE-SD#548",
+          "reported_or_code_tests": "作者描述 A5/PTA ExtensionOPS 调用通过且无 coredump/507035；本轮未执行设备测试",
+          "local_execution": false
+        }
+      ],
+      "candidate_id": null,
+      "MODE_ACCEPTED": false,
+      "hardware_validated": false,
+      "weekly_event_confirmed": false,
+      "comparison_reason": "资源存活与释放责任不是M004偏移算式；先保留框架功能性问题，不新增CANN精度模式。",
+      "related_task_ids": [
+        "RC-032"
+      ],
+      "evidence_ids": [
+        "OBS:TC-PLUGIN-ASYNC:1:before",
+        "OBS:TC-PLUGIN-ASYNC:1:after"
+      ],
+      "evidence_basis": "PRIOR_SELECTED_CODE_OBSERVATION",
+      "original_action": "RELATED_OUT_OF_SCOPE",
+      "source_completeness": "选段支持具体主张；旧GitCode PR全文本轮未取到。",
+      "failure_relation_id": "TC-PLUGIN-ASYNC:REL",
+      "contract": "RESOURCE_LIFE"
+    },
+    {
+      "technical_case_id": "TC-GRADPROBS-DTYPE",
+      "title": "梯度输出dtype取错输入对象",
+      "operator": "npu_moe_token_unpermute_grad",
+      "functions": [
+        "Meta/实际grad_probs输出分配"
+      ],
+      "kernel_files": [
+        "op_plugin/python/meta/_meta_registrations.py"
+      ],
+      "failure_mechanism": "grad_probs应继承probs类型，却使用grad_unpermuted_tokens类型；混合类型下返回契约错误，meta和实际输出分配同时修正。",
+      "faulty_behavior": "grad_probs 沿用 grad_unpermuted_tokens 的 dtype",
+      "expected_behavior": "按接口契约产生正确结果；修复意图：grad_probs 使用 probs.scalar_type()/empty_like(probs) 的 dtype",
+      "implementation_scope": "OP_PLUGIN_INTERFACE",
+      "source_evidence_level": "CODE_LOCALIZED",
+      "test_design_ids": [
+        "DESIGN-GRAD-META",
+        "DESIGN-GRAD-DEVICE"
+      ],
+      "entity_type": "INDEPENDENT_TECHNICAL_CASE",
+      "action": "NEW_CANDIDATE",
+      "proposed_mode_id": null,
+      "similar_original_mode_ids": [
+        "M001",
+        "M030"
+      ],
+      "related_original_mode_ids": [],
+      "mechanism_relation": "NEW_MECHANISM_CANDIDATE",
+      "impact_status": "OUTPUT_DTYPE_CONTRACT_CHANGE",
+      "relation_reason": "输出类型归属对象有源码依据；接口层收录范围和设备返回仍待审查。",
+      "trigger_predicate": "probs.dtype != grad_unpermuted_tokens.dtype；grad_probs错误继承后者类型",
+      "known_trigger_facts": [
+        "Meta及实际输出分配改为继承probs；公开混合dtype和直接Meta测试"
+      ],
+      "unresolved_gaps": [
+        "现场直接返回值/Meta运行；是否纳入CANN精度库的接口层范围"
+      ],
+      "repair_mechanism": "grad_probs 使用 probs.scalar_type()/empty_like(probs) 的 dtype",
+      "evidence_observation_ids": [
+        "OBS:TC-GRADPROBS-DTYPE:1"
+      ],
+      "repo_pr_commit_issue": [
+        {
+          "evidence_id": "PR:Ascend/op-plugin#4833",
+          "repo": "Ascend/op-plugin",
+          "pr_number": 4833,
+          "pinned_urls_or_observations": [
+            "https://gitcode.com/Ascend/op-plugin/pull/4833",
+            "https://gitcode.com/Ascend/op-plugin/blob/253d85bab82c94d6701542b45134cbb33d33690d/op_plugin/python/meta/_meta_registrations.py"
+          ],
+          "commit_ids": [
+            "253d85bab82c94d6701542b45134cbb33d33690d"
+          ],
+          "issue_urls_observed": [],
+          "issue_ids_mentioned": [],
+          "issue_status": "NOT_RECORDED_IN_SELECTED_EVIDENCE",
+          "commit_or_issue_details": "只摘录已取得的定位；未记载的Issue保持未知，不由PR编号猜客户身份"
+        }
+      ],
+      "author_or_code_test_evidence": [
+        {
+          "evidence_id": "PR:Ascend/op-plugin#4833",
+          "reported_or_code_tests": "实际有 fake/meta 与混合类型 backward 测试，检查 dtype、shape、None；未本机执行 NPU",
+          "local_execution": false
+        }
+      ],
+      "candidate_id": "DRAFT-OUTPUT-DTYPE-OWNER",
+      "MODE_ACCEPTED": false,
+      "hardware_validated": false,
+      "weekly_event_confirmed": false,
+      "comparison_reason": "输出元数据应继承probs却读取另一输入dtype；与M001提升时机、M030降精损失不同。该例是对象归属错误，不是scale本身。",
+      "related_task_ids": [
+        "RC-023"
+      ],
+      "evidence_ids": [
+        "OBS:TC-GRADPROBS-DTYPE:1:before",
+        "OBS:TC-GRADPROBS-DTYPE:1:after",
+        "GH-OPPLUGIN-META:Q1"
+      ],
+      "evidence_basis": "PRIOR_SELECTED_CODE_WITH_CURRENT_IMPLEMENTATION_CONTEXT",
+      "original_action": "NEW_CANDIDATE",
+      "source_completeness": "选段支持具体主张；旧GitCode PR全文本轮未取到。",
+      "failure_relation_id": "TC-GRADPROBS-DTYPE:REL",
+      "contract": "METADATA_OWNER"
+    },
+    {
+      "technical_case_id": "TC-RADIX-SYNC",
+      "title": "RadixTopK搬运/计算依赖缺同步",
+      "operator": "RadixTopK",
+      "functions": [
+        "SyncAll",
+        "SToV等依赖同步"
+      ],
+      "kernel_files": [
+        "math/radix_top_k/op_kernel/radix_top_k_ub.h"
+      ],
+      "failure_mechanism": "批处理TopK的核间及搬运/计算依赖缺同步，增加SyncAll及SToV等同步。",
+      "faulty_behavior": "若干搬运/计算及核间依赖没有对应同步",
+      "expected_behavior": "按接口契约产生正确结果；修复意图：增加SyncAll、SToV、MTE3ToS等依赖同步",
+      "implementation_scope": "CANN_IMPLEMENTATION",
+      "source_evidence_level": "CODE_LOCALIZED",
+      "test_design_ids": [
+        "DESIGN-RADIX-SYNC"
+      ],
+      "entity_type": "INDEPENDENT_TECHNICAL_CASE",
+      "action": "ADD_CASE",
+      "proposed_mode_id": "M007",
+      "similar_original_mode_ids": [
+        "M007"
+      ],
+      "related_original_mode_ids": [],
+      "mechanism_relation": "SAME_MECHANISM",
+      "impact_status": "PRECISION_ISSUE_REPORTED",
+      "relation_reason": "多核及搬运/计算依赖缺同步，与M007相符；同PR另有空间修复，贡献尚未隔离。",
+      "trigger_predicate": "目标RadixTopK UB/WS分支存在未满足的生产者→消费者依赖",
+      "known_trigger_facts": [
+        "源码增加SyncAll与SToV等依赖同步"
+      ],
+      "unresolved_gaps": [
+        "失败shape/k/dtype、实际参与核和依赖trace；单独回退同步修复"
+      ],
+      "repair_mechanism": "增加SyncAll、SToV、MTE3ToS等依赖同步",
+      "evidence_observation_ids": [
+        "OBS:TC-RADIX-SYNC:1"
+      ],
+      "repo_pr_commit_issue": [
+        {
+          "evidence_id": "PR:cann/ops-math#4871",
+          "repo": "cann/ops-math",
+          "pr_number": 4871,
+          "pinned_urls_or_observations": [
+            "https://gitcode.com/cann/ops-math/pull/4871",
+            "https://gitcode.com/cann/ops-math/blob/2486e024c457afbc49dbc266d418be71eaadfce1/math/radix_top_k/op_kernel/radix_top_k_ub.h"
+          ],
+          "commit_ids": [
+            "2486e024c457afbc49dbc266d418be71eaadfce1"
+          ],
+          "issue_urls_observed": [],
+          "issue_ids_mentioned": [
+            "2757",
+            "3007"
+          ],
+          "issue_status": "IDENTIFIERS_MENTIONED_PAGE_NOT_FETCHED",
+          "commit_or_issue_details": "只摘录已取得的定位；未记载的Issue保持未知，不由PR编号猜客户身份"
+        }
+      ],
+      "author_or_code_test_evidence": [
+        {
+          "evidence_id": "PR:cann/ops-math#4871",
+          "reported_or_code_tests": "作者称单算子精度、ATK泛化通过；Diff未新增独立测试文件；本轮未执行",
+          "local_execution": false
+        }
+      ],
+      "candidate_id": null,
+      "MODE_ACCEPTED": false,
+      "hardware_validated": false,
+      "weekly_event_confirmed": false,
+      "comparison_reason": "M007已经覆盖缺失生产/消费同步；增加RadixTopK的具体跨核/流水边。",
+      "related_task_ids": [
+        "RC-022"
+      ],
+      "evidence_ids": [
+        "OBS:TC-RADIX-SYNC:1:before",
+        "OBS:TC-RADIX-SYNC:1:after"
+      ],
+      "evidence_basis": "PRIOR_SELECTED_CODE_OBSERVATION",
+      "original_action": "ADD_CASE_TO_EXISTING",
+      "source_completeness": "选段支持具体主张；旧GitCode PR全文本轮未取到。",
+      "failure_relation_id": "TC-RADIX-SYNC:REL",
+      "contract": "SYNC"
+    },
+    {
+      "technical_case_id": "TC-RADIX-API-WORKSPACE",
+      "title": "RadixTopK未计入库API workspace",
+      "operator": "RadixTopK",
+      "functions": [
+        "GetLibApiWorkSpaceSize",
+        "workspace tiling"
+      ],
+      "kernel_files": [
+        "math/radix_top_k/op_host/radix_top_k_tiling.cpp"
+      ],
+      "failure_mechanism": "workspace总量未加AscendC库API所需空间，修复通过GetLibApiWorkSpaceSize计入分配。",
+      "faulty_behavior": "workspace总量未计库API需求",
+      "expected_behavior": "按接口契约产生正确结果；修复意图：通过GetLibApiWorkSpaceSize把库API需求加进预算",
+      "implementation_scope": "CANN_IMPLEMENTATION",
+      "source_evidence_level": "CODE_LOCALIZED",
+      "test_design_ids": [
+        "DESIGN-RADIX-API-WORKSPACE"
+      ],
+      "entity_type": "INDEPENDENT_TECHNICAL_CASE",
+      "action": "EXTEND",
+      "proposed_mode_id": "M015",
+      "similar_original_mode_ids": [
+        "M015",
+        "M004"
+      ],
+      "related_original_mode_ids": [],
+      "mechanism_relation": "FAMILY_RELATED",
+      "impact_status": "IMPACT_UNCONFIRMED",
+      "relation_reason": "预算漏计成立，但没有实际访问区间/错误输出证明M015意义的踩踏。",
+      "trigger_predicate": "W_api>0 && W_alloc_old<W_kernel+W_api；旧总预算未包含库API需求",
+      "known_trigger_facts": [
+        "GetLibApiWorkSpaceSize被加入workspace总量"
+      ],
+      "unresolved_gaps": [
+        "W_api/W_kernel对应的合法输入、实际分配及访问区间"
+      ],
+      "repair_mechanism": "通过GetLibApiWorkSpaceSize把库API需求加进预算",
+      "evidence_observation_ids": [
+        "OBS:TC-RADIX-API-WORKSPACE:1"
+      ],
+      "repo_pr_commit_issue": [
+        {
+          "evidence_id": "PR:cann/ops-math#4871",
+          "repo": "cann/ops-math",
+          "pr_number": 4871,
+          "pinned_urls_or_observations": [
+            "https://gitcode.com/cann/ops-math/pull/4871",
+            "https://gitcode.com/cann/ops-math/blob/2486e024c457afbc49dbc266d418be71eaadfce1/math/radix_top_k/op_host/radix_top_k_tiling.cpp"
+          ],
+          "commit_ids": [
+            "2486e024c457afbc49dbc266d418be71eaadfce1"
+          ],
+          "issue_urls_observed": [],
+          "issue_ids_mentioned": [
+            "2757",
+            "3007"
+          ],
+          "issue_status": "IDENTIFIERS_MENTIONED_PAGE_NOT_FETCHED",
+          "commit_or_issue_details": "只摘录已取得的定位；未记载的Issue保持未知，不由PR编号猜客户身份"
+        }
+      ],
+      "author_or_code_test_evidence": [
+        {
+          "evidence_id": "PR:cann/ops-math#4871",
+          "reported_or_code_tests": "作者称单算子精度、ATK泛化通过；Diff未新增独立测试文件；本轮未执行",
+          "local_execution": false
+        }
+      ],
+      "candidate_id": null,
+      "MODE_ACCEPTED": false,
+      "hardware_validated": false,
+      "weekly_event_confirmed": false,
+      "comparison_reason": "补库API workspace纳入总预算；M015只描述踩踏，不能据此声称已解释其历史容量机理。",
+      "related_task_ids": [
+        "RC-022"
+      ],
+      "evidence_ids": [
+        "OBS:TC-RADIX-API-WORKSPACE:1:before",
+        "OBS:TC-RADIX-API-WORKSPACE:1:after"
+      ],
+      "evidence_basis": "PRIOR_SELECTED_CODE_OBSERVATION",
+      "original_action": "EXTEND_EXISTING_MODE",
+      "source_completeness": "选段支持具体主张；旧GitCode PR全文本轮未取到。",
+      "failure_relation_id": "TC-RADIX-API-WORKSPACE:REL",
+      "contract": "BUFFER"
+    },
+    {
+      "technical_case_id": "TC-BOOL-REDUCE",
+      "title": "BOOL输出选错归约算法",
+      "operator": "ReduceProd/ReduceAll",
+      "functions": [
+        "aclnnProdGetWorkspaceSize",
+        "aclnnProdDimGetWorkspaceSize",
+        "ExecuteProd"
+      ],
+      "kernel_files": [
+        "math/reduce_prod/op_api/aclnn_prod.cpp"
+      ],
+      "failure_mechanism": "910B/910_93且out BOOL时原走数值ReduceProd，改向ExecuteProd传dimList并使用ReduceAll逻辑归约。",
+      "faulty_behavior": "bool 输出沿用一般 ReduceProd 路径",
+      "expected_behavior": "按接口契约产生正确结果；修复意图：条件成立则向 ExecuteProd 传 dimList，转至 ReduceAll；其他路径仍 ReduceProd",
+      "implementation_scope": "CANN_IMPLEMENTATION",
+      "source_evidence_level": "CODE_LOCALIZED",
+      "test_design_ids": [
+        "DESIGN-BOOL-ACL"
+      ],
+      "entity_type": "INDEPENDENT_TECHNICAL_CASE",
+      "action": "PENDING",
+      "proposed_mode_id": null,
+      "similar_original_mode_ids": [
+        "M019",
+        "M001"
+      ],
+      "related_original_mode_ids": [],
+      "mechanism_relation": "NEW_MECHANISM_CANDIDATE",
+      "impact_status": "BOOL_REDUCTION_PATH_CHANGE",
+      "relation_reason": "逻辑归约依赖有限精度连乘有独立抽象价值；仍需旧输出与转换链，不按候选强弱排序替代证据。",
+      "trigger_predicate": "SoC为910B/910_93 && out.dtype=显式dtype=BOOL；目标dimList进入ReduceAll",
+      "known_trigger_facts": [
+        "输入支持列表含FLOAT；源码选择ReduceAll而非数值ReduceProd"
+      ],
+      "unresolved_gaps": [
+        "历史失败输入、旧新输出、转换链；区分下溢与独立BOOL契约问题"
+      ],
+      "repair_mechanism": "条件成立则向 ExecuteProd 传 dimList，转至 ReduceAll；其他路径仍 ReduceProd",
+      "evidence_observation_ids": [
+        "OBS:TC-BOOL-REDUCE:1",
+        "OBS:TC-BOOL-REDUCE:2",
+        "OBS:TC-BOOL-REDUCE:3",
+        "OBS:TC-BOOL-REDUCE:4"
+      ],
+      "repo_pr_commit_issue": [
+        {
+          "evidence_id": "PR:cann/ops-math#6026",
+          "repo": "cann/ops-math",
+          "pr_number": 6026,
+          "pinned_urls_or_observations": [
+            "https://gitcode.com/cann/ops-math/pull/6026",
+            "https://gitcode.com/cann/ops-math/blob/adbf5a82f418507f1baf4e32020718571d9b5309/math/reduce_prod/op_api/aclnn_prod.cpp"
+          ],
+          "commit_ids": [
+            "adbf5a82f418507f1baf4e32020718571d9b5309"
+          ],
+          "issue_urls_observed": [],
+          "issue_ids_mentioned": [
+            "3344"
+          ],
+          "issue_status": "IDENTIFIERS_MENTIONED_PAGE_NOT_FETCHED",
+          "commit_or_issue_details": "只摘录已取得的定位；未记载的Issue保持未知，不由PR编号猜客户身份"
+        },
+        {
+          "evidence_id": "PR:cann/ops-math#6030",
+          "repo": "cann/ops-math",
+          "pr_number": 6030,
+          "pinned_urls_or_observations": [
+            "https://gitcode.com/cann/ops-math/pull/6030",
+            "https://gitcode.com/cann/ops-math/blob/95e7a81e1eca655b98f598fcafe9cd090ec1b8e5/math/reduce_prod/op_api/aclnn_prod.cpp"
+          ],
+          "commit_ids": [
+            "95e7a81e1eca655b98f598fcafe9cd090ec1b8e5"
+          ],
+          "issue_urls_observed": [],
+          "issue_ids_mentioned": [
+            "3344"
+          ],
+          "issue_status": "IDENTIFIERS_MENTIONED_PAGE_NOT_FETCHED",
+          "commit_or_issue_details": "只摘录已取得的定位；未记载的Issue保持未知，不由PR编号猜客户身份"
+        }
+      ],
+      "author_or_code_test_evidence": [
+        {
+          "evidence_id": "PR:cann/ops-math#6026",
+          "reported_or_code_tests": "作者称 ST 通过；Issue3344 未给输入值、形状、期望值；本轮未执行设备测试",
+          "local_execution": false
+        },
+        {
+          "evidence_id": "PR:cann/ops-math#6030",
+          "reported_or_code_tests": "作者称 ST 通过；Issue3344 未给输入值、形状、期望值；本轮未执行设备测试",
+          "local_execution": false
+        }
+      ],
+      "candidate_id": "NEW-C6-BOOL-REDUCTION",
+      "MODE_ACCEPTED": false,
+      "hardware_validated": false,
+      "weekly_event_confirmed": false,
+      "comparison_reason": "代码证明BOOL/SoC选路改变；尚不足证明它在原30条之外构成独立因果机理，不能把语义等价的乘积与All自动称不同数学算法错误。",
+      "related_task_ids": [
+        "RC-069"
+      ],
+      "evidence_ids": [
+        "OBS:TC-BOOL-REDUCE:1:before",
+        "OBS:TC-BOOL-REDUCE:1:after",
+        "OBS:TC-BOOL-REDUCE:2:before",
+        "OBS:TC-BOOL-REDUCE:2:after",
+        "OBS:TC-BOOL-REDUCE:3:before",
+        "OBS:TC-BOOL-REDUCE:3:after",
+        "OBS:TC-BOOL-REDUCE:4:before",
+        "OBS:TC-BOOL-REDUCE:4:after"
+      ],
+      "evidence_basis": "PRIOR_SELECTED_CODE_OBSERVATION",
+      "original_action": "NEW_CANDIDATE",
+      "source_completeness": "选段支持具体主张；旧GitCode PR全文本轮未取到。",
+      "failure_relation_id": "TC-BOOL-REDUCE:REL",
+      "contract": "DISPATCH"
+    },
+    {
+      "technical_case_id": "TC-GEMM-PRECISION-FLAG",
+      "title": "beta=0分支遗漏16入32出精度标记",
+      "operator": "addmm/baddbmm",
+      "functions": [
+        "NeedEnableFp32Output",
+        "ExecGemmV3WithAlphaBetaOp"
+      ],
+      "kernel_files": [
+        "matmul/batch_mat_mul_v3/op_host/op_api/aclnn_baddbmm.cpp",
+        "matmul/mat_mul_v3/op_host/op_api/aclnn_addmm.cpp"
+      ],
+      "failure_mechanism": "addmm/baddbmm的beta=0分支未把NeedEnableFp32Output结果传入ExecGemmV3WithAlphaBetaOp，导致计算精度请求未沿该分支生效。",
+      "faulty_behavior": "该分支未传 enableGemm16In32Out",
+      "expected_behavior": "按接口契约产生正确结果；修复意图：NeedEnableFp32Output 计算开关并传入执行函数",
+      "implementation_scope": "CANN_IMPLEMENTATION",
+      "source_evidence_level": "CODE_LOCALIZED",
+      "test_design_ids": [
+        "DESIGN-GEMM-PRECISION-FLAG"
+      ],
+      "entity_type": "INDEPENDENT_TECHNICAL_CASE",
+      "action": "EXTEND",
+      "proposed_mode_id": "M001",
+      "similar_original_mode_ids": [
+        "M001",
+        "M011",
+        "M009"
+      ],
+      "related_original_mode_ids": [],
+      "mechanism_relation": "FAMILY_RELATED",
+      "impact_status": "PRECISION_PATH_CHANGE_SUPPORTED",
+      "relation_reason": "M001精度路径的强扩展；控制信息遗漏不同于原例升精时点，不声称已发生Inf。",
+      "trigger_predicate": "beta=0 && cubeMathType=4 && NeedEnableFp32Output(...)为真；执行分支未接收该标记",
+      "known_trigger_facts": [
+        "作者给出beta=0/cubeMathType=4",
+        "代码补算并传递enableGemm16In32Out"
+      ],
+      "unresolved_gaps": [
+        "NeedEnableFp32Output的完整支持条件、输入输出dtype、旧新参考误差"
+      ],
+      "repair_mechanism": "NeedEnableFp32Output 计算开关并传入执行函数",
+      "evidence_observation_ids": [
+        "OBS:TC-GEMM-PRECISION-FLAG:1",
+        "OBS:TC-GEMM-PRECISION-FLAG:2"
+      ],
+      "repo_pr_commit_issue": [
+        {
+          "evidence_id": "PR:cann/ops-nn#10622",
+          "repo": "cann/ops-nn",
+          "pr_number": 10622,
+          "pinned_urls_or_observations": [
+            "https://gitcode.com/cann/ops-nn/pull/10622",
+            "https://gitcode.com/cann/ops-nn/blob/36adda8717a669bd39d197c69e6b63130c6d2831/matmul/batch_mat_mul_v3/op_host/op_api/aclnn_baddbmm.cpp",
+            "https://gitcode.com/cann/ops-nn/blob/36adda8717a669bd39d197c69e6b63130c6d2831/matmul/mat_mul_v3/op_host/op_api/aclnn_addmm.cpp"
+          ],
+          "commit_ids": [
+            "36adda8717a669bd39d197c69e6b63130c6d2831"
+          ],
+          "issue_urls_observed": [],
+          "issue_ids_mentioned": [
+            "5928"
+          ],
+          "issue_status": "IDENTIFIERS_MENTIONED_PAGE_NOT_FETCHED",
+          "commit_or_issue_details": "只摘录已取得的定位；未记载的Issue保持未知，不由PR编号猜客户身份"
+        }
+      ],
+      "author_or_code_test_evidence": [
+        {
+          "evidence_id": "PR:cann/ops-nn#10622",
+          "reported_or_code_tests": "正文有前后结果图片，未本机复现；Diff无新增测试文件",
+          "local_execution": false
+        }
+      ],
+      "candidate_id": null,
+      "MODE_ACCEPTED": false,
+      "hardware_validated": false,
+      "weekly_event_confirmed": false,
+      "comparison_reason": "增加beta=0路径遗漏16in32out标志；与M001/M011相关，但控制传播不同于普通数值范围溢出。",
+      "related_task_ids": [
+        "RC-002"
+      ],
+      "evidence_ids": [
+        "OBS:TC-GEMM-PRECISION-FLAG:1:before",
+        "OBS:TC-GEMM-PRECISION-FLAG:1:after",
+        "OBS:TC-GEMM-PRECISION-FLAG:2:before",
+        "OBS:TC-GEMM-PRECISION-FLAG:2:after"
+      ],
+      "evidence_basis": "PRIOR_SELECTED_CODE_OBSERVATION",
+      "original_action": "EXTEND_EXISTING_MODE",
+      "source_completeness": "选段支持具体主张；旧GitCode PR全文本轮未取到。",
+      "failure_relation_id": "TC-GEMM-PRECISION-FLAG:REL",
+      "contract": "CONTROL"
+    },
+    {
+      "technical_case_id": "TC-GATHER-SCALAR-COUNT",
+      "title": "索引元素计数混入字节倍数导致Gather模式误选",
+      "operator": "GatherV3",
+      "functions": [
+        "CheckParams",
+        "aclnnGatherV3GetWorkspaceSize",
+        "GatherV2WithImplMode"
+      ],
+      "kernel_files": [
+        "index/gather_v2/op_api/aclnn_gather_v3.cpp"
+      ],
+      "failure_mechanism": "indexSize原由ge::GetSizeByDataType(index->GetDataType())初始化，再乘索引各维，误把带元素字节倍数的计数与1536元素阈值比较；修复从1计算numel。只证明模式判定缺陷，数值影响未证实。",
+      "faulty_behavior": "例如self FP32[32768]、INT32 index[1535]，旧计数6140>=1536可能保留mode=1；新numel1535<1536应转mode=0。",
+      "expected_behavior": "按真实index numel及self总字节数判断是否转HIGH_PRECISION；non-Regbase路径把更新后的mode传给GatherV2WithImplMode。",
+      "implementation_scope": "CANN_IMPLEMENTATION",
+      "source_evidence_level": "CODE_LOCALIZED",
+      "test_design_ids": [
+        "DESIGN-GATHER-THRESHOLD"
+      ],
+      "entity_type": "INDEPENDENT_TECHNICAL_CASE",
+      "action": "EXTEND",
+      "proposed_mode_id": "M011",
+      "similar_original_mode_ids": [
+        "M011",
+        "M006"
+      ],
+      "related_original_mode_ids": [],
+      "mechanism_relation": "FAMILY_RELATED",
+      "impact_status": "DISPATCH_ERROR_SUPPORTED_PRECISION_UNCONFIRMED",
+      "relation_reason": "API实现模式分派不等于tiling模板；当前没有证实精度错误、性能回退或实际mode日志。",
+      "trigger_predicate": "non-Regbase && dim=0 && batchDims=0 && initial_mode=1；self_bytes>=102400；index_numel<1536<=index_numel*index_itemsize",
+      "known_trigger_facts": [
+        "CheckParams按引用改写mode",
+        "indexSize从sizeof(dtype)改为1；完整循环计算各维乘积"
+      ],
+      "unresolved_gaps": [
+        "目标环境的index类型合法性、实际mode消费日志；INT64需单独核对接口类型契约"
+      ],
+      "repair_mechanism": "indexSize=1个元素",
+      "evidence_observation_ids": [
+        "OBS:TC-GATHER-SCALAR-COUNT:1",
+        "OBS:TC-GATHER-SCALAR-COUNT:2"
+      ],
+      "repo_pr_commit_issue": [
+        {
+          "evidence_id": "PR:cann/ops-nn#1562",
+          "repo": "cann/ops-nn",
+          "pr_number": 1562,
+          "pinned_urls_or_observations": [
+            "https://gitcode.com/cann/ops-nn/pull/1562",
+            "https://gitcode.com/cann/ops-nn/blob/f1359e5fbab5971b2aeeda58e2fdc5ec8e92fab0/index/gather_v2/op_api/aclnn_gather_v3.cpp"
+          ],
+          "commit_ids": [
+            "f1359e5fbab5971b2aeeda58e2fdc5ec8e92fab0"
+          ],
+          "issue_urls_observed": [],
+          "issue_ids_mentioned": [
+            "841"
+          ],
+          "issue_status": "IDENTIFIERS_MENTIONED_PAGE_NOT_FETCHED",
+          "commit_or_issue_details": "只摘录已取得的定位；未记载的Issue保持未知，不由PR编号猜客户身份"
+        }
+      ],
+      "author_or_code_test_evidence": [
+        {
+          "evidence_id": "PR:cann/ops-nn#1562",
+          "reported_or_code_tests": "实际所见为代码、配置和文档变更；未见新增回归文件，未执行设备测试",
+          "local_execution": false
+        }
+      ],
+      "candidate_id": null,
+      "MODE_ACCEPTED": false,
+      "hardware_validated": false,
+      "weekly_event_confirmed": false,
+      "comparison_reason": "1536元素阈值误用带itemsize的计数；补M011分派条件错误的计量细节，不是M006的infer-shape -1。",
+      "related_task_ids": [
+        "RC-067"
+      ],
+      "evidence_ids": [
+        "OBS:TC-GATHER-SCALAR-COUNT:1:before",
+        "OBS:TC-GATHER-SCALAR-COUNT:1:after",
+        "OBS:TC-GATHER-SCALAR-COUNT:2:before",
+        "OBS:TC-GATHER-SCALAR-COUNT:2:after"
+      ],
+      "evidence_basis": "PRIOR_SELECTED_CODE_OBSERVATION",
+      "original_action": "ADD_CASE_TO_EXISTING",
+      "source_completeness": "选段支持具体主张；旧GitCode PR全文本轮未取到。",
+      "failure_relation_id": "TC-GATHER-SCALAR-COUNT:REL",
+      "contract": "DISPATCH"
+    },
+    {
+      "technical_case_id": "TC-MATMUL-DISPATCH-DTYPE",
+      "title": "二进制分派检查使用转换前类型",
+      "operator": "MatMulV3",
+      "functions": [
+        "CheckMMV3NzNzNdSupport"
+      ],
+      "kernel_files": [
+        "matmul/common/op_host/op_api/matmul_util.cpp"
+      ],
+      "failure_mechanism": "MatMul支持性检查使用ori_info类型，实际执行类型已转换；改用support_info，避免找不到MatMulV3二进制。",
+      "faulty_behavior": "检查 ori_info 的 self/bias dtype",
+      "expected_behavior": "按接口契约产生正确结果；修复意图：改为实际支持信息 support_info 的 self/bias dtype",
+      "implementation_scope": "CANN_FUNCTIONAL_DISPATCH",
+      "source_evidence_level": "CODE_LOCALIZED",
+      "test_design_ids": [
+        "DESIGN-MATMUL-DISPATCH-DTYPE"
+      ],
+      "entity_type": "INDEPENDENT_TECHNICAL_CASE",
+      "action": "PENDING",
+      "proposed_mode_id": null,
+      "similar_original_mode_ids": [
+        "M011",
+        "M001"
+      ],
+      "related_original_mode_ids": [
+        "M011"
+      ],
+      "mechanism_relation": "FUNCTIONAL_OUT_OF_SCOPE",
+      "impact_status": "BINARY_DISPATCH_FAILURE_REPORTED",
+      "relation_reason": "找不到二进制属于功能分派；只保留与M011的技术关系，不进入精度案例主表。",
+      "trigger_predicate": "API输入全FP16；内部转换后support_info与ori_info的类型不同；目标MatMulV3支持性检查仍读ori_info",
+      "known_trigger_facts": [
+        "作者说明内部bias转换为FP32",
+        "检查从ori_info改为support_info"
+      ],
+      "unresolved_gaps": [
+        "合法shape/格式、目标平台及实际二进制匹配记录"
+      ],
+      "repair_mechanism": "改为实际支持信息 support_info 的 self/bias dtype",
+      "evidence_observation_ids": [
+        "OBS:TC-MATMUL-DISPATCH-DTYPE:1"
+      ],
+      "repo_pr_commit_issue": [
+        {
+          "evidence_id": "PR:cann/ops-nn#2285",
+          "repo": "cann/ops-nn",
+          "pr_number": 2285,
+          "pinned_urls_or_observations": [
+            "https://gitcode.com/cann/ops-nn/pull/2285",
+            "https://gitcode.com/cann/ops-nn/blob/e7ad2aa953c5b4d5d9e1262680e1045cabbff4e4/matmul/common/op_host/op_api/matmul_util.cpp"
+          ],
+          "commit_ids": [
+            "e7ad2aa953c5b4d5d9e1262680e1045cabbff4e4"
+          ],
+          "issue_urls_observed": [],
+          "issue_ids_mentioned": [
+            "1294"
+          ],
+          "issue_status": "IDENTIFIERS_MENTIONED_PAGE_NOT_FETCHED",
+          "commit_or_issue_details": "只摘录已取得的定位；未记载的Issue保持未知，不由PR编号猜客户身份"
+        }
+      ],
+      "author_or_code_test_evidence": [
+        {
+          "evidence_id": "PR:cann/ops-nn#2285",
+          "reported_or_code_tests": "作者给前后图片；无本轮实测",
+          "local_execution": false
+        }
+      ],
+      "candidate_id": null,
+      "MODE_ACCEPTED": false,
+      "hardware_validated": false,
+      "weekly_event_confirmed": false,
+      "comparison_reason": "支持检查读取ori_info而非转换后的support_info，现有证据是找不到kernel二进制的功能错误，非已证精度模式新增。",
+      "related_task_ids": [
+        "RC-049"
+      ],
+      "evidence_ids": [
+        "OBS:TC-MATMUL-DISPATCH-DTYPE:1:before",
+        "OBS:TC-MATMUL-DISPATCH-DTYPE:1:after"
+      ],
+      "evidence_basis": "PRIOR_SELECTED_CODE_OBSERVATION",
+      "original_action": "RELATED_OUT_OF_SCOPE",
+      "source_completeness": "选段支持具体主张；旧GitCode PR全文本轮未取到。",
+      "failure_relation_id": "TC-MATMUL-DISPATCH-DTYPE:REL",
+      "contract": "DISPATCH"
+    },
+    {
+      "technical_case_id": "TC-REPEAT-INT32-ROUTE",
+      "title": "超大单轴漏掉安全实现选路",
+      "operator": "RepeatInterleave",
+      "functions": [
+        "IsRepeatInterleaveV2Support"
+      ],
+      "kernel_files": [
+        "index/repeat_interleave/op_api/repeat_interleave.cpp"
+      ],
+      "failure_mechanism": "view shape某轴超过INT32_MAX且dtype受支持时需要选择V2；原分派遗漏该边界约束。",
+      "faulty_behavior": "边界大shape仍可能走存在int32类型溢出的路径",
+      "expected_behavior": "按接口契约产生正确结果；修复意图：满足大shape与dtype条件则选择V2路径",
+      "implementation_scope": "CANN_IMPLEMENTATION",
+      "source_evidence_level": "CODE_LOCALIZED",
+      "test_design_ids": [
+        "DESIGN-REPEAT-INT32-ROUTE"
+      ],
+      "entity_type": "INDEPENDENT_TECHNICAL_CASE",
+      "action": "EXTEND",
+      "proposed_mode_id": "M011",
+      "similar_original_mode_ids": [
+        "M011",
+        "M014"
+      ],
+      "related_original_mode_ids": [],
+      "mechanism_relation": "FAMILY_RELATED",
+      "impact_status": "DISPATCH_ERROR_SUPPORTED_PRECISION_UNCONFIRMED",
+      "relation_reason": "大shape选路条件有据，内部溢出及错误数值未证实。",
+      "trigger_predicate": "exists(axis): xViewShape[axis]>INT32_MAX_NUM && CheckType(dtype)；需要选择V2",
+      "known_trigger_facts": [
+        "原分派漏掉上述边界；修复增加返回true的条件"
+      ],
+      "unresolved_gaps": [
+        "实际大tensor资源、旧新路径；内部窄整数地址公式尚无"
+      ],
+      "repair_mechanism": "满足大shape与dtype条件则选择V2路径",
+      "evidence_observation_ids": [
+        "OBS:TC-REPEAT-INT32-ROUTE:1"
+      ],
+      "repo_pr_commit_issue": [
+        {
+          "evidence_id": "PR:cann/ops-nn#6170",
+          "repo": "cann/ops-nn",
+          "pr_number": 6170,
+          "pinned_urls_or_observations": [
+            "https://gitcode.com/cann/ops-nn/pull/6170",
+            "https://gitcode.com/cann/ops-nn/blob/16c16335573d6086dbe7524ecb80e5c605692413/index/repeat_interleave/op_api/repeat_interleave.cpp"
+          ],
+          "commit_ids": [
+            "16c16335573d6086dbe7524ecb80e5c605692413"
+          ],
+          "issue_urls_observed": [],
+          "issue_ids_mentioned": [
+            "3365"
+          ],
+          "issue_status": "IDENTIFIERS_MENTIONED_PAGE_NOT_FETCHED",
+          "commit_or_issue_details": "只摘录已取得的定位；未记载的Issue保持未知，不由PR编号猜客户身份"
+        }
+      ],
+      "author_or_code_test_evidence": [
+        {
+          "evidence_id": "PR:cann/ops-nn#6170",
+          "reported_or_code_tests": "作者称泛化通过；未执行设备测试",
+          "local_execution": false
+        }
+      ],
+      "candidate_id": null,
+      "MODE_ACCEPTED": false,
+      "hardware_validated": false,
+      "weekly_event_confirmed": false,
+      "comparison_reason": "超过INT32_MAX的shape触发V2选路；没有实际offset溢出证据，不能直接判M014。",
+      "related_task_ids": [
+        "RC-065"
+      ],
+      "evidence_ids": [
+        "OBS:TC-REPEAT-INT32-ROUTE:1:before",
+        "OBS:TC-REPEAT-INT32-ROUTE:1:after"
+      ],
+      "evidence_basis": "PRIOR_SELECTED_CODE_OBSERVATION",
+      "original_action": "ADD_CASE_TO_EXISTING",
+      "source_completeness": "选段支持具体主张；旧GitCode PR全文本轮未取到。",
+      "failure_relation_id": "TC-REPEAT-INT32-ROUTE:REL",
+      "contract": "DISPATCH"
+    },
+    {
+      "technical_case_id": "TC-FIA-M-PIPE",
+      "title": "矩阵计算段之间缺PIPE_M屏障",
+      "operator": "IncreFlashAttention",
+      "functions": [
+        "IfaMatmulFullQuant::ComputeMm1"
+      ],
+      "kernel_files": [
+        "attention/incre_flash_attention/op_kernel/arch22/ifa_service_matmul_full_quant.h"
+      ],
+      "failure_mechanism": "ComputeMm1的相邻Mmad计算段之间缺少矩阵流水完成屏障；本轮补读#12716新行907加入PipeBarrier<PIPE_M>()。",
+      "faulty_behavior": "ComputeMm1相邻Mmad计算段间新行907处原为空行",
+      "expected_behavior": "按接口契约产生正确结果；修复意图：该处新增PipeBarrier<PIPE_M>()；其余大Diff不作全量核验声明",
+      "implementation_scope": "CANN_IMPLEMENTATION",
+      "source_evidence_level": "CODE_LOCALIZED",
+      "test_design_ids": [
+        "DESIGN-FIA-M-PIPE"
+      ],
+      "entity_type": "INDEPENDENT_TECHNICAL_CASE",
+      "action": "EXTEND",
+      "proposed_mode_id": "M007",
+      "similar_original_mode_ids": [
+        "M007"
+      ],
+      "related_original_mode_ids": [],
+      "mechanism_relation": "FAMILY_RELATED",
+      "impact_status": "DEPENDENCY_REPAIR_SUPPORTED",
+      "relation_reason": "核内矩阵流水与原M007多核搬运情境不同，改为机制详情，不共用原多核测试替代。",
+      "trigger_predicate": "命中IfaMatmulFullQuant::ComputeMm1中目标相邻Mmad计算段，且两段存在未完成的矩阵流水依赖",
+      "known_trigger_facts": [
+        "#12716新行907加入PipeBarrier<PIPE_M>()，已取得前后Mmad选段"
+      ],
+      "unresolved_gaps": [
+        "合法API到目标模板的选择谓词、实际依赖trace、单独回退实验"
+      ],
+      "repair_mechanism": "该处新增PipeBarrier<PIPE_M>()；其余大Diff不作全量核验声明",
+      "evidence_observation_ids": [
+        "OBS:TC-FIA-M-PIPE:1"
+      ],
+      "repo_pr_commit_issue": [
+        {
+          "evidence_id": "PR:cann/ops-transformer#12509",
+          "repo": "cann/ops-transformer",
+          "pr_number": 12509,
+          "pinned_urls_or_observations": [
+            "https://gitcode.com/cann/ops-transformer/pull/12509"
+          ],
+          "commit_ids": [
+            "d4dbaa1ac9848cfc32745e70f862c19e0bc17909"
+          ],
+          "issue_urls_observed": [],
+          "issue_ids_mentioned": [
+            "5514"
+          ],
+          "issue_status": "IDENTIFIERS_MENTIONED_PAGE_NOT_FETCHED",
+          "commit_or_issue_details": "只摘录已取得的定位；未记载的Issue保持未知，不由PR编号猜客户身份"
+        },
+        {
+          "evidence_id": "PR:cann/ops-transformer#12716",
+          "repo": "cann/ops-transformer",
+          "pr_number": 12716,
+          "pinned_urls_or_observations": [
+            "https://gitcode.com/cann/ops-transformer/pull/12716"
+          ],
+          "commit_ids": [
+            "e7396160f89d8338af2c45bdd090dc50b5bad4db"
+          ],
+          "issue_urls_observed": [],
+          "issue_ids_mentioned": [
+            "5514"
+          ],
+          "issue_status": "IDENTIFIERS_MENTIONED_PAGE_NOT_FETCHED",
+          "commit_or_issue_details": "只摘录已取得的定位；未记载的Issue保持未知，不由PR编号猜客户身份"
+        }
+      ],
+      "author_or_code_test_evidence": [
+        {
+          "evidence_id": "PR:cann/ops-transformer#12509",
+          "reported_or_code_tests": "未见本轮可核验的参数及测试结果，不声称完整大文件Diff审查",
+          "local_execution": false
+        },
+        {
+          "evidence_id": "PR:cann/ops-transformer#12716",
+          "reported_or_code_tests": "未见本轮可核验的参数及测试结果，不声称完整大文件Diff审查",
+          "local_execution": false
+        }
+      ],
+      "candidate_id": null,
+      "MODE_ACCEPTED": false,
+      "hardware_validated": false,
+      "weekly_event_confirmed": false,
+      "comparison_reason": "M007缺同步的核内M流水具体化；不与训练FA搬运竞争自动合事件。",
+      "related_task_ids": [
+        "RC-008"
+      ],
+      "evidence_ids": [
+        "OBS:TC-FIA-M-PIPE:1:before",
+        "OBS:TC-FIA-M-PIPE:1:after"
+      ],
+      "evidence_basis": "PRIOR_SELECTED_CODE_OBSERVATION",
+      "original_action": "EXTEND_EXISTING_MODE",
+      "source_completeness": "选段支持具体主张；旧GitCode PR全文本轮未取到。",
+      "failure_relation_id": "TC-FIA-M-PIPE:REL",
+      "contract": "SYNC"
+    },
+    {
+      "technical_case_id": "TC-GMM-K0",
+      "title": "Split-K空归约维度处理不当",
+      "operator": "GroupedMatmul",
+      "functions": [
+        "CheckZeroShapeSplitK",
+        "GetTiling/SPLIT_K特殊分支"
+      ],
+      "kernel_files": [
+        "gmm/grouped_matmul/op_host/op_tiling/grouped_matmul_tiling.cpp"
+      ],
+      "failure_mechanism": "K=0的SPLIT_K路径仍走高阶Matmul tiling/通用空输入检查，修复按特殊空归约语义处理，代码注释说明由kernel清零。",
+      "faulty_behavior": "K=0仍调用高阶 Matmul tiling 或走通用空tensor处理",
+      "expected_behavior": "按接口契约产生正确结果；修复意图：SPLIT_K专用校验；K=0由kernel清零，跳过高阶API GetTiling",
+      "implementation_scope": "CANN_IMPLEMENTATION",
+      "source_evidence_level": "CODE_LOCALIZED",
+      "test_design_ids": [
+        "DESIGN-GMM-K0"
+      ],
+      "entity_type": "INDEPENDENT_TECHNICAL_CASE",
+      "action": "EXTEND",
+      "proposed_mode_id": "M020",
+      "similar_original_mode_ids": [
+        "M020",
+        "M011"
+      ],
+      "related_original_mode_ids": [],
+      "mechanism_relation": "FAMILY_RELATED",
+      "impact_status": "SPECIAL_PATH_REPAIR_OUTPUT_UNCONFIRMED",
+      "relation_reason": "K=0特殊tiling/空归约路径已定位，未证明某次错误输出未清零；同时比较M020与M011。",
+      "trigger_predicate": "groupType=SPLIT_K && maxK=0；M/N及其他接口条件合法",
+      "known_trigger_facts": [
+        "专用空归约路径跳过高阶Matmul tiling；源码注释说明kernel清零"
+      ],
+      "unresolved_gaps": [
+        "完整列表/枚举契约、合法M/N及输出清零的实际结果"
+      ],
+      "repair_mechanism": "SPLIT_K专用校验；K=0由kernel清零，跳过高阶API GetTiling",
+      "evidence_observation_ids": [
+        "OBS:TC-GMM-K0:1"
+      ],
+      "repo_pr_commit_issue": [
+        {
+          "evidence_id": "PR:cann/ops-transformer#2077",
+          "repo": "cann/ops-transformer",
+          "pr_number": 2077,
+          "pinned_urls_or_observations": [
+            "https://gitcode.com/cann/ops-transformer/pull/2077",
+            "https://gitcode.com/cann/ops-transformer/blob/9888a6ca348359af8d03167e24483fe913354b7a/gmm/grouped_matmul/op_host/op_tiling/grouped_matmul_tiling.cpp"
+          ],
+          "commit_ids": [
+            "9888a6ca348359af8d03167e24483fe913354b7a"
+          ],
+          "issue_urls_observed": [],
+          "issue_ids_mentioned": [],
+          "issue_status": "NOT_RECORDED_IN_SELECTED_EVIDENCE",
+          "commit_or_issue_details": "只摘录已取得的定位；未记载的Issue保持未知，不由PR编号猜客户身份"
+        }
+      ],
+      "author_or_code_test_evidence": [
+        {
+          "evidence_id": "PR:cann/ops-transformer#2077",
+          "reported_or_code_tests": "正文未提供本轮可执行用例；未执行设备测试",
+          "local_execution": false
+        }
+      ],
+      "candidate_id": null,
+      "MODE_ACCEPTED": false,
+      "hardware_validated": false,
+      "weekly_event_confirmed": false,
+      "comparison_reason": "M020空边界可容纳；补SPLIT_K且maxK=0与kernel清零路径，不把空K当空输出。",
+      "related_task_ids": [
+        "RC-036",
+        "RC-038",
+        "RC-042"
+      ],
+      "evidence_ids": [
+        "OBS:TC-GMM-K0:1:before",
+        "OBS:TC-GMM-K0:1:after"
+      ],
+      "evidence_basis": "PRIOR_SELECTED_CODE_OBSERVATION",
+      "original_action": "EXTEND_EXISTING_MODE",
+      "source_completeness": "选段支持具体主张；旧GitCode PR全文本轮未取到。",
+      "failure_relation_id": "TC-GMM-K0:REL",
+      "contract": "EMPTY_WRITE"
+    },
+    {
+      "technical_case_id": "TC-FAG-MTE2-DIM",
+      "title": "搬运尺寸取错矩阵维度",
+      "operator": "FlashAttentionScoreGrad",
+      "functions": [
+        "bn2 MM12 MTE2配置；完整函数名未转存"
+      ],
+      "kernel_files": [
+        "attention/flash_attention_score_grad/op_kernel/arch32/flash_attention_score_grad_s1s2_bn2.h"
+      ],
+      "failure_mechanism": "FAG bn2 MM12的四处MTE2配置用mm1BaseK而非dimD，造成搬运范围与实际维度不符。",
+      "faulty_behavior": "四处配置使用 mm1BaseK",
+      "expected_behavior": "按接口契约产生正确结果；修复意图：四处改为实际 dimD",
+      "implementation_scope": "CANN_IMPLEMENTATION",
+      "source_evidence_level": "CODE_LOCALIZED",
+      "test_design_ids": [
+        "DESIGN-FAG-MTE2-DIM"
+      ],
+      "entity_type": "INDEPENDENT_TECHNICAL_CASE",
+      "action": "EXTEND",
+      "proposed_mode_id": "M004",
+      "similar_original_mode_ids": [
+        "M004",
+        "M006"
+      ],
+      "related_original_mode_ids": [],
+      "mechanism_relation": "FAMILY_RELATED",
+      "impact_status": "OOM_REPORTED",
+      "relation_reason": "搬运尺寸源错用不等于偏移算错或越界；仅作M004相关机制候选。",
+      "trigger_predicate": "命中FAG bn2 MM12 MTE2配置且mm1BaseK与实际dimD不一致",
+      "known_trigger_facts": [
+        "四处配置从mm1BaseK改为dimD"
+      ],
+      "unresolved_gaps": [
+        "外部headDim/shape到内部维度的关系、合法路径、真实搬运区间"
+      ],
+      "repair_mechanism": "四处改为实际 dimD",
+      "evidence_observation_ids": [
+        "OBS:TC-FAG-MTE2-DIM:1"
+      ],
+      "repo_pr_commit_issue": [
+        {
+          "evidence_id": "PR:cann/ops-transformer#3901",
+          "repo": "cann/ops-transformer",
+          "pr_number": 3901,
+          "pinned_urls_or_observations": [
+            "https://gitcode.com/cann/ops-transformer/pull/3901",
+            "https://gitcode.com/cann/ops-transformer/blob/f277be164030f3dd68cb041b2ab3f2b83e62d1d1/attention/flash_attention_score_grad/op_kernel/arch32/flash_attention_score_grad_s1s2_bn2.h"
+          ],
+          "commit_ids": [
+            "f277be164030f3dd68cb041b2ab3f2b83e62d1d1"
+          ],
+          "issue_urls_observed": [],
+          "issue_ids_mentioned": [],
+          "issue_status": "NOT_RECORDED_IN_SELECTED_EVIDENCE",
+          "commit_or_issue_details": "只摘录已取得的定位；未记载的Issue保持未知，不由PR编号猜客户身份"
+        }
+      ],
+      "author_or_code_test_evidence": [
+        {
+          "evidence_id": "PR:cann/ops-transformer#3901",
+          "reported_or_code_tests": "作者称编译oom包运行脚本通过；本轮未执行",
+          "local_execution": false
+        }
+      ],
+      "candidate_id": null,
+      "MODE_ACCEPTED": false,
+      "hardware_validated": false,
+      "weekly_event_confirmed": false,
+      "comparison_reason": "搬运参数应为dimD而非mm1BaseK；维度角色混用区别于单纯偏移算式或infer-shape返回值错误。",
+      "related_task_ids": [
+        "RC-058"
+      ],
+      "evidence_ids": [
+        "OBS:TC-FAG-MTE2-DIM:1:before",
+        "OBS:TC-FAG-MTE2-DIM:1:after"
+      ],
+      "evidence_basis": "PRIOR_SELECTED_CODE_OBSERVATION",
+      "original_action": "EXTEND_EXISTING_MODE",
+      "source_completeness": "选段支持具体主张；旧GitCode PR全文本轮未取到。",
+      "failure_relation_id": "TC-FAG-MTE2-DIM:REL",
+      "contract": "BUFFER"
+    },
+    {
+      "technical_case_id": "TC-NSA-TOPK-TMPUB",
+      "title": "TopK临时UB需求预算不足",
+      "operator": "NsaCompressAttention",
+      "functions": [
+        "GetTopKMaxMinTmpSize",
+        "kernel临时UB分配"
+      ],
+      "kernel_files": [
+        "attention/nsa_compress_attention/op_host/nsa_compress_attention_tiling_general.cpp",
+        "attention/nsa_compress_attention/op_kernel/nsa_compress_attention_s1s2_bn2gs1_sab.h"
+      ],
+      "failure_mechanism": "以20*S2align估算TopK临时UB，不满足库API真实需求；通过GetTopKMaxMinTmpSize取得tmpUbSize并同时用于预算和分配。",
+      "faulty_behavior": "临时区按20*S2align估计",
+      "expected_behavior": "按接口契约产生正确结果；修复意图：GetTopKMaxMinTmpSize 获取所需tmpUbSize，同时扣除容量和按该值分配",
+      "implementation_scope": "CANN_IMPLEMENTATION",
+      "source_evidence_level": "CODE_LOCALIZED",
+      "test_design_ids": [
+        "DESIGN-NSA-TOPK-TMPUB"
+      ],
+      "entity_type": "INDEPENDENT_TECHNICAL_CASE",
+      "action": "EXTEND",
+      "proposed_mode_id": "M015",
+      "similar_original_mode_ids": [
+        "M015"
+      ],
+      "related_original_mode_ids": [],
+      "mechanism_relation": "FAMILY_RELATED",
+      "impact_status": "IMPACT_UNCONFIRMED",
+      "relation_reason": "临时UB预算估算不足，不据此认定发生踩踏或精度错误。",
+      "trigger_predicate": "W_api_topk(S2,topK,dtype)>W_old_estimate(20*S2align)，并影响实际UB规划/分配",
+      "known_trigger_facts": [
+        "改用GetTopKMaxMinTmpSize返回tmpUbSize，同时用于预算和分配"
+      ],
+      "unresolved_gaps": [
+        "合法API到S2align/topK的推导、字节单位及容量两侧输入"
+      ],
+      "repair_mechanism": "GetTopKMaxMinTmpSize 获取所需tmpUbSize，同时扣除容量和按该值分配",
+      "evidence_observation_ids": [
+        "OBS:TC-NSA-TOPK-TMPUB:1",
+        "OBS:TC-NSA-TOPK-TMPUB:2",
+        "OBS:TC-NSA-TOPK-TMPUB:3",
+        "OBS:TC-NSA-TOPK-TMPUB:4"
+      ],
+      "repo_pr_commit_issue": [
+        {
+          "evidence_id": "PR:cann/ops-transformer#8365",
+          "repo": "cann/ops-transformer",
+          "pr_number": 8365,
+          "pinned_urls_or_observations": [
+            "https://gitcode.com/cann/ops-transformer/pull/8365",
+            "https://gitcode.com/cann/ops-transformer/blob/45600336cf2736eb677b4d12e0e75e2dee42c778/attention/nsa_compress_attention/op_host/nsa_compress_attention_tiling_general.cpp",
+            "https://gitcode.com/cann/ops-transformer/blob/45600336cf2736eb677b4d12e0e75e2dee42c778/attention/nsa_compress_attention/op_kernel/nsa_compress_attention_s1s2_bn2gs1_sab.h"
+          ],
+          "commit_ids": [
+            "45600336cf2736eb677b4d12e0e75e2dee42c778"
+          ],
+          "issue_urls_observed": [],
+          "issue_ids_mentioned": [
+            "3635"
+          ],
+          "issue_status": "IDENTIFIERS_MENTIONED_PAGE_NOT_FETCHED",
+          "commit_or_issue_details": "只摘录已取得的定位；未记载的Issue保持未知，不由PR编号猜客户身份"
+        },
+        {
+          "evidence_id": "PR:cann/ops-transformer#8367",
+          "repo": "cann/ops-transformer",
+          "pr_number": 8367,
+          "pinned_urls_or_observations": [
+            "https://gitcode.com/cann/ops-transformer/pull/8367",
+            "https://gitcode.com/cann/ops-transformer/blob/5c0fd9b4125461ca9ef07d5677416f12e5778d80/attention/nsa_compress_attention/op_host/nsa_compress_attention_tiling_general.cpp",
+            "https://gitcode.com/cann/ops-transformer/blob/5c0fd9b4125461ca9ef07d5677416f12e5778d80/attention/nsa_compress_attention/op_kernel/nsa_compress_attention_s1s2_bn2gs1_sab.h"
+          ],
+          "commit_ids": [
+            "5c0fd9b4125461ca9ef07d5677416f12e5778d80"
+          ],
+          "issue_urls_observed": [],
+          "issue_ids_mentioned": [
+            "3635"
+          ],
+          "issue_status": "IDENTIFIERS_MENTIONED_PAGE_NOT_FETCHED",
+          "commit_or_issue_details": "只摘录已取得的定位；未记载的Issue保持未知，不由PR编号猜客户身份"
+        }
+      ],
+      "author_or_code_test_evidence": [
+        {
+          "evidence_id": "PR:cann/ops-transformer#8365",
+          "reported_or_code_tests": "没有本轮设备复现；两PR对应分支的相同技术修改",
+          "local_execution": false
+        },
+        {
+          "evidence_id": "PR:cann/ops-transformer#8367",
+          "reported_or_code_tests": "没有本轮设备复现；两PR对应分支的相同技术修改",
+          "local_execution": false
+        }
+      ],
+      "candidate_id": null,
+      "MODE_ACCEPTED": false,
+      "hardware_validated": false,
+      "weekly_event_confirmed": false,
+      "comparison_reason": "真实API临时容量替代经验20*S2align；细化M015，但当前没有容量数值证明历史触发阈值。",
+      "related_task_ids": [
+        "RC-024"
+      ],
+      "evidence_ids": [
+        "OBS:TC-NSA-TOPK-TMPUB:1:before",
+        "OBS:TC-NSA-TOPK-TMPUB:1:after",
+        "OBS:TC-NSA-TOPK-TMPUB:2:before",
+        "OBS:TC-NSA-TOPK-TMPUB:2:after",
+        "OBS:TC-NSA-TOPK-TMPUB:3:before",
+        "OBS:TC-NSA-TOPK-TMPUB:3:after",
+        "OBS:TC-NSA-TOPK-TMPUB:4:before",
+        "OBS:TC-NSA-TOPK-TMPUB:4:after"
+      ],
+      "evidence_basis": "PRIOR_SELECTED_CODE_OBSERVATION",
+      "original_action": "ADD_CASE_TO_EXISTING",
+      "source_completeness": "选段支持具体主张；旧GitCode PR全文本轮未取到。",
+      "failure_relation_id": "TC-NSA-TOPK-TMPUB:REL",
+      "contract": "BUFFER"
+    },
+    {
+      "technical_case_id": "TC-SFAG-EVENT-ID",
+      "title": "同步事件ID未写入执行状态",
+      "operator": "SparseFlashAttentionGrad",
+      "functions": [
+        "UpdateGmOffset"
+      ],
+      "kernel_files": [
+        "attention/sparse_flash_attention_grad/op_kernel/arch22/sparse_flash_attention_grad_bs1_basic.h"
+      ],
+      "failure_mechanism": "runInfo中的4个scatterTmpK/V Mte2WaitV事件ID未赋值，修复在UpdateGmOffset补齐，作者报告偶现卡死。",
+      "faulty_behavior": "runInfo缺少4个scatterTmpK/V的eventId赋值",
+      "expected_behavior": "按接口契约产生正确结果；修复意图：UpdateGmOffset补齐WaitV及Pong事件ID",
+      "implementation_scope": "CANN_IMPLEMENTATION",
+      "source_evidence_level": "CODE_LOCALIZED",
+      "test_design_ids": [
+        "DESIGN-SFAG-EVENT-ID"
+      ],
+      "entity_type": "INDEPENDENT_TECHNICAL_CASE",
+      "action": "EXTEND",
+      "proposed_mode_id": "M007",
+      "similar_original_mode_ids": [
+        "M007"
+      ],
+      "related_original_mode_ids": [],
+      "mechanism_relation": "FAMILY_RELATED",
+      "impact_status": "HANG_REPORTED",
+      "relation_reason": "同步事件状态传递不同于少写屏障；卡死与精度影响分开。",
+      "trigger_predicate": "目标SparseFAG路径消费runInfo中四个WaitV/Pong事件ID，但旧UpdateGmOffset未完整赋值",
+      "known_trigger_facts": [
+        "源码补齐scatterTmpK/V Mte2WaitV及Pong标识；作者报告偶现卡死"
+      ],
+      "unresolved_gaps": [
+        "事件分配→runInfo赋值→wait消费链、失败输入及单独回归"
+      ],
+      "repair_mechanism": "UpdateGmOffset补齐WaitV及Pong事件ID",
+      "evidence_observation_ids": [
+        "OBS:TC-SFAG-EVENT-ID:1",
+        "OBS:TC-SFAG-EVENT-ID:2"
+      ],
+      "repo_pr_commit_issue": [
+        {
+          "evidence_id": "PR:cann/ops-transformer#8443",
+          "repo": "cann/ops-transformer",
+          "pr_number": 8443,
+          "pinned_urls_or_observations": [
+            "https://gitcode.com/cann/ops-transformer/pull/8443",
+            "https://gitcode.com/cann/ops-transformer/blob/8946df0285b1cddb46acf501c951e8bb04eaad11/attention/sparse_flash_attention_grad/op_kernel/arch22/sparse_flash_attention_grad_bs1_basic.h"
+          ],
+          "commit_ids": [
+            "8946df0285b1cddb46acf501c951e8bb04eaad11"
+          ],
+          "issue_urls_observed": [],
+          "issue_ids_mentioned": [
+            "3669"
+          ],
+          "issue_status": "IDENTIFIERS_MENTIONED_PAGE_NOT_FETCHED",
+          "commit_or_issue_details": "只摘录已取得的定位；未记载的Issue保持未知，不由PR编号猜客户身份"
+        },
+        {
+          "evidence_id": "PR:cann/ops-transformer#8445",
+          "repo": "cann/ops-transformer",
+          "pr_number": 8445,
+          "pinned_urls_or_observations": [
+            "https://gitcode.com/cann/ops-transformer/pull/8445",
+            "https://gitcode.com/cann/ops-transformer/blob/416787cc74933949b6b321cfc09aab03734fec24/attention/sparse_flash_attention_grad/op_kernel/arch22/sparse_flash_attention_grad_bs1_basic.h"
+          ],
+          "commit_ids": [
+            "416787cc74933949b6b321cfc09aab03734fec24"
+          ],
+          "issue_urls_observed": [],
+          "issue_ids_mentioned": [
+            "3669"
+          ],
+          "issue_status": "IDENTIFIERS_MENTIONED_PAGE_NOT_FETCHED",
+          "commit_or_issue_details": "只摘录已取得的定位；未记载的Issue保持未知，不由PR编号猜客户身份"
+        }
+      ],
+      "author_or_code_test_evidence": [
+        {
+          "evidence_id": "PR:cann/ops-transformer#8443",
+          "reported_or_code_tests": "作者未提供本轮可复现实测参数；未执行设备测试",
+          "local_execution": false
+        },
+        {
+          "evidence_id": "PR:cann/ops-transformer#8445",
+          "reported_or_code_tests": "作者未提供本轮可复现实测参数；未执行设备测试",
+          "local_execution": false
+        }
+      ],
+      "candidate_id": null,
+      "MODE_ACCEPTED": false,
+      "hardware_validated": false,
+      "weekly_event_confirmed": false,
+      "comparison_reason": "具体失效边是event ID分配后未传播到runInfo，消费者等待读错状态；可作M007同步详情，不重复新建所有event子型。",
+      "related_task_ids": [
+        "RC-063"
+      ],
+      "evidence_ids": [
+        "OBS:TC-SFAG-EVENT-ID:1:before",
+        "OBS:TC-SFAG-EVENT-ID:1:after",
+        "OBS:TC-SFAG-EVENT-ID:2:before",
+        "OBS:TC-SFAG-EVENT-ID:2:after"
+      ],
+      "evidence_basis": "PRIOR_SELECTED_CODE_OBSERVATION",
+      "original_action": "EXTEND_EXISTING_MODE",
+      "source_completeness": "选段支持具体主张；旧GitCode PR全文本轮未取到。",
+      "failure_relation_id": "TC-SFAG-EVENT-ID:REL",
+      "contract": "STATE_INIT",
+      "review_scope": "SHARED_TEMPLATE_CORRECTION_ONLY_NOT_QUANTITY_REVIEW"
+    },
+    {
+      "technical_case_id": "TC-MEGAMOE-REUSE-SPAN",
+      "title": "复用工作区槽宽不足覆盖未读输入",
+      "operator": "MegaMoE GMM1/SwiGLU",
+      "functions": [
+        "A2行跨度/A3专家槽跨度规划"
+      ],
+      "kernel_files": [
+        "mc2/mega_moe/op_kernel/arch22/mega_moe_a2.h",
+        "mc2/mega_moe/op_kernel/arch22/mega_moe_kernel_a3.hpp"
+      ],
+      "failure_mechanism": "GMM1输入宽K与SwiGLU输出宽N/2共用空间，N/2>K时输出覆盖后续未读输入；按max(K,N/2)组织行/专家槽宽。",
+      "faulty_behavior": "输入行/地址仍按K组织，较宽SwiGLU输出覆盖未读输入；expert之间按M*K紧排，实际复用输出更宽",
+      "expected_behavior": "按接口契约产生正确结果；修复意图：GMM1预处理/寻址使用max(K,N/2)，SwiGLU/GMM2仍保持原紧排语义；expert槽宽max(K,N/2)，expert内部仍K密排；另补activationClamp属性赋值",
+      "implementation_scope": "CANN_IMPLEMENTATION",
+      "source_evidence_level": "CODE_LOCALIZED",
+      "test_design_ids": [
+        "DESIGN-MEGAMOE-REUSE-SPAN"
+      ],
+      "entity_type": "INDEPENDENT_TECHNICAL_CASE",
+      "action": "EXTEND",
+      "proposed_mode_id": "M015",
+      "similar_original_mode_ids": [
+        "M015",
+        "M004"
+      ],
+      "related_original_mode_ids": [],
+      "mechanism_relation": "FAMILY_RELATED",
+      "impact_status": "UNREAD_INPUT_OVERWRITE_SUPPORTED",
+      "relation_reason": "复用跨度/生命周期的强扩展；A2行布局与A3专家槽分别验收，不倒灌为原FIA事件根因。",
+      "trigger_predicate": "GMM1输入宽K与SwiGLU输出宽N/2共用空间 && N/2>K && 存在后续未消费输入",
+      "known_trigger_facts": [
+        "A2行跨度、A3专家槽宽分别按max(K,N/2)处理；专家内部仍保持K密排"
+      ],
+      "unresolved_gaps": [
+        "完整合法API/量化/路由配置、实际rank与专家分布、未读输入覆盖trace"
+      ],
+      "repair_mechanism": "GMM1预处理/寻址使用max(K,N/2)，SwiGLU/GMM2仍保持原紧排语义；expert槽宽max(K,N/2)，expert内部仍K密排；另补activationClamp属性赋值",
+      "evidence_observation_ids": [
+        "OBS:TC-MEGAMOE-REUSE-SPAN:1",
+        "OBS:TC-MEGAMOE-REUSE-SPAN:2"
+      ],
+      "repo_pr_commit_issue": [
+        {
+          "evidence_id": "PR:cann/ops-transformer#8752",
+          "repo": "cann/ops-transformer",
+          "pr_number": 8752,
+          "pinned_urls_or_observations": [
+            "https://gitcode.com/cann/ops-transformer/pull/8752",
+            "https://gitcode.com/cann/ops-transformer/blob/351e0f8a622cc24d6e4f545b47597c1c1bdb9663/mc2/mega_moe/op_kernel/arch22/mega_moe_a2.h"
+          ],
+          "commit_ids": [
+            "351e0f8a622cc24d6e4f545b47597c1c1bdb9663"
+          ],
+          "issue_urls_observed": [],
+          "issue_ids_mentioned": [
+            "2111"
+          ],
+          "issue_status": "IDENTIFIERS_MENTIONED_PAGE_NOT_FETCHED",
+          "commit_or_issue_details": "只摘录已取得的定位；未记载的Issue保持未知，不由PR编号猜客户身份"
+        },
+        {
+          "evidence_id": "PR:cann/ops-transformer#8766",
+          "repo": "cann/ops-transformer",
+          "pr_number": 8766,
+          "pinned_urls_or_observations": [
+            "https://gitcode.com/cann/ops-transformer/pull/8766",
+            "https://gitcode.com/cann/ops-transformer/blob/508baa1d9ad00c51287cc561fbf76b2bf0a2aec1/mc2/mega_moe/op_kernel/arch22/mega_moe_kernel_a3.hpp"
+          ],
+          "commit_ids": [
+            "508baa1d9ad00c51287cc561fbf76b2bf0a2aec1"
+          ],
+          "issue_urls_observed": [],
+          "issue_ids_mentioned": [],
+          "issue_status": "NOT_RECORDED_IN_SELECTED_EVIDENCE",
+          "commit_or_issue_details": "只摘录已取得的定位；未记载的Issue保持未知，不由PR编号猜客户身份"
+        }
+      ],
+      "author_or_code_test_evidence": [
+        {
+          "evidence_id": "PR:cann/ops-transformer#8752",
+          "reported_or_code_tests": "未执行设备测试；Issue2111是MegaMoE需求，非周报客户事件证书",
+          "local_execution": false
+        },
+        {
+          "evidence_id": "PR:cann/ops-transformer#8766",
+          "reported_or_code_tests": "未执行设备测试；与#8752为相关A2/A3实现，不能当独立客户事故数",
+          "local_execution": false
+        }
+      ],
+      "candidate_id": null,
+      "MODE_ACCEPTED": false,
+      "hardware_validated": false,
+      "weekly_event_confirmed": false,
+      "comparison_reason": "M015可作内存足迹上位模式；本例是仍存活输入与输出槽宽不一致，不必然越过整个分配区。",
+      "related_task_ids": [
+        "RC-030"
+      ],
+      "evidence_ids": [
+        "OBS:TC-MEGAMOE-REUSE-SPAN:1:before",
+        "OBS:TC-MEGAMOE-REUSE-SPAN:1:after",
+        "OBS:TC-MEGAMOE-REUSE-SPAN:2:before",
+        "OBS:TC-MEGAMOE-REUSE-SPAN:2:after"
+      ],
+      "evidence_basis": "PRIOR_SELECTED_CODE_OBSERVATION",
+      "original_action": "EXTEND_EXISTING_MODE",
+      "source_completeness": "选段支持具体主张；旧GitCode PR全文本轮未取到。",
+      "failure_relation_id": "TC-MEGAMOE-REUSE-SPAN:REL",
+      "contract": "BUFFER"
+    },
+    {
+      "technical_case_id": "TC-LI-DUPLICATE-SPACE",
+      "title": "向量Duplicate访问空间未充分预留",
+      "operator": "LightningIndexer",
+      "functions": [
+        "Duplicate访问范围及尾部mask"
+      ],
+      "kernel_files": [
+        "attention/lightning_indexer/op_kernel/arch35/lightning_indexer_service_vector.h"
+      ],
+      "failure_mechanism": "Duplicate向量填充需要额外256字节访问空间；缓冲区未充分预留，修复加DUPSIZE，同时修改mask数组和尾部偏移。",
+      "faulty_behavior": "向量Duplicate填充所需额外空间不足；mask及尾部偏移配置亦有改动",
+      "expected_behavior": "按接口契约产生正确结果；修复意图：DUPSIZE=256，缓冲区加该字节空间；mask[1]→mask[2]，尾部uint16偏移64→128",
+      "implementation_scope": "CANN_IMPLEMENTATION",
+      "source_evidence_level": "CODE_LOCALIZED",
+      "test_design_ids": [
+        "DESIGN-LI-DUPLICATE-SPACE"
+      ],
+      "entity_type": "INDEPENDENT_TECHNICAL_CASE",
+      "action": "EXTEND",
+      "proposed_mode_id": "M015",
+      "similar_original_mode_ids": [
+        "M015"
+      ],
+      "related_original_mode_ids": [],
+      "mechanism_relation": "FAMILY_RELATED",
+      "impact_status": "MEMORY_FOOTPRINT_ERROR_REPORTED",
+      "relation_reason": "指令足迹与M015相关，但mask、偏移、空间三项贡献未隔离。",
+      "trigger_predicate": "目标Duplicate访问范围含额外DUPSIZE=256字节，旧临时区未充分预留；尾部mask/偏移需分别检查",
+      "known_trigger_facts": [
+        "缓冲区加DUPSIZE；mask[1]→mask[2]；uint16尾偏移64→128"
+      ],
+      "unresolved_gaps": [
+        "合法API到topkCountAlign256的推导、实际访问区间；三处改动贡献隔离"
+      ],
+      "repair_mechanism": "DUPSIZE=256，缓冲区加该字节空间；mask[1]→mask[2]，尾部uint16偏移64→128",
+      "evidence_observation_ids": [
+        "OBS:TC-LI-DUPLICATE-SPACE:1",
+        "OBS:TC-LI-DUPLICATE-SPACE:2"
+      ],
+      "repo_pr_commit_issue": [
+        {
+          "evidence_id": "PR:cann/ops-transformer#9834",
+          "repo": "cann/ops-transformer",
+          "pr_number": 9834,
+          "pinned_urls_or_observations": [
+            "https://gitcode.com/cann/ops-transformer/pull/9834",
+            "https://gitcode.com/cann/ops-transformer/blob/48bcf8a97d2c4afd974d3709ac60503001208a3c/attention/lightning_indexer/op_kernel/arch35/lightning_indexer_service_vector.h"
+          ],
+          "commit_ids": [
+            "48bcf8a97d2c4afd974d3709ac60503001208a3c"
+          ],
+          "issue_urls_observed": [],
+          "issue_ids_mentioned": [
+            "4290"
+          ],
+          "issue_status": "IDENTIFIERS_MENTIONED_PAGE_NOT_FETCHED",
+          "commit_or_issue_details": "只摘录已取得的定位；未记载的Issue保持未知，不由PR编号猜客户身份"
+        }
+      ],
+      "author_or_code_test_evidence": [
+        {
+          "evidence_id": "PR:cann/ops-transformer#9834",
+          "reported_or_code_tests": "无本轮设备执行；多个更改贡献未隔离",
+          "local_execution": false
+        }
+      ],
+      "candidate_id": null,
+      "MODE_ACCEPTED": false,
+      "hardware_validated": false,
+      "weekly_event_confirmed": false,
+      "comparison_reason": "补指令实际访问足迹比逻辑空间大，256字节、尾部mask和偏移分别看，不从同一个修复包制造独立验证。",
+      "related_task_ids": [
+        "RC-066"
+      ],
+      "evidence_ids": [
+        "OBS:TC-LI-DUPLICATE-SPACE:1:before",
+        "OBS:TC-LI-DUPLICATE-SPACE:1:after",
+        "OBS:TC-LI-DUPLICATE-SPACE:2:before",
+        "OBS:TC-LI-DUPLICATE-SPACE:2:after"
+      ],
+      "evidence_basis": "PRIOR_SELECTED_CODE_OBSERVATION",
+      "original_action": "EXTEND_EXISTING_MODE",
+      "source_completeness": "选段支持具体主张；旧GitCode PR全文本轮未取到。",
+      "failure_relation_id": "TC-LI-DUPLICATE-SPACE:REL",
+      "contract": "BUFFER"
+    },
+    {
+      "technical_case_id": "TC-FP8-VSCALE",
+      "title": "V scale参数替换：完整契约待核",
+      "operator": "FP8 GQA FusedInferAttentionScore",
+      "functions": [
+        "FlashUpdateNew",
+        "FlashUpdateLastNew"
+      ],
+      "kernel_files": [
+        "attention/common/op_kernel/arch35/fia_block_vec_fullquant_gqa.h"
+      ],
+      "failure_mechanism": "历史选段记录deScalePreVValue替换为deScaleVValue；对象、类型和数值语义待核。",
+      "faulty_behavior": "deScalePreVOffset = (deScaleVOffset < 1) ? 0 : deScaleVOffset - 1; FlashUpdate(...deScaleVValue, deScalePreVValue)",
+      "expected_behavior": "按接口契约产生正确结果；修复意图：FlashUpdateNew / FlashUpdateLastNew(...deScaleVValue, deScaleVValue)",
+      "implementation_scope": "CANN_IMPLEMENTATION",
+      "source_evidence_level": "CODE_LOCALIZED",
+      "test_design_ids": [
+        "DESIGN-FP8-VSCALE"
+      ],
+      "entity_type": "INDEPENDENT_TECHNICAL_CASE",
+      "action": "PENDING",
+      "proposed_mode_id": null,
+      "similar_original_mode_ids": [
+        "M010",
+        "M024"
+      ],
+      "related_original_mode_ids": [],
+      "mechanism_relation": "UNDETERMINED",
+      "impact_status": "SCALE_BINDING_CHANGE_SUPPORTED",
+      "relation_reason": "M010／M024的边界待完整调用契约后比较，不自动新增。",
+      "trigger_predicate": "完整变量定义、函数签名及输入对照待核；选段不是完整触发条件。",
+      "known_trigger_facts": [
+        "FlashUpdateNew/LastNew调用的参数对象替换"
+      ],
+      "unresolved_gaps": [
+        "scale完整轴语义、合法不同scale值的输入、旧新数值和路径对照"
+      ],
+      "repair_mechanism": "FlashUpdateNew / FlashUpdateLastNew(...deScaleVValue, deScaleVValue)",
+      "evidence_observation_ids": [
+        "OBS:TC-FP8-VSCALE:1"
+      ],
+      "repo_pr_commit_issue": [
+        {
+          "evidence_id": "PR:cann/ops-transformer#8005",
+          "repo": "cann/ops-transformer",
+          "pr_number": 8005,
+          "pinned_urls_or_observations": [
+            "https://gitcode.com/cann/ops-transformer/pull/8005",
+            "https://gitcode.com/cann/ops-transformer/blob/f4f1bafc2ffefc94306e0ea6403ff362e5259331/attention/common/op_kernel/arch35/fia_block_vec_fullquant_gqa.h"
+          ],
+          "commit_ids": [
+            "f4f1bafc2ffefc94306e0ea6403ff362e5259331"
+          ],
+          "issue_urls_observed": [],
+          "issue_ids_mentioned": [],
+          "issue_status": "NOT_RECORDED_IN_SELECTED_EVIDENCE",
+          "commit_or_issue_details": "只摘录已取得的定位；未记载的Issue保持未知，不由PR编号猜客户身份"
+        }
+      ],
+      "author_or_code_test_evidence": [
+        {
+          "evidence_id": "PR:cann/ops-transformer#8005",
+          "reported_or_code_tests": "golden/外部数据加载有修改；未完整审查大golden；未执行设备测试",
+          "local_execution": false
+        }
+      ],
+      "candidate_id": null,
+      "MODE_ACCEPTED": false,
+      "hardware_validated": false,
+      "weekly_event_confirmed": false,
+      "comparison_reason": "参数替换不足以确认独立对象错绑机理，暂保留待核关系讨论。",
+      "related_task_ids": [
+        "RC-029"
+      ],
+      "evidence_ids": [
+        "OBS:TC-FP8-VSCALE:1:before",
+        "OBS:TC-FP8-VSCALE:1:after"
+      ],
+      "evidence_basis": "PRIOR_SELECTED_CODE_OBSERVATION",
+      "original_action": "NEW_CANDIDATE",
+      "source_completeness": "选段支持具体主张；旧GitCode PR全文本轮未取到。",
+      "failure_relation_id": "TC-FP8-VSCALE:REL",
+      "contract": "SCALE_BINDING",
+      "review_scope": "SHARED_TEMPLATE_CORRECTION_ONLY_NOT_QUANTITY_REVIEW"
+    },
+    {
+      "technical_case_id": "TC-DEQUANT-REDUCE-STRIDE",
+      "title": "归约重复步长计算过早整数截断",
+      "operator": "npu_dequant_swiglu_quant",
+      "functions": [
+        "DynamicQuant/WholeReduceMax"
+      ],
+      "kernel_files": [
+        "csrc/moe/dequant_swiglu_quant/op_kernel/dequant_swiglu_quant.h"
+      ],
+      "failure_mechanism": "向量归约重复步长计算过早整数截断：BLOCK_ELEM=8、MASK_NUM_T32=64、MASK_BLK_STRIDE=8，旧式(q//64)*8改为q//8；差值为(q%64)//8。实际q=UbFactorDimy尚未取得，错误间距不必越界。",
+      "faulty_behavior": "在真实UbFactorDimy使两式不等时，旧重复间距可能选错数据；不能由输入[2,192]直接断言q=96，也未证明越界或独立历史事故。",
+      "expected_behavior": "按接口契约产生正确结果；修复意图：srcRepStride = UbFactorDimy / BLOCK_ELEM",
+      "implementation_scope": "VLLM_ASCEND_COMMUNITY_KERNEL",
+      "source_evidence_level": "CODE_LOCALIZED",
+      "test_design_ids": [
+        "DESIGN-DEQUANT-UPSTREAM"
+      ],
+      "integer_truncation_analysis": {
+        "source_id": "RECHECK:GH12123:CONSTANTS",
+        "constants": {
+          "BLOCK_SIZE": 32,
+          "BLOCK_ELEM": 8,
+          "MASK_NUM_T32": 64,
+          "MASK_BLK_STRIDE": 8
+        },
+        "old_formula": "(q//64)*8",
+        "new_formula": "q//8",
+        "difference_formula": "(q%64)//8",
+        "examples": [
+          {
+            "UbFactorDimy": 32,
+            "old_stride": 0,
+            "new_stride": 4,
+            "difference": 4,
+            "origin": "SOURCE_CONSTANT_HOST_ARITHMETIC_NOT_ACTUAL_TILING"
+          },
+          {
+            "UbFactorDimy": 64,
+            "old_stride": 8,
+            "new_stride": 8,
+            "difference": 0,
+            "origin": "SOURCE_CONSTANT_HOST_ARITHMETIC_NOT_ACTUAL_TILING"
+          },
+          {
+            "UbFactorDimy": 96,
+            "old_stride": 8,
+            "new_stride": 12,
+            "difference": 4,
+            "origin": "SOURCE_CONSTANT_HOST_ARITHMETIC_NOT_ACTUAL_TILING"
+          },
+          {
+            "UbFactorDimy": 128,
+            "old_stride": 16,
+            "new_stride": 16,
+            "difference": 0,
+            "origin": "SOURCE_CONSTANT_HOST_ARITHMETIC_NOT_ACTUAL_TILING"
+          },
+          {
+            "UbFactorDimy": 192,
+            "old_stride": 24,
+            "new_stride": 24,
+            "difference": 0,
+            "origin": "SOURCE_CONSTANT_HOST_ARITHMETIC_NOT_ACTUAL_TILING"
+          }
+        ],
+        "actual_q_observed": false,
+        "q_equals_derived_output_width_proven": false,
+        "out_of_bounds_proven": false
+      },
+      "entity_type": "INDEPENDENT_TECHNICAL_CASE",
+      "action": "EXTEND",
+      "proposed_mode_id": "M004",
+      "similar_original_mode_ids": [
+        "M004"
+      ],
+      "related_original_mode_ids": [],
+      "mechanism_relation": "FAMILY_RELATED",
+      "impact_status": "COMBINED_FIX_PRECISION_REPORTED",
+      "relation_reason": "过早整数截断导致重复间距模型错误；可能合法区间内错读，不等同M004越界踩踏。",
+      "trigger_predicate": "命中目标WholeReduceMax重复行路径 && (q%64)//8>0；q须取实际UbFactorDimy",
+      "known_trigger_facts": [
+        "srcRepStride从UbFactorDimy/MASK_NUM_T32*MASK_BLK_STRIDE改为UbFactorDimy/BLOCK_ELEM",
+        "公开测试含小shape"
+      ],
+      "unresolved_gaps": [
+        "真实tiling q及访问区间",
+        "单独回退步长修改的旧新结果；错误访问未必越界"
+      ],
+      "repair_mechanism": "srcRepStride = UbFactorDimy / BLOCK_ELEM",
+      "evidence_observation_ids": [
+        "OBS:TC-DEQUANT-REDUCE-STRIDE:1",
+        "OBS:TC-DEQUANT-REDUCE-STRIDE:2"
+      ],
+      "repo_pr_commit_issue": [
+        {
+          "evidence_id": "SUPPLEMENTAL:GH12123",
+          "repo": "vllm-project/vllm-ascend",
+          "pr_number": 12123,
+          "pinned_urls_or_observations": [
+            "https://github.com/vllm-project/vllm-ascend/pull/12123",
+            "https://github.com/vllm-project/vllm-ascend/blob/70b9edfb452cb50ab01ab1bf206cf316ec477824/csrc/moe/dequant_swiglu_quant/op_kernel/dequant_swiglu_quant.h"
+          ],
+          "commit_ids": [
+            "70b9edfb452cb50ab01ab1bf206cf316ec477824"
+          ],
+          "issue_urls_observed": [],
+          "issue_ids_mentioned": [],
+          "issue_status": "NOT_RECORDED_IN_SELECTED_EVIDENCE",
+          "commit_or_issue_details": "只摘录已取得的定位；未记载的Issue保持未知，不由PR编号猜客户身份"
+        }
+      ],
+      "author_or_code_test_evidence": [
+        {
+          "evidence_id": "SUPPLEMENTAL:GH12123",
+          "reported_or_code_tests": "测试增加小shape/图捕获对照；assert_close容差是未改上下文；本轮未执行NPU",
+          "local_execution": false
+        }
+      ],
+      "candidate_id": "HIST-WB-036",
+      "MODE_ACCEPTED": false,
+      "hardware_validated": false,
+      "weekly_event_confirmed": false,
+      "comparison_reason": "整数截断次序使repeat步长失真，补M004/M011计量细节；不自动声称内存越界或输入非64对齐。",
+      "related_task_ids": [
+        "RC-030"
+      ],
+      "evidence_ids": [
+        "OBS:TC-DEQUANT-REDUCE-STRIDE:1",
+        "OBS:TC-DEQUANT-REDUCE-STRIDE:2",
+        "GH-DEQUANT-PATCH:2:Q1",
+        "GH-DEQUANT-PATCH:2:Q2",
+        "GH-DEQUANT-PATCH:3:Q1"
+      ],
+      "evidence_basis": "CURRENT_GITHUB_PATCH",
+      "original_action": "EXTEND_EXISTING_MODE",
+      "source_completeness": "选段支持具体主张；旧GitCode PR全文本轮未取到。",
+      "failure_relation_id": "TC-DEQUANT-REDUCE-STRIDE:REL",
+      "contract": "DISPATCH"
+    },
+    {
+      "technical_case_id": "TC-DEQUANT-SCALE-BUFFER",
+      "title": "scale广播临时区独立分配及预算",
+      "operator": "npu_dequant_swiglu_quant",
+      "functions": [
+        "Init/CountMaxDim",
+        "DynamicQuant/Brcb"
+      ],
+      "kernel_files": [
+        "csrc/moe/dequant_swiglu_quant/op_host/dequant_swiglu_quant_tiling.cpp",
+        "csrc/moe/dequant_swiglu_quant/op_kernel/dequant_swiglu_quant.h"
+      ],
+      "failure_mechanism": "为scale广播建立scaleBuf_/brcbTmp，替代把outLocal兼作广播临时区，并在host UB预算扣除所需空间。",
+      "faulty_behavior": "Brcb(outLocal, scaleOut,...); Copy(...outLocal...)",
+      "expected_behavior": "按接口契约产生正确结果；修复意图：分配scaleBuf_/brcbTmp；Brcb与Copy使用brcbTmp；释放临时tensor并计入host UB预算",
+      "implementation_scope": "VLLM_ASCEND_COMMUNITY_KERNEL",
+      "source_evidence_level": "CODE_LOCALIZED_COUPLED_FIX",
+      "test_design_ids": [
+        "DESIGN-DEQUANT-UPSTREAM"
+      ],
+      "entity_type": "INDEPENDENT_TECHNICAL_CASE",
+      "action": "EXTEND",
+      "proposed_mode_id": "M015",
+      "similar_original_mode_ids": [
+        "M015"
+      ],
+      "related_original_mode_ids": [],
+      "mechanism_relation": "FAMILY_RELATED",
+      "impact_status": "CO_CHANGED_COMPONENT_ONLY",
+      "relation_reason": "保留共变更临时区线索，独立故障因果未闭合。",
+      "trigger_predicate": "DynamicQuant执行Brcb/Copy；旧outLocal复用区域的容量/类型/生命周期不满足临时需求（独立因果待验证）",
+      "known_trigger_facts": [
+        "增加scaleBuf_/brcbTmp替代outLocal作广播临时区，并同步扣减host UB预算"
+      ],
+      "unresolved_gaps": [
+        "原outLocal容量/类型和Brcb足迹、真实UB分配；与步长修复的独立贡献"
+      ],
+      "repair_mechanism": "分配scaleBuf_/brcbTmp；Brcb与Copy使用brcbTmp；释放临时tensor并计入host UB预算",
+      "evidence_observation_ids": [
+        "OBS:TC-DEQUANT-SCALE-BUFFER:1",
+        "OBS:TC-DEQUANT-SCALE-BUFFER:2"
+      ],
+      "repo_pr_commit_issue": [
+        {
+          "evidence_id": "SUPPLEMENTAL:GH12123",
+          "repo": "vllm-project/vllm-ascend",
+          "pr_number": 12123,
+          "pinned_urls_or_observations": [
+            "https://github.com/vllm-project/vllm-ascend/pull/12123",
+            "https://github.com/vllm-project/vllm-ascend/blob/70b9edfb452cb50ab01ab1bf206cf316ec477824/csrc/moe/dequant_swiglu_quant/op_host/dequant_swiglu_quant_tiling.cpp",
+            "https://github.com/vllm-project/vllm-ascend/blob/70b9edfb452cb50ab01ab1bf206cf316ec477824/csrc/moe/dequant_swiglu_quant/op_kernel/dequant_swiglu_quant.h"
+          ],
+          "commit_ids": [
+            "70b9edfb452cb50ab01ab1bf206cf316ec477824"
+          ],
+          "issue_urls_observed": [],
+          "issue_ids_mentioned": [],
+          "issue_status": "NOT_RECORDED_IN_SELECTED_EVIDENCE",
+          "commit_or_issue_details": "只摘录已取得的定位；未记载的Issue保持未知，不由PR编号猜客户身份"
+        }
+      ],
+      "author_or_code_test_evidence": [
+        {
+          "evidence_id": "SUPPLEMENTAL:GH12123",
+          "reported_or_code_tests": "测试增加小shape/图捕获对照；assert_close容差是未改上下文；本轮未执行NPU",
+          "local_execution": false
+        }
+      ],
+      "candidate_id": "HIST-WB-036",
+      "MODE_ACCEPTED": false,
+      "hardware_validated": false,
+      "weekly_event_confirmed": false,
+      "comparison_reason": "独立scale缓冲与容量预算是M015的实现详情；和归约步长共同修改，单独致因未隔离。",
+      "related_task_ids": [
+        "RC-030"
+      ],
+      "evidence_ids": [
+        "OBS:TC-DEQUANT-SCALE-BUFFER:1",
+        "OBS:TC-DEQUANT-SCALE-BUFFER:2",
+        "GH-DEQUANT-PATCH:1:Q1",
+        "GH-DEQUANT-PATCH:2:Q1",
+        "GH-DEQUANT-PATCH:2:Q2"
+      ],
+      "evidence_basis": "CURRENT_GITHUB_PATCH",
+      "original_action": "EXTEND_EXISTING_MODE",
+      "source_completeness": "选段支持具体主张；旧GitCode PR全文本轮未取到。",
+      "failure_relation_id": "TC-DEQUANT-SCALE-BUFFER:REL",
+      "contract": "BUFFER"
+    },
+    {
+      "technical_case_id": "TC-DS-IPG-SWAP",
+      "title": "双IPG梯度桶交换前的流依赖",
+      "operator": "DeepSpeed ZeRO1/2",
+      "contract": "SYNC",
+      "failure_mechanism": "双buffer交换前缺少当前流与reduction_stream依赖；#7371在不自动解析依赖的平台增加双向wait_stream。",
+      "expected_behavior": "新写入和上次归约的生命周期在交换/reuse前正确排序。",
+      "trigger_predicate": "contiguous_gradients && overlap_comm && !resolves_data_dependency()，到达bucket.index交换点。",
+      "similar_original_mode_ids": [
+        "M007"
+      ],
+      "action": "EXTEND",
+      "implementation_scope": "FRAMEWORK_ADAPTER",
+      "evidence_ids": [
+        "GH-DS-7371:diff:Q1",
+        "GH-DS-7371:body:Q1"
+      ],
+      "related_task_ids": [
+        "RC-122"
+      ],
+      "unresolved_gaps": [
+        "没有现场0.14.2/0.14.3的代码/轨迹，不能确认同一事件或同一修复分支。",
+        "PR报告的测试不等于本轮设备执行。"
+      ],
+      "entity_type": "INDEPENDENT_TECHNICAL_CASE",
+      "comparison_reason": "与原有同步/编译模式比较的实现详情，未转成周报事件。",
+      "evidence_basis": "CURRENT_GITHUB_PATCH_AND_AUTHOR_REPORT",
+      "weekly_event_confirmed": false,
+      "MODE_ACCEPTED": false,
+      "hardware_validated": false,
+      "source_completeness": "完整API响应归档，结论只使用注明的代码/说明选段。",
+      "failure_relation_id": "TC-DS-IPG-SWAP:REL"
+    },
+    {
+      "technical_case_id": "TC-GRAPH-LIVE-REDUCTION",
+      "title": "trace冻结运行时通信归约决定",
+      "operator": "vLLM Ascend MoERunner",
+      "contract": "GRAPH_STATE",
+      "failure_mechanism": "编译边界之外根据通信方法计算最终归约开关，首次trace决定被重放；运行时方法变化会少归约或重复归约。",
+      "expected_behavior": "最终归约由当前ALLGATHER/MC2/ALLTOALL及序列并行配置决定，而不是首次trace状态。",
+      "trigger_predicate": "重放同一编译图时通信方法与trace时不同，且两者对外部TP归约的需要不同。",
+      "similar_original_mode_ids": [
+        "M021",
+        "M011"
+      ],
+      "action": "EXTEND",
+      "implementation_scope": "FRAMEWORK_ADAPTER",
+      "evidence_ids": [
+        "GH-GRAPH-16484:Q1",
+        "GH-GRAPH-16482:diff:Q1",
+        "GH-GRAPH-16482:diff:Q2"
+      ],
+      "related_task_ids": [
+        "RC-077"
+      ],
+      "unresolved_gaps": [
+        "#16482是未合并的参考草案，不报告为已发布修复。",
+        "原周报缺少图IR与运行时通信配置，事件关系保持未知。",
+        "原issue另含SFA权重释放和DSpark缓冲区问题，不继承到本技术子问题。"
+      ],
+      "entity_type": "INDEPENDENT_TECHNICAL_CASE",
+      "comparison_reason": "与原有同步/编译模式比较的实现详情，未转成周报事件。",
+      "evidence_basis": "CURRENT_GITHUB_PATCH_AND_AUTHOR_REPORT",
+      "weekly_event_confirmed": false,
+      "MODE_ACCEPTED": false,
+      "hardware_validated": false,
+      "source_completeness": "完整API响应归档，结论只使用注明的代码/说明选段。",
+      "failure_relation_id": "TC-GRAPH-LIVE-REDUCTION:REL"
+    },
+    {
+      "technical_case_id": "TC-ROPE-CACHE-EXTENT",
+      "title": "图模式RoPE缓存切片长度遗漏缩放因子",
+      "operator": "vLLM Ascend MLA RoPE",
+      "contract": "GRAPH_STATE",
+      "failure_mechanism": "图模式decode/prefill均只截取max_position_embeddings长度的cos/sin，未按rotary_emb.scaling_factor扩展使用范围；a3a3d38两处补乘。",
+      "expected_behavior": "图模式使用的cos/sin范围应与缩放后的合法位置范围一致。",
+      "trigger_predicate": "运行decode或prefill图模式路径，使用具有scaling_factor的rotary_emb，且所需位置超出旧切片长度而未超出扩展范围。",
+      "similar_original_mode_ids": [
+        "M006",
+        "M011"
+      ],
+      "action": "EXTEND",
+      "implementation_scope": "FRAMEWORK_ADAPTER",
+      "evidence_ids": [
+        "GH-ROPE-a3a3d38:1:Q1",
+        "GH-ROPE-1332:body:Q1"
+      ],
+      "related_task_ids": [
+        "RC-094"
+      ],
+      "unresolved_gaps": [
+        "本轮取得真实2025-06-21提交，仍缺原周报完整输入及现场版本/工单身份。",
+        "两处路径修复不能当成两次独立客户故障验证。",
+        "提交作者报告的AIME得分不是本轮硬件执行。"
+      ],
+      "entity_type": "INDEPENDENT_TECHNICAL_CASE",
+      "comparison_reason": "与原有同步/编译模式比较的实现详情，未转成周报事件。",
+      "evidence_basis": "CURRENT_GITHUB_PATCH_AND_AUTHOR_REPORT",
+      "weekly_event_confirmed": false,
+      "MODE_ACCEPTED": false,
+      "hardware_validated": false,
+      "source_completeness": "完整API响应归档，结论只使用注明的代码/说明选段。",
+      "failure_relation_id": "TC-ROPE-CACHE-EXTENT:REL"
+    }
+  ],
+  "prior_case_count": 19,
+  "new_independent_case_count": 3,
+  "weekly_event_confirmed_count": 0
+}

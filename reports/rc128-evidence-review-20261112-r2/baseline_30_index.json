@@ -1,0 +1,3548 @@
+{
+  "modes": [
+    {
+      "mode_id": "M020",
+      "original_order": 1,
+      "name": "空tensor处理不当",
+      "original_definition": "embedding前向输入为空导致反向NaN",
+      "failure_mechanism": {
+        "text": "空输入的边界处理未满足后续梯度计算要求，导致NaN。",
+        "origin": "MODEL_DERIVED",
+        "source_ids": [
+          "SRC-822d0018d96866ff063ad602"
+        ],
+        "basis": "MODEL_DERIVED",
+        "source_text_independently_verified": false,
+        "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+      },
+      "semantic_dimensions": {
+        "object_roles": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "原表为embedding前向空tensor与反向梯度；W12称embedding可能相关、输入空值、总梯度NaN。",
+          "unknown": "实际空对象、shape/numel和反向输出形状未知。",
+          "source_selectors": [
+            "F",
+            "A-W12/涉及算子",
+            "A-W12/触发/复现条件"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-822d0018d96866ff063ad602",
+            "SRC-7b17786b37f45be0625d45a5",
+            "SRC-e940fc213fc5b6c408c8b9e4"
+          ]
+        },
+        "measurement_and_representation": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "原表声明空tensor；摘要的空值不足以独立确认numel==0。输出为NaN现象。",
+          "unknown": "空维度位置、dtype及非空梯度覆盖范围未知。",
+          "source_selectors": [
+            "F",
+            "A-W12/现象"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-822d0018d96866ff063ad602",
+            "SRC-a57b723834118c6f4be169b3"
+          ]
+        },
+        "lifecycle": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "仅给前向—反向先后。",
+          "unknown": "有无早退、分配后初始化、梯度累计/复位或漏写未知。",
+          "source_selectors": [
+            "F"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-822d0018d96866ff063ad602"
+          ]
+        },
+        "consumers": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "反向路径消费前向状态并产生梯度，训练消费梯度。",
+          "unknown": "空输入下梯度应如何写、是否确有非空输出及其合同未知。",
+          "source_selectors": [
+            "F",
+            "A-W12/根因"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-822d0018d96866ff063ad602",
+            "SRC-0d0c179824a47bcf093833cc"
+          ]
+        }
+      },
+      "relationships": [
+        {
+          "status": "DECLARATION_WITH_WEAK_SUMMARY",
+          "source_described_relationship": "原表声明前向空输入导致反向NaN，摘要只提供空值与梯度NaN线索。",
+          "specific_unresolved_relation": "不能由NaN确定缺判空、未初始化或早退漏写；具体失效关系未知。",
+          "source_selectors": [
+            "F",
+            "A-W12/现象",
+            "A-W12/根因"
+          ],
+          "independently_confirmed_failure": false,
+          "source_ids": [
+            "SRC-822d0018d96866ff063ad602",
+            "SRC-a57b723834118c6f4be169b3",
+            "SRC-0d0c179824a47bcf093833cc"
+          ]
+        }
+      ],
+      "lifecycle_obligations": {
+        "creator_and_storage_scope": {
+          "status": "UNKNOWN",
+          "reason": "未取得相关内部对象创建点与存储作用域。"
+        },
+        "initialization_before_first_read_on_all_paths": {
+          "status": "UNKNOWN",
+          "reason": "未取得首次读取前覆盖所有路径的初始化证据。"
+        },
+        "permitted_writers_and_ownership": {
+          "status": "UNKNOWN",
+          "reason": "声明中的写入/覆盖现象不证明允许写入者和所有权合同。"
+        },
+        "reset_and_reuse_contract": {
+          "status": "UNKNOWN",
+          "reason": "未取得逐调用、对象复用或并发场景的复位合同。"
+        }
+      },
+      "current_review_note": "原整理机理及来源声明，不等于原文独立核验。",
+      "basis": {
+        "file": "sources/baseline_30.json",
+        "json_pointer": "/modes/0",
+        "semantic_file": "sources/semantic30_prior.json"
+      },
+      "caveat": "原定义与既有审读，不是本轮重新取得历史Wiki/DTS原文或验证根因。",
+      "historical_source_verified": false,
+      "hardware_validated": false
+    },
+    {
+      "mode_id": "M006",
+      "original_order": 2,
+      "name": "越界读写：shape错误",
+      "original_definition": "SetSize算子的infershape接口存在问题，output shape是-1，导致其后面的算子ReduceSum推导出的shape是个标量，进而导致分配内存异常；",
+      "failure_mechanism": {
+        "text": "原表声明infer-shape返回-1，后续算子推导为标量，导致内存分配异常。",
+        "origin": "MODEL_DERIVED",
+        "source_ids": [
+          "SRC-bf19d6ead4761d9d1da7aeac"
+        ],
+        "basis": "MODEL_DERIVED",
+        "source_text_independently_verified": false,
+        "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+      },
+      "semantic_dimensions": {
+        "object_roles": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "原表称SetSize的InferShape输出-1，后续ReduceSum推导为标量并异常分配。",
+          "unknown": "输入是否携带合法-1哨兵、具体shape对象/算子版本未知。",
+          "source_selectors": [
+            "F"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-bf19d6ead4761d9d1da7aeac"
+          ]
+        },
+        "measurement_and_representation": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "shape元数据中的-1和标量shape解释；不是已证明的数值tensor取-1。",
+          "unknown": "-1在该接口中表示未知维、错误值还是其他状态未知，整数位宽未知。",
+          "source_selectors": [
+            "F"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-bf19d6ead4761d9d1da7aeac"
+          ]
+        },
+        "lifecycle": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "原表描述形状推导到后续分配的阶段链。",
+          "unknown": "没有跨调用复位、并发写或缓存生命周期证据。",
+          "source_selectors": [
+            "F"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-bf19d6ead4761d9d1da7aeac"
+          ]
+        },
+        "consumers": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "下游ReduceSum形状推导和内存分配消费上游元数据。",
+          "unknown": "合法推导/分配契约和修复代码未知。",
+          "source_selectors": [
+            "F"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-bf19d6ead4761d9d1da7aeac"
+          ]
+        }
+      },
+      "relationships": [
+        {
+          "status": "DECLARATION_ONLY",
+          "source_described_relationship": "原表声称上游形状推导结果与下游推导/分配不相容。",
+          "specific_unresolved_relation": "D02只称目录问题待确认，不能确认动态哨兵误解或该算子链就是历史根因。",
+          "source_selectors": [
+            "F",
+            "A-D02/根因"
+          ],
+          "independently_confirmed_failure": false,
+          "source_ids": [
+            "SRC-bf19d6ead4761d9d1da7aeac",
+            "SRC-e9681e058a0547c03fd1c930"
+          ]
+        }
+      ],
+      "lifecycle_obligations": {
+        "creator_and_storage_scope": {
+          "status": "UNKNOWN",
+          "reason": "未取得相关内部对象创建点与存储作用域。"
+        },
+        "initialization_before_first_read_on_all_paths": {
+          "status": "UNKNOWN",
+          "reason": "未取得首次读取前覆盖所有路径的初始化证据。"
+        },
+        "permitted_writers_and_ownership": {
+          "status": "UNKNOWN",
+          "reason": "声明中的写入/覆盖现象不证明允许写入者和所有权合同。"
+        },
+        "reset_and_reuse_contract": {
+          "status": "UNKNOWN",
+          "reason": "未取得逐调用、对象复用或并发场景的复位合同。"
+        }
+      },
+      "current_review_note": "V4 minus_one为用户暂记；具体-1语义及6.3 RC1 B060修复证据仍待确认。",
+      "basis": {
+        "file": "sources/baseline_30.json",
+        "json_pointer": "/modes/1",
+        "semantic_file": "sources/semantic30_prior.json"
+      },
+      "caveat": "原定义与既有审读，不是本轮重新取得历史Wiki/DTS原文或验证根因。",
+      "historical_source_verified": false,
+      "hardware_validated": false
+    },
+    {
+      "mode_id": "M026",
+      "original_order": 3,
+      "name": "越界读写：tiling切分策略的逻辑错误",
+      "original_definition": "测试脚本中输入的indices的tensor大小未对齐32b",
+      "failure_mechanism": {
+        "text": "原表声明测试脚本提供的indices大小未按32B对齐。",
+        "origin": "MODEL_DERIVED",
+        "source_ids": [
+          "SRC-b961fd52f21dd94eb19cd215"
+        ],
+        "basis": "MODEL_DERIVED",
+        "source_text_independently_verified": false,
+        "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+      },
+      "semantic_dimensions": {
+        "object_roles": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "原表为indices tensor的大小；D03只报告batch143时异常。",
+          "unknown": "indices角色、对应shape和是否真正存在对齐违例未知。",
+          "source_selectors": [
+            "F",
+            "A-D03/现象"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-b961fd52f21dd94eb19cd215",
+            "SRC-87ba23e4a7424824292d9400"
+          ]
+        },
+        "measurement_and_representation": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "原表原样记32b；暂不解释为32B。",
+          "unknown": "b是bit/byte还是其它约定、大小对齐还是起始地址对齐、单位换算均未知。",
+          "source_selectors": [
+            "F"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-b961fd52f21dd94eb19cd215"
+          ]
+        },
+        "lifecycle": {
+          "status": "UNKNOWN",
+          "described": "未知",
+          "unknown": "没有分配地址、初始化、写入者、复位或同步证据。",
+          "source_selectors": [],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": []
+        },
+        "consumers": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "潜在搬运/指令消费indices大小，但来源未给指令。",
+          "unknown": "指令要求的对齐单位、合法长度和尾块处理未知。",
+          "source_selectors": [
+            "F"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-b961fd52f21dd94eb19cd215"
+          ]
+        }
+      },
+      "relationships": [
+        {
+          "status": "DECLARATION_ONLY_UNIT_UNKNOWN",
+          "source_described_relationship": "原表称indices大小未对齐32b；D03不证明对齐或越界根因。",
+          "specific_unresolved_relation": "无法确认量/单位/消费者要求是哪条关系失效，禁止自动规格化为32字节。",
+          "source_selectors": [
+            "F",
+            "A-D03/根因"
+          ],
+          "independently_confirmed_failure": false,
+          "source_ids": [
+            "SRC-b961fd52f21dd94eb19cd215",
+            "SRC-0948277eb55e871f43de0458"
+          ]
+        }
+      ],
+      "lifecycle_obligations": {
+        "creator_and_storage_scope": {
+          "status": "UNKNOWN",
+          "reason": "未取得相关内部对象创建点与存储作用域。"
+        },
+        "initialization_before_first_read_on_all_paths": {
+          "status": "UNKNOWN",
+          "reason": "未取得首次读取前覆盖所有路径的初始化证据。"
+        },
+        "permitted_writers_and_ownership": {
+          "status": "UNKNOWN",
+          "reason": "声明中的写入/覆盖现象不证明允许写入者和所有权合同。"
+        },
+        "reset_and_reuse_contract": {
+          "status": "UNKNOWN",
+          "reason": "未取得逐调用、对象复用或并发场景的复位合同。"
+        }
+      },
+      "current_review_note": "原表32b的单位未核验，旧MODEL_DERIVED写32B不能作为单位确认；对齐与越界关系仍待证。",
+      "basis": {
+        "file": "sources/baseline_30.json",
+        "json_pointer": "/modes/2",
+        "semantic_file": "sources/semantic30_prior.json"
+      },
+      "caveat": "原定义与既有审读，不是本轮重新取得历史Wiki/DTS原文或验证根因。",
+      "historical_source_verified": false,
+      "hardware_validated": false
+    },
+    {
+      "mode_id": "M004",
+      "original_order": 4,
+      "name": "越界读写：偏移量计算错误",
+      "original_definition": "window区偏移计算存在问题,导致地址有踩踏，从而导致精度问题",
+      "failure_mechanism": {
+        "text": "原表声明window区偏移计算错误，写入覆盖其他地址，导致MC2反向NaN。",
+        "origin": "MODEL_DERIVED",
+        "source_ids": [
+          "SRC-4f21e6a2eabd29c3123db333"
+        ],
+        "basis": "MODEL_DERIVED",
+        "source_text_independently_verified": false,
+        "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+      },
+      "semantic_dimensions": {
+        "object_roles": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "原表声称通信window区偏移/地址；后续讨论另称MC2的useBufferType、AllGatherMatmul设置和HCCL消费配置。",
+          "unknown": "两种解释是否为同一修复链、涉及的具体buffer和字段值未知。",
+          "source_selectors": [
+            "F",
+            "DISCUSSION"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-4f21e6a2eabd29c3123db333",
+            "DISCUSSION-M004"
+          ]
+        },
+        "measurement_and_representation": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "原表涉及偏移/地址；讨论涉及缓冲模式配置。",
+          "unknown": "元素/字节单位、偏移公式、配置编码与窗口对应关系未知。",
+          "source_selectors": [
+            "F",
+            "DISCUSSION"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-4f21e6a2eabd29c3123db333",
+            "DISCUSSION-M004"
+          ]
+        },
+        "lifecycle": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "D07摘要称首step未完成时出现NaN；讨论称设置/获取/更新配置。",
+          "unknown": "状态是否跨调用残留、共享写或缺同步未知。",
+          "source_selectors": [
+            "A-D07/现象",
+            "DISCUSSION"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-81788a0d561a38690502ac26",
+            "DISCUSSION-M004"
+          ]
+        },
+        "consumers": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "旧声明的地址用于通信窗口；讨论中的配置由HCCL获取。",
+          "unknown": "从设置到消费的实际代码及正确契约未知。",
+          "source_selectors": [
+            "F",
+            "DISCUSSION"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-4f21e6a2eabd29c3123db333",
+            "DISCUSSION-M004"
+          ]
+        }
+      },
+      "relationships": [
+        {
+          "status": "CONFLICTING_ACCOUNTS",
+          "source_described_relationship": "旧声明：window偏移错误导致踩踏。",
+          "specific_unresolved_relation": "D07根因括号被现有审查标为可能回填原表，不能作独立支持。",
+          "source_selectors": [
+            "F",
+            "A-D07/根因"
+          ],
+          "independently_confirmed_failure": false,
+          "source_ids": [
+            "SRC-4f21e6a2eabd29c3123db333",
+            "SRC-763b294da5b0c0dbdc0719e1"
+          ]
+        },
+        {
+          "status": "DISCUSSION_ONLY",
+          "source_described_relationship": "讨论暂记：缓冲模式参数漏传/状态传播不一致。",
+          "specific_unresolved_relation": "不将其补写为已确认的偏移算式错误，也不把两者串成一条新根因。",
+          "source_selectors": [
+            "DISCUSSION"
+          ],
+          "independently_confirmed_failure": false,
+          "source_ids": [
+            "DISCUSSION-M004"
+          ]
+        }
+      ],
+      "lifecycle_obligations": {
+        "creator_and_storage_scope": {
+          "status": "UNKNOWN",
+          "reason": "未取得相关内部对象创建点与存储作用域。"
+        },
+        "initialization_before_first_read_on_all_paths": {
+          "status": "UNKNOWN",
+          "reason": "未取得首次读取前覆盖所有路径的初始化证据。"
+        },
+        "permitted_writers_and_ownership": {
+          "status": "UNKNOWN",
+          "reason": "声明中的写入/覆盖现象不证明允许写入者和所有权合同。"
+        },
+        "reset_and_reuse_contract": {
+          "status": "UNKNOWN",
+          "reason": "未取得逐调用、对象复用或并发场景的复位合同。"
+        }
+      },
+      "current_review_note": "旧window偏移声明与useBufferType漏传讨论分开，尚无修复原文把两者连接。",
+      "basis": {
+        "file": "sources/baseline_30.json",
+        "json_pointer": "/modes/3",
+        "semantic_file": "sources/semantic30_prior.json"
+      },
+      "caveat": "原定义与既有审读，不是本轮重新取得历史Wiki/DTS原文或验证根因。",
+      "historical_source_verified": false,
+      "hardware_validated": false
+    },
+    {
+      "mode_id": "M007",
+      "original_order": 5,
+      "name": "缺少同步",
+      "original_definition": "多核同时搬运可能会导致偶现精度问题",
+      "failure_mechanism": {
+        "text": "原表推定多核同时搬运缺少必要同步，使相同调用偶现错误。",
+        "origin": "MODEL_DERIVED",
+        "source_ids": [
+          "SRC-3b48bc17e29827c233b382aa"
+        ],
+        "basis": "MODEL_DERIVED",
+        "source_text_independently_verified": false,
+        "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+      },
+      "semantic_dimensions": {
+        "object_roles": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "原表仅称多核搬运；D05给Pool反向的self、indices、grad_out及tilingKey=2。",
+          "unknown": "哪个buffer、哪两次访问构成必要依赖未知。",
+          "source_selectors": [
+            "F",
+            "A-D05/现象",
+            "A-D05/根因"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-3b48bc17e29827c233b382aa",
+            "SRC-6fd70f6b17322d6a0bf351c9",
+            "SRC-fef32b8bd6d207c084438849"
+          ]
+        },
+        "measurement_and_representation": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "摘要给self[1,17,15,5,5]与indices/grad_out[1,17,1,1,5]；轴角色/实际搬运单位未给。",
+          "unknown": "偏移、长度、元素/字节和真实核数未知。",
+          "source_selectors": [
+            "A-D05/现象"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-6fd70f6b17322d6a0bf351c9"
+          ]
+        },
+        "lifecycle": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "D05称同输入第一次对、第二次错，属于调用次序线索。",
+          "unknown": "是否同二进制/状态、缺哪条同步边、是否残留未知。",
+          "source_selectors": [
+            "A-D05/现象"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-6fd70f6b17322d6a0bf351c9"
+          ]
+        },
+        "consumers": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "Pool反向计算消费上述输入。",
+          "unknown": "具体搬运生产者/消费者、同步域和位置未知。",
+          "source_selectors": [
+            "A-D05/现象"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-6fd70f6b17322d6a0bf351c9"
+          ]
+        }
+      },
+      "relationships": [
+        {
+          "status": "HYPOTHESIS_ONLY",
+          "source_described_relationship": "原表给出多核同时搬运可能导致偶现错误的假设。",
+          "specific_unresolved_relation": "D05未给同步根因，不能声明缺少具体Set/Wait或初始化。",
+          "source_selectors": [
+            "F",
+            "A-D05/根因"
+          ],
+          "independently_confirmed_failure": false,
+          "source_ids": [
+            "SRC-3b48bc17e29827c233b382aa",
+            "SRC-fef32b8bd6d207c084438849"
+          ]
+        }
+      ],
+      "lifecycle_obligations": {
+        "creator_and_storage_scope": {
+          "status": "UNKNOWN",
+          "reason": "未取得相关内部对象创建点与存储作用域。"
+        },
+        "initialization_before_first_read_on_all_paths": {
+          "status": "UNKNOWN",
+          "reason": "未取得首次读取前覆盖所有路径的初始化证据。"
+        },
+        "permitted_writers_and_ownership": {
+          "status": "UNKNOWN",
+          "reason": "声明中的写入/覆盖现象不证明允许写入者和所有权合同。"
+        },
+        "reset_and_reuse_contract": {
+          "status": "UNKNOWN",
+          "reason": "未取得逐调用、对象复用或并发场景的复位合同。"
+        }
+      },
+      "current_review_note": "原整理机理及来源声明，不等于原文独立核验。",
+      "basis": {
+        "file": "sources/baseline_30.json",
+        "json_pointer": "/modes/4",
+        "semantic_file": "sources/semantic30_prior.json"
+      },
+      "caveat": "原定义与既有审读，不是本轮重新取得历史Wiki/DTS原文或验证根因。",
+      "historical_source_verified": false,
+      "hardware_validated": false
+    },
+    {
+      "mode_id": "M022",
+      "original_order": 6,
+      "name": "搬运逻辑错误：blocktable有错误",
+      "original_definition": "Block Table 目前的索引和但kvCacheOut 的batch 偏移不一致",
+      "failure_mechanism": {
+        "text": "BlockTable索引与KV输出batch偏移不一致，发生错误搬运。",
+        "origin": "MODEL_DERIVED",
+        "source_ids": [
+          "SRC-d556251025040180c6bcf998"
+        ],
+        "basis": "MODEL_DERIVED",
+        "source_text_independently_verified": false,
+        "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+      },
+      "semantic_dimensions": {
+        "object_roles": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "原表区分BlockTable索引坐标与kvCacheOut的batch偏移；D04仅给[2896,128,59,128]特定用例。",
+          "unknown": "维度语义、BlockTable映射及两侧对象是否选对未知。",
+          "source_selectors": [
+            "F",
+            "A-D04/现象"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-d556251025040180c6bcf998",
+            "SRC-fec9b1bd3db265c36dd56816"
+          ]
+        },
+        "measurement_and_representation": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "声明涉及逻辑索引到输出batch地址的映射。",
+          "unknown": "索引/偏移单位、stride、原点、算术位宽与容量未知。",
+          "source_selectors": [
+            "F"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-d556251025040180c6bcf998"
+          ]
+        },
+        "lifecycle": {
+          "status": "UNKNOWN",
+          "described": "未知",
+          "unknown": "未给buffer创建、复用、写入者或同步事实。",
+          "source_selectors": [],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": []
+        },
+        "consumers": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "搬运/地址计算消费BlockTable及batch映射，写入kvCacheOut。",
+          "unknown": "每个坐标应映射到哪个合法存储区间未知。",
+          "source_selectors": [
+            "F"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-d556251025040180c6bcf998"
+          ]
+        }
+      },
+      "relationships": [
+        {
+          "status": "DECLARATION_ONLY",
+          "source_described_relationship": "原表声称BlockTable索引与kvCacheOut的batch偏移不一致。",
+          "specific_unresolved_relation": "未知是坐标系/对象角色、算式还是搬运参数失配；D04无根因，不能强挂B07。",
+          "source_selectors": [
+            "F",
+            "A-D04/根因"
+          ],
+          "independently_confirmed_failure": false,
+          "source_ids": [
+            "SRC-d556251025040180c6bcf998",
+            "SRC-cf6c72a38ab20848265c85de"
+          ]
+        }
+      ],
+      "lifecycle_obligations": {
+        "creator_and_storage_scope": {
+          "status": "UNKNOWN",
+          "reason": "未取得相关内部对象创建点与存储作用域。"
+        },
+        "initialization_before_first_read_on_all_paths": {
+          "status": "UNKNOWN",
+          "reason": "未取得首次读取前覆盖所有路径的初始化证据。"
+        },
+        "permitted_writers_and_ownership": {
+          "status": "UNKNOWN",
+          "reason": "声明中的写入/覆盖现象不证明允许写入者和所有权合同。"
+        },
+        "reset_and_reuse_contract": {
+          "status": "UNKNOWN",
+          "reason": "未取得逐调用、对象复用或并发场景的复位合同。"
+        }
+      },
+      "current_review_note": "原整理机理及来源声明，不等于原文独立核验。",
+      "basis": {
+        "file": "sources/baseline_30.json",
+        "json_pointer": "/modes/5",
+        "semantic_file": "sources/semantic30_prior.json"
+      },
+      "caveat": "原定义与既有审读，不是本轮重新取得历史Wiki/DTS原文或验证根因。",
+      "historical_source_verified": false,
+      "hardware_validated": false
+    },
+    {
+      "mode_id": "M024",
+      "original_order": 7,
+      "name": "数据排布转换错误",
+      "original_definition": "数据在内存排布转换发生错误，如NZ排布转换实现方案存在问题。",
+      "failure_mechanism": {
+        "text": "内存排布转换实现错误，改变数据对应关系。",
+        "origin": "MODEL_DERIVED",
+        "source_ids": [
+          "SRC-f781d0e3989ef1e15543920b"
+        ],
+        "basis": "MODEL_DERIVED",
+        "source_text_independently_verified": false,
+        "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+      },
+      "semantic_dimensions": {
+        "object_roles": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "原表为逻辑tensor与NZ等物理排布转换；D08实际为FAG的BNSD、Q句长256/KV句长32用例。",
+          "unknown": "D08没有NZ实现根因，无法把两者确定为同一转换错误。",
+          "source_selectors": [
+            "F",
+            "A-D08/现象",
+            "A-D08/根因"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-f781d0e3989ef1e15543920b",
+            "SRC-9e5ba3c877689050b3a4a96b",
+            "SRC-725177551a57288967d62438"
+          ]
+        },
+        "measurement_and_representation": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "原声明涉及逻辑/物理布局域；D08给BNSD及句长不等。",
+          "unknown": "转换前后布局单元、padding/stride、地址公式和dtype未知。",
+          "source_selectors": [
+            "F",
+            "A-D08/现象"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-f781d0e3989ef1e15543920b",
+            "SRC-9e5ba3c877689050b3a4a96b"
+          ]
+        },
+        "lifecycle": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "原声明是排布转换阶段，D08只说回归完成。",
+          "unknown": "谁分配/写入/复用目标存储、是否初始化未知。",
+          "source_selectors": [
+            "F",
+            "A-D08/验证结果"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-f781d0e3989ef1e15543920b",
+            "SRC-391f6e2434d17e6a7af846a5"
+          ]
+        },
+        "consumers": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "后续计算/访存消费转换后的tensor。",
+          "unknown": "应保留的逻辑坐标对应和消费者要求未知。",
+          "source_selectors": [
+            "F"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-f781d0e3989ef1e15543920b"
+          ]
+        }
+      },
+      "relationships": [
+        {
+          "status": "DECLARATION_NOT_SUPPORTED_BY_LINKED_ROOT_CAUSE",
+          "source_described_relationship": "原表称布局转换错误；D08提供句长不等BNSD精度异常，未给转换根因。",
+          "specific_unresolved_relation": "逻辑坐标→物理地址的哪一关系失效未知，不能补成NZ block/字节算错。",
+          "source_selectors": [
+            "F",
+            "A-D08/根因",
+            "A-D08/附件"
+          ],
+          "independently_confirmed_failure": false,
+          "source_ids": [
+            "SRC-f781d0e3989ef1e15543920b",
+            "SRC-725177551a57288967d62438",
+            "SRC-2423f1b92c6b418d43fa3f50"
+          ]
+        }
+      ],
+      "lifecycle_obligations": {
+        "creator_and_storage_scope": {
+          "status": "UNKNOWN",
+          "reason": "未取得相关内部对象创建点与存储作用域。"
+        },
+        "initialization_before_first_read_on_all_paths": {
+          "status": "UNKNOWN",
+          "reason": "未取得首次读取前覆盖所有路径的初始化证据。"
+        },
+        "permitted_writers_and_ownership": {
+          "status": "UNKNOWN",
+          "reason": "声明中的写入/覆盖现象不证明允许写入者和所有权合同。"
+        },
+        "reset_and_reuse_contract": {
+          "status": "UNKNOWN",
+          "reason": "未取得逐调用、对象复用或并发场景的复位合同。"
+        }
+      },
+      "current_review_note": "原整理机理及来源声明，不等于原文独立核验。",
+      "basis": {
+        "file": "sources/baseline_30.json",
+        "json_pointer": "/modes/6",
+        "semantic_file": "sources/semantic30_prior.json"
+      },
+      "caveat": "原定义与既有审读，不是本轮重新取得历史Wiki/DTS原文或验证根因。",
+      "historical_source_verified": false,
+      "hardware_validated": false
+    },
+    {
+      "mode_id": "M001",
+      "original_order": 8,
+      "name": "算子实现精度不一致：低精度误差累积",
+      "original_definition": "混合精度模式下npu和gpu的实现行为不一致，如混精下gpu默认先转fp32再计算，npu先fp16计算再转fp32，单算子相同输入gpu侧输出可以正常（超fp16没超fp32）npu溢出",
+      "failure_mechanism": {
+        "text": "混精路径的类型提升顺序不同：GPU先提升至FP32再计算，NPU在低精度计算后再提升，可能先产生溢出或误差。",
+        "origin": "MODEL_DERIVED",
+        "source_ids": [
+          "SRC-c7807e71337064e3f929d7a1"
+        ],
+        "basis": "MODEL_DERIVED",
+        "source_text_independently_verified": false,
+        "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+      },
+      "semantic_dimensions": {
+        "object_roles": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "原表区分GPU参考计算路径与NPU低精度计算/提升路径；W01称目标为torch.prod、输入float16输出float32。",
+          "unknown": "具体tensor、累加器与中间缓冲变量未知。",
+          "source_selectors": [
+            "F",
+            "A-W01/涉及算子",
+            "A-W01/触发/复现条件"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-c7807e71337064e3f929d7a1",
+            "SRC-92d0cb640e1c1ba9dc9ab0fd",
+            "SRC-9b6586b0f4bb3b6ca457301c"
+          ]
+        },
+        "measurement_and_representation": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "原表明确FP16/FP32表示范围不同，低精度计算先溢出；不是字节计数问题。",
+          "unknown": "实际输入值、各中间量类型和转换位置代码未知。",
+          "source_selectors": [
+            "F",
+            "A-W01/根因"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-c7807e71337064e3f929d7a1",
+            "SRC-c5965e166cab0ba1a66e7d6f"
+          ]
+        },
+        "lifecycle": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "声明给出计算与类型提升的先后次序；W01称先算后转。",
+          "unknown": "创建、初始化、共享写和跨调用复位均未知；没有证据归为生命周期竞争。",
+          "source_selectors": [
+            "F",
+            "A-W01/定位过程"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-c7807e71337064e3f929d7a1",
+            "SRC-343cc58dabb0462cb8068a17"
+          ]
+        },
+        "consumers": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "prod中间计算消费输入，提升后的结果继续用于训练；原表报告loss NaN。",
+          "unknown": "输出dtype请求如何约束中间精度、使用的精度契约未知。",
+          "source_selectors": [
+            "F",
+            "G",
+            "A-W01/触发/复现条件"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-c7807e71337064e3f929d7a1",
+            "SRC-96e00b645bbc9c2275544643",
+            "SRC-9b6586b0f4bb3b6ca457301c"
+          ]
+        }
+      },
+      "relationships": [
+        {
+          "status": "SUMMARY_REPORTED",
+          "source_described_relationship": "来源声称：参考先提升再计算，NPU先低精度计算再提升；后提升不能恢复已溢出的值。",
+          "specific_unresolved_relation": "该实现是否违反目标接口契约及历史修复闭环未知。",
+          "source_selectors": [
+            "F",
+            "A-W01/根因",
+            "A-W01/验证结果"
+          ],
+          "independently_confirmed_failure": false,
+          "source_ids": [
+            "SRC-c7807e71337064e3f929d7a1",
+            "SRC-c5965e166cab0ba1a66e7d6f",
+            "SRC-b92b8d3534a5972e99f16e97"
+          ]
+        }
+      ],
+      "lifecycle_obligations": {
+        "creator_and_storage_scope": {
+          "status": "UNKNOWN",
+          "reason": "未取得相关内部对象创建点与存储作用域。"
+        },
+        "initialization_before_first_read_on_all_paths": {
+          "status": "UNKNOWN",
+          "reason": "未取得首次读取前覆盖所有路径的初始化证据。"
+        },
+        "permitted_writers_and_ownership": {
+          "status": "UNKNOWN",
+          "reason": "声明中的写入/覆盖现象不证明允许写入者和所有权合同。"
+        },
+        "reset_and_reuse_contract": {
+          "status": "UNKNOWN",
+          "reason": "未取得逐调用、对象复用或并发场景的复位合同。"
+        }
+      },
+      "current_review_note": "原整理机理及来源声明，不等于原文独立核验。",
+      "basis": {
+        "file": "sources/baseline_30.json",
+        "json_pointer": "/modes/7",
+        "semantic_file": "sources/semantic30_prior.json"
+      },
+      "caveat": "原定义与既有审读，不是本轮重新取得历史Wiki/DTS原文或验证根因。",
+      "historical_source_verified": false,
+      "hardware_validated": false
+    },
+    {
+      "mode_id": "M019",
+      "original_order": 9,
+      "name": "数学等价但计算结果不等价",
+      "original_definition": "FA反向计算时顺序不合适（数学等价）导致精度不足",
+      "failure_mechanism": {
+        "text": "数学等价的求值顺序在有限精度下不等价，导致精度不足。",
+        "origin": "MODEL_DERIVED",
+        "source_ids": [
+          "SRC-c676fafbbc8fc31a8e890df8"
+        ],
+        "basis": "MODEL_DERIVED",
+        "source_text_independently_verified": false,
+        "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+      },
+      "semantic_dimensions": {
+        "object_roles": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "原表仅说明FA反向的数学等价计算顺序。",
+          "unknown": "输入、梯度、中间量、公式和缓冲角色未知。",
+          "source_selectors": [
+            "F"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-c676fafbbc8fc31a8e890df8"
+          ]
+        },
+        "measurement_and_representation": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "浮点有限精度下数学等价式的计算次序。",
+          "unknown": "dtype、值域、舍入、抵消/溢出关系均未知。",
+          "source_selectors": [
+            "F"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-c676fafbbc8fc31a8e890df8"
+          ]
+        },
+        "lifecycle": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "仅声称反向计算顺序不合适。",
+          "unknown": "未给状态/初始化/复用/复位事实。",
+          "source_selectors": [
+            "F"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-c676fafbbc8fc31a8e890df8"
+          ]
+        },
+        "consumers": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "FA反向实现消费未给出的中间表达式。",
+          "unknown": "具体消费者及期望的数值稳定性关系未知。",
+          "source_selectors": [
+            "F"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-c676fafbbc8fc31a8e890df8"
+          ]
+        }
+      },
+      "relationships": [
+        {
+          "status": "RELATION_UNKNOWN",
+          "source_described_relationship": "原表称数学等价但顺序不合适导致精度不足。",
+          "specific_unresolved_relation": "没有公式和案例，无法确认哪条具体关系失效，不能补成抵消、归约顺序或中间溢出。",
+          "source_selectors": [
+            "F"
+          ],
+          "independently_confirmed_failure": false,
+          "source_ids": [
+            "SRC-c676fafbbc8fc31a8e890df8"
+          ]
+        }
+      ],
+      "lifecycle_obligations": {
+        "creator_and_storage_scope": {
+          "status": "UNKNOWN",
+          "reason": "未取得相关内部对象创建点与存储作用域。"
+        },
+        "initialization_before_first_read_on_all_paths": {
+          "status": "UNKNOWN",
+          "reason": "未取得首次读取前覆盖所有路径的初始化证据。"
+        },
+        "permitted_writers_and_ownership": {
+          "status": "UNKNOWN",
+          "reason": "声明中的写入/覆盖现象不证明允许写入者和所有权合同。"
+        },
+        "reset_and_reuse_contract": {
+          "status": "UNKNOWN",
+          "reason": "未取得逐调用、对象复用或并发场景的复位合同。"
+        }
+      },
+      "current_review_note": "原整理机理及来源声明，不等于原文独立核验。",
+      "basis": {
+        "file": "sources/baseline_30.json",
+        "json_pointer": "/modes/8",
+        "semantic_file": "sources/semantic30_prior.json"
+      },
+      "caveat": "原定义与既有审读，不是本轮重新取得历史Wiki/DTS原文或验证根因。",
+      "historical_source_verified": false,
+      "hardware_validated": false
+    },
+    {
+      "mode_id": "M005",
+      "original_order": 10,
+      "name": "浮点数累加序不当",
+      "original_definition": "通信累加顺序不一致导致测试不通过，如不同测试脚本目前是只按照一种求和顺序来比较，而集合通信ReduceScatter实现不同rank天然就会有不同的加法顺序，出现结果不相等的情况。",
+      "failure_mechanism": {
+        "text": "不同rank的浮点求和顺序与单一顺序测试标杆不一致，fp16/bf16 sum结果出现差异。",
+        "origin": "MODEL_DERIVED",
+        "source_ids": [
+          "SRC-e9b0aa69133aff043359d260"
+        ],
+        "basis": "MODEL_DERIVED",
+        "source_text_independently_verified": false,
+        "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+      },
+      "semantic_dimensions": {
+        "object_roles": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "原表涉及不同rank的求和、ReduceScatter及只接受单一求和序的测试；D06摘要仅给fp16/bf16 sum精度不过。",
+          "unknown": "实际rank输入、归约树及参考实现未知。",
+          "source_selectors": [
+            "F",
+            "A-D06/现象"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-e9b0aa69133aff043359d260",
+            "SRC-fa551eb51e038e2a30a42404"
+          ]
+        },
+        "measurement_and_representation": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "浮点结合顺序与fp16/bf16数值表示。",
+          "unknown": "数据范围、累加类型、误差和容差/bitwise要求未知。",
+          "source_selectors": [
+            "F",
+            "A-D06/现象"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-e9b0aa69133aff043359d260",
+            "SRC-fa551eb51e038e2a30a42404"
+          ]
+        },
+        "lifecycle": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "声明涉及多rank求和的执行顺序。",
+          "unknown": "同一次集合通信的调度及重复运行行为未知，不能写为随机竞争。",
+          "source_selectors": [
+            "F"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-e9b0aa69133aff043359d260"
+          ]
+        },
+        "consumers": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "归约实现消费分片，测试程序消费输出并按参考判定。",
+          "unknown": "两侧契约是否一致、测试是否过严未知。",
+          "source_selectors": [
+            "F"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-e9b0aa69133aff043359d260"
+          ]
+        }
+      },
+      "relationships": [
+        {
+          "status": "DECLARATION_ONLY",
+          "source_described_relationship": "原表归因为求和序与测试参考序不一致。",
+          "specific_unresolved_relation": "D06没有根因；尚未确认是实现超差、参考过严或合法误差。",
+          "source_selectors": [
+            "F",
+            "A-D06/根因"
+          ],
+          "independently_confirmed_failure": false,
+          "source_ids": [
+            "SRC-e9b0aa69133aff043359d260",
+            "SRC-e2699315f6b760f87e735695"
+          ]
+        }
+      ],
+      "lifecycle_obligations": {
+        "creator_and_storage_scope": {
+          "status": "UNKNOWN",
+          "reason": "未取得相关内部对象创建点与存储作用域。"
+        },
+        "initialization_before_first_read_on_all_paths": {
+          "status": "UNKNOWN",
+          "reason": "未取得首次读取前覆盖所有路径的初始化证据。"
+        },
+        "permitted_writers_and_ownership": {
+          "status": "UNKNOWN",
+          "reason": "声明中的写入/覆盖现象不证明允许写入者和所有权合同。"
+        },
+        "reset_and_reuse_contract": {
+          "status": "UNKNOWN",
+          "reason": "未取得逐调用、对象复用或并发场景的复位合同。"
+        }
+      },
+      "current_review_note": "原整理机理及来源声明，不等于原文独立核验。",
+      "basis": {
+        "file": "sources/baseline_30.json",
+        "json_pointer": "/modes/9",
+        "semantic_file": "sources/semantic30_prior.json"
+      },
+      "caveat": "原定义与既有审读，不是本轮重新取得历史Wiki/DTS原文或验证根因。",
+      "historical_source_verified": false,
+      "hardware_validated": false
+    },
+    {
+      "mode_id": "M023",
+      "original_order": 11,
+      "name": "tiling切分策略的逻辑异常",
+      "original_definition": "tiling逻辑计算有误，如未适配多种芯片核数，例310P3 8个核，310P1 10个核，前者能正常执行但后者报错",
+      "failure_mechanism": {
+        "text": "Tiling未正确适配不同芯片可用核数，导致特定平台执行错误。",
+        "origin": "MODEL_DERIVED",
+        "source_ids": [
+          "SRC-0aaa41fed7b0efac00c8358a"
+        ],
+        "basis": "MODEL_DERIVED",
+        "source_text_independently_verified": false,
+        "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+      },
+      "semantic_dimensions": {
+        "object_roles": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "原表为tiling的设备核数：310P3 8核、310P1 10核；D10无权限查看。",
+          "unknown": "核心数量的真实设备查询值、任务划分对象与适配代码未知。",
+          "source_selectors": [
+            "F",
+            "A-D10/现象"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-0aaa41fed7b0efac00c8358a",
+            "SRC-3d97c802ad48189a1496c5ef"
+          ]
+        },
+        "measurement_and_representation": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "核数/任务分配数量，属于执行资源域，不是tensor维度。",
+          "unknown": "任务总数、整除/余数规则、block_dim和实际映射未知。",
+          "source_selectors": [
+            "F"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-0aaa41fed7b0efac00c8358a"
+          ]
+        },
+        "lifecycle": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "描述不同硬件上的分派。",
+          "unknown": "无跨调用状态、线程共享、复位或同步证据。",
+          "source_selectors": [
+            "F"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-0aaa41fed7b0efac00c8358a"
+          ]
+        },
+        "consumers": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "tiling与调度消费可用核数，分配执行任务。",
+          "unknown": "应按实际核数分配的具体契约和边界未知。",
+          "source_selectors": [
+            "F"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-0aaa41fed7b0efac00c8358a"
+          ]
+        }
+      },
+      "relationships": [
+        {
+          "status": "DECLARATION_ONLY",
+          "source_described_relationship": "原表声称未适配多种芯片核数，8核正常而10核报错。",
+          "specific_unresolved_relation": "缺原单正文与代码；是否硬编码、分片漏尾或其它资源失配未知。",
+          "source_selectors": [
+            "F",
+            "A-D10/根因"
+          ],
+          "independently_confirmed_failure": false,
+          "source_ids": [
+            "SRC-0aaa41fed7b0efac00c8358a",
+            "SRC-7ece75847675956e42f9cb1c"
+          ]
+        }
+      ],
+      "lifecycle_obligations": {
+        "creator_and_storage_scope": {
+          "status": "UNKNOWN",
+          "reason": "未取得相关内部对象创建点与存储作用域。"
+        },
+        "initialization_before_first_read_on_all_paths": {
+          "status": "UNKNOWN",
+          "reason": "未取得首次读取前覆盖所有路径的初始化证据。"
+        },
+        "permitted_writers_and_ownership": {
+          "status": "UNKNOWN",
+          "reason": "声明中的写入/覆盖现象不证明允许写入者和所有权合同。"
+        },
+        "reset_and_reuse_contract": {
+          "status": "UNKNOWN",
+          "reason": "未取得逐调用、对象复用或并发场景的复位合同。"
+        }
+      },
+      "current_review_note": "原整理机理及来源声明，不等于原文独立核验。",
+      "basis": {
+        "file": "sources/baseline_30.json",
+        "json_pointer": "/modes/10",
+        "semantic_file": "sources/semantic30_prior.json"
+      },
+      "caveat": "原定义与既有审读，不是本轮重新取得历史Wiki/DTS原文或验证根因。",
+      "historical_source_verified": false,
+      "hardware_validated": false
+    },
+    {
+      "mode_id": "M011",
+      "original_order": 12,
+      "name": "tiling切分策略分支错误",
+      "original_definition": "tiling逻辑判断或具体条件判断错误，导致走入错误分支",
+      "failure_mechanism": {
+        "text": "Tiling条件判定错误，选择不适用的执行分支。",
+        "origin": "MODEL_DERIVED",
+        "source_ids": [
+          "SRC-379643568fa69a1dd317a863"
+        ],
+        "basis": "MODEL_DERIVED",
+        "source_text_independently_verified": false,
+        "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+      },
+      "semantic_dimensions": {
+        "object_roles": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "原表涉及tiling条件、分支和被分派的kernel；D09仅定位到scatter_特定shape。",
+          "unknown": "条件引用哪个tensor、轴、配置或硬件属性未知。",
+          "source_selectors": [
+            "F",
+            "A-D09/现象"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-379643568fa69a1dd317a863",
+            "SRC-15eda5d4945097d0eb3fb126"
+          ]
+        },
+        "measurement_and_representation": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "存在条件判断和分支选择的声明。",
+          "unknown": "阈值、比较单位、shape实际值和算术类型未知。",
+          "source_selectors": [
+            "F"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-379643568fa69a1dd317a863"
+          ]
+        },
+        "lifecycle": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "原表描述一次分派选择。",
+          "unknown": "没有跨调用污染、初始化或核间同步证据。",
+          "source_selectors": [
+            "F"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-379643568fa69a1dd317a863"
+          ]
+        },
+        "consumers": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "分派逻辑消费条件并选择实现；D09记录scatter_报错。",
+          "unknown": "被选分支的适用合同及为何不满足未知。",
+          "source_selectors": [
+            "F",
+            "A-D09/根因"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-379643568fa69a1dd317a863",
+            "SRC-2e2c9bb83f28671018fabc53"
+          ]
+        }
+      },
+      "relationships": [
+        {
+          "status": "DECLARATION_ONLY",
+          "source_described_relationship": "原表称条件判断错误导致选错分支。",
+          "specific_unresolved_relation": "D09的根因字段仍是症状，不证明具体比较式或分支失效；附件未采集。",
+          "source_selectors": [
+            "F",
+            "A-D09/根因",
+            "A-D09/附件"
+          ],
+          "independently_confirmed_failure": false,
+          "source_ids": [
+            "SRC-379643568fa69a1dd317a863",
+            "SRC-2e2c9bb83f28671018fabc53",
+            "SRC-0878353a2b749e5fcab84121"
+          ]
+        }
+      ],
+      "lifecycle_obligations": {
+        "creator_and_storage_scope": {
+          "status": "UNKNOWN",
+          "reason": "未取得相关内部对象创建点与存储作用域。"
+        },
+        "initialization_before_first_read_on_all_paths": {
+          "status": "UNKNOWN",
+          "reason": "未取得首次读取前覆盖所有路径的初始化证据。"
+        },
+        "permitted_writers_and_ownership": {
+          "status": "UNKNOWN",
+          "reason": "声明中的写入/覆盖现象不证明允许写入者和所有权合同。"
+        },
+        "reset_and_reuse_contract": {
+          "status": "UNKNOWN",
+          "reason": "未取得逐调用、对象复用或并发场景的复位合同。"
+        }
+      },
+      "current_review_note": "原整理机理及来源声明，不等于原文独立核验。",
+      "basis": {
+        "file": "sources/baseline_30.json",
+        "json_pointer": "/modes/11",
+        "semantic_file": "sources/semantic30_prior.json"
+      },
+      "caveat": "原定义与既有审读，不是本轮重新取得历史Wiki/DTS原文或验证根因。",
+      "historical_source_verified": false,
+      "hardware_validated": false
+    },
+    {
+      "mode_id": "M012",
+      "original_order": 13,
+      "name": "确定性计算未实现",
+      "original_definition": "RMSNorm小算子（Pow + ReduceMean + Add +Rsqrt）实现与RMSNorm算子不同；ReduceMean的确定性未能固定",
+      "failure_mechanism": {
+        "text": "归约过程未固定确定性，导致相同图推理重复调用结果随机。",
+        "origin": "MODEL_DERIVED",
+        "source_ids": [
+          "SRC-72c00c8db0479f6b30494648"
+        ],
+        "basis": "MODEL_DERIVED",
+        "source_text_independently_verified": false,
+        "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+      },
+      "semantic_dimensions": {
+        "object_roles": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "原表区分Pow、ReduceMean、Add、Rsqrt组合与融合RMSNorm；W06/W07比较两条计算路径。",
+          "unknown": "归约中间量、工作区和确定性控制的实际变量未知。",
+          "source_selectors": [
+            "F",
+            "A-W06/涉及算子",
+            "A-W07/根因"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-72c00c8db0479f6b30494648",
+            "SRC-20bc3fa9a971ca097f87e8a5",
+            "SRC-6b455737f5e4ec7ee822edef"
+          ]
+        },
+        "measurement_and_representation": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "计算拓扑与浮点归约；摘要称重复推理结果随机。",
+          "unknown": "累加类型、误差、实际输入是否逐字节相同及二进制固定情况未知。",
+          "source_selectors": [
+            "F",
+            "A-W06/现象"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-72c00c8db0479f6b30494648",
+            "SRC-0c33220b9443a7d7673824b1"
+          ]
+        },
+        "lifecycle": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "摘要记录多次推理输出变化。",
+          "unknown": "没有初始化、复位、共享写或同步边证据。",
+          "source_selectors": [
+            "A-W06/现象"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-0c33220b9443a7d7673824b1"
+          ]
+        },
+        "consumers": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "组合实现消费归约输入，输出由确定性/精度比较消费。",
+          "unknown": "是否开启受支持的确定性承诺、比较容差及保持不变的上下文未知。",
+          "source_selectors": [
+            "F",
+            "A-W06/验证结果"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-72c00c8db0479f6b30494648",
+            "SRC-eb36c60c6a3c016df514c0d6"
+          ]
+        }
+      },
+      "relationships": [
+        {
+          "status": "SUMMARY_REPORTED_CONTRACT_UNKNOWN",
+          "source_described_relationship": "来源把不固定归因于ReduceMean路径，融合RMSNorm替换后对齐。",
+          "specific_unresolved_relation": "替换结果不能独立确定归约顺序、同步或状态根因；确定性承诺的前提未知。",
+          "source_selectors": [
+            "F",
+            "A-W06/根因",
+            "A-W06/修复方案",
+            "A-W07/验证结果"
+          ],
+          "independently_confirmed_failure": false,
+          "source_ids": [
+            "SRC-72c00c8db0479f6b30494648",
+            "SRC-2495272ea1cf3198fefc2569",
+            "SRC-d982947484b1b6398038d1f9",
+            "SRC-f7987ce838c0c043687ff35c"
+          ]
+        }
+      ],
+      "lifecycle_obligations": {
+        "creator_and_storage_scope": {
+          "status": "UNKNOWN",
+          "reason": "未取得相关内部对象创建点与存储作用域。"
+        },
+        "initialization_before_first_read_on_all_paths": {
+          "status": "UNKNOWN",
+          "reason": "未取得首次读取前覆盖所有路径的初始化证据。"
+        },
+        "permitted_writers_and_ownership": {
+          "status": "UNKNOWN",
+          "reason": "声明中的写入/覆盖现象不证明允许写入者和所有权合同。"
+        },
+        "reset_and_reuse_contract": {
+          "status": "UNKNOWN",
+          "reason": "未取得逐调用、对象复用或并发场景的复位合同。"
+        }
+      },
+      "current_review_note": "原整理机理及来源声明，不等于原文独立核验。",
+      "basis": {
+        "file": "sources/baseline_30.json",
+        "json_pointer": "/modes/12",
+        "semantic_file": "sources/semantic30_prior.json"
+      },
+      "caveat": "原定义与既有审读，不是本轮重新取得历史Wiki/DTS原文或验证根因。",
+      "historical_source_verified": false,
+      "hardware_validated": false
+    },
+    {
+      "mode_id": "M008",
+      "original_order": 14,
+      "name": "浮点数累加序不当",
+      "original_definition": "累加序实现不一致，如二分累加对比顺序累加，导致精度差异，如未设置export CLOSE_MATMUL_K_SHIFT=1时会有计算误差，具体可能是在router选择时容易出现较大偏差，导致评分下降",
+      "failure_mechanism": {
+        "text": "浮点累加次序随实现/tiling变化，微小差异在router选路中放大。",
+        "origin": "MODEL_DERIVED",
+        "source_ids": [
+          "SRC-c851534aabb5d657bb408d5f"
+        ],
+        "basis": "MODEL_DERIVED",
+        "source_text_independently_verified": false,
+        "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+      },
+      "semantic_dimensions": {
+        "object_roles": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "原表称二分/顺序累加不同；W04将差异定位方向指向matmul K错峰，后续影响MoE router。",
+          "unknown": "具体归约块与tensor消费者变量未知；TopK/pow/linear是排查项。",
+          "source_selectors": [
+            "F",
+            "A-W04/根因"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-c851534aabb5d657bb408d5f",
+            "SRC-8671bfb6f88ffdf6ef83961d"
+          ]
+        },
+        "measurement_and_representation": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "数值结合顺序/分块精度及router离散选择。",
+          "unknown": "输入值域、累加类型、误差阈值和实际K边界未知。",
+          "source_selectors": [
+            "F",
+            "A-W04/现象"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-c851534aabb5d657bb408d5f",
+            "SRC-214441dadbbd8f58fae98ed5"
+          ]
+        },
+        "lifecycle": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "存在环境开关CLOSE_MATMUL_K_SHIFT=1及不同路径对照。",
+          "unknown": "没有跨调用污染或同步假设的证据。",
+          "source_selectors": [
+            "F",
+            "A-W04/修复方案"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-c851534aabb5d657bb408d5f",
+            "SRC-aa2b6ac9971b80e3346d59e5"
+          ]
+        },
+        "consumers": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "matmul计算结果影响router选路及任务评分。",
+          "unknown": "精确传递链、阈值和单算子通过标准未知。",
+          "source_selectors": [
+            "F",
+            "A-W04/现象"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-c851534aabb5d657bb408d5f",
+            "SRC-214441dadbbd8f58fae98ed5"
+          ]
+        }
+      },
+      "relationships": [
+        {
+          "status": "SUMMARY_REPORTED",
+          "source_described_relationship": "摘要称shape选择K错峰路径后出现计算误差，关闭该路径后对齐/评分改善。",
+          "specific_unresolved_relation": "具体失效算式和与二分/顺序累加的对应仍需代码证据。",
+          "source_selectors": [
+            "F",
+            "A-W04/根因",
+            "A-W04/验证结果"
+          ],
+          "independently_confirmed_failure": false,
+          "source_ids": [
+            "SRC-c851534aabb5d657bb408d5f",
+            "SRC-8671bfb6f88ffdf6ef83961d",
+            "SRC-11f3bf5b4a0dbd23ce2cea8b"
+          ]
+        }
+      ],
+      "lifecycle_obligations": {
+        "creator_and_storage_scope": {
+          "status": "UNKNOWN",
+          "reason": "未取得相关内部对象创建点与存储作用域。"
+        },
+        "initialization_before_first_read_on_all_paths": {
+          "status": "UNKNOWN",
+          "reason": "未取得首次读取前覆盖所有路径的初始化证据。"
+        },
+        "permitted_writers_and_ownership": {
+          "status": "UNKNOWN",
+          "reason": "声明中的写入/覆盖现象不证明允许写入者和所有权合同。"
+        },
+        "reset_and_reuse_contract": {
+          "status": "UNKNOWN",
+          "reason": "未取得逐调用、对象复用或并发场景的复位合同。"
+        }
+      },
+      "current_review_note": "原整理机理及来源声明，不等于原文独立核验。",
+      "basis": {
+        "file": "sources/baseline_30.json",
+        "json_pointer": "/modes/13",
+        "semantic_file": "sources/semantic30_prior.json"
+      },
+      "caveat": "原定义与既有审读，不是本轮重新取得历史Wiki/DTS原文或验证根因。",
+      "historical_source_verified": false,
+      "hardware_validated": false
+    },
+    {
+      "mode_id": "M029",
+      "original_order": 15,
+      "name": "硬件导致算子不支持未拦截",
+      "original_definition": "如300I系列机器均不支持处理fp32的dtype数据，matmul算子先将输入cast为FP16后进行计算；如310P不支持inf nan；如reshapeAndCacheNd在输入shape较大时走入了使用DataCopyPad分支，在310p上不支持该指令",
+      "failure_mechanism": {
+        "text": "原定义混列FP32不支持而降精度、Inf/NaN不支持及DataCopyPad指令不支持三种能力约束。",
+        "origin": "MODEL_DERIVED",
+        "source_ids": [
+          "SRC-7e5dbd3d6eb75a1c3dfb20a6"
+        ],
+        "basis": "MODEL_DERIVED",
+        "source_text_independently_verified": false,
+        "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+      },
+      "semantic_dimensions": {
+        "object_roles": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "原表含三段独立声明：300I matmul的FP32→FP16；310P特殊值；reshapeAndCacheNd的大shape/DataCopyPad分支。W08只支撑第一段降精描述，W17只支撑第二段sub/exp/where。",
+          "unknown": "三段不是同一案例；DataCopyPad段无关联实证。",
+          "source_selectors": [
+            "F",
+            "A-W08/根因",
+            "A-W17/涉及算子"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-7e5dbd3d6eb75a1c3dfb20a6",
+            "SRC-1d4103abadc515997228876f",
+            "SRC-07f86b92dd655b3c183018d6"
+          ]
+        },
+        "measurement_and_representation": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "R1为dtype/范围；R2为sub溢出后exp/where输入含Inf；R3为shape驱动指令支持面。",
+          "unknown": "各平台规格、各段合法域、阈值、精确shape和值未知。",
+          "source_selectors": [
+            "F",
+            "A-W17/触发/复现条件"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-7e5dbd3d6eb75a1c3dfb20a6",
+            "SRC-0ab091274725ca514e9bd3df"
+          ]
+        },
+        "lifecycle": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "R2摘要给sub→exp/where顺序；R3原表给分派阶段。",
+          "unknown": "没有初始化、共享状态、复位或同步边证据。",
+          "source_selectors": [
+            "F",
+            "A-W17/触发/复现条件"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-7e5dbd3d6eb75a1c3dfb20a6",
+            "SRC-0ab091274725ca514e9bd3df"
+          ]
+        },
+        "consumers": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "R1 matmul消费cast输入；R2 exp/where消费sub输出；R3分派/指令消费shape/搬运参数。",
+          "unknown": "各自应校验或拒绝的合同未知，不能把所有300I/310P算子一概定性。",
+          "source_selectors": [
+            "F",
+            "A-W17/触发/复现条件"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-7e5dbd3d6eb75a1c3dfb20a6",
+            "SRC-0ab091274725ca514e9bd3df"
+          ]
+        }
+      },
+      "relationships": [
+        {
+          "status": "SUBCLAIM_R1_SUMMARY_REPORTED",
+          "source_described_relationship": "R1来源称300I matmul将FP32输入转FP16计算。",
+          "specific_unresolved_relation": "整系列硬件支持声明和应否拒绝未独立核验；具体数值合同未知。",
+          "source_selectors": [
+            "F",
+            "A-W08/根因"
+          ],
+          "independently_confirmed_failure": false,
+          "source_ids": [
+            "SRC-7e5dbd3d6eb75a1c3dfb20a6",
+            "SRC-1d4103abadc515997228876f"
+          ]
+        },
+        {
+          "status": "SUBCLAIM_R2_SUMMARY_REPORTED",
+          "source_described_relationship": "R2摘要明确Data大→sub溢出→exp/where输入Inf，截断/关融合后恢复。",
+          "specific_unresolved_relation": "Inf相对目标exp/where是输入，相对上游整图是中间量；平台支持/拦截合同未知。",
+          "source_selectors": [
+            "A-W17/触发/复现条件",
+            "A-W17/修复方案",
+            "A-W17/验证结果"
+          ],
+          "independently_confirmed_failure": false,
+          "source_ids": [
+            "SRC-0ab091274725ca514e9bd3df",
+            "SRC-0c64e038a28e72ee56394426",
+            "SRC-6f651049d944792e864f4ad9"
+          ]
+        },
+        {
+          "status": "SUBCLAIM_R3_DECLARATION_ONLY",
+          "source_described_relationship": "R3原表称大shape选到310P不支持的DataCopyPad。",
+          "specific_unresolved_relation": "没有shape、分派谓词、指令规格或原始修复，无法确认实际失败关系。",
+          "source_selectors": [
+            "F"
+          ],
+          "independently_confirmed_failure": false,
+          "source_ids": [
+            "SRC-7e5dbd3d6eb75a1c3dfb20a6"
+          ]
+        }
+      ],
+      "lifecycle_obligations": {
+        "creator_and_storage_scope": {
+          "status": "UNKNOWN",
+          "reason": "未取得相关内部对象创建点与存储作用域。"
+        },
+        "initialization_before_first_read_on_all_paths": {
+          "status": "UNKNOWN",
+          "reason": "未取得首次读取前覆盖所有路径的初始化证据。"
+        },
+        "permitted_writers_and_ownership": {
+          "status": "UNKNOWN",
+          "reason": "声明中的写入/覆盖现象不证明允许写入者和所有权合同。"
+        },
+        "reset_and_reuse_contract": {
+          "status": "UNKNOWN",
+          "reason": "未取得逐调用、对象复用或并发场景的复位合同。"
+        }
+      },
+      "current_review_note": "原整理机理及来源声明，不等于原文独立核验。",
+      "basis": {
+        "file": "sources/baseline_30.json",
+        "json_pointer": "/modes/14",
+        "semantic_file": "sources/semantic30_prior.json"
+      },
+      "caveat": "原定义与既有审读，不是本轮重新取得历史Wiki/DTS原文或验证根因。",
+      "historical_source_verified": false,
+      "hardware_validated": false
+    },
+    {
+      "mode_id": "M013",
+      "original_order": 16,
+      "name": "NPU适配引入额外参数",
+      "original_definition": "tik底层对coreNum特性，block_dim为scalar时支持不够导致的，需添加常量折叠配置。",
+      "failure_mechanism": {
+        "text": "原表声明scalar形式block_dim的支持不足，需要常量折叠配置。",
+        "origin": "MODEL_DERIVED",
+        "source_ids": [
+          "SRC-3d65d6157051edd48713c3b6"
+        ],
+        "basis": "MODEL_DERIVED",
+        "source_text_independently_verified": false,
+        "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+      },
+      "semantic_dimensions": {
+        "object_roles": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "原表是TIK的coreNum、block_dim scalar与常量折叠配置；D01为310P3 BERT离线推理工具链问题。",
+          "unknown": "scalar由哪层构造、编译器如何表达及其值未知。",
+          "source_selectors": [
+            "F",
+            "A-D01/现象",
+            "A-D01/芯片"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-3d65d6157051edd48713c3b6",
+            "SRC-b992591cf691f93dae7a8005",
+            "SRC-2fc120e89e29cc2f6424025b"
+          ]
+        },
+        "measurement_and_representation": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "coreNum是执行资源数量，block_dim涉及调度参数的scalar/常量表示。",
+          "unknown": "位宽、值域、常量折叠条件和与任务数的关系未知。",
+          "source_selectors": [
+            "F"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-3d65d6157051edd48713c3b6"
+          ]
+        },
+        "lifecycle": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "原表涉及编译/配置阶段的折叠。",
+          "unknown": "配置创建、缓存、复位和线程共享未知。",
+          "source_selectors": [
+            "F"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-3d65d6157051edd48713c3b6"
+          ]
+        },
+        "consumers": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "TIK/编译工具链消费block_dim及折叠配置。",
+          "unknown": "合法表示、支持范围和失败位置未知。",
+          "source_selectors": [
+            "F"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-3d65d6157051edd48713c3b6"
+          ]
+        }
+      },
+      "relationships": [
+        {
+          "status": "DECLARATION_ONLY",
+          "source_described_relationship": "原表称block_dim为scalar时支持不足，需要常量折叠配置。",
+          "specific_unresolved_relation": "D01未给具体实现闭环，不能补成核数硬编码、输入scalar值错误或工具链缺陷位置。",
+          "source_selectors": [
+            "F",
+            "A-D01/根因"
+          ],
+          "independently_confirmed_failure": false,
+          "source_ids": [
+            "SRC-3d65d6157051edd48713c3b6",
+            "SRC-c92f469208867cf135887454"
+          ]
+        }
+      ],
+      "lifecycle_obligations": {
+        "creator_and_storage_scope": {
+          "status": "UNKNOWN",
+          "reason": "未取得相关内部对象创建点与存储作用域。"
+        },
+        "initialization_before_first_read_on_all_paths": {
+          "status": "UNKNOWN",
+          "reason": "未取得首次读取前覆盖所有路径的初始化证据。"
+        },
+        "permitted_writers_and_ownership": {
+          "status": "UNKNOWN",
+          "reason": "声明中的写入/覆盖现象不证明允许写入者和所有权合同。"
+        },
+        "reset_and_reuse_contract": {
+          "status": "UNKNOWN",
+          "reason": "未取得逐调用、对象复用或并发场景的复位合同。"
+        }
+      },
+      "current_review_note": "原整理机理及来源声明，不等于原文独立核验。",
+      "basis": {
+        "file": "sources/baseline_30.json",
+        "json_pointer": "/modes/15",
+        "semantic_file": "sources/semantic30_prior.json"
+      },
+      "caveat": "原定义与既有审读，不是本轮重新取得历史Wiki/DTS原文或验证根因。",
+      "historical_source_verified": false,
+      "hardware_validated": false
+    },
+    {
+      "mode_id": "M014",
+      "original_order": 17,
+      "name": "tensor下标超出数值范围",
+      "original_definition": "偏移量超出INT32数值范围",
+      "failure_mechanism": {
+        "text": "地址/元素偏移超出INT32可表示范围，导致索引失真。",
+        "origin": "MODEL_DERIVED",
+        "source_ids": [
+          "SRC-b711249e77351636e8a5f8fe"
+        ],
+        "basis": "MODEL_DERIVED",
+        "source_text_independently_verified": false,
+        "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+      },
+      "semantic_dimensions": {
+        "object_roles": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "原表仅称tensor下标/偏移超出INT32。",
+          "unknown": "哪个tensor、偏移原点、输入驱动对象与存储对象未知。",
+          "source_selectors": [
+            "F"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-b711249e77351636e8a5f8fe"
+          ]
+        },
+        "measurement_and_representation": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "声明给出INT32表示范围。",
+          "unknown": "有符号性、元素/字节单位、各运算位宽与提升顺序未知。",
+          "source_selectors": [
+            "F"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-b711249e77351636e8a5f8fe"
+          ]
+        },
+        "lifecycle": {
+          "status": "UNKNOWN",
+          "described": "未知",
+          "unknown": "没有对象分配、写入、复用或复位记录。",
+          "source_selectors": [],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": []
+        },
+        "consumers": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "下标/偏移拟被地址计算或指令参数消费。",
+          "unknown": "实际消费者、容量及合法边界未知。",
+          "source_selectors": [
+            "F"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-b711249e77351636e8a5f8fe"
+          ]
+        }
+      },
+      "relationships": [
+        {
+          "status": "DECLARATION_ONLY",
+          "source_described_relationship": "原表声称偏移量超出INT32范围。",
+          "specific_unresolved_relation": "缺算式、操作数、值及强转位置，无法定位哪一步窄化/溢出，也无法证明越界访问。",
+          "source_selectors": [
+            "F"
+          ],
+          "independently_confirmed_failure": false,
+          "source_ids": [
+            "SRC-b711249e77351636e8a5f8fe"
+          ]
+        }
+      ],
+      "lifecycle_obligations": {
+        "creator_and_storage_scope": {
+          "status": "UNKNOWN",
+          "reason": "未取得相关内部对象创建点与存储作用域。"
+        },
+        "initialization_before_first_read_on_all_paths": {
+          "status": "UNKNOWN",
+          "reason": "未取得首次读取前覆盖所有路径的初始化证据。"
+        },
+        "permitted_writers_and_ownership": {
+          "status": "UNKNOWN",
+          "reason": "声明中的写入/覆盖现象不证明允许写入者和所有权合同。"
+        },
+        "reset_and_reuse_contract": {
+          "status": "UNKNOWN",
+          "reason": "未取得逐调用、对象复用或并发场景的复位合同。"
+        }
+      },
+      "current_review_note": "原整理机理及来源声明，不等于原文独立核验。",
+      "basis": {
+        "file": "sources/baseline_30.json",
+        "json_pointer": "/modes/16",
+        "semantic_file": "sources/semantic30_prior.json"
+      },
+      "caveat": "原定义与既有审读，不是本轮重新取得历史Wiki/DTS原文或验证根因。",
+      "historical_source_verified": false,
+      "hardware_validated": false
+    },
+    {
+      "mode_id": "M009",
+      "original_order": 18,
+      "name": "精度溢出：数值格式精度不够导致精度溢出",
+      "original_definition": "baddbmm公式out=β input +α (batch1@batch2),计算时括号内为中间变量，超出fp16表示范围",
+      "failure_mechanism": {
+        "text": "中间乘积在低精度范围外，转换/保存为FP16时变为Inf，后续缩放无法恢复。",
+        "origin": "MODEL_DERIVED",
+        "source_ids": [
+          "SRC-f0813efdc9daf08665ec6edb"
+        ],
+        "basis": "MODEL_DERIVED",
+        "source_text_independently_verified": false,
+        "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+      },
+      "semantic_dimensions": {
+        "object_roles": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "原表明确baddbmm中的input、batch1、batch2、α、β及括号内矩阵乘中间量。",
+          "unknown": "实际tensor规格/调用入口和中间buffer未知。",
+          "source_selectors": [
+            "F"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-f0813efdc9daf08665ec6edb"
+          ]
+        },
+        "measurement_and_representation": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "中间batch1@batch2超FP16；W05约-70000并称mm结果cast为FP16时溢出。",
+          "unknown": "原输入各元素、类型及后续乘加中间类型未知。",
+          "source_selectors": [
+            "F",
+            "A-W05/触发/复现条件",
+            "A-W05/根因"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-f0813efdc9daf08665ec6edb",
+            "SRC-77b22633bde2cf4ad719ad50",
+            "SRC-e4e988397ecd0d6a667fb65f"
+          ]
+        },
+        "lifecycle": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "摘要给mm→cast→后续乘缩放的计算阶段。",
+          "unknown": "没有跨调用状态或复位证据。",
+          "source_selectors": [
+            "A-W05/涉及算子",
+            "A-W05/根因"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-63195548667651d518378f82",
+            "SRC-e4e988397ecd0d6a667fb65f"
+          ]
+        },
+        "consumers": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "后续缩放/加法消费mm中间量，原公式给出α/β的位置。",
+          "unknown": "最终理论结果是否有限、具体舍入契约需原实际数据。",
+          "source_selectors": [
+            "F"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-f0813efdc9daf08665ec6edb"
+          ]
+        }
+      },
+      "relationships": [
+        {
+          "status": "SUMMARY_REPORTED",
+          "source_described_relationship": "来源称中间乘积在低精度落地时先溢出，后续运算消费已失真的值。",
+          "specific_unresolved_relation": "未取得历史完整输入、修复Diff及接口中间精度契约。",
+          "source_selectors": [
+            "F",
+            "A-W05/根因"
+          ],
+          "independently_confirmed_failure": false,
+          "source_ids": [
+            "SRC-f0813efdc9daf08665ec6edb",
+            "SRC-e4e988397ecd0d6a667fb65f"
+          ]
+        }
+      ],
+      "lifecycle_obligations": {
+        "creator_and_storage_scope": {
+          "status": "UNKNOWN",
+          "reason": "未取得相关内部对象创建点与存储作用域。"
+        },
+        "initialization_before_first_read_on_all_paths": {
+          "status": "UNKNOWN",
+          "reason": "未取得首次读取前覆盖所有路径的初始化证据。"
+        },
+        "permitted_writers_and_ownership": {
+          "status": "UNKNOWN",
+          "reason": "声明中的写入/覆盖现象不证明允许写入者和所有权合同。"
+        },
+        "reset_and_reuse_contract": {
+          "status": "UNKNOWN",
+          "reason": "未取得逐调用、对象复用或并发场景的复位合同。"
+        }
+      },
+      "current_review_note": "原整理机理及来源声明，不等于原文独立核验。",
+      "basis": {
+        "file": "sources/baseline_30.json",
+        "json_pointer": "/modes/17",
+        "semantic_file": "sources/semantic30_prior.json"
+      },
+      "caveat": "原定义与既有审读，不是本轮重新取得历史Wiki/DTS原文或验证根因。",
+      "historical_source_verified": false,
+      "hardware_validated": false
+    },
+    {
+      "mode_id": "M025",
+      "original_order": 19,
+      "name": "算子实现精度不一致：指数函数精度实现错误",
+      "original_definition": "Tensor.exponoential_算子实现精度不一致",
+      "failure_mechanism": {
+        "text": "采样实现/随机数生成质量差异影响推理输出和评分。",
+        "origin": "MODEL_DERIVED",
+        "source_ids": [
+          "SRC-c96b0044562c8f9e8c0aa49e"
+        ],
+        "basis": "MODEL_DERIVED",
+        "source_text_independently_verified": false,
+        "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+      },
+      "semantic_dimensions": {
+        "object_roles": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "原表写Tensor.exponoential_；W14明确Tensor.exponential_随机采样与vllm采样路径，并记GPU曾误走greedy。",
+          "unknown": "生成器、种子/状态、分布参数、样本数及实际比较对象未知。",
+          "source_selectors": [
+            "F",
+            "A-W14/涉及算子",
+            "A-W14/触发/复现条件",
+            "A-W14/根因"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-c96b0044562c8f9e8c0aa49e",
+            "SRC-0f44c9eb0cd918f1fe1dd095",
+            "SRC-9bfe77d98cc3b18edf4abed4",
+            "SRC-1e7f7004ac4360a88bf8c070"
+          ]
+        },
+        "measurement_and_representation": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "对象是随机样本/分布质量和下游评分，不是逐元素exp近似误差。",
+          "unknown": "目标概率分布、参数单位、随机算法和统计阈值未知。",
+          "source_selectors": [
+            "A-W14/涉及算子",
+            "A-W14/根因"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-0f44c9eb0cd918f1fe1dd095",
+            "SRC-1e7f7004ac4360a88bf8c070"
+          ]
+        },
+        "lifecycle": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "随机采样可能消费生成器状态，但资料没有状态记录。",
+          "unknown": "种子初始化、推进/复位、流间独立性全部未知，不作为根因。",
+          "source_selectors": [
+            "A-W14/触发/复现条件"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-9bfe77d98cc3b18edf4abed4"
+          ]
+        },
+        "consumers": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "vllm采样器消费随机样本，模型评分消费采样结果；GPU比较路径曾不一致。",
+          "unknown": "可比采样配置、统计oracle和升级具体修复对象未知。",
+          "source_selectors": [
+            "A-W14/根因",
+            "A-W14/修复方案"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-1e7f7004ac4360a88bf8c070",
+            "SRC-a2cd92319e39a280566fd883"
+          ]
+        }
+      },
+      "relationships": [
+        {
+          "status": "CONFOUNDED_COMPARISON",
+          "source_described_relationship": "摘要声称NPU随机数质量差，同时记录GPU曾走greedy的比较混杂及升级后恢复。",
+          "specific_unresolved_relation": "不能从评分差确认随机分布违反合同，也不能由升级反推某个RNG状态/精度根因。",
+          "source_selectors": [
+            "A-W14/根因",
+            "A-W14/验证结果"
+          ],
+          "independently_confirmed_failure": false,
+          "source_ids": [
+            "SRC-1e7f7004ac4360a88bf8c070",
+            "SRC-216894242ce561eec8d0bbb5"
+          ]
+        }
+      ],
+      "lifecycle_obligations": {
+        "creator_and_storage_scope": {
+          "status": "UNKNOWN",
+          "reason": "未取得相关内部对象创建点与存储作用域。"
+        },
+        "initialization_before_first_read_on_all_paths": {
+          "status": "UNKNOWN",
+          "reason": "未取得首次读取前覆盖所有路径的初始化证据。"
+        },
+        "permitted_writers_and_ownership": {
+          "status": "UNKNOWN",
+          "reason": "声明中的写入/覆盖现象不证明允许写入者和所有权合同。"
+        },
+        "reset_and_reuse_contract": {
+          "status": "UNKNOWN",
+          "reason": "未取得逐调用、对象复用或并发场景的复位合同。"
+        }
+      },
+      "current_review_note": "原整理机理及来源声明，不等于原文独立核验。",
+      "basis": {
+        "file": "sources/baseline_30.json",
+        "json_pointer": "/modes/18",
+        "semantic_file": "sources/semantic30_prior.json"
+      },
+      "caveat": "原定义与既有审读，不是本轮重新取得历史Wiki/DTS原文或验证根因。",
+      "historical_source_verified": false,
+      "hardware_validated": false
+    },
+    {
+      "mode_id": "M028",
+      "original_order": 20,
+      "name": "确定性计算未实现",
+      "original_definition": "reducescatter算子，HCCL场景支持确定性计算，LCCL场景不支持确定性计算",
+      "failure_mechanism": {
+        "text": "通信后端未实现确定性累加/执行，造成重复推理随机波动。",
+        "origin": "MODEL_DERIVED",
+        "source_ids": [
+          "SRC-65917f4bff2a96fc2cdc8d9f"
+        ],
+        "basis": "MODEL_DERIVED",
+        "source_text_independently_verified": false,
+        "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+      },
+      "semantic_dimensions": {
+        "object_roles": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "原表区分HCCL/LCCL的ReduceScatter；W16涉及dp/tp/ep并行，另记MLA与DP上移问题。",
+          "unknown": "实际通信域、rank、reduce输入与确定性控制未知。",
+          "source_selectors": [
+            "F",
+            "A-W16/触发/复现条件",
+            "A-W16/根因"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-65917f4bff2a96fc2cdc8d9f",
+            "SRC-3328050ba4bffce2ae9054f1",
+            "SRC-43d3c62e7aa12ca9a1d90e91"
+          ]
+        },
+        "measurement_and_representation": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "后端、集合通信归约与确定性等级，摘要记录模型正确率波动。",
+          "unknown": "单算子误差、输入dtype/值、归约树及统计判据未知。",
+          "source_selectors": [
+            "F",
+            "A-W16/影响"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-65917f4bff2a96fc2cdc8d9f",
+            "SRC-f8c0046badd4476c343cc5c1"
+          ]
+        },
+        "lifecycle": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "W16报告改HCCL后多次请求回答一致。",
+          "unknown": "是否完全固定输入/seed/调度，状态初始化和同步合同未知。",
+          "source_selectors": [
+            "A-W16/修复方案",
+            "A-W16/验证结果"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-ecb08f8373d6f08ff521da79",
+            "SRC-bd3040e1c414049522b43a97"
+          ]
+        },
+        "consumers": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "不同后端消费归约输入，服务消费结果。",
+          "unknown": "LCCL在该配置下是否承诺确定性、失败应否拦截未知。",
+          "source_selectors": [
+            "F"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-65917f4bff2a96fc2cdc8d9f"
+          ]
+        }
+      },
+      "relationships": [
+        {
+          "status": "SUMMARY_REPORTED_CONTRACT_UNKNOWN",
+          "source_described_relationship": "摘要称LCCL不支持确定性，换HCCL后多次回答一致。",
+          "specific_unresolved_relation": "支持面差异不自动是承诺违约；无法定位到顺序、同步或状态哪条实现关系失效。",
+          "source_selectors": [
+            "F",
+            "A-W16/根因",
+            "A-W16/验证结果"
+          ],
+          "independently_confirmed_failure": false,
+          "source_ids": [
+            "SRC-65917f4bff2a96fc2cdc8d9f",
+            "SRC-43d3c62e7aa12ca9a1d90e91",
+            "SRC-bd3040e1c414049522b43a97"
+          ]
+        }
+      ],
+      "lifecycle_obligations": {
+        "creator_and_storage_scope": {
+          "status": "UNKNOWN",
+          "reason": "未取得相关内部对象创建点与存储作用域。"
+        },
+        "initialization_before_first_read_on_all_paths": {
+          "status": "UNKNOWN",
+          "reason": "未取得首次读取前覆盖所有路径的初始化证据。"
+        },
+        "permitted_writers_and_ownership": {
+          "status": "UNKNOWN",
+          "reason": "声明中的写入/覆盖现象不证明允许写入者和所有权合同。"
+        },
+        "reset_and_reuse_contract": {
+          "status": "UNKNOWN",
+          "reason": "未取得逐调用、对象复用或并发场景的复位合同。"
+        }
+      },
+      "current_review_note": "原整理机理及来源声明，不等于原文独立核验。",
+      "basis": {
+        "file": "sources/baseline_30.json",
+        "json_pointer": "/modes/19",
+        "semantic_file": "sources/semantic30_prior.json"
+      },
+      "caveat": "原定义与既有审读，不是本轮重新取得历史Wiki/DTS原文或验证根因。",
+      "historical_source_verified": false,
+      "hardware_validated": false
+    },
+    {
+      "mode_id": "M015",
+      "original_order": 21,
+      "name": "越界读写：内存踩踏覆盖",
+      "original_definition": "FIA算子踩踏reducesum的内存，导致传入残差入口（add_3算子）的数据发生误差，导致残差之后的误差会不断放大",
+      "failure_mechanism": {
+        "text": "FIA写入覆盖ReduceSum使用的内存，残差入口错误进一步放大。",
+        "origin": "MODEL_DERIVED",
+        "source_ids": [
+          "SRC-002a5d15b67dc7d53782149b"
+        ],
+        "basis": "MODEL_DERIVED",
+        "source_text_independently_verified": false,
+        "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+      },
+      "semantic_dimensions": {
+        "object_roles": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "原声明对象为FIA、ReduceSum存储及add_3残差入口；关联W08实际讲matmul FP32→FP16。",
+          "unknown": "FIA/ReduceSum具体buffer、别名和事件身份未知；W08不能填这些角色。",
+          "source_selectors": [
+            "F",
+            "A-W08/涉及算子",
+            "A-W08/根因"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-002a5d15b67dc7d53782149b",
+            "SRC-cc31721e1e3a07cd9e615fca",
+            "SRC-1d4103abadc515997228876f"
+          ]
+        },
+        "measurement_and_representation": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "原声明涉及地址区间和数据覆盖后精度放大。",
+          "unknown": "地址、长度、单位、合法边界及容量算式均未知。",
+          "source_selectors": [
+            "F"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-002a5d15b67dc7d53782149b"
+          ]
+        },
+        "lifecycle": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "声明声称FIA写入干扰ReduceSum存储，后续add_3消费异常值。",
+          "unknown": "是否生命周期重叠、复用过早、共享写或其他原因未知。",
+          "source_selectors": [
+            "F"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-002a5d15b67dc7d53782149b"
+          ]
+        },
+        "consumers": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "ReduceSum/残差入口消费被声明为遭覆盖的数据。",
+          "unknown": "谁拥有存储、谁允许写、何时可读的合同未知。",
+          "source_selectors": [
+            "F"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-002a5d15b67dc7d53782149b"
+          ]
+        }
+      },
+      "relationships": [
+        {
+          "status": "EVIDENCE_MISMATCH",
+          "source_described_relationship": "原表声明FIA覆盖ReduceSum内存并放大残差误差。",
+          "specific_unresolved_relation": "关联W08的matmul降精材料不支持该覆盖链；具体哪条地址/所有权/生命周期关系失效保持未知。",
+          "source_selectors": [
+            "F",
+            "A-W08/根因"
+          ],
+          "independently_confirmed_failure": false,
+          "source_ids": [
+            "SRC-002a5d15b67dc7d53782149b",
+            "SRC-1d4103abadc515997228876f"
+          ]
+        }
+      ],
+      "lifecycle_obligations": {
+        "creator_and_storage_scope": {
+          "status": "UNKNOWN",
+          "reason": "未取得相关内部对象创建点与存储作用域。"
+        },
+        "initialization_before_first_read_on_all_paths": {
+          "status": "UNKNOWN",
+          "reason": "未取得首次读取前覆盖所有路径的初始化证据。"
+        },
+        "permitted_writers_and_ownership": {
+          "status": "UNKNOWN",
+          "reason": "声明中的写入/覆盖现象不证明允许写入者和所有权合同。"
+        },
+        "reset_and_reuse_contract": {
+          "status": "UNKNOWN",
+          "reason": "未取得逐调用、对象复用或并发场景的复位合同。"
+        }
+      },
+      "current_review_note": "原整理机理及来源声明，不等于原文独立核验。",
+      "basis": {
+        "file": "sources/baseline_30.json",
+        "json_pointer": "/modes/20",
+        "semantic_file": "sources/semantic30_prior.json"
+      },
+      "caveat": "原定义与既有审读，不是本轮重新取得历史Wiki/DTS原文或验证根因。",
+      "historical_source_verified": false,
+      "hardware_validated": false
+    },
+    {
+      "mode_id": "M027",
+      "original_order": 22,
+      "name": "竞品实现不一致：特定私有数据排列格式",
+      "original_definition": "特定私有格式（NC1HWC0、NDHWC、NDC1HWC0、Z_3D）， 不支持as_strided的改变stride的view操作",
+      "failure_mechanism": {
+        "text": "私有格式未适配改变stride的view，使inplace copy未正确作用于预期数据。",
+        "origin": "MODEL_DERIVED",
+        "source_ids": [
+          "SRC-ad9e5647bba1a4975bf52e79"
+        ],
+        "basis": "MODEL_DERIVED",
+        "source_text_independently_verified": false,
+        "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+      },
+      "semantic_dimensions": {
+        "object_roles": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "原表列NC1HWC0/NDHWC/NDC1HWC0/Z_3D及as_strided view；W15称转换为非私有tensor再view导致inplace copy_不生效。",
+          "unknown": "源存储、view、转换结果与写回目标的别名/所有权关系未知。",
+          "source_selectors": [
+            "F",
+            "A-W15/根因"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-ad9e5647bba1a4975bf52e79",
+            "SRC-1767adbe2b40b26e45023d6c"
+          ]
+        },
+        "measurement_and_representation": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "逻辑stride/view语义与私有物理布局的表示差异。",
+          "unknown": "stride单位、storage_offset、具体布局块、真实shape/值和地址映射未知。",
+          "source_selectors": [
+            "F",
+            "A-W15/触发/复现条件"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-ad9e5647bba1a4975bf52e79",
+            "SRC-044c27bd2f6cdff543e9b620"
+          ]
+        },
+        "lifecycle": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "摘要给转换—view—inplace copy_顺序，报告预期写回不生效。",
+          "unknown": "buffer何时创建/释放、是否共享存储与应写对象未知；不补成生命周期越界。",
+          "source_selectors": [
+            "A-W15/根因"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-1767adbe2b40b26e45023d6c"
+          ]
+        },
+        "consumers": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "as_strided消费布局/stride，copy_消费view并预期修改目标，视频输出观察条纹。",
+          "unknown": "私有格式是否承诺此view与写回、哪个消费者的合同被违反未知。",
+          "source_selectors": [
+            "F",
+            "A-W15/现象",
+            "A-W15/根因"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-ad9e5647bba1a4975bf52e79",
+            "SRC-d63a8ea7882ddfe3549f3764",
+            "SRC-1767adbe2b40b26e45023d6c"
+          ]
+        }
+      },
+      "relationships": [
+        {
+          "status": "SUMMARY_REPORTED_CONTRACT_UNKNOWN",
+          "source_described_relationship": "来源声称私有格式与修改stride的view不适配，转换后copy_未生效。",
+          "specific_unresolved_relation": "具体别名/写回关系与支持合同未见，不能归成已证地址算错。",
+          "source_selectors": [
+            "A-W15/根因",
+            "A-W15/验证结果"
+          ],
+          "independently_confirmed_failure": false,
+          "source_ids": [
+            "SRC-1767adbe2b40b26e45023d6c",
+            "SRC-c8ea158d73e9d97df0410e5b"
+          ]
+        }
+      ],
+      "lifecycle_obligations": {
+        "creator_and_storage_scope": {
+          "status": "UNKNOWN",
+          "reason": "未取得相关内部对象创建点与存储作用域。"
+        },
+        "initialization_before_first_read_on_all_paths": {
+          "status": "UNKNOWN",
+          "reason": "未取得首次读取前覆盖所有路径的初始化证据。"
+        },
+        "permitted_writers_and_ownership": {
+          "status": "UNKNOWN",
+          "reason": "声明中的写入/覆盖现象不证明允许写入者和所有权合同。"
+        },
+        "reset_and_reuse_contract": {
+          "status": "UNKNOWN",
+          "reason": "未取得逐调用、对象复用或并发场景的复位合同。"
+        }
+      },
+      "current_review_note": "原整理机理及来源声明，不等于原文独立核验。",
+      "basis": {
+        "file": "sources/baseline_30.json",
+        "json_pointer": "/modes/21",
+        "semantic_file": "sources/semantic30_prior.json"
+      },
+      "caveat": "原定义与既有审读，不是本轮重新取得历史Wiki/DTS原文或验证根因。",
+      "historical_source_verified": false,
+      "hardware_validated": false
+    },
+    {
+      "mode_id": "M003",
+      "original_order": 23,
+      "name": "tiling切分策略的逻辑异常",
+      "original_definition": "reduce轴没有切多核，但m轴在多batch下切分不同，由于FA是下三角的sparse计算，导致核内的reduce轴切分粒度不同",
+      "failure_mechanism": {
+        "text": "m轴随batch改变切分，改变核内reduce粒度和计算顺序，导致单/多batch结果差异。",
+        "origin": "MODEL_DERIVED",
+        "source_ids": [
+          "SRC-a54baa324f56cf730d2392af"
+        ],
+        "basis": "MODEL_DERIVED",
+        "source_text_independently_verified": false,
+        "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+      },
+      "semantic_dimensions": {
+        "object_roles": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "原表区分m轴、reduce轴和下三角sparse计算；W03比较单/多batch中的相同query。",
+          "unknown": "batch到m及reduce分片的实际变量/映射未知。",
+          "source_selectors": [
+            "F",
+            "A-W03/现象",
+            "A-W03/根因"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-a54baa324f56cf730d2392af",
+            "SRC-52eb2472cbe428fb439f8067",
+            "SRC-532f2acb14b202bc691df062"
+          ]
+        },
+        "measurement_and_representation": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "归约切分粒度及浮点计算结果；没有字节/地址溢出声明。",
+          "unknown": "每块长度、实际累加序、精度误差及mask表达未知。",
+          "source_selectors": [
+            "F",
+            "A-W03/根因"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-a54baa324f56cf730d2392af",
+            "SRC-532f2acb14b202bc691df062"
+          ]
+        },
+        "lifecycle": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "摘要比较单batch与多batch两种调用情境。",
+          "unknown": "没有同实参同二进制重复随机或状态残留证据。",
+          "source_selectors": [
+            "A-W03/触发/复现条件"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-25cd847f7341b3c83fcdc4f2"
+          ]
+        },
+        "consumers": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "切分/归约计算消费不同batch下的分片，后续观察首token logits。",
+          "unknown": "单/多batch是否要求bitwise一致、允许误差未知。",
+          "source_selectors": [
+            "F",
+            "A-W03/现象"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-a54baa324f56cf730d2392af",
+            "SRC-52eb2472cbe428fb439f8067"
+          ]
+        }
+      },
+      "relationships": [
+        {
+          "status": "SUMMARY_REPORTED_CONTRACT_UNKNOWN",
+          "source_described_relationship": "来源声称batch改变m轴切分，使核内reduce粒度不同并产生结果差异。",
+          "specific_unresolved_relation": "变化是否越过精度契约未知；不能仅由差异认定错误分支或同步缺失。",
+          "source_selectors": [
+            "F",
+            "A-W03/根因"
+          ],
+          "independently_confirmed_failure": false,
+          "source_ids": [
+            "SRC-a54baa324f56cf730d2392af",
+            "SRC-532f2acb14b202bc691df062"
+          ]
+        }
+      ],
+      "lifecycle_obligations": {
+        "creator_and_storage_scope": {
+          "status": "UNKNOWN",
+          "reason": "未取得相关内部对象创建点与存储作用域。"
+        },
+        "initialization_before_first_read_on_all_paths": {
+          "status": "UNKNOWN",
+          "reason": "未取得首次读取前覆盖所有路径的初始化证据。"
+        },
+        "permitted_writers_and_ownership": {
+          "status": "UNKNOWN",
+          "reason": "声明中的写入/覆盖现象不证明允许写入者和所有权合同。"
+        },
+        "reset_and_reuse_contract": {
+          "status": "UNKNOWN",
+          "reason": "未取得逐调用、对象复用或并发场景的复位合同。"
+        }
+      },
+      "current_review_note": "原整理机理及来源声明，不等于原文独立核验。",
+      "basis": {
+        "file": "sources/baseline_30.json",
+        "json_pointer": "/modes/22",
+        "semantic_file": "sources/semantic30_prior.json"
+      },
+      "caveat": "原定义与既有审读，不是本轮重新取得历史Wiki/DTS原文或验证根因。",
+      "historical_source_verified": false,
+      "hardware_validated": false
+    },
+    {
+      "mode_id": "M016",
+      "original_order": 24,
+      "name": "精度溢出：特定硬件数值格式导致精度溢出",
+      "original_definition": "调用的是BNInferenceD算子，该算子在310P fp16场景有概率发生精度溢出",
+      "failure_mechanism": {
+        "text": "倒数等中间运算超出FP16表示范围，造成归一化精度溢出。",
+        "origin": "MODEL_DERIVED",
+        "source_ids": [
+          "SRC-bbb7aba1bd94da37493ad718"
+        ],
+        "basis": "MODEL_DERIVED",
+        "source_text_independently_verified": false,
+        "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+      },
+      "semantic_dimensions": {
+        "object_roles": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "原表为310P fp16 BNInferenceD；W09明确1/weight为溢出位置。",
+          "unknown": "weight具体语义、tensor值及内部变量未知。",
+          "source_selectors": [
+            "F",
+            "A-W09/根因"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-bbb7aba1bd94da37493ad718",
+            "SRC-899c5efc86e51ce3a8bb91ea"
+          ]
+        },
+        "measurement_and_representation": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "摘要称极小weight的倒数超出fp16表示范围。",
+          "unknown": "阈值、计算/累加dtype和硬件规格未独立核实。",
+          "source_selectors": [
+            "A-W09/触发/复现条件",
+            "A-W09/根因"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-9807fadbbc4e98e2eefe31cb",
+            "SRC-899c5efc86e51ce3a8bb91ea"
+          ]
+        },
+        "lifecycle": {
+          "status": "UNKNOWN",
+          "described": "未知",
+          "unknown": "没有状态初始化、复位或并发证据。",
+          "source_selectors": [],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": []
+        },
+        "consumers": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "倒数计算消费weight，BN路径消费倒数；改BNInfer后内部精度较高。",
+          "unknown": "BNInferenceD受支持输入域、溢出允许行为及修改代码未知。",
+          "source_selectors": [
+            "A-W09/根因",
+            "A-W09/修复方案"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-899c5efc86e51ce3a8bb91ea",
+            "SRC-fa5b15e985e0bd88db578e59"
+          ]
+        }
+      },
+      "relationships": [
+        {
+          "status": "SUMMARY_REPORTED",
+          "source_described_relationship": "摘要称1/weight在310P fp16下溢出，换BNInfer后恢复。",
+          "specific_unresolved_relation": "可描述小分母—倒数范围关系，不能据此认定所有310P算子不支持FP32或特殊值。",
+          "source_selectors": [
+            "A-W09/根因",
+            "A-W09/验证结果"
+          ],
+          "independently_confirmed_failure": false,
+          "source_ids": [
+            "SRC-899c5efc86e51ce3a8bb91ea",
+            "SRC-8e0b76941c707403b14c3efd"
+          ]
+        }
+      ],
+      "lifecycle_obligations": {
+        "creator_and_storage_scope": {
+          "status": "UNKNOWN",
+          "reason": "未取得相关内部对象创建点与存储作用域。"
+        },
+        "initialization_before_first_read_on_all_paths": {
+          "status": "UNKNOWN",
+          "reason": "未取得首次读取前覆盖所有路径的初始化证据。"
+        },
+        "permitted_writers_and_ownership": {
+          "status": "UNKNOWN",
+          "reason": "声明中的写入/覆盖现象不证明允许写入者和所有权合同。"
+        },
+        "reset_and_reuse_contract": {
+          "status": "UNKNOWN",
+          "reason": "未取得逐调用、对象复用或并发场景的复位合同。"
+        }
+      },
+      "current_review_note": "原整理机理及来源声明，不等于原文独立核验。",
+      "basis": {
+        "file": "sources/baseline_30.json",
+        "json_pointer": "/modes/23",
+        "semantic_file": "sources/semantic30_prior.json"
+      },
+      "caveat": "原定义与既有审读，不是本轮重新取得历史Wiki/DTS原文或验证根因。",
+      "historical_source_verified": false,
+      "hardware_validated": false
+    },
+    {
+      "mode_id": "M002",
+      "original_order": 25,
+      "name": "边界值异常",
+      "original_definition": "INTrainingUpdataV2算子variance算出来有负值，导致开根后变为nan",
+      "failure_mechanism": {
+        "text": "方差计算结果出现负值，随后开平方产生NaN。",
+        "origin": "MODEL_DERIVED",
+        "source_ids": [
+          "SRC-2b49dafe78f0f09e7f7f699a"
+        ],
+        "basis": "MODEL_DERIVED",
+        "source_text_independently_verified": false,
+        "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+      },
+      "semantic_dimensions": {
+        "object_roles": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "原声明对象是INTrainingUpdataV2的variance及后续开根；W02称InstanceNormalization输入in1大部分为0。",
+          "unknown": "variance来自哪些tensor/归约分支、缓冲位置未知。",
+          "source_selectors": [
+            "F",
+            "A-W02/涉及算子",
+            "A-W02/触发/复现条件"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-2b49dafe78f0f09e7f7f699a",
+            "SRC-e5fb158e680b6dc7ca9f44b5",
+            "SRC-c6f52c0539faa912aa96e170"
+          ]
+        },
+        "measurement_and_representation": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "variance出现负值并进入sqrt定义域外，随后NaN；属于数值表示/定义域。",
+          "unknown": "方差公式、dtype、舍入和负值幅度未知。",
+          "source_selectors": [
+            "F",
+            "A-W02/根因"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-2b49dafe78f0f09e7f7f699a",
+            "SRC-f3aa36d48bcaff9a96b7be3f"
+          ]
+        },
+        "lifecycle": {
+          "status": "UNKNOWN",
+          "described": "未知",
+          "unknown": "没有初始化、共享写、缓存复用或复位证据。",
+          "source_selectors": [],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": []
+        },
+        "consumers": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "sqrt消费variance；摘要报告NaN传播到后续帧。",
+          "unknown": "sqrt前应采取的数值稳定性/容差处理及实现合同未知。",
+          "source_selectors": [
+            "F",
+            "A-W02/影响"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-2b49dafe78f0f09e7f7f699a",
+            "SRC-84a739a176e25e72ad0ee485"
+          ]
+        }
+      },
+      "relationships": [
+        {
+          "status": "SUMMARY_REPORTED",
+          "source_described_relationship": "来源声称variance计算得到负值，随后开根得到NaN。",
+          "specific_unresolved_relation": "为何为负的具体公式失效关系未知，不能补写E[x²]-E[x]²抵消根因。",
+          "source_selectors": [
+            "F",
+            "A-W02/根因",
+            "A-W02/修复方案"
+          ],
+          "independently_confirmed_failure": false,
+          "source_ids": [
+            "SRC-2b49dafe78f0f09e7f7f699a",
+            "SRC-f3aa36d48bcaff9a96b7be3f",
+            "SRC-66c54b0f1420709f400a70ab"
+          ]
+        }
+      ],
+      "lifecycle_obligations": {
+        "creator_and_storage_scope": {
+          "status": "UNKNOWN",
+          "reason": "未取得相关内部对象创建点与存储作用域。"
+        },
+        "initialization_before_first_read_on_all_paths": {
+          "status": "UNKNOWN",
+          "reason": "未取得首次读取前覆盖所有路径的初始化证据。"
+        },
+        "permitted_writers_and_ownership": {
+          "status": "UNKNOWN",
+          "reason": "声明中的写入/覆盖现象不证明允许写入者和所有权合同。"
+        },
+        "reset_and_reuse_contract": {
+          "status": "UNKNOWN",
+          "reason": "未取得逐调用、对象复用或并发场景的复位合同。"
+        }
+      },
+      "current_review_note": "原整理机理及来源声明，不等于原文独立核验。",
+      "basis": {
+        "file": "sources/baseline_30.json",
+        "json_pointer": "/modes/24",
+        "semantic_file": "sources/semantic30_prior.json"
+      },
+      "caveat": "原定义与既有审读，不是本轮重新取得历史Wiki/DTS原文或验证根因。",
+      "historical_source_verified": false,
+      "hardware_validated": false
+    },
+    {
+      "mode_id": "M010",
+      "original_order": 26,
+      "name": "融合算子反量化位置不当",
+      "original_definition": "图优化阶段因反量化（Dequantize）节点摆放位置错误，导致本应以纯INT8执行的融合算子退化为“反量化+高精度计算+再量化”路径，或使量化参数（scale/zero_point）传递断裂，最终引发精度异常",
+      "failure_mechanism": {
+        "text": "反量化节点位置或量化参数传递错误，改变融合图的计算路径。",
+        "origin": "MODEL_DERIVED",
+        "source_ids": [
+          "SRC-cbfd780ebe0ca7cb408a5873"
+        ],
+        "basis": "MODEL_DERIVED",
+        "source_text_independently_verified": false,
+        "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+      },
+      "semantic_dimensions": {
+        "object_roles": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "原表涉及Dequantize节点、融合节点、scale/zero_point及量化图边。",
+          "unknown": "具体图、tensor角色和丢失的参数未知。",
+          "source_selectors": [
+            "F"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-cbfd780ebe0ca7cb408a5873"
+          ]
+        },
+        "measurement_and_representation": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "声明比较纯INT8与反量化—高精度计算—再量化路径。",
+          "unknown": "高精度具体类型、量化粒度、单位及scale形状未知；不补成FP32。",
+          "source_selectors": [
+            "F"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-cbfd780ebe0ca7cb408a5873"
+          ]
+        },
+        "lifecycle": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "描述图优化/节点重写阶段。",
+          "unknown": "无调用状态、缓冲初始化或多线程证据。",
+          "source_selectors": [
+            "F"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-cbfd780ebe0ca7cb408a5873"
+          ]
+        },
+        "consumers": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "融合计算消费图结构与量化参数。",
+          "unknown": "节点应处位置、数据边及等价变换契约未知。",
+          "source_selectors": [
+            "F"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-cbfd780ebe0ca7cb408a5873"
+          ]
+        }
+      },
+      "relationships": [
+        {
+          "status": "DECLARATION_ONLY",
+          "source_described_relationship": "原表含两个可选解释：反量化节点位置不当，或量化参数传递断裂。",
+          "specific_unresolved_relation": "没有图样例、链接或修复，不能合并为已确认的一条因果链。",
+          "source_selectors": [
+            "F"
+          ],
+          "independently_confirmed_failure": false,
+          "source_ids": [
+            "SRC-cbfd780ebe0ca7cb408a5873"
+          ]
+        }
+      ],
+      "lifecycle_obligations": {
+        "creator_and_storage_scope": {
+          "status": "UNKNOWN",
+          "reason": "未取得相关内部对象创建点与存储作用域。"
+        },
+        "initialization_before_first_read_on_all_paths": {
+          "status": "UNKNOWN",
+          "reason": "未取得首次读取前覆盖所有路径的初始化证据。"
+        },
+        "permitted_writers_and_ownership": {
+          "status": "UNKNOWN",
+          "reason": "声明中的写入/覆盖现象不证明允许写入者和所有权合同。"
+        },
+        "reset_and_reuse_contract": {
+          "status": "UNKNOWN",
+          "reason": "未取得逐调用、对象复用或并发场景的复位合同。"
+        }
+      },
+      "current_review_note": "原整理机理及来源声明，不等于原文独立核验。",
+      "basis": {
+        "file": "sources/baseline_30.json",
+        "json_pointer": "/modes/25",
+        "semantic_file": "sources/semantic30_prior.json"
+      },
+      "caveat": "原定义与既有审读，不是本轮重新取得历史Wiki/DTS原文或验证根因。",
+      "historical_source_verified": false,
+      "hardware_validated": false
+    },
+    {
+      "mode_id": "M030",
+      "original_order": 27,
+      "name": "输入数据类型强转低精丢失",
+      "original_definition": "conv2d算子在进行计算之前，会把输入的tensor强制转换成FP16格式的，因为算子内部不支持FP32格式。所以计算出的结果和onnx就不对齐",
+      "failure_mechanism": {
+        "text": "计算前将FP32输入降为FP16，损失信息并在后续argmax等非线性决策处放大。",
+        "origin": "MODEL_DERIVED",
+        "source_ids": [
+          "SRC-b13d0b3f0eb6cf984980655c"
+        ],
+        "basis": "MODEL_DERIVED",
+        "source_text_independently_verified": false,
+        "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+      },
+      "semantic_dimensions": {
+        "object_roles": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "原表为conv2d输入tensor与内部强转；W18给FP32输入、conv2d及下游argmaxd。",
+          "unknown": "权重/中间/累加/输出的完整dtype和tensor变量未知。",
+          "source_selectors": [
+            "F",
+            "A-W18/触发/复现条件",
+            "A-W18/涉及算子"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-b13d0b3f0eb6cf984980655c",
+            "SRC-ed9e68856b79e7d872bac7c5",
+            "SRC-f2d192a0cdaf37c636852adc"
+          ]
+        },
+        "measurement_and_representation": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "声明FP32输入在计算前转FP16，数值与onnx不对齐并被argmax放大。",
+          "unknown": "原值、舍入点、溢出是否发生及误差阈值未知，不能补写溢出。",
+          "source_selectors": [
+            "F",
+            "A-W18/根因"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-b13d0b3f0eb6cf984980655c",
+            "SRC-5e0ba87374d4b963de5888e5"
+          ]
+        },
+        "lifecycle": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "原表明确计算前发生转换。",
+          "unknown": "未给跨调用状态、缓冲初始化、复位或共享写事实。",
+          "source_selectors": [
+            "F"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-b13d0b3f0eb6cf984980655c"
+          ]
+        },
+        "consumers": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "conv2d消费强转后的输入，argmaxd/整网比较消费输出。",
+          "unknown": "FP32支持承诺、内部精度合同及argmax临界值未知。",
+          "source_selectors": [
+            "F",
+            "A-W18/根因"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-b13d0b3f0eb6cf984980655c",
+            "SRC-5e0ba87374d4b963de5888e5"
+          ]
+        }
+      },
+      "relationships": [
+        {
+          "status": "SUMMARY_REPORTED",
+          "source_described_relationship": "来源声称内部FP16计算使FP32输入结果与onnx不同，改图或CPU切片后通过。",
+          "specific_unresolved_relation": "可描述输入—计算精度路径差异，未独立证明强转合同违例与具体误差机制。",
+          "source_selectors": [
+            "F",
+            "A-W18/根因",
+            "A-W18/验证结果"
+          ],
+          "independently_confirmed_failure": false,
+          "source_ids": [
+            "SRC-b13d0b3f0eb6cf984980655c",
+            "SRC-5e0ba87374d4b963de5888e5",
+            "SRC-f1dc503d0cda9efae9d7a8bf"
+          ]
+        }
+      ],
+      "lifecycle_obligations": {
+        "creator_and_storage_scope": {
+          "status": "UNKNOWN",
+          "reason": "未取得相关内部对象创建点与存储作用域。"
+        },
+        "initialization_before_first_read_on_all_paths": {
+          "status": "UNKNOWN",
+          "reason": "未取得首次读取前覆盖所有路径的初始化证据。"
+        },
+        "permitted_writers_and_ownership": {
+          "status": "UNKNOWN",
+          "reason": "声明中的写入/覆盖现象不证明允许写入者和所有权合同。"
+        },
+        "reset_and_reuse_contract": {
+          "status": "UNKNOWN",
+          "reason": "未取得逐调用、对象复用或并发场景的复位合同。"
+        }
+      },
+      "current_review_note": "原整理机理及来源声明，不等于原文独立核验。",
+      "basis": {
+        "file": "sources/baseline_30.json",
+        "json_pointer": "/modes/26",
+        "semantic_file": "sources/semantic30_prior.json"
+      },
+      "caveat": "原定义与既有审读，不是本轮重新取得历史Wiki/DTS原文或验证根因。",
+      "historical_source_verified": false,
+      "hardware_validated": false
+    },
+    {
+      "mode_id": "M017",
+      "original_order": 28,
+      "name": "tiling切分策略不同分支处理精度不一致",
+      "original_definition": "PageAttention blockSize 不同时，会有不同的tiling选择，结果精度不能保持二进制一致",
+      "failure_mechanism": {
+        "text": "不同分块/算法更新路径产生不同舍入累加结果，不能保证跨配置二进制一致。",
+        "origin": "MODEL_DERIVED",
+        "source_ids": [
+          "SRC-f37548c4acf7cbb9dce8cb35"
+        ],
+        "basis": "MODEL_DERIVED",
+        "source_text_independently_verified": false,
+        "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+      },
+      "semantic_dimensions": {
+        "object_roles": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "原表为PageAttention的blockSize/tiling；W10另给服务化batch变化和PA/FA。",
+          "unknown": "blockSize是否公开实参、与工作区/轴的实际映射未知。",
+          "source_selectors": [
+            "F",
+            "A-W10/触发/复现条件"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-f37548c4acf7cbb9dce8cb35",
+            "SRC-5dfddb9099c16e4657528b78"
+          ]
+        },
+        "measurement_and_representation": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "不同分块的softmax逐步更新产生非bitwise相同结果。",
+          "unknown": "实际误差、分块尺寸及累加类型未知。",
+          "source_selectors": [
+            "F",
+            "A-W10/根因"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-f37548c4acf7cbb9dce8cb35",
+            "SRC-02892a03791e16277e14efdb"
+          ]
+        },
+        "lifecycle": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "比较不同batch/分块的请求情境。",
+          "unknown": "没有同实参同上下文重复随机或共享状态证据。",
+          "source_selectors": [
+            "A-W10/触发/复现条件"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-5dfddb9099c16e4657528b78"
+          ]
+        },
+        "consumers": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "PA/FA计算消费不同分块；测试/服务消费结果并期望确定性。",
+          "unknown": "跨batch是否承诺bitwise一致未知；摘要明确符合算子精度标准。",
+          "source_selectors": [
+            "A-W10/根因",
+            "A-W10/验证结果"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-02892a03791e16277e14efdb",
+            "SRC-bc48765fde936cb52aa08398"
+          ]
+        }
+      },
+      "relationships": [
+        {
+          "status": "NO_VIOLATED_CONTRACT_ESTABLISHED",
+          "source_described_relationship": "来源描述跨配置结果不能二进制一致，同时明确结果符合算子精度标准、未改实现。",
+          "specific_unresolved_relation": "无法确认任何算子合同失效；不能把精度达标记录改写成已证故障。",
+          "source_selectors": [
+            "F",
+            "A-W10/修复方案",
+            "A-W10/验证结果"
+          ],
+          "independently_confirmed_failure": false,
+          "source_ids": [
+            "SRC-f37548c4acf7cbb9dce8cb35",
+            "SRC-4501b39b1295287e9be05c58",
+            "SRC-bc48765fde936cb52aa08398"
+          ]
+        }
+      ],
+      "lifecycle_obligations": {
+        "creator_and_storage_scope": {
+          "status": "UNKNOWN",
+          "reason": "未取得相关内部对象创建点与存储作用域。"
+        },
+        "initialization_before_first_read_on_all_paths": {
+          "status": "UNKNOWN",
+          "reason": "未取得首次读取前覆盖所有路径的初始化证据。"
+        },
+        "permitted_writers_and_ownership": {
+          "status": "UNKNOWN",
+          "reason": "声明中的写入/覆盖现象不证明允许写入者和所有权合同。"
+        },
+        "reset_and_reuse_contract": {
+          "status": "UNKNOWN",
+          "reason": "未取得逐调用、对象复用或并发场景的复位合同。"
+        }
+      },
+      "current_review_note": "原整理机理及来源声明，不等于原文独立核验。",
+      "basis": {
+        "file": "sources/baseline_30.json",
+        "json_pointer": "/modes/27",
+        "semantic_file": "sources/semantic30_prior.json"
+      },
+      "caveat": "原定义与既有审读，不是本轮重新取得历史Wiki/DTS原文或验证根因。",
+      "historical_source_verified": false,
+      "hardware_validated": false
+    },
+    {
+      "mode_id": "M021",
+      "original_order": 29,
+      "name": "矩阵乘加融合后数据格式转换精度丢失",
+      "original_definition": "MatmulAtomicAddUbFusion打开矩阵乘法加法融合，特定shape下matmul算子 在线编译和二进制的输出会有精度差距",
+      "failure_mechanism": {
+        "text": "融合及编译路径改变Cast和计算顺序，导致在线编译与二进制路径输出不一致。",
+        "origin": "MODEL_DERIVED",
+        "source_ids": [
+          "SRC-32cf3df1acb14a40aae88e3e"
+        ],
+        "basis": "MODEL_DERIVED",
+        "source_text_independently_verified": false,
+        "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+      },
+      "semantic_dimensions": {
+        "object_roles": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "原表比较MatmulAtomicAddUbFusion开启时在线/二进制matmul；W13给两矩阵[201,11008]×[11008,4096]及cast/融合路径。",
+          "unknown": "中间tensor、累加器、融合输入输出的完整角色未知。",
+          "source_selectors": [
+            "F",
+            "A-W13/触发/复现条件",
+            "A-W13/根因"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-32cf3df1acb14a40aae88e3e",
+            "SRC-6426cf974c90dcbbc4fece91",
+            "SRC-fffbb9419689a0869eacd91d"
+          ]
+        },
+        "measurement_and_representation": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "W13报告fp16→fp32→fp16转换和融合后FP32出；同时记录ULP=0.0004433<0.001。",
+          "unknown": "造成差异的具体转换和实际值未知；不能假设单纯精确往返cast必然有损。",
+          "source_selectors": [
+            "A-W13/根因",
+            "A-W13/验证结果"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-fffbb9419689a0869eacd91d",
+            "SRC-64a0e8863d5d6442d8b4b5c2"
+          ]
+        },
+        "lifecycle": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "材料比较编译/融合配置。",
+          "unknown": "没有跨调用残留、复位、共享写或同步证据。",
+          "source_selectors": [
+            "F"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-32cf3df1acb14a40aae88e3e"
+          ]
+        },
+        "consumers": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "融合计算消费cast结果，海思门禁和ULP规则分别消费输出。",
+          "unknown": "两个判据是否同目标、优先级及最终合同未知。",
+          "source_selectors": [
+            "A-W13/影响",
+            "A-W13/验证结果"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-b711d5be5a1f9735eddc91d9",
+            "SRC-64a0e8863d5d6442d8b4b5c2"
+          ]
+        }
+      },
+      "relationships": [
+        {
+          "status": "ORACLE_SCOPE_UNRESOLVED",
+          "source_described_relationship": "摘要称融合/转换相关差异，关开关后对齐；同时存在门禁拦截与ULP达标两项记录。",
+          "specific_unresolved_relation": "保留两种判定，不把它们补成已确认违反算子精度合同；具体失效转换关系未知。",
+          "source_selectors": [
+            "F",
+            "A-W13/根因",
+            "A-W13/修复方案",
+            "A-W13/影响",
+            "A-W13/验证结果"
+          ],
+          "independently_confirmed_failure": false,
+          "source_ids": [
+            "SRC-32cf3df1acb14a40aae88e3e",
+            "SRC-fffbb9419689a0869eacd91d",
+            "SRC-cd9c0ef8b79e688563dcd3c0",
+            "SRC-b711d5be5a1f9735eddc91d9",
+            "SRC-64a0e8863d5d6442d8b4b5c2"
+          ]
+        }
+      ],
+      "lifecycle_obligations": {
+        "creator_and_storage_scope": {
+          "status": "UNKNOWN",
+          "reason": "未取得相关内部对象创建点与存储作用域。"
+        },
+        "initialization_before_first_read_on_all_paths": {
+          "status": "UNKNOWN",
+          "reason": "未取得首次读取前覆盖所有路径的初始化证据。"
+        },
+        "permitted_writers_and_ownership": {
+          "status": "UNKNOWN",
+          "reason": "声明中的写入/覆盖现象不证明允许写入者和所有权合同。"
+        },
+        "reset_and_reuse_contract": {
+          "status": "UNKNOWN",
+          "reason": "未取得逐调用、对象复用或并发场景的复位合同。"
+        }
+      },
+      "current_review_note": "原整理机理及来源声明，不等于原文独立核验。",
+      "basis": {
+        "file": "sources/baseline_30.json",
+        "json_pointer": "/modes/28",
+        "semantic_file": "sources/semantic30_prior.json"
+      },
+      "caveat": "原定义与既有审读，不是本轮重新取得历史Wiki/DTS原文或验证根因。",
+      "historical_source_verified": false,
+      "hardware_validated": false
+    },
+    {
+      "mode_id": "M018",
+      "original_order": 30,
+      "name": "浮点数累加序不当",
+      "original_definition": "attention算子输入shape不一样导致Tiling 策略并行粒度变化，输出微小差异带来精度误差",
+      "failure_mechanism": {
+        "text": "原表将不同shape下的输出微差归因于Tiling并行粒度变化。",
+        "origin": "MODEL_DERIVED",
+        "source_ids": [
+          "SRC-fd6787c70348dc9d6bbc5525"
+        ],
+        "basis": "MODEL_DERIVED",
+        "source_text_independently_verified": false,
+        "interpretation_scope": "MODE_DEFINITION_NOT_CONFIRMED_CUSTOMER_ROOT_CAUSE"
+      },
+      "semantic_dimensions": {
+        "object_roles": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "原表为attention shape、tiling并行粒度和输出；W11比较全量4096与91输入在第92位置的logits。",
+          "unknown": "4096/91具体轴和两次调用的tensor对应关系未知。",
+          "source_selectors": [
+            "F",
+            "A-W11/现象"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-fd6787c70348dc9d6bbc5525",
+            "SRC-8b0ef1a967116a48a0a16719"
+          ]
+        },
+        "measurement_and_representation": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "shape/分块与浮点结果的跨情境比较。",
+          "unknown": "序列单位、实际tile、误差幅度和精度合同未知。",
+          "source_selectors": [
+            "F",
+            "A-W11/根因"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-fd6787c70348dc9d6bbc5525",
+            "SRC-df4c3eaaa957aff679a469f3"
+          ]
+        },
+        "lifecycle": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "记录不同输入情境。",
+          "unknown": "未给同输入重复、初始化、复位或共享写证据。",
+          "source_selectors": [
+            "A-W11/触发/复现条件"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-ee99d2489d233737d46bab7d"
+          ]
+        },
+        "consumers": {
+          "status": "PARTIAL_SOURCE_DESCRIPTION",
+          "described": "attention路径消费shape，后续比较logits。",
+          "unknown": "是否应跨shape严格相等以及比较位置的语义未知。",
+          "source_selectors": [
+            "F",
+            "A-W11/现象"
+          ],
+          "meaning": "按注明来源重述；没有补充未见的实现、变量或执行事实",
+          "source_ids": [
+            "SRC-fd6787c70348dc9d6bbc5525",
+            "SRC-8b0ef1a967116a48a0a16719"
+          ]
+        }
+      },
+      "relationships": [
+        {
+          "status": "RELATION_UNCONFIRMED",
+          "source_described_relationship": "原表声明shape改变并行粒度导致微小误差；W11仅粗略结论，验证未闭环。",
+          "specific_unresolved_relation": "无法定位被违反的具体数值或分派合同，不补写越标、同步或缓存原因。",
+          "source_selectors": [
+            "F",
+            "A-W11/定位过程",
+            "A-W11/验证结果"
+          ],
+          "independently_confirmed_failure": false,
+          "source_ids": [
+            "SRC-fd6787c70348dc9d6bbc5525",
+            "SRC-d7f8e25fcd17b08c1984c109",
+            "SRC-a266a6de26f09cd9e1ea1cc3"
+          ]
+        }
+      ],
+      "lifecycle_obligations": {
+        "creator_and_storage_scope": {
+          "status": "UNKNOWN",
+          "reason": "未取得相关内部对象创建点与存储作用域。"
+        },
+        "initialization_before_first_read_on_all_paths": {
+          "status": "UNKNOWN",
+          "reason": "未取得首次读取前覆盖所有路径的初始化证据。"
+        },
+        "permitted_writers_and_ownership": {
+          "status": "UNKNOWN",
+          "reason": "声明中的写入/覆盖现象不证明允许写入者和所有权合同。"
+        },
+        "reset_and_reuse_contract": {
+          "status": "UNKNOWN",
+          "reason": "未取得逐调用、对象复用或并发场景的复位合同。"
+        }
+      },
+      "current_review_note": "原整理机理及来源声明，不等于原文独立核验。",
+      "basis": {
+        "file": "sources/baseline_30.json",
+        "json_pointer": "/modes/29",
+        "semantic_file": "sources/semantic30_prior.json"
+      },
+      "caveat": "原定义与既有审读，不是本轮重新取得历史Wiki/DTS原文或验证根因。",
+      "historical_source_verified": false,
+      "hardware_validated": false
+    }
+  ],
+  "baseline_library_size": 30,
+  "baseline_replaced": false,
+  "comparison_uses_53_catalog": false,
+  "discussion_updates": [
+    {
+      "mode_id": "M006",
+      "original_order": 2,
+      "recorded_on": "2026-11-11",
+      "origin": "USER_DISCUSSION",
+      "v4_scenario_ids": [
+        "minus_one"
+      ],
+      "v4_scenario_name": "-1：推断维度 / 动态标记 / 哨兵",
+      "classification_scope": "PROVISIONAL_FROM_DESCRIPTION",
+      "note": "按用户指示先记录为V4的-1；原记录描述InferShape输出-1，合法输入标记、传播链及具体修复点仍待确认。",
+      "evidence_confirmed": false,
+      "hardware_validated": false,
+      "counts_toward_historical_coverage": false,
+      "fix_version": {
+        "value": "CANN 6.3 RC1 B060",
+        "origin": "USER_PROVIDED",
+        "verified": false
+      }
+    },
+    {
+      "mode_id": "M026",
+      "original_order": 3,
+      "recorded_on": "2026-11-11",
+      "origin": "USER_DISCUSSION",
+      "status": "RETAIN_PENDING_EVIDENCE",
+      "note": "原序第3条M026按用户指示先保留，继续收集证据；现有对齐分类保持候选，不升级为根因或越界已证实。",
+      "evidence_confirmed": false,
+      "hardware_validated": false
+    },
+    {
+      "mode_id": "M004",
+      "original_order": 4,
+      "recorded_on": "2026-11-11",
+      "origin": "USER_DISCUSSION",
+      "classification_scope": "MECHANISM_REFINEMENT_FROM_USER_REPAIR_ACCOUNT",
+      "mechanism_refinement": "用户补充：MC2未传入useBufferType；AllGatherMatmul调用SetSkipBufferWindowCopy设置该配置，HCCL获取该值并更新。先按通信缓冲区模式参数漏传或状态传播不一致整理，不直接认定为偏移算式错误。",
+      "input_dependency": "CONTROL_CONFIGURATION_AND_IMPLEMENTATION_PATH; TENSOR_SHAPE_OR_VALUE_TRIGGER_UNKNOWN",
+      "reproduction_status": "CONDITIONS_REQUIRED_RATE_UNKNOWN",
+      "v4_class_candidates": [
+        "C4"
+      ],
+      "v4_scenario_ids": [],
+      "api42_ids": [],
+      "classification_note": "C4显式模式分派作为待核对方向；不把内部必需字段漏传直接当成合法可选参数省略，也不直接增加API42或55构造覆盖。",
+      "public_api_reference": {
+        "url": "https://www.hiascend.com/doc_center/source/zh/canncommercial/800/apiref/ascendcopapi/atlasascendc_api_07_10044.html",
+        "supports": "SetSkipBufferWindowCopy设置通信算法获取输入数据的位置；只支持接口语义，不是本故障的修复提交。"
+      },
+      "evidence_confirmed": false,
+      "hardware_validated": false,
+      "counts_toward_historical_coverage": false
+    }
+  ],
+  "source_verified": false,
+  "hardware_validated": false
+}
