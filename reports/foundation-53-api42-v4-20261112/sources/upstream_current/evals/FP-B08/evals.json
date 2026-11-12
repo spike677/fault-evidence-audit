@@ -1,0 +1,55 @@
+{
+  "skill_name": "fpb08-fallback-review",
+  "pattern_id": "FP-B08",
+  "eval_mode": "text",
+  "verdict_convention": "回答末尾须有一行 `verdict: <FP-XX | OUT_OF_SCOPE>`",
+  "evals": [
+    {
+      "id": "FP-B08-P1",
+      "kind": "positive",
+      "prompt": "【现象】节点级配置未生效但无报错；图模式与 aclnn 直调不一致；全局生效节点级不生效\n【上下文】仓：canndev；侧别：Host；载体：IR与图配置。\n请判定属于本库哪条故障模式（给出 FP 编号与子型），并给出首查动作与需要补齐的证据；信息不足时说明还缺什么。回答末尾须有一行 `verdict: <FP-XX | OUT_OF_SCOPE>`。",
+      "expected_verdict": "FP-B08",
+      "expected_output": "应判 FP-B08；给出该模式子型与首查动作；结论须附证据等级。",
+      "must_include": [
+        "首查|检查项|核对|排查|扫描|查看|定位",
+        "证据等级|静态可证|需实测确认|信息不足|缺.{0,6}证据",
+        "FP-B08"
+      ],
+      "forbidden": [
+        "BUG-\\d{8}|[A-Za-z]:\\\\|内部日报|内部缺陷单",
+        "已确认为缺陷|必然是缺陷|无条件确定是缺陷"
+      ]
+    },
+    {
+      "id": "FP-B08-N1",
+      "kind": "neighbor-negative",
+      "prompt": "【现象】合法输入报 Not supported / Unsupported；误拦截\n【已有证据】新支持项全矩阵二级冒烟 指向该机制。\n【上下文】仓：canndev；侧别：Host；载体：IR与图配置。\n请判定属于本库哪条故障模式（给出 FP 编号与子型），并给出首查动作与需要补齐的证据；信息不足时说明还缺什么。回答末尾须有一行 `verdict: <FP-XX | OUT_OF_SCOPE>`。",
+      "expected_verdict": "FP-B01",
+      "expected_output": "应判 FP-B01；该现象带有 FP-B01 的典型工具证据（新支持项全矩阵二级冒烟），应据此归 FP-B01；若判 FP-B08，须给出 [文件]:[行号] 级负向证据。",
+      "must_include": [
+        "首查|检查项|核对|排查|扫描|查看|定位",
+        "证据等级|静态可证|需实测确认|信息不足|缺.{0,6}证据",
+        "FP-B01"
+      ],
+      "forbidden": [
+        "BUG-\\d{8}|[A-Za-z]:\\\\|内部日报|内部缺陷单",
+        "已确认为缺陷|必然是缺陷|无条件确定是缺陷"
+      ],
+      "discriminator": "证据类型偏向 FP-B01（新支持项全矩阵二级冒烟）；判 FP-B08 须给出负向证据"
+    },
+    {
+      "id": "FP-B08-X1",
+      "kind": "out-of-scope",
+      "prompt": "【现象】文档措辞想改成中英双语并统一排版，属编辑规范诉求而非内容不一致。\n请判定是否属于本库适用面；若不适用，须说明定界理由（如环境 / 流程 / 方案选型 / 与算子无关），不得强行套用任一 FP 模式。回答末尾须有一行 `verdict: <FP-XX | OUT_OF_SCOPE>`。",
+      "expected_verdict": "OUT_OF_SCOPE",
+      "expected_output": "应声明不在本库适用面（未定界到算子缺陷 / 属环境或方案选型），不得强行套用任一 FP 模式。",
+      "must_include": [
+        "不在(本库)?适用面|超出(本库)?(适用|范围)|不属(于)?(算子|本库)|未定界|环境问题|方案选型|选型问题|流程问题|与算子(计算)?无关"
+      ],
+      "forbidden": [
+        "BUG-\\d{8}|[A-Za-z]:\\\\|内部日报|内部缺陷单",
+        "属\\s?FP-[A-G]\\d{2}|应判\\s?FP-[A-G]\\d{2}"
+      ]
+    }
+  ]
+}

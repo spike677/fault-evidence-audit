@@ -1,0 +1,4036 @@
+{
+  "schema_version": "FOUNDATION-53-INVENTORY-1",
+  "source_version": "v6.63",
+  "source_commit": "1652e0fc3f8aeb617eeb889e518e2bc9cc8494e8",
+  "source_root": "D:\\project\\demoncatpfi\\work\\ascend_pattern_comparison_20261111\\ascend-op-fault-patterns",
+  "scope": "COMPLETE_53_LIBRARY_INVENTORY_NOT_TARGET_REPOSITORY_BUG_SCAN",
+  "original_definition_files_modified": false,
+  "overview": {
+    "groups": [
+      {
+        "prefix": "FP-A",
+        "category": "accuracy",
+        "name": "精度",
+        "count": 22
+      },
+      {
+        "prefix": "FP-B",
+        "category": "compatibility",
+        "name": "功能兼容",
+        "count": 15
+      },
+      {
+        "prefix": "FP-C",
+        "category": "performance",
+        "name": "性能",
+        "count": 6
+      },
+      {
+        "prefix": "FP-D",
+        "category": "resource",
+        "name": "资源内存",
+        "count": 2
+      },
+      {
+        "prefix": "FP-E",
+        "category": "test_effectiveness",
+        "name": "测试有效性",
+        "count": 2
+      },
+      {
+        "prefix": "FP-F",
+        "category": "engineering",
+        "name": "工程交付",
+        "count": 4
+      },
+      {
+        "prefix": "FP-G",
+        "category": "reliability",
+        "name": "执行可靠性",
+        "count": 2
+      }
+    ],
+    "definition_vs_validation": {
+      "original_entries": 53,
+      "unique_original_ids": 53,
+      "groups": 7,
+      "definition_inventory_status": "ALL_53_CORE_DEFINITIONS_APPLICABILITY_NEIGHBOUR_BOUNDARIES_AND_L2_REVIEWED",
+      "newly_independently_verified_defects": 0,
+      "new_device_runs": 0,
+      "finding": "53项为跨精度、功能契约、性能资源、测试判据、工程交付及执行可靠性的检视模式，不是53个已证实精度根因。",
+      "distinction": "原库定义/签名/L2设计/案例叙述与本轮独立代码或设备验证分层。"
+    },
+    "analysis_kind_semantics": "analysis_kind为非互斥审读注释，不替代原7分组，不可加总当故障数。",
+    "version_note": "本清单固定1652e0fc原53条。父Agent另核上游6c47a3a9af9159129d1678b05b9382f749537f0c据报新增FP-B16且文档计数有矛盾；根报告另列，不并入53分母或当现场独立验证。",
+    "coverage_summary": [
+      "A组亦含A13测试输入掩盖、A19路径覆盖、A20声明/判据粒度、A04错误传播后果面，不全为独立数值根因。",
+      "B组覆盖支持/合法性、空/动态、配置、整数域、输出义务、图通路和容器容量，均依本接口合同。",
+      "C/D比较性能/资源，慢但完成与不完成、容量与内存正确性不同。",
+      "E管golden/判据本身，F管构建/声明/上报/交付，不能全当kernel精度机理。",
+      "G管执行完成性与生产者消费者依赖，非确定性不自动证明缺同步。"
+    ],
+    "object_time_consumer_summary": {
+      "objects": [
+        "数值载荷/中间量",
+        "dtype/shape/attr/动态哨兵",
+        "tiling/分核/容量",
+        "workspace/CKE/别名/输出",
+        "进程共享/调用私有状态",
+        "事件/流水/核/通信域",
+        "golden/阈值/支持声明",
+        "注册/构建/打包/日志"
+      ],
+      "times": [
+        "声明发布",
+        "图编译推导",
+        "接口第一段",
+        "模板选择",
+        "kernel计算寻址",
+        "写回同步完成",
+        "跨调用线程长稳",
+        "测试设计判读"
+      ],
+      "consumers": [
+        "接口/图框架",
+        "checker/dispatcher",
+        "计算/搬运/归约",
+        "等待方/参与核",
+        "后续算子/模型",
+        "oracle/CI/性能资源基线",
+        "加载/发布/监控"
+      ]
+    },
+    "testing_and_evidence_discipline": [
+      "L1机理、L2怎么测、L3观测手段失效分开；签名只候选。",
+      "T1限本接口实测，旁证不能借用为阳性/阴性。",
+      "阴性前证明路径、参与核/冲突前提和工具激活，未观测不等无缺陷。",
+      "适用仓/侧别/载体/触发先核，排除需具体负向证据。",
+      "参考匹配接口层和有效计算精度，完整导出，离散并列不可唯一bit对标。",
+      "两段式返回0不是设备完成；同步结论和racecheck激活须另核。",
+      "四问只审驱动量，未知写原因，Q4未定不判Q2，不能替代算法/数值稳定性/复现。",
+      "第二oracle冲突须实测，不以定义或结构覆盖升级设备覆盖。"
+    ],
+    "measured_inventory": {
+      "signature_patterns": 50,
+      "subtype_patterns": 22,
+      "subtypes": 102,
+      "detect_records": 53,
+      "oracle_failure_categories": 11,
+      "oracle_failure_records": 69
+    },
+    "important_boundaries": [
+      "A05内存正确性≠D01/D02容量；B07地址算式≠B13参数窄化≠B15容器容量。",
+      "A06开关承诺≠A20声明判据≠G02依赖顺序，C05是代价。",
+      "A07谓词错≠A19路径未测≠A22 dtype映射错。",
+      "B06空态分支≠B12输出义务；numel=0≠nullptr≠rank-0标量。",
+      "F03接口声明不能被算子README替代；F01构建与F04交付不同，合法AICPU回退须排除。"
+    ],
+    "index_card_title_differences": [
+      {
+        "id": "FP-A05",
+        "index_name": "脏数据/数据踩踏",
+        "card_name": "脏数据 / 数据踩踏",
+        "note": "原样分别保留，不自动改名；多为排版或标题长短差别。"
+      },
+      {
+        "id": "FP-A20",
+        "index_name": "确定性等级未分级标注（二元描述掩盖条件确定性）",
+        "card_name": "确定性等级未分级标注（「确定/非确定」二元描述掩盖条件确定性）",
+        "note": "原样分别保留，不自动改名；多为排版或标题长短差别。"
+      },
+      {
+        "id": "FP-B04",
+        "index_name": "aclnn 必选入参空指针校验缺失",
+        "card_name": "aclnn 必选入参空指针校验缺失（含可选输出反向依赖）",
+        "note": "原样分别保留，不自动改名；多为排版或标题长短差别。"
+      },
+      {
+        "id": "FP-B10",
+        "index_name": "集合通信算子功能/兼容问题（通信域/拓扑/图模式契约/同族实现不对称）",
+        "card_name": "集合通信算子功能/兼容问题（通信域 / 拓扑 / 图模式契约 / 同族实现不对称）",
+        "note": "原样分别保留，不自动改名；多为排版或标题长短差别。"
+      },
+      {
+        "id": "FP-B11",
+        "index_name": "第一段接口/InferShape 参数契约校验缺失（非法 shape/rank/attr 放行）",
+        "card_name": "第一段接口 / InferShape 参数契约校验缺失（非法 shape/rank/attr 放行）",
+        "note": "原样分别保留，不自动改名；多为排版或标题长短差别。"
+      },
+      {
+        "id": "FP-B13",
+        "index_name": "host 侧 int64→int32 窄化/乘积溢出（参数值静默改变）",
+        "card_name": "host 侧 int64→int32 窄化 / 乘积溢出（参数值静默改变）",
+        "note": "原样分别保留，不自动改名；多为排版或标题长短差别。"
+      },
+      {
+        "id": "FP-C01",
+        "index_name": "算子端到端耗时占比高且单次调用耗时高（含 host 侧循环上界写错致重复调度子型）",
+        "card_name": "算子端到端耗时占比高且单次调用耗时高",
+        "note": "原样分别保留，不自动改名；多为排版或标题长短差别。"
+      },
+      {
+        "id": "FP-F04",
+        "index_name": "算子接口交付面缺失（符号未导出/原型未注册/未纳入商分）",
+        "card_name": "算子接口交付面缺失（符号未导出 / 原型未注册 / 未纳入商分）",
+        "note": "原样分别保留，不自动改名；多为排版或标题长短差别。"
+      },
+      {
+        "id": "FP-G01",
+        "index_name": "执行挂死与调度超时（死循环/回绕长循环/通信等待/kernel 超时）",
+        "card_name": "执行挂死与调度超时（死循环 / 回绕长循环 / 通信等待 / kernel 超时）",
+        "note": "原样分别保留，不自动改名；多为排版或标题长短差别。"
+      }
+    ]
+  },
+  "patterns": [
+    {
+      "id": "FP-A01",
+      "name": "硬件指令精度不足，未与竞品对齐",
+      "category": "accuracy",
+      "coverage": "硬件指令精度不足，未与竞品对齐；依赖特定指令路径的算子（exp/sin/cos/rsqrt 等近似指令实现）。",
+      "relation_focus": "近似指令与补偿须满足声明精度",
+      "object_focus": "输入/中间量/指令与补偿",
+      "time_focus": "kernel计算",
+      "consumer_focus": "近似结果读者和精度oracle",
+      "boundary": "A02累加、A03中间dtype、E02判据不同；超差不唯一定位本型",
+      "analysis_kind": [
+        "MECHANISM",
+        "CONTRACT"
+      ],
+      "source_file": "patterns/FP-A/FP-A01.md",
+      "source_quote": "- **故障机理**：所选硬件指令（近似超越函数、低精度乘加等）的精度规格低于竞品同类指令，且未做软件补偿。",
+      "source_quote_line": 7,
+      "source_sha256": "a1d34e16776663b3919bac4fa798628f4a6b51d90af6e4ec786359434995aa23",
+      "source_card_name": "硬件指令精度不足，未与竞品对齐",
+      "applicability": {
+        "repos": [
+          "All"
+        ],
+        "sides": [
+          "Kernel"
+        ],
+        "carriers": [
+          "Kernel源码"
+        ],
+        "trigger": "Exp|Log1p|Rsqrt|Tanh|Power\\(",
+        "enabled": true
+      },
+      "applicability_source_quote": "- **适用**：仓 All ｜ 侧别 Kernel ｜ 载体 Kernel源码 ｜ 触发 Exp|Log1p|Rsqrt|Tanh|Power\\( ｜ 默认启用 true",
+      "related_pattern_ids": [
+        "FP-A14",
+        "FP-A17"
+      ],
+      "boundary_source_quotes": [
+        "- **关联**：[FP-A14](FP-A14.md)、[FP-A17](FP-A17.md)。"
+      ],
+      "test_design": {
+        "axes": [
+          "golden",
+          "dtype",
+          "content"
+        ],
+        "oracle": [
+          "golden-utol"
+        ],
+        "signal": "golden",
+        "lines": [
+          "precision"
+        ],
+        "min_cases": 3,
+        "constructor": "构造含超越函数/近似指令的输入跨数量级（pow 的 ratio 跨 2 个数量级、p∈(1,2) 与 p>2 各一组），与 GPU 参考逐元素 utol；另加关键网络级 E2E 精度基线看护。",
+        "judge": "逐元素 utol 达标且未劣化；关键网络 E2E 精度基线不退化。",
+        "kill": "若近似指令组合替代原生高精度实现，则 utol 出现 2~4 ULP 稳定偏差且跨数量级放大。",
+        "sourced": {
+          "constructor": "测试拦截建议+实证案例",
+          "judge": "测试拦截建议",
+          "kill": "故障机理"
+        }
+      },
+      "subtype_ids": [],
+      "evidence_status": "SOURCE_LIBRARY_DECLARATION_NOT_INDEPENDENT_CASE_OR_DEVICE_VERIFICATION",
+      "evidence_source_notes": "卡内issue/PR和实测均为原库叙述；本轮未复抓外部正文、未扫描算子实现、未设备复现。"
+    },
+    {
+      "id": "FP-A02",
+      "name": "归约/累加实现顺序与竞品不一致",
+      "category": "accuracy",
+      "coverage": "归约/累加实现顺序与竞品不一致；大规模归约（sum/mean/norm 梯度类）、多核并行归约、性能优化改写计算拓扑。",
+      "relation_focus": "求和分组/顺序改变舍入，需遵守精度和确定性合同",
+      "object_focus": "归约项/累加器/分组",
+      "time_focus": "归约与重复执行",
+      "consumer_focus": "归约合并及后续算子",
+      "boundary": "稳定舍入差不自动是竞态；开关承诺查A06，padding查A08",
+      "analysis_kind": [
+        "MECHANISM"
+      ],
+      "source_file": "patterns/FP-A/FP-A02.md",
+      "source_quote": "- **故障机理**：浮点加法不满足结合律，二分归并式求和 vs 顺序累加、多核并行归约的分组顺序差异引入可复现偏差；性能优化重排结合顺序会放大该差异。",
+      "source_quote_line": 7,
+      "source_sha256": "ebb419bc3940e247bfcd1e4d4b10e7530a6d22249a603a631ab8c07813da4d8f",
+      "source_card_name": "归约/累加实现顺序与竞品不一致",
+      "applicability": {
+        "repos": [
+          "All"
+        ],
+        "sides": [
+          "Kernel"
+        ],
+        "carriers": [
+          "Kernel源码"
+        ],
+        "trigger": "ReduceSum|WholeReduceSum|BlockReduce|ReduceMax",
+        "enabled": true
+      },
+      "applicability_source_quote": "- **适用**：仓 All ｜ 侧别 Kernel ｜ 载体 Kernel源码 ｜ 触发 ReduceSum|WholeReduceSum|BlockReduce|ReduceMax ｜ 默认启用 true",
+      "related_pattern_ids": [
+        "FP-A06",
+        "FP-A08"
+      ],
+      "boundary_source_quotes": [
+        "- **关联**：[FP-A06](FP-A06.md)、[FP-A08](FP-A08.md)。"
+      ],
+      "test_design": {
+        "axes": [
+          "dtype",
+          "shape",
+          "golden"
+        ],
+        "oracle": [
+          "golden-utol",
+          "bitwise"
+        ],
+        "signal": "golden",
+        "lines": [
+          "precision",
+          "determinism"
+        ],
+        "min_cases": 3,
+        "constructor": "同输入多轮执行一致性 + 大 shape 归约场景（覆盖树形归约与串行累加的浮点结合顺序差异），与标杆逐元素 utol。",
+        "judge": "与标杆逐元素 utol 达标；同输入多轮结果一致。",
+        "kill": "若归约顺序与竞品不一致，则大 shape 累加结果超 utol 而小 shape 通过。",
+        "sourced": {
+          "constructor": "测试拦截建议",
+          "judge": "测试拦截建议",
+          "kill": "故障机理"
+        }
+      },
+      "subtype_ids": [],
+      "evidence_status": "SOURCE_LIBRARY_DECLARATION_NOT_INDEPENDENT_CASE_OR_DEVICE_VERIFICATION",
+      "evidence_source_notes": "卡内issue/PR和实测均为原库叙述；本轮未复抓外部正文、未扫描算子实现、未设备复现。"
+    },
+    {
+      "id": "FP-A03",
+      "name": "竞品高精度中间计算，NPU 直接低精度",
+      "category": "accuracy",
+      "coverage": "竞品高精度中间计算，NPU 直接低精度；中间结果动态范围大的算子（softmax、norm 类、量化/反量化路径）。",
+      "relation_focus": "中间dtype不应提前丢失参考保留的信息",
+      "object_focus": "窄类型输入/fp32中间缓冲/累加器",
+      "time_focus": "提升/计算/保存/回转",
+      "consumer_focus": "归约与最终输出",
+      "boundary": "不是所有cast错误；A10属性类型、A13测试预处理、E02合法口径另判",
+      "analysis_kind": [
+        "MECHANISM"
+      ],
+      "source_file": "patterns/FP-A/FP-A03.md",
+      "source_quote": "- **故障机理**：标杆（GPU/框架参考实现）在 fp32 中间缓冲累加，NPU 实现直接用 fp16/bf16 中间变量，误差逐层累积。",
+      "source_quote_line": 7,
+      "source_sha256": "a71deb506ca7d08f8fa228d4c034e2ed66ac9ed8a8dd8a049c710328db5a2bf3",
+      "source_card_name": "竞品高精度中间计算，NPU 直接低精度",
+      "applicability": {
+        "repos": [
+          "All"
+        ],
+        "sides": [
+          "Kernel"
+        ],
+        "carriers": [
+          "Kernel源码"
+        ],
+        "trigger": "half|bfloat16_t|bf16",
+        "enabled": true
+      },
+      "applicability_source_quote": "- **适用**：仓 All ｜ 侧别 Kernel ｜ 载体 Kernel源码 ｜ 触发 half|bfloat16_t|bf16 ｜ 默认启用 true",
+      "related_pattern_ids": [
+        "FP-A13"
+      ],
+      "boundary_source_quotes": [
+        "- **关联**：[FP-A13](FP-A13.md)。"
+      ],
+      "test_design": {
+        "axes": [
+          "dtype",
+          "content",
+          "golden"
+        ],
+        "oracle": [
+          "golden-utol"
+        ],
+        "signal": "golden",
+        "lines": [
+          "precision"
+        ],
+        "min_cases": 4,
+        "constructor": "bf16/fp16 全 dtype 矩阵精度用例 + 含离群值的输入分布（大动态范围），与 fp32 标杆对比。",
+        "judge": "低精度 dtype 逐元素 utol 达标；离群值输入不失真。",
+        "kill": "若中间量用 fp16/bf16 累加而非 fp32，则 bf16/fp16 在大动态范围输入上大面积超阈。",
+        "sourced": {
+          "constructor": "测试拦截建议",
+          "judge": "测试拦截建议",
+          "kill": "源码审查映射点"
+        }
+      },
+      "subtype_ids": [],
+      "evidence_status": "SOURCE_LIBRARY_DECLARATION_NOT_INDEPENDENT_CASE_OR_DEVICE_VERIFICATION",
+      "evidence_source_notes": "卡内issue/PR和实测均为原库叙述；本轮未复抓外部正文、未扫描算子实现、未设备复现。"
+    },
+    {
+      "id": "FP-A04",
+      "name": "功能问题演变为精度静默故障",
+      "category": "accuracy",
+      "coverage": "功能问题演变为精度静默故障；异常分支、tiling 不匹配时的降级路径、部分失败未中断。",
+      "relation_focus": "失败状态/部分结果不得无声变为成功输出",
+      "object_focus": "返回码/错误状态/部分输出",
+      "time_focus": "异常/降级/返回前",
+      "consumer_focus": "框架与后续数值调用",
+      "boundary": "偏错误传播后果面；已知分派或初始化根因不再当独立上游根因",
+      "analysis_kind": [
+        "CONTRACT",
+        "MECHANISM"
+      ],
+      "source_file": "patterns/FP-A/FP-A04.md",
+      "source_quote": "- **故障机理**：错误分支吞掉返回值或输出部分结果而不报错，错误以数值偏差形式静默流出。",
+      "source_quote_line": 7,
+      "source_sha256": "63afae646959e7e44d256b8918cc1a2c2a5c80a9185f3837f4cf02e3a2e8b8bc",
+      "source_card_name": "功能问题演变为精度静默故障",
+      "applicability": {
+        "repos": [
+          "All"
+        ],
+        "sides": [
+          "All"
+        ],
+        "carriers": [
+          "Tiling源码",
+          "Kernel源码"
+        ],
+        "trigger": "OP_LOGE|GRAPH_SUCCESS|return false",
+        "enabled": true
+      },
+      "applicability_source_quote": "- **适用**：仓 All ｜ 侧别 All ｜ 载体 Tiling源码,Kernel源码 ｜ 触发 OP_LOGE|GRAPH_SUCCESS|return false ｜ 默认启用 true",
+      "related_pattern_ids": [
+        "FP-B03",
+        "FP-E01",
+        "FP-A05"
+      ],
+      "boundary_source_quotes": [
+        "- **关联**：[FP-B03](../FP-B/FP-B03.md)、[FP-E01](../FP-E/FP-E01.md)、[FP-A05](FP-A05.md)（同为脏数据/未初始化数据被当作有效输入读入，A04 侧重「不报错」，A05 侧重「数据源本身脏」）。"
+      ],
+      "test_design": {
+        "axes": [
+          "input-validity",
+          "content"
+        ],
+        "oracle": [
+          "error-code",
+          "golden-canary"
+        ],
+        "signal": "canary",
+        "lines": [
+          "error-scenario",
+          "valid-fuzz"
+        ],
+        "min_cases": 2,
+        "constructor": "错误注入用例（非法输入必须报错而非出数）+ 输出 NaN/inf 哨兵检查。",
+        "judge": "非法输入返回明确错误码而非产出数值；输出不含 NaN/inf 残留。",
+        "kill": "若错误分支静默吞掉并返回部分结果，则非法输入用例返回 0 且输出含 NaN 或哨兵残留。",
+        "sourced": {
+          "constructor": "测试拦截建议",
+          "judge": "测试拦截建议",
+          "kill": "源码审查映射点"
+        }
+      },
+      "subtype_ids": [],
+      "evidence_status": "SOURCE_LIBRARY_DECLARATION_NOT_INDEPENDENT_CASE_OR_DEVICE_VERIFICATION",
+      "evidence_source_notes": "卡内issue/PR和实测均为原库叙述；本轮未复抓外部正文、未扫描算子实现、未设备复现。"
+    },
+    {
+      "id": "FP-A05",
+      "name": "脏数据/数据踩踏",
+      "category": "accuracy",
+      "coverage": "脏数据/数据踩踏；空张量/退化 shape、workspace 复用、inplace 路径、尾块覆盖不完整。",
+      "relation_focus": "读取前有效内容及写入所有权/范围须成立",
+      "object_focus": "workspace/CKE/别名/尾块",
+      "time_focus": "申请/初始化/写入/复用/读取",
+      "consumer_focus": "buffer读者及后续算子",
+      "boundary": "D01/D02容量、G02依赖顺序、B07地址算式各有边界",
+      "analysis_kind": [
+        "MECHANISM"
+      ],
+      "source_file": "patterns/FP-A/FP-A05.md",
+      "source_quote": "- **故障机理**（**实质是内存安全正确性问题，不是容量问题**）：缓冲区未初始化、workspace 未清零、**算子申请 CKE 内存后未做初始化**、原地写覆盖输入、越界写引入未定义数据。",
+      "source_quote_line": 7,
+      "source_sha256": "352ba3b7b8b2c986cd5651b45da9cb6dd2bc3ff99b535e6731f29788ae811577",
+      "source_card_name": "脏数据 / 数据踩踏",
+      "applicability": {
+        "repos": [
+          "All"
+        ],
+        "sides": [
+          "All"
+        ],
+        "carriers": [
+          "Kernel源码",
+          "Tiling源码"
+        ],
+        "trigger": "workspace|GetWorkspaceSize|SetGlobalBuffer|Init\\(",
+        "enabled": true
+      },
+      "applicability_source_quote": "- **适用**：仓 All ｜ 侧别 All ｜ 载体 Kernel源码,Tiling源码 ｜ 触发 workspace|GetWorkspaceSize|SetGlobalBuffer|Init\\( ｜ 默认启用 true",
+      "related_pattern_ids": [
+        "FP-A08",
+        "FP-D02",
+        "FP-D01",
+        "FP-B07",
+        "FP-G01"
+      ],
+      "boundary_source_quotes": [
+        "- **关联**：[FP-A08](FP-A08.md)、[FP-D02](../FP-D/FP-D02.md)、[FP-D01](../FP-D/FP-D01.md)（**边界**：D01 / D02 管内存**容量**，本条管内存**正确性**——同一批「内存问题」按此二分归属，可避免建出重复条目）、[FP-B07](../FP-B/FP-B07.md)（越界写是脏数据的来源之一）、[FP-G01](../FP-G/FP-G01.md)（未初始化累积致内存耗尽后挂死）。"
+      ],
+      "test_design": {
+        "axes": [
+          "shape",
+          "sequence",
+          "memory"
+        ],
+        "oracle": [
+          "sanitizer-memcheck",
+          "golden-canary"
+        ],
+        "signal": "memory",
+        "lines": [
+          "memory"
+        ],
+        "min_cases": 4,
+        "constructor": "空张量/零元素用例；workspace 复用下连续两次调用结果一致性；mssanitizer/memcheck 内存检测。",
+        "judge": "memcheck 零告警（无未初始化读）；连续两次调用结果一致；输出无魔数残留。",
+        "kill": "若输出/累加缓冲或 workspace 未初始化/未清零，则 memcheck 报未初始化读，或连续两次调用结果不同。",
+        "sourced": {
+          "constructor": "测试拦截建议",
+          "judge": "测试拦截建议",
+          "kill": "源码审查映射点"
+        }
+      },
+      "subtype_ids": [
+        "A05-1",
+        "A05-2",
+        "A05-3",
+        "A05-4",
+        "A05-5"
+      ],
+      "evidence_status": "SOURCE_LIBRARY_DECLARATION_NOT_INDEPENDENT_CASE_OR_DEVICE_VERIFICATION",
+      "evidence_source_notes": "卡内issue/PR和实测均为原库叙述；本轮未复抓外部正文、未扫描算子实现、未设备复现。"
+    },
+    {
+      "id": "FP-A06",
+      "name": "确定性开关下结果不固定",
+      "category": "accuracy",
+      "coverage": "确定性开关下结果不固定；开启确定性计算开关，多核/多卡场景。",
+      "relation_focus": "确定性请求应选择并覆盖其承诺的实现",
+      "object_focus": "开关/归约分组/原子路径",
+      "time_focus": "配置传入/分派/重复执行",
+      "consumer_focus": "确定性结果调用方",
+      "boundary": "结果变化不证明缺同步；未承诺开关不直接判本型，成本查C05",
+      "analysis_kind": [
+        "CONTRACT",
+        "MECHANISM"
+      ],
+      "source_file": "patterns/FP-A/FP-A06.md",
+      "source_quote": "- **故障机理**：确定性分支未真正生效；多核归约顺序不定、原子加（float）路径未消除。",
+      "source_quote_line": 7,
+      "source_sha256": "d3bcaffb79390d9ace5fe69a2259c2cee46da33d4d49e6ecda2a9e1f4d3187a1",
+      "source_card_name": "确定性开关下结果不固定",
+      "applicability": {
+        "repos": [
+          "All"
+        ],
+        "sides": [
+          "Kernel"
+        ],
+        "carriers": [
+          "Kernel源码"
+        ],
+        "trigger": "AtomicAdd|SetAtomicAdd|Deterministic|GetDeterministic",
+        "enabled": true
+      },
+      "applicability_source_quote": "- **适用**：仓 All ｜ 侧别 Kernel ｜ 载体 Kernel源码 ｜ 触发 AtomicAdd|SetAtomicAdd|Deterministic|GetDeterministic ｜ 默认启用 true",
+      "related_pattern_ids": [
+        "FP-A02",
+        "FP-C05",
+        "FP-A05"
+      ],
+      "boundary_source_quotes": [
+        "- **关联**：[FP-A02](FP-A02.md)、[FP-C05](../FP-C/FP-C05.md)、[FP-A05](FP-A05.md)（A05 的 workspace 未清零在此型中表现为「随机数残留」）。"
+      ],
+      "test_design": {
+        "axes": [
+          "bitwise",
+          "dtype"
+        ],
+        "oracle": [
+          "bitwise"
+        ],
+        "signal": "bitwise",
+        "lines": [
+          "determinism"
+        ],
+        "min_cases": 2,
+        "constructor": "开确定性开关，同输入连续多轮 bitwise 级一致性用例（对照关开关的同批输入）。",
+        "judge": "确定性开关开启时 N 轮逐 bit 相同。",
+        "kill": "若确定性分支未真正生效（仍走原子加/多核无序归约），则同输入多轮 bit 不一致。",
+        "sourced": {
+          "constructor": "测试拦截建议",
+          "judge": "故障机理",
+          "kill": "源码审查映射点"
+        }
+      },
+      "subtype_ids": [],
+      "evidence_status": "SOURCE_LIBRARY_DECLARATION_NOT_INDEPENDENT_CASE_OR_DEVICE_VERIFICATION",
+      "evidence_source_notes": "卡内issue/PR和实测均为原库叙述；本轮未复抓外部正文、未扫描算子实现、未设备复现。"
+    },
+    {
+      "id": "FP-A07",
+      "name": "tiling 条件判断错误走入错误分支",
+      "category": "accuracy",
+      "coverage": "tiling 条件判断错误走入错误分支；奇异 shape（0/1、极小/极大、非对齐）。",
+      "relation_focus": "输入/平台谓词应与所选模板适用域匹配",
+      "object_focus": "shape/阈值/分核/分支",
+      "time_focus": "host/tiling选择",
+      "consumer_focus": "tiling数据消费者",
+      "boundary": "A19是路径没测；A22是dtype映射错；C01结果对而多算",
+      "analysis_kind": [
+        "MECHANISM"
+      ],
+      "source_file": "patterns/FP-A/FP-A07.md",
+      "source_quote": "- **故障机理**：tiling 分支边界条件（`<` 与 `<=`、off-by-one、shape 奇异值）写错，进入错误处理路径。",
+      "source_quote_line": 7,
+      "source_sha256": "ae58c0b48f24fc85b2fac9f7b99d6d2a0cafc046cc418899a05311992fc4ca5b",
+      "source_card_name": "tiling 条件判断错误走入错误分支",
+      "applicability": {
+        "repos": [
+          "All"
+        ],
+        "sides": [
+          "Tiling"
+        ],
+        "carriers": [
+          "Tiling源码"
+        ],
+        "trigger": "Tiling|IsCapable",
+        "enabled": true
+      },
+      "applicability_source_quote": "- **适用**：仓 All ｜ 侧别 Tiling ｜ 载体 Tiling源码 ｜ 触发 Tiling|IsCapable ｜ 默认启用 true",
+      "related_pattern_ids": [
+        "FP-A08",
+        "FP-B02"
+      ],
+      "boundary_source_quotes": [
+        "- **关联**：[FP-A08](FP-A08.md)、[FP-B02](../FP-B/FP-B02.md)。"
+      ],
+      "test_design": {
+        "axes": [
+          "shape",
+          "content"
+        ],
+        "oracle": [
+          "golden-utol"
+        ],
+        "signal": "golden",
+        "lines": [
+          "precision"
+        ],
+        "min_cases": 4,
+        "constructor": "shape 边界值用例集：0、1、blocksize±1、非对齐尾块、极值维度，在 tiling 分支阈值两侧成对构造。",
+        "judge": "阈值两侧 shape 结果均与标杆一致。",
+        "kill": "若 tiling 分支条件（< 与 <= 混用）写错，则阈值±1 的成对 shape 中恰有一侧精度失败。",
+        "sourced": {
+          "constructor": "测试拦截建议",
+          "judge": "故障机理",
+          "kill": "源码审查映射点"
+        }
+      },
+      "subtype_ids": [],
+      "evidence_status": "SOURCE_LIBRARY_DECLARATION_NOT_INDEPENDENT_CASE_OR_DEVICE_VERIFICATION",
+      "evidence_source_notes": "卡内issue/PR和实测均为原库叙述；本轮未复抓外部正文、未扫描算子实现、未设备复现。"
+    },
+    {
+      "id": "FP-A08",
+      "name": "切块粒度差异致离群点精度问题",
+      "category": "accuracy",
+      "coverage": "切块粒度差异致离群点精度问题；极端 shape、离群点数据、尾块场景。",
+      "relation_focus": "切块及padding应符合归约等实际消费者",
+      "object_focus": "tile/尾块/padding/归约项",
+      "time_focus": "切分/补齐/计算/合并",
+      "consumer_focus": "归约与最终输出",
+      "boundary": "先核消费者，不是对齐都错；A07选错分支、A05独立污染另判",
+      "analysis_kind": [
+        "MECHANISM"
+      ],
+      "source_file": "patterns/FP-A/FP-A08.md",
+      "source_quote": "- **故障机理**：不同切块大小下浮点归约分组不同；尾块 padding 值参与计算引入偏差。",
+      "source_quote_line": 7,
+      "source_sha256": "aef99318c796927d240c548e143c562cc23ab437184f99cb156dd3d973e204d1",
+      "source_card_name": "切块粒度差异致离群点精度问题",
+      "applicability": {
+        "repos": [
+          "All"
+        ],
+        "sides": [
+          "Tiling",
+          "Kernel"
+        ],
+        "carriers": [
+          "Tiling源码",
+          "Kernel源码"
+        ],
+        "trigger": "tileSize|tileNum|Tail|tail",
+        "enabled": true
+      },
+      "applicability_source_quote": "- **适用**：仓 All ｜ 侧别 Tiling,Kernel ｜ 载体 Tiling源码,Kernel源码 ｜ 触发 tileSize|tileNum|Tail|tail ｜ 默认启用 true",
+      "related_pattern_ids": [
+        "FP-A02",
+        "FP-A05",
+        "FP-A07"
+      ],
+      "boundary_source_quotes": [
+        "- **关联**：[FP-A02](FP-A02.md)、[FP-A05](FP-A05.md)、[FP-A07](FP-A07.md)。"
+      ],
+      "test_design": {
+        "axes": [
+          "shape",
+          "content"
+        ],
+        "oracle": [
+          "golden-utol"
+        ],
+        "signal": "golden",
+        "lines": [
+          "precision"
+        ],
+        "min_cases": 3,
+        "constructor": "同 shape 换 tiling 粒度对比；含 ±inf/极大极小值的离群点用例。",
+        "judge": "不同切块粒度下离群点仍达标；padding 值不污染结果。",
+        "kill": "若切块粒度改变归约结合顺序或 padding 值选择不当，则离群点输入在大 shape 下超阈值而小 shape 通过。",
+        "sourced": {
+          "constructor": "测试拦截建议",
+          "judge": "故障机理",
+          "kill": "源码审查映射点"
+        }
+      },
+      "subtype_ids": [],
+      "evidence_status": "SOURCE_LIBRARY_DECLARATION_NOT_INDEPENDENT_CASE_OR_DEVICE_VERIFICATION",
+      "evidence_source_notes": "卡内issue/PR和实测均为原库叙述；本轮未复抓外部正文、未扫描算子实现、未设备复现。"
+    },
+    {
+      "id": "FP-A09",
+      "name": "对标 TF 语义与 PTA（torch_npu）不一致",
+      "category": "accuracy",
+      "coverage": "对标 TF 语义与 PTA（torch_npu）不一致；多框架对标算子、含默认参数与特殊值处理。",
+      "relation_focus": "默认值和特殊值语义应对应目标框架API",
+      "object_focus": "框架API/attr/clip/epsilon",
+      "time_focus": "适配与调用解释",
+      "consumer_focus": "TF/torch_npu调用方",
+      "boundary": "合法框架差异不是缺陷；A15数值传播本身不同",
+      "analysis_kind": [
+        "CONTRACT"
+      ],
+      "source_file": "patterns/FP-A/FP-A09.md",
+      "source_quote": "- **故障机理**：算子实现以 TF 为参考，而 torch_npu API 语义（attr 默认值、clip/epsilon/nan 处理）与 TF 存在差异，实现选错对标。",
+      "source_quote_line": 8,
+      "source_sha256": "0dab16a2d62467d3e828c786e797193f102009953be4b3bc19104b026b2ba734",
+      "source_card_name": "对标 TF 语义与 PTA（torch_npu）不一致",
+      "applicability": {
+        "repos": [
+          "All"
+        ],
+        "sides": [
+          "All"
+        ],
+        "carriers": [
+          "aclnn源码"
+        ],
+        "trigger": "epsilon|clip",
+        "enabled": true
+      },
+      "applicability_source_quote": "- **适用**：仓 All ｜ 侧别 All ｜ 载体 aclnn源码 ｜ 触发 epsilon|clip ｜ 默认启用 true",
+      "related_pattern_ids": [
+        "FP-A15"
+      ],
+      "boundary_source_quotes": [
+        "- **关联**：[FP-A15](FP-A15.md)。注：PTA 指 PyTorch Ascend 适配（torch_npu）。"
+      ],
+      "test_design": {
+        "axes": [
+          "attr",
+          "content"
+        ],
+        "oracle": [
+          "golden-utol"
+        ],
+        "signal": "golden",
+        "lines": [
+          "precision"
+        ],
+        "min_cases": 3,
+        "constructor": "attr 全枚举 + 默认值专项用例；nan/inf 特殊值专项，与 torch_npu / TF 双标杆对拍。",
+        "judge": "attr 默认值、clip/epsilon、nan 处理与参考语义一致。",
+        "kill": "若 aclnn 语义与 PTA/TF 在 attr 默认值或 clip/epsilon 处理上分歧，则同输入多标杆结果不一致。",
+        "sourced": {
+          "constructor": "测试拦截建议",
+          "judge": "源码审查映射点",
+          "kill": "故障机理"
+        }
+      },
+      "subtype_ids": [],
+      "evidence_status": "SOURCE_LIBRARY_DECLARATION_NOT_INDEPENDENT_CASE_OR_DEVICE_VERIFICATION",
+      "evidence_source_notes": "卡内issue/PR和实测均为原库叙述；本轮未复抓外部正文、未扫描算子实现、未设备复现。"
+    },
+    {
+      "id": "FP-A10",
+      "name": "原型 Attr 不支持 Double",
+      "category": "accuracy",
+      "coverage": "原型 Attr 不支持 Double；含标量 attr（scale/eps/阈值）且用户传入 double。",
+      "relation_focus": "属性double须保存语义或明确拒绝",
+      "object_focus": "scale/eps/阈值等attr",
+      "time_focus": "proto声明/解析/透传",
+      "consumer_focus": "host/kernel标量消费",
+      "boundary": "A11是float64张量硬件能力，A03为中间计算精度",
+      "analysis_kind": [
+        "CONTRACT",
+        "MECHANISM"
+      ],
+      "source_file": "patterns/FP-A/FP-A10.md",
+      "source_quote": "- **故障机理**：算子原型（proto）Attr 类型不含 double，或解析分支静默降级为 float，精度丢失。",
+      "source_quote_line": 7,
+      "source_sha256": "be7ab48f12e4aafe7cb6a7ca79ecfcc2db07fce54b6f7ba233919ab65b5aead2",
+      "source_card_name": "原型 Attr 不支持 Double",
+      "applicability": {
+        "repos": [
+          "All"
+        ],
+        "sides": [
+          "All"
+        ],
+        "carriers": [
+          "IR与图配置"
+        ],
+        "trigger": "GetAttrPointer|Attr",
+        "enabled": true
+      },
+      "applicability_source_quote": "- **适用**：仓 All ｜ 侧别 All ｜ 载体 IR与图配置 ｜ 触发 GetAttrPointer|Attr ｜ 默认启用 true",
+      "related_pattern_ids": [
+        "FP-A11",
+        "FP-A13"
+      ],
+      "boundary_source_quotes": [
+        "- **关联**：[FP-A11](FP-A11.md)、[FP-A13](FP-A13.md)（同源于「高精度值在低精度链路上被静默降级」，A13 侧重输入预处理截断）。"
+      ],
+      "test_design": {
+        "axes": [
+          "attr",
+          "dtype"
+        ],
+        "oracle": [
+          "error-code"
+        ],
+        "signal": "error-code",
+        "lines": [
+          "error-scenario"
+        ],
+        "min_cases": 2,
+        "constructor": "attr 传高精度敏感值（如 1e-8 级 eps）边界用例，覆盖 double 与 float 两种属性类型。",
+        "judge": "double 属性不静默降级为 float；不支持时明确报错而非精度异常。",
+        "kill": "若 Attr 解析对 double 静默降级，则 1e-8 级 eps 传参后行为与被截断为 float 等价。",
+        "sourced": {
+          "constructor": "测试拦截建议",
+          "judge": "典型表现",
+          "kill": "源码审查映射点"
+        }
+      },
+      "subtype_ids": [],
+      "evidence_status": "SOURCE_LIBRARY_DECLARATION_NOT_INDEPENDENT_CASE_OR_DEVICE_VERIFICATION",
+      "evidence_source_notes": "卡内issue/PR和实测均为原库叙述；本轮未复抓外部正文、未扫描算子实现、未设备复现。"
+    },
+    {
+      "id": "FP-A11",
+      "name": "AiCore 不支持 double 类型",
+      "category": "accuracy",
+      "coverage": "AiCore 不支持 double 类型；用户显式请求 double dtype 输入/输出。",
+      "relation_focus": "硬件不支持类型须拦截或按合同模拟",
+      "object_focus": "double输入输出/硬件/模拟路径",
+      "time_focus": "dtype接入/能力选择/执行",
+      "consumer_focus": "硬件指令及调用方",
+      "boundary": "请求double不自动是bug；属性double查A10，支持约定需核",
+      "analysis_kind": [
+        "CONTRACT",
+        "MECHANISM"
+      ],
+      "source_file": "patterns/FP-A/FP-A11.md",
+      "source_quote": "- **故障机理**：AiCore 硬件无 float64 单元，double 路径既未正确拆分模拟也未明确拦截，行为未定义。",
+      "source_quote_line": 7,
+      "source_sha256": "107d7c4c7da1e2034b9d06a17d14693e0ac448003eb75397d3975fa59c17bc0a",
+      "source_card_name": "AiCore 不支持 double 类型",
+      "applicability": {
+        "repos": [
+          "All"
+        ],
+        "sides": [
+          "All"
+        ],
+        "carriers": [
+          "Kernel源码",
+          "IR与图配置"
+        ],
+        "trigger": "DT_DOUBLE|double",
+        "enabled": true
+      },
+      "applicability_source_quote": "- **适用**：仓 All ｜ 侧别 All ｜ 载体 Kernel源码,IR与图配置 ｜ 触发 DT_DOUBLE|double ｜ 默认启用 true",
+      "related_pattern_ids": [
+        "FP-A10",
+        "FP-B01"
+      ],
+      "boundary_source_quotes": [
+        "- **关联**：[FP-A10](FP-A10.md)、[FP-B01](../FP-B/FP-B01.md)（B01 是该拦不拦的反面：此处是声明支持却未实现，实际被底层报错拦截）。"
+      ],
+      "test_design": {
+        "axes": [
+          "dtype"
+        ],
+        "oracle": [
+          "golden-utol",
+          "error-code"
+        ],
+        "signal": "golden",
+        "lines": [
+          "precision",
+          "error-scenario"
+        ],
+        "min_cases": 2,
+        "constructor": "double dtype 正向（拆分模拟结果与标杆比对）与反向（应拦截场景必须报错）用例。",
+        "judge": "float64 拆分模拟结果与标杆一致；不支持场景明确拦截报错。",
+        "kill": "若 float64 未正确拆分模拟或未拦截，则 double 用例静默出数但精度不达标，或应报错却返回 0。",
+        "sourced": {
+          "constructor": "测试拦截建议",
+          "judge": "源码审查映射点",
+          "kill": "源码审查映射点"
+        }
+      },
+      "subtype_ids": [],
+      "evidence_status": "SOURCE_LIBRARY_DECLARATION_NOT_INDEPENDENT_CASE_OR_DEVICE_VERIFICATION",
+      "evidence_source_notes": "卡内issue/PR和实测均为原库叙述；本轮未复抓外部正文、未扫描算子实现、未设备复现。"
+    },
+    {
+      "id": "FP-A12",
+      "name": "大整数转 fp32 计算精度损失",
+      "category": "accuracy",
+      "coverage": "大整数转 fp32 计算精度损失；大数值索引/计数/求和后转 float 参与计算。",
+      "relation_focus": "整数转浮点后不可默认保留精确整数语义",
+      "object_focus": "int32/int64/float与乘积",
+      "time_focus": "转换与后续算术",
+      "consumer_focus": "转换值计算链",
+      "boundary": "B13整型回绕不同；比较/索引改变进一步用A18",
+      "analysis_kind": [
+        "MECHANISM"
+      ],
+      "source_file": "patterns/FP-A/FP-A12.md",
+      "source_quote": "- **故障机理**：int64/int32 数值超出 float 24 位尾数精确表示范围（|x|>2^24），转换后参与计算产生偏差；先转后乘与先乘后转的结果不同。",
+      "source_quote_line": 7,
+      "source_sha256": "2a9b92f5bc8076b40c380742c40e3dd4efa6c694a88fbe2c5be4f3fb9a5043f7",
+      "source_card_name": "大整数转 fp32 计算精度损失",
+      "applicability": {
+        "repos": [
+          "All"
+        ],
+        "sides": [
+          "All"
+        ],
+        "carriers": [
+          "Tiling源码",
+          "Kernel源码"
+        ],
+        "trigger": "static_cast<float>|static_cast<double>",
+        "enabled": true
+      },
+      "applicability_source_quote": "- **适用**：仓 All ｜ 侧别 All ｜ 载体 Tiling源码,Kernel源码 ｜ 触发 static_cast<float>|static_cast<double> ｜ 默认启用 true",
+      "related_pattern_ids": [
+        "FP-A18"
+      ],
+      "boundary_source_quotes": [
+        "- **关联**：[FP-A18](FP-A18.md)（同源不同焦点：A12 关注数值计算损失，A18 关注比较语义偏差）。"
+      ],
+      "test_design": {
+        "axes": [
+          "dtype",
+          "boundary",
+          "content"
+        ],
+        "oracle": [
+          "golden-utol"
+        ],
+        "signal": "golden",
+        "lines": [
+          "precision"
+        ],
+        "min_cases": 2,
+        "constructor": "含 2^24±1、INT32_MAX/MIN 边界值的数值用例（重点覆盖「先乘后转」与「先转后乘」的差异区间）。",
+        "judge": "大整数边界值结果与标杆逐元素一致。",
+        "kill": "若 int64→fp32 未升位或先乘后转，则 2^24±1 附近输入结果偏差而小值正确。",
+        "sourced": {
+          "constructor": "测试拦截建议",
+          "judge": "故障机理",
+          "kill": "源码审查映射点"
+        }
+      },
+      "subtype_ids": [
+        "A12-1"
+      ],
+      "evidence_status": "SOURCE_LIBRARY_DECLARATION_NOT_INDEPENDENT_CASE_OR_DEVICE_VERIFICATION",
+      "evidence_source_notes": "卡内issue/PR和实测均为原库叙述；本轮未复抓外部正文、未扫描算子实现、未设备复现。"
+    },
+    {
+      "id": "FP-A13",
+      "name": "输入尾数截断才能通过精度标准",
+      "category": "accuracy",
+      "coverage": "输入尾数截断才能通过精度标准；精度调试历史遗留的对输入做 round 的逻辑。",
+      "relation_focus": "测试输入不得为过测预先截断而偏离真实输入",
+      "object_focus": "测试输入/预处理/golden",
+      "time_focus": "造数/预处理/测试",
+      "consumer_focus": "被测实现与判据",
+      "boundary": "测试掩盖面不是自动确认的kernel根因；接口是否允许预处理另核",
+      "analysis_kind": [
+        "COVERAGE_OR_ORACLE"
+      ],
+      "source_file": "patterns/FP-A/FP-A13.md",
+      "source_quote": "- **故障机理**：输入预处理存在 round/截断逻辑，掩盖实现精度不足——测试以截断后的输入通过，真实场景未截断输入失败。",
+      "source_quote_line": 8,
+      "source_sha256": "5e0444a3a1b2a9e0f97beaa6699085e699b8c0834aed8448caee85ee70cfa8e0",
+      "source_card_name": "输入尾数截断才能通过精度标准",
+      "applicability": {
+        "repos": [
+          "All"
+        ],
+        "sides": [
+          "All"
+        ],
+        "carriers": [
+          "UT与golden资产"
+        ],
+        "trigger": "Round|round|Truncate",
+        "enabled": true
+      },
+      "applicability_source_quote": "- **适用**：仓 All ｜ 侧别 All ｜ 载体 UT与golden资产 ｜ 触发 Round|round|Truncate ｜ 默认启用 true",
+      "related_pattern_ids": [
+        "FP-A03",
+        "FP-E01"
+      ],
+      "boundary_source_quotes": [
+        "- **关联**：[FP-A03](FP-A03.md)、[FP-E01](../FP-E/FP-E01.md)。"
+      ],
+      "test_design": {
+        "axes": [
+          "content",
+          "golden"
+        ],
+        "oracle": [
+          "golden-utol"
+        ],
+        "signal": "golden",
+        "lines": [
+          "precision"
+        ],
+        "min_cases": 2,
+        "constructor": "全精度输入用例（golden 生成端禁止预处理）；UT 输入与 ST 输入分布一致性抽查。",
+        "judge": "全精度输入下仍达标，不得依赖输入 round/截断。",
+        "kill": "若通过依赖输入尾数截断预处理，则全精度输入用例超阈而截断输入通过。",
+        "sourced": {
+          "constructor": "测试拦截建议",
+          "judge": "故障机理",
+          "kill": "源码审查映射点"
+        }
+      },
+      "subtype_ids": [],
+      "evidence_status": "SOURCE_LIBRARY_DECLARATION_NOT_INDEPENDENT_CASE_OR_DEVICE_VERIFICATION",
+      "evidence_source_notes": "卡内issue/PR和实测均为原库叙述；本轮未复抓外部正文、未扫描算子实现、未设备复现。"
+    },
+    {
+      "id": "FP-A14",
+      "name": "FFMA 与 MMAD 硬件指令差异",
+      "category": "accuracy",
+      "coverage": "FFMA 与 MMAD 硬件指令差异；同一算子存在 Vector/Cube 两条实现路径且可切换。",
+      "relation_focus": "FFMA/MMAD精度与舍入须各自满足接口合同",
+      "object_focus": "Vector/Cube/累加器/舍入",
+      "time_focus": "路径分流与执行",
+      "consumer_focus": "路径输出及后续计算",
+      "boundary": "合法浮点路径不同不直接算bug；A01规格、A08分块另判",
+      "analysis_kind": [
+        "MECHANISM",
+        "CONTRACT"
+      ],
+      "source_file": "patterns/FP-A/FP-A14.md",
+      "source_quote": "- **故障机理**：Vector(FFMA) 与 Cube(MMAD) 的浮点语义（累加器精度、舍入模式）不同，同一数学在两条路径结果有差。",
+      "source_quote_line": 7,
+      "source_sha256": "c1109543658fbadb264e0b2f1dc71a1e449d1c9abd5a37db4ec008db341da38a",
+      "source_card_name": "FFMA 与 MMAD 硬件指令差异",
+      "applicability": {
+        "repos": [
+          "All"
+        ],
+        "sides": [
+          "Kernel"
+        ],
+        "carriers": [
+          "Kernel源码"
+        ],
+        "trigger": "Mmad|MMAD|SetMMAD",
+        "enabled": true
+      },
+      "applicability_source_quote": "- **适用**：仓 All ｜ 侧别 Kernel ｜ 载体 Kernel源码 ｜ 触发 Mmad|MMAD|SetMMAD ｜ 默认启用 true",
+      "related_pattern_ids": [
+        "FP-A01",
+        "FP-A16",
+        "FP-A08"
+      ],
+      "boundary_source_quotes": [
+        "- **关联**：[FP-A01](FP-A01.md)、[FP-A16](FP-A16.md)、[FP-A08](FP-A08.md)（#1246 的 K 对齐补零缺失与尾块/对齐问题同源）。注：FFMA 为 Vector 融合乘加指令、MMAD 为 Cube 矩阵乘指令。"
+      ],
+      "test_design": {
+        "axes": [
+          "dtype",
+          "content"
+        ],
+        "oracle": [
+          "golden-utol"
+        ],
+        "signal": "golden",
+        "lines": [
+          "precision"
+        ],
+        "min_cases": 2,
+        "constructor": "强制走两条路径（Vector FFMA / Cube MMAD）的开关级用例对比，同一输入切路径各跑一遍。",
+        "judge": "两条指令路径各自与标杆一致，切路径前后无系统性偏差。",
+        "kill": "若 FFMA 与 MMAD 精度语义差异未补偿，则同一输入切路径后结果超出 utol。",
+        "sourced": {
+          "constructor": "测试拦截建议",
+          "judge": "典型表现",
+          "kill": "源码审查映射点"
+        }
+      },
+      "subtype_ids": [],
+      "evidence_status": "SOURCE_LIBRARY_DECLARATION_NOT_INDEPENDENT_CASE_OR_DEVICE_VERIFICATION",
+      "evidence_source_notes": "卡内issue/PR和实测均为原库叙述；本轮未复抓外部正文、未扫描算子实现、未设备复现。"
+    },
+    {
+      "id": "FP-A15",
+      "name": "inf/nan 特殊值行为差异",
+      "category": "accuracy",
+      "coverage": "inf/nan 特殊值行为差异；① 输入含 nan/inf 或计算过程中产生。② 数值动态范围大、方差/范数接近零、大量零元素、接近 `1e-7` 量级的极小数、`inf - inf` 型中间结果；**提高零元素比例直到旧实现中间方差为负**是最可靠的构造方式。",
+      "relation_focus": "特殊值/定义域/mask应符合数学语义",
+      "object_focus": "NaN/Inf/方差/范数/log或除法实参/mask",
+      "time_focus": "计算/比较/屏蔽/消费中间量",
+      "consumer_focus": "sqrt/rsqrt/log/softmax",
+      "boundary": "输入NaN与计算产生NaN分开；有限屏蔽值方向错不是输入NaN；非法参数查B11",
+      "analysis_kind": [
+        "MECHANISM",
+        "CONTRACT"
+      ],
+      "source_file": "patterns/FP-A/FP-A15.md",
+      "source_quote": "- **故障机理**：① nan 比较分支结果（如 nan 与阈值比较的判断走向）、inf 传播与标杆不一致；`float == NaN` 恒假类分支写错。② **正常输入算出非法中间值**：典型是「先算平方和再减均值平方」这类数学等价但数值不等价的写法——`E[x²]-E[x]²` 在方差极小时，两个大数相减发生**灾难性抵消**，舍入误差可让结果落到 `-ε`（负方差），再经 `sqrt`/`rsqrt` 变成 **NaN**；同理 `std` 的负数、`log(0)`、`1/x` 除零、`acos` 越界都属于本型。**特征：输入完全合法，缺陷在公式的数值形态，不在输入校验。** ③ **掩码/布尔语义错位（v6.33）**：bool mask 的 `true/false` 语义与资料公式相反（该屏蔽的位置被保留），或用 `-10000`/`-1e4` 等有限大负数代替 `-inf` 做屏蔽——有效位 logits 低于该常量时屏蔽位吃掉全部概率；与 ① 的区别是输入不是 nan/inf，而是**语义方向错了**。",
+      "source_quote_line": 9,
+      "source_sha256": "1029ab816019def956d0755462326a423a0a7868ae4f5fd3f7b2f3266b256e49",
+      "source_card_name": "inf/nan 特殊值行为差异",
+      "applicability": {
+        "repos": [
+          "All"
+        ],
+        "sides": [
+          "Kernel"
+        ],
+        "carriers": [
+          "Kernel源码"
+        ],
+        "trigger": "isnan|IsNan|NAN|INFINITY|rsqrt|sqrt|E\\[x²\\]",
+        "enabled": true
+      },
+      "applicability_source_quote": "- **适用**：仓 All ｜ 侧别 Kernel ｜ 载体 Kernel源码 ｜ 触发 isnan|IsNan|NAN|INFINITY|rsqrt|sqrt|E\\[x²\\] ｜ 默认启用 true",
+      "related_pattern_ids": [
+        "FP-A01",
+        "FP-A04",
+        "FP-A09",
+        "FP-A18"
+      ],
+      "boundary_source_quotes": [
+        "- **关联**：[FP-A09](FP-A09.md)（标杆语义差异）、[FP-A18](FP-A18.md)（整型边界值与舍入）、[FP-A01](FP-A01.md)（近似指令带来的额外误差会放大本型②的抵消）、[FP-A04](FP-A04.md)（本型②常表现为「静默 nan」）。"
+      ],
+      "test_design": {
+        "axes": [
+          "content",
+          "dtype"
+        ],
+        "oracle": [
+          "golden-utol"
+        ],
+        "signal": "golden",
+        "lines": [
+          "precision"
+        ],
+        "min_cases": 3,
+        "constructor": "nan/inf 专项矩阵，按「输入携带 / 计算产生 / 输出注入」三类来源分别构造。",
+        "judge": "inf/nan 传播、比较分支、clamp 对 nan 的行为与标杆一致。",
+        "kill": "若特殊值处理缺失（clamp 对 nan、比较分支），则 nan/inf 用例输出与标杆不一致。",
+        "sourced": {
+          "constructor": "测试拦截建议",
+          "judge": "源码审查映射点",
+          "kill": "源码审查映射点"
+        }
+      },
+      "subtype_ids": [
+        "A15-1",
+        "A15-2",
+        "A15-3"
+      ],
+      "evidence_status": "SOURCE_LIBRARY_DECLARATION_NOT_INDEPENDENT_CASE_OR_DEVICE_VERIFICATION",
+      "evidence_source_notes": "卡内issue/PR和实测均为原库叙述；本轮未复抓外部正文、未扫描算子实现、未设备复现。"
+    },
+    {
+      "id": "FP-A16",
+      "name": "aclop 与 aclnn 编译阶段精度差异",
+      "category": "accuracy",
+      "coverage": "aclop 与 aclnn 编译阶段精度差异；同一算子分别经 aclop 与 aclnn 调用（实证中对应 aclnn 单算子与 GE 图/GEIR 两条路径）。",
+      "relation_focus": "调用编译路径间精度决策须按合同可比",
+      "object_focus": "常量/精度策略/aclop与aclnn",
+      "time_focus": "编译与执行切换",
+      "consumer_focus": "算子结果读者",
+      "boundary": "B14功能合同、B08属性丢失不同，不能混层对标",
+      "analysis_kind": [
+        "MECHANISM",
+        "CONTRACT"
+      ],
+      "source_file": "patterns/FP-A/FP-A16.md",
+      "source_quote": "- **故障机理**：两条调用路径编译期常量折叠/精度决策不同，同一算子同输入结果不同。",
+      "source_quote_line": 7,
+      "source_sha256": "afc2d76f74cb1a94d717ac1a53b487da13ce9c34694e613a36f58a99dc4ed6ba",
+      "source_card_name": "aclop 与 aclnn 编译阶段精度差异",
+      "applicability": {
+        "repos": [
+          "All"
+        ],
+        "sides": [
+          "Host"
+        ],
+        "carriers": [
+          "aclnn源码",
+          "IR与图配置"
+        ],
+        "trigger": "aclop|GEIR",
+        "enabled": true
+      },
+      "applicability_source_quote": "- **适用**：仓 All ｜ 侧别 Host ｜ 载体 aclnn源码,IR与图配置 ｜ 触发 aclop|GEIR ｜ 默认启用 true",
+      "related_pattern_ids": [
+        "FP-A14",
+        "FP-D02"
+      ],
+      "boundary_source_quotes": [
+        "- **关联**：[FP-A14](FP-A14.md)、[FP-D02](../FP-D/FP-D02.md)。"
+      ],
+      "test_design": {
+        "axes": [
+          "sequence",
+          "content"
+        ],
+        "oracle": [
+          "golden-utol"
+        ],
+        "signal": "sequence",
+        "lines": [
+          "precision"
+        ],
+        "min_cases": 2,
+        "constructor": "aclop/aclnn 双路径同输入一致性用例（同一 shape/dtype 分别走两条调用路径）。",
+        "judge": "两条调用路径同输入结果一致。",
+        "kill": "若编译期常量折叠/精度决策或 pad/对齐预处理决策不同，则 aclop 与 aclnn 同输入结果不一致。",
+        "sourced": {
+          "constructor": "测试拦截建议",
+          "judge": "典型表现",
+          "kill": "源码审查映射点"
+        }
+      },
+      "subtype_ids": [],
+      "evidence_status": "SOURCE_LIBRARY_DECLARATION_NOT_INDEPENDENT_CASE_OR_DEVICE_VERIFICATION",
+      "evidence_source_notes": "卡内issue/PR和实测均为原库叙述；本轮未复抓外部正文、未扫描算子实现、未设备复现。"
+    },
+    {
+      "id": "FP-A17",
+      "name": "A1 与 A2 硬件代际精度差异",
+      "category": "accuracy",
+      "coverage": "A1 与 A2 硬件代际精度差异；跨代芯片（A1/A2/A5 等）部署同一算子。",
+      "relation_focus": "各代分支须满足本代声明精度及适用参考",
+      "object_focus": "SoC/指令/硬编码",
+      "time_focus": "跨代部署与选型",
+      "consumer_focus": "精度基线与接口用户",
+      "boundary": "bit差异不自动是缺陷；并列索引不可唯一bit对标；C06性能另判",
+      "analysis_kind": [
+        "MECHANISM",
+        "CONTRACT"
+      ],
+      "source_file": "patterns/FP-A/FP-A17.md",
+      "source_quote": "- **故障机理**：SOC 代际间指令精度规格/默认路径不同，代际分支含精度相关硬编码遗漏一侧。",
+      "source_quote_line": 8,
+      "source_sha256": "9edeb51a8737c11a33c848be00d7a1d125bdc670ae32d1faa568b44b02e74df7",
+      "source_card_name": "A1 与 A2 硬件代际精度差异",
+      "applicability": {
+        "repos": [
+          "All"
+        ],
+        "sides": [
+          "All"
+        ],
+        "carriers": [
+          "Tiling源码",
+          "Kernel源码"
+        ],
+        "trigger": "GetSocVersion|SOC_VERSION|socVersion",
+        "enabled": true
+      },
+      "applicability_source_quote": "- **适用**：仓 All ｜ 侧别 All ｜ 载体 Tiling源码,Kernel源码 ｜ 触发 GetSocVersion|SOC_VERSION|socVersion ｜ 默认启用 true",
+      "related_pattern_ids": [
+        "FP-A01",
+        "FP-C06"
+      ],
+      "boundary_source_quotes": [
+        "- **关联**：[FP-A01](FP-A01.md)、[FP-C06](../FP-C/FP-C06.md)。"
+      ],
+      "test_design": {
+        "axes": [
+          "dtype",
+          "content"
+        ],
+        "oracle": [
+          "golden-utol"
+        ],
+        "signal": "golden",
+        "lines": [
+          "precision"
+        ],
+        "min_cases": 2,
+        "constructor": "多代芯片同用例精度基线对比（同 shape/dtype 跨 SOC 各跑一遍）。",
+        "judge": "跨代平台同用例精度基线可比且无劣化。",
+        "kill": "若 SOC 代际分支有精度相关硬编码，则同一用例在两代芯片上偏差显著不同。",
+        "sourced": {
+          "constructor": "测试拦截建议",
+          "judge": "典型表现",
+          "kill": "源码审查映射点"
+        }
+      },
+      "subtype_ids": [],
+      "evidence_status": "SOURCE_LIBRARY_DECLARATION_NOT_INDEPENDENT_CASE_OR_DEVICE_VERIFICATION",
+      "evidence_source_notes": "卡内issue/PR和实测均为原库叙述；本轮未复抓外部正文、未扫描算子实现、未设备复现。"
+    },
+    {
+      "id": "FP-A18",
+      "name": "int32 边界值转 float 舍入致比较语义偏差",
+      "category": "accuracy",
+      "coverage": "int32 边界值转 float 舍入致比较语义偏差；int32 输入接近或超过 2^24；参与比较、索引、阈值判断。",
+      "relation_focus": "整数域比较语义不可被float舍入无声改变",
+      "object_focus": "int32边界/阈值/比较结果",
+      "time_focus": "类型提升与分支判断",
+      "consumer_focus": "比较/索引消费者",
+      "boundary": "A12一般数值损失，B13整型窄化，本条重判断语义",
+      "analysis_kind": [
+        "MECHANISM"
+      ],
+      "source_file": "patterns/FP-A/FP-A18.md",
+      "source_quote": "- **故障机理**：`int32` 大整数（>2^24）转 `float` 时尾数位不足，舍入后比较/索引语义偏差。",
+      "source_quote_line": 7,
+      "source_sha256": "fbe406c02189e70644d42cd37c7ff08fba8ba9d01dbe2df1d68025bdd43b3816",
+      "source_card_name": "int32 边界值转 float 舍入致比较语义偏差",
+      "applicability": {
+        "repos": [
+          "All"
+        ],
+        "sides": [
+          "All"
+        ],
+        "carriers": [
+          "Tiling源码",
+          "Kernel源码"
+        ],
+        "trigger": "numeric_limits<int32_t>|INT32_MAX|INT32_MIN",
+        "enabled": true
+      },
+      "applicability_source_quote": "- **适用**：仓 All ｜ 侧别 All ｜ 载体 Tiling源码,Kernel源码 ｜ 触发 numeric_limits<int32_t>|INT32_MAX|INT32_MIN ｜ 默认启用 true",
+      "related_pattern_ids": [
+        "FP-A12",
+        "FP-A15",
+        "FP-E01"
+      ],
+      "boundary_source_quotes": [
+        "- **关联**：[FP-A12](FP-A12.md)、[FP-A15](FP-A15.md)、[FP-E01](../FP-E/FP-E01.md)（#5562 的 golden.py 曾按错误实现编写——边界比较语义偏差依赖对比基准正确性，测试有效性面归 E01）。"
+      ],
+      "test_design": {
+        "axes": [
+          "boundary",
+          "dtype"
+        ],
+        "oracle": [
+          "golden-utol"
+        ],
+        "signal": "golden",
+        "lines": [
+          "precision"
+        ],
+        "min_cases": 2,
+        "constructor": "int32 边界值用例集：2^24 两侧、INT32_MAX/MIN（重点覆盖整型极值被隐式转 float 的舍入区间）。",
+        "judge": "整数域比较语义不被浮点提升破坏。",
+        "kill": "若整型极值被隐式转 float 舍入，则 ±2^31 附近两个不同整数被判为相等。",
+        "sourced": {
+          "constructor": "测试拦截建议",
+          "judge": "源码审查映射点",
+          "kill": "故障机理"
+        }
+      },
+      "subtype_ids": [],
+      "evidence_status": "SOURCE_LIBRARY_DECLARATION_NOT_INDEPENDENT_CASE_OR_DEVICE_VERIFICATION",
+      "evidence_source_notes": "卡内issue/PR和实测均为原库叙述；本轮未复抓外部正文、未扫描算子实现、未设备复现。"
+    },
+    {
+      "id": "FP-A19",
+      "name": "同算子多 tiling 路径覆盖盲区（新增路径未纳入测试矩阵）",
+      "category": "accuracy",
+      "coverage": "同算子多 tiling 路径覆盖盲区（新增路径未纳入测试矩阵）；算子存在按 shape 阈值分流的多 tiling 模板；版本升级新增/修改了其中一条模板；测试 shape 分布集中在单一侧；分流阈值依赖平台参数（`vlFp32`、`aivCoreNum`、`UB_SIZE`）故**跨平台阈值不同**。",
+      "relation_focus": "模板适用区间应有真实用例命中",
+      "object_focus": "模板清单/IsCapable/平台参数/测试shape",
+      "time_focus": "新增模板与版本回归",
+      "consumer_focus": "覆盖声明/CI",
+      "boundary": "覆盖盲区不证明模板必有bug；A07谓词错、A22映射错不同",
+      "analysis_kind": [
+        "COVERAGE_OR_ORACLE"
+      ],
+      "source_file": "patterns/FP-A/FP-A19.md",
+      "source_quote": "- **故障机理**：算子在同一平台上注册**多条 tiling 模板**（按 `REGISTER_TILING_TEMPLATE` 的优先级数字决定尝试顺序），各模板由其 `IsCapable()` 的 shape 阈值分流。新版本引入新模板时，**两条路径可能一条确定、一条非确定**，或归约实现不同（核内二叉树折叠 vs 跨核两段归约）。若测试用例的 shape 全部落在旧路径一侧，新路径**永远不被执行**，缺陷长期潜伏。",
+      "source_quote_line": 7,
+      "source_sha256": "2f65ba9a1f1db7535ef9569d1a6912784db30118c5d7cae8079575c67b19c03f",
+      "source_card_name": "同算子多 tiling 路径覆盖盲区（新增路径未纳入测试矩阵）",
+      "applicability": {
+        "repos": [
+          "All"
+        ],
+        "sides": [
+          "Tiling",
+          "Kernel"
+        ],
+        "carriers": [
+          "Tiling源码",
+          "Kernel源码"
+        ],
+        "trigger": "REGISTER_TILING_TEMPLATE|IsCapable",
+        "enabled": true
+      },
+      "applicability_source_quote": "- **适用**：仓 All ｜ 侧别 Tiling,Kernel ｜ 载体 Tiling源码,Kernel源码 ｜ 触发 REGISTER_TILING_TEMPLATE|IsCapable ｜ 默认启用 true",
+      "related_pattern_ids": [
+        "FP-A06",
+        "FP-A07",
+        "FP-A08",
+        "FP-B02"
+      ],
+      "boundary_source_quotes": [
+        "- **关联**：[FP-A06](FP-A06.md)（新路径的非确定性正是 A06 的一个具体来源）、[FP-A07](FP-A07.md)（阈值边界写错 = A07）、[FP-A08](FP-A08.md)（切块粒度致归约分组不同）、[FP-B02](../FP-B/FP-B02.md)（阈值依赖芯片核数、跨平台不一致）。"
+      ],
+      "test_design": {
+        "axes": [
+          "shape",
+          "sequence"
+        ],
+        "oracle": [
+          "golden-utol"
+        ],
+        "signal": "golden",
+        "lines": [
+          "precision"
+        ],
+        "min_cases": 4,
+        "constructor": "按阈值两侧构造对照用例（阈值±1、恰好命中、恰好不命中）而非随机 shape；建立「模板 → 触发 shape 区间 → 覆盖用例」映射表。",
+        "judge": "每个 REGISTER_TILING_TEMPLATE 模板都有用例命中；同 shape 跨平台命中同一 tilingKey。",
+        "kill": "若新增模板未纳入矩阵，则某模板触发 shape 区间内结果与标杆不一致而既有区间全绿。",
+        "sourced": {
+          "constructor": "测试拦截建议",
+          "judge": "测试拦截建议",
+          "kill": "典型表现"
+        }
+      },
+      "subtype_ids": [],
+      "evidence_status": "SOURCE_LIBRARY_DECLARATION_NOT_INDEPENDENT_CASE_OR_DEVICE_VERIFICATION",
+      "evidence_source_notes": "卡内issue/PR和实测均为原库叙述；本轮未复抓外部正文、未扫描算子实现、未设备复现。"
+    },
+    {
+      "id": "FP-A20",
+      "name": "确定性等级未分级标注（二元描述掩盖条件确定性）",
+      "category": "accuracy",
+      "coverage": "确定性等级未分级标注（二元描述掩盖条件确定性）；算子含多条 tiling 路径；同一 kernel 内不同输出走不同归约实现；跨核归约与核内归约混用；测试用例的比对策略按「算子级」而非「输出级 + 路径级」设定。",
+      "relation_focus": "确定性声明和比对需细到输出/路径/shape",
+      "object_focus": "不同输出/路径/等级/oracle",
+      "time_focus": "声明/设计/判读",
+      "consumer_focus": "bitwise或容差测试器",
+      "boundary": "A06开关实际不生效与A02顺序差异不同，本型为声明/判据面",
+      "analysis_kind": [
+        "CONTRACT",
+        "COVERAGE_OR_ORACLE"
+      ],
+      "source_file": "patterns/FP-A/FP-A20.md",
+      "source_quote": "- **故障机理**：算子文档/测试结论仅以「确定性算子」「非确定性算子」二元标注，但实际存在**条件确定性**——同一算子不同 tiling 路径、不同输出（如 `dx` 与 `dgamma`）、不同 shape 区间的确定性等级不同。二元描述使测试用例的比对策略（`torch.equal` 严格比对 vs 容差比对）选错：对严格确定的输出用了容差比对 → **掩盖真实缺陷**（假阴性）；对非确定的输出用了 bitwise 比对 → 误报。",
+      "source_quote_line": 7,
+      "source_sha256": "db33748bdf93a51bb71dd0aa891dfd85766f88fa16437f4a9325f70cad0957c1",
+      "source_card_name": "确定性等级未分级标注（「确定/非确定」二元描述掩盖条件确定性）",
+      "applicability": {
+        "repos": [
+          "All"
+        ],
+        "sides": [
+          "Tiling",
+          "Kernel"
+        ],
+        "carriers": [
+          "Tiling源码",
+          "Kernel源码"
+        ],
+        "trigger": "SyncAll|AtomicAdd|ReduceSum",
+        "enabled": true
+      },
+      "applicability_source_quote": "- **适用**：仓 All ｜ 侧别 Tiling,Kernel ｜ 载体 Tiling源码,Kernel源码 ｜ 触发 SyncAll|AtomicAdd|ReduceSum ｜ 默认启用 true",
+      "related_pattern_ids": [
+        "FP-A06",
+        "FP-A02",
+        "FP-A19",
+        "FP-C05",
+        "FP-F03"
+      ],
+      "boundary_source_quotes": [
+        "- **关联**：[FP-A06](FP-A06.md)（A06 是「确定性开关失效」的缺陷型，本型是「确定性等级描述不足」的表达型，二者互补）、[FP-A02](FP-A02.md)（归约顺序差异）、[FP-A19](FP-A19.md)（多路径是分级的载体）、[FP-C05](../FP-C/FP-C05.md)（确定性场景性能劣化，其前提也是先分清哪些算子是确定的）、[FP-F03](../FP-F/FP-F03.md)（#4890 声明面与行为面整体错位已另录 F03——二元标注掩盖条件确定性，属「文档/声明面与实现面不一致」）。"
+      ],
+      "test_design": {
+        "axes": [
+          "bitwise",
+          "shape",
+          "sequence"
+        ],
+        "oracle": [
+          "bitwise",
+          "golden-utol"
+        ],
+        "signal": "bitwise",
+        "lines": [
+          "determinism",
+          "precision"
+        ],
+        "min_cases": 3,
+        "constructor": "按「输出 × 路径 × shape 区间」三级矩阵设定比对策略；严格确定的输出用 torch.equal 重复 100 次全等。",
+        "judge": "确定输出 bitwise 全等；非确定输出容差比对且结论显式标注触发 shape 区间。",
+        "kill": "若确定性被二元描述掩盖，则被判「确定」的输出在重复执行中出现 bit 不一致。",
+        "sourced": {
+          "constructor": "测试拦截建议",
+          "judge": "测试拦截建议",
+          "kill": "典型表现"
+        }
+      },
+      "subtype_ids": [],
+      "evidence_status": "SOURCE_LIBRARY_DECLARATION_NOT_INDEPENDENT_CASE_OR_DEVICE_VERIFICATION",
+      "evidence_source_notes": "卡内issue/PR和实测均为原库叙述；本轮未复抓外部正文、未扫描算子实现、未设备复现。"
+    },
+    {
+      "id": "FP-A21",
+      "name": "tiling 可重入性缺失致跨调用/跨线程污染（TU 级可变全局）",
+      "category": "accuracy",
+      "coverage": "tiling 可重入性缺失致跨调用/跨线程污染（TU 级可变全局）；tiling 源码或 aclnn/host 源码在匿名 `namespace` / 文件作用域声明了**非 `constexpr` 的可变全局**（`bool` 标志位、`uint64_t tilingKey/dtypeSize/seqLen/headDim/bufferSize`、`XxxTilingData tiling` 对象）；同一进程内**先后调用同一算子的不同 shape**（尤其「新增路径在前、旧路径在后」，如 3D TND → 4D BNSD/BSND）；**多线程 / 多流并发调用**同一算子（每线程独立 stream，host 侧 tiling 无锁进入）；图模式一次编译含多个该算子节点。**注意：单算子用例天然凑不齐「前导状态」，结构上无法复现序列型变体**——一进程一 shape，全局每次都是初值。",
+      "relation_focus": "调用私有状态不得被前次或并发他者污染",
+      "object_focus": "可变全局/TilingData/每调用标志",
+      "time_focus": "创建/赋值/复位/跨调用线程复用",
+      "consumer_focus": "SaveToBuffer/kernel配置",
+      "boundary": "串行残留与竞争各自证明；不因见全局变量就确认bug",
+      "analysis_kind": [
+        "MECHANISM"
+      ],
+      "source_file": "patterns/FP-A/FP-A21.md",
+      "source_quote": "- **故障机理**：tiling（以及 2026-10-21 扩展的 **aclnn/host 层**）里有一部分状态**语义上是 per-call 的**（本次输入的 layout、dtype、由 shape 推导出的切分参数、本次选定的 tilingKey、本次的阈值/可选输入开关），却被放进**per-process 的容器**——文件作用域或匿名 `namespace` 内的可变全局变量、全局 `XxxTilingData` 对象。两者**生命周期不匹配**，产生两类后果：**① 时序耦合（串行残留）**——前一次调用写入的值被后一次调用读到；若某条分支（如 4D 路径）压根没有写操作，该分支就永远读到上一次留下的值，不存在「该更新了所以自动复位」这回事；**② 数据竞争（并发串味）**——多线程并发 tiling 时各方在同一块内存上读改写，A 线程 `SaveToBuffer` 时可能把 B 线程刚写进去的字段一并写进自己的 tiling data。它不是「某一行写错了」，而是**「状态该归谁」的设计错误**：C++ 里静态存储期变量的复位只有两个时机——静态初始化（模块加载时一次）、或显式赋值语句真的被执行。 **两个子型（v6.33 机读化）**：**A21-1 时序耦合（串行残留）**——前一次调用写入的 per-call 状态被后一次调用读到；**A21-2 数据竞争（并发串味）**——多线程并发 tiling 在同一全局/静态状态上读改写。",
+      "source_quote_line": 7,
+      "source_sha256": "4f80345a86562d8e81f05784e3af5b9fb256561590f3e8ea5f1e6b67031f90e1",
+      "source_card_name": "tiling 可重入性缺失致跨调用/跨线程污染（TU 级可变全局）",
+      "applicability": {
+        "repos": [
+          "All"
+        ],
+        "sides": [
+          "Tiling",
+          "Host"
+        ],
+        "carriers": [
+          "Tiling源码",
+          "aclnn源码"
+        ],
+        "trigger": "TilingData|tilingKey|namespace",
+        "enabled": true
+      },
+      "applicability_source_quote": "- **适用**：仓 All ｜ 侧别 Tiling,Host ｜ 载体 Tiling源码,aclnn源码 ｜ 触发 TilingData|tilingKey|namespace ｜ 默认启用 true",
+      "related_pattern_ids": [
+        "FP-A07",
+        "FP-A19",
+        "FP-G02",
+        "FP-A05",
+        "FP-E01"
+      ],
+      "boundary_source_quotes": [
+        "- **关联**：[FP-A07](FP-A07.md)（tiling 分支边界写错，走错分支但状态来源正确；本型条件是对的、状态是别人的）、[FP-A19](FP-A19.md)（多 tiling 路径覆盖盲区，缺陷在新路径未被测到；本型单路径即可复现）、[FP-G02](../FP-G/FP-G02.md)（race 检测方法与 racecheck 用法可复用，但该条针对 device/kernel 侧同步原语配对，本型是 host 侧变量生命周期、无同步边可缺）、[FP-A05](FP-A05.md)（脏数据/数据踩踏是其结果面表征，本型给出可扫描的机理判据）、[FP-E01](../FP-E/FP-E01.md)（UT 用例按错误实现或错误顺序编写，使序列型缺陷长期不可见）。"
+      ],
+      "test_design": {
+        "axes": [
+          "sequence",
+          "concurrency"
+        ],
+        "oracle": [
+          "golden-utol",
+          "bitwise"
+        ],
+        "signal": "sequence",
+        "lines": [
+          "determinism",
+          "multithread-fuzz"
+        ],
+        "min_cases": 4,
+        "constructor": "序列化用例：3D→4D / 带可选输入 x→不带 x / fp16→fp32 / 新路径→旧路径 四种顺序；--gtest_shuffle --gtest_repeat=50；多线程只调 GetWorkspaceSize 交替 layout/dtype。",
+        "judge": "连续/乱序/并发调用后每次输出与单独跑一致；打桩证明 peak>1 才认并发结论。",
+        "kill": "若匿名 namespace 可变全局未被每路径赋值，则换顺序调用后输出与单独跑不一致，而单跑通过。",
+        "sourced": {
+          "constructor": "测试拦截建议",
+          "judge": "测试拦截建议",
+          "kill": "源码审查映射点"
+        }
+      },
+      "subtype_ids": [
+        "A21-1",
+        "A21-2"
+      ],
+      "evidence_status": "SOURCE_LIBRARY_DECLARATION_NOT_INDEPENDENT_CASE_OR_DEVICE_VERIFICATION",
+      "evidence_source_notes": "卡内issue/PR和实测均为原库叙述；本轮未复抓外部正文、未扫描算子实现、未设备复现。"
+    },
+    {
+      "id": "FP-A22",
+      "name": "kernel dtype 分派/模板映射错配（特定 dtype 静默走错分支）",
+      "category": "accuracy",
+      "coverage": "kernel dtype 分派/模板映射错配（特定 dtype 静默走错分支）；kernel 用 `dtype` / `sizeof(T)` / `TILING_KEY` / 函数指针表做模板派发，且映射表是**手写枚举**而非 `if constexpr` 全覆盖；同一算子支持 ≥5 种 dtype（尤其同时含 `int32/uint32`、`int64/uint64`、`bool`、`uint8`）；输出 shape 非 1 元素且按行/块写入。**单 dtype 用例无法暴露**——必须跑 dtype 全组合矩阵，并与同宽度兄弟 dtype 对照。",
+      "relation_focus": "dtype/模板/计算类型及容量绑定须正确",
+      "object_focus": "映射表/模板/计算与输出dtype/输出覆盖",
+      "time_focus": "分派/特化/预算/写回",
+      "consumer_focus": "执行模板/buffer预算/输出读者",
+      "boundary": "非一般舍入或仅路径未测；B12可记漏写结果，已知分派根因归此",
+      "analysis_kind": [
+        "MECHANISM",
+        "CONTRACT"
+      ],
+      "source_file": "patterns/FP-A/FP-A22.md",
+      "source_quote": "- **故障机理**：kernel 按 dtype 把计算派发到不同的**执行模板 / TilingKey / 类型特化分支**，而 `dtype ↔ 模板` 的**映射表条目缺失或错配**时，某个 dtype 会静默落到**默认分支、错误模板或部分覆盖的循环上界**，函数照常返回 `ACLNN_SUCCESS`，但输出只被写入了部分元素，或掩码/边界按错误的类型语义计算。它不是「数值近似差一点」（FP-A01/A02/A03），也不是「路径没被测到」（FP-A19）——**派发表本身是错的，任何输入只要落到该 dtype 就必现**。五个子型：① **映射表条目错配**（同宽度的兄弟 dtype 表现不同，可排除单一宽度搬运解释）；② **类型特化路径缺失**（bool / 无符号类型走默认或错误模板，掩码边界按有符号/位宽语义计算）；③ **分派后输出覆盖不全**（部分元素未写却返回成功，未写区域保留调用方预填值）；④ **输出 dtype 被误当计算 dtype**（用 `GetSizeByDataType(outDataType)` 推容量/临时 buffer 尺寸，而该算子实际在更宽类型上计算——如 BF16/INT8 输出、FP32 中间计算。**位宽差 2~4 倍，容量估算系统性偏小或偏大**，表现为 tiling 分块数错、单次处理量错、workspace 不足；与 ①的区别是「dtype 都对，但用错了**哪个** dtype」）。 ⑤ **出参 dtype 未纳入白名单/一致性校验（v6.33）**：`out` 只做了 `CheckNotNull`，没有 `OP_CHECK_DTYPE_NOT_SUPPORT(out, ...)`，也没有 `self/out dtype` 一致性检查；非法 out dtype 被放行后由 kernel 按错误位宽写，表现为部分输出未写或结果错。",
+      "source_quote_line": 8,
+      "source_sha256": "b7cb237c325ef3697808be4ad0323d3e513ef60f34a98a46155d93bb4e4183ff",
+      "source_card_name": "kernel dtype 分派/模板映射错配（特定 dtype 静默走错分支）",
+      "applicability": {
+        "repos": [
+          "All"
+        ],
+        "sides": [
+          "Kernel",
+          "Tiling"
+        ],
+        "carriers": [
+          "Kernel源码",
+          "Tiling源码"
+        ],
+        "trigger": "必须触发",
+        "enabled": true
+      },
+      "applicability_source_quote": "- **适用**：仓 All ｜ 侧别 Kernel,Tiling ｜ 载体 Kernel源码,Tiling源码 ｜ 触发 必须触发 ｜ 默认启用 true",
+      "related_pattern_ids": [
+        "FP-A19",
+        "FP-B01",
+        "FP-B07",
+        "FP-A05",
+        "FP-E01",
+        "FP-B12"
+      ],
+      "boundary_source_quotes": [
+        "- **关联**：[FP-A19](FP-A19.md)（多 tiling 路径覆盖盲区：缺陷在新路径未被测到；本型是**派发表本身错**，任何输入落到该 dtype 即必现）、[FP-B01](../FP-B/FP-B01.md)（支持面校验过严误拦截合法输入；本型方向相反——已放行但算错）、[FP-B07](../FP-B/FP-B07.md)（索引/偏移越界；本型的「部分未写」可能表现为写越界/漏写，须按映射表区分根因）、[FP-A05](FP-A05.md)（脏数据/数据踩踏是结果面；本型给出可判定的 dtype 派发机理）、[FP-E01](../FP-E/FP-E01.md)（UT 只覆盖常用 dtype、只断言返回码时本型长期不可见）、[FP-B12](../FP-B/FP-B12.md)（B12-2「输出覆盖不全」的结果面与本型子型③重合，机理与定级归本条）。"
+      ],
+      "test_design": {
+        "axes": [
+          "dtype",
+          "shape"
+        ],
+        "oracle": [
+          "golden-canary",
+          "golden-utol"
+        ],
+        "signal": "canary",
+        "lines": [
+          "precision",
+          "valid-fuzz"
+        ],
+        "min_cases": 4,
+        "constructor": "dtype × shape 全组合矩阵（每受支持 dtype 至少「1 元素 / 非整除行宽 / 带 diagonal 边界」三档）；输出 buffer 预填魔数 0x7FC07FC0；同宽度兄弟 dtype 成对对照。",
+        "judge": "返回码 + 输出全量正确；魔数残留比例为 0（禁止只断言返回码）。",
+        "kill": "若 dtype→模板映射条目错配，则同宽度兄弟 dtype（int32 vs uint32）结果不同，或输出部分未写致魔数残留。",
+        "sourced": {
+          "constructor": "测试拦截建议",
+          "judge": "测试拦截建议",
+          "kill": "源码审查映射点"
+        }
+      },
+      "subtype_ids": [
+        "A22-1",
+        "A22-2",
+        "A22-3",
+        "A22-4",
+        "A22-5"
+      ],
+      "evidence_status": "SOURCE_LIBRARY_DECLARATION_NOT_INDEPENDENT_CASE_OR_DEVICE_VERIFICATION",
+      "evidence_source_notes": "卡内issue/PR和实测均为原库叙述；本轮未复抓外部正文、未扫描算子实现、未设备复现。"
+    },
+    {
+      "id": "FP-B01",
+      "name": "支持面校验过严误拦截合法输入",
+      "category": "compatibility",
+      "coverage": "支持面校验过严误拦截合法输入；新增 dtype/quant_mode/布局支持后 checker 未同步。",
+      "relation_focus": "接受集合应包含本接口声明合法的支持项",
+      "object_focus": "白名单/可选项/支持矩阵",
+      "time_focus": "第一段校验/图推导",
+      "consumer_focus": "合法调用方",
+      "boundary": "未声明输入不能任定合法；B09动态标签、B11非法放行方向相反",
+      "analysis_kind": [
+        "CONTRACT"
+      ],
+      "source_file": "patterns/FP-B/FP-B01.md",
+      "source_quote": "- **故障机理**：checker 的 dtype/format/shape/quant_mode 白名单硬编码不全或漏登记新支持项，合法输入被错误拒绝。**子型 B01-1（v6.13）：可选输入/可选属性的缺省路径被误判为非法**——Proto 已声明 `OPTIONAL_INPUT`/`OPTIONAL`，但 `CheckNotNull` 无条件要求非空、InferShape 按固定下标读取可选输入、或 checker 不区分「未传」与「传了非法值」，导致合法的缺省调用在第一段接口或图推导阶段即失败。",
+      "source_quote_line": 7,
+      "source_sha256": "c21763232bc3f81f8599fe685d0d33481114ddd63e7dd751565fa132a00247f8",
+      "source_card_name": "支持面校验过严误拦截合法输入",
+      "applicability": {
+        "repos": [
+          "All"
+        ],
+        "sides": [
+          "All"
+        ],
+        "carriers": [
+          "Tiling源码",
+          "IR与图配置"
+        ],
+        "trigger": "Not supported|Unsupported|OP_CHECK",
+        "enabled": true
+      },
+      "applicability_source_quote": "- **适用**：仓 All ｜ 侧别 All ｜ 载体 Tiling源码,IR与图配置 ｜ 触发 Not supported|Unsupported|OP_CHECK ｜ 默认启用 true",
+      "related_pattern_ids": [
+        "FP-B03",
+        "FP-B04",
+        "FP-B05",
+        "FP-B06"
+      ],
+      "boundary_source_quotes": [
+        "- **关联**：**「不该拦却拦」与「该拦不拦」的完整分工（v2.16 扩写）**——本卡只承载**过拦**方向；**漏拦方向按机理拆到四条，不另立「支持面校验缺失」通用条目**（否则四条会与新条目互相抢料、维护者无从打标）：[FP-B03](FP-B03.md)（跨仓迁移丢失防御/拦截逻辑，含「校验被显式跳过」）、[FP-B04](FP-B04.md)（aclnn 必选入参空指针校验缺失）、[FP-B05](FP-B05.md)（入参校验覆盖度参差，同仓文件级）、[FP-B06](FP-B06.md)（空 tensor（numel==0）输入分支处理缺失）。判定「漏拦 / 该拦不拦」类问题时，**先问是哪一种机理（迁移丢失 / 指针 / 覆盖度 / 空输入），再打对应标签**。"
+      ],
+      "test_design": {
+        "axes": [
+          "dtype",
+          "attr",
+          "content"
+        ],
+        "oracle": [
+          "golden-utol"
+        ],
+        "signal": "legal-accept",
+        "lines": [
+          "valid-fuzz",
+          "error-scenario"
+        ],
+        "min_cases": 3,
+        "constructor": "每次放开新支持项后，二级冒烟必跑该 dtype/模式全矩阵（正反向）；可选输入缺省路径单独成例。",
+        "judge": "资料声明的支持面全部放行，不报 Not supported / Unsupported。",
+        "kill": "若白名单未随支持面放开，则资料声明支持的 dtype/format 被拒。",
+        "sourced": {
+          "constructor": "测试拦截建议",
+          "judge": "典型表现",
+          "kill": "源码审查映射点"
+        }
+      },
+      "subtype_ids": [
+        "B01-1"
+      ],
+      "evidence_status": "SOURCE_LIBRARY_DECLARATION_NOT_INDEPENDENT_CASE_OR_DEVICE_VERIFICATION",
+      "evidence_source_notes": "卡内issue/PR和实测均为原库叙述；本轮未复抓外部正文、未扫描算子实现、未设备复现。"
+    },
+    {
+      "id": "FP-B02",
+      "name": "tiling 未适配多种芯片核数",
+      "category": "compatibility",
+      "coverage": "tiling 未适配多种芯片核数；跨芯片型号部署（如 310P3 8 核正常、310P1 10 核报错）。",
+      "relation_focus": "核数核型与切分须对应当前SoC",
+      "object_focus": "AIC/AIV/blockDim/平台分支",
+      "time_focus": "tiling/跨型号部署",
+      "consumer_focus": "分核kernel",
+      "boundary": "A07一般边界、A17精度代际、C04板型性能不同",
+      "analysis_kind": [
+        "MECHANISM",
+        "CONTRACT"
+      ],
+      "source_file": "patterns/FP-B/FP-B02.md",
+      "source_quote": "- **故障机理**：核数/AIC/AIV 计算硬编码或 SOC 型号分支遗漏，按单核数假设切分任务。",
+      "source_quote_line": 7,
+      "source_sha256": "29b9219e3b69c8c1911f33c5560a79a7308e1b604da71019511d654c6af9cb66",
+      "source_card_name": "tiling 未适配多种芯片核数",
+      "applicability": {
+        "repos": [
+          "All"
+        ],
+        "sides": [
+          "Tiling"
+        ],
+        "carriers": [
+          "Tiling源码"
+        ],
+        "trigger": "GetCoreNum|GetBlockNum|coreNum",
+        "enabled": true
+      },
+      "applicability_source_quote": "- **适用**：仓 All ｜ 侧别 Tiling ｜ 载体 Tiling源码 ｜ 触发 GetCoreNum|GetBlockNum|coreNum ｜ 默认启用 true",
+      "related_pattern_ids": [
+        "FP-A07",
+        "FP-A17",
+        "FP-C04"
+      ],
+      "boundary_source_quotes": [
+        "- **关联**：[FP-A07](../FP-A/FP-A07.md)、[FP-A17](../FP-A/FP-A17.md)（A17 是同因在精度侧的呈现）、[FP-C04](../FP-C/FP-C04.md)。"
+      ],
+      "test_design": {
+        "axes": [
+          "shape",
+          "content"
+        ],
+        "oracle": [
+          "golden-utol"
+        ],
+        "signal": "golden",
+        "lines": [
+          "precision"
+        ],
+        "min_cases": 3,
+        "constructor": "全型号芯片 CI 矩阵执行（禁止单型号抽检代替）；核数=1 / 2 / 实际核数±1 各一组。",
+        "judge": "全型号芯片可执行且同用例结果一致。",
+        "kill": "若核数硬编码或 SOC 分支遗漏，则部分芯片报错，或结果随核数变化。",
+        "sourced": {
+          "constructor": "测试拦截建议",
+          "judge": "典型表现",
+          "kill": "源码审查映射点"
+        }
+      },
+      "subtype_ids": [],
+      "evidence_status": "SOURCE_LIBRARY_DECLARATION_NOT_INDEPENDENT_CASE_OR_DEVICE_VERIFICATION",
+      "evidence_source_notes": "卡内issue/PR和实测均为原库叙述；本轮未复抓外部正文、未扫描算子实现、未设备复现。"
+    },
+    {
+      "id": "FP-B03",
+      "name": "跨仓迁移丢失防御/拦截逻辑",
+      "category": "compatibility",
+      "coverage": "跨仓迁移丢失防御/拦截逻辑；跨仓迁移、Pass 融合迁移场景；**调试 / 性能优化期临时跳过校验的开关被带入发布版本**（v2.16 增补）。",
+      "relation_focus": "既定防线不应因漏迁或skip被绕过",
+      "object_focus": "校验分支/skipCheck/迁移清单",
+      "time_focus": "迁移/调试入发布/异常执行",
+      "consumer_focus": "下游执行/调用方",
+      "boundary": "F04为接口本体交付遗漏；有迁移事实不证明可达绕过",
+      "analysis_kind": [
+        "MECHANISM",
+        "ENGINEERING_PROCESS"
+      ],
+      "source_file": "patterns/FP-B/FP-B03.md",
+      "source_quote": "- **故障机理**：算子/融合 Pass 从其它仓库（如 canndev）迁移时只迁功能主体，防御性代码（动态 shape 拦截、合法性校验分支）被漏掉；**同类后果的另一成因（v2.16 增补）：防御逻辑被「显式跳过」而非被删除**——以 `if (skipCheck) return SUCCESS;`、`SKIP_INDEX_CHECK` 类开关、或调试/性能优化期注释掉校验后忘记恢复等形式，使非法输入绕过校验直接进入执行。二者同属「**防御逻辑被移除 / 绕过**」这一机理，区别仅在移除方式（**漏迁** vs **显式跳过**）。",
+      "source_quote_line": 7,
+      "source_sha256": "55d5d19e1db5ff4fbfe5c2162a2eb2345b1898c784b3142d59726285b055d2c1",
+      "source_card_name": "跨仓迁移丢失防御/拦截逻辑",
+      "applicability": {
+        "repos": [
+          "All"
+        ],
+        "sides": [
+          "All"
+        ],
+        "carriers": [
+          "Tiling源码",
+          "IR与图配置"
+        ],
+        "trigger": "skipCheck|SKIP_[A-Z_]*CHECK|OP_CHECK",
+        "enabled": true
+      },
+      "applicability_source_quote": "- **适用**：仓 All ｜ 侧别 All ｜ 载体 Tiling源码,IR与图配置 ｜ 触发 skipCheck|SKIP_[A-Z_]*CHECK|OP_CHECK ｜ 默认启用 true",
+      "related_pattern_ids": [
+        "FP-A04",
+        "FP-B01",
+        "FP-B05",
+        "FP-B06"
+      ],
+      "boundary_source_quotes": [
+        "- **关联**：[FP-A04](../FP-A/FP-A04.md)、[FP-B01](FP-B01.md)、**[FP-B05](FP-B05.md)/[FP-B06](FP-B06.md)（同为「该拦不拦」族，按机理分工，见 [FP-B01](FP-B01.md) 关联字段）**。"
+      ],
+      "test_design": {
+        "axes": [
+          "input-validity",
+          "contract"
+        ],
+        "oracle": [
+          "error-code"
+        ],
+        "signal": "error-code",
+        "lines": [
+          "error-scenario"
+        ],
+        "min_cases": 3,
+        "constructor": "迁移类合入必附「迁移前后拦截行为对齐」清单；动态 shape 负向用例集。",
+        "judge": "迁移前后拦截行为对齐，迁移前被拒的非法输入迁移后仍被拒。",
+        "kill": "若迁移丢失防御分支，则迁移前被拒的非法输入在迁移后被静默接受。",
+        "sourced": {
+          "constructor": "测试拦截建议",
+          "judge": "典型表现",
+          "kill": "源码审查映射点"
+        }
+      },
+      "subtype_ids": [],
+      "evidence_status": "SOURCE_LIBRARY_DECLARATION_NOT_INDEPENDENT_CASE_OR_DEVICE_VERIFICATION",
+      "evidence_source_notes": "卡内issue/PR和实测均为原库叙述；本轮未复抓外部正文、未扫描算子实现、未设备复现。"
+    },
+    {
+      "id": "FP-B04",
+      "name": "aclnn 必选入参空指针校验缺失",
+      "category": "compatibility",
+      "coverage": "aclnn 必选入参空指针校验缺失；① 任一必选入参传 `nullptr`；GetWorkspaceSize 或 Execute 阶段任一阶段；尤其易发于共享校验函数被多入口复用的算子族。② 只请求部分输出（如 backward 只算 dw 不算 dx），被省略的那一路输出为 `nullptr`，而兄弟输出路径读取了它的 shape/view。",
+      "relation_focus": "解引用前满足必选非空或可选跳过合同",
+      "object_focus": "tensor/scalar/数组/字符串/可选输出",
+      "time_focus": "两段式接口/首次解引用前",
+      "consumer_focus": "校验/shape-view/兄弟梯度",
+      "boundary": "必选该拦与可选该跳相反；nullptr不同numel=0",
+      "analysis_kind": [
+        "CONTRACT",
+        "MECHANISM"
+      ],
+      "source_file": "patterns/FP-B/FP-B04.md",
+      "source_quote": "- **故障机理**：aclnn 两段式接口（GetWorkspaceSize / Execute）对必选入参（输入 tensor、scalar、属性数组、属性字符串）未做 `nullptr` 拦截即向下透传，下游解引用空地址。**三类成因**：① **必选入参**未拦截——适配层由模板脚本生成导致校验宏漏插；多接口共享的公共校验函数内直接解引用（如 `strcmp`），入口仅校验了部分参数；校验位置晚于首次解引用；tiling/infershape 层 `GetData()` 返回值未判空。② **可选输出**（`outputMask` / `aclBoolArray` 门控的反向输出）——由 output-mask 允许缺省的输出指针为 `nullptr`，但某条计算路径仍按「所有输出都会请求」的假设去读它的 shape、建 view 或反推另一侧梯度（v2.18 增补，实证 26-02）。②与本卡 ①的**方向相反**：① 是「该拦没拦」，② 是「该跳没跳」。 ③ **可选输入省略后解引用（v6.33）**：资料把某输入标为 OPTIONAL，实现也在 `GetOptionalInputShape()` 返回 `nullptr` 时未判空就调 `->GetStorageShape()` / 参与偏移计算；与 ② 的区别是对象从「可选输出」换成「可选输入」。",
+      "source_quote_line": 8,
+      "source_sha256": "e7d39d2b0a4e18a8ca5b873f51af890e1b6fd9ecc6829ada141122275f6bae58",
+      "source_card_name": "aclnn 必选入参空指针校验缺失（含可选输出反向依赖）",
+      "applicability": {
+        "repos": [
+          "All"
+        ],
+        "sides": [
+          "Host"
+        ],
+        "carriers": [
+          "aclnn源码"
+        ],
+        "trigger": "必须触发",
+        "enabled": true
+      },
+      "applicability_source_quote": "- **适用**：仓 All ｜ 侧别 Host ｜ 载体 aclnn源码 ｜ 触发 必须触发 ｜ 默认启用 true",
+      "related_pattern_ids": [
+        "FP-B03",
+        "FP-B01",
+        "FP-A04",
+        "FP-B05"
+      ],
+      "boundary_source_quotes": [
+        "- **关联**：[FP-B03](FP-B03.md)（迁移场景丢失的防御逻辑中常含空指针拦截）、[FP-B01](FP-B01.md)（方向相反：B01 是该拦不拦）、[FP-A04](../FP-A/FP-A04.md)（未拦截若未崩溃则演变为静默错误结果）、[FP-B05](FP-B05.md)。"
+      ],
+      "test_design": {
+        "axes": [
+          "input-validity",
+          "contract"
+        ],
+        "oracle": [
+          "error-code"
+        ],
+        "signal": "null-input",
+        "lines": [
+          "error-scenario"
+        ],
+        "min_cases": 4,
+        "constructor": "nullptr 探针覆盖「算子 × 入参位置 × 两段式阶段」全矩阵；共享校验函数的算子族须逐个入口独立置空，不可只测一个入口。",
+        "judge": "返回 161001（ACLNN_ERR_PARAM_NULLPTR）；rc=139（崩溃）或 1（断言 FAIL）即缺陷；gdb 取栈定位解引用点。",
+        "kill": "若 CheckParams 漏参或校验晚于解引用，则对应入参置空后 SIGSEGV 而非返回 161001。",
+        "sourced": {
+          "constructor": "测试拦截建议",
+          "judge": "测试拦截建议",
+          "kill": "源码审查映射点"
+        }
+      },
+      "subtype_ids": [
+        "B04-1",
+        "B04-2",
+        "B04-3"
+      ],
+      "evidence_status": "SOURCE_LIBRARY_DECLARATION_NOT_INDEPENDENT_CASE_OR_DEVICE_VERIFICATION",
+      "evidence_source_notes": "卡内issue/PR和实测均为原库叙述；本轮未复抓外部正文、未扫描算子实现、未设备复现。"
+    },
+    {
+      "id": "FP-B05",
+      "name": "入参校验覆盖度参差（同仓内文件级）",
+      "category": "compatibility",
+      "coverage": "入参校验覆盖度参差（同仓内文件级）；新增算子未对齐仓内既有校验范式；算子由不同开发者/不同时期合入；仓内缺乏生成模板或范式约束。",
+      "relation_focus": "校验组织应让全部要求与顺序可审计",
+      "object_focus": "CheckNotNull/CheckParams骨架/文件",
+      "time_focus": "接口新增/模板生成/审查",
+      "consumer_focus": "公共校验/维护者",
+      "boundary": "无函数名或骨架是风险线索，不能单凭缺失确认非法值已放行",
+      "analysis_kind": [
+        "ENGINEERING_PROCESS",
+        "COVERAGE_OR_ORACLE"
+      ],
+      "source_file": "patterns/FP-B/FP-B05.md",
+      "source_quote": "- **故障机理**：同一仓内 aclnn 接口文件的校验完备度严重不均——部分文件具备统一的 `CheckNotNull` 骨架 + `CheckParams` 聚合入口，另一部分**完全没有**，其入参校验仅依赖零散 `OP_CHECK_NULL` 散点，无聚合入口则校验完整性与顺序皆无从保证。",
+      "source_quote_line": 7,
+      "source_sha256": "8869b41f994bb7e52f18508f0d4aee2ee0716a88876dbdec79fccfb231a3da9b",
+      "source_card_name": "入参校验覆盖度参差（同仓内文件级）",
+      "applicability": {
+        "repos": [
+          "All"
+        ],
+        "sides": [
+          "Host"
+        ],
+        "carriers": [
+          "aclnn源码"
+        ],
+        "trigger": "CheckNotNull|CheckParams|aclnn",
+        "enabled": true
+      },
+      "applicability_source_quote": "- **适用**：仓 All ｜ 侧别 Host ｜ 载体 aclnn源码 ｜ 触发 CheckNotNull|CheckParams|aclnn ｜ 默认启用 true",
+      "related_pattern_ids": [
+        "FP-B04",
+        "FP-B03"
+      ],
+      "boundary_source_quotes": [
+        "- **关联**：[FP-B04](FP-B04.md)（无骨架文件内的算子即 B04 的受害者）、[FP-B03](FP-B03.md)（跨仓迁移易致范式参差）。"
+      ],
+      "test_design": {
+        "axes": [
+          "input-validity",
+          "contract"
+        ],
+        "oracle": [
+          "error-code"
+        ],
+        "signal": "null-input",
+        "lines": [
+          "static-absence",
+          "error-scenario"
+        ],
+        "min_cases": 2,
+        "constructor": "按「仓内无骨架文件清单」定向补探针用例，而非全量随机抽检；横向比对同仓有/无 CheckNotNull 骨架的两类文件。",
+        "judge": "同仓内各算子对 nullptr 的拦截行为一致，不呈文件级参差。",
+        "kill": "若无 CheckNotNull 骨架的文件内算子任一必选入参置空即崩溃，而有骨架文件同操作正常。",
+        "sourced": {
+          "constructor": "测试拦截建议",
+          "judge": "典型表现",
+          "kill": "故障机理"
+        }
+      },
+      "subtype_ids": [],
+      "evidence_status": "SOURCE_LIBRARY_DECLARATION_NOT_INDEPENDENT_CASE_OR_DEVICE_VERIFICATION",
+      "evidence_source_notes": "卡内issue/PR和实测均为原库叙述；本轮未复抓外部正文、未扫描算子实现、未设备复现。"
+    },
+    {
+      "id": "FP-B06",
+      "name": "空 tensor（numel==0）输入分支处理缺失",
+      "category": "compatibility",
+      "coverage": "空 tensor（numel==0）输入分支处理缺失；任一输入（尤其可选输入/第二输入：masked_scatter 的 `source`、Dropout 的 `mask`、量化类的 `scales`/`zeroPoints`/`smoothScale`）numel==0；平台为 A2/A3（非 regbase）；同算子 tiling/kernel 未对 0 元素早退。语义上「空输入是否合法」须以 PyTorch 为准（如 masked_scatter 中 `source` 为空**仅当 mask 无 true 元素时合法**，此时应为 no-op 而非报错）。",
+      "relation_focus": "空态处理须符合合法组合且不绕过仍适用守卫",
+      "object_focus": "numel/shape/mask/辅助输入",
+      "time_focus": "判空/早退/连续化/执行入口",
+      "consumer_focus": "no-op/错误返回/正常kernel",
+      "boundary": "空tensor不同nullptr及0维标量；已有分支但漏写输出查B12",
+      "analysis_kind": [
+        "CONTRACT",
+        "MECHANISM"
+      ],
+      "source_file": "patterns/FP-B/FP-B06.md",
+      "source_quote": "- **故障机理**：aclnn 两段式接口对「空 tensor（numel==0，即 shape 含 0 维）」这一**语义可能合法的输入形态**缺少分支处理，五种子形态：① **判空覆盖不全**——同一接口只对部分输入调 `IsEmpty()`（典型：`selfRef`/`mask` 判了、`source`/`updates` 类第二输入漏判）；② **完全未判空**——空 tensor 被当正常输入继续 `l0op::Contiguous` / `Cast` / 算子构建（部分实现已有 `if (source->IsEmpty()) sourceContiguous = source;` 之类半程保护，但仅跳过连续化，仍把 0 元素 buffer 交给算子）；③ **平台分支不对称**——`!Ops::NN::AclnnUtil::IsRegbase()`（arch22 / A2A3）与 regbase（arch35 / 950）各有一套实现与 kernel，修复常只 gate 一侧；④ **快速路径前置于校验**（v6.1 显式化）——接口内**确有空输入 / no-op 早退分支**，但位置排在参数校验**之前**（或校验被写在该早退之后），于是**非法组合随空态一并被放行**：`InplacePartialRotaryMulGrad` 的 no-op 提前返回排在 `CheckRotaryModeShapeRelation` 之前，零长度但越界的 `partial_slice=[9,9]` 与负起点 `[-1,0]` 都返回 `GRAPH_SUCCESS`（#4531）；`UpsampleNearestExact2d` 与 `BoundingBoxEncode` 的空输入快速路径同样绕过参数校验（#928、#935）。**⑤ 空态被过严校验拒绝（v6.13 新增）**——与 ①~④ 方向相反：接口对空 tensor 做**无条件** `Size() != 0` / `IsEmpty() → 报错` 判断，把**资料明确支持的空输入**直接判为非法（`aclnnConvTbcBackward` 的 `OP_CHECK(self->Size() != 0, ... return ACLNN_ERR_PARAM_INVALID)` 不在任何 SoC 分支内，A2/950 一致与资料四处「支持空 Tensor」相反，#7060；`aclnnAddLayerNormGrad` 空张量 `(M=0,H>0)` 返回 561002，而同算子正向 `aclnnAddLayerNorm` 已支持，#7055）。判据是**以资料/对标的空态语义为准**：该支持却拒绝 → 本子型；该拒绝却放行 → ①~④。与 ①②③ 的本质区别是**分支存在而顺序错**——只查「分支是否存在」的静态扫描（含本节 `absence_signatures` 规则）**查不出这一类**，须按「早退块是否在校验之后」逐接口人工核。空输入进入 arch22 算子后，tiling/kernel 未适配 0 元素：kernel `Init()` 用**由 mask/shape 推导的元素数**（而非该 tensor 自身元素数）去 `SetGlobalBuffer`，等于把 0 字节分配注册成非 0 长度；source 元素数不足时更会读到分配外地址（越界/NaN）。",
+      "source_quote_line": 7,
+      "source_sha256": "54de0378cd3353dbb8fa8c1714be942b7e7dde366e8d7bcdd098851dda4845a7",
+      "source_card_name": "空 tensor（numel==0）输入分支处理缺失",
+      "applicability": {
+        "repos": [
+          "All"
+        ],
+        "sides": [
+          "Host",
+          "Tiling",
+          "Kernel"
+        ],
+        "carriers": [
+          "aclnn源码",
+          "Tiling源码",
+          "Kernel源码"
+        ],
+        "trigger": "必须触发",
+        "enabled": true
+      },
+      "applicability_source_quote": "- **适用**：仓 All ｜ 侧别 Host,Tiling,Kernel ｜ 载体 aclnn源码,Tiling源码,Kernel源码 ｜ 触发 必须触发 ｜ 默认启用 true",
+      "related_pattern_ids": [
+        "FP-B04",
+        "FP-B05",
+        "FP-A04",
+        "FP-A19",
+        "FP-E01"
+      ],
+      "boundary_source_quotes": [
+        "- **关联**：[FP-B04](FP-B04.md)（相邻但不同：B04 是 `nullptr` 指针缺失，本条是 numel==0 的**语义分支**缺失，两者可共现于同一 `CheckParams`）、[FP-B05](FP-B05.md)（同源——文件级校验范差不齐）、[FP-A04](../FP-A/FP-A04.md)（未拦截的空输入可能演变为静默结果/精度故障）、[FP-A19](../FP-A/FP-A19.md)（arch22 与 regbase 属两条路径，多路径覆盖盲区同样适用）、[FP-E01](../FP-E/FP-E01.md)（golden/UT 未覆盖空输入时同样会出现「与错误实现共错」）。"
+      ],
+      "test_design": {
+        "axes": [
+          "shape",
+          "input-validity"
+        ],
+        "oracle": [
+          "golden-canary",
+          "error-code"
+        ],
+        "signal": "canary",
+        "lines": [
+          "valid-fuzz",
+          "error-scenario"
+        ],
+        "min_cases": 4,
+        "constructor": "空 tensor 探针矩阵=「接口 × 输入位置 × 空形态（0 维标量 / 含 0 维 shape / 正常）」；优先覆盖「已写判空但漏了一个输入」的接口；空用例须同时跑 regbase 与非 regbase。",
+        "judge": "合法空输入输出等价 no-op；非法组合明确报错而非静默 SUCCESS；以 PyTorch CPU 参考为准。",
+        "kill": "若判空只覆盖部分输入，则该输入置空时第一段报错或读越界，而同接口其他输入置空正常。",
+        "sourced": {
+          "constructor": "测试拦截建议",
+          "judge": "测试拦截建议",
+          "kill": "源码审查映射点"
+        }
+      },
+      "subtype_ids": [
+        "B06-1",
+        "B06-2",
+        "B06-3",
+        "B06-4",
+        "B06-5"
+      ],
+      "evidence_status": "SOURCE_LIBRARY_DECLARATION_NOT_INDEPENDENT_CASE_OR_DEVICE_VERIFICATION",
+      "evidence_source_notes": "卡内issue/PR和实测均为原库叙述；本轮未复抓外部正文、未扫描算子实现、未设备复现。"
+    },
+    {
+      "id": "FP-B07",
+      "name": "索引/偏移计算错误致越界",
+      "category": "compatibility",
+      "coverage": "索引/偏移计算错误致越界；大 shape（元素数跨 2^31、单核偏移超 int32）；indices/offsets 取**边界值、负值、重复值**；末维/尾块非对齐（如 31/32/33）；分核数与 shape 不整除；模板分支（全载/切分/单核）切换处的偏移语义不同；dav3510x 等多平台分支的检查次序差异；**合法大 shape 且 GM 偏移链路存在多因子乘法**（batch×heads×seqLen×headDim 量级可达数十 GB，见成因⑥）。",
+      "relation_focus": "地址索引对象/位宽/单位/边界须匹配",
+      "object_focus": "indices/offset/GM长度/元素字节/中间积",
+      "time_focus": "推导/切分/寻址/搬运",
+      "consumer_focus": "SetGlobalBuffer/DataCopy",
+      "boundary": "B13参数窄化、B15容量不足、B09哨兵错误不同",
+      "analysis_kind": [
+        "MECHANISM",
+        "CONTRACT"
+      ],
+      "source_file": "patterns/FP-B/FP-B07.md",
+      "source_quote": "- **故障机理**：索引/偏移量在 host（tiling / infershape / aclnn）或 kernel 内计算错误，导致越界读/写或取到错误数据。**七种**典型成因：① **整型宽度不足**——用 `int32_t` 承载元素数/地址（元素数 > 2^31 即溢出，单核偏移相乘更易溢出）；② **符号/方向翻转**——`idxOffset`、`startOffset` 等正负号或方向取反；③ **边界条件写错**——`>=`/`>` 混用、末块/尾块偏移计算漏 1、`CeilDiv/FloorDiv` 取整方向错；④ **对齐与分核偏移**——`DataCopy/DataCopyPad` 的 32B 对齐、多核分核偏移叠加未对齐；⑤ **检查次序颠倒**——先按连续性/对齐算偏移，后做维度值校验，非法值先参与偏移运算；⑥ **GM 偏移 / 长度 32 位计算域溢出（v2.17 增补）**——合法大 shape 下线性元素位置达 **`2^32`**（**uint32 域回绕**，与成因① 的 int32 溢出是不同档位），或 GM 起始地址 / 下标 / 搬运长度 / `SetGlobalBuffer` 的 **size 参数**中 **≥2 个 32 位因子相乘**。**隐蔽特征是最终变量已声明为 `int64_t` / `uint64_t`，但右侧乘法仍全在 32 位域完成**——赋值时回绕已发生，再提升也无效。表现常为**后段输出全 0 的静默错误**（无 `aic error`、无 coredump），与成因① 的 aic error 型不同（实证 ops-nn #4494）。 ⑦ **分组/列表索引负值未校验（v6.33）**：`groupList` / `indices` / `slot` 等分组或索引值取负时未拦截，直接参与前缀和/寻址，导致 AI Core 越界（507015）或静默错位；与 ② 的区别是 ② 是偏移算式符号翻转，本条是**入参值域本身为负**。",
+      "source_quote_line": 7,
+      "source_sha256": "f89b07a1e539babb568296d5adf21c95c703308b26cadb88a11f205c17805576",
+      "source_card_name": "索引/偏移计算错误致越界",
+      "applicability": {
+        "repos": [
+          "All"
+        ],
+        "sides": [
+          "Tiling",
+          "Kernel",
+          "Host"
+        ],
+        "carriers": [
+          "Tiling源码",
+          "Kernel源码",
+          "aclnn源码"
+        ],
+        "trigger": "必须触发",
+        "enabled": true
+      },
+      "applicability_source_quote": "- **适用**：仓 All ｜ 侧别 Tiling,Kernel,Host ｜ 载体 Tiling源码,Kernel源码,aclnn源码 ｜ 触发 必须触发 ｜ 默认启用 true",
+      "related_pattern_ids": [
+        "FP-A18",
+        "FP-A04",
+        "FP-B04",
+        "FP-B06",
+        "FP-D01",
+        "FP-E01",
+        "FP-B08"
+      ],
+      "boundary_source_quotes": [
+        "- **故障机理**：索引/偏移量在 host（tiling / infershape / aclnn）或 kernel 内计算错误，导致越界读/写或取到错误数据。**七种**典型成因：① **整型宽度不足**——用 `int32_t` 承载元素数/地址（元素数 > 2^31 即溢出，单核偏移相乘更易溢出）；② **符号/方向翻转**——`idxOffset`、`startOffset` 等正负号或方向取反；③ **边界条件写错**——`>=`/`>` 混用、末块/尾块偏移计算漏 1、`CeilDiv/FloorDiv` 取整方向错；④ **对齐与分核偏移**——`DataCopy/DataCopyPad` 的 32B 对齐、多核分核偏移叠加未对齐；⑤ **检查次序颠倒**——先按连续性/对齐算偏移，后做维度值校验，非法值先参与偏移运算；⑥ **GM 偏移 / 长度 32 位计算域溢出（v2.17 增补）**——合法大 shape 下线性元素位置达 **`2^32`**（**uint32 域回绕**，与成因① 的 int32 溢出是不同档位），或 GM 起始地址 / 下标 / 搬运长度 / `SetGlobalBuffer` 的 **size 参数**中 **≥2 个 32 位因子相乘**。**隐蔽特征是最终变量已声明为 `int64_t` / `uint64_t`，但右侧乘法仍全在 32 位域完成**——赋值时回绕已发生，再提升也无效。表现常为**后段输出全 0 的静默错误**（无 `aic error`、无 coredump），与成因① 的 aic error 型不同（实证 ops-nn #4494）。 ⑦ **分组/列表索引负值未校验（v6.33）**：`groupList` / `indices` / `slot` 等分组或索引值取负时未拦截，直接参与前缀和/寻址，导致 AI Core 越界（507015）或静默错位；与 ② 的区别是 ② 是偏移算式符号翻转，本条是**入参值域本身为负**。",
+        "- **触发条件**：大 shape（元素数跨 2^31、单核偏移超 int32）；indices/offsets 取**边界值、负值、重复值**；末维/尾块非对齐（如 31/32/33）；分核数与 shape 不整除；模板分支（全载/切分/单核）切换处的偏移语义不同；dav3510x 等多平台分支的检查次序差异；**合法大 shape 且 GM 偏移链路存在多因子乘法**（batch×heads×seqLen×headDim 量级可达数十 GB，见成因⑥）。",
+        "- **关联**：[FP-A18](../FP-A/FP-A18.md)（int32 边界值转 float 舍入——本条是**整型承载与符号语义**，同一 int32 主题的两个面）、[FP-A04](../FP-A/FP-A04.md)（越界取值错误常表现为\"静默精度不对\"）、[FP-B04](FP-B04.md)（越界写常伴随空指针/未校验的指针基线）、[FP-B06](FP-B06.md)（空/0 元素输入是索引越界的极端输入形态）、[FP-D01](../FP-D/FP-D01.md)（workspace/偏移申请不足同源）、[FP-E01](../FP-E/FP-E01.md)（只比数值不看 aic error 会漏判此类）、**[FP-A04](../FP-A/FP-A04.md)（成因⑥ 的静默型表现：后段输出全 0 而无任何报错，落在 A04「不报错地输出部分结果」上——只按本条主症状（aic error / 错位）去比对会整体漏判）**、[FP-B08](FP-B08.md)（节点级配置未参与派发致模板/分支选错，错误分支的索引/偏移假设不成立时可表现为本型越界）。"
+      ],
+      "test_design": {
+        "axes": [
+          "shape",
+          "memory",
+          "boundary"
+        ],
+        "oracle": [
+          "sanitizer-memcheck"
+        ],
+        "signal": "memory",
+        "lines": [
+          "memory"
+        ],
+        "min_cases": 4,
+        "constructor": "四类探针：元素数跨 2^31 / indices 取边界负值重复 / 非对齐尾块（末维 31/32/33、尾块非整除）/ 分核数=1、2、实际核数±1；大 shape 需与 tiling 阈值两侧成对构造。",
+        "judge": "mssanitizer 无越界告警；不出现 aic error / coredump / 数值错位三类症状（避免只报「精度不一致」）。",
+        "kill": "若 int32 承载元素数/地址或偏移符号方向翻转，则元素数跨 2^31 时越界，或尾块数值错位。",
+        "sourced": {
+          "constructor": "测试拦截建议",
+          "judge": "测试拦截建议",
+          "kill": "源码审查映射点"
+        }
+      },
+      "subtype_ids": [
+        "B07-1",
+        "B07-2",
+        "B07-3",
+        "B07-4",
+        "B07-5",
+        "B07-6",
+        "B07-7"
+      ],
+      "evidence_status": "SOURCE_LIBRARY_DECLARATION_NOT_INDEPENDENT_CASE_OR_DEVICE_VERIFICATION",
+      "evidence_source_notes": "卡内issue/PR和实测均为原库叙述；本轮未复抓外部正文、未扫描算子实现、未设备复现。"
+    },
+    {
+      "id": "FP-B08",
+      "name": "节点级配置未参与派发决策（属性在某一跳被丢弃：fallback 回调 / 前端插件 / fusion pass）",
+      "category": "compatibility",
+      "coverage": "节点级配置未参与派发决策（属性在某一跳被丢弃：fallback 回调 / 前端插件 / fusion pass）；**四元组同时成立**——① 走 **GE 图模式**（非 aclnn 直调）；② 该算子**经由 aclnn fallback 回调**执行；③ 节点上**设置了节点级配置属性**（且与全局配置不一致）；④ 该算子的回调分支**已被实现**但未读取该属性。**aclnn 直调路径不触发**。**载体泛化**：任一「属性需跨越一跳传递」的环节——图模式 fallback 回调、前端（ONNX/TF）插件解析、图 fusion pass 新建节点——只要该跳**未显式透传属性**，即可能触发；**前端框架版本升级新增属性**（如 ONNX13+ 引入 `noop_with_empty_axes`）是高频触发场景。",
+      "relation_focus": "节点配置须跨每一跳到实际决策者",
+      "object_focus": "节点attr/全局配置/源新节点",
+      "time_focus": "前端解析/fusion/fallback",
+      "consumer_focus": "派发/精度/分组决策",
+      "boundary": "B14入口合同不同步不同；需图路径和配置实际可达，不由同名attr推关联",
+      "analysis_kind": [
+        "MECHANISM",
+        "CONTRACT"
+      ],
+      "source_file": "patterns/FP-B/FP-B08.md",
+      "source_quote": "- **故障机理**：**图模式**下算子经 **aclnn fallback 回调**执行时，回调实现只读取**全局配置**（如 `allow_hf32`、`precision_mode`）来决定派发/执行模式，**未读取节点携带的节点级属性**（如 `opImplMode`、`enable_hf32`、`groups`），导致节点级配置**不参与**执行模式决策。① 节点级开启了某模式而全局未开 → **节点配置被静默忽略**，走默认路径；② 反向：全局开了而节点显式关闭 → 仍按全局开执行（无节点级否决权）；③ 与「直接 aclnn 调用路径」表现不一致——**aclnn 直调正常，图模式 fallback 异常**，这是本型最典型的定位特征。根因多为回调实现按 `GetNodeType()` 分支处理时只覆盖部分算子（如仅 `MatMulV3`），或**属性按位置索引取值**（`GetAttrPointer<T>(3)`）而属性顺序变更后静默取错。**同一机理在三个不同载体上均有实证，且修复时机不同（2026-09-16 逐分支实测）**：① **fallback 回调**（#1790）—— 9.1.0 起修复；② **ONNX 插件解析函数**——新增前端属性未纳入解析透传清单（#1647）—— 9.1.0 起修复；③ **图 fusion pass**——新建节点时未把源节点属性拷到新节点（#1639）—— **9.1.0-beta.2 起修复（早于 ①②）**。三者共性是**「属性在某一跳被丢弃」**，而非读取逻辑本身错误。**注意版本矩阵不可统一按「9.1.0 前都带 bug」构造**：载体③在 `9.1.0-beta.2` / `9.1.0-beta.3` 上已修复。",
+      "source_quote_line": 7,
+      "source_sha256": "20a73d8b9570b084f320daee6bcfa8d2bc6f9510af9001111bbac89505f34566",
+      "source_card_name": "节点级配置未参与派发决策（属性在某一跳被丢弃：fallback 回调 / 前端插件 / fusion pass）",
+      "applicability": {
+        "repos": [
+          "canndev"
+        ],
+        "sides": [
+          "Host"
+        ],
+        "carriers": [
+          "IR与图配置"
+        ],
+        "trigger": "GetAttrPointer|ParseOpToGraph|fallback|AddNode",
+        "enabled": true
+      },
+      "applicability_source_quote": "- **适用**：仓 canndev ｜ 侧别 Host ｜ 载体 IR与图配置 ｜ 触发 GetAttrPointer|ParseOpToGraph|fallback|AddNode ｜ 默认启用 true",
+      "related_pattern_ids": [
+        "FP-B01",
+        "FP-B03",
+        "FP-A16",
+        "FP-A20",
+        "FP-F02",
+        "FP-F01"
+      ],
+      "boundary_source_quotes": [
+        "- **关联**：[FP-B01](FP-B01.md)（**方向相反的镜像**：B01 是校验过严、把合法输入拦掉；本型是校验/派发读取不全，把**节点配置静默忽略**，二者同属\"配置面与判定面不一致\"）、[FP-B03](FP-B03.md)（跨仓迁移丢失防御逻辑——本型可视为\"迁移时丢失节点属性读取\"的特化）、[FP-A16](../FP-A/FP-A16.md)（**aclop 与 aclnn 编译阶段精度差异**——本型是\"图模式 fallback vs aclnn 直调\"的路径差异，同属多通路一致性族）、[FP-A20](../FP-A/FP-A20.md)（确定性等级未分级标注——同属\"配置粒度未正确传递/暴露\"）、[FP-F02](../FP-F/FP-F02.md)（属性读取失败仅 `OP_LOGE` 后静默 `return false`，属可观测性不足；#1660 的「降级分支误报 error」是其对称面）、[FP-F01](../FP-F/FP-F01.md)（#1639 的表现为 ATC 编译失败，与构建/产物类缺陷交叠）。"
+      ],
+      "test_design": {
+        "axes": [
+          "attr",
+          "sequence",
+          "content"
+        ],
+        "oracle": [
+          "golden-utol"
+        ],
+        "signal": "sequence",
+        "lines": [
+          "precision"
+        ],
+        "min_cases": 4,
+        "constructor": "节点级 × 全局级四组交叉矩阵 {节点开,全局关}/{节点关,全局开}/{双开}/{双关}，断言四组行为两两可区分；图模式（经 fallback）vs aclnn 直调对拍。",
+        "judge": "四组行为两两可区分；图模式与 aclnn 直调在数值与执行模式上一致。",
+        "kill": "若节点属性在某一跳被丢弃，则 {节点开,全局关} 与 {双关} 行为相同，而语义上应可区分。",
+        "sourced": {
+          "constructor": "测试拦截建议",
+          "judge": "测试拦截建议",
+          "kill": "故障机理"
+        }
+      },
+      "subtype_ids": [
+        "B08-1",
+        "B08-2",
+        "B08-3"
+      ],
+      "evidence_status": "SOURCE_LIBRARY_DECLARATION_NOT_INDEPENDENT_CASE_OR_DEVICE_VERIFICATION",
+      "evidence_source_notes": "卡内issue/PR和实测均为原库叙述；本轮未复抓外部正文、未扫描算子实现、未设备复现。"
+    },
+    {
+      "id": "FP-B09",
+      "name": "动态 shape 标签未参与校验决策（`-2`/`-1` 被当真实维度）",
+      "category": "compatibility",
+      "coverage": "动态 shape 标签未参与校验决策（`-2`/`-1` 被当真实维度）；**任一动态 shape 输入**——① 输入 tensor 带 `-2`（UNKNOWN_RANK）或 `-1`（UNKNOWN_SHAPE）标签；② 该输入的校验/推导路径**未在入口前置动态标签判断**；③ 算子为**新上库**或**刚同步配置**（#1673「新增 AdaptiveAvgPool2dGrad，同步修改 cann 仓原有配置」即此类：新算子易照抄静态校验骨架）。**静态 shape 输入不触发**，故常规静态用例全绿也测不出；**动态编译能过而静态编译失败**（或反向）是典型旁证。",
+      "relation_focus": "未知维/未知rank按符号语义而非实数处理",
+      "object_focus": "-1/-2/GetDims短向量/shape range",
+      "time_focus": "GE推导/verifier/tiling入口",
+      "consumer_focus": "校验/符号输出推导",
+      "boundary": "动态标签不是任意运行时负shape；不同于合法静态输入误拒",
+      "analysis_kind": [
+        "CONTRACT",
+        "MECHANISM"
+      ],
+      "source_file": "patterns/FP-B/FP-B09.md",
+      "source_quote": "- **故障机理**：GE 的动态 shape 用**哨兵值**表达未知程度——`-1` = `UNKNOWN_SHAPE`（维数已知、某维长度未知）、`-2` = `UNKNOWN_RANK`（连维数都未知）。**校验/推导代码（infershape、verifier、tiling 入口）把这些哨兵值当成普通维度值直接参与运算**，于是「正确的动态 input」被判为非法。三种独立成因：① **哨兵当实数用**——`-2`/`-1` 参与「维度必须为 N」「各维必须相等」「维度数必须为 N」等判断必然为假，**infershape 直接返回失败**；② **短向量按下标访存**——`GetDims()` 对 `{-2}`（UNKNOWN_RANK）返回 **size=1** 的向量，而代码按静态假设访问 `inputShape[1]`、`inputShape[2]`，**越界读致崩溃**；③ **取 shape range 前未 `MakeUpRange`**——`GetShapeRange()` 返回的是「补全后」的上下界，未先 `MakeUpRange` 即取值会拿到不完整/错误区间，后续校验基于错误前提。**共同的修复范式**：**校验前先判动态标签，命中则跳过维数/取值/一致性校验并让输出相应置 `-1`**（#1786、#1787 的修复方案即为此），而非在原有静态校验上打补丁。",
+      "source_quote_line": 7,
+      "source_sha256": "047718e29253376035e4683157be5c8e950ffa913bf481dc5b6f43c428fe113a",
+      "source_card_name": "动态 shape 标签未参与校验决策（`-2`/`-1` 被当真实维度）",
+      "applicability": {
+        "repos": [
+          "All"
+        ],
+        "sides": [
+          "Host"
+        ],
+        "carriers": [
+          "IR与图配置"
+        ],
+        "trigger": "UNKNOWN_RANK|UNKNOWN_SHAPE|GetShapeRange|GetDims",
+        "enabled": true
+      },
+      "applicability_source_quote": "- **适用**：仓 All ｜ 侧别 Host ｜ 载体 IR与图配置 ｜ 触发 UNKNOWN_RANK|UNKNOWN_SHAPE|GetShapeRange|GetDims ｜ 默认启用 true",
+      "related_pattern_ids": [
+        "FP-B01",
+        "FP-B02",
+        "FP-B07",
+        "FP-A19",
+        "FP-F03",
+        "FP-E01"
+      ],
+      "boundary_source_quotes": [
+        "- **关联**：[FP-B01](FP-B01.md)（**最易混淆项**：B01 是「校验过严误拦截**合法静态输入**」，本条是「校验未识别**动态标签**」——二者同属\"校验面与输入面不一致\"，但 B01 的输入是合法的静态值、本条是合法的动态哨兵值，**排查时须先确认输入到底是不是动态**）、[FP-B02](FP-B02.md)（tiling 未适配芯片核数——同属\"编译期前置校验/适配考虑不全\"，本条是**维数未知**未适配、B02 是**核数档位**未适配）、[FP-B07](FP-B07.md)（索引/偏移计算错误致越界——本条形态② 也是越界，但**根因是动态 shape 下维度数不确定**而非偏移算错，且发生时点在 host 校验期而非 kernel 期）、[FP-A19](../FP-A/FP-A19.md)（同算子多路径覆盖盲区——**本条的高发诱因与之同源**：动静双通路只测静态即得盲区，A19 是 tiling 多路径只测其一）、[FP-F03](../FP-F/FP-F03.md)（文档/声明面与实现面不一致——算子若声明支持动态 shape 而校验不接受，即两型的复合）、[FP-E01](../FP-E/FP-E01.md)（golden/UT 期望值失配——本条需靠「断言不报错」拦截，只比精度的 UT 天然漏检此类）。"
+      ],
+      "test_design": {
+        "axes": [
+          "shape",
+          "input-validity"
+        ],
+        "oracle": [
+          "error-code"
+        ],
+        "signal": "legal-accept",
+        "lines": [
+          "valid-fuzz",
+          "error-scenario"
+        ],
+        "min_cases": 4,
+        "constructor": "每个算子必配动态 shape 最小集 {-2} / {-1} / {-1,-1,-1} / {-1,-1,-1,-1}，断言不报错（只比精度的用例走不到比较步）；另加动静一致性对拍。",
+        "judge": "动态 shape 全部可编译可执行，不报 infershape/verifier 错误；动静结果一致。",
+        "kill": "若 -2/-1 被当真实维度参与校验，则动态最小集在 infershape/verifier 阶段报维度不为 N 的错。",
+        "sourced": {
+          "constructor": "测试拦截建议",
+          "judge": "测试拦截建议",
+          "kill": "典型表现"
+        }
+      },
+      "subtype_ids": [
+        "B09-1",
+        "B09-2",
+        "B09-3",
+        "B09-4"
+      ],
+      "evidence_status": "SOURCE_LIBRARY_DECLARATION_NOT_INDEPENDENT_CASE_OR_DEVICE_VERIFICATION",
+      "evidence_source_notes": "卡内issue/PR和实测均为原库叙述；本轮未复抓外部正文、未扫描算子实现、未设备复现。"
+    },
+    {
+      "id": "FP-B10",
+      "name": "集合通信算子功能/兼容问题（通信域/拓扑/图模式契约/同族实现不对称）",
+      "category": "compatibility",
+      "coverage": "集合通信算子功能/兼容问题（通信域/拓扑/图模式契约/同族实现不对称）；多级或复杂拓扑（Mesh 1D/2D、UBX、超大 rank 数、奇数 rank 数）；`send_counts`/`recv_count` 为非常量（图编译期不可知）；配置值超 `uint32_t` 或为负；数据量跨越 2^24 的 Broadcast / 切分类算子；**AICPU 模式 + CCLBuffer 配置 >2GB**；CANN 版本与 toolkit 版本错配；跨版本复用 tiling/kernel。",
+      "relation_focus": "域/rank结构/count/IR形状须匹配算法模式",
+      "object_focus": "通信域/拓扑/配置/counts/切片",
+      "time_focus": "初始化/图推导/分派/通信执行",
+      "consumer_focus": "集合通信消费者",
+      "boundary": "等待超时G01、kernel核间同步G02另判，不因通信同名归同根因",
+      "analysis_kind": [
+        "CONTRACT",
+        "MECHANISM"
+      ],
+      "source_file": "patterns/FP-B/FP-B10.md",
+      "source_quote": "- **故障机理**：集合通信算子（AllReduce / AllGather / AllToAllV / ReduceScatter / Scatter / Broadcast / Send / Recv）的故障集中在**计算算子不具备的四个维度**上：① **通信域与 rank 拓扑结构假设错误**——模板把多级 rank 结构（如二维 Mesh 的 `subCommRanks_`）收缩后仍按下标取多级元素，越界读污染拓扑变量，下游取模可致整数除零；② **图模式 shape / 维度契约未落实**——infershape 在 count 为非常量（编译期不可知）时把输入形状**原样赋给输出并返回成功**，日志声称已标记未知维而代码从未 `SetDim(0, ge::UNKNOWN_DIM)`，属「声明了动态语义却没写进 IR」；③ **通信域匹配与配置校验缺失**——调优插件用 `get<uint32_t>()` 直接取配置，不拒窄化与负数回绕，超大 rank 数被截断成真实 rank 数从而**错误命中通信域**并改写算法 cost；④ **同族算法实现不对称**——功能等价的 executor 之间精度类型选用不一致（Broadcast 用 `float()`、AllReduce 用 `double()`+`std::floor`），前者在数据量 >2^24 时丢精度致切片不均；⑤ **跨模式 / 跨版本算法路径差异**——同一算子在 AICPU 与 AICore、单级与多级拓扑、不同 toolkit 版本下的实现与约束各不相同（含 CCLBuffer 配置阈值与「新包在旧 toolkit 下返回不支持」）。",
+      "source_quote_line": 7,
+      "source_sha256": "1f8560186ad33d66a490c37a318e912fe680e5b320d00aff42167be17e23a5da",
+      "source_card_name": "集合通信算子功能/兼容问题（通信域 / 拓扑 / 图模式契约 / 同族实现不对称）",
+      "applicability": {
+        "repos": [
+          "hccl"
+        ],
+        "sides": [
+          "Host",
+          "Kernel"
+        ],
+        "carriers": [
+          "Host源码",
+          "Kernel源码"
+        ],
+        "trigger": "Hccl|HCCL|AllReduce|AllGather|AllToAll|ReduceScatter",
+        "enabled": true
+      },
+      "applicability_source_quote": "- **适用**：仓 hccl ｜ 侧别 Host,Kernel ｜ 载体 Host源码,Kernel源码 ｜ 触发 Hccl|HCCL|AllReduce|AllGather|AllToAll|ReduceScatter ｜ 默认启用 true",
+      "related_pattern_ids": [
+        "FP-G01",
+        "FP-B01",
+        "FP-B07",
+        "FP-A03",
+        "FP-A19",
+        "FP-F03"
+      ],
+      "boundary_source_quotes": [
+        "- **关联**：[FP-G01](../FP-G/FP-G01.md)（**边界约定**：集合通信的**等待超时 / 挂死**归 [FP-G01](../FP-G/FP-G01.md) 子型 ②，本条只承载功能 / 精度 / 性能 / 兼容面，两型以关联互指避免重复收料）、[FP-B01](FP-B01.md)（#740「算法配置解析拒绝**已注册的** MeshSingleChannel 模板名称」是校验过严在通信侧的呈现）、[FP-B07](FP-B07.md)（#744 越界读的机理同为索引/偏移计算错误，但载体是通信域拓扑变量而非 tensor 偏移）、[FP-A03](../FP-A/FP-A03.md)（#275 的 u64→float 丢精度属低精度中间量问题）、[FP-A19](../FP-A/FP-A19.md)（同一通信算子存在 AICPU/AICore 与多级拓扑多条路径，覆盖盲区同样适用）、[FP-F03](../FP-F/FP-F03.md)（#106 的前向兼容声明与各版本实际支持面需逐一核对）。"
+      ],
+      "test_design": {
+        "axes": [
+          "shape",
+          "concurrency"
+        ],
+        "oracle": [
+          "golden-utol"
+        ],
+        "signal": "concurrency",
+        "lines": [
+          "multithread-fuzz"
+        ],
+        "min_cases": 4,
+        "constructor": "多级拓扑矩阵（单机 2 卡 vs 多级 Mesh/UBX、非 2 的幂 rank、奇数 rank）；send_counts 作为图输入而非常量；数据量跨 2^24；AICPU 与 AICore 双路径对拍。",
+        "judge": "各拓扑下通信结果与参考一致；IR 上未知维确实置为未知（只打日志不算）；配置越界给明确报错而非静默错配。",
+        "kill": "若通信域拓扑下标或配置窄化错配，则非 2 的幂 rank 或跨 2^24 数据量下结果错位、部分输出恒为 0。",
+        "sourced": {
+          "constructor": "测试拦截建议",
+          "judge": "测试拦截建议",
+          "kill": "源码审查映射点"
+        }
+      },
+      "subtype_ids": [
+        "B10-1",
+        "B10-2",
+        "B10-3",
+        "B10-4",
+        "B10-5"
+      ],
+      "evidence_status": "SOURCE_LIBRARY_DECLARATION_NOT_INDEPENDENT_CASE_OR_DEVICE_VERIFICATION",
+      "evidence_source_notes": "卡内issue/PR和实测均为原库叙述；本轮未复抓外部正文、未扫描算子实现、未设备复现。"
+    },
+    {
+      "id": "FP-B11",
+      "name": "第一段接口/InferShape 参数契约校验缺失（非法 shape/rank/attr 放行）",
+      "category": "compatibility",
+      "coverage": "第一段接口/InferShape 参数契约校验缺失（非法 shape/rank/attr 放行）；rank 与契约不符（rank-0 当 rank-1、ND 当 4-D）；`ListInt` 属性长度不足（如只传 1 个 `scales`）或超长（`output_size` 传 3 个）；维度 ≤ 0（零 batch、负 `pooled_h`）；属性超 int32（大 `stride`/`rate`/`pad`）；`scale`/`sigma` 为 NaN/Inf；dtype 组合不在支持矩阵内（`img` 与 `lut_table` 不一致）；可选输入与主输入的 batch/空间尺寸交叉不匹配；资料 `npu=\"...\"` 分段把某产品的 dtype 支持集收窄，而代码白名单是跨产品并集（B11-9）；API dtype 白名单含某 dtype，而 `op_host/*_def.cpp` 的 `DataType` 未注册该 dtype 或 `AddConfig` 未覆盖该 SoC（B11-10）。",
+      "relation_focus": "参数自身及交叉合法性须在负责阶段验证",
+      "object_focus": "rank/shape/ListInt/标量有限性/dtype/可选关系",
+      "time_focus": "第一段/InferShape/tiling/解引用前",
+      "consumer_focus": "kernel/按码分类的调用方",
+      "boundary": "须排合法默认/前端保障/AICPU回退/环境；未见检查不能直接判bug",
+      "analysis_kind": [
+        "CONTRACT",
+        "MECHANISM"
+      ],
+      "source_file": "patterns/FP-B/FP-B11.md",
+      "source_quote": "- **故障机理**：第一段接口（`aclnnXxxGetWorkspaceSize`）与图模式 `InferShape` 的校验只覆盖\"**形状之间的一致性**\"（如 `grid[4]==3`、`inputC==gradOutputC`），不覆盖\"**单个参数自身的合法性**\"——rank 是否为契约值、`ListInt` 长度是否足/是否超、维度是否为正、属性是否落在 int32 可表达范围、`scale`/`sigma` 是否有限、dtype 组合是否被支持。五种子形态：① **未校验**（25/52）——完全没有对应检查；② **放行**（24/52）——有检查但条件写反或范围写宽（如只判 `< 0` 不判 `== 0`）；③ **校验对象选错**（3/52）——检查函数读了错误的张量（`CheckUplimit` 五个维度全取自 `gradOut`，`inputSize`/`gradInput` 从未参与）。**④ 前后段不对称**（v6.1 显式化）：同一契约在 op_api、InferShape、tiling 三处各写一遍且**不同步**，出现\"InferShape 放行、tiling 拒绝\"或反之。**⑥ 标量属性值域未校验**（v6.27）：前三类子型全部落在**张量**上——shape/rank/dtype/连续化。但 `aclnn` 签名里还有一类形参是**值传递标量**（`double eps` / `float scale` / `int64_t dim` / `bool keepdim`），它们同样来自调用方，同样能造出非法输入（`eps < 0` → 输出整块 NaN、`dim` 越界、`scale` 为 NaN），却常常**连一次比较都没有**。2026-11-06 实测 `aclnnLayerNorm` 的 `CheckParamsWithImplMode`只查 dtype / shape / meanOut/rstdOut 的 shape，**完全不看 `eps` 的值域**，`eps=-1` 一路进 kernel 后输出 100% NaN。同批扫描（`ops-nn` 408 个 `aclnn_*.cpp` / 480 个接口 / 501 个标量形参）：**336 个（67.1%）标量形参在所在文件里找不到任何比较**，其中 `eps`/`epsilon` 类 **31 个**。该子型的判据特征是**只看张量不看标量**——`CheckShape` / `CheckInputDtype` 写了一长串，但没有一行 `eps >= 0`。**⑤ 参数有限性未校验**（v6.13）：用 `<= std::numeric_limits<float>::min()`（即 `FLT_MIN`）代替 `> 0` 判正值——最小正正规数被误拒，而 **NaN / ±Inf 与任何值比较恒假**，直接绕过校验进入 kernel；或用 `if (scale > 0)` 分支承载合法性判断，非有限值落入\"未提供\"回退路径被静默接受。该子型的判据特征是**比较表达式对 NaN 恒为 false**，只做范围上下界检查而不调用 `isfinite` 即命中。 **⑦ 错误码族选错（v6.33）**：校验确实命中并返回了非 0，但把「参数非法」映射成**内部错误码**（`ACLNN_ERR_INNER_NULLPTR` / `561103`、`561002`、`361001`），而资料错误码表要求 `161001`/`161002`；调用方按返回码分类时会把参数错误当内部故障。判据：同一接口的其它非法分支返回正确族、唯独该分支返回内部码。 **⑧ 校验顺序倒置（v6.33）**：`GetOptionalInputShape()` / `->` 解引用排在能排除该状态的校验之前，执行到解引用时守卫尚未运行。 **⑨ 平台分支复用超集白名单（v6.41）**：按 `IsRegbase()` / SoC 分支裁剪校验时，非 RegBase 分支（A2/A3/310P）直接复用了 RegBase（950）的 dtype 白名单，而资料在 `npu=\"...\"` 分段里把该产品的支持集收得更窄；结果是「白名单包含、该 SoC 实际不支持」的 dtype 在第一段被放行，掉到执行段才以 561000/561002 失败。判据：同一 dtype 在资料的分产品段里写着「仅支持 X」，而代码白名单是跨产品并集且分支内无 SoC 判断。 **⑩ API dtype 白名单超出算子原型/kernel 注册面（v6.44）**：`op_api/aclnn_*.cpp` 的首段校验白名单包含某 dtype（如 `DT_DOUBLE`），但 `op_host/*_def.cpp` 的 `DataType` 列表与 `AICore().AddConfig` 从未注册该 dtype / 该 SoC，于是非法组合在第一段被放行、执行段掉进 `AiCpu` 回退并以设备异常（实测 `507018` `ACL_ERROR_RT_AICPU_EXCEPTION`）失败。与 ⑨ 的分界：⑨ 是**平台分支之间**复用超集，⑩ 是 **API 层白名单与算子原型注册面**之间不一致；判据是「API 支持列表 − def.cpp 注册集」非空且资料把该 dtype 写成支持。**⑩ 的前置排除（v6.47）**：判本子型前必须先排除 **AICPU 回退**——若 `op_api/<op>.cpp` 中存在该 dtype 的 `*AiCpu` 分支（如 `AddcdivAiCpu`），且交付包 `opp/built-in/op_impl/host_aicpu/libcpu_kernels.so` 中已注册该算子名，则 `def.cpp` 只注册 AICore 配置属**正常结构**（AICPU 内核另包交付），不构成缺陷。2026-11-07 实测：ops-math#4612/#4613/#4614/#4615 与 ops-nn#8384 五单均因漏做该排除而误判，已全部撤回（详见「实证案例」v6.47）。",
+      "source_quote_line": 7,
+      "source_sha256": "d544499399884fa5b447a88a846394812f25032a8c8ffd1a050352eeefc12c52",
+      "source_card_name": "第一段接口 / InferShape 参数契约校验缺失（非法 shape/rank/attr 放行）",
+      "applicability": {
+        "repos": [
+          "All"
+        ],
+        "sides": [
+          "Host"
+        ],
+        "carriers": [
+          "aclnn源码",
+          "Tiling源码"
+        ],
+        "trigger": "InferShape|CheckShape|GetDimNum|IsFinite|GetAttrPointer",
+        "enabled": true
+      },
+      "applicability_source_quote": "- **适用**：仓 All ｜ 侧别 Host ｜ 载体 aclnn源码,Tiling源码 ｜ 触发 InferShape|CheckShape|GetDimNum|IsFinite|GetAttrPointer ｜ 默认启用 true",
+      "related_pattern_ids": [
+        "FP-B04",
+        "FP-B05",
+        "FP-B06",
+        "FP-B09",
+        "FP-B13",
+        "FP-F03",
+        "FP-E01"
+      ],
+      "boundary_source_quotes": [
+        "- **关联**：[FP-B05](FP-B05.md)（相邻但不同：B05 是 **null 校验骨架的文件级参差**，本条是**语义校验缺失**且落点在 InferShape/tiling）、[FP-B04](FP-B04.md)（同为入口校验，但对象是空指针）、[FP-B06](FP-B06.md)（空 tensor 是 numel==0 的合法形态，本条覆盖的是**非法**形态）、[FP-B09](FP-B09.md)（动态 shape 哨兵被当真实维度，属本条的一个特例来源）、[FP-B13](FP-B13.md)（属性窄化是同簇的数值子型）、[FP-F03](../FP-F/FP-F03.md)（文档约束与代码校验不一致时双向命中）、[FP-E01](../FP-E/FP-E01.md)（非法输入矩阵缺失导致长期无人报）。"
+      ],
+      "test_design": {
+        "axes": [
+          "input-validity",
+          "contract",
+          "boundary"
+        ],
+        "oracle": [
+          "error-code"
+        ],
+        "signal": "error-code",
+        "lines": [
+          "error-scenario"
+        ],
+        "min_cases": 4,
+        "constructor": "非法输入六轴矩阵：rank × ListInt 长度 × 维度符号 × 属性量级 × 有限性 × dtype 组合；空数组/空 ListInt 单独建例；每算子补一组「InferShape 与 tiling 结论必须一致」的双阶段断言。",
+        "judge": "第一段接口即返回 161002（ACLNN_ERR_PARAM_INVALID），而非落到 561002；两阶段接受集合完全相同。",
+        "kill": "若契约校验缺失/写反/校验对象选错，则非法 shape 返回 0 或被接受，或落到内部错误 561002。",
+        "sourced": {
+          "constructor": "测试拦截建议",
+          "judge": "测试拦截建议",
+          "kill": "源码审查映射点"
+        }
+      },
+      "subtype_ids": [
+        "B11-1",
+        "B11-2",
+        "B11-3",
+        "B11-4",
+        "B11-5",
+        "B11-6",
+        "B11-7",
+        "B11-8",
+        "B11-11"
+      ],
+      "evidence_status": "SOURCE_LIBRARY_DECLARATION_NOT_INDEPENDENT_CASE_OR_DEVICE_VERIFICATION",
+      "evidence_source_notes": "卡内issue/PR和实测均为原库叙述；本轮未复抓外部正文、未扫描算子实现、未设备复现。"
+    },
+    {
+      "id": "FP-B12",
+      "name": "空/退化输入早退路径未写非空输出（SUCCESS + 未初始化输出）",
+      "category": "compatibility",
+      "coverage": "空/退化输入早退路径未写非空输出（SUCCESS + 未初始化输出）；至少一个输入 `numel==0`，且**至少一个输出非空**；以反向/梯度类算子为主（`*Backward`、`*Grad`）；正向算子若输入全空则输出也为空（no-op 成立，不触发）。典型组合：`gradOutput` 空 × `input` 非空；`grid` 空 × `input` 非空；`roisN==0` × `gradInput` 非空。",
+      "relation_focus": "所有合同要求的非空输出必须写入",
+      "object_focus": "主辅助输出/独立shape域/输出buffer",
+      "time_focus": "早退/写回/同步完成后",
+      "consumer_focus": "梯度/scale/rstd读者",
+      "boundary": "B06空态分支不同；A22可为上游根因；rc=0还须核sync",
+      "analysis_kind": [
+        "CONTRACT",
+        "MECHANISM"
+      ],
+      "source_file": "patterns/FP-B/FP-B12.md",
+      "source_quote": "- **故障机理**：接口**已有** `IsEmpty()` 判空分支（因此不属于 [FP-B06](FP-B06.md) 的\"分支缺失\"），但早退体只做 `*workspaceSize = 0; uniqueExecutor.ReleaseTo(executor); return ACLNN_SUCCESS;`，**不写任何输出张量**。而输出 shape 与输入强绑定，存在\"**输入为空、输出非空**\"的合法组合——尤其是反向算子：`gradOutput` 为空而正向输入（`input`/`grad_x`/`features`）非空时，梯度输出（`inputGrad`/`grad_y`）与之同形且非空。此时调用方拿到的是自己预分配的未初始化内存（NaN/随机值），却被当作合法梯度返回。**本型含四个子型（v6.13 起，v6.26 增 B12-3）**：**B12-1 早退不写任何非空输出**（上面的主形态，5 条 ops-cv 案例 + #7033）；**B12-2 输出覆盖不全**——**没有早退**，返回 `ACLNN_SUCCESS` 但只写入了部分元素（#3747 `uint32`/`int64` 约一半输出一个字节都没写，未写元素数恒为 `ceil(n/2)`）。**B12-3 非空辅助输出被早退跳过（v6.26）**——早退块**确实写了主输出**（或主输出本就该为空，写不写都\"对\"），但**形状由其它入参/属性决定、与触发早退的那个空维无关**的辅助输出（`*Scale` / `*Out` / `rstd` / `invRms` / `gradWeight` / `bagSize` / `maxIndices` / `amax` / `outputScale`）被整块跳过。**这是判据口径的关键升级**：旧口径只问\"早退块内写没写输出\"，遇到\"主输出本来就该为空\"的接口会直接判 clean，而真正受害的是辅助输出。正确问法是：**该输出的 shape 域是否与触发早退的空维无关？无关且非空 ⇒ 必查是否被写。**B12-2 只负责识别「返回成功但输出未写全」这一**结果面**；若根因是 dtype→执行模板映射错配，**机理归 [FP-A22](../FP-A/FP-A22.md)**，不要在本条重复定级。 **B12-4 早退旁路参数校验（v6.33）**：`IsEmpty()` 的 `return ACLNN_SUCCESS` 排在参数校验之前，**非法 dtype/shape 与空输入同时出现时被早退直接放行**，既不报错也不写输出；与 B12-1 的区别是「早退块本身也错了」——不是漏写，而是根本不该走到早退。",
+      "source_quote_line": 7,
+      "source_sha256": "6a7d56c77284704984e491dcbe14523c4fa1f53a1ce0922be424805e1d17b8db",
+      "source_card_name": "空/退化输入早退路径未写非空输出（SUCCESS + 未初始化输出）",
+      "applicability": {
+        "repos": [
+          "All"
+        ],
+        "sides": [
+          "Host"
+        ],
+        "carriers": [
+          "aclnn源码"
+        ],
+        "trigger": "IsEmpty()",
+        "enabled": true
+      },
+      "applicability_source_quote": "- **适用**：仓 All ｜ 侧别 Host ｜ 载体 aclnn源码 ｜ 触发 IsEmpty() ｜ 默认启用 true",
+      "related_pattern_ids": [
+        "FP-B11",
+        "FP-B06",
+        "FP-B04",
+        "FP-A04",
+        "FP-A05",
+        "FP-E01",
+        "FP-A22"
+      ],
+      "boundary_source_quotes": [
+        "- **关联**：[FP-B11](FP-B11.md)（B12-3 是**输出侧**的遗漏，B11 是**输入侧**契约校验缺失；同一个 `IsEmpty()` 早退块可能两者都缺）、[FP-B06](FP-B06.md)（**互补**：B06 是\"没有判空分支\"，本条是\"有分支但早退不写输出\"；同一接口可能两代问题先后出现）、[FP-B04](FP-B04.md)（同为两段式接口契约）、[FP-A04](../FP-A/FP-A04.md)（未写输出最终会以\"精度异常/NaN\"暴露，须防止被误归因为精度问题）、[FP-A05](../FP-A/FP-A05.md)（脏数据/未初始化读的另一来源）、[FP-E01](../FP-E/FP-E01.md)（只断言返回码的 UT 会把该缺陷判成 PASS）、[FP-A22](../FP-A/FP-A22.md)（B12-2 的输出覆盖不全若由 dtype 分派映射错配导致，机理与定级归 A22）。"
+      ],
+      "test_design": {
+        "axes": [
+          "shape",
+          "content"
+        ],
+        "oracle": [
+          "golden-canary"
+        ],
+        "signal": "canary",
+        "lines": [
+          "memory",
+          "valid-fuzz"
+        ],
+        "min_cases": 4,
+        "constructor": "「空输入 × 输出非空」矩阵：对每个反向算子把所有输入逐个置空（shape 含 0 维）；输出 buffer 预填魔数，跑后检查残留魔数比例。",
+        "judge": "返回码为 0 且非空输出的每个元素等于 0（PyTorch 语义）；魔数残留比例为 0。禁止只断言返回码。",
+        "kill": "若早退块 IsEmpty()->return ACLNN_SUCCESS 未写非空输出，则输出残留魔数而返回码为 0。",
+        "sourced": {
+          "constructor": "测试拦截建议",
+          "judge": "测试拦截建议",
+          "kill": "源码审查映射点"
+        },
+        "note": ""
+      },
+      "subtype_ids": [
+        "B12-1",
+        "B12-2",
+        "B12-3",
+        "B12-4"
+      ],
+      "evidence_status": "SOURCE_LIBRARY_DECLARATION_NOT_INDEPENDENT_CASE_OR_DEVICE_VERIFICATION",
+      "evidence_source_notes": "卡内issue/PR和实测均为原库叙述；本轮未复抓外部正文、未扫描算子实现、未设备复现。"
+    },
+    {
+      "id": "FP-B13",
+      "name": "host 侧 int64→int32 窄化/乘积溢出（参数值静默改变）",
+      "category": "compatibility",
+      "coverage": "host 侧 int64→int32 窄化/乘积溢出（参数值静默改变）；`ListInt` 属性值接近或超过 `INT32_MAX`（`stride`/`rate`/`pad`/`output_size`/`pooled_size`）；shape 维度乘积超 int32（`H*W`、`N*C*H*W`、`output_shape` 各维相乘）；`int64` 偏移相加（`offsets + size`）；`size_t` 在空/rank-0 输入下下溢（`rank-0` 取 `size()-1`）。CV 算子里这类\"极大属性\"多来自 fuzz/边界测试或图上的常量折叠结果，业务侧较少但**一旦发生就是静默错误**。",
+      "relation_focus": "int64参数/shape承载计算须保语义或拒绝超界",
+      "object_focus": "ListInt/shape/offset+size/32位中间积",
+      "time_focus": "host解析/转换/推导/填tiling",
+      "consumer_focus": "shape判断/资源/分核",
+      "boundary": "A12/A18浮点舍入不同；B07重寻址，本型先破坏参数值",
+      "analysis_kind": [
+        "MECHANISM",
+        "CONTRACT"
+      ],
+      "source_file": "patterns/FP-B/FP-B13.md",
+      "source_quote": "- **故障机理**：proto 里属性/维度是 **int64 语义**（`ListInt`/`ListInt64`/shape），host 实现却用 `int32_t` 承接或在 32 位域完成乘积：`static_cast<int32_t>(attr)` 无范围判断，或 `H*W`、`offsets+size`、`totalPairs` 这类表达式的操作数全为 32 位。超界即回绕，**参数值被静默改写**（`2^32+1` 变成 `1`、`2^31` 变成负数），随后参与 shape 推导、约束判定与 tiling data 填充——参数、推导出的 shape、tiling 三者互相不一致。与 [FP-B07](FP-B07.md) 的区别：B07 错在**索引/偏移算式**（后果是越界读写），本条错在**参数值本身**（后果是形状/配置错误）；与 [FP-A12](../FP-A/FP-A12.md) 的区别：A12 是 int→float 的**精度**损失，本条是整型**回绕**。",
+      "source_quote_line": 7,
+      "source_sha256": "4d29e4cca80428c76502c5af01d37436645a6ea70a5cd1a454236d4c1ea4f39a",
+      "source_card_name": "host 侧 int64→int32 窄化 / 乘积溢出（参数值静默改变）",
+      "applicability": {
+        "repos": [
+          "All"
+        ],
+        "sides": [
+          "Host"
+        ],
+        "carriers": [
+          "aclnn源码",
+          "Tiling源码"
+        ],
+        "trigger": "static_cast<int32_t>",
+        "enabled": true
+      },
+      "applicability_source_quote": "- **适用**：仓 All ｜ 侧别 Host ｜ 载体 aclnn源码,Tiling源码 ｜ 触发 static_cast<int32_t> ｜ 默认启用 true",
+      "related_pattern_ids": [
+        "FP-B07",
+        "FP-A12",
+        "FP-A18",
+        "FP-B11",
+        "FP-G01"
+      ],
+      "boundary_source_quotes": [
+        "- **关联**：[FP-B07](FP-B07.md)（同属\"整型宽度不足\"，但 B07 在 kernel/索引侧，本条在 host 参数侧）、[FP-A12](../FP-A/FP-A12.md)（int→float 精度损失，与整型回绕互补）、[FP-A18](../FP-A/FP-A18.md)（int32 边界转 float 后比较语义偏差，同一边界量的另一表现）、[FP-B11](FP-B11.md)（窄化常与\"未做值域校验\"共现，修复可一并落）、[FP-G01](../FP-G/FP-G01.md)（回绕后的巨大循环上界可能演变为挂死）。"
+      ],
+      "test_design": {
+        "axes": [
+          "boundary",
+          "shape"
+        ],
+        "oracle": [
+          "error-code",
+          "golden-utol"
+        ],
+        "signal": "error-code",
+        "lines": [
+          "error-scenario",
+          "valid-fuzz"
+        ],
+        "min_cases": 3,
+        "constructor": "属性/维度边界矩阵：INT32_MAX-1 / INT32_MAX / INT32_MAX+1 / 2^32 / 2^32+1 / 2^63-1；乘积类额外构造 H=65536,W=65536（H*W=2^32）。",
+        "judge": "每例断言「第一段返回 161002（参数非法）或按 int64 语义正确推导」；绝不允许「返回 SUCCESS 且值被改写」。",
+        "kill": "若 attr/维度被 static_cast<int32_t> 窄化，则 2^32 附近返回 SUCCESS 但输出 shape 与入参不一致。",
+        "sourced": {
+          "constructor": "测试拦截建议",
+          "judge": "测试拦截建议",
+          "kill": "源码审查映射点"
+        }
+      },
+      "subtype_ids": [],
+      "evidence_status": "SOURCE_LIBRARY_DECLARATION_NOT_INDEPENDENT_CASE_OR_DEVICE_VERIFICATION",
+      "evidence_source_notes": "卡内issue/PR和实测均为原库叙述；本轮未复抓外部正文、未扫描算子实现、未设备复现。"
+    },
+    {
+      "id": "FP-B14",
+      "name": "图模式（GEIR/aclGraph）通路与 aclnn 单算子通路未同步适配",
+      "category": "compatibility",
+      "coverage": "图模式（GEIR/aclGraph）通路与 aclnn 单算子通路未同步适配；① op_graph proto 的 attr 默认值与 tiling 的 `ParseAttrs` 校验范围不同步（如 proto 默认 0、tiling 只接受 -1 或 >0）；② 图模式输入携带 tiling 的 format 白名单未覆盖的元数据（`NC1HWC0` 等，常见于图优化插格式后）；③ 图编译需要 L0 显式传 dtype 属性，而 `def.cpp` 未声明；④ 可选输入在图模式下缺省；⑤ infershape 注册名错误或缺失；⑥ 图模式专用常量折叠路径未走通。",
+      "relation_focus": "共享kernel的各入口仍须正确传本入口合同",
+      "object_focus": "op_graph/op_api/attr/format/dtype/可选项",
+      "time_focus": "编译/推导/tiling/执行",
+      "consumer_focus": "GE和单算子调用链",
+      "boundary": "B08跨跳丢属性、A16精度、F01构建符号不同",
+      "analysis_kind": [
+        "CONTRACT",
+        "ENGINEERING_PROCESS"
+      ],
+      "source_file": "patterns/FP-B/FP-B14.md",
+      "source_quote": "- **故障机理**：同一算子有两条交付路径——**aclnn 单算子**（`op_api` → tiling → kernel）与**图模式**（`op_graph` proto → GE 推导 → tiling → kernel）。二者共享 tiling/kernel，但**入口契约各自维护**：op_graph 里 attr 的默认值、输入输出的 format 元数据、可选输入的缺省形态、L0 层 dtype 属性的下发、infershape 的注册与推导，都不经过 aclnn 的 `CheckShape`。当开发/测试只覆盖 aclnn 路径时，图模式会在三个不同阶段失败：**编译**（常量折叠/符号缺失，E40021）、**推导**（GRAPH_FAILED）、**执行**（Run graph failed / device fault），而同一算子的 aclnn 用例全部通过。",
+      "source_quote_line": 7,
+      "source_sha256": "3c140e4a167558eb55196a3d94c30d8883f652365e76b291b54c9cb5e8c225ab",
+      "source_card_name": "图模式（GEIR/aclGraph）通路与 aclnn 单算子通路未同步适配",
+      "applicability": {
+        "repos": [
+          "All"
+        ],
+        "sides": [
+          "Host"
+        ],
+        "carriers": [
+          "IR与图配置",
+          "aclnn源码",
+          "Tiling源码"
+        ],
+        "trigger": "图模式|GEIR|aclnnGraph|op_graph",
+        "enabled": true
+      },
+      "applicability_source_quote": "- **适用**：仓 All ｜ 侧别 Host ｜ 载体 IR与图配置,aclnn源码,Tiling源码 ｜ 触发 图模式|GEIR|aclnnGraph|op_graph ｜ 默认启用 true",
+      "related_pattern_ids": [
+        "FP-B08",
+        "FP-A16",
+        "FP-F01",
+        "FP-F03",
+        "FP-B11"
+      ],
+      "boundary_source_quotes": [
+        "- **关联**：[FP-B08](FP-B08.md)（相邻：B08 是**属性在 pass 链路中被丢弃**——fallback 回调/前端插件/fusion pass；本条是**入口契约不同步**——proto 默认值/format 白名单/dtype 属性，两者可共现但修复落点不同）、[FP-A16](../FP-A/FP-A16.md)（aclop 与 aclnn 的**精度**双路径差异，本条是**功能**双路径失败）、[FP-F01](../FP-F/FP-F01.md)（图编译符号缺失/链接失败属构建面，不归本条）、[FP-F03](../FP-F/FP-F03.md)（proto 与文档/实现三方不一致时双向命中）、[FP-B11](FP-B11.md)（图模式同样需要参数契约校验，但本条特指**两条路径契约不同步**）。"
+      ],
+      "test_design": {
+        "axes": [
+          "sequence",
+          "attr"
+        ],
+        "oracle": [
+          "golden-utol",
+          "error-code"
+        ],
+        "signal": "sequence",
+        "lines": [
+          "precision",
+          "error-scenario"
+        ],
+        "min_cases": 2,
+        "constructor": "每个算子至少一条图模式冒烟（ptgraph 或 aclGraph），断言「与 aclnn 结果一致 + 不抛 GRAPH_FAILED」；对新增 attr 补「proto 默认值 ∈ tiling 接受域」静态断言。",
+        "judge": "图模式与 aclnn 直调结果一致，不抛 GRAPH_FAILED / E40021 / 507011。",
+        "kill": "若图模式通路未同步适配，则 aclnn 正常而图模式报 GRAPH_FAILED 或结果与 aclnn 不一致。",
+        "sourced": {
+          "constructor": "测试拦截建议",
+          "judge": "测试拦截建议",
+          "kill": "典型表现"
+        }
+      },
+      "subtype_ids": [],
+      "evidence_status": "SOURCE_LIBRARY_DECLARATION_NOT_INDEPENDENT_CASE_OR_DEVICE_VERIFICATION",
+      "evidence_source_notes": "卡内issue/PR和实测均为原库叙述；本轮未复抓外部正文、未扫描算子实现、未设备复现。"
+    },
+    {
+      "id": "FP-B15",
+      "name": "定长容器容量无校验（入参索引 + 越界写 + 静默截断）",
+      "category": "compatibility",
+      "coverage": "定长容器容量无校验（入参索引 + 越界写 + 静默截断）；① 存在 `Type name[N]` 或 `constexpr int MAX_... = N` 的定长数组/常量；② 其索引来自入参（`tensorNum` / `listSize` / `groupNum` / `tensorCount`）；③ **同族兄弟实现有 `OP_CHECK_IF(x > N)` 而本算子没有**——第 ③ 条是零成本强证据，不需要论证 N 的合理性即可定缺陷。",
+      "relation_focus": "变长集合长度不得超出实际定长数组",
+      "object_focus": "TensorList/groupNum/tiling数组/tensorCount",
+      "time_focus": "host填充/kernel索引/尾张量消费",
+      "consumer_focus": "数组读写/张量输出",
+      "boundary": "下标算式可正确，与B07不同；一般值域B11和整型承载B13另判",
+      "analysis_kind": [
+        "CONTRACT",
+        "MECHANISM"
+      ],
+      "source_file": "patterns/FP-B/FP-B15.md",
+      "source_quote": "- **故障机理**：host/tiling 侧用**定长数组**承载「由入参决定的变长集合」——tiling data 结构体里写死 `int64_t tensorElements[256]`，填充与消费各用一次循环下标 `for (i = 0; i < tensorNum; i++)`，而 `tensorNum`（`GetInstanceNum()` / `listSize` / `groupNum` / `tensorCount`）**来自调用方，全程无上界校验**。三条后果**同时**存在且互相遮蔽：① **host 结构体越界写**（`n=512` 时约 2048 字节）；② **kernel 侧用同一个未截断的 `tensorCount` 索引同一数组**，越界读后 fault（`sync 507035`）；③ **超出容量的尾部张量被静默丢弃**——接口两段都返回 0，前 256 个张量算对、后面全错。与 [FP-B07](FP-B07.md) 的区别：B07 错在**索引算式本身**（下标算错），本条**下标表达式没错**，错在**容器容量与入参上界之间没有约束**；与 [FP-B11](FP-B11.md) 的区别：B11 是「单个参数自身合法性」未校验（rank/长度/值域），本条特指**容器容量**这一类，且其静态形态（`Type name[N]` + 入参索引）可被机器一次扫清。",
+      "source_quote_line": 7,
+      "source_sha256": "590615e1931b74d9a284dfdbb8ef8015b180a6b68a5e4221108479e917bbde64",
+      "source_card_name": "定长容器容量无校验（入参索引 + 越界写 + 静默截断）",
+      "applicability": {
+        "repos": [
+          "All"
+        ],
+        "sides": [
+          "Host",
+          "Tiling"
+        ],
+        "carriers": [
+          "Tiling源码",
+          "Host源码"
+        ],
+        "trigger": "\\[256\\]|MAX_TENSOR_NUM|tensorElements|listSize|groupNum",
+        "enabled": true
+      },
+      "applicability_source_quote": "- **适用**：仓 All ｜ 侧别 Host,Tiling ｜ 载体 Tiling源码,Host源码 ｜ 触发 \\[256\\]|MAX_TENSOR_NUM|tensorElements|listSize|groupNum ｜ 默认启用 true",
+      "related_pattern_ids": [
+        "FP-B11",
+        "FP-B07",
+        "FP-B13",
+        "FP-G01",
+        "FP-F03"
+      ],
+      "boundary_source_quotes": [
+        "- **关联**：[FP-B11](FP-B11.md)（**相邻但不同**：B11 是单个参数的合法性（rank/长度/值域/有限性），本条是**容器容量与入参上界之间缺约束**；两者常共现，修复可一并落）、[FP-B07](FP-B07.md)（B07 是下标算式算错，本条下标算式正确、容量不足）、[FP-B13](FP-B13.md)（同属「数值承载不够」，B13 是整型宽度不足，本条是数组长度不足）、[FP-G01](../FP-G/FP-G01.md)（越界后的巨大循环上界可能演变为挂死）、[FP-F03](../FP-F/FP-F03.md)（同一上限若文档也未披露，双向命中 F03-7）。"
+      ],
+      "test_design": {
+        "axes": [
+          "shape",
+          "attr"
+        ],
+        "oracle": [
+          "error-code",
+          "golden-canary"
+        ],
+        "signal": "canary",
+        "lines": [
+          "valid-fuzz",
+          "static-absence"
+        ],
+        "min_cases": 5,
+        "constructor": "容量扫描矩阵：对每个含变长列表入参的接口，列表长度取 1 / N-1 / N / N+1 / 2N（N=实现内部定长容量，如 256）；每个输出 buffer 预填魔数，逐点记录两段返回码、sync 返回码与各输出的魔数残留比例。",
+        "judge": "超上限必须明确报错（161002 或等价）；未超上限时每个元素的结果与单元素调用逐个一致。禁止只断言返回码。",
+        "kill": "若填充循环上界来自入参且无 OP_CHECK_IF(x > N)，则 n>N 时返回码仍为 0 而尾部数据缺失；n 再大触发 kernel fault（只有 sync 非 0）。",
+        "sourced": {
+          "constructor": "测试拦截建议",
+          "judge": "测试拦截建议",
+          "kill": "故障机理"
+        }
+      },
+      "subtype_ids": [],
+      "evidence_status": "SOURCE_LIBRARY_DECLARATION_NOT_INDEPENDENT_CASE_OR_DEVICE_VERIFICATION",
+      "evidence_source_notes": "卡内issue/PR和实测均为原库叙述；本轮未复抓外部正文、未扫描算子实现、未设备复现。"
+    },
+    {
+      "id": "FP-C01",
+      "name": "算子端到端耗时占比高且单次调用耗时高（含 host 侧循环上界写错致重复调度子型）",
+      "category": "performance",
+      "coverage": "算子端到端耗时占比高且单次调用耗时高（含 host 侧循环上界写错致重复调度子型）；网络中高频调用路径上的算子；**子型 ②** 额外需同时满足：该循环上界处于「小 shape 不显、大 shape 放大」的区间（如 `n` 与 `n±1` 在小 n 下耗时差不可测），且该算子位于端到端热点路径（劣化被放大才可观测）；构建期子型需为增量构建或模板规模大的仓（重复配置开销随模板/源文件数线性放大）。**子型 ③** 额外需满足：存在**可比基线**（同一 shape / dtype / 芯片 / 编译选项四要素一致），且劣化由**一次变更**划界（可用二分 commit 定位首次劣化点）。",
+      "relation_focus": "实需工作匹配下发任务，回归比较须固定条件",
+      "object_focus": "循环上界/tileNum/blockDim/搬运/基线",
+      "time_focus": "调度/执行/构建/版本变更",
+      "consumer_focus": "性能基线/热点",
+      "boundary": "A07结果错，G01不完成；本型结果对但多算或跨版本性能回归",
+      "analysis_kind": [
+        "PERFORMANCE_OR_RESOURCE",
+        "MECHANISM"
+      ],
+      "source_file": "patterns/FP-C/FP-C01.md",
+      "source_quote": "- **故障机理**：存在冗余计算、重复搬运、可合并的循环/分支未合并。**两条独立子路径（2026-09-16 增补子型 ②）**：① **实现层冗余**——kernel 模板内冗余初始化/冗余指令/未合并搬运；② **调度层膨胀**——host 侧（tiling / infershape / aclnn / 工程构建脚本）循环上界或派发条件计算错误，致**下发迭代次数、blockDim、tileNum、核间屏障或重复配置次数多于实需**，kernel 被重复调用或空转，而**单次计算逻辑完全正确**（与 FP-A07 的区别：A07 走错分支致结果错，本条结果对、只是白干）。**③ 变更引入的版本基线回归（v2.16 增补）**——绝对耗时未超标、结构上也未必是\"冗余\"，但**某次变更把原本合格的表现推坏**：新增冗余计算或同步、tiling/分核阈值漂移使原最优点被跨过、dtype 或派发路径变化、模板实例化规模放大、新增确定性/原子约束。**判据是「与自身上一版本或基线对比出现劣化」，而非与其它维度（dtype / 板型 / 代际）对比**——这是与子型 ①②（结构性冗余）及 C02~C06（维度对比型）的本质区别，后者的绝对值可能一直\"合格\"，只有基线对比才暴露。",
+      "source_quote_line": 7,
+      "source_sha256": "7abb6aa6522a933fd0a0366a81a90d19a948b9b251bd93c9884ccd7d8958d3ac",
+      "source_card_name": "算子端到端耗时占比高且单次调用耗时高",
+      "applicability": {
+        "repos": [
+          "All"
+        ],
+        "sides": [
+          "All"
+        ],
+        "carriers": [
+          "Tiling源码",
+          "Kernel源码",
+          "构建配置与日志"
+        ],
+        "trigger": "loopTimes|tileNum|foreach|for\\(",
+        "enabled": true
+      },
+      "applicability_source_quote": "- **适用**：仓 All ｜ 侧别 All ｜ 载体 Tiling源码,Kernel源码,构建配置与日志 ｜ 触发 loopTimes|tileNum|foreach|for\\( ｜ 默认启用 true",
+      "related_pattern_ids": [
+        "FP-C02",
+        "FP-C05",
+        "FP-C06",
+        "FP-A07",
+        "FP-F01",
+        "FP-E02"
+      ],
+      "boundary_source_quotes": [
+        "- **关联**：[FP-C02](FP-C02.md)、[FP-C05](FP-C05.md)、[FP-C06](FP-C06.md)（C01 为通用型，其余为按 dtype/开关/代际细分的特化型）；[FP-A07](../FP-A/FP-A07.md)（**最易混淆项**：A07 是 tiling 条件写错致**走错分支、结果错**，本条子型 ② 是上界写错致**结果对、只是多算**，两者审查映射点相邻但后果不同，勿合并）；[FP-F01](../FP-F/FP-F01.md)（同属「工程配置类」，构建期子型 ① 与其交叠）；[FP-E02](../FP-E/FP-E02.md)（精度判定无法发现本条，需性能判据补充）。**与 C02~C06 的边界（v2.16 明确）**：C02/C03（dtype 派发）、C04（板型）、C05（确定性）、C06（代际）均为**同版本内跨维度对比**，本条子型 ③ 是**跨版本同条件对比**——四要素（shape / dtype / 芯片 / 编译选项）必须一致才成立。"
+      ],
+      "test_design": {
+        "axes": [
+          "perf",
+          "shape"
+        ],
+        "oracle": [
+          "perf-baseline"
+        ],
+        "signal": "perf",
+        "lines": [
+          "none"
+        ],
+        "min_cases": 2,
+        "constructor": "profiler kernel_details 聚合；跨版本耗时比值 >1.15 看护；先校验基线四要素（shape/dtype/芯片/编译选项）可比性。",
+        "judge": "跨版本耗时比值 ≤1.15；无整数倍台阶式劣化。",
+        "kill": "若 host 循环上界或派发条件算错致重复调度，则耗时呈非整数倍台阶而精度全对。",
+        "sourced": {
+          "constructor": "测试拦截建议+detectors",
+          "judge": "detectors",
+          "kill": "子型划分"
+        }
+      },
+      "subtype_ids": [
+        "C01-1",
+        "C01-2",
+        "C01-3"
+      ],
+      "evidence_status": "SOURCE_LIBRARY_DECLARATION_NOT_INDEPENDENT_CASE_OR_DEVICE_VERIFICATION",
+      "evidence_source_notes": "卡内issue/PR和实测均为原库叙述；本轮未复抓外部正文、未扫描算子实现、未设备复现。"
+    },
+    {
+      "id": "FP-C02",
+      "name": "A2 上 fp16 Vector 算子性能不如 bf16",
+      "category": "performance",
+      "coverage": "A2 上 fp16 Vector 算子性能不如 bf16；fp16 Vector 类算子。",
+      "relation_focus": "dtype分派应进入适配性能路径",
+      "object_focus": "A2 fp16-bf16 Vector",
+      "time_focus": "dtype分派/计时",
+      "consumer_focus": "算子/端到端性能",
+      "boundary": "C03对称相邻，dtype性能差异不自动为bug，非精度根因",
+      "analysis_kind": [
+        "PERFORMANCE_OR_RESOURCE"
+      ],
+      "source_file": "patterns/FP-C/FP-C02.md",
+      "source_quote": "- **故障机理**：dtype 分支走了非优化路径。",
+      "source_quote_line": 7,
+      "source_sha256": "c30f243777e112f03da68ab6c8831601ada1960d31590bf7b01fc8e67439c366",
+      "source_card_name": "A2 上 fp16 Vector 算子性能不如 bf16",
+      "applicability": {
+        "repos": [
+          "All"
+        ],
+        "sides": [
+          "Kernel"
+        ],
+        "carriers": [
+          "Kernel源码"
+        ],
+        "trigger": "half|float16",
+        "enabled": true
+      },
+      "applicability_source_quote": "- **适用**：仓 All ｜ 侧别 Kernel ｜ 载体 Kernel源码 ｜ 触发 half|float16 ｜ 默认启用 true",
+      "related_pattern_ids": [
+        "FP-C03",
+        "FP-C01",
+        "FP-B01"
+      ],
+      "boundary_source_quotes": [
+        "- **关联**：[FP-C03](FP-C03.md)（同一现象的对称面）、[FP-C01](FP-C01.md)、[FP-B01](../FP-B/FP-B01.md)（派发白名单/条件硬编码同源）。"
+      ],
+      "test_design": {
+        "axes": [
+          "dtype",
+          "perf"
+        ],
+        "oracle": [
+          "perf-baseline"
+        ],
+        "signal": "perf",
+        "lines": [
+          "none"
+        ],
+        "min_cases": 2,
+        "constructor": "fp16/bf16 双 dtype 性能对比基线（同 shape、同芯片、同编译选项）。",
+        "judge": "fp16 与 bf16 同算子性能差异在合理带内。",
+        "kill": "若 fp16 走降级路径，则同算子 fp16 耗时显著劣于 bf16。",
+        "sourced": {
+          "constructor": "测试拦截建议",
+          "judge": "典型表现",
+          "kill": "源码审查映射点"
+        }
+      },
+      "subtype_ids": [],
+      "evidence_status": "SOURCE_LIBRARY_DECLARATION_NOT_INDEPENDENT_CASE_OR_DEVICE_VERIFICATION",
+      "evidence_source_notes": "卡内issue/PR和实测均为原库叙述；本轮未复抓外部正文、未扫描算子实现、未设备复现。"
+    },
+    {
+      "id": "FP-C03",
+      "name": "bf16 与 fp16 性能差异大",
+      "category": "performance",
+      "coverage": "bf16 与 fp16 性能差异大；双 dtype 支持的算子。",
+      "relation_focus": "各支持dtype需相应实现特化",
+      "object_focus": "bf16/fp16实现/计时",
+      "time_focus": "同配置两dtype执行",
+      "consumer_focus": "性能基线",
+      "boundary": "C02相邻不自动为两个独立缺陷；需排合法硬件差别",
+      "analysis_kind": [
+        "PERFORMANCE_OR_RESOURCE"
+      ],
+      "source_file": "patterns/FP-C/FP-C03.md",
+      "source_quote": "- **故障机理**：实现中 dtype 特化不完整。",
+      "source_quote_line": 7,
+      "source_sha256": "ec0916ec19771ce87acce05366253dafcfac944b226cf1e2396c5b993c40c3da",
+      "source_card_name": "bf16 与 fp16 性能差异大",
+      "applicability": {
+        "repos": [
+          "All"
+        ],
+        "sides": [
+          "Kernel"
+        ],
+        "carriers": [
+          "Kernel源码"
+        ],
+        "trigger": "bfloat16|bf16|half",
+        "enabled": true
+      },
+      "applicability_source_quote": "- **适用**：仓 All ｜ 侧别 Kernel ｜ 载体 Kernel源码 ｜ 触发 bfloat16|bf16|half ｜ 默认启用 true",
+      "related_pattern_ids": [
+        "FP-C02",
+        "FP-C01"
+      ],
+      "boundary_source_quotes": [
+        "- **关联**：[FP-C02](FP-C02.md)（同一现象的对称面）、[FP-C01](FP-C01.md)。"
+      ],
+      "test_design": {
+        "axes": [
+          "dtype",
+          "perf"
+        ],
+        "oracle": [
+          "perf-baseline"
+        ],
+        "signal": "perf",
+        "lines": [
+          "none"
+        ],
+        "min_cases": 2,
+        "constructor": "双 dtype 性能对比基线（与 FP-C02 合并执行，避免重复上板）。",
+        "judge": "两 dtype 性能差异在合理带内且特化分支完整。",
+        "kill": "若 dtype 特化分支缺失，则 bf16/fp16 耗时差异超出基线带。",
+        "sourced": {
+          "constructor": "测试拦截建议",
+          "judge": "典型表现",
+          "kill": "源码审查映射点"
+        }
+      },
+      "subtype_ids": [],
+      "evidence_status": "SOURCE_LIBRARY_DECLARATION_NOT_INDEPENDENT_CASE_OR_DEVICE_VERIFICATION",
+      "evidence_source_notes": "卡内issue/PR和实测均为原库叙述；本轮未复抓外部正文、未扫描算子实现、未设备复现。"
+    },
+    {
+      "id": "FP-C04",
+      "name": "A2 B2 机器性能劣于 A2 B3",
+      "category": "performance",
+      "coverage": "A2 B2 机器性能劣于 A2 B3；跨板型部署（B2/B3）。",
+      "relation_focus": "tiling频率带宽假设应对应板型",
+      "object_focus": "A2 B2/B3/频率/带宽",
+      "time_focus": "跨板型部署/计时",
+      "consumer_focus": "性能判据",
+      "boundary": "无代码签名，需真实可比性能；B02功能核数/C06代际不同",
+      "analysis_kind": [
+        "PERFORMANCE_OR_RESOURCE"
+      ],
+      "source_file": "patterns/FP-C/FP-C04.md",
+      "source_quote": "- **故障机理**：频率/带宽相关 tiling 假设不适用于部分板型。",
+      "source_quote_line": 8,
+      "source_sha256": "fb7f0884041b010599a64fe91ed078dc09c6f9f92498914daac773484bd7d7c8",
+      "source_card_name": "A2 B2 机器性能劣于 A2 B3",
+      "applicability": {
+        "repos": [
+          "All"
+        ],
+        "sides": [
+          "Tiling"
+        ],
+        "carriers": [
+          "Tiling源码"
+        ],
+        "trigger": "无代码触发特征",
+        "enabled": true
+      },
+      "applicability_source_quote": "- **适用**：仓 All ｜ 侧别 Tiling ｜ 载体 Tiling源码 ｜ 触发 无代码触发特征 ｜ 默认启用 true",
+      "related_pattern_ids": [],
+      "boundary_source_quotes": [],
+      "test_design": {
+        "axes": [
+          "perf"
+        ],
+        "oracle": [
+          "perf-baseline"
+        ],
+        "signal": "perf",
+        "lines": [
+          "none"
+        ],
+        "min_cases": 2,
+        "constructor": "多板型性能基线对比（同芯片 A2 B2 / B3 等板型矩阵）。",
+        "judge": "同芯片各板型性能在基线带内。",
+        "kill": "若频率/带宽相关 tiling 假设固化，则 B2 板型耗时显著劣于 B3。",
+        "sourced": {
+          "constructor": "测试拦截建议",
+          "judge": "典型表现",
+          "kill": "源码审查映射点"
+        }
+      },
+      "subtype_ids": [],
+      "evidence_status": "SOURCE_LIBRARY_DECLARATION_NOT_INDEPENDENT_CASE_OR_DEVICE_VERIFICATION",
+      "evidence_source_notes": "卡内issue/PR和实测均为原库叙述；本轮未复抓外部正文、未扫描算子实现、未设备复现。"
+    },
+    {
+      "id": "FP-C05",
+      "name": "确定性场景性能大幅劣于非确定性",
+      "category": "performance",
+      "coverage": "确定性场景性能大幅劣于非确定性；开启确定性计算开关。",
+      "relation_focus": "开关生效后的并行组织须核性能基线",
+      "object_focus": "确定性配置/原子/并行度/workspace",
+      "time_focus": "模式分派/执行对照",
+      "consumer_focus": "性能/吞吐",
+      "boundary": "A06不生效不同；workspace相同不证明kernel耗时相同",
+      "analysis_kind": [
+        "PERFORMANCE_OR_RESOURCE"
+      ],
+      "source_file": "patterns/FP-C/FP-C05.md",
+      "source_quote": "- **故障机理**：确定性路径实现低效（串行化、禁用必要并行）。",
+      "source_quote_line": 7,
+      "source_sha256": "bbcb25c9c5acaffa3b9d5f4bc211dabe86349550e6bb1d7b6cff5af6f6537a1f",
+      "source_card_name": "确定性场景性能大幅劣于非确定性",
+      "applicability": {
+        "repos": [
+          "All"
+        ],
+        "sides": [
+          "Kernel"
+        ],
+        "carriers": [
+          "Kernel源码"
+        ],
+        "trigger": "Deterministic|AtomicAdd",
+        "enabled": true
+      },
+      "applicability_source_quote": "- **适用**：仓 All ｜ 侧别 Kernel ｜ 载体 Kernel源码 ｜ 触发 Deterministic|AtomicAdd ｜ 默认启用 true",
+      "related_pattern_ids": [
+        "FP-A06",
+        "FP-C01"
+      ],
+      "boundary_source_quotes": [
+        "- **关联**：[FP-A06](../FP-A/FP-A06.md)（同一开关的两面：A06 是开了不生效，C05 是生效了但代价过大）、[FP-C01](FP-C01.md)。"
+      ],
+      "test_design": {
+        "axes": [
+          "perf",
+          "bitwise"
+        ],
+        "oracle": [
+          "perf-baseline"
+        ],
+        "signal": "perf",
+        "lines": [
+          "none"
+        ],
+        "min_cases": 2,
+        "constructor": "确定性开/关性能对比基线（其余条件全同）。",
+        "judge": "确定性开关前后性能比值在基线带内。",
+        "kill": "若确定性路径过度串行化或禁用必要并行，则开开关后耗时骤降超过基线。",
+        "sourced": {
+          "constructor": "测试拦截建议",
+          "judge": "典型表现",
+          "kill": "源码审查映射点"
+        }
+      },
+      "subtype_ids": [],
+      "evidence_status": "SOURCE_LIBRARY_DECLARATION_NOT_INDEPENDENT_CASE_OR_DEVICE_VERIFICATION",
+      "evidence_source_notes": "卡内issue/PR和实测均为原库叙述；本轮未复抓外部正文、未扫描算子实现、未设备复现。"
+    },
+    {
+      "id": "FP-C06",
+      "name": "A5 性能劣于 A2",
+      "category": "performance",
+      "coverage": "A5 性能劣于 A2；新代际芯片首发适配期。",
+      "relation_focus": "新SoC性能路径须经可比基线确认",
+      "object_focus": "SoC/tiling/kernel",
+      "time_focus": "新代际适配/跨代部署",
+      "consumer_focus": "性能基线",
+      "boundary": "A17精度/B02功能/C04板型各自判断",
+      "analysis_kind": [
+        "PERFORMANCE_OR_RESOURCE"
+      ],
+      "source_file": "patterns/FP-C/FP-C06.md",
+      "source_quote": "- **故障机理**：新 SOC 适配不完整的性能路径。",
+      "source_quote_line": 7,
+      "source_sha256": "83adf2408172a12525f25c88894dfdd2ac35a194713dd9d2f3ba8173502113f8",
+      "source_card_name": "A5 性能劣于 A2",
+      "applicability": {
+        "repos": [
+          "All"
+        ],
+        "sides": [
+          "All"
+        ],
+        "carriers": [
+          "Tiling源码",
+          "Kernel源码"
+        ],
+        "trigger": "GetSocVersion|SOC_VERSION",
+        "enabled": true
+      },
+      "applicability_source_quote": "- **适用**：仓 All ｜ 侧别 All ｜ 载体 Tiling源码,Kernel源码 ｜ 触发 GetSocVersion|SOC_VERSION ｜ 默认启用 true",
+      "related_pattern_ids": [
+        "FP-A17",
+        "FP-B02",
+        "FP-C04"
+      ],
+      "boundary_source_quotes": [
+        "- **关联**：[FP-A17](../FP-A/FP-A17.md)、[FP-B02](../FP-B/FP-B02.md)（同为代际/型号分支遗漏，B02 侧重功能、C06 侧重性能）、[FP-C04](FP-C04.md)。"
+      ],
+      "test_design": {
+        "axes": [
+          "perf"
+        ],
+        "oracle": [
+          "perf-baseline"
+        ],
+        "signal": "perf",
+        "lines": [
+          "none"
+        ],
+        "min_cases": 2,
+        "constructor": "跨代际性能基线对比（A5 vs A2 同用例）。",
+        "judge": "新代际性能不劣于上一代。",
+        "kill": "若新 SOC 适配的性能路径不完整，则新代际同用例耗时高于旧代际。",
+        "sourced": {
+          "constructor": "测试拦截建议",
+          "judge": "典型表现",
+          "kill": "源码审查映射点"
+        }
+      },
+      "subtype_ids": [],
+      "evidence_status": "SOURCE_LIBRARY_DECLARATION_NOT_INDEPENDENT_CASE_OR_DEVICE_VERIFICATION",
+      "evidence_source_notes": "卡内issue/PR和实测均为原库叙述；本轮未复抓外部正文、未扫描算子实现、未设备复现。"
+    },
+    {
+      "id": "FP-D01",
+      "name": "GPU 迁移 NPU 场景显存过度占用",
+      "category": "resource",
+      "coverage": "GPU 迁移 NPU 场景显存过度占用；GPU 训练 / 推理脚本直接迁移到 NPU；**aclGraph 等图模式下经条件算子触发的内存申请**（v2.13 增补——原卡片仅覆盖迁移场景，遗漏图模式申请路径）。",
+      "relation_focus": "申请复用及缓存上限须匹配工作需求",
+      "object_focus": "workspace/缓存/中间tensor/图申请",
+      "time_focus": "申请/复用/峰值/长稳占用",
+      "consumer_focus": "内存预算/可运行性",
+      "boundary": "管容量非A05正确性；D02是双路径相对比较",
+      "analysis_kind": [
+        "PERFORMANCE_OR_RESOURCE"
+      ],
+      "source_file": "patterns/FP-D/FP-D01.md",
+      "source_quote": "- **故障机理**：workspace 大小计算过大、内存未复用、缓存未设上限；**图模式（aclGraph / 条件算子）下的内存申请路径未纳入容量评估**（v2.13 增补）。",
+      "source_quote_line": 7,
+      "source_sha256": "58441f0f9d858c7f9f100bfc35626d775383c1a7bcaeeeaba6c248856be2617a",
+      "source_card_name": "GPU 迁移 NPU 场景显存过度占用",
+      "applicability": {
+        "repos": [
+          "All"
+        ],
+        "sides": [
+          "Tiling"
+        ],
+        "carriers": [
+          "Tiling源码"
+        ],
+        "trigger": "workspace|GetWorkspaceSize",
+        "enabled": true
+      },
+      "applicability_source_quote": "- **适用**：仓 All ｜ 侧别 Tiling ｜ 载体 Tiling源码 ｜ 触发 workspace|GetWorkspaceSize ｜ 默认启用 true",
+      "related_pattern_ids": [
+        "FP-D02",
+        "FP-A05"
+      ],
+      "boundary_source_quotes": [
+        "- **关联**：[FP-D02](FP-D02.md)（同源：均指向 workspace 计算与内存复用缺失，D01 关注迁移场景的绝对值超限，D02 关注双路径对比的相对值）、[FP-A05](../FP-A/FP-A05.md)。"
+      ],
+      "test_design": {
+        "axes": [
+          "memory",
+          "shape"
+        ],
+        "oracle": [
+          "memory-peak"
+        ],
+        "signal": "memory",
+        "lines": [
+          "memory"
+        ],
+        "min_cases": 2,
+        "constructor": "峰值显存基线看护；大 batch / 长序列场景内存压测。",
+        "judge": "峰值显存不超基线。",
+        "kill": "若 workspace 大小计算/内存复用/缓存上限不当，则大 batch 场景峰值显存超基线。",
+        "sourced": {
+          "constructor": "测试拦截建议",
+          "judge": "典型表现",
+          "kill": "源码审查映射点"
+        }
+      },
+      "subtype_ids": [],
+      "evidence_status": "SOURCE_LIBRARY_DECLARATION_NOT_INDEPENDENT_CASE_OR_DEVICE_VERIFICATION",
+      "evidence_source_notes": "卡内issue/PR和实测均为原库叙述；本轮未复抓外部正文、未扫描算子实现、未设备复现。"
+    },
+    {
+      "id": "FP-D02",
+      "name": "aclnn 内存占用高于 aclop",
+      "category": "resource",
+      "coverage": "aclnn 内存占用高于 aclop；同一算子 aclop 与 aclnn 双路径对比。",
+      "relation_focus": "两路径中间存储须按lifetime复用并比较峰值",
+      "object_focus": "workspace/中间tensor/lifetime",
+      "time_focus": "aclnn-aclop资源管理",
+      "consumer_focus": "内存峰值评价",
+      "boundary": "A16比精度；占用不自动推出越界/未初始化/竞态",
+      "analysis_kind": [
+        "PERFORMANCE_OR_RESOURCE"
+      ],
+      "source_file": "patterns/FP-D/FP-D02.md",
+      "source_quote": "- **故障机理**：workspace/中间 tensor 复用逻辑缺失、lifetime 分析缺失。",
+      "source_quote_line": 7,
+      "source_sha256": "6a2f92417adafae79508128c87cba65d40e829fa11bf0cf49c8ddf84648db84c",
+      "source_card_name": "aclnn 内存占用高于 aclop",
+      "applicability": {
+        "repos": [
+          "All"
+        ],
+        "sides": [
+          "Host"
+        ],
+        "carriers": [
+          "aclnn源码"
+        ],
+        "trigger": "workspace|GetWorkspaceSize",
+        "enabled": true
+      },
+      "applicability_source_quote": "- **适用**：仓 All ｜ 侧别 Host ｜ 载体 aclnn源码 ｜ 触发 workspace|GetWorkspaceSize ｜ 默认启用 true",
+      "related_pattern_ids": [
+        "FP-A16",
+        "FP-D01"
+      ],
+      "boundary_source_quotes": [
+        "- **关联**：[FP-A16](../FP-A/FP-A16.md)（同属双路径对比类：A16 比精度、D02 比内存）、[FP-D01](FP-D01.md)。"
+      ],
+      "test_design": {
+        "axes": [
+          "memory",
+          "sequence"
+        ],
+        "oracle": [
+          "memory-peak"
+        ],
+        "signal": "memory",
+        "lines": [
+          "memory"
+        ],
+        "min_cases": 2,
+        "constructor": "torch.npu.memory_allocated 前后打点；aclnn / aclop 双路径对比。",
+        "judge": "aclnn 峰值内存不高于 aclop。",
+        "kill": "若中间 tensor 复用或 lifetime 分析不当，则 aclnn 路径峰值内存高于 aclop。",
+        "sourced": {
+          "constructor": "测试拦截建议",
+          "judge": "典型表现",
+          "kill": "源码审查映射点"
+        }
+      },
+      "subtype_ids": [],
+      "evidence_status": "SOURCE_LIBRARY_DECLARATION_NOT_INDEPENDENT_CASE_OR_DEVICE_VERIFICATION",
+      "evidence_source_notes": "卡内issue/PR和实测均为原库叙述；本轮未复抓外部正文、未扫描算子实现、未设备复现。"
+    },
+    {
+      "id": "FP-E01",
+      "name": "golden/UT 期望值失配或按错误实现编写",
+      "category": "test_effectiveness",
+      "coverage": "golden/UT 期望值失配或按错误实现编写；测试基础设施代码（golden.py、st csv）与用例演进不同步；缺陷修复未审视 golden 正确性。",
+      "relation_focus": "期望必须独立正确而非与错误实现闭环",
+      "object_focus": "golden/命名/期望/输出",
+      "time_focus": "造数/参考生成/同步变更",
+      "consumer_focus": "测试器/CI",
+      "boundary": "E02判据口径不同；同PR改golden只是线索不证明哪侧正确",
+      "analysis_kind": [
+        "COVERAGE_OR_ORACLE"
+      ],
+      "source_file": "patterns/FP-E/FP-E01.md",
+      "source_quote": "- **故障机理**：① golden 生成脚本与用例命名/约定失配，精度验证静默失效（用例永远通过）；② golden 按（曾经的错误）实现逆向编写，缺陷被 UT「合法化」——修复 PR 中 golden 与实现同步修改即是强信号。",
+      "source_quote_line": 7,
+      "source_sha256": "ef18808fb7af62a8f9359afc1f2d8bc766cc187e7c734fb2cf98245e82314908",
+      "source_card_name": "golden/UT 期望值失配或按错误实现编写",
+      "applicability": {
+        "repos": [
+          "All"
+        ],
+        "sides": [
+          "All"
+        ],
+        "carriers": [
+          "UT与golden资产"
+        ],
+        "trigger": "golden",
+        "enabled": true
+      },
+      "applicability_source_quote": "- **适用**：仓 All ｜ 侧别 All ｜ 载体 UT与golden资产 ｜ 触发 golden ｜ 默认启用 true",
+      "related_pattern_ids": [
+        "FP-A04",
+        "FP-A13",
+        "FP-A18",
+        "FP-E02"
+      ],
+      "boundary_source_quotes": [
+        "- **关联**：[FP-A04](../FP-A/FP-A04.md)、[FP-A13](../FP-A/FP-A13.md)、[FP-A18](../FP-A/FP-A18.md)、[FP-E02](FP-E02.md)（E01 是 golden 本身错，E02 是判据/标杆口径设计错——二者常叠加放大）。"
+      ],
+      "test_design": {
+        "axes": [
+          "golden",
+          "content"
+        ],
+        "oracle": [
+          "golden-utol"
+        ],
+        "signal": "golden",
+        "lines": [
+          "precision"
+        ],
+        "min_cases": 2,
+        "constructor": "golden 必须由独立参考实现（numpy / torch CPU）生成而非待测实现回放；golden-用例失配纳入 CI 静态扫描。",
+        "judge": "golden 与独立参考实现一致，不是按待测实现录制。",
+        "kill": "若 golden 按错误实现编写，则修复类 PR 的 diff 中 golden 与实现同步改动。",
+        "sourced": {
+          "constructor": "测试拦截建议",
+          "judge": "测试拦截建议",
+          "kill": "源码审查映射点"
+        }
+      },
+      "subtype_ids": [],
+      "evidence_status": "SOURCE_LIBRARY_DECLARATION_NOT_INDEPENDENT_CASE_OR_DEVICE_VERIFICATION",
+      "evidence_source_notes": "卡内issue/PR和实测均为原库叙述；本轮未复抓外部正文、未扫描算子实现、未设备复现。"
+    },
+    {
+      "id": "FP-E02",
+      "name": "精度测试判据与标杆口径设计缺陷",
+      "category": "test_effectiveness",
+      "coverage": "精度测试判据与标杆口径设计缺陷；ATK/TTK 批量精度测试；含 cubeMathType 降精度属性、近零相消输出、极端值域（±1e30）、窄类型（bf16）多步累加的算子；阈值按「1 ulp × 1.125」类口径设定。",
+      "relation_focus": "参考/有效精度/量纲/误差规则须一致",
+      "object_focus": "cubeMathType/ulp/误差地板/比例分母",
+      "time_focus": "测试设计/判读",
+      "consumer_focus": "ATK/TTK评价工具",
+      "boundary": "合法降精度与舍入不直接为kernel缺陷，先裁定参考合同",
+      "analysis_kind": [
+        "COVERAGE_OR_ORACLE",
+        "CONTRACT"
+      ],
+      "source_file": "patterns/FP-E/FP-E02.md",
+      "source_quote": "- **故障机理**：精度比对基础设施的**判据/标杆选择设计缺陷**导致结构性误报（假阳性泛滥、用例被误关停）或漏报（真缺陷被口径吞掉）：① **降精度模式误比全精度标杆**——cubeMathType=1/2/3（HF32/FP16 降精度）按文档语义降精度计算，却被与不降精度的 GPU 标杆比较，失败率 100% 属口径分歧；② **阈值紧贴 1 ulp 理论下界**——single_bm 阈值（fp16 1.125×2⁻¹¹、bf16 1.015625×2⁻⁸）落在 1 ulp 相对误差带内，任何孤立 1 ulp 舍入翻转几乎必然判 FAIL；③ **相对误差判据缺绝对误差地板**——近零/相消输出点上累加顺序差被放大 60 倍以上，golden==native 时容差为 0，任何 NPU 实现结构性不可通过；④ **双标杆比例分母退化**——基准侧误差恰为 0 时比例分母取固定下限 2⁻¹⁴，RMS 判据退化为与数值量纲无关的绝对误差要求，极端值域下必然失败；⑤ **中间计算精度口径未声明**——文档公式不规定乘加中间精度，「fp32 中间累加+出口单次舍入」与「逐步落回窄类型」两条合法路径的系统性 1 ULP 分歧无裁定依据，同机制在 fp16/fp32 上低于阈值而漏报、仅在 bf16 上超阈而误报。",
+      "source_quote_line": 7,
+      "source_sha256": "a697f0a136db7cc29f4a63cc359aece08330a2837c893447fab80cbdfdda0d4e",
+      "source_card_name": "精度测试判据与标杆口径设计缺陷",
+      "applicability": {
+        "repos": [
+          "cann-bench"
+        ],
+        "sides": [
+          "All"
+        ],
+        "carriers": [
+          "UT与golden资产"
+        ],
+        "trigger": "无代码触发特征",
+        "enabled": true
+      },
+      "applicability_source_quote": "- **适用**：仓 cann-bench ｜ 侧别 All ｜ 载体 UT与golden资产 ｜ 触发 无代码触发特征 ｜ 默认启用 true",
+      "related_pattern_ids": [
+        "FP-E01",
+        "FP-A20",
+        "FP-A02",
+        "FP-B01"
+      ],
+      "boundary_source_quotes": [
+        "- **关联**：[FP-E01](FP-E01.md)（golden 本身错 vs 判据设计错，常叠加）、[FP-A20](../FP-A/FP-A20.md)（确定性等级描述不足属同一「口径未声明」家族的确定性面）、[FP-A02](../FP-A/FP-A02.md)（累加顺序差是本型误报的物理来源）、[FP-B01](../FP-B/FP-B01.md)（声明面与实现面不符在精度口径上的呈现）。"
+      ],
+      "test_design": {
+        "axes": [
+          "golden",
+          "boundary"
+        ],
+        "oracle": [
+          "golden-utol"
+        ],
+        "signal": "golden",
+        "lines": [
+          "precision"
+        ],
+        "min_cases": 3,
+        "constructor": "双标杆复核；判据分母退化检查；阈值对 1 ulp 翻转留裕度（≥1 ulp 上界而非带内）；降精度模式用同精度标杆。",
+        "judge": "近零/相消场景有与量纲无关的绝对误差地板；阈值不紧贴 1 ulp 理论下界。",
+        "kill": "若判据分母退化或阈值紧贴 1 ulp 下界，则换任何合法实现都 FAIL，或同 shape 换 cubeMathType 即大面积翻转。",
+        "sourced": {
+          "constructor": "测试拦截建议",
+          "judge": "源码审查映射点",
+          "kill": "典型表现"
+        }
+      },
+      "subtype_ids": [
+        "E02-1",
+        "E02-2",
+        "E02-3",
+        "E02-4",
+        "E02-5"
+      ],
+      "evidence_status": "SOURCE_LIBRARY_DECLARATION_NOT_INDEPENDENT_CASE_OR_DEVICE_VERIFICATION",
+      "evidence_source_notes": "卡内issue/PR和实测均为原库叙述；本轮未复抓外部正文、未扫描算子实现、未设备复现。"
+    },
+    {
+      "id": "FP-F01",
+      "name": "构建/工程配置不一致致编译与产物缺陷",
+      "category": "engineering",
+      "coverage": "构建/工程配置不一致致编译与产物缺陷；跨仓编译（同时依赖多仓头文件）、新增 SoC/编译器分支、CANN 包裁剪后样例引用失效头文件、算子新增平台注册漏配置文件、双源列表（脚本/CMake）独立演化。",
+      "relation_focus": "原型头文件架构def与binary配置须一致",
+      "object_focus": "REG_OP/include/CMake/build/binary.json",
+      "time_focus": "编译/链接/打包",
+      "consumer_focus": "构建器/链接器/发布包",
+      "boundary": "F04重交付符号接口；退出码0不证产物齐全",
+      "analysis_kind": [
+        "ENGINEERING_PROCESS",
+        "CONTRACT"
+      ],
+      "source_file": "patterns/FP-F/FP-F01.md",
+      "source_quote": "- **故障机理**：构建体系中的**双源/多源配置不一致**与**配置面缺失**，使编译期/链接期失败或产物静默缺失：① **原型跨仓重复定义**——同一 `REG_OP` 在两仓头文件并存，同编译单元包含即重复注册符号链接冲突；② **注册块缺独立去重宏**——仅靠头文件级 include guard，多包含路径下 `REG_OP` 多次展开；③ **构建脚本 include 路径与头文件实际位置不一致**、**样例引用已废弃头文件**——批量 example 编译失败；④ **def 已注册而 binary.json 配置缺失**——cmake 以 `if(EXISTS)` 为门槛静默 `continue`，kernel 不进编译打包，且退化为按算子名推断 op_type 弱化注册绑定；⑤ **SoC/架构列表双处维护不一致**——build.sh 校验通过而 CMake 侧不识别、或编译器分支硬编码架构锁死无法出其他 SoC 产物；⑥ **评测平台别名表缺失时静默 fallback**——用错误平台基线计分且仅一条 WARNING。 ⑦ **同名算子目录/注册名大小写冲突（v6.33）**：仓内同时存在 `roi_align_grad` 与 `ROIAlignGrad` 两套目录/注册名，构建脚本按大小写敏感查找，误取 experimental 版注册名，导致正式 kernel 被整体跳过编译、包内无该 SoC 产物。",
+      "source_quote_line": 7,
+      "source_sha256": "bccfe0a016000898c5cc52be84cd6d1467a08523d4393d55ce4afb2479146ee6",
+      "source_card_name": "构建/工程配置不一致致编译与产物缺陷",
+      "applicability": {
+        "repos": [
+          "All"
+        ],
+        "sides": [
+          "All"
+        ],
+        "carriers": [
+          "构建配置与日志"
+        ],
+        "trigger": "CMakeLists|REG_OP|AddConfig|build.sh",
+        "enabled": true
+      },
+      "applicability_source_quote": "- **适用**：仓 All ｜ 侧别 All ｜ 载体 构建配置与日志 ｜ 触发 CMakeLists|REG_OP|AddConfig|build.sh ｜ 默认启用 true",
+      "related_pattern_ids": [
+        "FP-F02",
+        "FP-B02",
+        "FP-F03"
+      ],
+      "boundary_source_quotes": [
+        "- **关联**：[FP-F02](FP-F02.md)（配置缺失的静默表现属「无告警/告警不足」）、[FP-B02](../FP-B/FP-B02.md)（SOC 适配遗漏在 tiling 侧的姊妹型）、[FP-F03](FP-F03.md)（声明面与产物面不一致）。"
+      ],
+      "test_design": {
+        "axes": [
+          "doc",
+          "contract"
+        ],
+        "oracle": [
+          "error-code"
+        ],
+        "signal": "error-code",
+        "lines": [
+          "static-absence"
+        ],
+        "min_cases": 2,
+        "constructor": "CI「def 注册 soc × binary.json 存在性」一致性门禁（缺失即失败而非跳过）；跨仓原型符号冲突用联合编译冒烟。",
+        "judge": "注册 soc 与 binary.json 一一对应；无 undefined symbol / 符号冲突。",
+        "kill": "若 def 已注册而 binary.json 缺失，则构建退出码 0 但目标 soc 产物静默缺失。",
+        "sourced": {
+          "constructor": "测试拦截建议",
+          "judge": "源码审查映射点",
+          "kill": "典型表现"
+        }
+      },
+      "subtype_ids": [
+        "F01-1",
+        "F01-2",
+        "F01-3",
+        "F01-4",
+        "F01-5",
+        "F01-6",
+        "F01-7"
+      ],
+      "evidence_status": "SOURCE_LIBRARY_DECLARATION_NOT_INDEPENDENT_CASE_OR_DEVICE_VERIFICATION",
+      "evidence_source_notes": "卡内issue/PR和实测均为原库叙述；本轮未复抓外部正文、未扫描算子实现、未设备复现。"
+    },
+    {
+      "id": "FP-F02",
+      "name": "维测与错误上报缺陷（含跨仓错误码不一致）",
+      "category": "engineering",
+      "coverage": "维测与错误上报缺陷（含跨仓错误码不一致）；任一异常分支（参数非法、shape/dtype 不支持、内存不足、属性非法）；构建或运行期启用 dump/日志开关；**同源算子在两仓之间的同一非法输入对照**；错误信息巡检（人工阅读）；**规范化工具全量扫描**（如 `cann-log-evaluation` 类工具）；**可预期的降级路径被走通**（如查询类接口返回异常值，而设计上仅回退默认行为并继续执行）。",
+      "relation_focus": "可观测产物应准确表达状态与错误类别",
+      "object_focus": "错误码/日志级别/上下文/dump",
+      "time_focus": "异常/降级/运行/维测",
+      "consumer_focus": "调用方/诊断/监控",
+      "boundary": "漏报误报两方向；非零码不等正确码，合法fallback不是数值缺陷",
+      "analysis_kind": [
+        "ENGINEERING_PROCESS",
+        "CONTRACT"
+      ],
+      "source_file": "patterns/FP-F/FP-F02.md",
+      "source_quote": "- **故障机理**：算子/接口的**可观测性产物**缺失或错误，使缺陷无法定位甚至被误导：① 日志与维测信息不打印、打印时机错误（编译/执行结束才输出）、内容缺字段或拼写错误；② dump 类调试产物（`--dump_cce` 的 `kernel_meta`、tiling/日志开关）为空或路径错误；③ **错误码/报错信息不规范**（**v2.13 拆显为两个可独立判定的子面**）：**③-a 跨仓/跨接口不一致**——同一非法输入在不同仓/不同接口返回不同错误码；**③-b 错误码选择错误**——拦截**确实存在**但所选错误码与场景不匹配，典型为 `ACLNN_ERR_PARAM_INVALID`(161002) / `ACLNN_ERR_PARAM_NULLPTR`(161001) / `ACLNN_ERR_INNER_*` 三者混用（如 layout/dtype 不匹配误报为 PARAM_INVALID、空输入误报为 INVALID 而非 NULLPTR）；两子面之外另含缺少上下文（算子名/参数名/实际值）；④ 异常被静默吞掉（日志级别过低、错误分支直接 `return` 未上报）；⑤ **日志级别误用（反向问题）**——**设计内的正常降级/可预期分支被按 error 级别上报**，制造大量误报 error 日志与虚假监控告警，反而**掩盖真实故障**（与 ④ 方向相反：④ 是该报不报，⑤ 是不该报却报，二者共同后果都是真实故障被淹没）。根因多为模板/复制导致的维测宏漏插、错误分支未上报、**降级分支的日志级别未与「是否 fatal」对齐**、跨仓错误码约定未统一。",
+      "source_quote_line": 7,
+      "source_sha256": "3b6b154a45a46ca012dbbdfa2af3a14c9f43faa9876228ed70081c0b61838cfe",
+      "source_card_name": "维测与错误上报缺陷（含跨仓错误码不一致）",
+      "applicability": {
+        "repos": [
+          "All"
+        ],
+        "sides": [
+          "Tiling",
+          "Kernel",
+          "Host"
+        ],
+        "carriers": [
+          "Tiling源码",
+          "Kernel源码",
+          "Host源码"
+        ],
+        "trigger": "OP_LOGE|ACLNN_ERR",
+        "enabled": true
+      },
+      "applicability_source_quote": "- **适用**：仓 All ｜ 侧别 Tiling,Kernel,Host ｜ 载体 Tiling源码,Kernel源码,Host源码 ｜ 触发 OP_LOGE|ACLNN_ERR ｜ 默认启用 true",
+      "related_pattern_ids": [
+        "FP-B04",
+        "FP-B05",
+        "FP-B01",
+        "FP-E01",
+        "FP-A20",
+        "FP-B08"
+      ],
+      "boundary_source_quotes": [
+        "- **关联**：[FP-B04](../FP-B/FP-B04.md)（空指针校验缺失——常与\"未上报\"伴生）、[FP-B05](../FP-B/FP-B05.md)（校验覆盖度参差——同源，均为范差不齐）、[FP-B01](../FP-B/FP-B01.md)（误拦截时错误信息质量决定排查成本）、[FP-E01](../FP-E/FP-E01.md)（测试只断言 rc 不校验错误信息会导致此类漏检）、[FP-A20](../FP-A/FP-A20.md)（确定性等级未分级标注，亦属「信息未暴露给使用者」的可观测性问题；**#1660 同时是 A20 的实证**——确定性接口异常返回值的语义未与调用方对齐，致调用方把可预期降级当 fatal）；[FP-B08](../FP-B/FP-B08.md)（属性/配置读取失败后**静默降级 return false** 且以 `OP_LOGE` 上报，与本型子型 ⑤ 同属「降级路径日志级别与 fatal 语义不对齐」）。**子型 ④ 与子型 ⑤ 构成完整对称面：④ 该报不报（静默吞掉）→ 故障无痕；⑤ 不该报却报（误报 error）→ 故障被淹没。**。"
+      ],
+      "test_design": {
+        "axes": [
+          "contract",
+          "doc"
+        ],
+        "oracle": [
+          "log-field",
+          "error-code"
+        ],
+        "signal": "error-code",
+        "lines": [
+          "error-scenario"
+        ],
+        "min_cases": 3,
+        "constructor": "负向用例断言「返回码 + 错误信息关键字段」；跨仓同源算子同一非法输入的返回码对照矩阵；配置 dump/日志开关后检查产物非空；正常用例统计 error 日志条数基线。",
+        "judge": "错误码与错误类别匹配（161001 / 161002 / INNER_* 不混用）；日志文案合规且含上下文；降级路径不出 error 级日志。",
+        "kill": "若错误分支不上报或上报为非 fatal 级别，则同因不同码，或可预期降级路径出现 error 级日志（误报）。",
+        "sourced": {
+          "constructor": "测试拦截建议",
+          "judge": "源码审查映射点",
+          "kill": "源码审查映射点"
+        }
+      },
+      "subtype_ids": [
+        "F02-1",
+        "F02-2",
+        "F02-3",
+        "F02-4",
+        "F02-5"
+      ],
+      "evidence_status": "SOURCE_LIBRARY_DECLARATION_NOT_INDEPENDENT_CASE_OR_DEVICE_VERIFICATION",
+      "evidence_source_notes": "卡内issue/PR和实测均为原库叙述；本轮未复抓外部正文、未扫描算子实现、未设备复现。"
+    },
+    {
+      "id": "FP-F03",
+      "name": "文档/声明面与实现面不一致",
+      "category": "engineering",
+      "coverage": "文档/声明面与实现面不一致；兄弟算子复制创建、新平台（如 ascend950）接入后文档未同步、产品矩阵人工维护滞后于注册代码变更。",
+      "relation_focus": "同范围接口声明应与注册和实际行为对账",
+      "object_focus": "接口md/README/Proto/OpDef/上限",
+      "time_focus": "发布/支持演化/接入",
+      "consumer_focus": "用户/图构建/测试",
+      "boundary": "算子README不能替接口支持；缺披露和显式矛盾分开，保留合法回退豁免",
+      "analysis_kind": [
+        "ENGINEERING_PROCESS",
+        "CONTRACT"
+      ],
+      "source_file": "patterns/FP-F/FP-F03.md",
+      "source_quote": "- **故障机理**：README/产品支持矩阵/确定性声明/参数约束等**声明面**与代码实际（`AddConfig` 注册面、kernel 行为面、公式与 dtype 定义）脱节，误导用户接入与测试判定：① 支持矩阵声明支持某产品而 def 仅注册单一 soc（或反向，开源仓无对应 kernel）；② 确定性描述与代码实际行为不符（声明支持开关实际不支持、声明非确定实际确定）；③ 文档整体复制自兄弟算子，公式/dtype/Op 名/链接全错；④ 脚本 help 文本声称的支持面与代码映射表矛盾；⑤ **Proto / IR 声明面与 OpDef / README 三方不一致**（v6.1 扩面）——Proto 端口的 dtype 集合用 `TensorType::NumberType()` / `RealNumberType()` 兜底，**宽于** OpDef 的 `DataType(dtypeList)` 与 README 支持表（#6892 SegmentSum 声明含 INT8 而实现只支持 7 种；#6790 BNLL；#6793/#6795/#6836 L2Loss/EluGrad/FusedBiasLeakyReluGrad 声明未实现的 DOUBLE），或**反向窄于**实现（#6791 DeformableOffsetsGrad Proto 拒绝已支持的 BF16 输出），或 Proto 注释里的公式/约束与同仓 infershape 不一致（#6870 AvgPool3D `ceil_mode` 公式重复使用 `in_width` 并遗漏 `pad_left`；#6314 文档把约束写成 `N1 > N2` 而实现只需 `N1 % N2 == 0`）；⑥ **可选/必选/属性归属标注与执行端不一致**（v6.13）——Proto 的 `OPTIONAL_INPUT` / `REQUIRED_ATTR` 与 README 参数表、ACLNN 文档、`CheckNotNull`/InferShape 实际要求三者不一致：把必填写成可选（调用方省略后必然失败）、把可选写成必填（合法缺省调用被拒）、把可选输入写成属性（构图侧直接找不到该字段）。**同一契约在 Proto / OpDef / README 三处各写一遍**是该型的结构性诱因。 **⑦ 数值上限「未披露」的口径争议（F03-7，v6.26）**——实现里有硬上限（`dim > 8` 报错、TensorList 长度 >256 拒绝、`headDim > 768` 拒绝、`padding > kernel/2` 拒绝），而文档的**维度列写 `-`、或全篇没有任何数值**。这是本型里**最容易争议、也最容易批量出单**的一类：它没有\"文档说 A、实现做 B\"的显式矛盾，只有\"实现有边界、文档不提\"的缺失，所以必须先按下表把\"算什么、不算什么\"钉死，否则同一份资料会被不同人判出相反结论。",
+      "source_quote_line": 7,
+      "source_sha256": "09ca536e3736318740032ede16f188e24f6f730025c46f7d8a127bcab68a708d",
+      "source_card_name": "文档/声明面与实现面不一致",
+      "applicability": {
+        "repos": [
+          "All"
+        ],
+        "sides": [
+          "All"
+        ],
+        "carriers": [
+          "文档与支持矩阵",
+          "IR与图配置"
+        ],
+        "trigger": "README|AddConfig|TensorType::(Real)?NumberType\\(\\)",
+        "enabled": true
+      },
+      "applicability_source_quote": "- **适用**：仓 All ｜ 侧别 All ｜ 载体 文档与支持矩阵,IR与图配置 ｜ 触发 README|AddConfig|TensorType::(Real)?NumberType\\(\\) ｜ 默认启用 true",
+      "related_pattern_ids": [
+        "FP-F01",
+        "FP-A20",
+        "FP-B01"
+      ],
+      "boundary_source_quotes": [
+        "- **关联**：[FP-F01](FP-F01.md)（支持声明 vs binary.json 产物面同源）、[FP-A20](../FP-A/FP-A20.md)（确定性等级未分级标注是「确定性声明」维度的特化）、[FP-B01](../FP-B/FP-B01.md)（声明面与校验面不一致的镜像：B01 是校验拦截声明外输入，本型是文档声明实现外能力）。"
+      ],
+      "test_design": {
+        "axes": [
+          "doc",
+          "dtype"
+        ],
+        "oracle": [
+          "error-code"
+        ],
+        "signal": "doc",
+        "lines": [
+          "static-absence"
+        ],
+        "min_cases": 3,
+        "constructor": "README 支持表 vs def 注册 静态门禁；Proto ↔ OpDef ↔ README 三方 dtype 一致性静态门禁。",
+        "judge": "三处 dtype 集合逐项一致；禁止 NumberType() / RealNumberType() 兜底（确需兜底须登记豁免理由）。",
+        "kill": "若 Proto 用 NumberType 兜底或 README 与 AddConfig 差集非空，则资料声明支持的 dtype 实际被拒。",
+        "sourced": {
+          "constructor": "测试拦截建议",
+          "judge": "测试拦截建议",
+          "kill": "源码审查映射点"
+        }
+      },
+      "subtype_ids": [
+        "F03-1",
+        "F03-2",
+        "F03-3",
+        "F03-4",
+        "F03-5",
+        "F03-6",
+        "F03-7",
+        "F03-8"
+      ],
+      "evidence_status": "SOURCE_LIBRARY_DECLARATION_NOT_INDEPENDENT_CASE_OR_DEVICE_VERIFICATION",
+      "evidence_source_notes": "卡内issue/PR和实测均为原库叙述；本轮未复抓外部正文、未扫描算子实现、未设备复现。"
+    },
+    {
+      "id": "FP-F04",
+      "name": "算子接口交付面缺失（符号未导出/原型未注册/未纳入商分）",
+      "category": "engineering",
+      "coverage": "算子接口交付面缺失（符号未导出/原型未注册/未纳入商分）；新增算子或新增接口后未同步更新导出符号表 / 公开名注册 / `binary.json` / apt 派发表；算子跨版本复用且上游新增 tilingkey；**选择性打包**（sanitizer、商分裁剪、形态裁剪）；跨 toolkit 版本发布；框架侧适配层（torch_npu）未同步算子清单；**接口从内部 dev 仓向开源仓同步时遗漏**、文档「跳转源码」链接未随仓迁移更新（v2.16 增补）。",
+      "relation_focus": "实现接口应在声明交付形态可解析注册调用",
+      "object_focus": "so符号/op名/派发表/商分/源码链接",
+      "time_focus": "打包/加载/注册/发布",
+      "consumer_focus": "dlsym/torch.ops/用户",
+      "boundary": "B03漏防御、本型漏接口；F01配置一致性为另一面",
+      "analysis_kind": [
+        "ENGINEERING_PROCESS",
+        "CONTRACT"
+      ],
+      "source_file": "patterns/FP-F/FP-F04.md",
+      "source_quote": "- **故障机理**：算子的**实现已经完成**，但在「把接口交付到用户手里」的清单上漏项，使接口在用户侧不可用、或被**静默降级**。五种独立成因：① **`.so` 符号未导出**——`libopapi.so` / `liboptiling.so` 中缺少 aclnn 接口或 typeinfo 符号，框架侧 `dlsym` 返回 `nullptr`；② **公开算子名未注册**——PTA / 框架侧公开名（如 `cann_ops_transformer::compressor`）未注册，`torch.ops.<ns>.<op>` 不可用；③ **派发表未同步注册**——算子跨版本复用兄弟实现（v4 复用 v3 的 tiling/kernel）时，上游新增的 tilingkey 未同步适配，走到该模板即报「未注册 tilingkey」；④ **适配层注册缺失致静默降级**——算子未在 torch_npu 注册，dynamo 时**静默 fall back 到 CPU**（不报错，仅性能与行为变化）；⑤ **商分清单未合入**——代码已进社区主干但未进商业发行分支，表现为能力缺失或用例挂死；⑥ **接口/源码未同步至开源仓、文档跳转缺失（发布面遗漏，v2.16 增补）**——接口本体只存在于内部 dev 仓、未随发布同步到开源仓，或资料中的「跳转源码」链接指向不存在的路径，用户按文档接入时找不到实现。**与 FP-B03 的边界**：B03 是「迁移时把**防御代码**漏掉」（机理 = 防御逻辑漏迁），本成因是「**接口本体**没迁、或跳转没配」（机理 = 交付清单漏项），二者不同源。**共同特征：交付面缺失，而构建 / 调用链不报错、或只打 `ERROR` 日志仍返回成功。**",
+      "source_quote_line": 7,
+      "source_sha256": "b6c21fb83056e560702544816f48c4379ce97f3357c4ffe4752cbc9e8ca68934",
+      "source_card_name": "算子接口交付面缺失（符号未导出 / 原型未注册 / 未纳入商分）",
+      "applicability": {
+        "repos": [
+          "All"
+        ],
+        "sides": [
+          "All"
+        ],
+        "carriers": [
+          "构建配置与日志",
+          "aclnn源码",
+          "IR与图配置"
+        ],
+        "trigger": "undefined symbol|dlsym|AddConfig",
+        "enabled": true
+      },
+      "applicability_source_quote": "- **适用**：仓 All ｜ 侧别 All ｜ 载体 构建配置与日志,aclnn源码,IR与图配置 ｜ 触发 undefined symbol|dlsym|AddConfig ｜ 默认启用 true",
+      "related_pattern_ids": [
+        "FP-F01",
+        "FP-F03",
+        "FP-B01",
+        "FP-G01",
+        "FP-B10"
+      ],
+      "boundary_source_quotes": [
+        "- **关联**：[FP-F01](FP-F01.md)（**边界**：F01 是配置**不一致**致编译/链接失败或产物静默跳过；本条是交付面**清单缺失**致接口不可用。两者缺口方向相反、可共用同一套 def × binary.json 门禁）、[FP-F03](FP-F03.md)（文档声明支持而接口实际不可用属两型复合）、[FP-B01](../FP-B/FP-B01.md)（校验过严误拦截的镜像：本条是接口根本没走到校验层）、[FP-G01](../FP-G/FP-G01.md)（#5337 商分未合入直接表现为用例挂死）、[FP-B10](../FP-B/FP-B10.md)（HCCL 侧的注册/导出类问题同源）。"
+      ],
+      "test_design": {
+        "axes": [
+          "contract",
+          "doc"
+        ],
+        "oracle": [
+          "symbol-resolve"
+        ],
+        "signal": "symbol",
+        "lines": [
+          "static-absence"
+        ],
+        "min_cases": 3,
+        "constructor": "构建门禁解析日志而非退出码（正则 undefined symbol / lib*.so 加载失败）；每个 aclnn 接口跑 dlsym；torch.ops.<ns>.<op> 可访问且在 torch._dynamo 下不回退。",
+        "judge": "符号可解析；框架侧注册可访问且不回退 CPU；export 符号表与接口清单双向差集为空。",
+        "kill": "若 .so 符号未导出或算子名未注册，则退出码 0 + Built target，但 dlsym 失败或 torch.ops 不可用。",
+        "sourced": {
+          "constructor": "测试拦截建议",
+          "judge": "源码审查映射点",
+          "kill": "典型表现"
+        }
+      },
+      "subtype_ids": [
+        "F04-1",
+        "F04-2",
+        "F04-3",
+        "F04-4",
+        "F04-5",
+        "F04-6"
+      ],
+      "evidence_status": "SOURCE_LIBRARY_DECLARATION_NOT_INDEPENDENT_CASE_OR_DEVICE_VERIFICATION",
+      "evidence_source_notes": "卡内issue/PR和实测均为原库叙述；本轮未复抓外部正文、未扫描算子实现、未设备复现。"
+    },
+    {
+      "id": "FP-G01",
+      "name": "执行挂死与调度超时（死循环/回绕长循环/通信等待/kernel 超时）",
+      "category": "reliability",
+      "coverage": "执行挂死与调度超时（死循环/回绕长循环/通信等待/kernel 超时）；host tiling / infershape 中的迭代求解循环（`while(true)` / `for(;;)`）遇到异常输入或异常中间状态；整数下溢 / 回绕值被用作循环上界；rank-0、空 tensor、退化 shape；分核 / 切分参数使循环不收敛；设备侧大 shape 或异常模板致 kernel 长时占用；超时值配置超过 `uint32_t`；长期高频调用累积资源泄漏；**测试框架缺单用例超时熔断**（卡死会一直等下去）。",
+      "relation_focus": "循环等待资源消耗须有推进完成或超时",
+      "object_focus": "推进量/超时配置/通信参与者/资源",
+      "time_focus": "host求解/等待/kernel/长稳",
+      "consumer_focus": "调度/watchdog/请求方",
+      "boundary": "C01慢但完成，G02依赖根因另判；本型为完成性家族非统一精度机理",
+      "analysis_kind": [
+        "RELIABILITY",
+        "MECHANISM"
+      ],
+      "source_file": "patterns/FP-G/FP-G01.md",
+      "source_quote": "- **故障机理**：任务**无法完成**——进程存活但永不返回，或被超时强制中断。五种独立成因（编号与五子型一一对应）：① **迭代求解循环不推进**——host tiling 的 `while(true)` 迭代求解在异常分支下不更新推进变量（如 `updateDivRect` 未置位）且无「不推进即退出」防护，CPU 空转死循环；② **集合通信与流同步等待超时**——多卡训练 `rank_table` 配置无误仍随机出现初始化连接超时、个别 rank 掉线，等待时长由 `HCCL_CONNECT_TIMEOUT` / `HCCL_EXEC_TIMEOUT` / `HCCL_RETRY_CNT` / `HCCL_DFS_CONFIG` 等超时与重传配置项决定，配置缺失或换算错误致等待无界/超时；③ **循环上界由回绕值得出**——rank-0 / 空输入经 `size_t` 下溢回绕成 `SIZE_MAX`，后续按该上限循环，Host 线程长时间不返回；④ **设备侧算子执行超时**——kernel 长时间不返回，报 `vector core execution timed out` 并升级为 `aic error`；⑤ **资源泄漏累积**——内存申请-释放不成对，长期调用致设备内存耗尽，把正常算子推向挂死/闪退。另有**横切成因（独立于①~⑤、不单独成子型）：超时机制自身错误/死代码**——超时判定代码的溢出检查是**死代码**（`double` 先截断为 `u32` 后，`u32` 不可能大于 `UINT32_MAX`），大超时值被截断反而**误超时**，横切于②④（通信等待与设备超时）的超时判定面。**共性：缺陷不是「算错了」，而是「永远算不完」；且在没有单用例超时熔断的框架里表现为卡死而非失败，掩盖真实失败点。**",
+      "source_quote_line": 7,
+      "source_sha256": "e5007c995800e880bac037e10f3ae058329389e0634b823b7b66dc7341364df9",
+      "source_card_name": "执行挂死与调度超时（死循环 / 回绕长循环 / 通信等待 / kernel 超时）",
+      "applicability": {
+        "repos": [
+          "All"
+        ],
+        "sides": [
+          "Tiling",
+          "Kernel"
+        ],
+        "carriers": [
+          "Tiling源码",
+          "Kernel源码"
+        ],
+        "trigger": "必须触发",
+        "enabled": true
+      },
+      "applicability_source_quote": "- **适用**：仓 All ｜ 侧别 Tiling,Kernel ｜ 载体 Tiling源码,Kernel源码 ｜ 触发 必须触发 ｜ 默认启用 true",
+      "related_pattern_ids": [
+        "FP-C01",
+        "FP-B10",
+        "FP-B07",
+        "FP-B06",
+        "FP-D01",
+        "FP-F04",
+        "FP-E01"
+      ],
+      "boundary_source_quotes": [
+        "- **测试拦截建议**：① **单用例超时熔断（最高优先级）**——CI 对每个用例设硬超时（如 10 分钟），超时**转失败**并 dump 堆栈；否则卡死只表现为「任务不动」，是全库最贵的排查成本来源；② **断言「不返回」而不仅断言精度**——挂死类缺陷根本走不到数值比较步，现有精度用例天然漏检；③ **UT 执行顺序随机化**——顺序依赖造成的单例污染只有固定顺序才会被掩盖；④ **fixture 强制重置全局单例**并在每个 tiling 用例显式 `SetSocVersion`，禁止依赖前序用例状态；⑤ **边界输入探针**——rank-0 / 空 tensor / 退化 shape 单独成类（覆盖下溢与回绕路径）；⑥ 对迭代求解循环加**静态门禁**（循环体内必须有推进语句与不推进退出）；⑦ **超时配置边界**（超过 2^32 微秒、负值）与**长稳看护**（设备内存持续上涨即告警）。",
+        "- **关联**：[FP-C01](../FP-C/FP-C01.md)（**最易混淆项**：C01 是「慢但能完成」，本条是「根本没完成」；耗时呈非整数倍阶跃是 C01 的特征，**日志完全无进展**是本条的特征）、[FP-B10](../FP-B/FP-B10.md)（**边界约定**：集合通信的等待超时归本条子型 ②，功能/精度/兼容面归 B10）、[FP-B07](../FP-B/FP-B07.md)（越界也会致异常终止，但本条的特征是「不终止」）、[FP-B06](../FP-B/FP-B06.md)（空/0 元素输入是回绕路径的高发形态）、[FP-D01](../FP-D/FP-D01.md)（资源泄漏致内存耗尽，D01 管容量、本条管后果）、[FP-F04](../FP-F/FP-F04.md)（#4967 构建静默成功与本条同属「退出码不可信」家族：一个是不报错地失败、一个是不返回地卡住）、[FP-E01](../FP-E/FP-E01.md)（golden/UT 只断言数值时天然漏检本型）。"
+      ],
+      "test_design": {
+        "axes": [
+          "shape",
+          "concurrency"
+        ],
+        "oracle": [
+          "watchdog"
+        ],
+        "signal": "hang",
+        "lines": [
+          "error-scenario",
+          "multithread-fuzz"
+        ],
+        "min_cases": 3,
+        "constructor": "单用例硬超时（如 10 分钟）转失败并 dump 堆栈；UT 执行顺序随机化；边界输入探针 rank-0 / 空 tensor / 退化 shape 单独成类；超时配置边界（>2^32 微秒、负值）。",
+        "judge": "单用例在硬超时内返回；超时转失败而非挂起（断言「不返回」而不仅断言精度）。",
+        "kill": "若循环推进变量缺失或上界回绕，则用例不返回直至硬超时，而精度比对根本走不到。",
+        "sourced": {
+          "constructor": "测试拦截建议",
+          "judge": "测试拦截建议",
+          "kill": "源码审查映射点"
+        }
+      },
+      "subtype_ids": [
+        "G01-1",
+        "G01-2",
+        "G01-3",
+        "G01-4",
+        "G01-5"
+      ],
+      "evidence_status": "SOURCE_LIBRARY_DECLARATION_NOT_INDEPENDENT_CASE_OR_DEVICE_VERIFICATION",
+      "evidence_source_notes": "卡内issue/PR和实测均为原库叙述；本轮未复抓外部正文、未扫描算子实现、未设备复现。"
+    },
+    {
+      "id": "FP-G02",
+      "name": "核间/流水同步缺失或配对不完整（SetFlag/WaitFlag 未配平 / 流水同步遗漏 / 事件 ID 冲突 / 跨核覆盖不全）",
+      "category": "reliability",
+      "coverage": "核间/流水同步缺失或配对不完整（SetFlag/WaitFlag 未配平 / 流水同步遗漏 / 事件 ID 冲突 / 跨核覆盖不全）；手写同步的 kernel（`SetFlag` / `WaitFlag` / `PipeBarrier` / `CrossCore*` 出现在源码中）；双缓冲 / 流水复用**固定 UB / L1 / GM buffer**；同一物理核的**双 AIV 并行**（Ascend950 / arch35，`__NPU_ARCH__ == 3510`）；多核共享同一 workspace 或同一 GM 地址；事件 ID 池有限（`AllocEventID<HardEvent::MTE2_V>` 仅 8 个）且循环内反复申请；同步对落在**条件分支**（如 `!pseInfo.pseEndogenous`）内致另一分支缺失；host 侧 `SyncAll` 依赖核同时驻留却未设 `schedule_mode`；同一 pipe 对同一地址的两次访问之间只放了**产出方** flag（如 `MTE2→V`）而无**等待方**反向同步；开启确定性计算（dw 切 k）后 cube 空转而 set 过快。",
+      "relation_focus": "同址读写须满足等待方需要的先后关系",
+      "object_focus": "buffer/Set-Wait/事件ID/流水/核",
+      "time_focus": "写搬读/复用/分配释放事件",
+      "consumer_focus": "等待方流水/kernel/核/host调度",
+      "boundary": "A06确定性承诺、A05脏数据、G01超时后果分开；未激活racecheck零告警非阴性",
+      "analysis_kind": [
+        "RELIABILITY",
+        "MECHANISM"
+      ],
+      "source_file": "patterns/FP-G/FP-G02.md",
+      "source_quote": "- **故障机理**：缺陷不是「算错了」，而是**「没按序」**——同一块 buffer / 地址上的生产者与消费者之间，缺少一条**以等待方为视角**的同步边，导致「读先于写」或「写覆盖了尚未被读的数据」。它属于**遗漏型缺陷**：出错的代码行本身语法正确、单看无异常，只有把「生产者—消费者」当成一对一起看才暴露，因此常规逐行审查与静态扫描（扫「错误行」）天然漏检。五种独立成因（编号与五子型一一对应）：① **同步原语配对失衡/不完整**——`SetFlag`/`WaitFlag` 次数不配平（只 set 不 wait、wait 个数多于 set、发起侧与等待侧计数不一致），或同步对被放在错误语句之后（先搬运后置同步），导致某方**永久等待**或搬运先于计算执行；② **跨流水同步遗漏或用错同步边**——`PipeBarrier<PIPE_X>` 只保证**同一管线内部**顺序，跨管线（V→MTE2 / V→MTE3 / MTE3→S / S→MTE3 / MTE2→V 等）必须用 `SetFlag/WaitFlag<HardEvent::…>` 显式事件同步；只写同管线 barrier、或用错方向的事件（如用 `SToMTE3Sync` 去护 V→MTE3），覆盖不到真实依赖；③ **事件 ID / flagId 冲突、越界、泄漏**——两个不同事件常量共用同一 ID（如 `FIX_MTE2_EVENT` 与 `S_MTE3_EVENT` 同为 `6`）、`id % N` 取模而 buffer 数 > N 致 ID 重复、循环内 `AllocEventID` 申请后从不 `ReleaseEventID` 致事件池（`MTE2_V` 仅 8 个）耗尽、缺失同步引发行为回退；④ **跨核同步覆盖不全**——`CrossCoreSetFlag/CrossCoreWaitFlag` 的 mode+flagId 映射只让等待方感知到**部分**核（如双 AIV 只覆盖 AIV0），另一核的写未被等待方感知，构成核间 RAW/WAW；⑤ **同步与调度约束缺失**——kernel 用 `SyncAll` 合并各核结果，但 host 侧未 `SetScheduleMode(1)`，无法保证所有参与核**同时驻留**，`SyncAll` 语义失效致卡死。**共性：单看每一行都「没错」，错在两条指令之间的**依赖顺序**；且这类缺陷**时隐时现**——双 AIV 冗余写结果逐字节一致时 `VerifyResult` 照样通过、新进程首次调用才触发、批跑轮换复现，使「偶现精度失败/偶发卡死」长期无解。**",
+      "source_quote_line": 7,
+      "source_sha256": "b3743b1e6b73d337312dc28c6a43746863d2723d1305706fcd17f5dff7923af5",
+      "source_card_name": "核间/流水同步缺失或配对不完整（SetFlag/WaitFlag 未配平 / 流水同步遗漏 / 事件 ID 冲突 / 跨核覆盖不全）",
+      "applicability": {
+        "repos": [
+          "All"
+        ],
+        "sides": [
+          "Kernel",
+          "Host",
+          "Tiling"
+        ],
+        "carriers": [
+          "Kernel源码",
+          "Host源码",
+          "Tiling源码"
+        ],
+        "trigger": "必须触发",
+        "enabled": true
+      },
+      "applicability_source_quote": "- **适用**：仓 All ｜ 侧别 Kernel,Host,Tiling ｜ 载体 Kernel源码,Host源码,Tiling源码 ｜ 触发 必须触发 ｜ 默认启用 true",
+      "related_pattern_ids": [
+        "FP-G01",
+        "FP-A06",
+        "FP-A05",
+        "FP-A04",
+        "FP-C05",
+        "FP-B10"
+      ],
+      "boundary_source_quotes": [
+        "- **关联**：[FP-G01](../FP-G/FP-G01.md)（**最易混淆项**：G01 是 host / 集群级「死循环 / 通信等待超时 / 设备侧超时」，本条是 **kernel 级同步原语**缺失；两者都致挂死，但 G01 的指纹是「无退出条件循环 / 超时配置」，本条的指纹是「`set`/`wait` 不配平、racecheck `WAW`/`RAW`」）、[FP-A06](../FP-A/FP-A06.md)（**边界**：A06 是确定性开关语义下的结果不固定，本条是**并发序竞争**致不固定——先在 racecheck 上找 `WAW`/`RAW` 证据再落本条）、[FP-A05](../FP-A/FP-A05.md)（缺同步致「写覆盖尚未被读的数据」在现象上极似脏数据 / 数据踩踏；A05 管脏数据来源，本条管数据依赖顺序）、[FP-A04](../FP-A/FP-A04.md)（本条后果常表现为「功能问题演变为精度静默故障」，A04 是后果面、本条是机理面）、[FP-C05](../FP-C/FP-C05.md)（关闭自动同步的性能优化是本条高发诱因）、[FP-B10](../FP-B/FP-B10.md)（**跨卡边界**：集合通信 kernel 内的 AIV 间同步归本条子型 ④，通信的功能 / 精度 / 兼容面归 B10）。"
+      ],
+      "test_design": {
+        "axes": [
+          "concurrency",
+          "sequence",
+          "memory"
+        ],
+        "oracle": [
+          "sanitizer-racecheck",
+          "bitwise"
+        ],
+        "signal": "concurrency",
+        "lines": [
+          "memory",
+          "multithread-fuzz",
+          "determinism"
+        ],
+        "min_cases": 4,
+        "constructor": "mssanitizer racecheck 零告警门禁；同步原语 set/wait 配平静态统计；事件 ID 池审计（Alloc/Release 成对、申请不在循环体内、常量互异）；双 AIV/多核共享 workspace 单独成类；批跑轮换 + 新进程首调。",
+        "judge": "racecheck 零告警；set/wait 次数与分支都配平；AllocEventID 与 ReleaseEventID 成对且 ID 两两互异。",
+        "kill": "若 SetFlag/WaitFlag 未配平或跨核覆盖不全，则 racecheck 报 WAW/RAW，或批跑轮换下偶现结果错而单跑首次通过。",
+        "sourced": {
+          "constructor": "测试拦截建议",
+          "judge": "测试拦截建议",
+          "kill": "源码审查映射点"
+        }
+      },
+      "subtype_ids": [
+        "G02-1",
+        "G02-2",
+        "G02-3",
+        "G02-4",
+        "G02-5",
+        "G02-6"
+      ],
+      "evidence_status": "SOURCE_LIBRARY_DECLARATION_NOT_INDEPENDENT_CASE_OR_DEVICE_VERIFICATION",
+      "evidence_source_notes": "卡内issue/PR和实测均为原库叙述；本轮未复抓外部正文、未扫描算子实现、未设备复现。"
+    }
+  ],
+  "source_integrity": {
+    "index_sha256": "1191e249ad67d78769ac343c63588630ab08e9ffd626254fd7a94dce4095edea",
+    "card_sha256": {
+      "patterns/FP-A/FP-A01.md": "a1d34e16776663b3919bac4fa798628f4a6b51d90af6e4ec786359434995aa23",
+      "patterns/FP-A/FP-A02.md": "ebb419bc3940e247bfcd1e4d4b10e7530a6d22249a603a631ab8c07813da4d8f",
+      "patterns/FP-A/FP-A03.md": "a71deb506ca7d08f8fa228d4c034e2ed66ac9ed8a8dd8a049c710328db5a2bf3",
+      "patterns/FP-A/FP-A04.md": "63afae646959e7e44d256b8918cc1a2c2a5c80a9185f3837f4cf02e3a2e8b8bc",
+      "patterns/FP-A/FP-A05.md": "352ba3b7b8b2c986cd5651b45da9cb6dd2bc3ff99b535e6731f29788ae811577",
+      "patterns/FP-A/FP-A06.md": "d3bcaffb79390d9ace5fe69a2259c2cee46da33d4d49e6ecda2a9e1f4d3187a1",
+      "patterns/FP-A/FP-A07.md": "ae58c0b48f24fc85b2fac9f7b99d6d2a0cafc046cc418899a05311992fc4ca5b",
+      "patterns/FP-A/FP-A08.md": "aef99318c796927d240c548e143c562cc23ab437184f99cb156dd3d973e204d1",
+      "patterns/FP-A/FP-A09.md": "0dab16a2d62467d3e828c786e797193f102009953be4b3bc19104b026b2ba734",
+      "patterns/FP-A/FP-A10.md": "be7ab48f12e4aafe7cb6a7ca79ecfcc2db07fce54b6f7ba233919ab65b5aead2",
+      "patterns/FP-A/FP-A11.md": "107d7c4c7da1e2034b9d06a17d14693e0ac448003eb75397d3975fa59c17bc0a",
+      "patterns/FP-A/FP-A12.md": "2a9b92f5bc8076b40c380742c40e3dd4efa6c694a88fbe2c5be4f3fb9a5043f7",
+      "patterns/FP-A/FP-A13.md": "5e0444a3a1b2a9e0f97beaa6699085e699b8c0834aed8448caee85ee70cfa8e0",
+      "patterns/FP-A/FP-A14.md": "c1109543658fbadb264e0b2f1dc71a1e449d1c9abd5a37db4ec008db341da38a",
+      "patterns/FP-A/FP-A15.md": "1029ab816019def956d0755462326a423a0a7868ae4f5fd3f7b2f3266b256e49",
+      "patterns/FP-A/FP-A16.md": "afc2d76f74cb1a94d717ac1a53b487da13ce9c34694e613a36f58a99dc4ed6ba",
+      "patterns/FP-A/FP-A17.md": "9edeb51a8737c11a33c848be00d7a1d125bdc670ae32d1faa568b44b02e74df7",
+      "patterns/FP-A/FP-A18.md": "fbe406c02189e70644d42cd37c7ff08fba8ba9d01dbe2df1d68025bdd43b3816",
+      "patterns/FP-A/FP-A19.md": "2f65ba9a1f1db7535ef9569d1a6912784db30118c5d7cae8079575c67b19c03f",
+      "patterns/FP-A/FP-A20.md": "db33748bdf93a51bb71dd0aa891dfd85766f88fa16437f4a9325f70cad0957c1",
+      "patterns/FP-A/FP-A21.md": "4f80345a86562d8e81f05784e3af5b9fb256561590f3e8ea5f1e6b67031f90e1",
+      "patterns/FP-A/FP-A22.md": "b7cb237c325ef3697808be4ad0323d3e513ef60f34a98a46155d93bb4e4183ff",
+      "patterns/FP-B/FP-B01.md": "c21763232bc3f81f8599fe685d0d33481114ddd63e7dd751565fa132a00247f8",
+      "patterns/FP-B/FP-B02.md": "29b9219e3b69c8c1911f33c5560a79a7308e1b604da71019511d654c6af9cb66",
+      "patterns/FP-B/FP-B03.md": "55d5d19e1db5ff4fbfe5c2162a2eb2345b1898c784b3142d59726285b055d2c1",
+      "patterns/FP-B/FP-B04.md": "e7d39d2b0a4e18a8ca5b873f51af890e1b6fd9ecc6829ada141122275f6bae58",
+      "patterns/FP-B/FP-B05.md": "8869b41f994bb7e52f18508f0d4aee2ee0716a88876dbdec79fccfb231a3da9b",
+      "patterns/FP-B/FP-B06.md": "54de0378cd3353dbb8fa8c1714be942b7e7dde366e8d7bcdd098851dda4845a7",
+      "patterns/FP-B/FP-B07.md": "f89b07a1e539babb568296d5adf21c95c703308b26cadb88a11f205c17805576",
+      "patterns/FP-B/FP-B08.md": "20a73d8b9570b084f320daee6bcfa8d2bc6f9510af9001111bbac89505f34566",
+      "patterns/FP-B/FP-B09.md": "047718e29253376035e4683157be5c8e950ffa913bf481dc5b6f43c428fe113a",
+      "patterns/FP-B/FP-B10.md": "1f8560186ad33d66a490c37a318e912fe680e5b320d00aff42167be17e23a5da",
+      "patterns/FP-B/FP-B11.md": "d544499399884fa5b447a88a846394812f25032a8c8ffd1a050352eeefc12c52",
+      "patterns/FP-B/FP-B12.md": "6a7d56c77284704984e491dcbe14523c4fa1f53a1ce0922be424805e1d17b8db",
+      "patterns/FP-B/FP-B13.md": "4d29e4cca80428c76502c5af01d37436645a6ea70a5cd1a454236d4c1ea4f39a",
+      "patterns/FP-B/FP-B14.md": "3c140e4a167558eb55196a3d94c30d8883f652365e76b291b54c9cb5e8c225ab",
+      "patterns/FP-B/FP-B15.md": "590615e1931b74d9a284dfdbb8ef8015b180a6b68a5e4221108479e917bbde64",
+      "patterns/FP-C/FP-C01.md": "7abb6aa6522a933fd0a0366a81a90d19a948b9b251bd93c9884ccd7d8958d3ac",
+      "patterns/FP-C/FP-C02.md": "c30f243777e112f03da68ab6c8831601ada1960d31590bf7b01fc8e67439c366",
+      "patterns/FP-C/FP-C03.md": "ec0916ec19771ce87acce05366253dafcfac944b226cf1e2396c5b993c40c3da",
+      "patterns/FP-C/FP-C04.md": "fb7f0884041b010599a64fe91ed078dc09c6f9f92498914daac773484bd7d7c8",
+      "patterns/FP-C/FP-C05.md": "bbcb25c9c5acaffa3b9d5f4bc211dabe86349550e6bb1d7b6cff5af6f6537a1f",
+      "patterns/FP-C/FP-C06.md": "83adf2408172a12525f25c88894dfdd2ac35a194713dd9d2f3ba8173502113f8",
+      "patterns/FP-D/FP-D01.md": "58441f0f9d858c7f9f100bfc35626d775383c1a7bcaeeeaba6c248856be2617a",
+      "patterns/FP-D/FP-D02.md": "6a2f92417adafae79508128c87cba65d40e829fa11bf0cf49c8ddf84648db84c",
+      "patterns/FP-E/FP-E01.md": "ef18808fb7af62a8f9359afc1f2d8bc766cc187e7c734fb2cf98245e82314908",
+      "patterns/FP-E/FP-E02.md": "a697f0a136db7cc29f4a63cc359aece08330a2837c893447fab80cbdfdda0d4e",
+      "patterns/FP-F/FP-F01.md": "bccfe0a016000898c5cc52be84cd6d1467a08523d4393d55ce4afb2479146ee6",
+      "patterns/FP-F/FP-F02.md": "3b6b154a45a46ca012dbbdfa2af3a14c9f43faa9876228ed70081c0b61838cfe",
+      "patterns/FP-F/FP-F03.md": "09ca536e3736318740032ede16f188e24f6f730025c46f7d8a127bcab68a708d",
+      "patterns/FP-F/FP-F04.md": "b6c21fb83056e560702544816f48c4379ce97f3357c4ffe4752cbc9e8ca68934",
+      "patterns/FP-G/FP-G01.md": "e5007c995800e880bac037e10f3ae058329389e0634b823b7b66dc7341364df9",
+      "patterns/FP-G/FP-G02.md": "b3743b1e6b73d337312dc28c6a43746863d2723d1305706fcd17f5dff7923af5"
+    },
+    "discipline_files": {
+      "AGENTS.md": "554461ac586c876fb83f4550c392eed66bf0274bb95f290abc5ae39c308e6971",
+      "INVARIANTS.md": "b7aba39222e7c99b9aee9b9cf1e180ebf6451b2bd8055cd81134cfd3f304cd94",
+      "EVIDENCE_DISCIPLINE.md": "1cbd6236eab1715380b262692dd1ac1731ed711a8366379f620caf6d65abcb1f",
+      "fault_patterns_secondary_oracle.json": "f43432e58de8502b2539dda6699f542e9e9135f5a490dded3e120991c497747d"
+    },
+    "quote_validation": "Exact whole mechanism line; one-based source_quote_line.",
+    "source_files_read_only": true
+  }
+}

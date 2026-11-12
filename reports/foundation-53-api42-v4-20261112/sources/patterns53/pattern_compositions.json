@@ -1,0 +1,76 @@
+{
+  "schema": "ascend-op-fault-patterns/compositions@1",
+  "version": "1.0",
+  "compositions": [
+    {
+      "id": "COMP-A05-A21",
+      "members": ["FP-A05", "FP-A21"],
+      "rationale": "跨调用 tiling 状态残留可能把上一次调用的长度或偏移带到下一次调用，单独检查脏数据或全局状态都不足以区分；需要在同一 executor 上换 shape 重放并用毒化 workspace 观察陈旧读写。",
+      "next_experiment": {
+        "schema_version": "deep-experiment/v1",
+        "experiment_id": "EXP-COMP-A05-A21",
+        "operation": "aclnn:<operator>",
+        "initial_state": {"executor": "fresh", "workspace": "uninitialized", "stream": "s0"},
+        "actions": [
+          {"id": "size", "type": "GetWorkspaceSize", "executor_ref": "e0"},
+          {"id": "poison", "type": "PoisonWorkspace", "workspace_ref": "w0", "value": 165},
+          {"id": "reuse", "type": "ReuseExecutor", "executor_ref": "e0"},
+          {"id": "execute-a", "type": "Execute", "executor_ref": "e0", "case_ref": "shape-a", "output_ref": "out-a"},
+          {"id": "execute-b", "type": "Execute", "executor_ref": "e0", "case_ref": "shape-b", "output_ref": "out-b"},
+          {"id": "free", "type": "Free", "workspace_ref": "w0", "executor_ref": "e0"}
+        ],
+        "schedule": {"mode": "serial", "sequence": ["shape-a", "shape-b", "shape-a"]},
+        "observations": ["比较两次 shape-a 输出及 out-b 的哨兵残留，区分状态污染与独立脏写"],
+        "oracle": {"type": "golden-canary", "expect": "同 shape 同输入结果一致，且输出边界外哨兵不变"},
+        "provenance": {"source": "COMP-A05-A21", "coverage_state": "designed"}
+      }
+    },
+    {
+      "id": "COMP-A06-G02",
+      "members": ["FP-A06", "FP-G02"],
+      "rationale": "事件或流水同步缺失可表现为跨流执行时序变化，进而造成同输入位模式不稳定；仅重复执行或仅数同步原语都无法建立二者的因果关系，必须跨流重放并同时保留 bitwise 与 race 观测。",
+      "next_experiment": {
+        "schema_version": "deep-experiment/v1",
+        "experiment_id": "EXP-COMP-A06-G02",
+        "operation": "aclnn:<operator>",
+        "initial_state": {"executor": "fresh", "workspace": "allocated", "stream": "s0"},
+        "actions": [
+          {"id": "size", "type": "GetWorkspaceSize", "executor_ref": "e0"},
+          {"id": "reuse", "type": "ReuseWorkspace", "workspace_ref": "w0"},
+          {"id": "produce", "type": "Execute", "executor_ref": "e0", "stream_ref": "s0", "output_ref": "out-0"},
+          {"id": "record", "type": "RecordEvent", "event_ref": "ev0", "stream_ref": "s0"},
+          {"id": "switch", "type": "SwitchStream", "from_stream_ref": "s0", "stream_ref": "s1"},
+          {"id": "wait", "type": "WaitEvent", "event_ref": "ev0", "stream_ref": "s1"},
+          {"id": "consume", "type": "Execute", "executor_ref": "e0", "stream_ref": "s1", "output_ref": "out-1"},
+          {"id": "free", "type": "Free", "workspace_ref": "w0", "event_ref": "ev0"}
+        ],
+        "schedule": {"mode": "stream_interleave", "streams": ["s0", "s1"], "repeat": 3},
+        "observations": ["逐轮比较输出原始位模式，并保存 racecheck 对 ev0 与共享 workspace 的记录"],
+        "oracle": {"type": "bitwise+sanitizer-racecheck", "expect": "同步基线与跨流重放均逐位一致且无 WAW/RAW 告警"},
+        "provenance": {"source": "COMP-A06-G02", "coverage_state": "designed"}
+      }
+    },
+    {
+      "id": "COMP-B07-A05",
+      "members": ["FP-B07", "FP-A05"],
+      "rationale": "错误索引或偏移首先造成越界写，随后表现为相邻 tensor、workspace 或输出尾部被踩踏；只查整数偏移会漏掉可见后果，只查脏数据又难以定位源头，需将边界尺寸阶梯与哨兵取证放在同一实验。",
+      "next_experiment": {
+        "schema_version": "deep-experiment/v1",
+        "experiment_id": "EXP-COMP-B07-A05",
+        "operation": "aclnn:<operator>",
+        "initial_state": {"executor": "fresh", "workspace": "allocated", "stream": "s0"},
+        "actions": [
+          {"id": "size", "type": "GetWorkspaceSize", "executor_ref": "e0"},
+          {"id": "poison", "type": "PoisonWorkspace", "workspace_ref": "w0", "value": 165},
+          {"id": "reuse", "type": "ReuseWorkspace", "workspace_ref": "w0"},
+          {"id": "execute-boundary", "type": "Execute", "executor_ref": "e0", "case_ref": "boundary-index", "output_ref": "out-0"},
+          {"id": "free", "type": "Free", "workspace_ref": "w0", "executor_ref": "e0"}
+        ],
+        "schedule": {"mode": "serial", "case_sequence": ["aligned-minus-one", "aligned", "aligned-plus-one"]},
+        "observations": ["记录输出与前后 guard 区的原始字节，并将首次哨兵变化对应到边界索引"],
+        "oracle": {"type": "golden-canary+sanitizer-memcheck", "expect": "输出符合标杆，guard 区不变且无越界访问"},
+        "provenance": {"source": "COMP-B07-A05", "coverage_state": "designed"}
+      }
+    }
+  ]
+}

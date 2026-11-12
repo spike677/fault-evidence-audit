@@ -1,0 +1,55 @@
+{
+  "skill_name": "fpg02-sync-review",
+  "pattern_id": "FP-G02",
+  "eval_mode": "text",
+  "verdict_convention": "回答末尾须有一行 `verdict: <FP-XX | OUT_OF_SCOPE>`",
+  "evals": [
+    {
+      "id": "FP-G02-P1",
+      "kind": "positive",
+      "prompt": "【现象】racecheck 报 WAW/RAW hazard；偶现精度失败（批跑轮换/单跑新进程首调易触发）；输出整段为 0 或错值\n【上下文】仓：All；侧别：Kernel,Host,Tiling；载体：Kernel源码,Host源码,Tiling源码。\n请判定属于本库哪条故障模式（给出 FP 编号与子型），并给出首查动作与需要补齐的证据；信息不足时说明还缺什么。回答末尾须有一行 `verdict: <FP-XX | OUT_OF_SCOPE>`。",
+      "expected_verdict": "FP-G02",
+      "expected_output": "应判 FP-G02；给出该模式子型与首查动作；结论须附证据等级。",
+      "must_include": [
+        "首查|检查项|核对|排查|扫描|查看|定位",
+        "证据等级|静态可证|需实测确认|信息不足|缺.{0,6}证据",
+        "FP-G02"
+      ],
+      "forbidden": [
+        "BUG-\\d{8}|[A-Za-z]:\\\\|内部日报|内部缺陷单",
+        "已确认为缺陷|必然是缺陷|无条件确定是缺陷"
+      ]
+    },
+    {
+      "id": "FP-G02-N1",
+      "kind": "neighbor-negative",
+      "prompt": "【现象】hang；卡死；超时退出码 124\n【已有证据】单用例超时熔断 指向该机制。\n【上下文】仓：All；侧别：Kernel,Host,Tiling；载体：Kernel源码,Host源码,Tiling源码。\n请判定属于本库哪条故障模式（给出 FP 编号与子型），并给出首查动作与需要补齐的证据；信息不足时说明还缺什么。回答末尾须有一行 `verdict: <FP-XX | OUT_OF_SCOPE>`。",
+      "expected_verdict": "FP-G01",
+      "expected_output": "应判 FP-G01；该现象带有 FP-G01 的典型工具证据（单用例超时熔断），应据此归 FP-G01；若判 FP-G02，须给出 [文件]:[行号] 级负向证据。",
+      "must_include": [
+        "首查|检查项|核对|排查|扫描|查看|定位",
+        "证据等级|静态可证|需实测确认|信息不足|缺.{0,6}证据",
+        "FP-G01"
+      ],
+      "forbidden": [
+        "BUG-\\d{8}|[A-Za-z]:\\\\|内部日报|内部缺陷单",
+        "已确认为缺陷|必然是缺陷|无条件确定是缺陷"
+      ],
+      "discriminator": "证据类型偏向 FP-G01（单用例超时熔断）；判 FP-G02 须给出负向证据"
+    },
+    {
+      "id": "FP-G02-X1",
+      "kind": "out-of-scope",
+      "prompt": "【现象】许可证合规问询：能否把该仓代码引入商业产品。\n请判定是否属于本库适用面；若不适用，须说明定界理由（如环境 / 流程 / 方案选型 / 与算子无关），不得强行套用任一 FP 模式。回答末尾须有一行 `verdict: <FP-XX | OUT_OF_SCOPE>`。",
+      "expected_verdict": "OUT_OF_SCOPE",
+      "expected_output": "应声明不在本库适用面（未定界到算子缺陷 / 属环境或方案选型），不得强行套用任一 FP 模式。",
+      "must_include": [
+        "不在(本库)?适用面|超出(本库)?(适用|范围)|不属(于)?(算子|本库)|未定界|环境问题|方案选型|选型问题|流程问题|与算子(计算)?无关"
+      ],
+      "forbidden": [
+        "BUG-\\d{8}|[A-Za-z]:\\\\|内部日报|内部缺陷单",
+        "属\\s?FP-[A-G]\\d{2}|应判\\s?FP-[A-G]\\d{2}"
+      ]
+    }
+  ]
+}

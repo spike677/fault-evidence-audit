@@ -1,0 +1,14 @@
+# FP-B14 图模式（GEIR/aclGraph）通路与 aclnn 单算子通路未同步适配
+
+> [← 库索引](../../README.md) ｜ [变更记录](../../CHANGELOG.md) ｜ 类别：功能/兼容 ｜ 风险：高（S2×O3=6） ｜ 状态：活跃
+
+- **元数据**：类别 功能/兼容 ｜ 风险 高（S2×O3=6）｜ 状态 活跃 ｜ 来源 ops-math / ops-nn / ops-transformer 全量 issue 语料（2026-10-17，16 270 条中 3 011 条 bug-report，图模式相关 69 条）
+- **适用**：仓 All ｜ 侧别 Host ｜ 载体 IR与图配置,aclnn源码,Tiling源码 ｜ 触发 图模式|GEIR|aclnnGraph|op_graph ｜ 默认启用 true
+- **故障机理**：同一算子有两条交付路径——**aclnn 单算子**（`op_api` → tiling → kernel）与**图模式**（`op_graph` proto → GE 推导 → tiling → kernel）。二者共享 tiling/kernel，但**入口契约各自维护**：op_graph 里 attr 的默认值、输入输出的 format 元数据、可选输入的缺省形态、L0 层 dtype 属性的下发、infershape 的注册与推导，都不经过 aclnn 的 `CheckShape`。当开发/测试只覆盖 aclnn 路径时，图模式会在三个不同阶段失败：**编译**（常量折叠/符号缺失，E40021）、**推导**（GRAPH_FAILED）、**执行**（Run graph failed / device fault），而同一算子的 aclnn 用例全部通过。
+- **触发条件**：① op_graph proto 的 attr 默认值与 tiling 的 `ParseAttrs` 校验范围不同步（如 proto 默认 0、tiling 只接受 -1 或 >0）；② 图模式输入携带 tiling 的 format 白名单未覆盖的元数据（`NC1HWC0` 等，常见于图优化插格式后）；③ 图编译需要 L0 显式传 dtype 属性，而 `def.cpp` 未声明；④ 可选输入在图模式下缺省；⑤ infershape 注册名错误或缺失；⑥ 图模式专用常量折叠路径未走通。
+- **典型表现**：**aclnn/TTK 直调用例全 PASS，图模式（ptgraph / aclGraph / GEIR）用例失败**；报错多为 `E40021`、`GRAPH_FAILED`、`Run graph failed`、`507011 AICore device fault`；或图模式结果与单算子不一致、图模式默认属性被拒。特征信号：问题只在 `torch.compile`/`graph` 模式复现，`torch_npu` eager 正常。
+- **源码审查映射点**：`op_graph/*_proto.h` 的 `Attr(...).DefaultValue(...)` 与 `op_host/*_tiling*.cpp` 中 `ParseAttrs` 的合法值域逐项比对；`ValidateTensorDescs`/`CheckFormat` 的 format 白名单是否包含图优化常见格式；`op_host/*_def.cpp` 是否为 950/L0 声明了必需属性；`*_infershape.cpp` 的注册名与算子名一致；`docs/aclnn*.md` 与图模式 proto 的 attr 默认值是否一致。
+- **检测签名**：静态比对「proto attr 默认值 ⊄ tiling 接受值域」⇒ 候选；扫描 `GetOptionalInputShape` 与 `GetOptionalInputDesc` 误用；图模式用例缺失（仓内 `*_geir_*`/`*graph*` 测试目录存在但未覆盖该算子）。三仓基线：图模式相关 bug 69 条（math 13 / nn 26 / transformer 30）。
+- **测试拦截建议**：每个算子至少一条图模式冒烟（ptgraph 或 aclGraph），断言"与 aclnn 结果一致 + 不抛 GRAPH_FAILED"；对新增 attr 补"proto 默认值 ∈ tiling 接受域"的静态断言；把 `*_geir_*` 用例纳入 CI 时同时校验**状态码语义**（GRAPH_FAILED 不能被收窄成 1/#2830 类问题）。
+- **实证案例**：ops-nn **#5201** `swiglu_group_grad` 图模式缺省 `clamp_limit` 被 proto 默认值 0 拒绝（tiling 在 #8844 后要求 -1 或 >0，proto 未同步，仅图模式暴露）；**#5477** `BNInferGrad` format 校验过严（`NC1HWC0` 元数据被判非法）致 GEIR `GRAPH_FAILED`；**#5922** `matmulEmuSplitWeight` aclGraph 调用失败；**#6017** `deformable_offsets_grad` A5 图模式 example `Run graph failed`；ops-math **#3188** `ArgMaxV2` 需在 L0 传 dtype 属性否则 aclnngraph 编译失败；**#2619** `reducesum/reducemean` geir 功能失败；**#3361** `fillv2` geir 通路失败；ops-transformer **#5736** `qfa quant_mode=6` 在 aclgraph 下报 507011 AICore device fault。
+- **关联**：[FP-B08](FP-B08.md)（相邻：B08 是**属性在 pass 链路中被丢弃**——fallback 回调/前端插件/fusion pass；本条是**入口契约不同步**——proto 默认值/format 白名单/dtype 属性，两者可共现但修复落点不同）、[FP-A16](../FP-A/FP-A16.md)（aclop 与 aclnn 的**精度**双路径差异，本条是**功能**双路径失败）、[FP-F01](../FP-F/FP-F01.md)（图编译符号缺失/链接失败属构建面，不归本条）、[FP-F03](../FP-F/FP-F03.md)（proto 与文档/实现三方不一致时双向命中）、[FP-B11](FP-B11.md)（图模式同样需要参数契约校验，但本条特指**两条路径契约不同步**）。

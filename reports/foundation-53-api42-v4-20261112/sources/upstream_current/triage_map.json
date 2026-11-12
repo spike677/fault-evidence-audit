@@ -1,0 +1,529 @@
+{
+ "version": "5.4",
+ "quick_index": [
+  {
+   "words": "卡死 / 不动 / 没有输出 / 超时 / 退出码 124",
+   "entry": "T1"
+  },
+  {
+   "words": "编译失败 / 链接冲突 / undefined symbol / 未注册 tilingkey / 示例跑不起来",
+   "entry": "T2.1"
+  },
+  {
+   "words": "SIGSEGV / rc=139 / coredump / 161001 / 161002 / Not supported / 非法 shape 被放行",
+   "entry": "T2.2"
+  },
+  {
+   "words": "double 输入或 double 属性不支持",
+   "entry": "T2.3"
+  },
+  {
+   "words": "aic error / 偶发崩溃",
+   "entry": "T2.4"
+  },
+  {
+   "words": "通信 / rank / AllReduce / 集合通信",
+   "entry": "T2.5"
+  },
+  {
+   "words": "错误码不符 / 日志缺失 / 维度不为 N",
+   "entry": "T2.6"
+  },
+  {
+   "words": "精度 / 超差 / 数值不对 / NaN / inf",
+   "entry": "T3"
+  },
+  {
+   "words": "偶发 / 两次结果不同 / flaky / 无法复现",
+   "entry": "T4"
+  },
+  {
+   "words": "racecheck / WAW / RAW / 同步 / SetFlag / WaitFlag / 竞态 / 核间同步",
+   "entry": "T4"
+  },
+  {
+   "words": "慢 / 耗时 / 性能退化 / 不如 bf16",
+   "entry": "T5"
+  },
+  {
+   "words": "OOM / 内存 / 显存 / workspace",
+   "entry": "T6"
+  },
+  {
+   "words": "测试全绿但线上异常 / golden / 判据 / README 与实现不符 / 迁移",
+   "entry": "T7"
+  }
+ ],
+ "entries": [
+  {
+   "id": "T1",
+   "title": "跑不完 / 卡死 / 超时",
+   "intro": "进程还活着但不返回，或被超时中断。与「慢」（T5）的区别是**没有完成**：日志完全无进展、退出码 124、CPU 空转。",
+   "groups": [
+    {
+     "title": "无进展 / 超时 / 设备侧超时",
+     "rows": [
+      {
+       "fp": "FP-G01",
+       "symptom": "日志完全无进展 / CPU 空转 / 退出码 124 / `vector core execution timed out` / aic error",
+       "first": "看日志是否推进；查 `while(true)` 推进变量与不推进退出；单用例超时熔断"
+      },
+      {
+       "fp": "FP-G02",
+       "symptom": "SetFlag/WaitFlag 不配平致**永久等待** / 同步卡死 / 同步超时 aic error",
+       "first": "扫同步原语配平（set↔wait 次数与分支）；`scripts/scan_sync.py` + racecheck"
+      },
+      {
+       "fp": "FP-B10",
+       "symptom": "通信等待卡住 / 初始化连接超时 / 个别 rank 掉线",
+       "first": "核通信域与超时配置（CONNECT/EXEC_TIMEOUT）；多级拓扑对拍"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "T2",
+   "title": "报错退出",
+   "intro": "有明确错误出口：编译/链接失败、返回码非 0、崩溃或显式报错。先按**报错发生的阶段**分组，再按错误码/符号定位。",
+   "groups": [
+    {
+     "title": "T2.1 构建 / 链接 / 交付期",
+     "rows": [
+      {
+       "fp": "FP-F01",
+       "symptom": "编译失败 / `REG_OP` 重复注册 / CMake 报错 / `No such file or directory`",
+       "first": "def × binary.json 差集；读构建日志"
+      },
+      {
+       "fp": "FP-F04",
+       "symptom": "`undefined symbol` / `dlsym` 为空 / `torch.ops` 不可用 / 未注册 tilingkey",
+       "first": "构建日志查符号与注册；dlsym 冒烟"
+      },
+      {
+       "fp": "FP-F03",
+       "symptom": "README 声明支持但调用报未适配 / 示例编译失败",
+       "first": "README 支持表与 AddConfig 差集"
+      }
+     ]
+    },
+    {
+     "title": "T2.2 参数校验与会话契约（161xxx）",
+     "rows": [
+      {
+       "fp": "FP-B04",
+       "symptom": "SIGSEGV / rc=139 / coredump / 161001",
+       "first": "必选参数判空矩阵；gdb 栈回溯"
+      },
+      {
+       "fp": "FP-B11",
+       "symptom": "非法 shape/rank/ListInt 长度/属性超界被放行：第一段返回 ACLNN_SUCCESS，到 tiling 才报 561002 或直接 coredump",
+       "first": "比对 CheckShape 的 rank/长度/值域/有限性四类检查；InferShape 与 tiling 校验集合是否一致"
+      },
+      {
+       "fp": "FP-B06",
+       "symptom": "含 0 维 shape 报错 / 空 tensor 在第一段接口失败",
+       "first": "空 tensor 探针矩阵（0 维 / 零元素）"
+      },
+      {
+       "fp": "FP-B01",
+       "symptom": "合法输入报 Not supported / Unsupported（误拦截）",
+       "first": "核白名单与 AddConfig 差集"
+      },
+      {
+       "fp": "FP-B02",
+       "symptom": "部分芯片可执行、部分报错（如 310P 系列）",
+       "first": "核数来源是否硬编码；全型号矩阵"
+      }
+     ]
+    },
+    {
+     "title": "T2.3 dtype / attr 支持面",
+     "rows": [
+      {
+       "fp": "FP-A10",
+       "symptom": "double 属性报 161002 / attr 精度异常",
+       "first": "proto attr 类型与解析分支"
+      },
+      {
+       "fp": "FP-A11",
+       "symptom": "double 输入报不支持",
+       "first": "dtype 分派与声明一致性"
+      }
+     ]
+    },
+    {
+     "title": "T2.4 运行期崩溃 / 异常终止",
+     "rows": [
+      {
+       "fp": "FP-B07",
+       "symptom": "aic error / coredump / 结果错位 / 非对齐尾块",
+       "first": "mssanitizer + 偏移表达式上界反推"
+      },
+      {
+       "fp": "FP-A05",
+       "symptom": "偶发崩溃 / `mssanitizer` 报内存错误",
+       "first": "memcheck；连续两次调用一致性"
+      },
+      {
+       "fp": "FP-B15",
+       "symptom": "列表长度超过内部容量时机率性 coredump 或 `sync 507035` 但两段返回码都是 0",
+       "first": "查 tiling_data 定长数组容量；n=N+1 起逐级复测"
+      }
+     ]
+    },
+    {
+     "title": "T2.5 通信 / 集合通信",
+     "rows": [
+      {
+       "fp": "FP-B10",
+       "symptom": "通信等待卡住 / 初始化连接超时 / 个别 rank 掉线",
+       "first": "核通信域与超时配置（CONNECT/EXEC_TIMEOUT）；多级拓扑对拍"
+      }
+     ]
+    },
+    {
+     "title": "T2.6 错误码 / 日志语义",
+     "rows": [
+      {
+       "fp": "FP-F02",
+       "symptom": "错误码不符 / 跨仓错误码不一致 / 日志缺失 / error 日志误报",
+       "first": "跨仓返回码对照；日志级别核查"
+      },
+      {
+       "fp": "FP-B09",
+       "symptom": "infershape/verifier 编译期报错 / 「维度不为 N」",
+       "first": "动态 shape {-2}/{-1} 最小集；GetDims 下标"
+      }
+     ]
+    },
+    {
+     "title": "图模式（GEIR/aclGraph）专用失败",
+     "rows": [
+      {
+       "fp": "FP-B14",
+       "symptom": "aclnn 正常但图模式报 E40021 / GRAPH_FAILED / Run graph failed / 507011",
+       "first": "比对 proto 默认值与 tiling 接受域、format 白名单、属性下发；图模式冒烟对拍 aclnn"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "T3",
+   "title": "结果不对（精度 / 数值）",
+   "intro": "能跑完、能出结果，但数值不对。先看**误差形态**（大面积 / 边界 / 组合 / 静默 / 路径），形态决定候选顺序——不要一上来读全部精度模式。",
+   "groups": [
+    {
+     "title": "T3.1 大面积 / 系统性偏差",
+     "rows": [
+      {
+       "fp": "FP-A03",
+       "symptom": "bf16/fp16 大面积超阈值 / 低精度 dtype 整体劣化",
+       "first": "查中间量位宽与累加 dtype"
+      },
+      {
+       "fp": "FP-A01",
+       "symptom": "超越函数精度超标 / 网络精度波动",
+       "first": "与 GPU 或参考库逐元素 utol"
+      },
+      {
+       "fp": "FP-A02",
+       "symptom": "偏差稳定可复现、随 reduce 维增长",
+       "first": "对齐归约拓扑与分组顺序"
+      },
+      {
+       "fp": "FP-A14",
+       "symptom": "与 GPU 结果不一致 / 切 MMAD-FFMA 路径后变化",
+       "first": "路径切换对拍；核 stepK 与 K 补零"
+      },
+      {
+       "fp": "FP-A12",
+       "symptom": "大数值场景结果偏差 / 偏差量级约「大数 × 1 ulp」",
+       "first": "扫 int→float 转换点，反推可达上界"
+      },
+      {
+       "fp": "FP-A18",
+       "symptom": "INT32_MAX/MIN 边界值失败 / 分支选错",
+       "first": "比较前是否提升类型"
+      }
+     ]
+    },
+    {
+     "title": "T3.2 边界 / 离群 / 尾块",
+     "rows": [
+      {
+       "fp": "FP-A08",
+       "symptom": "离群点 / 极端 shape 才失败 / 大 shape 超阈值",
+       "first": "极端值分布 + 切块边界探针"
+      },
+      {
+       "fp": "FP-A07",
+       "symptom": "特定 shape 失败 / 分支阈值附近异常",
+       "first": "阈值 ±1 成对用例；IsCapable 验算"
+      },
+      {
+       "fp": "FP-B06",
+       "symptom": "空 tensor / 零元素输入产生 NaN 或读越界",
+       "first": "空 tensor 探针（0 维 / 零元素）"
+      }
+     ]
+    },
+    {
+     "title": "T3.3 特定 shape / dtype / attr / 平台组合",
+     "rows": [
+      {
+       "fp": "FP-B08",
+       "symptom": "节点级配置未生效但无报错 / 全局生效节点级不生效",
+       "first": "节点 × 全局四组交叉"
+      },
+      {
+       "fp": "FP-A15",
+       "symptom": "nan/inf 用例失败 / 特殊值结果不一致",
+       "first": "特殊值用例集；核 isnan 分支"
+      },
+      {
+       "fp": "FP-A09",
+       "symptom": "与 TF / PTA 语义不一致（epsilon、clip、默认值）",
+       "first": "双标杆对拍；核 attr 默认值"
+      },
+      {
+       "fp": "FP-A17",
+       "symptom": "跨代芯片精度不一致（A1 vs A2）",
+       "first": "跨代同用例对拍；扫 GetSocVersion 分支"
+      },
+      {
+       "fp": "FP-B09",
+       "symptom": "动态 shape 下维度 / 维数不对",
+       "first": "{-2}/{-1} 最小集；GetShapeRange 前 MakeUpRange"
+      },
+      {
+       "fp": "FP-A22",
+       "symptom": "特定 dtype 返回 0 但部分输出未写 / 同宽度兄弟 dtype 表现分裂（int32 对而 uint32 错）/ bool 掩码边界错位",
+       "first": "按 def.cpp 支持集核对 kernel dtype→模板映射表；dtype 全组合 + 输出魔数预填"
+      }
+     ]
+    },
+    {
+     "title": "T3.4 静默错（无报错）[WIDE]",
+     "rows": [
+      {
+       "fp": "FP-A04",
+       "symptom": "无报错但数值错 / NaN / 错误被吞",
+       "first": "查错误分支是否静默早退或恒返回成功"
+      },
+      {
+       "fp": "FP-B12",
+       "symptom": "空/退化输入返回 SUCCESS 但输出未写（NaN 或随机值）/ 反向算子梯度偶发 NaN",
+       "first": "查 IsEmpty 早退块是否写非空输出；跑「空输入 × 非空输出」矩阵"
+      },
+      {
+       "fp": "FP-B13",
+       "symptom": "超大属性值（2^31 / 2^32 附近）才错 / 输出 shape 与入参不一致 / 返回码 SUCCESS",
+       "first": "扫 static_cast<int32_t> 与 32 位乘积；改小值复测是否消失"
+      },
+      {
+       "fp": "FP-B15",
+       "symptom": "列表长度超过内部容量后返回 SUCCESS 但尾部结果静默错 / n 再大时 sync 507035 kernel fault / 同族接口一个报错一个放行",
+       "first": "扫 tiling_data 定长数组 × 入参索引 × 全 op_host 无 MAX 校验；跑容量扫描 1/N-1/N/N+1/2N"
+      },
+      {
+       "fp": "FP-B03",
+       "symptom": "迁移后应拦截未拦截 / 错误结果静默产出",
+       "first": "迁移 diff 前后拦截点比对"
+      },
+      {
+       "fp": "FP-A05",
+       "symptom": "偶发崩溃 / `mssanitizer` 报内存错误",
+       "first": "memcheck；连续两次调用一致性"
+      },
+      {
+       "fp": "FP-A21",
+       "symptom": "同一进程连续跑不同 shape 后结果不对（如 3D TND → 4D BNSD）/ 报 `do tiling failed` / D 维取到原 S 维的值 / 输出错但全链路无报错",
+       "first": "查 tiling 内匿名 namespace 可变全局与全局 TilingData；补同进程序列化用例（3D→4D / 带x→不带x / fp16→fp32），顺序敏感即命中"
+      },
+      {
+       "fp": "FP-B16",
+       "symptom": "出参传非连续 view（带空洞 stride）时恰好一半元素为旧值 / 返回码 0 / 跨版本逐位一致",
+       "first": "先查 ACLNNTYPE 是否 aclnn 且无 op_host/op_api；再物理 dump 出参 storage 前 numel 个与连续基线对拍"
+      }
+     ],
+     "intro": "候选偏多（7 条），按**错法**二次筛选：整块未写/NaN 优先看 FP-B12（空态早退）与 FP-A04（静默早退）；只有尾部/部分元素错、且与列表长度相关 → FP-B15（容量）；只在 2^31 附近错 → FP-B13；同进程顺序敏感 → FP-A21；迁移后才有 → FP-B03。"
+    },
+    {
+     "title": "T3.5 路径 / 口径差异",
+     "rows": [
+      {
+       "fp": "FP-A16",
+       "symptom": "aclnn 与 aclop / GEIR 结果不同",
+       "first": "双路径同输入对拍"
+      },
+      {
+       "fp": "FP-B08",
+       "symptom": "图模式与 aclnn 直调不一致",
+       "first": "图 vs 直调对拍；核属性透传"
+      },
+      {
+       "fp": "FP-E02",
+       "symptom": "同 shape 换 cubeMathType 即大面积 PASS/FAIL 翻转 / rmse 远大于 mare",
+       "first": "双标杆复核 + 判据分母检查"
+      }
+     ]
+    },
+    {
+     "title": "T3.6 精度验证本身可疑",
+     "rows": [
+      {
+       "fp": "FP-E01",
+       "symptom": "精度验证静默失效 / golden 与实现同时被改",
+       "first": "golden 来源与命名核查"
+      },
+      {
+       "fp": "FP-A13",
+       "symptom": "仅截断输入才能过测试 / 精度勉强达标",
+       "first": "看 golden/UT 是否对输入 round"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "T4",
+   "title": "结果不稳 / 可复现性",
+   "intro": "同一输入、同一环境，两次结果不同，或时好时坏。先做**稳定性分流**（连跑 3~5 次两两比对），再区分确定性、脏数据与等级未分级。",
+   "groups": [
+    {
+     "title": "两次不一致 / 偶发",
+     "rows": [
+      {
+       "fp": "FP-A06",
+       "symptom": "确定性开关下两次运行结果不同 / 同输入不同结果",
+       "first": "开关开-关对照；同输入多轮 bitwise 比对"
+      },
+      {
+       "fp": "FP-A20",
+       "symptom": "flaky 误报 / 缺陷被容差吞掉 / 无法复现",
+       "first": "按输出 × 路径 × shape 分级复核"
+      },
+      {
+       "fp": "FP-A05",
+       "symptom": "偶发精度错 / NaN 随机出现 / 单跑过批量失败",
+       "first": "memcheck；固定用例顺序复跑"
+      },
+      {
+       "fp": "FP-A21",
+       "symptom": "并发多流 / 多线程下偶发精度失败；单跑通过、压测失败；结果随并发度或调用顺序变化（与 shape 无因果关系）",
+       "first": "多线程只调 `GetWorkspaceSize` 压测 tiling；`DoOpTiling` 首尾 atomic 打桩确认 peak 并发数 > 1"
+      },
+      {
+       "fp": "FP-G02",
+       "symptom": "同步缺失 / 事件 ID 冲突致**偶发结果不同** / racecheck 报 `WAW`/`RAW` hazard",
+       "first": "mssanitizer racecheck 零告警门禁；事件 ID 池审计；批跑轮换 + 新进程首调"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "T5",
+   "title": "慢 / 性能退化",
+   "intro": "结果正确但耗时变长。先分清**绝对慢**（端到端占比高）与**相对慢**（同 shape 比另一 dtype / 板型 / 代际 / 上一次版本慢）。",
+   "groups": [
+    {
+     "title": "耗时与性能",
+     "rows": [
+      {
+       "fp": "FP-C01",
+       "symptom": "端到端性能瓶颈 / 耗时变长但精度全对 / 跨版本耗时回归",
+       "first": "profiler kernel_details 聚合；跨版本比值 >1.15"
+      },
+      {
+       "fp": "FP-C02",
+       "symptom": "A2 上 fp16 Vector 算子慢于 bf16",
+       "first": "fp16/bf16 对照；查 dtype 特化"
+      },
+      {
+       "fp": "FP-C03",
+       "symptom": "bf16 与 fp16 性能差异异常",
+       "first": "对照测试；查 Cast DAG 冗余"
+      },
+      {
+       "fp": "FP-C05",
+       "symptom": "开确定性开关性能骤降",
+       "first": "确定性开关性能对照；查串行化"
+      },
+      {
+       "fp": "FP-C04",
+       "symptom": "同芯片不同板型（B2 vs B3）性能差异",
+       "first": "板型矩阵对比；查频率/带宽假设"
+      },
+      {
+       "fp": "FP-C06",
+       "symptom": "新代际（A5）性能不升反降",
+       "first": "跨代基线对比；查新代际路径"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "T6",
+   "title": "内存 / 资源",
+   "intro": "结果对、能跑完，但占用高或 OOM。先分清**峰值超基线**与**双路径（aclnn vs aclop）差异**。",
+   "groups": [
+    {
+     "title": "内存占用",
+     "rows": [
+      {
+       "fp": "FP-D01",
+       "symptom": "OOM / 峰值内存超基线 / 显存过度占用",
+       "first": "profiler 峰值内存；workspace 申请量推导"
+      },
+      {
+       "fp": "FP-D02",
+       "symptom": "aclnn 比 aclop 内存高 / 内存占用偏高",
+       "first": "aclnn/aclop 双路径内存对比"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "T7",
+   "title": "编译 / 交付 / 文档 / 测试资产",
+   "intro": "代码可能没错，但**声明面、测试面或交付面**出了问题：测试全绿却线上异常、文档说支持却没适配、迁移后丢了拦截。",
+   "groups": [
+    {
+     "title": "测试资产与交付面",
+     "rows": [
+      {
+       "fp": "FP-A19",
+       "symptom": "测试全绿而线上特定 shape 异常 / 同 shape 跨平台表现不同",
+       "first": "三表：tiling 模板 × 阈值 × 用例"
+      },
+      {
+       "fp": "FP-E01",
+       "symptom": "golden 失配 / 精度验证静默失效",
+       "first": "golden 来源与命名；看是否与实现同改"
+      },
+      {
+       "fp": "FP-F03",
+       "symptom": "支持矩阵与注册不符 / 文档整体复制兄弟算子",
+       "first": "README 支持表与 AddConfig 差集"
+      },
+      {
+       "fp": "FP-B05",
+       "symptom": "部分算子崩溃、部分正常（文件级参差）",
+       "first": "CheckNotNull / CheckParams 横向比对"
+      },
+      {
+       "fp": "FP-B03",
+       "symptom": "迁移 / 重构后应拦截未拦截",
+       "first": "迁移 diff 的拦截点前后比对"
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

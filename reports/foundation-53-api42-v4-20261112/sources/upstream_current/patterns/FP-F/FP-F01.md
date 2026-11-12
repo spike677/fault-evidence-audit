@@ -1,0 +1,14 @@
+# FP-F01 构建/工程配置不一致致编译与产物缺陷
+
+> [← 库索引](../../README.md) ｜ [变更记录](../../CHANGELOG.md) ｜ 类别：工程/交付 ｜ 风险：高（S2×O3=6） ｜ 状态：活跃
+
+- **元数据**：类别 工程/交付 ｜ 风险 高（S2×O3=6）｜ 状态 活跃 ｜ 来源 gitcode CANN issue 检索（2026-09-16，v2.5 预留编号正式落地）
+- **适用**：仓 All ｜ 侧别 All ｜ 载体 构建配置与日志 ｜ 触发 CMakeLists|REG_OP|AddConfig|build.sh ｜ 默认启用 true
+- **故障机理**：构建体系中的**双源/多源配置不一致**与**配置面缺失**，使编译期/链接期失败或产物静默缺失：① **原型跨仓重复定义**——同一 `REG_OP` 在两仓头文件并存，同编译单元包含即重复注册符号链接冲突；② **注册块缺独立去重宏**——仅靠头文件级 include guard，多包含路径下 `REG_OP` 多次展开；③ **构建脚本 include 路径与头文件实际位置不一致**、**样例引用已废弃头文件**——批量 example 编译失败；④ **def 已注册而 binary.json 配置缺失**——cmake 以 `if(EXISTS)` 为门槛静默 `continue`，kernel 不进编译打包，且退化为按算子名推断 op_type 弱化注册绑定；⑤ **SoC/架构列表双处维护不一致**——build.sh 校验通过而 CMake 侧不识别、或编译器分支硬编码架构锁死无法出其他 SoC 产物；⑥ **评测平台别名表缺失时静默 fallback**——用错误平台基线计分且仅一条 WARNING。 ⑦ **同名算子目录/注册名大小写冲突（v6.33）**：仓内同时存在 `roi_align_grad` 与 `ROIAlignGrad` 两套目录/注册名，构建脚本按大小写敏感查找，误取 experimental 版注册名，导致正式 kernel 被整体跳过编译、包内无该 SoC 产物。
+- **触发条件**：跨仓编译（同时依赖多仓头文件）、新增 SoC/编译器分支、CANN 包裁剪后样例引用失效头文件、算子新增平台注册漏配置文件、双源列表（脚本/CMake）独立演化。
+- **典型表现**：`fatal error: xxx.h: No such file or directory` 批量编译失败；重复注册/符号冲突链接错误；`--soc=X` 校验通过但 CMake 阶段失败；算子在声明支持的平台上无产物且构建无报错（静默跳过）。
+- **源码审查映射点**：`REG_OP` 注册块是否带独立 `#ifndef/#define` 去重宏；跨仓同名原型归属唯一性；build.sh/CMakeLists 的 SoC 列表、include 路径单一来源；`op_host/config/<soc>/*_binary.json` 与 def 中 `AddConfig("<soc>")` 一一对应；fallback 分支是否有告警升级/失败出口。
+- **检测签名**：`grep -rn "REG_OP\\(" 多仓同名比对`；`AddConfig\\(\\\"([a-z0-9_]+)\\\"` 与 `op_host/config/` 目录清单差集；`if\\s*\\(\\s*EXISTS[^)]*binary\\.json`（静默跳过点）；build.sh 与 CMake 中 SOC 列表双源比对。
+- **测试拦截建议**：CI 增加「def 注册 soc × binary.json 存在性」一致性门禁（缺失即失败而非跳过）；跨仓原型符号冲突用联合编译冒烟捕获；SoC 列表收敛单一源；样例头文件引用随 CANN 包变更批量静态扫描；fallback 必须可配置升级为 FAIL。
+- **实证案例**：ops-nn #5469（closed）`REG_OP(Rsqrt)` 同时存在于 ops-math `rsqrt_proto.h` 与 ops-nn `op_nn_proto_extend.h`，同编译单元包含即链接符号冲突（PR #9693 迁移 stub 修复）；ops-math #2886（closed）AbsGrad/ComplexAbs/Rsqrt proto 缺 `OPS_PROTO_DEF_*` 去重宏致重复注册风险（PR #5096）、#3036 同根因；ops-math #1821（closed）build.sh `INC_INCLUDE_PATH` 指向 `op_proto/inc` 而 `experiment_ops.h` 在 `op_graph/inc`，114 个 graph 模式 example 编译失败、#3157（open）68 个样例引用商发 cann 包已不存在的 `experiment_ops.h` 批量编译失败；ops-nn #4483（closed）4 算子 def 已 `AddConfig("ascend950")` 而 `ascend950/*_binary.json` 缺失，`custom_kernel.cmake` 以 `if(EXISTS)` 静默 `continue` 致 950 kernel 不进编译打包、ut.cmake 退化为按名推断 op_type；ops-cv #405（closed）build.sh `SUPPORT_COMPUTE_UNIT_SHORT` 含 `ascend910_55` 而 CMakeLists `ASCEND_ALL_COMPUTE_UNIT` 无，校验通过 CMake 编译失败、#408 同文件 CORE_NUMS 死代码与 `ascedn910_93` 拼写错误；ops-collections #28（closed）bisheng 编译器分支硬编码 `--npu-arch=dav-3510` 锁死架构，非 950 目标静默编出错误架构产物；cann-bench #63（open）`PLATFORM_ALIAS` 无 910b3 映射，自动评测静默 fallback 到 910b2 基线计分失真。 **2026-11 批次（v6.33 反哺）**：本簇 2 条；ops-cv#1529（同名 roi_align_grad 目录注册名大小写冲突，ascend950 kernel 未进包）、catlass#891（shared_lib ArchTag 硬编码 AtlasA2，3510 构建失败）。
+- **关联**：[FP-F02](FP-F02.md)（配置缺失的静默表现属「无告警/告警不足」）、[FP-B02](../FP-B/FP-B02.md)（SOC 适配遗漏在 tiling 侧的姊妹型）、[FP-F03](FP-F03.md)（声明面与产物面不一致）。

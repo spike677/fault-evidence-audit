@@ -1,0 +1,1792 @@
+{
+  "schema_version": "FOUNDATION-API42-REVIEW-1",
+  "source_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+  "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\reports\\rc128-mechanism-design-20261112-r4\\sources\\original\\api42_trigger_library_original.md",
+  "source_taxonomy_id": "trigger-taxonomy-c55b1bb7b4b62b13f8576e85",
+  "source_taxonomy_hash": "c55b1bb7b4b62b13f8576e8521d4fc0188c43c65a06ebfcd1858555b7aad8c5d",
+  "definition_variant": "ORIGINAL42_NOT_REVISED42",
+  "overview": {
+    "item_count": 42,
+    "family_count": 9,
+    "family_counts": {
+      "1.1": 5,
+      "1.2": 8,
+      "1.3": 4,
+      "1.4": 3,
+      "1.5": 4,
+      "1.6": 2,
+      "1.7": 6,
+      "1.8": 3,
+      "1.C": 7
+    },
+    "purpose": "按参数结构、语义角色和约束选择可构造输入条件，指导code-guided fuzzing及覆盖台账。",
+    "scope": "调用实参：值、shape、索引、mask、序列、布局、可暴露控制属性。",
+    "not_in_scope": [
+      "编译选项/宏与SoC工具链选择",
+      "多流/多设备/重复执行的运行情境",
+      "直接认定内部失效机理或历史事件身份"
+    ],
+    "applicability_rule": "结构类型 × 语义角色 × 约束；必须核对项级与家族级完整Requires/Skip，以及1.C schema控制前提。",
+    "relation_to_base": "输入角色为对象提供起点，条件构造提供时点/路径探查方向；不能直接给出具体代码消费者或因果关系。",
+    "coverage_rule": "语义条件满足、构造被保留、路径实际命中及执行结果分别记录；标签计数不等于已证历史故障或实机覆盖。",
+    "consumer_mapping": "consumer_direction是审读方向，尚需实际赋值/传参/读取与位置证据，非自动映射。",
+    "strengths": [
+      "原始ID稳定，API输入角色和约束明确",
+      "家族门禁降低无关构造",
+      "控制参数与数据分布分开",
+      "普通/边界/组合输入及覆盖台账可工程化"
+    ],
+    "limits": [
+      "不把42项当42种根因",
+      "内部派生/执行情境可能没有原42标签",
+      "非连续输入受本版schema表达限制",
+      "普通数据shape进入内部窄整数算址不自动满足原1.3家族硬条件",
+      "接口有out参数不等于原输入schema已支持非连续输出或输出stride构造；不可将执行器能力当作已实现。"
+    ],
+    "source_conflicts_or_cautions": [
+      "1.3.1/1.3.3包含无效域校验方向，不应把所有42项解释为仅合法计算输入。",
+      "算法线索示意表不能绕过正式家族硬门禁。",
+      "1.5.3条目名称含decode，但仅seq_len=1仍不能证明实际decode路径。"
+    ]
+  },
+  "families": [
+    {
+      "family_id": "1.1",
+      "name": "Empty / Degenerate Input",
+      "item_count": 5,
+      "requires": [
+        "任一 `TEN-*` 带 `CON-SHAPE`，或控制循环次数的 `scalar`/`attr`，或 `TEN-MOE-ROUTE` / `SEM-MOE-DIST`。"
+      ],
+      "skip_if": [
+        "算子无张量 shape、无循环计数、无路由——无可退化对象。"
+      ],
+      "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\reports\\rc128-mechanism-design-20261112-r4\\sources\\original\\api42_trigger_library_original.md",
+      "line_start": 180,
+      "line_end": 183,
+      "source_quote": "\\### 1.1 Empty / Degenerate Input\r\n\r\n**Requires:** 任一 `TEN-*` 带 `CON-SHAPE`，或控制循环次数的 `scalar`/`attr`，或 `TEN-MOE-ROUTE` / `SEM-MOE-DIST`。  \r\n**Skip if:** 算子无张量 shape、无循环计数、无路由——无可退化对象。\r\n"
+    },
+    {
+      "family_id": "1.2",
+      "name": "Shape & Dimension Boundary",
+      "item_count": 8,
+      "requires": [
+        "任一 tensor-like 的 `CON-SHAPE-*`，或 `SEM-GEOM`（卷积组合）。"
+      ],
+      "skip_if": [
+        "无 shape 可配（极罕见）。"
+      ],
+      "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\reports\\rc128-mechanism-design-20261112-r4\\sources\\original\\api42_trigger_library_original.md",
+      "line_start": 206,
+      "line_end": 209,
+      "source_quote": "\\### 1.2 Shape & Dimension Boundary\r\n\r\n**Requires:** 任一 tensor-like 的 `CON-SHAPE-*`，或 `SEM-GEOM`（卷积组合）。  \r\n**Skip if:** 无 shape 可配（极罕见）。\r\n"
+    },
+    {
+      "family_id": "1.3",
+      "name": "Index & Range Mapping",
+      "item_count": 4,
+      "requires": [
+        "- `TEN-INDEX` 或 `tensor_tuple` 索引，或\n- `TEN-MOE-ROUTE` 中的 expert/token 下标，或\n- `SEM-INDEX-CTRL` / `SEM-SLICE`（begin/end/window）且参与地址映射。"
+      ],
+      "skip_if": [
+        "仅有 `TEN-PRIMARY` 等数据张量、无任何索引/下标/窗映射实参 —— 禁止给 1.3 分配预算。\n（这是「张量输入不会有 index 触发」的形式化表述。）"
+      ],
+      "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\reports\\rc128-mechanism-design-20261112-r4\\sources\\original\\api42_trigger_library_original.md",
+      "line_start": 240,
+      "line_end": 249,
+      "source_quote": "\\### 1.3 Index & Range Mapping\r\n\r\n**Requires（硬条件）:**  \r\n\r\n\\- `TEN-INDEX` 或 `tensor_tuple` 索引，**或**  \r\n\\- `TEN-MOE-ROUTE` 中的 expert/token 下标，**或**  \r\n\\- `SEM-INDEX-CTRL` / `SEM-SLICE`（begin/end/window）且参与地址映射。  \r\n\r\n**Skip if:** 仅有 `TEN-PRIMARY` 等数据张量、**无任何索引/下标/窗映射实参** —— **禁止**给 1.3 分配预算。  \r\n（这是「张量输入不会有 index 触发」的形式化表述。）\r\n"
+    },
+    {
+      "family_id": "1.4",
+      "name": "Layout & Stride Format",
+      "item_count": 3,
+      "requires": [
+        "`SEM-LAYOUT`，或 `SEM-TRANSPOSE` 导致非平凡 stride，或 schema 暴露 format/stride，或 `CON-ALIGN`。"
+      ],
+      "skip_if": [
+        "固定 ND、无 format/transpose/align 实参且框架不可控 stride（多项标 `[not testable]`）。"
+      ],
+      "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\reports\\rc128-mechanism-design-20261112-r4\\sources\\original\\api42_trigger_library_original.md",
+      "line_start": 267,
+      "line_end": 270,
+      "source_quote": "\\### 1.4 Layout & Stride Format\r\n\r\n**Requires:** `SEM-LAYOUT`，或 `SEM-TRANSPOSE` 导致非平凡 stride，或 schema 暴露 format/stride，或 `CON-ALIGN`。  \r\n**Skip if:** 固定 ND、无 format/transpose/align 实参且框架不可控 stride（多项标 `[not testable]`）。\r\n"
+    },
+    {
+      "family_id": "1.5",
+      "name": "Sequence & Context Length",
+      "item_count": 4,
+      "requires": [
+        "`SEM-SEQ-LEN` / `TEN-SEQ-META` / `SEM-ATTN-STRUCT` / `TEN-ATTN-QKV` 上可解释的 seq/head 维。"
+      ],
+      "skip_if": [
+        "无序列维语义（纯点对点 elemwise 且无 seq）。"
+      ],
+      "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\reports\\rc128-mechanism-design-20261112-r4\\sources\\original\\api42_trigger_library_original.md",
+      "line_start": 281,
+      "line_end": 284,
+      "source_quote": "\\### 1.5 Sequence & Context Length\r\n\r\n**Requires:** `SEM-SEQ-LEN` / `TEN-SEQ-META` / `SEM-ATTN-STRUCT` / `TEN-ATTN-QKV` 上可解释的 seq/head 维。  \r\n**Skip if:** 无序列维语义（纯点对点 elemwise 且无 seq）。\r\n"
+    },
+    {
+      "family_id": "1.6",
+      "name": "Batch & Sample Composition",
+      "item_count": 2,
+      "requires": [
+        "shape 上存在 batch/sample 维，或 MoE token 分配。"
+      ],
+      "skip_if": [
+        "无 batch 概念的标量核。"
+      ],
+      "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\reports\\rc128-mechanism-design-20261112-r4\\sources\\original\\api42_trigger_library_original.md",
+      "line_start": 294,
+      "line_end": 297,
+      "source_quote": "\\### 1.6 Batch & Sample Composition\r\n\r\n**Requires:** shape 上存在 batch/sample 维，或 MoE token 分配。  \r\n**Skip if:** 无 batch 概念的标量核。\r\n"
+    },
+    {
+      "family_id": "1.7",
+      "name": "Data Distribution & Value Pattern",
+      "item_count": 6,
+      "requires": [
+        "至少一数值型 `TEN-PRIMARY` / `OTHER-OPERAND` / `WEIGHT` / `SCALE-ZP` / `SEM-SCALAR-COEFF`（浮点或会转浮点）。"
+      ],
+      "skip_if": [
+        "无数值载荷（纯 shape 推导算子且无 data）。"
+      ],
+      "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\reports\\rc128-mechanism-design-20261112-r4\\sources\\original\\api42_trigger_library_original.md",
+      "line_start": 306,
+      "line_end": 310,
+      "source_quote": "\\### 1.7 Data Distribution & Value Pattern\r\n\r\n**Requires:** 至少一数值型 `TEN-PRIMARY` / `OTHER-OPERAND` / `WEIGHT` / `SCALE-ZP` / `SEM-SCALAR-COEFF`（浮点或会转浮点）。  \r\n**Skip if:** 无数值载荷（纯 shape 推导算子且无 data）。  \r\n**Note:** `TEN-INDEX` 的值分布走 **1.3**，不占用 1.7 的 INF/exp 模板。\r\n"
+    },
+    {
+      "family_id": "1.8",
+      "name": "Sample Organization & Masking",
+      "item_count": 3,
+      "requires": [
+        "`TEN-MASK` / `SEM-SPARSE-MASK` / `SEM-PADDED-MODE` / packed 相关 attr / `SEM-GEOM` 负 padding。"
+      ],
+      "skip_if": [
+        "无 mask、无 pack/pad 组织、无 crop。"
+      ],
+      "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\reports\\rc128-mechanism-design-20261112-r4\\sources\\original\\api42_trigger_library_original.md",
+      "line_start": 323,
+      "line_end": 326,
+      "source_quote": "\\### 1.8 Sample Organization & Masking\r\n\r\n**Requires:** `TEN-MASK` / `SEM-SPARSE-MASK` / `SEM-PADDED-MODE` / packed 相关 attr / `SEM-GEOM` 负 padding。  \r\n**Skip if:** 无 mask、无 pack/pad 组织、无 crop。\r\n"
+    },
+    {
+      "family_id": "1.C",
+      "name": "Control Arguments",
+      "item_count": 7,
+      "requires": [],
+      "skip_if": [],
+      "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\reports\\rc128-mechanism-design-20261112-r4\\sources\\original\\api42_trigger_library_original.md",
+      "line_start": 337,
+      "line_end": 343,
+      "source_quote": "\\## 1.C Control Arguments\r\n\r\n\\> 仍属 **输入构造**（API 实参），但语义是「拨开关」而非「填数据」。  \r\n\\> 仅当 schema/`inputs` 暴露对应 attr 时 applicable。\r\n\r\n| ID        | 项                           | Requires 语义                               | 常联合 1.x |\r\n| --------- | ---------------------------- | ------------------------------------------- | ---------- |\r\n"
+    }
+  ],
+  "items42": [
+    {
+      "id": "1.1.1",
+      "name": "Zero dimension",
+      "family_id": "1.1",
+      "definition": "某维 shape=0。\nRequires: `CON-SHAPE` on tensor-like.  \r\nGenerator: shape 含 0。",
+      "requires": [
+        "任一 `TEN-*` 带 `CON-SHAPE`，或控制循环次数的 `scalar`/`attr`，或 `TEN-MOE-ROUTE` / `SEM-MOE-DIST`。",
+        "`CON-SHAPE` on tensor-like."
+      ],
+      "skip_if": [
+        "算子无张量 shape、无循环计数、无路由——无可退化对象。"
+      ],
+      "item_requires": [
+        "`CON-SHAPE` on tensor-like."
+      ],
+      "item_skip_if": [],
+      "family_requires": [
+        "任一 `TEN-*` 带 `CON-SHAPE`，或控制循环次数的 `scalar`/`attr`，或 `TEN-MOE-ROUTE` / `SEM-MOE-DIST`。"
+      ],
+      "family_skip_if": [
+        "算子无张量 shape、无循环计数、无路由——无可退化对象。"
+      ],
+      "family_scope_constraint": null,
+      "input_roles": [
+        "TEN-PRIMARY",
+        "TEN-OTHER-OPERAND",
+        "TEN-GRAD",
+        "CON-SHAPE"
+      ],
+      "construction_focus": "把可配维设0，保留其他维及输出关系，比较首个非空输入。",
+      "consumer_direction": "判空、InferShape、早退及非空辅助/梯度输出写回。",
+      "boundary": "零元素只说明主数据为空；不证明所有输出为空或可以跳过初始化。",
+      "legality_expectation": "按目标接口/版本契约分别记录合法计算、明确应拒绝及未定义域；未定义输入的异常不自动成为精度缺陷。",
+      "interpretation_status": "REVIEWER_EXPLANATION_NOT_IMPLEMENTATION_OR_HISTORICAL_PROOF",
+      "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\reports\\rc128-mechanism-design-20261112-r4\\sources\\original\\api42_trigger_library_original.md",
+      "source_quote": "`[ / ]` **1.1.1 Zero dimension** — 某维 shape=0。  \r\nRequires: `CON-SHAPE` on tensor-like.  \r\nGenerator: shape 含 0。\r\n",
+      "source_line": 185,
+      "source_line_end": 187,
+      "family_source_quote": "\\### 1.1 Empty / Degenerate Input\r\n\r\n**Requires:** 任一 `TEN-*` 带 `CON-SHAPE`，或控制循环次数的 `scalar`/`attr`，或 `TEN-MOE-ROUTE` / `SEM-MOE-DIST`。  \r\n**Skip if:** 算子无张量 shape、无循环计数、无路由——无可退化对象。\r\n",
+      "family_source_line": 180
+    },
+    {
+      "id": "1.1.2",
+      "name": "Zero repeat/loop count",
+      "family_id": "1.1",
+      "definition": "repeat/loop/r=0。\nRequires: `SEM-SCALAR-COEFF` 或相关 attr/scalar 表示次数。  \r\nSkip if: 无此类参数。",
+      "requires": [
+        "任一 `TEN-*` 带 `CON-SHAPE`，或控制循环次数的 `scalar`/`attr`，或 `TEN-MOE-ROUTE` / `SEM-MOE-DIST`。",
+        "`SEM-SCALAR-COEFF` 或相关 attr/scalar 表示次数。"
+      ],
+      "skip_if": [
+        "算子无张量 shape、无循环计数、无路由——无可退化对象。",
+        "无此类参数。"
+      ],
+      "item_requires": [
+        "`SEM-SCALAR-COEFF` 或相关 attr/scalar 表示次数。"
+      ],
+      "item_skip_if": [
+        "无此类参数。"
+      ],
+      "family_requires": [
+        "任一 `TEN-*` 带 `CON-SHAPE`，或控制循环次数的 `scalar`/`attr`，或 `TEN-MOE-ROUTE` / `SEM-MOE-DIST`。"
+      ],
+      "family_skip_if": [
+        "算子无张量 shape、无循环计数、无路由——无可退化对象。"
+      ],
+      "family_scope_constraint": null,
+      "input_roles": [
+        "SEM-SCALAR-COEFF",
+        "scalar/attr循环次数"
+      ],
+      "construction_focus": "次数取0、1及普通值，检查零迭代语义。",
+      "consumer_direction": "循环入口、提前返回和循环后置条件消费者。",
+      "boundary": "必须存在次数实参；不能把内部任意循环计数冒充API输入，也不能因零次直接推断缺同步。",
+      "legality_expectation": "按目标接口/版本契约分别记录合法计算、明确应拒绝及未定义域；未定义输入的异常不自动成为精度缺陷。",
+      "interpretation_status": "REVIEWER_EXPLANATION_NOT_IMPLEMENTATION_OR_HISTORICAL_PROOF",
+      "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\reports\\rc128-mechanism-design-20261112-r4\\sources\\original\\api42_trigger_library_original.md",
+      "source_quote": "`[ / ]` **1.1.2 Zero repeat/loop count** — repeat/loop/r=0。  \r\nRequires: `SEM-SCALAR-COEFF` 或相关 attr/scalar 表示次数。  \r\nSkip if: 无此类参数。\r\n",
+      "source_line": 189,
+      "source_line_end": 191,
+      "family_source_quote": "\\### 1.1 Empty / Degenerate Input\r\n\r\n**Requires:** 任一 `TEN-*` 带 `CON-SHAPE`，或控制循环次数的 `scalar`/`attr`，或 `TEN-MOE-ROUTE` / `SEM-MOE-DIST`。  \r\n**Skip if:** 算子无张量 shape、无循环计数、无路由——无可退化对象。\r\n",
+      "family_source_line": 180
+    },
+    {
+      "id": "1.1.3",
+      "name": "All-zero rows/blocks",
+      "family_id": "1.1",
+      "definition": "shape 非空但值全 0。\nRequires: 浮点/量化相关 `TEN-PRIMARY`（或参与 ReduceMax/scale 的张量）。  \r\nSkip if: 无数据张量或纯布尔逻辑且无数值归约。",
+      "requires": [
+        "任一 `TEN-*` 带 `CON-SHAPE`，或控制循环次数的 `scalar`/`attr`，或 `TEN-MOE-ROUTE` / `SEM-MOE-DIST`。",
+        "浮点/量化相关 `TEN-PRIMARY`（或参与 ReduceMax/scale 的张量）。"
+      ],
+      "skip_if": [
+        "算子无张量 shape、无循环计数、无路由——无可退化对象。",
+        "无数据张量或纯布尔逻辑且无数值归约。"
+      ],
+      "item_requires": [
+        "浮点/量化相关 `TEN-PRIMARY`（或参与 ReduceMax/scale 的张量）。"
+      ],
+      "item_skip_if": [
+        "无数据张量或纯布尔逻辑且无数值归约。"
+      ],
+      "family_requires": [
+        "任一 `TEN-*` 带 `CON-SHAPE`，或控制循环次数的 `scalar`/`attr`，或 `TEN-MOE-ROUTE` / `SEM-MOE-DIST`。"
+      ],
+      "family_skip_if": [
+        "算子无张量 shape、无循环计数、无路由——无可退化对象。"
+      ],
+      "family_scope_constraint": null,
+      "input_roles": [
+        "TEN-PRIMARY",
+        "TEN-SCALE-ZP"
+      ],
+      "construction_focus": "shape非空，某行/块数据全0，与一个非零值对照。",
+      "consumer_direction": "ReduceMax/统计量/scale生成及归一化消费者。",
+      "boundary": "与shape=0区分；全0是输入条件，scale=Inf或缺zero-guard需要公式及观测支持。",
+      "legality_expectation": "按目标接口/版本契约分别记录合法计算、明确应拒绝及未定义域；未定义输入的异常不自动成为精度缺陷。",
+      "interpretation_status": "REVIEWER_EXPLANATION_NOT_IMPLEMENTATION_OR_HISTORICAL_PROOF",
+      "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\reports\\rc128-mechanism-design-20261112-r4\\sources\\original\\api42_trigger_library_original.md",
+      "source_quote": "`[ / ]` **1.1.3 All-zero rows/blocks** — shape 非空但值全 0。  \r\nRequires: 浮点/量化相关 `TEN-PRIMARY`（或参与 ReduceMax/scale 的张量）。  \r\nSkip if: 无数据张量或纯布尔逻辑且无数值归约。\r\n",
+      "source_line": 193,
+      "source_line_end": 195,
+      "family_source_quote": "\\### 1.1 Empty / Degenerate Input\r\n\r\n**Requires:** 任一 `TEN-*` 带 `CON-SHAPE`，或控制循环次数的 `scalar`/`attr`，或 `TEN-MOE-ROUTE` / `SEM-MOE-DIST`。  \r\n**Skip if:** 算子无张量 shape、无循环计数、无路由——无可退化对象。\r\n",
+      "family_source_line": 180
+    },
+    {
+      "id": "1.1.4",
+      "name": "Empty expert (MoE)",
+      "family_id": "1.1",
+      "definition": "某 expert token 数=0。\nRequires: `TEN-MOE-ROUTE` 或 `SEM-MOE-DIST`。  \r\nSkip if: 非 MoE。",
+      "requires": [
+        "任一 `TEN-*` 带 `CON-SHAPE`，或控制循环次数的 `scalar`/`attr`，或 `TEN-MOE-ROUTE` / `SEM-MOE-DIST`。",
+        "`TEN-MOE-ROUTE` 或 `SEM-MOE-DIST`。"
+      ],
+      "skip_if": [
+        "算子无张量 shape、无循环计数、无路由——无可退化对象。",
+        "非 MoE。"
+      ],
+      "item_requires": [
+        "`TEN-MOE-ROUTE` 或 `SEM-MOE-DIST`。"
+      ],
+      "item_skip_if": [
+        "非 MoE。"
+      ],
+      "family_requires": [
+        "任一 `TEN-*` 带 `CON-SHAPE`，或控制循环次数的 `scalar`/`attr`，或 `TEN-MOE-ROUTE` / `SEM-MOE-DIST`。"
+      ],
+      "family_skip_if": [
+        "算子无张量 shape、无循环计数、无路由——无可退化对象。"
+      ],
+      "family_scope_constraint": null,
+      "input_roles": [
+        "TEN-MOE-ROUTE",
+        "SEM-MOE-DIST"
+      ],
+      "construction_focus": "通过合法路由令某expert没有token，其他expert仍有数据。",
+      "consumer_direction": "专家计数、分组分派、空expert跳过及结果合并。",
+      "boundary": "需要真实MoE路由语义；不能由普通空tensor自动挂空专家专项。",
+      "legality_expectation": "按目标接口/版本契约分别记录合法计算、明确应拒绝及未定义域；未定义输入的异常不自动成为精度缺陷。",
+      "interpretation_status": "REVIEWER_EXPLANATION_NOT_IMPLEMENTATION_OR_HISTORICAL_PROOF",
+      "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\reports\\rc128-mechanism-design-20261112-r4\\sources\\original\\api42_trigger_library_original.md",
+      "source_quote": "`[ / ]` **1.1.4 Empty expert (MoE)** — 某 expert token 数=0。  \r\nRequires: `TEN-MOE-ROUTE` 或 `SEM-MOE-DIST`。  \r\nSkip if: 非 MoE。\r\n",
+      "source_line": 197,
+      "source_line_end": 199,
+      "family_source_quote": "\\### 1.1 Empty / Degenerate Input\r\n\r\n**Requires:** 任一 `TEN-*` 带 `CON-SHAPE`，或控制循环次数的 `scalar`/`attr`，或 `TEN-MOE-ROUTE` / `SEM-MOE-DIST`。  \r\n**Skip if:** 算子无张量 shape、无循环计数、无路由——无可退化对象。\r\n",
+      "family_source_line": 180
+    },
+    {
+      "id": "1.1.5",
+      "name": "Empty partition/shard",
+      "family_id": "1.1",
+      "definition": "分核后某核 0 数据（靠 shape 间接）。\nRequires: `CON-SHAPE` + 多核切分可能（大/怪 shape）。",
+      "requires": [
+        "任一 `TEN-*` 带 `CON-SHAPE`，或控制循环次数的 `scalar`/`attr`，或 `TEN-MOE-ROUTE` / `SEM-MOE-DIST`。",
+        "`CON-SHAPE` + 多核切分可能（大/怪 shape）。"
+      ],
+      "skip_if": [
+        "算子无张量 shape、无循环计数、无路由——无可退化对象。"
+      ],
+      "item_requires": [
+        "`CON-SHAPE` + 多核切分可能（大/怪 shape）。"
+      ],
+      "item_skip_if": [],
+      "family_requires": [
+        "任一 `TEN-*` 带 `CON-SHAPE`，或控制循环次数的 `scalar`/`attr`，或 `TEN-MOE-ROUTE` / `SEM-MOE-DIST`。"
+      ],
+      "family_skip_if": [
+        "算子无张量 shape、无循环计数、无路由——无可退化对象。"
+      ],
+      "family_scope_constraint": null,
+      "input_roles": [
+        "CON-SHAPE",
+        "TEN-PRIMARY"
+      ],
+      "construction_focus": "在多核切分可能的合法shape中让部分分片为空。",
+      "consumer_direction": "tiling分核、每核有效长度、空分片早退和聚合。",
+      "boundary": "输入shape只是间接入口；实际哪核为0及路径必须由tiling/分派证据确认。",
+      "legality_expectation": "按目标接口/版本契约分别记录合法计算、明确应拒绝及未定义域；未定义输入的异常不自动成为精度缺陷。",
+      "interpretation_status": "REVIEWER_EXPLANATION_NOT_IMPLEMENTATION_OR_HISTORICAL_PROOF",
+      "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\reports\\rc128-mechanism-design-20261112-r4\\sources\\original\\api42_trigger_library_original.md",
+      "source_quote": "`[ / ]` **1.1.5 Empty partition/shard** — 分核后某核 0 数据（靠 shape 间接）。  \r\nRequires: `CON-SHAPE` + 多核切分可能（大/怪 shape）。  \r\n",
+      "source_line": 201,
+      "source_line_end": 202,
+      "family_source_quote": "\\### 1.1 Empty / Degenerate Input\r\n\r\n**Requires:** 任一 `TEN-*` 带 `CON-SHAPE`，或控制循环次数的 `scalar`/`attr`，或 `TEN-MOE-ROUTE` / `SEM-MOE-DIST`。  \r\n**Skip if:** 算子无张量 shape、无循环计数、无路由——无可退化对象。\r\n",
+      "family_source_line": 180
+    },
+    {
+      "id": "1.2.1",
+      "name": "Minimal dimension (M/N/K=1)",
+      "family_id": "1.2",
+      "definition": "核心维=1。\nRequires: 存在可解释为 M/N/K/L 的 shape 维。",
+      "requires": [
+        "任一 tensor-like 的 `CON-SHAPE-*`，或 `SEM-GEOM`（卷积组合）。",
+        "存在可解释为 M/N/K/L 的 shape 维。"
+      ],
+      "skip_if": [
+        "无 shape 可配（极罕见）。"
+      ],
+      "item_requires": [
+        "存在可解释为 M/N/K/L 的 shape 维。"
+      ],
+      "item_skip_if": [],
+      "family_requires": [
+        "任一 tensor-like 的 `CON-SHAPE-*`，或 `SEM-GEOM`（卷积组合）。"
+      ],
+      "family_skip_if": [
+        "无 shape 可配（极罕见）。"
+      ],
+      "family_scope_constraint": null,
+      "input_roles": [
+        "CON-SHAPE",
+        "M/N/K/L语义维"
+      ],
+      "construction_focus": "选择核心维1及相邻合法维长。",
+      "consumer_direction": "小维特化、循环次数、广播和分块消费者。",
+      "boundary": "需证明该轴确为核心维；任意shape含1不等于同一退化路径。",
+      "legality_expectation": "按目标接口/版本契约分别记录合法计算、明确应拒绝及未定义域；未定义输入的异常不自动成为精度缺陷。",
+      "interpretation_status": "REVIEWER_EXPLANATION_NOT_IMPLEMENTATION_OR_HISTORICAL_PROOF",
+      "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\reports\\rc128-mechanism-design-20261112-r4\\sources\\original\\api42_trigger_library_original.md",
+      "source_quote": "`[ / ]` **1.2.1 Minimal dimension (M/N/K=1)** — 核心维=1。  \r\nRequires: 存在可解释为 M/N/K/L 的 shape 维。\r\n",
+      "source_line": 211,
+      "source_line_end": 212,
+      "family_source_quote": "\\### 1.2 Shape & Dimension Boundary\r\n\r\n**Requires:** 任一 tensor-like 的 `CON-SHAPE-*`，或 `SEM-GEOM`（卷积组合）。  \r\n**Skip if:** 无 shape 可配（极罕见）。\r\n",
+      "family_source_line": 206
+    },
+    {
+      "id": "1.2.2",
+      "name": "Tail-block misalignment",
+      "family_id": "1.2",
+      "definition": "维长 ∉ 对齐（16/32/64/128/256）。\nValues: 1,3,7,13,17,33,65,69,127,129,255,257。",
+      "requires": [
+        "任一 tensor-like 的 `CON-SHAPE-*`，或 `SEM-GEOM`（卷积组合）。"
+      ],
+      "skip_if": [
+        "无 shape 可配（极罕见）。"
+      ],
+      "item_requires": [],
+      "item_skip_if": [],
+      "family_requires": [
+        "任一 tensor-like 的 `CON-SHAPE-*`，或 `SEM-GEOM`（卷积组合）。"
+      ],
+      "family_skip_if": [
+        "无 shape 可配（极罕见）。"
+      ],
+      "family_scope_constraint": null,
+      "input_roles": [
+        "CON-SHAPE",
+        "CON-ALIGN"
+      ],
+      "construction_focus": "按该实现真实分块/对齐A构造kA−1、kA、kA+1及不足一块。",
+      "consumer_direction": "尾块有效长度、补齐、搬运和向量/矩阵计算。",
+      "boundary": "原表16/32/64等是构造线索，不是每个算子通用阈值；不从非对齐直接认定越界。",
+      "legality_expectation": "按目标接口/版本契约分别记录合法计算、明确应拒绝及未定义域；未定义输入的异常不自动成为精度缺陷。",
+      "interpretation_status": "REVIEWER_EXPLANATION_NOT_IMPLEMENTATION_OR_HISTORICAL_PROOF",
+      "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\reports\\rc128-mechanism-design-20261112-r4\\sources\\original\\api42_trigger_library_original.md",
+      "source_quote": "`[ / ]` **1.2.2 Tail-block misalignment** — 维长 ∉ 对齐（16/32/64/128/256）。  \r\nValues: 1,3,7,13,17,33,65,69,127,129,255,257。\r\n",
+      "source_line": 214,
+      "source_line_end": 215,
+      "family_source_quote": "\\### 1.2 Shape & Dimension Boundary\r\n\r\n**Requires:** 任一 tensor-like 的 `CON-SHAPE-*`，或 `SEM-GEOM`（卷积组合）。  \r\n**Skip if:** 无 shape 可配（极罕见）。\r\n",
+      "family_source_line": 206
+    },
+    {
+      "id": "1.2.3",
+      "name": "Split count exceeds limit",
+      "family_id": "1.2",
+      "definition": "split/chunk 数超内部数组。\nRequires: `SEM-SLICE` / split 类 attr 或可推导 split 的 shape。  \r\nSkip if: 无 split。",
+      "requires": [
+        "任一 tensor-like 的 `CON-SHAPE-*`，或 `SEM-GEOM`（卷积组合）。",
+        "`SEM-SLICE` / split 类 attr 或可推导 split 的 shape。"
+      ],
+      "skip_if": [
+        "无 shape 可配（极罕见）。",
+        "无 split。"
+      ],
+      "item_requires": [
+        "`SEM-SLICE` / split 类 attr 或可推导 split 的 shape。"
+      ],
+      "item_skip_if": [
+        "无 split。"
+      ],
+      "family_requires": [
+        "任一 tensor-like 的 `CON-SHAPE-*`，或 `SEM-GEOM`（卷积组合）。"
+      ],
+      "family_skip_if": [
+        "无 shape 可配（极罕见）。"
+      ],
+      "family_scope_constraint": null,
+      "input_roles": [
+        "SEM-SLICE",
+        "split类attr",
+        "可推导split的CON-SHAPE"
+      ],
+      "construction_focus": "令split/chunk数量跨内部容量边界，保留合法接口约束。",
+      "consumer_direction": "split数量计算、固定数组/列表容量及循环索引。",
+      "boundary": "必须有split语义及内部容量依据；单纯大维不证明split数组越界。",
+      "legality_expectation": "按目标接口/版本契约分别记录合法计算、明确应拒绝及未定义域；未定义输入的异常不自动成为精度缺陷。",
+      "interpretation_status": "REVIEWER_EXPLANATION_NOT_IMPLEMENTATION_OR_HISTORICAL_PROOF",
+      "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\reports\\rc128-mechanism-design-20261112-r4\\sources\\original\\api42_trigger_library_original.md",
+      "source_quote": "`[ / ]` **1.2.3 Split count exceeds limit** — split/chunk 数超内部数组。  \r\nRequires: `SEM-SLICE` / split 类 attr 或可推导 split 的 shape。  \r\nSkip if: 无 split。\r\n",
+      "source_line": 217,
+      "source_line_end": 219,
+      "family_source_quote": "\\### 1.2 Shape & Dimension Boundary\r\n\r\n**Requires:** 任一 tensor-like 的 `CON-SHAPE-*`，或 `SEM-GEOM`（卷积组合）。  \r\n**Skip if:** 无 shape 可配（极罕见）。\r\n",
+      "family_source_line": 206
+    },
+    {
+      "id": "1.2.4",
+      "name": "Very large dimension (int overflow)",
+      "family_id": "1.2",
+      "definition": "近 uint16/int32/2^24。\nValues: 65535, 65536, 16777217, 2^31 边界。  \r\n代码信号: 窄整型存 offset。",
+      "requires": [
+        "任一 tensor-like 的 `CON-SHAPE-*`，或 `SEM-GEOM`（卷积组合）。"
+      ],
+      "skip_if": [
+        "无 shape 可配（极罕见）。"
+      ],
+      "item_requires": [],
+      "item_skip_if": [],
+      "family_requires": [
+        "任一 tensor-like 的 `CON-SHAPE-*`，或 `SEM-GEOM`（卷积组合）。"
+      ],
+      "family_skip_if": [
+        "无 shape 可配（极罕见）。"
+      ],
+      "family_scope_constraint": null,
+      "input_roles": [
+        "CON-SHAPE",
+        "窄整型offset实现线索"
+      ],
+      "construction_focus": "在uint16/int32/2^24附近设计规模或表示边界，记录实际可达容量。",
+      "consumer_direction": "元素总量/stride/偏移乘积、整数或浮点表示转换。",
+      "boundary": "2^24精确整数边界与int32回绕是不同机制；大shape不证明溢出，实际算式/类型仍须核对。",
+      "legality_expectation": "按目标接口/版本契约分别记录合法计算、明确应拒绝及未定义域；未定义输入的异常不自动成为精度缺陷。",
+      "interpretation_status": "REVIEWER_EXPLANATION_NOT_IMPLEMENTATION_OR_HISTORICAL_PROOF",
+      "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\reports\\rc128-mechanism-design-20261112-r4\\sources\\original\\api42_trigger_library_original.md",
+      "source_quote": "`[ / ]` **1.2.4 Very large dimension (int overflow)** — 近 uint16/int32/2^24。  \r\nValues: 65535, 65536, 16777217, 2^31 边界。  \r\n代码信号: 窄整型存 offset。\r\n",
+      "source_line": 221,
+      "source_line_end": 223,
+      "family_source_quote": "\\### 1.2 Shape & Dimension Boundary\r\n\r\n**Requires:** 任一 tensor-like 的 `CON-SHAPE-*`，或 `SEM-GEOM`（卷积组合）。  \r\n**Skip if:** 无 shape 可配（极罕见）。\r\n",
+      "family_source_line": 206
+    },
+    {
+      "id": "1.2.5",
+      "name": "Broadcast degeneration",
+      "family_id": "1.2",
+      "definition": "广播维=1 / stride 0。\nRequires: ≥2 个可广播 tensor 操作数（PRIMARY+OTHER 或列表）。",
+      "requires": [
+        "任一 tensor-like 的 `CON-SHAPE-*`，或 `SEM-GEOM`（卷积组合）。",
+        "≥2 个可广播 tensor 操作数（PRIMARY+OTHER 或列表）。"
+      ],
+      "skip_if": [
+        "无 shape 可配（极罕见）。"
+      ],
+      "item_requires": [
+        "≥2 个可广播 tensor 操作数（PRIMARY+OTHER 或列表）。"
+      ],
+      "item_skip_if": [],
+      "family_requires": [
+        "任一 tensor-like 的 `CON-SHAPE-*`，或 `SEM-GEOM`（卷积组合）。"
+      ],
+      "family_skip_if": [
+        "无 shape 可配（极罕见）。"
+      ],
+      "family_scope_constraint": null,
+      "input_roles": [
+        "TEN-PRIMARY",
+        "TEN-OTHER-OPERAND",
+        "可广播tensor列表"
+      ],
+      "construction_focus": "在至少两个可广播操作数上使用维1及相关广播组合。",
+      "consumer_direction": "广播轴对齐、零步长派生及跨输入地址映射。",
+      "boundary": "合同允许的广播不是非法shape；不能把广播退化自动等同布局转换错误。",
+      "legality_expectation": "按目标接口/版本契约分别记录合法计算、明确应拒绝及未定义域；未定义输入的异常不自动成为精度缺陷。",
+      "interpretation_status": "REVIEWER_EXPLANATION_NOT_IMPLEMENTATION_OR_HISTORICAL_PROOF",
+      "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\reports\\rc128-mechanism-design-20261112-r4\\sources\\original\\api42_trigger_library_original.md",
+      "source_quote": "`[ / ]` **1.2.5 Broadcast degeneration** — 广播维=1 / stride 0。  \r\nRequires: ≥2 个可广播 tensor 操作数（PRIMARY+OTHER 或列表）。\r\n",
+      "source_line": 225,
+      "source_line_end": 226,
+      "family_source_quote": "\\### 1.2 Shape & Dimension Boundary\r\n\r\n**Requires:** 任一 tensor-like 的 `CON-SHAPE-*`，或 `SEM-GEOM`（卷积组合）。  \r\n**Skip if:** 无 shape 可配（极罕见）。\r\n",
+      "family_source_line": 206
+    },
+    {
+      "id": "1.2.6",
+      "name": "Tiling template boundary (off-by-one)",
+      "family_id": "1.2",
+      "definition": "落在模板选择边界 ±1。\nRequires: 从 src 读出边界常量 + `CON-SHAPE`。",
+      "requires": [
+        "任一 tensor-like 的 `CON-SHAPE-*`，或 `SEM-GEOM`（卷积组合）。",
+        "从 src 读出边界常量 + `CON-SHAPE`。"
+      ],
+      "skip_if": [
+        "无 shape 可配（极罕见）。"
+      ],
+      "item_requires": [
+        "从 src 读出边界常量 + `CON-SHAPE`。"
+      ],
+      "item_skip_if": [],
+      "family_requires": [
+        "任一 tensor-like 的 `CON-SHAPE-*`，或 `SEM-GEOM`（卷积组合）。"
+      ],
+      "family_skip_if": [
+        "无 shape 可配（极罕见）。"
+      ],
+      "family_scope_constraint": null,
+      "input_roles": [
+        "CON-SHAPE",
+        "源码模板选择边界"
+      ],
+      "construction_focus": "从源码读真实模板分派边界，构造边界两侧和等值。",
+      "consumer_direction": "tiling/模板分派谓词、分支专属容量与计算路径。",
+      "boundary": "只有容量阈值或某个常量还不够；要证明其参与模板选择，未观测tiling不能声称路径已覆盖。",
+      "legality_expectation": "按目标接口/版本契约分别记录合法计算、明确应拒绝及未定义域；未定义输入的异常不自动成为精度缺陷。",
+      "interpretation_status": "REVIEWER_EXPLANATION_NOT_IMPLEMENTATION_OR_HISTORICAL_PROOF",
+      "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\reports\\rc128-mechanism-design-20261112-r4\\sources\\original\\api42_trigger_library_original.md",
+      "source_quote": "`[ / ]` **1.2.6 Tiling template boundary (off-by-one)** — 落在模板选择边界 ±1。  \r\nRequires: 从 src 读出边界常量 + `CON-SHAPE`。\r\n",
+      "source_line": 228,
+      "source_line_end": 229,
+      "family_source_quote": "\\### 1.2 Shape & Dimension Boundary\r\n\r\n**Requires:** 任一 tensor-like 的 `CON-SHAPE-*`，或 `SEM-GEOM`（卷积组合）。  \r\n**Skip if:** 无 shape 可配（极罕见）。\r\n",
+      "family_source_line": 206
+    },
+    {
+      "id": "1.2.7",
+      "name": "Convolution special shape combo",
+      "family_id": "1.2",
+      "definition": "input×kernel×stride×dilation×pad。\nRequires: `SEM-GEOM`（attrs/attr_tuple）+ 特征/权重张量。  \r\nSkip if: 非 conv/pool 几何类。",
+      "requires": [
+        "任一 tensor-like 的 `CON-SHAPE-*`，或 `SEM-GEOM`（卷积组合）。",
+        "`SEM-GEOM`（attrs/attr_tuple）+ 特征/权重张量。"
+      ],
+      "skip_if": [
+        "无 shape 可配（极罕见）。",
+        "非 conv/pool 几何类。"
+      ],
+      "item_requires": [
+        "`SEM-GEOM`（attrs/attr_tuple）+ 特征/权重张量。"
+      ],
+      "item_skip_if": [
+        "非 conv/pool 几何类。"
+      ],
+      "family_requires": [
+        "任一 tensor-like 的 `CON-SHAPE-*`，或 `SEM-GEOM`（卷积组合）。"
+      ],
+      "family_skip_if": [
+        "无 shape 可配（极罕见）。"
+      ],
+      "family_scope_constraint": null,
+      "input_roles": [
+        "SEM-GEOM",
+        "TEN-PRIMARY",
+        "TEN-WEIGHT"
+      ],
+      "construction_focus": "组合input、kernel、stride、dilation、pad，保持卷积/池化接口约束。",
+      "consumer_direction": "输出尺寸推导、窗口映射、边缘补齐及几何分支。",
+      "boundary": "不适用于无几何语义算子；不同几何条件可能触达不同关系，不统一推成同一根因。",
+      "legality_expectation": "按目标接口/版本契约分别记录合法计算、明确应拒绝及未定义域；未定义输入的异常不自动成为精度缺陷。",
+      "interpretation_status": "REVIEWER_EXPLANATION_NOT_IMPLEMENTATION_OR_HISTORICAL_PROOF",
+      "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\reports\\rc128-mechanism-design-20261112-r4\\sources\\original\\api42_trigger_library_original.md",
+      "source_quote": "`[ / ]` **1.2.7 Convolution special shape combo** — input×kernel×stride×dilation×pad。  \r\nRequires: `SEM-GEOM`（attrs/attr_tuple）+ 特征/权重张量。  \r\nSkip if: 非 conv/pool 几何类。\r\n",
+      "source_line": 231,
+      "source_line_end": 233,
+      "family_source_quote": "\\### 1.2 Shape & Dimension Boundary\r\n\r\n**Requires:** 任一 tensor-like 的 `CON-SHAPE-*`，或 `SEM-GEOM`（卷积组合）。  \r\n**Skip if:** 无 shape 可配（极罕见）。\r\n",
+      "family_source_line": 206
+    },
+    {
+      "id": "1.2.8",
+      "name": "Output dim < minimum transfer granularity",
+      "family_id": "1.2",
+      "definition": "输出 < 32B 等。\nRequires: 可推出 output 元素数与 dtype 宽度。",
+      "requires": [
+        "任一 tensor-like 的 `CON-SHAPE-*`，或 `SEM-GEOM`（卷积组合）。",
+        "可推出 output 元素数与 dtype 宽度。"
+      ],
+      "skip_if": [
+        "无 shape 可配（极罕见）。"
+      ],
+      "item_requires": [
+        "可推出 output 元素数与 dtype 宽度。"
+      ],
+      "item_skip_if": [],
+      "family_requires": [
+        "任一 tensor-like 的 `CON-SHAPE-*`，或 `SEM-GEOM`（卷积组合）。"
+      ],
+      "family_skip_if": [
+        "无 shape 可配（极罕见）。"
+      ],
+      "family_scope_constraint": null,
+      "input_roles": [
+        "CON-SHAPE",
+        "输出元素数及dtype宽度"
+      ],
+      "construction_focus": "通过合法输入导出小于最小搬运粒度的输出，检查字节与元素换算。",
+      "consumer_direction": "输出容量、DataCopy/尾部写回及padding区域。",
+      "boundary": "输出通常是由输入推导的对象，不是任意可写API输入；32B是否适用须由实际指令/合同确认。",
+      "legality_expectation": "按目标接口/版本契约分别记录合法计算、明确应拒绝及未定义域；未定义输入的异常不自动成为精度缺陷。",
+      "interpretation_status": "REVIEWER_EXPLANATION_NOT_IMPLEMENTATION_OR_HISTORICAL_PROOF",
+      "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\reports\\rc128-mechanism-design-20261112-r4\\sources\\original\\api42_trigger_library_original.md",
+      "source_quote": "`[ / ]` **1.2.8 Output dim < minimum transfer granularity** — 输出 < 32B 等。  \r\nRequires: 可推出 output 元素数与 dtype 宽度。\r\n",
+      "source_line": 235,
+      "source_line_end": 236,
+      "family_source_quote": "\\### 1.2 Shape & Dimension Boundary\r\n\r\n**Requires:** 任一 tensor-like 的 `CON-SHAPE-*`，或 `SEM-GEOM`（卷积组合）。  \r\n**Skip if:** 无 shape 可配（极罕见）。\r\n",
+      "family_source_line": 206
+    },
+    {
+      "id": "1.3.1",
+      "name": "Index OOB / extreme",
+      "family_id": "1.3",
+      "definition": "0, -1, MAX_INT, ≥dim。\nRequires: `TEN-INDEX`（dtype 多为 int32/64）。",
+      "requires": [
+        "- `TEN-INDEX` 或 `tensor_tuple` 索引，或\n- `TEN-MOE-ROUTE` 中的 expert/token 下标，或\n- `SEM-INDEX-CTRL` / `SEM-SLICE`（begin/end/window）且参与地址映射。",
+        "`TEN-INDEX`（dtype 多为 int32/64）。"
+      ],
+      "skip_if": [
+        "仅有 `TEN-PRIMARY` 等数据张量、无任何索引/下标/窗映射实参 —— 禁止给 1.3 分配预算。\n（这是「张量输入不会有 index 触发」的形式化表述。）"
+      ],
+      "item_requires": [
+        "`TEN-INDEX`（dtype 多为 int32/64）。"
+      ],
+      "item_skip_if": [],
+      "family_requires": [
+        "- `TEN-INDEX` 或 `tensor_tuple` 索引，或\n- `TEN-MOE-ROUTE` 中的 expert/token 下标，或\n- `SEM-INDEX-CTRL` / `SEM-SLICE`（begin/end/window）且参与地址映射。"
+      ],
+      "family_skip_if": [
+        "仅有 `TEN-PRIMARY` 等数据张量、无任何索引/下标/窗映射实参 —— 禁止给 1.3 分配预算。\n（这是「张量输入不会有 index 触发」的形式化表述。）"
+      ],
+      "family_scope_constraint": null,
+      "input_roles": [
+        "TEN-INDEX",
+        "int32/int64索引"
+      ],
+      "construction_focus": "构造0、-1、MAX_INT、≥dim等端点/极端值，分别标记有效、应拒绝及未定义域。",
+      "consumer_direction": "索引合法性校验、负索引规范化、gather/scatter地址。",
+      "boundary": "原42含无效值校验测试；是否允许-1、报错或忽略取决接口契约，不能把任何异常值输出当精度缺陷。",
+      "legality_expectation": "按目标接口/版本契约分别记录合法计算、明确应拒绝及未定义域；未定义输入的异常不自动成为精度缺陷。",
+      "interpretation_status": "REVIEWER_EXPLANATION_NOT_IMPLEMENTATION_OR_HISTORICAL_PROOF",
+      "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\reports\\rc128-mechanism-design-20261112-r4\\sources\\original\\api42_trigger_library_original.md",
+      "source_quote": "`[ / ]` **1.3.1 Index OOB / extreme** — 0, -1, MAX_INT, ≥dim。  \r\nRequires: `TEN-INDEX`（dtype 多为 int32/64）。\r\n",
+      "source_line": 251,
+      "source_line_end": 252,
+      "family_source_quote": "\\### 1.3 Index & Range Mapping\r\n\r\n**Requires（硬条件）:**  \r\n\r\n\\- `TEN-INDEX` 或 `tensor_tuple` 索引，**或**  \r\n\\- `TEN-MOE-ROUTE` 中的 expert/token 下标，**或**  \r\n\\- `SEM-INDEX-CTRL` / `SEM-SLICE`（begin/end/window）且参与地址映射。  \r\n\r\n**Skip if:** 仅有 `TEN-PRIMARY` 等数据张量、**无任何索引/下标/窗映射实参** —— **禁止**给 1.3 分配预算。  \r\n（这是「张量输入不会有 index 触发」的形式化表述。）\r\n",
+      "family_source_line": 240
+    },
+    {
+      "id": "1.3.2",
+      "name": "Offset overflow (>uint16 / >int32)",
+      "family_id": "1.3",
+      "definition": "算址偏移溢出。\nRequires: shape/index 使 offset 公式 > 阈值；常与 1.2.4 组合。",
+      "requires": [
+        "- `TEN-INDEX` 或 `tensor_tuple` 索引，或\n- `TEN-MOE-ROUTE` 中的 expert/token 下标，或\n- `SEM-INDEX-CTRL` / `SEM-SLICE`（begin/end/window）且参与地址映射。",
+        "shape/index 使 offset 公式 > 阈值；常与 1.2.4 组合。"
+      ],
+      "skip_if": [
+        "仅有 `TEN-PRIMARY` 等数据张量、无任何索引/下标/窗映射实参 —— 禁止给 1.3 分配预算。\n（这是「张量输入不会有 index 触发」的形式化表述。）"
+      ],
+      "item_requires": [
+        "shape/index 使 offset 公式 > 阈值；常与 1.2.4 组合。"
+      ],
+      "item_skip_if": [],
+      "family_requires": [
+        "- `TEN-INDEX` 或 `tensor_tuple` 索引，或\n- `TEN-MOE-ROUTE` 中的 expert/token 下标，或\n- `SEM-INDEX-CTRL` / `SEM-SLICE`（begin/end/window）且参与地址映射。"
+      ],
+      "family_skip_if": [
+        "仅有 `TEN-PRIMARY` 等数据张量、无任何索引/下标/窗映射实参 —— 禁止给 1.3 分配预算。\n（这是「张量输入不会有 index 触发」的形式化表述。）"
+      ],
+      "family_scope_constraint": null,
+      "input_roles": [
+        "TEN-INDEX",
+        "TEN-MOE-ROUTE",
+        "SEM-INDEX-CTRL",
+        "SEM-SLICE"
+      ],
+      "construction_focus": "满足1.3家族硬门禁后，使具体shape/index偏移公式跨表示阈值。",
+      "consumer_direction": "索引/窗口映射后的偏移计算、类型提升及地址消费者。",
+      "boundary": "原定义要求索引/路由/窗口映射实参；仅普通数据tensor的shape驱动内部算址不自动适用，不能套修订42或V4I3。",
+      "legality_expectation": "按目标接口/版本契约分别记录合法计算、明确应拒绝及未定义域；未定义输入的异常不自动成为精度缺陷。",
+      "interpretation_status": "REVIEWER_EXPLANATION_NOT_IMPLEMENTATION_OR_HISTORICAL_PROOF",
+      "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\reports\\rc128-mechanism-design-20261112-r4\\sources\\original\\api42_trigger_library_original.md",
+      "source_quote": "`[ / ]` **1.3.2 Offset overflow (>uint16 / >int32)** — 算址偏移溢出。  \r\nRequires: shape/index 使 offset 公式 > 阈值；常与 1.2.4 组合。\r\n",
+      "source_line": 254,
+      "source_line_end": 255,
+      "family_source_quote": "\\### 1.3 Index & Range Mapping\r\n\r\n**Requires（硬条件）:**  \r\n\r\n\\- `TEN-INDEX` 或 `tensor_tuple` 索引，**或**  \r\n\\- `TEN-MOE-ROUTE` 中的 expert/token 下标，**或**  \r\n\\- `SEM-INDEX-CTRL` / `SEM-SLICE`（begin/end/window）且参与地址映射。  \r\n\r\n**Skip if:** 仅有 `TEN-PRIMARY` 等数据张量、**无任何索引/下标/窗映射实参** —— **禁止**给 1.3 分配预算。  \r\n（这是「张量输入不会有 index 触发」的形式化表述。）\r\n",
+      "family_source_line": 240
+    },
+    {
+      "id": "1.3.3",
+      "name": "Sliding window / attention window boundary",
+      "family_id": "1.3",
+      "definition": "窗起止非法。\nRequires: `SEM-ATTN-STRUCT` / `SEM-GEOM` 窗参数或 mask 窗。  \r\nSkip if: 无窗。",
+      "requires": [
+        "- `TEN-INDEX` 或 `tensor_tuple` 索引，或\n- `TEN-MOE-ROUTE` 中的 expert/token 下标，或\n- `SEM-INDEX-CTRL` / `SEM-SLICE`（begin/end/window）且参与地址映射。",
+        "`SEM-ATTN-STRUCT` / `SEM-GEOM` 窗参数或 mask 窗。"
+      ],
+      "skip_if": [
+        "仅有 `TEN-PRIMARY` 等数据张量、无任何索引/下标/窗映射实参 —— 禁止给 1.3 分配预算。\n（这是「张量输入不会有 index 触发」的形式化表述。）",
+        "无窗。"
+      ],
+      "item_requires": [
+        "`SEM-ATTN-STRUCT` / `SEM-GEOM` 窗参数或 mask 窗。"
+      ],
+      "item_skip_if": [
+        "无窗。"
+      ],
+      "family_requires": [
+        "- `TEN-INDEX` 或 `tensor_tuple` 索引，或\n- `TEN-MOE-ROUTE` 中的 expert/token 下标，或\n- `SEM-INDEX-CTRL` / `SEM-SLICE`（begin/end/window）且参与地址映射。"
+      ],
+      "family_skip_if": [
+        "仅有 `TEN-PRIMARY` 等数据张量、无任何索引/下标/窗映射实参 —— 禁止给 1.3 分配预算。\n（这是「张量输入不会有 index 触发」的形式化表述。）"
+      ],
+      "family_scope_constraint": null,
+      "input_roles": [
+        "SEM-ATTN-STRUCT",
+        "SEM-GEOM",
+        "窗参数或mask窗"
+      ],
+      "construction_focus": "构造窗起止非法及邻近边界，先明确有效域、开闭区间和拒绝预期。",
+      "consumer_direction": "窗口合法性检查、mask生成及窗口到地址映射。",
+      "boundary": "原条目明确含非法窗；不把所有非法条件归作正常计算覆盖，且无窗语义应Skip。",
+      "legality_expectation": "按目标接口/版本契约分别记录合法计算、明确应拒绝及未定义域；未定义输入的异常不自动成为精度缺陷。",
+      "interpretation_status": "REVIEWER_EXPLANATION_NOT_IMPLEMENTATION_OR_HISTORICAL_PROOF",
+      "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\reports\\rc128-mechanism-design-20261112-r4\\sources\\original\\api42_trigger_library_original.md",
+      "source_quote": "`[ / ]` **1.3.3 Sliding window / attention window boundary** — 窗起止非法。  \r\nRequires: `SEM-ATTN-STRUCT` / `SEM-GEOM` 窗参数或 mask 窗。  \r\nSkip if: 无窗。\r\n",
+      "source_line": 257,
+      "source_line_end": 259,
+      "family_source_quote": "\\### 1.3 Index & Range Mapping\r\n\r\n**Requires（硬条件）:**  \r\n\r\n\\- `TEN-INDEX` 或 `tensor_tuple` 索引，**或**  \r\n\\- `TEN-MOE-ROUTE` 中的 expert/token 下标，**或**  \r\n\\- `SEM-INDEX-CTRL` / `SEM-SLICE`（begin/end/window）且参与地址映射。  \r\n\r\n**Skip if:** 仅有 `TEN-PRIMARY` 等数据张量、**无任何索引/下标/窗映射实参** —— **禁止**给 1.3 分配预算。  \r\n（这是「张量输入不会有 index 触发」的形式化表述。）\r\n",
+      "family_source_line": 240
+    },
+    {
+      "id": "1.3.4",
+      "name": "Expert/routing index combo (MoE)",
+      "family_id": "1.3",
+      "definition": "极端/全同/重复路由。\nRequires: `TEN-MOE-ROUTE` 或 `SEM-MOE-DIST`。  \r\nSkip if: 非 MoE。",
+      "requires": [
+        "- `TEN-INDEX` 或 `tensor_tuple` 索引，或\n- `TEN-MOE-ROUTE` 中的 expert/token 下标，或\n- `SEM-INDEX-CTRL` / `SEM-SLICE`（begin/end/window）且参与地址映射。",
+        "`TEN-MOE-ROUTE` 或 `SEM-MOE-DIST`。"
+      ],
+      "skip_if": [
+        "仅有 `TEN-PRIMARY` 等数据张量、无任何索引/下标/窗映射实参 —— 禁止给 1.3 分配预算。\n（这是「张量输入不会有 index 触发」的形式化表述。）",
+        "非 MoE。"
+      ],
+      "item_requires": [
+        "`TEN-MOE-ROUTE` 或 `SEM-MOE-DIST`。"
+      ],
+      "item_skip_if": [
+        "非 MoE。"
+      ],
+      "family_requires": [
+        "- `TEN-INDEX` 或 `tensor_tuple` 索引，或\n- `TEN-MOE-ROUTE` 中的 expert/token 下标，或\n- `SEM-INDEX-CTRL` / `SEM-SLICE`（begin/end/window）且参与地址映射。"
+      ],
+      "family_skip_if": [
+        "仅有 `TEN-PRIMARY` 等数据张量、无任何索引/下标/窗映射实参 —— 禁止给 1.3 分配预算。\n（这是「张量输入不会有 index 触发」的形式化表述。）"
+      ],
+      "family_scope_constraint": null,
+      "input_roles": [
+        "TEN-MOE-ROUTE",
+        "SEM-MOE-DIST"
+      ],
+      "construction_focus": "构造极端、全同、重复expert/token路由及合法分布组合。",
+      "consumer_direction": "路由归一化、专家分配、scatter/gather及合并。",
+      "boundary": "非MoE应Skip；同一个expert重复可能合法，处理预期依契约，不由重复本身认定冲突。",
+      "legality_expectation": "按目标接口/版本契约分别记录合法计算、明确应拒绝及未定义域；未定义输入的异常不自动成为精度缺陷。",
+      "interpretation_status": "REVIEWER_EXPLANATION_NOT_IMPLEMENTATION_OR_HISTORICAL_PROOF",
+      "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\reports\\rc128-mechanism-design-20261112-r4\\sources\\original\\api42_trigger_library_original.md",
+      "source_quote": "`[ / ]` **1.3.4 Expert/routing index combo (MoE)** — 极端/全同/重复路由。  \r\nRequires: `TEN-MOE-ROUTE` 或 `SEM-MOE-DIST`。  \r\nSkip if: 非 MoE。\r\n",
+      "source_line": 261,
+      "source_line_end": 263,
+      "family_source_quote": "\\### 1.3 Index & Range Mapping\r\n\r\n**Requires（硬条件）:**  \r\n\r\n\\- `TEN-INDEX` 或 `tensor_tuple` 索引，**或**  \r\n\\- `TEN-MOE-ROUTE` 中的 expert/token 下标，**或**  \r\n\\- `SEM-INDEX-CTRL` / `SEM-SLICE`（begin/end/window）且参与地址映射。  \r\n\r\n**Skip if:** 仅有 `TEN-PRIMARY` 等数据张量、**无任何索引/下标/窗映射实参** —— **禁止**给 1.3 分配预算。  \r\n（这是「张量输入不会有 index 触发」的形式化表述。）\r\n",
+      "family_source_line": 240
+    },
+    {
+      "id": "1.4.1",
+      "name": "Non-contiguous tensor",
+      "family_id": "1.4",
+      "definition": "`[not testable]` — 除非 schema 暴露 stride。",
+      "requires": [
+        "`SEM-LAYOUT`，或 `SEM-TRANSPOSE` 导致非平凡 stride，或 schema 暴露 format/stride，或 `CON-ALIGN`。"
+      ],
+      "skip_if": [
+        "固定 ND、无 format/transpose/align 实参且框架不可控 stride（多项标 `[not testable]`）。"
+      ],
+      "item_requires": [],
+      "item_skip_if": [],
+      "family_requires": [
+        "`SEM-LAYOUT`，或 `SEM-TRANSPOSE` 导致非平凡 stride，或 schema 暴露 format/stride，或 `CON-ALIGN`。"
+      ],
+      "family_skip_if": [
+        "固定 ND、无 format/transpose/align 实参且框架不可控 stride（多项标 `[not testable]`）。"
+      ],
+      "family_scope_constraint": null,
+      "input_roles": [
+        "SEM-LAYOUT",
+        "schema暴露stride"
+      ],
+      "construction_focus": "在schema确实能表达stride的前提下构造非连续tensor，并检查执行时保留。",
+      "consumer_direction": "视图stride、逻辑到物理地址、算子入口连续化。",
+      "boundary": "原条目标为not testable除非schema暴露stride；这是本版测试入口边界，不推导V4或其他执行器没有表达能力。 这里是原输入构造范围；接口出现out参数并不能证明ATK能表达并保留输出stride，输出回写布局需另核实际schema及执行器。",
+      "legality_expectation": "按目标接口/版本契约分别记录合法计算、明确应拒绝及未定义域；未定义输入的异常不自动成为精度缺陷。",
+      "interpretation_status": "REVIEWER_EXPLANATION_NOT_IMPLEMENTATION_OR_HISTORICAL_PROOF",
+      "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\reports\\rc128-mechanism-design-20261112-r4\\sources\\original\\api42_trigger_library_original.md",
+      "source_quote": "`[ / ]` **1.4.1 Non-contiguous tensor** `[not testable]` — 除非 schema 暴露 stride。  \r\n",
+      "source_line": 272,
+      "source_line_end": 272,
+      "family_source_quote": "\\### 1.4 Layout & Stride Format\r\n\r\n**Requires:** `SEM-LAYOUT`，或 `SEM-TRANSPOSE` 导致非平凡 stride，或 schema 暴露 format/stride，或 `CON-ALIGN`。  \r\n**Skip if:** 固定 ND、无 format/transpose/align 实参且框架不可控 stride（多项标 `[not testable]`）。\r\n",
+      "family_source_line": 267
+    },
+    {
+      "id": "1.4.2",
+      "name": "Large stride (>65535)",
+      "family_id": "1.4",
+      "definition": "由 shape 推出使 stride>65535。\nRequires: 高维大尾维 + 地址按 stride 计算的实现。",
+      "requires": [
+        "`SEM-LAYOUT`，或 `SEM-TRANSPOSE` 导致非平凡 stride，或 schema 暴露 format/stride，或 `CON-ALIGN`。",
+        "高维大尾维 + 地址按 stride 计算的实现。"
+      ],
+      "skip_if": [
+        "固定 ND、无 format/transpose/align 实参且框架不可控 stride（多项标 `[not testable]`）。"
+      ],
+      "item_requires": [
+        "高维大尾维 + 地址按 stride 计算的实现。"
+      ],
+      "item_skip_if": [],
+      "family_requires": [
+        "`SEM-LAYOUT`，或 `SEM-TRANSPOSE` 导致非平凡 stride，或 schema 暴露 format/stride，或 `CON-ALIGN`。"
+      ],
+      "family_skip_if": [
+        "固定 ND、无 format/transpose/align 实参且框架不可控 stride（多项标 `[not testable]`）。"
+      ],
+      "family_scope_constraint": null,
+      "input_roles": [
+        "CON-SHAPE",
+        "SEM-LAYOUT",
+        "stride寻址实现"
+      ],
+      "construction_focus": "用可推导stride的大尾维构造>65535跨度，并核对stride单位。",
+      "consumer_direction": "stride乘积、窄参数存储、搬运/地址消费者。",
+      "boundary": "65535是原构造边界线索；不同消费者的元素/字节单位与字段位宽需要核对，不从数值大直接认错。",
+      "legality_expectation": "按目标接口/版本契约分别记录合法计算、明确应拒绝及未定义域；未定义输入的异常不自动成为精度缺陷。",
+      "interpretation_status": "REVIEWER_EXPLANATION_NOT_IMPLEMENTATION_OR_HISTORICAL_PROOF",
+      "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\reports\\rc128-mechanism-design-20261112-r4\\sources\\original\\api42_trigger_library_original.md",
+      "source_quote": "`[ / ]` **1.4.2 Large stride (>65535)** — 由 shape 推出使 stride>65535。  \r\nRequires: 高维大尾维 + 地址按 stride 计算的实现。  \r\n",
+      "source_line": 273,
+      "source_line_end": 274,
+      "family_source_quote": "\\### 1.4 Layout & Stride Format\r\n\r\n**Requires:** `SEM-LAYOUT`，或 `SEM-TRANSPOSE` 导致非平凡 stride，或 schema 暴露 format/stride，或 `CON-ALIGN`。  \r\n**Skip if:** 固定 ND、无 format/transpose/align 实参且框架不可控 stride（多项标 `[not testable]`）。\r\n",
+      "family_source_line": 267
+    },
+    {
+      "id": "1.4.3",
+      "name": "Special format (NZ, TND)",
+      "family_id": "1.4",
+      "definition": "Requires: `SEM-LAYOUT` 可选 NZ/TND 等。  \r\nSkip if: 仅 ND。",
+      "requires": [
+        "`SEM-LAYOUT`，或 `SEM-TRANSPOSE` 导致非平凡 stride，或 schema 暴露 format/stride，或 `CON-ALIGN`。",
+        "`SEM-LAYOUT` 可选 NZ/TND 等。"
+      ],
+      "skip_if": [
+        "固定 ND、无 format/transpose/align 实参且框架不可控 stride（多项标 `[not testable]`）。",
+        "仅 ND。"
+      ],
+      "item_requires": [
+        "`SEM-LAYOUT` 可选 NZ/TND 等。"
+      ],
+      "item_skip_if": [
+        "仅 ND。"
+      ],
+      "family_requires": [
+        "`SEM-LAYOUT`，或 `SEM-TRANSPOSE` 导致非平凡 stride，或 schema 暴露 format/stride，或 `CON-ALIGN`。"
+      ],
+      "family_skip_if": [
+        "固定 ND、无 format/transpose/align 实参且框架不可控 stride（多项标 `[not testable]`）。"
+      ],
+      "family_scope_constraint": null,
+      "input_roles": [
+        "SEM-LAYOUT",
+        "format控制"
+      ],
+      "construction_focus": "在接口允许时选择NZ、TND等format，保留逻辑/物理形状身份。",
+      "consumer_direction": "格式转换、物理排布、模板选择及指令参数。",
+      "boundary": "仅ND应Skip；NZ/TND不是可互换枚举，需按目标接口的真实格式域构造。",
+      "legality_expectation": "按目标接口/版本契约分别记录合法计算、明确应拒绝及未定义域；未定义输入的异常不自动成为精度缺陷。",
+      "interpretation_status": "REVIEWER_EXPLANATION_NOT_IMPLEMENTATION_OR_HISTORICAL_PROOF",
+      "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\reports\\rc128-mechanism-design-20261112-r4\\sources\\original\\api42_trigger_library_original.md",
+      "source_quote": "`[ / ]` **1.4.3 Special format (NZ, TND)** —  \r\nRequires: `SEM-LAYOUT` 可选 NZ/TND 等。  \r\nSkip if: 仅 ND。\r\n",
+      "source_line": 275,
+      "source_line_end": 277,
+      "family_source_quote": "\\### 1.4 Layout & Stride Format\r\n\r\n**Requires:** `SEM-LAYOUT`，或 `SEM-TRANSPOSE` 导致非平凡 stride，或 schema 暴露 format/stride，或 `CON-ALIGN`。  \r\n**Skip if:** 固定 ND、无 format/transpose/align 实参且框架不可控 stride（多项标 `[not testable]`）。\r\n",
+      "family_source_line": 267
+    },
+    {
+      "id": "1.5.1",
+      "name": "Non-aligned sequence length",
+      "family_id": "1.5",
+      "definition": "seq ∉ 16/32/64/128 倍数。",
+      "requires": [
+        "`SEM-SEQ-LEN` / `TEN-SEQ-META` / `SEM-ATTN-STRUCT` / `TEN-ATTN-QKV` 上可解释的 seq/head 维。"
+      ],
+      "skip_if": [
+        "无序列维语义（纯点对点 elemwise 且无 seq）。"
+      ],
+      "item_requires": [],
+      "item_skip_if": [],
+      "family_requires": [
+        "`SEM-SEQ-LEN` / `TEN-SEQ-META` / `SEM-ATTN-STRUCT` / `TEN-ATTN-QKV` 上可解释的 seq/head 维。"
+      ],
+      "family_skip_if": [
+        "无序列维语义（纯点对点 elemwise 且无 seq）。"
+      ],
+      "family_scope_constraint": null,
+      "input_roles": [
+        "SEM-SEQ-LEN",
+        "TEN-SEQ-META",
+        "TEN-ATTN-QKV"
+      ],
+      "construction_focus": "令真实序列维不对齐实际16/32/64/128等粒度。",
+      "consumer_direction": "序列tile、mask、position/cache索引及尾部处理。",
+      "boundary": "需要序列语义；普通张量非对齐不自动具有Attention专项含义。",
+      "legality_expectation": "按目标接口/版本契约分别记录合法计算、明确应拒绝及未定义域；未定义输入的异常不自动成为精度缺陷。",
+      "interpretation_status": "REVIEWER_EXPLANATION_NOT_IMPLEMENTATION_OR_HISTORICAL_PROOF",
+      "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\reports\\rc128-mechanism-design-20261112-r4\\sources\\original\\api42_trigger_library_original.md",
+      "source_quote": "`[ / ]` **1.5.1 Non-aligned sequence length** — seq ∉ 16/32/64/128 倍数。  \r\n",
+      "source_line": 286,
+      "source_line_end": 286,
+      "family_source_quote": "\\### 1.5 Sequence & Context Length\r\n\r\n**Requires:** `SEM-SEQ-LEN` / `TEN-SEQ-META` / `SEM-ATTN-STRUCT` / `TEN-ATTN-QKV` 上可解释的 seq/head 维。  \r\n**Skip if:** 无序列维语义（纯点对点 elemwise 且无 seq）。\r\n",
+      "family_source_line": 281
+    },
+    {
+      "id": "1.5.2",
+      "name": "Very long sequence",
+      "family_id": "1.5",
+      "definition": "2048/4096/8192…",
+      "requires": [
+        "`SEM-SEQ-LEN` / `TEN-SEQ-META` / `SEM-ATTN-STRUCT` / `TEN-ATTN-QKV` 上可解释的 seq/head 维。"
+      ],
+      "skip_if": [
+        "无序列维语义（纯点对点 elemwise 且无 seq）。"
+      ],
+      "item_requires": [],
+      "item_skip_if": [],
+      "family_requires": [
+        "`SEM-SEQ-LEN` / `TEN-SEQ-META` / `SEM-ATTN-STRUCT` / `TEN-ATTN-QKV` 上可解释的 seq/head 维。"
+      ],
+      "family_skip_if": [
+        "无序列维语义（纯点对点 elemwise 且无 seq）。"
+      ],
+      "family_scope_constraint": null,
+      "input_roles": [
+        "SEM-SEQ-LEN",
+        "TEN-SEQ-META",
+        "TEN-ATTN-QKV"
+      ],
+      "construction_focus": "选择可承载的长序列并保存真实长度、容量和分派条件。",
+      "consumer_direction": "长上下文分块、KV/临时区容量、索引及数值归约。",
+      "boundary": "2048/4096/8192不是统一缺陷阈值；合法长度、资源阻塞和代码错误分别记录。",
+      "legality_expectation": "按目标接口/版本契约分别记录合法计算、明确应拒绝及未定义域；未定义输入的异常不自动成为精度缺陷。",
+      "interpretation_status": "REVIEWER_EXPLANATION_NOT_IMPLEMENTATION_OR_HISTORICAL_PROOF",
+      "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\reports\\rc128-mechanism-design-20261112-r4\\sources\\original\\api42_trigger_library_original.md",
+      "source_quote": "`[ / ]` **1.5.2 Very long sequence** — 2048/4096/8192…  \r\n",
+      "source_line": 287,
+      "source_line_end": 287,
+      "family_source_quote": "\\### 1.5 Sequence & Context Length\r\n\r\n**Requires:** `SEM-SEQ-LEN` / `TEN-SEQ-META` / `SEM-ATTN-STRUCT` / `TEN-ATTN-QKV` 上可解释的 seq/head 维。  \r\n**Skip if:** 无序列维语义（纯点对点 elemwise 且无 seq）。\r\n",
+      "family_source_line": 281
+    },
+    {
+      "id": "1.5.3",
+      "name": "Decode-length (seq_len=1)",
+      "family_id": "1.5",
+      "definition": "单步 decode 路径。",
+      "requires": [
+        "`SEM-SEQ-LEN` / `TEN-SEQ-META` / `SEM-ATTN-STRUCT` / `TEN-ATTN-QKV` 上可解释的 seq/head 维。"
+      ],
+      "skip_if": [
+        "无序列维语义（纯点对点 elemwise 且无 seq）。"
+      ],
+      "item_requires": [],
+      "item_skip_if": [],
+      "family_requires": [
+        "`SEM-SEQ-LEN` / `TEN-SEQ-META` / `SEM-ATTN-STRUCT` / `TEN-ATTN-QKV` 上可解释的 seq/head 维。"
+      ],
+      "family_skip_if": [
+        "无序列维语义（纯点对点 elemwise 且无 seq）。"
+      ],
+      "family_scope_constraint": null,
+      "input_roles": [
+        "SEM-SEQ-LEN",
+        "TEN-ATTN-QKV"
+      ],
+      "construction_focus": "构造seq_len=1，并独立确认是否进入目标decode路径。",
+      "consumer_direction": "prefill/decode选择、KV读取和单步Attention。",
+      "boundary": "seq_len=1本身不证明decode，也可能是一长度prefill；不能从shape推断已覆盖执行阶段。",
+      "legality_expectation": "按目标接口/版本契约分别记录合法计算、明确应拒绝及未定义域；未定义输入的异常不自动成为精度缺陷。",
+      "interpretation_status": "REVIEWER_EXPLANATION_NOT_IMPLEMENTATION_OR_HISTORICAL_PROOF",
+      "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\reports\\rc128-mechanism-design-20261112-r4\\sources\\original\\api42_trigger_library_original.md",
+      "source_quote": "`[ / ]` **1.5.3 Decode-length (seq_len=1)** — 单步 decode 路径。  \r\n",
+      "source_line": 288,
+      "source_line_end": 288,
+      "family_source_quote": "\\### 1.5 Sequence & Context Length\r\n\r\n**Requires:** `SEM-SEQ-LEN` / `TEN-SEQ-META` / `SEM-ATTN-STRUCT` / `TEN-ATTN-QKV` 上可解释的 seq/head 维。  \r\n**Skip if:** 无序列维语义（纯点对点 elemwise 且无 seq）。\r\n",
+      "family_source_line": 281
+    },
+    {
+      "id": "1.5.4",
+      "name": "Head dim not aligned",
+      "family_id": "1.5",
+      "definition": "dSize 非标准对齐。\nRequires: head 维存在（ATTN-STRUCT 或 QKV shape）。",
+      "requires": [
+        "`SEM-SEQ-LEN` / `TEN-SEQ-META` / `SEM-ATTN-STRUCT` / `TEN-ATTN-QKV` 上可解释的 seq/head 维。",
+        "head 维存在（ATTN-STRUCT 或 QKV shape）。"
+      ],
+      "skip_if": [
+        "无序列维语义（纯点对点 elemwise 且无 seq）。"
+      ],
+      "item_requires": [
+        "head 维存在（ATTN-STRUCT 或 QKV shape）。"
+      ],
+      "item_skip_if": [],
+      "family_requires": [
+        "`SEM-SEQ-LEN` / `TEN-SEQ-META` / `SEM-ATTN-STRUCT` / `TEN-ATTN-QKV` 上可解释的 seq/head 维。"
+      ],
+      "family_skip_if": [
+        "无序列维语义（纯点对点 elemwise 且无 seq）。"
+      ],
+      "family_scope_constraint": null,
+      "input_roles": [
+        "SEM-ATTN-STRUCT",
+        "TEN-ATTN-QKV",
+        "head维"
+      ],
+      "construction_focus": "对接口允许的head dim构造非标准对齐维长。",
+      "consumer_direction": "head布局、向量分块、Attention及位置编码消费者。",
+      "boundary": "需要明确哪个轴是head及合法head域；普通尾维非对齐不能自动继承本项。",
+      "legality_expectation": "按目标接口/版本契约分别记录合法计算、明确应拒绝及未定义域；未定义输入的异常不自动成为精度缺陷。",
+      "interpretation_status": "REVIEWER_EXPLANATION_NOT_IMPLEMENTATION_OR_HISTORICAL_PROOF",
+      "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\reports\\rc128-mechanism-design-20261112-r4\\sources\\original\\api42_trigger_library_original.md",
+      "source_quote": "`[ / ]` **1.5.4 Head dim not aligned** — dSize 非标准对齐。  \r\nRequires: head 维存在（ATTN-STRUCT 或 QKV shape）。\r\n",
+      "source_line": 289,
+      "source_line_end": 290,
+      "family_source_quote": "\\### 1.5 Sequence & Context Length\r\n\r\n**Requires:** `SEM-SEQ-LEN` / `TEN-SEQ-META` / `SEM-ATTN-STRUCT` / `TEN-ATTN-QKV` 上可解释的 seq/head 维。  \r\n**Skip if:** 无序列维语义（纯点对点 elemwise 且无 seq）。\r\n",
+      "family_source_line": 281
+    },
+    {
+      "id": "1.6.1",
+      "name": "Batch > 1",
+      "family_id": "1.6",
+      "definition": "batch=2/4 激活不同 offset/workspace。",
+      "requires": [
+        "shape 上存在 batch/sample 维，或 MoE token 分配。"
+      ],
+      "skip_if": [
+        "无 batch 概念的标量核。"
+      ],
+      "item_requires": [],
+      "item_skip_if": [],
+      "family_requires": [
+        "shape 上存在 batch/sample 维，或 MoE token 分配。"
+      ],
+      "family_skip_if": [
+        "无 batch 概念的标量核。"
+      ],
+      "family_scope_constraint": null,
+      "input_roles": [
+        "batch/sample维",
+        "TEN-PRIMARY"
+      ],
+      "construction_focus": "batch从1到2/4等，按样本编码值并维持其余可比条件。",
+      "consumer_direction": "batch stride、workspace分片及样本间索引。",
+      "boundary": "同batch标签不证明同一偏移机制；实际offset/workspace分支需源码或观测。",
+      "legality_expectation": "按目标接口/版本契约分别记录合法计算、明确应拒绝及未定义域；未定义输入的异常不自动成为精度缺陷。",
+      "interpretation_status": "REVIEWER_EXPLANATION_NOT_IMPLEMENTATION_OR_HISTORICAL_PROOF",
+      "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\reports\\rc128-mechanism-design-20261112-r4\\sources\\original\\api42_trigger_library_original.md",
+      "source_quote": "`[ / ]` **1.6.1 Batch > 1** — batch=2/4 激活不同 offset/workspace。  \r\n",
+      "source_line": 299,
+      "source_line_end": 299,
+      "family_source_quote": "\\### 1.6 Batch & Sample Composition\r\n\r\n**Requires:** shape 上存在 batch/sample 维，或 MoE token 分配。  \r\n**Skip if:** 无 batch 概念的标量核。\r\n",
+      "family_source_line": 294
+    },
+    {
+      "id": "1.6.2",
+      "name": "Uneven expert/token allocation",
+      "family_id": "1.6",
+      "definition": "Requires: MoE 路由实参（同 1.1.4/1.3.4）。  \r\nSkip if: 非 MoE。",
+      "requires": [
+        "shape 上存在 batch/sample 维，或 MoE token 分配。",
+        "MoE 路由实参（同 1.1.4/1.3.4）。"
+      ],
+      "skip_if": [
+        "无 batch 概念的标量核。",
+        "非 MoE。"
+      ],
+      "item_requires": [
+        "MoE 路由实参（同 1.1.4/1.3.4）。"
+      ],
+      "item_skip_if": [
+        "非 MoE。"
+      ],
+      "family_requires": [
+        "shape 上存在 batch/sample 维，或 MoE token 分配。"
+      ],
+      "family_skip_if": [
+        "无 batch 概念的标量核。"
+      ],
+      "family_scope_constraint": null,
+      "input_roles": [
+        "TEN-MOE-ROUTE",
+        "SEM-MOE-DIST"
+      ],
+      "construction_focus": "通过路由实参构造不均匀token分配，保存各expert实际计数。",
+      "consumer_direction": "expert分组、负载分派、容量边界与合并。",
+      "boundary": "非MoE应Skip；与空expert可组合但不等价，不能共享标签就宣称同机理。",
+      "legality_expectation": "按目标接口/版本契约分别记录合法计算、明确应拒绝及未定义域；未定义输入的异常不自动成为精度缺陷。",
+      "interpretation_status": "REVIEWER_EXPLANATION_NOT_IMPLEMENTATION_OR_HISTORICAL_PROOF",
+      "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\reports\\rc128-mechanism-design-20261112-r4\\sources\\original\\api42_trigger_library_original.md",
+      "source_quote": "`[ / ]` **1.6.2 Uneven expert/token allocation** —  \r\nRequires: MoE 路由实参（同 1.1.4/1.3.4）。  \r\nSkip if: 非 MoE。\r\n",
+      "source_line": 300,
+      "source_line_end": 302,
+      "family_source_quote": "\\### 1.6 Batch & Sample Composition\r\n\r\n**Requires:** shape 上存在 batch/sample 维，或 MoE token 分配。  \r\n**Skip if:** 无 batch 概念的标量核。\r\n",
+      "family_source_line": 294
+    },
+    {
+      "id": "1.7.1",
+      "name": "All-zero → div-by-zero (scale=INF)",
+      "family_id": "1.7",
+      "definition": "`constant(0)`；常与动态量化 attr 联用。",
+      "requires": [
+        "至少一数值型 `TEN-PRIMARY` / `OTHER-OPERAND` / `WEIGHT` / `SCALE-ZP` / `SEM-SCALAR-COEFF`（浮点或会转浮点）。"
+      ],
+      "skip_if": [
+        "无数值载荷（纯 shape 推导算子且无 data）。"
+      ],
+      "item_requires": [],
+      "item_skip_if": [],
+      "family_requires": [
+        "至少一数值型 `TEN-PRIMARY` / `OTHER-OPERAND` / `WEIGHT` / `SCALE-ZP` / `SEM-SCALAR-COEFF`（浮点或会转浮点）。"
+      ],
+      "family_skip_if": [
+        "无数值载荷（纯 shape 推导算子且无 data）。"
+      ],
+      "family_scope_constraint": null,
+      "input_roles": [
+        "TEN-PRIMARY",
+        "TEN-SCALE-ZP",
+        "SEM-QUANT"
+      ],
+      "construction_focus": "非空全零输入配合适用动态量化控制，检查统计量到scale的公式。",
+      "consumer_direction": "ReduceMax/absmax、分母保护、scale及量化消费者。",
+      "boundary": "全零是构造事实，除零/scale=Inf是待核关系；控制attr不存在时不强加量化开关。",
+      "legality_expectation": "按目标接口/版本契约分别记录合法计算、明确应拒绝及未定义域；未定义输入的异常不自动成为精度缺陷。",
+      "interpretation_status": "REVIEWER_EXPLANATION_NOT_IMPLEMENTATION_OR_HISTORICAL_PROOF",
+      "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\reports\\rc128-mechanism-design-20261112-r4\\sources\\original\\api42_trigger_library_original.md",
+      "source_quote": "`[ / ]` **1.7.1 All-zero → div-by-zero (scale=INF)** — `constant(0)`；常与动态量化 attr 联用。  \r\n",
+      "source_line": 312,
+      "source_line_end": 312,
+      "family_source_quote": "\\### 1.7 Data Distribution & Value Pattern\r\n\r\n**Requires:** 至少一数值型 `TEN-PRIMARY` / `OTHER-OPERAND` / `WEIGHT` / `SCALE-ZP` / `SEM-SCALAR-COEFF`（浮点或会转浮点）。  \r\n**Skip if:** 无数值载荷（纯 shape 推导算子且无 data）。  \r\n**Note:** `TEN-INDEX` 的值分布走 **1.3**，不占用 1.7 的 INF/exp 模板。\r\n",
+      "family_source_line": 306
+    },
+    {
+      "id": "1.7.2",
+      "name": "NaN / Inf",
+      "family_id": "1.7",
+      "definition": "Requires: `CON-BOUNDARY-INFNAN` 或 dtype 为浮点。",
+      "requires": [
+        "至少一数值型 `TEN-PRIMARY` / `OTHER-OPERAND` / `WEIGHT` / `SCALE-ZP` / `SEM-SCALAR-COEFF`（浮点或会转浮点）。"
+      ],
+      "skip_if": [
+        "无数值载荷（纯 shape 推导算子且无 data）。"
+      ],
+      "item_requires": [],
+      "item_skip_if": [],
+      "family_requires": [
+        "至少一数值型 `TEN-PRIMARY` / `OTHER-OPERAND` / `WEIGHT` / `SCALE-ZP` / `SEM-SCALAR-COEFF`（浮点或会转浮点）。"
+      ],
+      "family_skip_if": [
+        "无数值载荷（纯 shape 推导算子且无 data）。"
+      ],
+      "family_scope_constraint": null,
+      "input_roles": [
+        "CON-BOUNDARY-INFNAN",
+        "数值型TEN角色"
+      ],
+      "construction_focus": "在允许或明确拒绝特殊值的接口域内构造NaN/Inf位置和组合。",
+      "consumer_direction": "特殊值传播、比较/归约、异常处理及输出检查器。",
+      "boundary": "输入NaN/Inf、内部生成非有限值和前次状态污染要分开；不把中间溢出反贴成本项。",
+      "legality_expectation": "按目标接口/版本契约分别记录合法计算、明确应拒绝及未定义域；未定义输入的异常不自动成为精度缺陷。",
+      "interpretation_status": "REVIEWER_EXPLANATION_NOT_IMPLEMENTATION_OR_HISTORICAL_PROOF",
+      "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\reports\\rc128-mechanism-design-20261112-r4\\sources\\original\\api42_trigger_library_original.md",
+      "source_quote": "`[ / ]` **1.7.2 NaN / Inf** — Requires: `CON-BOUNDARY-INFNAN` 或 dtype 为浮点。  \r\n",
+      "source_line": 313,
+      "source_line_end": 313,
+      "family_source_quote": "\\### 1.7 Data Distribution & Value Pattern\r\n\r\n**Requires:** 至少一数值型 `TEN-PRIMARY` / `OTHER-OPERAND` / `WEIGHT` / `SCALE-ZP` / `SEM-SCALAR-COEFF`（浮点或会转浮点）。  \r\n**Skip if:** 无数值载荷（纯 shape 推导算子且无 data）。  \r\n**Note:** `TEN-INDEX` 的值分布走 **1.3**，不占用 1.7 的 INF/exp 模板。\r\n",
+      "family_source_line": 306
+    },
+    {
+      "id": "1.7.3",
+      "name": "Extreme large values",
+      "family_id": "1.7",
+      "definition": "近 FP 上限 / exp 溢出区。",
+      "requires": [
+        "至少一数值型 `TEN-PRIMARY` / `OTHER-OPERAND` / `WEIGHT` / `SCALE-ZP` / `SEM-SCALAR-COEFF`（浮点或会转浮点）。"
+      ],
+      "skip_if": [
+        "无数值载荷（纯 shape 推导算子且无 data）。"
+      ],
+      "item_requires": [],
+      "item_skip_if": [],
+      "family_requires": [
+        "至少一数值型 `TEN-PRIMARY` / `OTHER-OPERAND` / `WEIGHT` / `SCALE-ZP` / `SEM-SCALAR-COEFF`（浮点或会转浮点）。"
+      ],
+      "family_skip_if": [
+        "无数值载荷（纯 shape 推导算子且无 data）。"
+      ],
+      "family_scope_constraint": null,
+      "input_roles": [
+        "TEN-PRIMARY",
+        "TEN-WEIGHT",
+        "TEN-OTHER-OPERAND",
+        "SEM-SCALAR-COEFF"
+      ],
+      "construction_focus": "选择接近实际dtype上限或exp敏感区的有限值，并记录输入转换后的值。",
+      "consumer_direction": "范围检查、exp/乘加、累加与cast。",
+      "boundary": "大输入与大中间量不同；接口正常允许的Inf输出也不一定是缺陷，应有数值语义及容差参考。",
+      "legality_expectation": "按目标接口/版本契约分别记录合法计算、明确应拒绝及未定义域；未定义输入的异常不自动成为精度缺陷。",
+      "interpretation_status": "REVIEWER_EXPLANATION_NOT_IMPLEMENTATION_OR_HISTORICAL_PROOF",
+      "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\reports\\rc128-mechanism-design-20261112-r4\\sources\\original\\api42_trigger_library_original.md",
+      "source_quote": "`[ / ]` **1.7.3 Extreme large values** — 近 FP 上限 / exp 溢出区。  \r\n",
+      "source_line": 314,
+      "source_line_end": 314,
+      "family_source_quote": "\\### 1.7 Data Distribution & Value Pattern\r\n\r\n**Requires:** 至少一数值型 `TEN-PRIMARY` / `OTHER-OPERAND` / `WEIGHT` / `SCALE-ZP` / `SEM-SCALAR-COEFF`（浮点或会转浮点）。  \r\n**Skip if:** 无数值载荷（纯 shape 推导算子且无 data）。  \r\n**Note:** `TEN-INDEX` 的值分布走 **1.3**，不占用 1.7 的 INF/exp 模板。\r\n",
+      "family_source_line": 306
+    },
+    {
+      "id": "1.7.4",
+      "name": "Near-zero denominator",
+      "family_id": "1.7",
+      "definition": "scale/除数 ~0。\nRequires: 除数角色张量或 scalar。",
+      "requires": [
+        "至少一数值型 `TEN-PRIMARY` / `OTHER-OPERAND` / `WEIGHT` / `SCALE-ZP` / `SEM-SCALAR-COEFF`（浮点或会转浮点）。",
+        "除数角色张量或 scalar。"
+      ],
+      "skip_if": [
+        "无数值载荷（纯 shape 推导算子且无 data）。"
+      ],
+      "item_requires": [
+        "除数角色张量或 scalar。"
+      ],
+      "item_skip_if": [],
+      "family_requires": [
+        "至少一数值型 `TEN-PRIMARY` / `OTHER-OPERAND` / `WEIGHT` / `SCALE-ZP` / `SEM-SCALAR-COEFF`（浮点或会转浮点）。"
+      ],
+      "family_skip_if": [
+        "无数值载荷（纯 shape 推导算子且无 data）。"
+      ],
+      "family_scope_constraint": null,
+      "input_roles": [
+        "除数角色tensor",
+        "TEN-SCALE-ZP",
+        "scalar除数"
+      ],
+      "construction_focus": "使实际被消费的分母接近0，配合非零分子和普通分母对照。",
+      "consumer_direction": "除法、归一化、scale倒数及数值保护。",
+      "boundary": "必须证明该输入在当前路径确是分母；仅数值很小但作为乘数不满足该语义。",
+      "legality_expectation": "按目标接口/版本契约分别记录合法计算、明确应拒绝及未定义域；未定义输入的异常不自动成为精度缺陷。",
+      "interpretation_status": "REVIEWER_EXPLANATION_NOT_IMPLEMENTATION_OR_HISTORICAL_PROOF",
+      "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\reports\\rc128-mechanism-design-20261112-r4\\sources\\original\\api42_trigger_library_original.md",
+      "source_quote": "`[ / ]` **1.7.4 Near-zero denominator** — scale/除数 ~0。  \r\nRequires: 除数角色张量或 scalar。  \r\n",
+      "source_line": 315,
+      "source_line_end": 316,
+      "family_source_quote": "\\### 1.7 Data Distribution & Value Pattern\r\n\r\n**Requires:** 至少一数值型 `TEN-PRIMARY` / `OTHER-OPERAND` / `WEIGHT` / `SCALE-ZP` / `SEM-SCALAR-COEFF`（浮点或会转浮点）。  \r\n**Skip if:** 无数值载荷（纯 shape 推导算子且无 data）。  \r\n**Note:** `TEN-INDEX` 的值分布走 **1.3**，不占用 1.7 的 INF/exp 模板。\r\n",
+      "family_source_line": 306
+    },
+    {
+      "id": "1.7.5",
+      "name": "Log-domain instability",
+      "family_id": "1.7",
+      "definition": "概率近 0/1。\nRequires: 进入 log/softmax 的输入。",
+      "requires": [
+        "至少一数值型 `TEN-PRIMARY` / `OTHER-OPERAND` / `WEIGHT` / `SCALE-ZP` / `SEM-SCALAR-COEFF`（浮点或会转浮点）。",
+        "进入 log/softmax 的输入。"
+      ],
+      "skip_if": [
+        "无数值载荷（纯 shape 推导算子且无 data）。"
+      ],
+      "item_requires": [
+        "进入 log/softmax 的输入。"
+      ],
+      "item_skip_if": [],
+      "family_requires": [
+        "至少一数值型 `TEN-PRIMARY` / `OTHER-OPERAND` / `WEIGHT` / `SCALE-ZP` / `SEM-SCALAR-COEFF`（浮点或会转浮点）。"
+      ],
+      "family_skip_if": [
+        "无数值载荷（纯 shape 推导算子且无 data）。"
+      ],
+      "family_scope_constraint": null,
+      "input_roles": [
+        "进入log/softmax的输入",
+        "概率语义载荷"
+      ],
+      "construction_focus": "围绕概率近0/1和实际log/softmax定义域构造敏感输入。",
+      "consumer_direction": "log、softmax/归一化、稳定公式与截断。",
+      "boundary": "概率与logprob不能因数值相同当同一事实；合法域和稳定参考必须来自接口/算法。",
+      "legality_expectation": "按目标接口/版本契约分别记录合法计算、明确应拒绝及未定义域；未定义输入的异常不自动成为精度缺陷。",
+      "interpretation_status": "REVIEWER_EXPLANATION_NOT_IMPLEMENTATION_OR_HISTORICAL_PROOF",
+      "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\reports\\rc128-mechanism-design-20261112-r4\\sources\\original\\api42_trigger_library_original.md",
+      "source_quote": "`[ / ]` **1.7.5 Log-domain instability** — 概率近 0/1。  \r\nRequires: 进入 log/softmax 的输入。  \r\n",
+      "source_line": 317,
+      "source_line_end": 318,
+      "family_source_quote": "\\### 1.7 Data Distribution & Value Pattern\r\n\r\n**Requires:** 至少一数值型 `TEN-PRIMARY` / `OTHER-OPERAND` / `WEIGHT` / `SCALE-ZP` / `SEM-SCALAR-COEFF`（浮点或会转浮点）。  \r\n**Skip if:** 无数值载荷（纯 shape 推导算子且无 data）。  \r\n**Note:** `TEN-INDEX` 的值分布走 **1.3**，不占用 1.7 的 INF/exp 模板。\r\n",
+      "family_source_line": 306
+    },
+    {
+      "id": "1.7.6",
+      "name": "Intermediate overflow (mul before div)",
+      "family_id": "1.7",
+      "definition": "大值触发中间溢出。",
+      "requires": [
+        "至少一数值型 `TEN-PRIMARY` / `OTHER-OPERAND` / `WEIGHT` / `SCALE-ZP` / `SEM-SCALAR-COEFF`（浮点或会转浮点）。"
+      ],
+      "skip_if": [
+        "无数值载荷（纯 shape 推导算子且无 data）。"
+      ],
+      "item_requires": [],
+      "item_skip_if": [],
+      "family_requires": [
+        "至少一数值型 `TEN-PRIMARY` / `OTHER-OPERAND` / `WEIGHT` / `SCALE-ZP` / `SEM-SCALAR-COEFF`（浮点或会转浮点）。"
+      ],
+      "family_skip_if": [
+        "无数值载荷（纯 shape 推导算子且无 data）。"
+      ],
+      "family_scope_constraint": null,
+      "input_roles": [
+        "数值型TEN角色",
+        "SEM-SCALAR-COEFF"
+      ],
+      "construction_focus": "有限输入驱动大中间值，比较计算顺序和高精参考。",
+      "consumer_direction": "乘除/乘加中间量、累加dtype、保存与最终cast。",
+      "boundary": "中间计算溢出不等于输入NaN/Inf；最终cast不能证明恢复精度，具体溢出点及范围需证据。",
+      "legality_expectation": "按目标接口/版本契约分别记录合法计算、明确应拒绝及未定义域；未定义输入的异常不自动成为精度缺陷。",
+      "interpretation_status": "REVIEWER_EXPLANATION_NOT_IMPLEMENTATION_OR_HISTORICAL_PROOF",
+      "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\reports\\rc128-mechanism-design-20261112-r4\\sources\\original\\api42_trigger_library_original.md",
+      "source_quote": "`[ / ]` **1.7.6 Intermediate overflow (mul before div)** — 大值触发中间溢出。\r\n",
+      "source_line": 319,
+      "source_line_end": 319,
+      "family_source_quote": "\\### 1.7 Data Distribution & Value Pattern\r\n\r\n**Requires:** 至少一数值型 `TEN-PRIMARY` / `OTHER-OPERAND` / `WEIGHT` / `SCALE-ZP` / `SEM-SCALAR-COEFF`（浮点或会转浮点）。  \r\n**Skip if:** 无数值载荷（纯 shape 推导算子且无 data）。  \r\n**Note:** `TEN-INDEX` 的值分布走 **1.3**，不占用 1.7 的 INF/exp 模板。\r\n",
+      "family_source_line": 306
+    },
+    {
+      "id": "1.8.1",
+      "name": "Packed variable-length sequence",
+      "family_id": "1.8",
+      "definition": "batchSizes/packed 实参。\nRequires: pack 相关 attr 或 SEQ-LEN 数组。",
+      "requires": [
+        "`TEN-MASK` / `SEM-SPARSE-MASK` / `SEM-PADDED-MODE` / packed 相关 attr / `SEM-GEOM` 负 padding。",
+        "pack 相关 attr 或 SEQ-LEN 数组。"
+      ],
+      "skip_if": [
+        "无 mask、无 pack/pad 组织、无 crop。"
+      ],
+      "item_requires": [
+        "pack 相关 attr 或 SEQ-LEN 数组。"
+      ],
+      "item_skip_if": [],
+      "family_requires": [
+        "`TEN-MASK` / `SEM-SPARSE-MASK` / `SEM-PADDED-MODE` / packed 相关 attr / `SEM-GEOM` 负 padding。"
+      ],
+      "family_skip_if": [
+        "无 mask、无 pack/pad 组织、无 crop。"
+      ],
+      "family_scope_constraint": null,
+      "input_roles": [
+        "packed相关attr",
+        "TEN-SEQ-META",
+        "SEQ-LEN数组"
+      ],
+      "construction_focus": "按接口约束构造packed变长组织及对应长度元数据。",
+      "consumer_direction": "packed展开、样本边界、mask和累加/归约。",
+      "boundary": "必须有真实packed输入组织；不同长度的普通batch不能自动作为packed专项。",
+      "legality_expectation": "按目标接口/版本契约分别记录合法计算、明确应拒绝及未定义域；未定义输入的异常不自动成为精度缺陷。",
+      "interpretation_status": "REVIEWER_EXPLANATION_NOT_IMPLEMENTATION_OR_HISTORICAL_PROOF",
+      "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\reports\\rc128-mechanism-design-20261112-r4\\sources\\original\\api42_trigger_library_original.md",
+      "source_quote": "`[ / ]` **1.8.1 Packed variable-length sequence** — batchSizes/packed 实参。  \r\nRequires: pack 相关 attr 或 SEQ-LEN 数组。  \r\n",
+      "source_line": 328,
+      "source_line_end": 329,
+      "family_source_quote": "\\### 1.8 Sample Organization & Masking\r\n\r\n**Requires:** `TEN-MASK` / `SEM-SPARSE-MASK` / `SEM-PADDED-MODE` / packed 相关 attr / `SEM-GEOM` 负 padding。  \r\n**Skip if:** 无 mask、无 pack/pad 组织、无 crop。\r\n",
+      "family_source_line": 323
+    },
+    {
+      "id": "1.8.2",
+      "name": "Mask type/combination",
+      "family_id": "1.8",
+      "definition": "causal/SWA/custom + GQA 等。\nRequires: `TEN-MASK` 或 `SEM-SPARSE-MASK`。",
+      "requires": [
+        "`TEN-MASK` / `SEM-SPARSE-MASK` / `SEM-PADDED-MODE` / packed 相关 attr / `SEM-GEOM` 负 padding。",
+        "`TEN-MASK` 或 `SEM-SPARSE-MASK`。"
+      ],
+      "skip_if": [
+        "无 mask、无 pack/pad 组织、无 crop。"
+      ],
+      "item_requires": [
+        "`TEN-MASK` 或 `SEM-SPARSE-MASK`。"
+      ],
+      "item_skip_if": [],
+      "family_requires": [
+        "`TEN-MASK` / `SEM-SPARSE-MASK` / `SEM-PADDED-MODE` / packed 相关 attr / `SEM-GEOM` 负 padding。"
+      ],
+      "family_skip_if": [
+        "无 mask、无 pack/pad 组织、无 crop。"
+      ],
+      "family_scope_constraint": null,
+      "input_roles": [
+        "TEN-MASK",
+        "SEM-SPARSE-MASK",
+        "SEM-ATTN-STRUCT"
+      ],
+      "construction_focus": "选择合法causal/SWA/custom等mask及接口支持的GQA组合。",
+      "consumer_direction": "有效集合构造、Attention过滤、位置/分组映射。",
+      "boundary": "布尔/加性编码、全屏蔽语义及mask组合按接口确认；名字相同不证明mask语义相同。",
+      "legality_expectation": "按目标接口/版本契约分别记录合法计算、明确应拒绝及未定义域；未定义输入的异常不自动成为精度缺陷。",
+      "interpretation_status": "REVIEWER_EXPLANATION_NOT_IMPLEMENTATION_OR_HISTORICAL_PROOF",
+      "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\reports\\rc128-mechanism-design-20261112-r4\\sources\\original\\api42_trigger_library_original.md",
+      "source_quote": "`[ / ]` **1.8.2 Mask type/combination** — causal/SWA/custom + GQA 等。  \r\nRequires: `TEN-MASK` 或 `SEM-SPARSE-MASK`。  \r\n",
+      "source_line": 330,
+      "source_line_end": 331,
+      "family_source_quote": "\\### 1.8 Sample Organization & Masking\r\n\r\n**Requires:** `TEN-MASK` / `SEM-SPARSE-MASK` / `SEM-PADDED-MODE` / packed 相关 attr / `SEM-GEOM` 负 padding。  \r\n**Skip if:** 无 mask、无 pack/pad 组织、无 crop。\r\n",
+      "family_source_line": 323
+    },
+    {
+      "id": "1.8.3",
+      "name": "Negative padding (crop)",
+      "family_id": "1.8",
+      "definition": "Requires: `SEM-GEOM` padding 允许负值。",
+      "requires": [
+        "`TEN-MASK` / `SEM-SPARSE-MASK` / `SEM-PADDED-MODE` / packed 相关 attr / `SEM-GEOM` 负 padding。",
+        "`SEM-GEOM` padding 允许负值。"
+      ],
+      "skip_if": [
+        "无 mask、无 pack/pad 组织、无 crop。"
+      ],
+      "item_requires": [
+        "`SEM-GEOM` padding 允许负值。"
+      ],
+      "item_skip_if": [],
+      "family_requires": [
+        "`TEN-MASK` / `SEM-SPARSE-MASK` / `SEM-PADDED-MODE` / packed 相关 attr / `SEM-GEOM` 负 padding。"
+      ],
+      "family_skip_if": [
+        "无 mask、无 pack/pad 组织、无 crop。"
+      ],
+      "family_scope_constraint": null,
+      "input_roles": [
+        "SEM-GEOM",
+        "padding允许负值"
+      ],
+      "construction_focus": "仅在支持负padding时构造crop及几何边界对照。",
+      "consumer_direction": "裁剪范围、窗口起点、输出尺寸及地址映射。",
+      "boundary": "参数不允许负值时不按正常计算测试；负padding不是一般负索引的同义词。",
+      "legality_expectation": "按目标接口/版本契约分别记录合法计算、明确应拒绝及未定义域；未定义输入的异常不自动成为精度缺陷。",
+      "interpretation_status": "REVIEWER_EXPLANATION_NOT_IMPLEMENTATION_OR_HISTORICAL_PROOF",
+      "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\reports\\rc128-mechanism-design-20261112-r4\\sources\\original\\api42_trigger_library_original.md",
+      "source_quote": "`[ / ]` **1.8.3 Negative padding (crop)** —  \r\nRequires: `SEM-GEOM` padding 允许负值。\r\n",
+      "source_line": 332,
+      "source_line_end": 333,
+      "family_source_quote": "\\### 1.8 Sample Organization & Masking\r\n\r\n**Requires:** `TEN-MASK` / `SEM-SPARSE-MASK` / `SEM-PADDED-MODE` / packed 相关 attr / `SEM-GEOM` 负 padding。  \r\n**Skip if:** 无 mask、无 pack/pad 组织、无 crop。\r\n",
+      "family_source_line": 323
+    },
+    {
+      "id": "1.C.1",
+      "name": "动态/静态量化、quant 粒度",
+      "family_id": "1.C",
+      "definition": "动态/静态量化、quant 粒度",
+      "requires": [
+        "`SEM-QUANT`"
+      ],
+      "skip_if": [],
+      "item_requires": [
+        "`SEM-QUANT`"
+      ],
+      "item_skip_if": [],
+      "family_requires": [],
+      "family_skip_if": [],
+      "family_scope_constraint": "仅当 schema/`inputs` 暴露对应 attr 时 applicable。",
+      "input_roles": [
+        "SEM-QUANT",
+        "schema暴露量化控制"
+      ],
+      "construction_focus": "切换接口明确暴露的动态/静态量化、位宽或粒度配置。",
+      "consumer_direction": "量化策略选择、scale生成与对应载荷的消费路径。",
+      "boundary": "内部scale变量、量化描述文件或某测试出现过quant_mode不能自动证明当前schema控制入口。",
+      "legality_expectation": "按目标接口/版本契约分别记录合法计算、明确应拒绝及未定义域；未定义输入的异常不自动成为精度缺陷。",
+      "interpretation_status": "REVIEWER_EXPLANATION_NOT_IMPLEMENTATION_OR_HISTORICAL_PROOF",
+      "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\reports\\rc128-mechanism-design-20261112-r4\\sources\\original\\api42_trigger_library_original.md",
+      "source_quote": "| **1.C.1** | 动态/静态量化、quant 粒度    | `SEM-QUANT`                                 | 1.7.1      |\r\n",
+      "source_line": 344,
+      "source_line_end": 344,
+      "family_source_quote": "\\## 1.C Control Arguments\r\n\r\n\\> 仍属 **输入构造**（API 实参），但语义是「拨开关」而非「填数据」。  \r\n\\> 仅当 schema/`inputs` 暴露对应 attr 时 applicable。\r\n\r\n| ID        | 项                           | Requires 语义                               | 常联合 1.x |\r\n| --------- | ---------------------------- | ------------------------------------------- | ---------- |\r\n",
+      "family_source_line": 337
+    },
+    {
+      "id": "1.C.2",
+      "name": "输出低精度 / out dtype",
+      "family_id": "1.C",
+      "definition": "输出低精度 / out dtype",
+      "requires": [
+        "`SEM-DTYPE-OUT` / `SEM-QUANT`"
+      ],
+      "skip_if": [],
+      "item_requires": [
+        "`SEM-DTYPE-OUT` / `SEM-QUANT`"
+      ],
+      "item_skip_if": [],
+      "family_requires": [],
+      "family_skip_if": [],
+      "family_scope_constraint": "仅当 schema/`inputs` 暴露对应 attr 时 applicable。",
+      "input_roles": [
+        "SEM-DTYPE-OUT",
+        "SEM-QUANT",
+        "schema暴露输出类型控制"
+      ],
+      "construction_focus": "改变用户可设置的输出dtype/低精输出选项，核对结果和转换。",
+      "consumer_direction": "输出类型推导、转换、写回及后续消费。",
+      "boundary": "内部结果dtype或内部函数参数不等于API输出dtype开关；没有schema证据保持未知。",
+      "legality_expectation": "按目标接口/版本契约分别记录合法计算、明确应拒绝及未定义域；未定义输入的异常不自动成为精度缺陷。",
+      "interpretation_status": "REVIEWER_EXPLANATION_NOT_IMPLEMENTATION_OR_HISTORICAL_PROOF",
+      "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\reports\\rc128-mechanism-design-20261112-r4\\sources\\original\\api42_trigger_library_original.md",
+      "source_quote": "| **1.C.2** | 输出低精度 / out dtype       | `SEM-DTYPE-OUT` / `SEM-QUANT`               | 1.7        |\r\n",
+      "source_line": 345,
+      "source_line_end": 345,
+      "family_source_quote": "\\## 1.C Control Arguments\r\n\r\n\\> 仍属 **输入构造**（API 实参），但语义是「拨开关」而非「填数据」。  \r\n\\> 仅当 schema/`inputs` 暴露对应 attr 时 applicable。\r\n\r\n| ID        | 项                           | Requires 语义                               | 常联合 1.x |\r\n| --------- | ---------------------------- | ------------------------------------------- | ---------- |\r\n",
+      "family_source_line": 337
+    },
+    {
+      "id": "1.C.3",
+      "name": "cubeMathType / KEEP_DTYPE",
+      "family_id": "1.C",
+      "definition": "cubeMathType / KEEP_DTYPE",
+      "requires": [
+        "`SEM-MATH-MODE`"
+      ],
+      "skip_if": [],
+      "item_requires": [
+        "`SEM-MATH-MODE`"
+      ],
+      "item_skip_if": [],
+      "family_requires": [],
+      "family_skip_if": [],
+      "family_scope_constraint": "仅当 schema/`inputs` 暴露对应 attr 时 applicable。",
+      "input_roles": [
+        "SEM-MATH-MODE",
+        "schema暴露计算模式"
+      ],
+      "construction_focus": "选择合法cubeMathType/KEEP_DTYPE计算模式进行同输入对照。",
+      "consumer_direction": "计算/累加精度选择、标志派生及kernel/GEMM调用传播。",
+      "boundary": "内部精度标志是派生量；必须追踪其由API属性生成和消费的关系，不能把输出差异直接当模式错误。",
+      "legality_expectation": "按目标接口/版本契约分别记录合法计算、明确应拒绝及未定义域；未定义输入的异常不自动成为精度缺陷。",
+      "interpretation_status": "REVIEWER_EXPLANATION_NOT_IMPLEMENTATION_OR_HISTORICAL_PROOF",
+      "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\reports\\rc128-mechanism-design-20261112-r4\\sources\\original\\api42_trigger_library_original.md",
+      "source_quote": "| **1.C.3** | cubeMathType / KEEP_DTYPE    | `SEM-MATH-MODE`                             | 1.2, 1.7   |\r\n",
+      "source_line": 346,
+      "source_line_end": 346,
+      "family_source_quote": "\\## 1.C Control Arguments\r\n\r\n\\> 仍属 **输入构造**（API 实参），但语义是「拨开关」而非「填数据」。  \r\n\\> 仅当 schema/`inputs` 暴露对应 attr 时 applicable。\r\n\r\n| ID        | 项                           | Requires 语义                               | 常联合 1.x |\r\n| --------- | ---------------------------- | ------------------------------------------- | ---------- |\r\n",
+      "family_source_line": 337
+    },
+    {
+      "id": "1.C.4",
+      "name": "RoPE / sink / dual-IO 等模式",
+      "family_id": "1.C",
+      "definition": "RoPE / sink / dual-IO 等模式",
+      "requires": [
+        "`SEM-ATTN-STRUCT` 等"
+      ],
+      "skip_if": [],
+      "item_requires": [
+        "`SEM-ATTN-STRUCT` 等"
+      ],
+      "item_skip_if": [],
+      "family_requires": [],
+      "family_skip_if": [],
+      "family_scope_constraint": "仅当 schema/`inputs` 暴露对应 attr 时 applicable。",
+      "input_roles": [
+        "SEM-ATTN-STRUCT",
+        "schema暴露Attention模式"
+      ],
+      "construction_focus": "在接口支持时切换RoPE/sink/dual-IO等模式及相应载荷。",
+      "consumer_direction": "模式分派、位置/窗口语义及Attention路径。",
+      "boundary": "各模式的payload合同分别核对；普通rope术语或mrope名称相近不证明同一模式/缺陷。",
+      "legality_expectation": "按目标接口/版本契约分别记录合法计算、明确应拒绝及未定义域；未定义输入的异常不自动成为精度缺陷。",
+      "interpretation_status": "REVIEWER_EXPLANATION_NOT_IMPLEMENTATION_OR_HISTORICAL_PROOF",
+      "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\reports\\rc128-mechanism-design-20261112-r4\\sources\\original\\api42_trigger_library_original.md",
+      "source_quote": "| **1.C.4** | RoPE / sink / dual-IO 等模式 | `SEM-ATTN-STRUCT` 等                        | 1.5, 1.8   |\r\n",
+      "source_line": 347,
+      "source_line_end": 347,
+      "family_source_quote": "\\## 1.C Control Arguments\r\n\r\n\\> 仍属 **输入构造**（API 实参），但语义是「拨开关」而非「填数据」。  \r\n\\> 仅当 schema/`inputs` 暴露对应 attr 时 applicable。\r\n\r\n| ID        | 项                           | Requires 语义                               | 常联合 1.x |\r\n| --------- | ---------------------------- | ------------------------------------------- | ---------- |\r\n",
+      "family_source_line": 337
+    },
+    {
+      "id": "1.C.5",
+      "name": "deterministic / accumulate",
+      "family_id": "1.C",
+      "definition": "deterministic / accumulate",
+      "requires": [
+        "`SEM-DETERMINISTIC` / `SEM-INDEX-CTRL`"
+      ],
+      "skip_if": [],
+      "item_requires": [
+        "`SEM-DETERMINISTIC` / `SEM-INDEX-CTRL`"
+      ],
+      "item_skip_if": [],
+      "family_requires": [],
+      "family_skip_if": [],
+      "family_scope_constraint": "仅当 schema/`inputs` 暴露对应 attr 时 applicable。",
+      "input_roles": [
+        "SEM-DETERMINISTIC",
+        "SEM-INDEX-CTRL",
+        "schema暴露行为控制"
+      ],
+      "construction_focus": "切换接口暴露的deterministic/accumulate，按语义检查固定性或累加结果。",
+      "consumer_direction": "确定性路径/归约策略、累加初值及输出复用。",
+      "boundary": "内部非确定性或运行时流同步不是API开关；正确的accumulate累积也不属于状态污染。",
+      "legality_expectation": "按目标接口/版本契约分别记录合法计算、明确应拒绝及未定义域；未定义输入的异常不自动成为精度缺陷。",
+      "interpretation_status": "REVIEWER_EXPLANATION_NOT_IMPLEMENTATION_OR_HISTORICAL_PROOF",
+      "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\reports\\rc128-mechanism-design-20261112-r4\\sources\\original\\api42_trigger_library_original.md",
+      "source_quote": "| **1.C.5** | deterministic / accumulate   | `SEM-DETERMINISTIC` / `SEM-INDEX-CTRL`      | 1.3        |\r\n",
+      "source_line": 348,
+      "source_line_end": 348,
+      "family_source_quote": "\\## 1.C Control Arguments\r\n\r\n\\> 仍属 **输入构造**（API 实参），但语义是「拨开关」而非「填数据」。  \r\n\\> 仅当 schema/`inputs` 暴露对应 attr 时 applicable。\r\n\r\n| ID        | 项                           | Requires 语义                               | 常联合 1.x |\r\n| --------- | ---------------------------- | ------------------------------------------- | ---------- |\r\n",
+      "family_source_line": 337
+    },
+    {
+      "id": "1.C.6",
+      "name": "format / NZ",
+      "family_id": "1.C",
+      "definition": "format / NZ",
+      "requires": [
+        "`SEM-LAYOUT`"
+      ],
+      "skip_if": [],
+      "item_requires": [
+        "`SEM-LAYOUT`"
+      ],
+      "item_skip_if": [],
+      "family_requires": [],
+      "family_skip_if": [],
+      "family_scope_constraint": "仅当 schema/`inputs` 暴露对应 attr 时 applicable。",
+      "input_roles": [
+        "SEM-LAYOUT",
+        "schema暴露format"
+      ],
+      "construction_focus": "选择接口支持的format/NZ属性并保持逻辑数据可比。",
+      "consumer_direction": "format到物理布局转换、分派及存储消费者。",
+      "boundary": "schema只有ND或没有format控制时不强加枚举；与1.4.3可关联但不是两份独立故障证据。",
+      "legality_expectation": "按目标接口/版本契约分别记录合法计算、明确应拒绝及未定义域；未定义输入的异常不自动成为精度缺陷。",
+      "interpretation_status": "REVIEWER_EXPLANATION_NOT_IMPLEMENTATION_OR_HISTORICAL_PROOF",
+      "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\reports\\rc128-mechanism-design-20261112-r4\\sources\\original\\api42_trigger_library_original.md",
+      "source_quote": "| **1.C.6** | format / NZ                  | `SEM-LAYOUT`                                | 1.4        |\r\n",
+      "source_line": 349,
+      "source_line_end": 349,
+      "family_source_quote": "\\## 1.C Control Arguments\r\n\r\n\\> 仍属 **输入构造**（API 实参），但语义是「拨开关」而非「填数据」。  \r\n\\> 仅当 schema/`inputs` 暴露对应 attr 时 applicable。\r\n\r\n| ID        | 项                           | Requires 语义                               | 常联合 1.x |\r\n| --------- | ---------------------------- | ------------------------------------------- | ---------- |\r\n",
+      "family_source_line": 337
+    },
+    {
+      "id": "1.C.7",
+      "name": "reduction / dim / transpose",
+      "family_id": "1.C",
+      "definition": "reduction / dim / transpose",
+      "requires": [
+        "`SEM-REDUCE` / `SEM-AXIS` / `SEM-TRANSPOSE`"
+      ],
+      "skip_if": [],
+      "item_requires": [
+        "`SEM-REDUCE` / `SEM-AXIS` / `SEM-TRANSPOSE`"
+      ],
+      "item_skip_if": [],
+      "family_requires": [],
+      "family_skip_if": [],
+      "family_scope_constraint": "仅当 schema/`inputs` 暴露对应 attr 时 applicable。",
+      "input_roles": [
+        "SEM-REDUCE",
+        "SEM-AXIS",
+        "SEM-TRANSPOSE",
+        "schema暴露轴/转置"
+      ],
+      "construction_focus": "选择合法reduction/dim/transpose属性，核对规范化与输出语义。",
+      "consumer_direction": "轴规范化、维序重排、归约路径和输出形状。",
+      "boundary": "不同属性各有合同；负轴是否合法、transpose是否等价须按接口判断，不把内部排布变化冒充用户实参。",
+      "legality_expectation": "按目标接口/版本契约分别记录合法计算、明确应拒绝及未定义域；未定义输入的异常不自动成为精度缺陷。",
+      "interpretation_status": "REVIEWER_EXPLANATION_NOT_IMPLEMENTATION_OR_HISTORICAL_PROOF",
+      "source_file": "D:\\project\\demoncatpfi\\fault-evidence-audit-rootcause\\reports\\rc128-mechanism-design-20261112-r4\\sources\\original\\api42_trigger_library_original.md",
+      "source_quote": "| **1.C.7** | reduction / dim / transpose  | `SEM-REDUCE` / `SEM-AXIS` / `SEM-TRANSPOSE` | 1.2        |\r\n",
+      "source_line": 350,
+      "source_line_end": 350,
+      "family_source_quote": "\\## 1.C Control Arguments\r\n\r\n\\> 仍属 **输入构造**（API 实参），但语义是「拨开关」而非「填数据」。  \r\n\\> 仅当 schema/`inputs` 暴露对应 attr 时 applicable。\r\n\r\n| ID        | 项                           | Requires 语义                               | 常联合 1.x |\r\n| --------- | ---------------------------- | ------------------------------------------- | ---------- |\r\n",
+      "family_source_line": 337
+    }
+  ]
+}

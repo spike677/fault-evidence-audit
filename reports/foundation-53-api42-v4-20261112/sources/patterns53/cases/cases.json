@@ -1,0 +1,3770 @@
+{
+  "schema_version": "1.0",
+  "library_version": "6.63",
+  "updated": "2026-11-08",
+  "generated_by": "scripts/gen_cases.py",
+  "source": "skills/FP-*/*/SKILL.md §「已知缺陷案例库（v5.1）」+ §「实证加深（v5.4）反向排除项/真实修复锚」；patterns/FP-G/FP-G02.md（同步配对表）",
+  "evidence_commits": {
+    "ops-cv": "79680a9",
+    "ops-math": "9a37afe",
+    "ops-nn": "a7539b",
+    "ops-transformer": "d5c0683"
+  },
+  "sync_pairs": {
+    "FP-G02": [
+      {
+        "a": "SetFlag<HardEvent::X>",
+        "b": "WaitFlag<HardEvent::X>",
+        "kind": "event",
+        "note": "同一事件域的 set/wait 次数与分支须配平（只 set 不 wait / wait 多于 set 即失衡）"
+      },
+      {
+        "a": "AllocEventID<HardEvent::X>",
+        "b": "ReleaseEventID<HardEvent::X>",
+        "kind": "event_id",
+        "note": "申请与释放成对，且不得在循环体内申请（事件池有限，每迭代申请即泄漏）"
+      },
+      {
+        "a": "CrossCoreSetFlag<mode,pipe>",
+        "b": "CrossCoreWaitFlag<mode,pipe>",
+        "kind": "cross_core",
+        "note": "mode+flagId 须让等待方感知全部参与核（双 AIV 的 AIV0/AIV1 都要覆盖）"
+      },
+      {
+        "a": "SyncAll<...>",
+        "b": "SetScheduleMode(1)",
+        "kind": "schedule",
+        "note": "kernel 用 SyncAll 合并各核结果时，host 侧须设 schedule_mode=1 保证核同时驻留"
+      }
+    ]
+  },
+  "reverse_exclusions": {
+    "FP-A01": [
+      {
+        "item": "已用高精度指令",
+        "evidence": "给出 `Power/Exp/Log` 调用点**带 `DOUBLE_FLOAT_TECH`/高精度 config** 的 `[file]:[line]`；裸调用不算"
+      },
+      {
+        "item": "已做数值稳定补偿",
+        "evidence": "给出 `log1p` 型掩码链（如 `Adds(…,1.0f)` + `[file]:[line]`）或等价补偿的实现行"
+      },
+      {
+        "item": "该 dtype 路径不走近似",
+        "evidence": "给出 dtype 派发处分流到精确实现的 `[file]:[line]`"
+      },
+      {
+        "item": "误差在合同精度标准内",
+        "evidence": "给出双标杆（GPU/CPU 库）实测对比结论，而非「理论上够用」的断言"
+      }
+    ],
+    "FP-A02": [
+      {
+        "item": "被测路径只用单指令归约",
+        "evidence": "给出「无逐段 `Add` 累进同一缓冲」的 `[file]:[line]`，即直接 `Reduce<…SUM>` / `ReduceSum` 于源数据"
+      },
+      {
+        "item": "顺序差异不改变结果（整数/定点归约）",
+        "evidence": "给出输入 dtype 为整型（无舍入序依赖）的声明 `[file]:[line]`"
+      },
+      {
+        "item": "已被高层精度缓冲抵消",
+        "evidence": "给出 `DOUBLE_FLOAT_TECH`/fp32 中间缓冲启用点的 `[file]:[line]`"
+      },
+      {
+        "item": "标杆本就是同一顺序",
+        "evidence": "给出标杆侧（GPU/CPU 库）实现顺序的公开引用，而非「应无差异」的断言"
+      }
+    ],
+    "FP-A14": [
+      {
+        "item": "步长参数来源正确",
+        "evidence": "给出 `stepKa`/`stepKb`（或对应 A/B 侧步长）**各自独立**赋值/初始化的 `[file]:[line]`，而非互相赋值"
+      },
+      {
+        "item": "K/M 已对齐且无 pad 行脏数据",
+        "evidence": "给出「先 `Fill`/`Duplicate` 清零再搬有效行」的 `[file]:[line]`（见 12.1 `PadQL1Zero` 样板）"
+      },
+      {
+        "item": "两路径（FFMA/MMAD）结果本就一致",
+        "evidence": "给出同一算子双路径各自的真实实现行 `[file]:[line]` 并说明为何结果必然相同"
+      },
+      {
+        "item": "该组合不在硬件模板能力集内",
+        "evidence": "给出模板能力表/tilingkey 组合清单中缺该组合的声明行"
+      }
+    ],
+    "FP-A21": [
+      {
+        "item": "反向排除项",
+        "evidence": "所需负向证据"
+      },
+      {
+        "item": "该状态在每次进入时都无条件赋值",
+        "evidence": "给出赋值语句位于**所有分支之外**的 `[文件]:[行号]`，而非某个 `if` 体内"
+      },
+      {
+        "item": "状态载体是 per-call 对象（类成员/局部），非 TU 全局",
+        "evidence": "给出声明所在作用域 `[文件]:[行号]`：类成员需证明对象每次调用新建；匿名 namespace / 文件作用域全局直接算命中"
+      },
+      {
+        "item": "该状态只有单一写点且写点在无条件路径上",
+        "evidence": "给出唯一写点 `[文件]:[行号]` 及其所在控制流层级"
+      },
+      {
+        "item": "同族其他标量也已处理（并发面）",
+        "evidence": "给出并发场景下无共享写的证据；仅修主状态不覆盖并发"
+      }
+    ],
+    "FP-A22": [
+      {
+        "item": "反向排除项",
+        "evidence": "所需负向证据"
+      },
+      {
+        "item": "该 dtype 路径的计算类型确实等于输出类型",
+        "evidence": "给出 dtype 分派处「计算类型 = 输出类型」的 `[文件]:[行号]`；不得以「通常如此」代替"
+      },
+      {
+        "item": "该尺寸只用于输出存储分配",
+        "evidence": "给出该变量作为输出 tensor 分配参数的 `[文件]:[行号]`，且未流入容量/循环上界"
+      },
+      {
+        "item": "位宽差在该处不影响结果",
+        "evidence": "给出「尺寸仅作上界且下游另有 clamp」的 `[文件]:[行号]`；无证据记观察项"
+      },
+      {
+        "item": "已有 calcDtype 映射且覆盖该输出 dtype",
+        "evidence": "给出映射表覆盖该 dtype 的分支 `[文件]:[行号]`，且该映射是该尺寸的实际输入"
+      }
+    ],
+    "FP-B04": [
+      {
+        "item": "反向排除项",
+        "evidence": "所需负向证据"
+      },
+      {
+        "item": "该参数本就允许为空（`Optional` 语义）",
+        "evidence": "给出接口签名或 `docs/aclnn*.md` 中「可为空指针」的原文，并指出**空值时的合法分支** `[文件]:[行号]`；只说「文档是可选参数」不算"
+      },
+      {
+        "item": "该输出在本次调用中不可能被省略",
+        "evidence": "给出「mask 恒真」的证据 `[文件]:[行号]`：如 `outputMask` 由框架固定构造、或首段校验强制全部为 true"
+      },
+      {
+        "item": "校验已由上游入口完成",
+        "evidence": "给出**该入口自身**的判空行 `[文件]:[行号]`；不得以「另一个入口校验了」代替（多入口族必须逐入口）"
+      },
+      {
+        "item": "校验命中后已有有效控制流",
+        "evidence": "给出命中分支的 `return` / `CHECK_RET` `[文件]:[行号]`；仅 `OP_LOGE` 不算"
+      },
+      {
+        "item": "读取的是本输出自己的元信息",
+        "evidence": "给出门控条件与该读取在同一分支内的 `[文件]:[行号]`，证明读取方即该输出的后处理"
+      },
+      {
+        "item": "非连续性已被正确处理",
+        "evidence": "给出 `TensorContiguousProcess` / `Contiguous` 调用点 `[文件]:[行号]`，且其产物确实被下游消费（不是算了没用）"
+      }
+    ],
+    "FP-B06": [
+      {
+        "item": "反向排除项",
+        "evidence": "所需负向证据"
+      },
+      {
+        "item": "空态在该路径已被完整早退",
+        "evidence": "给出 `ReleaseTo(executor)` + `return ACLNN_SUCCESS` 同在空态分支内的 `[文件]:[行号]`；只跳过 `Contiguous` 不算"
+      },
+      {
+        "item": "空态输入本身非法（应被拒绝而非早退）",
+        "evidence": "给出文档或首段校验明确拒绝 0 元素的 `[文件]:[行号]`，且与 CPU/GPU 参考行为一致"
+      },
+      {
+        "item": "平台分支两侧都有保护",
+        "evidence": "给出 arch22 与 arch35/regbase **各自**的空态处理行 `[文件]:[行号]`；只 gate 一侧不算"
+      },
+      {
+        "item": "非 inplace 变体同样覆盖",
+        "evidence": "给出非 inplace 入口的空态分支 `[文件]:[行号]`；同族入口必须逐入口核"
+      }
+    ],
+    "FP-B07": [
+      {
+        "item": "反向排除项",
+        "evidence": "所需负向证据"
+      },
+      {
+        "item": "该搬运因子不存在尾块（形状恒整除）",
+        "evidence": "给出「迭代数上界被 tiling 强制为偶数/整除」的 `[文件]:[行号]`，或该循环上界来源的约束行"
+      },
+      {
+        "item": "容量比较处「等于上限」时确实无需额外空间",
+        "evidence": "给出该分支后不使用 scratch/临时 buffer 的 `[文件]:[行号]`；仅凭「一般不会刚好相等」不算"
+      },
+      {
+        "item": "已用 64 位承载且乘法前已提升",
+        "evidence": "给出**第一次乘法前**的 `static_cast<int64_t>` / `static_cast<uint64_t>` `[文件]:[行号]`，而非只看左值声明类型"
+      },
+      {
+        "item": "该偏移不参与 GM 寻址",
+        "evidence": "给出该变量仅用于局部 UB 内定位、且上界远小于 2^31 的 `[文件]:[行号]`"
+      }
+    ],
+    "FP-B11": [
+      {
+        "item": "该路径已整体跳过校验",
+        "evidence": "给出**有意**跳过的真实代码行，如 `image/upsample_nearest_exact3d_grad/…/aclnn_upsample_nearest_exact3d_backward.cpp:141-143` 的 `if (IsRegBase()) { return true; }`——但**须说明 regbase 侧由谁兜底**，否则改为「降级路径校验缺失」候选"
+      },
+      {
+        "item": "长度/值域已前置校验",
+        "evidence": "给出前置 `CheckXXX` 中该校验项的 `[file]:[line]`"
+      },
+      {
+        "item": "dtype 组合由平台模板兜底",
+        "evidence": "给出模板/能力表中断言该组合的 `[file]:[line]`"
+      },
+      {
+        "item": "非有限值由算子语义允许",
+        "evidence": "给出文档或头注释中显式允许 `inf/nan` 的声明行"
+      }
+    ],
+    "FP-B12": [
+      {
+        "item": "早退块已写输出",
+        "evidence": "给出早退块内写该输出的 `[file]:[line]`：`l0op::ViewCopy` / `GetOutTensorWithValueZero` / `Duplicate` / `InitOutput` 之一"
+      },
+      {
+        "item": "输出为可选/不参与语义",
+        "evidence": "proto 或 def 中该输出的 `optional=true` 声明行"
+      },
+      {
+        "item": "空输入语义即「输出保持未写」",
+        "evidence": "接口头注释或文档中对空输入 → 输出语义的显式声明行（如「undefined」）"
+      },
+      {
+        "item": "早退发生在 kernel 下发之后",
+        "evidence": "该 `return` 位于 `ADD_TO_LAUNCHER_LIST_AICORE`/launcher 调用之后的 `[file]:[line]`"
+      }
+    ],
+    "FP-B14": [
+      {
+        "item": "proto 默认值落在 tiling 接受域内",
+        "evidence": "给出 proto `.ATTR(...)` 默认值行 + tiling 值域校验行**两处** `[file]:[line]`，并证明默认值 ∈ 校验域"
+      },
+      {
+        "item": "attr 可选且缺省即合法",
+        "evidence": "给出 proto 中该 attr 未声明 default（optional）的 `[file]:[line]`"
+      },
+      {
+        "item": "format 差异由框架统一抹平",
+        "evidence": "给出 def 中 `Format`/`UnknownShapeFormat` 两处一致的 `[file]:[line]`（**仅一处一致不足以排除**，`UnknownShapeFormat` 缺失是常见漏洞）"
+      },
+      {
+        "item": "图模式通路不在被检算子支持范围",
+        "evidence": "给出算子注册/支持矩阵中未注册图模式的声明行"
+      }
+    ],
+    "FP-G02": [
+      {
+        "item": "反向排除项",
+        "evidence": "所需负向证据"
+      },
+      {
+        "item": "循环上界数学上不可能为 0",
+        "evidence": "给出上界来源的约束行 `[文件]:[行号]`（如由 `CeilDiv` 且被除数恒 ≥1、或前置校验拒绝空态）"
+      },
+      {
+        "item": "零迭代时循环前没有在飞工作",
+        "evidence": "给出循环前无 `IterateAll`/`SetFlag`/异步搬运的 `[文件]:[行号]` 区间说明"
+      },
+      {
+        "item": "零迭代路径已被更外层的等待覆盖",
+        "evidence": "给出外层 Wait 位置与它晚于零迭代返回点的 `[文件]:[行号]`；「外层总会等」不算"
+      },
+      {
+        "item": "该循环非「有后置条件」型（纯计算无异步）",
+        "evidence": "给出循环体内无任何跨 pipe 原语的 `[文件]:[行号]`"
+      }
+    ]
+  },
+  "stats": {
+    "total": 100,
+    "depth_patterns": 20,
+    "by_fp": {
+      "FP-A01": 4,
+      "FP-A02": 4,
+      "FP-A08": 6,
+      "FP-A14": 4,
+      "FP-A19": 4,
+      "FP-A20": 4,
+      "FP-A21": 3,
+      "FP-A22": 3,
+      "FP-B04": 5,
+      "FP-B06": 5,
+      "FP-B07": 8,
+      "FP-B08": 4,
+      "FP-B09": 5,
+      "FP-B10": 4,
+      "FP-B11": 5,
+      "FP-B12": 5,
+      "FP-B14": 4,
+      "FP-C01": 4,
+      "FP-G01": 6,
+      "FP-G02": 13
+    },
+    "with_issue": 88,
+    "with_verified_anchor": 31,
+    "verified_anchors": 42,
+    "sync_cases": 13
+  },
+  "cases": [
+    {
+      "case_id": "FP-A01-C1",
+      "fp_id": "FP-A01",
+      "skill": "fpa01-kernel-review",
+      "title": "exp/log 组合近似替代原生幂，精度劣化 —— #2110（cdist_grad）",
+      "subtype": null,
+      "trigger": "cdist 反向 grad 的 pow 路径（GENERAL 0<p<2 / LARGEP p>2 两条 DAG），ratio 跨数量级或 p 非整数时命中。",
+      "root_cause": "GENERAL/LARGEP DAG 将 `pow(ratio, p-1)` 写成 `Exp(Muls(Log(ratio), p-1))` 组合近似（误差 2~4 ULP）→ 对标 `torch.ops.aten._cdist_backward` 的 `std::pow`（表驱动、内部扩展精度 <1 ULP）→ 均方根误差劣化 **4.65 倍**（NPU fp32 3.91e-4 vs GPU A100 8.40e-5）→ ATK 双标杆精度不达标。",
+      "criteria": {
+        "locators": [],
+        "check": [
+          "签名 `Exp\\s*\\(\\s*Muls\\s*\\(\\s*Log` 定位组合近似段；",
+          "核是否已有 `Vec::Power` + DOUBLE_FLOAT_TECH 路径（有则记防护面）；",
+          "对照标杆 pow 的精度口径（表驱动 / 扩展精度）。"
+        ]
+      },
+      "fix_pattern": "",
+      "fix_pattern_code": "// ❌ 组合近似：误差 2~4 ULP、跨数量级放大\n// out = Exp(Muls(Log(ratio), p - 1.0f));\n// ✅ 高精度原生幂（DOUBLE_FLOAT_TECH，约 1 ULP）\n// out = Vec::Power(ratio, p - 1.0f, /*DOUBLE_FLOAT_TECH*/);",
+      "min_repro": "构造 ratio 跨数量级、p∈(1,2) 与 p>2 输入，与 GPU `_cdist_backward` 逐元素 utol，看误差是否稳定落在 2~4 ULP / 均方根劣化。",
+      "evidence": "ops-math **#2110**。",
+      "issues": [
+        "#2110"
+      ],
+      "verified_anchors": [
+        {
+          "file": "math/cdist_grad/op_kernel/arch35/cdist_grad_operator.h",
+          "lines": "247-265",
+          "commit": "f94a6cd6d",
+          "repo": "ops-math",
+          "note": "**改用高精度 `Power`**：`:263` `static constexpr AscendC::PowerConfig dftCfg = {AscendC::PowerAlgo::DOUBLE_FLOAT_TECH};`、`:264` `AscendC::Power<PromoteT, false, dftCfg>(dst, base, expVal, sharedTmp, count);`；注释 `:248-252` 说明「DOUBLE_FLOAT_TECH 需 3 个 float 缓冲，无 tmpBuffer 重载在 DAG 内取到垃圾栈缓冲，故由外层 DAG 节点分配 tmpBuf」——**这是可复用的真实修复要件，非示意**",
+          "issue": "#2110"
+        }
+      ]
+    },
+    {
+      "case_id": "FP-A01-C2",
+      "fp_id": "FP-A01",
+      "skill": "fpa01-kernel-review",
+      "title": "Taylor 级数截断 + 系数有效位不足 —— #2271（bessel_i1e，arch35）",
+      "subtype": null,
+      "trigger": "arch35 上 bessel_i1e 的 `exp(-|x|/4)` Taylor 级数实现，|x| 偏大输入。",
+      "root_cause": "Taylor 级数仅 **9 项**截断 + 有理多项式**系数有效位不足** → 最大误差 **2.6e-6** 远超 fp32 精度预期 → 修复将 Taylor 扩至 **13 项**、提升系数精度并**分段 Horner** 规避编译器常量折叠限制 → 误差降至 **6.1e-10**（约 4000 倍）。",
+      "criteria": {
+        "locators": [],
+        "check": [
+          "grep `Taylor|taylor|Horner`；",
+          "数截断项数与目标精度匹配性；",
+          "核系数有效位；",
+          "看是否分段 Horner。"
+        ]
+      },
+      "fix_pattern": "",
+      "fix_pattern_code": "// ❌ 固定 9 项 + 低有效位系数\n// t = poly9(x);\n// ✅ 扩至 13 项 + 分段 Horner（规避编译器常量折叠）\n// if (x < seg) t = horner_lo(x); else t = horner_hi(x);",
+      "min_repro": "|x| 扫描到较大值，与 CPU 参考 bessel_i1e 逐点比对最大误差量级。",
+      "evidence": "ops-math **#2271**（PR **#4131**）。",
+      "issues": [
+        "#2271",
+        "#4131"
+      ],
+      "verified_anchors": [
+        {
+          "file": "math/bessel_i1e/op_kernel/arch35/bessel_i1e.h",
+          "lines": "26-27",
+          "commit": "f94a6cd6d",
+          "repo": "ops-math",
+          "note": "真实多项式与分段：`:26-27` `constexpr float itrBefore[7] = {0.5000000008f, 0.8789061535f, 0.5149860539f, 0.1508606731f, 0.0265652742f, 0.0030351394f, 0.0003173337f};`；`:167-174` Horner 递推 `Duplicate(poly, itrBefore[6], n); Mul(scratch, poly, t2, n); Adds(poly, scratch, itrBefore[5], n); …`（分母 `:24 INV_SEGMENT = 0.26666666666666666f`）",
+          "issue": "#2271"
+        }
+      ]
+    },
+    {
+      "case_id": "FP-A01-C3",
+      "fp_id": "FP-A01",
+      "skill": "fpa01-kernel-review",
+      "title": "log(1+exp) 无数值稳定补偿，负大数输出恒 0 —— #3589（softplus_v2）",
+      "subtype": null,
+      "trigger": "SoftplusV2 输入为负大数（实证 x=**-16.619**），`exp(x)≈6e-8`，fp32 下 `1+exp(x)` 被舍入为 1。",
+      "root_cause": "直接 `log(1+exp(x))` 无 log1p / 分段恒等变形补偿 → x=-16.619 时 NPU 输出 **0** 而 torch CPU 非 0 → 静默精度损失。",
+      "criteria": {
+        "locators": [],
+        "check": [
+          "签名 `log1p|Log1p` 定位补偿面；",
+          "找 `Log(Add(Exp(` 无补偿写法；",
+          "核是否分段恒等变形。"
+        ]
+      },
+      "fix_pattern": "",
+      "fix_pattern_code": "// ❌ 负大数下 1+exp(x) 舍入为 1\n// y = Log(Add(Exp(x), 1.0f));\n// ✅ 数值稳定分段恒等变形\n// y = Max(x, 0.0f) + Log1p(Exp(-Abs(x)));",
+      "min_repro": "输入 x=-16.619 及相邻负大数，与 torch CPU softplus 比对，看 NPU 是否恒 0。",
+      "evidence": "ops-nn **#3589**。",
+      "issues": [
+        "#3589"
+      ],
+      "verified_anchors": []
+    },
+    {
+      "case_id": "FP-A01-C4",
+      "fp_id": "FP-A01",
+      "skill": "fpa01-kernel-review",
+      "title": "候选型：组合近似 / 补偿缺失的泛化深挖（无独立实证）",
+      "subtype": null,
+      "trigger": "quant/dequant、norm 缩放类算子以 `Exp(Muls(Log(...)))` 近似幂/缩放；或 log(1+x) 类写法未用 log1p，ratio / x 跨数量级。",
+      "root_cause": "检测签名 `Exp\\s*\\(\\s*Muls\\s*\\(\\s*Log` 或 `log1p|Log1p` 命中，且未用原生 `Power`（DOUBLE_FLOAT_TECH）/ 无稳定补偿、位于算子主路径。",
+      "criteria": {
+        "locators": [
+          {
+            "file": "scripts/scan_fp.py",
+            "lines": ""
+          }
+        ],
+        "check": [
+          "全仓 grep 两枚检测签名；",
+          "仅对「组合近似 + 无补偿 + 主路径」记候选，并按第 7 节给量化推导链。"
+        ]
+      },
+      "fix_pattern": "改用 `Vec::Power`（DOUBLE_FLOAT_TECH 类）或数值稳定实现（log1p / 分段恒等变形）。",
+      "fix_pattern_code": "",
+      "min_repro": "见下方语料基线 scan 命令 + 与标杆逐元素 utol。",
+      "evidence": "无（检测签名候选，须实测确认后升档）。\n### 语料基线与深挖起手式\n- 确认实证 **3 条**：ops-math **#2110**（cdist_grad 组合近似劣化 4.65×）、ops-math **#2271**（bessel_i1e 级数扩展，PR #4131）、ops-nn **#3589**（softplus_v2 log(1+exp)）。\n- 深挖起手：`python3 scripts/scan_fp.py --only FP-A01 --format json <目标文件>`（签名候选，非结论）。",
+      "issues": [
+        "#2110",
+        "#2271",
+        "#3589",
+        "#4131"
+      ],
+      "verified_anchors": [
+        {
+          "file": "math/cdist_grad/op_kernel/arch35/cdist_grad_operator.h",
+          "lines": "247-265",
+          "commit": "f94a6cd6d",
+          "repo": "ops-math",
+          "note": "**改用高精度 `Power`**：`:263` `static constexpr AscendC::PowerConfig dftCfg = {AscendC::PowerAlgo::DOUBLE_FLOAT_TECH};`、`:264` `AscendC::Power<PromoteT, false, dftCfg>(dst, base, expVal, sharedTmp, count);`；注释 `:248-252` 说明「DOUBLE_FLOAT_TECH 需 3 个 float 缓冲，无 tmpBuffer 重载在 DAG 内取到垃圾栈缓冲，故由外层 DAG 节点分配 tmpBuf」——**这是可复用的真实修复要件，非示意**",
+          "issue": "#2110"
+        },
+        {
+          "file": "math/bessel_i1e/op_kernel/arch35/bessel_i1e.h",
+          "lines": "26-27",
+          "commit": "f94a6cd6d",
+          "repo": "ops-math",
+          "note": "真实多项式与分段：`:26-27` `constexpr float itrBefore[7] = {0.5000000008f, 0.8789061535f, 0.5149860539f, 0.1508606731f, 0.0265652742f, 0.0030351394f, 0.0003173337f};`；`:167-174` Horner 递推 `Duplicate(poly, itrBefore[6], n); Mul(scratch, poly, t2, n); Adds(poly, scratch, itrBefore[5], n); …`（分母 `:24 INV_SEGMENT = 0.26666666666666666f`）",
+          "issue": "#2271"
+        }
+      ]
+    },
+    {
+      "case_id": "FP-A02-C1",
+      "fp_id": "FP-A02",
+      "skill": "fpa02-kernel-review",
+      "title": "dx 归约拓扑与标杆不一致 —— #5560（rms_norm_grad）",
+      "subtype": null,
+      "trigger": "rms_norm_grad 反向 dx 的大规模归约、多核并行归约场景；小 shape 天然不可见。",
+      "root_cause": "dx 计算的归约/累加（分组与结合顺序）与 PyTorch CUDA 不一致 → 浮点加法不满足结合律 → 大 shape 偏差稳定放大；修复以 `Reg::Axpy` 显式对齐标杆拓扑（PR **!9873**）。",
+      "criteria": {
+        "locators": [],
+        "check": [
+          "签名 `ReduceSum|WholeReduceSum|BlockReduce` 定位归约实现；",
+          "找 `Reg::Axpy` 类对齐写法（有则记防护面）；",
+          "对比 CUDA 归约分组层级。"
+        ]
+      },
+      "fix_pattern": "",
+      "fix_pattern_code": "// ❌ 自定义归并分组，顺序与 CUDA 标杆不同\n// acc = ReduceSum(local);   // 树形分组未对齐标杆\n// ✅ 显式对齐标杆拓扑逐层累加\n// Reg::Axpy(dx, dy, coeff); // 按 PyTorch CUDA 拓扑",
+      "min_repro": "大 shape rms_norm_grad 与 PyTorch CUDA 逐元素 utol；**同输入多轮结果应一致**（不一致则转 A06）。",
+      "evidence": "ops-nn **#5560**（PR **!9873**）。",
+      "issues": [
+        "#5560"
+      ],
+      "verified_anchors": [
+        {
+          "file": "norm/rms_norm_grad/op_kernel/arch35/rms_norm_grad_regbase_common.h",
+          "lines": "149-156",
+          "commit": "a7539b",
+          "repo": "ops-nn",
+          "note": "#5560 的 dx 顺序面",
+          "issue": "#5560"
+        }
+      ]
+    },
+    {
+      "case_id": "FP-A02-C2",
+      "fp_id": "FP-A02",
+      "skill": "fpa02-kernel-review",
+      "title": "性能优化重排浮点结合顺序致 EVB 失败 —— #5537（swiglu_mx_quant）",
+      "subtype": null,
+      "trigger": "近期性能优化改动（向量化 / 循环展开 / 分块重排 / 合并 FMA 链）触及累加段的算子路径。",
+      "root_cause": "性能优化把串行累加改为树形或合并 FMA 链 → 浮点结合顺序改变且未做精度回归 → EVB 精度失败；PR **#9828** 已修。",
+      "criteria": {
+        "locators": [],
+        "check": [
+          "查近期性能优化 diff（git log/diff）；",
+          "逐段核累加结合顺序是否变化；",
+          "优先核「优化合入后精度回归」记录。"
+        ]
+      },
+      "fix_pattern": "",
+      "fix_pattern_code": "// ❌ 性能优化合并累加链，改写结合顺序\n// s = Fma(a, b, Fma(c, d, e));   // 顺序漂移\n// ✅ 恢复标杆结合顺序（并补精度回归门禁）\n// s = (a * b + c * d) + e;",
+      "min_repro": "优化前后同输入对拍 + 大 shape 归约，看偏差量级是否跳变。",
+      "evidence": "ops-nn **#5537**（PR **#9828**）。",
+      "issues": [
+        "#5537",
+        "#9828"
+      ],
+      "verified_anchors": [
+        {
+          "file": "quant/swiglu_mx_quant/op_kernel/arch35/swiglu_mx_quant_axis_last.h",
+          "lines": "46-51",
+          "commit": "a7539b",
+          "repo": "ops-nn",
+          "note": "#5537 的结合顺序面",
+          "issue": "#5537"
+        }
+      ]
+    },
+    {
+      "case_id": "FP-A02-C3",
+      "fp_id": "FP-A02",
+      "skill": "fpa02-kernel-review",
+      "title": "候选型：多核分组 / 二次归约顺序（无独立实证）",
+      "subtype": null,
+      "trigger": "多核并行归约、核数变化时偏差量级跳变；分组边界（按行 / 按块 / chunk）与标杆不一致。",
+      "root_cause": "各核部分和分组方式与最终二次归约顺序与标杆不同，且失败 shape 可使偏差超阈。",
+      "criteria": {
+        "locators": [],
+        "check": [
+          "grep 分核/分组参数与 `BlockReduce`；",
+          "核数变化对照偏差量级是否跳变。"
+        ]
+      },
+      "fix_pattern": "固定分组与二次归约顺序，对齐标杆分组边界（同族已修复样板如 `Reg::Axpy` 类显式对齐）。",
+      "fix_pattern_code": "",
+      "min_repro": "同输入换核数（多核 vs 单核）对拍。",
+      "evidence": "无（候选，须实测确认）。",
+      "issues": [],
+      "verified_anchors": []
+    },
+    {
+      "case_id": "FP-A02-C4",
+      "fp_id": "FP-A02",
+      "skill": "fpa02-kernel-review",
+      "title": "候选型：位宽正确但拓扑不同（无独立实证）",
+      "subtype": null,
+      "trigger": "累加器已为 fp32，但归约拓扑仍与标杆不同（与 A03 分界：位宽不足归 A03）。",
+      "root_cause": "位宽正确、顺序不同 → 归本条。",
+      "criteria": {
+        "locators": [
+          {
+            "file": "scripts/scan_fp.py",
+            "lines": ""
+          }
+        ],
+        "check": [
+          "核累加器声明类型（fp16/bf16 → A03）；",
+          "fp32 但拓扑不同 → 归 A02。"
+        ]
+      },
+      "fix_pattern": "对齐标杆归约拓扑（不改位宽）。",
+      "fix_pattern_code": "",
+      "min_repro": "见下方语料基线 scan 命令。",
+      "evidence": "无（候选）。\n### 语料基线与深挖起手式\n- 确认实证 **2 条**：ops-nn **#5560**（PR !9873，`Reg::Axpy` 对齐）、ops-nn **#5537**（PR #9828，性能优化改结合顺序）。\n- 深挖起手：`python3 scripts/scan_fp.py --only FP-A02 --format json <目标文件>`（签名候选，非结论）。",
+      "issues": [
+        "#5537",
+        "#5560",
+        "#9828"
+      ],
+      "verified_anchors": [
+        {
+          "file": "quant/swiglu_mx_quant/op_kernel/arch35/swiglu_mx_quant_axis_last.h",
+          "lines": "46-51",
+          "commit": "a7539b",
+          "repo": "ops-nn",
+          "note": "#5537 的结合顺序面",
+          "issue": "#5537"
+        },
+        {
+          "file": "norm/rms_norm_grad/op_kernel/arch35/rms_norm_grad_regbase_common.h",
+          "lines": "149-156",
+          "commit": "a7539b",
+          "repo": "ops-nn",
+          "note": "#5560 的 dx 顺序面",
+          "issue": "#5560"
+        }
+      ]
+    },
+    {
+      "case_id": "FP-A08-C1",
+      "fp_id": "FP-A08",
+      "skill": "fpa08-kernel-review",
+      "title": "紧贴 ND2NZ on-the-fly 上限的尾块精度超阈 —— #5519（batch_mat_mul）",
+      "subtype": null,
+      "trigger": "aclnnBatchMatMul fp32 且 **K=65533**（紧贴 ND2NZ on-the-fly 上限 **65535**），走尾块路径。",
+      "root_cause": "K 轴紧贴实现上限 → 尾块路径归约分组/覆盖与主块不同 → 相对误差比例 **3.099 > 阈值 2.0**（fp32 精度超阈）。",
+      "criteria": {
+        "locators": [],
+        "check": [
+          "在 `*_tiling*.cpp` 定位 ND2NZ on-the-fly 上限常量（65535）与 K 轴切块；",
+          "找 K=65535 附近的尾块分支；",
+          "核尾块归约分组是否随粒度变化。"
+        ]
+      },
+      "fix_pattern": "修正紧贴上限 shape 的尾块路径（尾块切块对齐 / 覆盖补齐；对齐同族已修复样板）。",
+      "fix_pattern_code": "",
+      "min_repro": "K=65533、fp32 输入与 GPU 参考逐元素 utol，看相对误差比例是否超 2.0。",
+      "evidence": "ops-nn **#5519**。",
+      "issues": [
+        "#5519"
+      ],
+      "verified_anchors": []
+    },
+    {
+      "case_id": "FP-A08-C2",
+      "fp_id": "FP-A08",
+      "skill": "fpa08-kernel-review",
+      "title": "尾块 `preCoreNum` 未清零致 index 溢出 —— #3081（all_gather_matmul_v2）",
+      "subtype": null,
+      "trigger": "AllGatherMatmulV2 尾块 / 分核不整除场景，某些 shape 触发。",
+      "root_cause": "尾块 `preCoreNum` **未清零** → `UpdateBasicIndex` 计算 index 时 `uint64_t` **负数溢出**（若致越界则主导归 FP-B07，双向关联）。",
+      "criteria": {
+        "locators": [],
+        "check": [
+          "grep `preCoreNum|blockFactor|UpdateBasicIndex`；",
+          "逐尾块分支核变量是否初始化；",
+          "判是否致越界 → 归 B07 或 A08。"
+        ]
+      },
+      "fix_pattern": "",
+      "fix_pattern_code": "// ❌ 尾块 preCoreNum 未清零 → uint64_t 下溢\n// uint64_t idx = base - preCoreNum;   // preCoreNum 残留\n// ✅ 每个尾块分支显式清零 / 初始化\n// preCoreNum = 0;\n// uint64_t idx = base + offset;",
+      "min_repro": "构造分核不整除尾核 shape，观察 index 计算与越界。",
+      "evidence": "ops-transformer **#3081**。",
+      "issues": [
+        "#3081"
+      ],
+      "verified_anchors": []
+    },
+    {
+      "case_id": "FP-A08-C3",
+      "fp_id": "FP-A08",
+      "skill": "fpa08-kernel-review",
+      "title": "slice m 方向尾块 slicem 对齐与负载均衡 —— #3391（slice）",
+      "subtype": null,
+      "trigger": "slice 场景 m 方向非对齐尾块。",
+      "root_cause": "m 方向**尾块切块 slicem 对齐**与**负载均衡**不当 → 尾块归约分组/覆盖偏差。",
+      "criteria": {
+        "locators": [],
+        "check": [
+          "grep `slicem|tileSize|Tail`；",
+          "核 m 方向尾块对齐；",
+          "核分核负载均衡参数。"
+        ]
+      },
+      "fix_pattern": "尾块切块 slicem 对齐修正 + 负载均衡修正。",
+      "fix_pattern_code": "",
+      "min_repro": "m 方向非对齐 shape + 换 tiling 粒度对比。",
+      "evidence": "ops-nn **#3391**。",
+      "issues": [
+        "#3391"
+      ],
+      "verified_anchors": []
+    },
+    {
+      "case_id": "FP-A08-C4",
+      "fp_id": "FP-A08",
+      "skill": "fpa08-kernel-review",
+      "title": "conv2d FM 非全载 Cin 尾块计算错误 —— #5061（conv2d）",
+      "subtype": null,
+      "trigger": "conv2d 走 **FM 非全载**模板，Cin 轴非对齐尾块。",
+      "root_cause": "FM 非全载模板下 Cin 轴尾块计算错误（模板分支 × 尾块）。",
+      "criteria": {
+        "locators": [],
+        "check": [
+          "grep `FM|nonFull|Cin|Tail`；",
+          "定位模板分支切换处的 Cin 尾块处理。"
+        ]
+      },
+      "fix_pattern": "修正 FM 非全载模板的 Cin 尾块计算。",
+      "fix_pattern_code": "",
+      "min_repro": "Cin 非对齐 + FM 非全载模板组合对拍。",
+      "evidence": "ops-nn **#5061**。",
+      "issues": [
+        "#5061"
+      ],
+      "verified_anchors": []
+    },
+    {
+      "case_id": "FP-A08-C5",
+      "fp_id": "FP-A08",
+      "skill": "fpa08-kernel-review",
+      "title": "Conv weightUb 模板 K 轴尾块处理异常 —— #3281（conv）",
+      "subtype": null,
+      "trigger": "Conv 走 **weightUb 模板**，K 轴非对齐尾块。",
+      "root_cause": "weightUb 模板下 K 轴尾块处理异常。",
+      "criteria": {
+        "locators": [],
+        "check": [
+          "grep `weightUb|Tail`；",
+          "核 K 轴尾块在 weightUb 模板下的计算。"
+        ]
+      },
+      "fix_pattern": "修正 weightUb 模板的 K 轴尾块处理。",
+      "fix_pattern_code": "",
+      "min_repro": "K 非对齐 + weightUb 模板对拍。",
+      "evidence": "ops-nn **#3281**。",
+      "issues": [
+        "#3281"
+      ],
+      "verified_anchors": []
+    },
+    {
+      "case_id": "FP-A08-C6",
+      "fp_id": "FP-A08",
+      "skill": "fpa08-kernel-review",
+      "title": "尾核尾块 L0B 全载 weight 搬进搬出偏移错误 —— #3273（conv）",
+      "subtype": null,
+      "trigger": "尾核 / 尾块场景，L0B **全载 weight**。",
+      "root_cause": "L0B 全载 weight 时**搬进搬出指令偏移错误** → 尾块数据错位。",
+      "criteria": {
+        "locators": [
+          {
+            "file": "scripts/scan_fp.py",
+            "lines": ""
+          }
+        ],
+        "check": [
+          "grep `L0B|weight|offset`；",
+          "核尾核尾块下 L0B 全载的偏移。"
+        ]
+      },
+      "fix_pattern": "修正 L0B 全载 weight 的搬进 / 搬出偏移。",
+      "fix_pattern_code": "",
+      "min_repro": "尾核场景 + L0B 全载 weight 对拍。",
+      "evidence": "ops-nn **#3273**。\n### 语料基线与深挖起手式\n- 确认实证 **8 条**：ops-nn **#5519 / #3391 / #5061 / #3281 / #5138 / #3273 / #4239** 与 ops-transformer **#3081**。本节展开 6 例（#5519 / #3081 / #3391 / #5061 / #3281 / #3273），其余同类：#5138 singlecorebatch 尾块尾核、#4239 dynamic_quant 尾块。\n- 深挖起手：`python3 scripts/scan_fp.py --only FP-A08 --format json <目标文件>`（签名候选，非结论）。",
+      "issues": [
+        "#3081",
+        "#3273",
+        "#3281",
+        "#3391",
+        "#4239",
+        "#5061",
+        "#5138",
+        "#5519"
+      ],
+      "verified_anchors": []
+    },
+    {
+      "case_id": "FP-A14-C1",
+      "fp_id": "FP-A14",
+      "skill": "fpa14-mmad-review",
+      "title": "mmad 指令配置与算子形态不匹配 —— #3503（conv2d）",
+      "subtype": null,
+      "trigger": "conv2d 组合 **c04 + innerbatch + 1x1 卷积 + NCHW**，**950PR**、**fp16**、通路经 pytorch 执行。",
+      "root_cause": "Cube 侧 **mmad 指令配置错误**（分形 / 转置位 / dtype 参数与实际形态不匹配）→ 精度比对**最大相对误差 100%**。",
+      "criteria": {
+        "locators": [],
+        "check": [
+          "grep `Mmad|SetMMAD`；",
+          "逐组合核指令模板参数（dtype / 分形 / 转置位 / 量化模式）；",
+          "配置应随组合正确切换（有则记防护面）。"
+        ]
+      },
+      "fix_pattern": "按实际 shape·layout·dtype·量化模式修正 mmad 指令配置（分形与转置位逐组合核对）。",
+      "fix_pattern_code": "",
+      "min_repro": "构造 c04+innerbatch+1x1+NCHW 的 fp16 conv2d，与 golden 比对最大相对误差。",
+      "evidence": "ops-nn **#3503**。",
+      "issues": [
+        "#3503"
+      ],
+      "verified_anchors": []
+    },
+    {
+      "case_id": "FP-A14-C2",
+      "fp_id": "FP-A14",
+      "skill": "fpa14-mmad-review",
+      "title": "stepKb 从 stepKa 错误初始化 —— #1577（block_mmad_mx_weight_from_ub.h / block_prologue_b_cast_scsc_nn.h）",
+      "subtype": null,
+      "trigger": "使用 `block_mmad_mx_weight_from_ub.h` / `block_prologue_b_cast_scsc_nn.h` 通用 block 实现的 Cube 算子。",
+      "root_cause": "两处 **`stepKb` 从 `stepKa` 错误初始化** → B 矩阵步长取了 A 侧语义 → 搬进步长错误。",
+      "criteria": {
+        "locators": [
+          {
+            "file": "block_mmad_mx_weight_from_ub.h",
+            "lines": ""
+          },
+          {
+            "file": "block_prologue_b_cast_scsc_nn.h",
+            "lines": ""
+          }
+        ],
+        "check": [
+          "先**按文件名 grep 定位所属算子**（严禁据文件名臆测归属）；",
+          "grep `stepKa|stepKb|stepK`；",
+          "逐处核赋值右侧语义与 A / B 对称性。"
+        ]
+      },
+      "fix_pattern": "",
+      "fix_pattern_code": "// ❌ B 侧步长误取 A 侧\n// stepKb = stepKa;\n// ✅ 各侧步长取各自来源\n// stepKa = ...;  stepKb = ...;   // 语义 / 来源独立",
+      "min_repro": "打印 / 断言 `stepKa` / `stepKb` 实际值，核两者来源正确且非互相赋值。",
+      "evidence": "ops-nn **#1577**。",
+      "issues": [
+        "#1577"
+      ],
+      "verified_anchors": []
+    },
+    {
+      "case_id": "FP-A14-C3",
+      "fp_id": "FP-A14",
+      "skill": "fpa14-mmad-review",
+      "title": "K 对齐补零缺失（值域拼接处） —— #1246（mxfp8 blockmmad）",
+      "subtype": null,
+      "trigger": "mxfp8 blockmmad，**A 转置 / B 不转置** 且 **ND** layout 场景。",
+      "root_cause": "值域拼接处 **K 对齐补零缺失** → K 维非对齐时 MMAD 结果错误（与 FP-A08 尾块 / 对齐同源，双向关联）。",
+      "criteria": {
+        "locators": [],
+        "check": [
+          "grep `Pad|pad|duplicate|Duplicate`；",
+          "逐「转置 × layout × 量化模式」组合核 K 补零完整性；",
+          "补零值须对矩阵乘中性。"
+        ]
+      },
+      "fix_pattern": "K 维尾块补齐中性零，覆盖全部转置 × layout 组合。",
+      "fix_pattern_code": "",
+      "min_repro": "K % 16 ≠ 0（K=1/17/33）+ A 转置 / B 不转置 + ND，与参考比对。",
+      "evidence": "ops-transformer **#1246**。",
+      "issues": [
+        "#1246"
+      ],
+      "verified_anchors": [
+        {
+          "file": "attention/block_sparse_attention/op_kernel/attn_infra/gemm/block/block_mmad_qk_arch35_mxfp8.hpp",
+          "lines": "58-59",
+          "commit": "39b52ad5e",
+          "repo": "ops-transformer",
+          "note": "`:58` 注释「Q(M) 方向统一 pad 到 128，满足 Fixpipe nSize 32B 倍数约束」+ `:59` `static constexpr uint32_t Q_M_PAD = 128;`；`:158` 注释「qs64：L1 Q / Q-scale 按 128 行布局，**先清零再只搬有效 64 行，避免 pad 行脏数据进 S**」+ `:159` `PadQL1Zero(qBufId)`；调用点 `:499-500 if (qsActBaseTile < Q_M_PAD) { PadQL1Zero(qBufId); }`",
+          "issue": "#1246"
+        },
+        {
+          "file": "attention/block_sparse_attention/op_kernel/attn_infra/gemm/block/block_mmad_pv_arch35_mxfp8.hpp",
+          "lines": "350-355",
+          "commit": "39b52ad5e",
+          "repo": "ops-transformer",
+          "note": "`:352 constexpr uint16_t seedPadBlocks = static_cast<uint16_t>(MXFP8::L1_ROW_SUM_SEED_SIZE / MXFP8::BLOCK_SIZE);` + `:353 InitConstValueParams<uint16_t> seedPadParams(1, seedPadBlocks, 0, MXFP8::SEED_V_DATA_FILL);` + `:354 Fill(...)` —— **`Fill` 显式写入 pad 块种子值**（对应「值域拼接处的 K 对齐补零缺失」的修复面）",
+          "issue": "#1246"
+        }
+      ]
+    },
+    {
+      "case_id": "FP-A14-C4",
+      "fp_id": "FP-A14",
+      "skill": "fpa14-mmad-review",
+      "title": "候选型：双路径 FFMA / MMAD 语义差（无独立实证）",
+      "subtype": null,
+      "trigger": "同一算子存在 Vector(FFMA) 与 Cube(MMAD) 两条可切换实现（`cubeMathType` 类开关 / tiling 分流 / 模板特化）。",
+      "root_cause": "两路径对同一输出的累加器精度 / 舍入模式不一致，且无数值一致性对照用例或差异无文档说明。",
+      "criteria": {
+        "locators": [
+          {
+            "file": "scripts/scan_fp.py",
+            "lines": ""
+          }
+        ],
+        "check": [
+          "找双实现文件与路径分流开关；",
+          "核两路径累加器位宽与舍入模式是否一致；",
+          "无对照用例记观察项。"
+        ]
+      },
+      "fix_pattern": "对齐两路径累加器精度 / 舍入口径，或补开关级对照用例。",
+      "fix_pattern_code": "",
+      "min_repro": "同输入强制走 FFMA 与 MMAD，对拍差异是否在容差内。",
+      "evidence": "无（候选，须 NPU 实测确认）。\n### 语料基线与深挖起手式\n- 确认实证 **3 条**：ops-nn **#3503**（mmad 配置错，最大相对误差 100%）、ops-nn **#1577**（stepKb 从 stepKa 错误初始化）、ops-transformer **#1246**（mxfp8 K 对齐补零缺失）。\n- 深挖起手：`python3 scripts/scan_fp.py --only FP-A14 --format json <目标文件>`（签名候选，非结论）。",
+      "issues": [
+        "#1246",
+        "#1577",
+        "#3503"
+      ],
+      "verified_anchors": [
+        {
+          "file": "attention/block_sparse_attention/op_kernel/attn_infra/gemm/block/block_mmad_qk_arch35_mxfp8.hpp",
+          "lines": "58-59",
+          "commit": "39b52ad5e",
+          "repo": "ops-transformer",
+          "note": "`:58` 注释「Q(M) 方向统一 pad 到 128，满足 Fixpipe nSize 32B 倍数约束」+ `:59` `static constexpr uint32_t Q_M_PAD = 128;`；`:158` 注释「qs64：L1 Q / Q-scale 按 128 行布局，**先清零再只搬有效 64 行，避免 pad 行脏数据进 S**」+ `:159` `PadQL1Zero(qBufId)`；调用点 `:499-500 if (qsActBaseTile < Q_M_PAD) { PadQL1Zero(qBufId); }`",
+          "issue": "#1246"
+        },
+        {
+          "file": "attention/block_sparse_attention/op_kernel/attn_infra/gemm/block/block_mmad_pv_arch35_mxfp8.hpp",
+          "lines": "350-355",
+          "commit": "39b52ad5e",
+          "repo": "ops-transformer",
+          "note": "`:352 constexpr uint16_t seedPadBlocks = static_cast<uint16_t>(MXFP8::L1_ROW_SUM_SEED_SIZE / MXFP8::BLOCK_SIZE);` + `:353 InitConstValueParams<uint16_t> seedPadParams(1, seedPadBlocks, 0, MXFP8::SEED_V_DATA_FILL);` + `:354 Fill(...)` —— **`Fill` 显式写入 pad 块种子值**（对应「值域拼接处的 K 对齐补零缺失」的修复面）",
+          "issue": "#1246"
+        }
+      ]
+    },
+    {
+      "case_id": "FP-A19-C1",
+      "fp_id": "FP-A19",
+      "skill": "fpa19-aclnn-review",
+      "title": "新增 big_m 模板阈值高、测试 shape 全落旧路径侧致 0 覆盖 —— rms_norm_grad 跨分支核验（2026-09-13）",
+      "subtype": null,
+      "trigger": "需同时 `rows_ >= 64×aivCoreNum/2`（950 上即 M ≥ 2048）且 `rows_ >= 2×cols_` 才入 big_m 路径；而用例矩阵 M 全部 < 2048。",
+      "root_cause": "`RmsNormGradBigMTiling`（优先级 100）**9.1.0 才引入**（8.5.0 无此文件）→ `IsCapable()` 阈值只有大 M 可入 → 测试 shape 分布未随引入同步补齐 → big_m 路径**永远不被执行**、缺陷潜伏；9.1.0→9.2.0 该文件 diff 全为格式化、阈值自引入未变 → 缺口不随版本自然消失。",
+      "criteria": {
+        "locators": [
+          {
+            "file": "rms_norm_grad_regbase_big_m_tiling.cpp",
+            "lines": "253"
+          },
+          {
+            "file": "rms_norm_grad_regbase_tiling.cpp",
+            "lines": "416"
+          }
+        ],
+        "check": [
+          "`git grep -n \"REGISTER_TILING_TEMPLATE\"` 列出全部模板与优先级（数字越小越先尝试）；",
+          "提取各 `IsCapable()` 的 `return false` 阈值表达式、代入平台常量实算区间；",
+          "对照 `tests/` 用例 shape 分布，任一模板区间用例数 = 0 即缺口。"
+        ]
+      },
+      "fix_pattern": "",
+      "fix_pattern_code": "// ❌ 旧用例矩阵：M 全部 < 2048 → big_m 路径 0 覆盖\n{/* M=1024, N=512 */}, {/* M=1024, N=1024 */}\n// ✅ 按阈值两侧补对照用例（恰好命中 / 恰好不命中）\n{/* M=2047 */}, {/* M=2048 */}, {/* M=2049 */}\n{/* rows_ == 2*cols_ */}, {/* rows_ == 2*cols_ - 1 */}",
+      "min_repro": "M=2047 与 M=2048 各跑一次，确认命中模板由 `RmsNormGradRegbaseTiling` 切到 `RmsNormGradBigMTiling`（tilingKey 7000 族 → 9000 族）。",
+      "evidence": "跨分支核验 2026-09-13（无 issue）；`rms_norm_grad_regbase_big_m_tiling.cpp:253` 注册优先级 100、`:34` `MFACTOR_DEFAULT = 64`、`:37-50` `IsCapable()`；对照 `rms_norm_grad_regbase_tiling.cpp:416` 优先级 200 兜底、`:246` `IsCapable(){ return true; }`。",
+      "issues": [],
+      "verified_anchors": []
+    },
+    {
+      "case_id": "FP-A19-C2",
+      "fp_id": "FP-A19",
+      "skill": "fpa19-aclnn-review",
+      "title": "模板二次能力检查回退形成隐式第三态 —— 映射点③",
+      "subtype": null,
+      "trigger": "shape 已通过 `IsCapable()` 阈值进入模板，但模板内 `DoOpTiling()` 的**二次能力检查**不通过。",
+      "root_cause": "外层 `IsCapable()` 放行 → `DoOpTiling()` 二次检查返回 `GRAPH_PARAM_INVALID` **回退** → 落点既非路径 A 也非路径 B（隐式第三态）→ 该落点无用例覆盖。",
+      "criteria": {
+        "locators": [],
+        "check": [
+          "逐模板搜索 `DoOpTiling` 内 `GRAPH_PARAM_INVALID` 返回点；",
+          "判定回退落点（下一条模板 / 直接失败）；",
+          "检查该落点是否有用例覆盖。"
+        ]
+      },
+      "fix_pattern": "二次检查不通过时显式 `return GRAPH_PARAM_INVALID`（回退语义明确），并把该 shape 条件前移到 `IsCapable()` 拦截，使回退分支不可达。",
+      "fix_pattern_code": "",
+      "min_repro": "构造「`IsCapable()` 通过但 `DoOpTiling` 二次检查失败」的 shape，观察回退后实际执行的模板 / 失败码。",
+      "evidence": "映射点③（模式卡「源码审查映射点」），无 issue 实证。",
+      "issues": [],
+      "verified_anchors": []
+    },
+    {
+      "case_id": "FP-A19-C3",
+      "fp_id": "FP-A19",
+      "skill": "fpa19-aclnn-review",
+      "title": "盲区路径与主路径归约方式不同、确定性标注未区分 —— 映射点④（连打 FP-A06）",
+      "subtype": null,
+      "trigger": "同一输出（`dgamma`）在 big_m 路径与 regbase 路径下走不同归约实现。",
+      "root_cause": "big_m `dgamma` 用 `SyncAll()` + 0 核跨核 `ReduceSum<RA>`（**非确定**）→ 常规 `dgamma` 核间无交叉归约、核内折叠（**数值确定**）→ 两条路径对同一输出确定性不同而文档 / 测试未按路径区分 → 盲区一旦被触发即不可复现类风险。",
+      "criteria": {
+        "locators": [
+          {
+            "file": "op_kernel/arch35/rms_norm_grad_regbase_dgamma_big_m.h",
+            "lines": "103"
+          },
+          {
+            "file": "rms_norm_grad_regbase_dgamma.h",
+            "lines": "138"
+          }
+        ],
+        "check": [
+          "`git grep -n \"SyncAll\\|ReduceSum\\|atomic\"` 定位各路径归约调用点；",
+          "对照同一输出在两条路径下的原语（核内 vs 跨核）；",
+          "核对该输出的确定性标注是否按路径区分。"
+        ]
+      },
+      "fix_pattern": "",
+      "fix_pattern_code": "// ❌ 对同一输出在两条路径下都做 bitwise 比对\n// ✅ 按路径分级：big_m 容差并标注触发 shape 区间；regbase bitwise 看护\ntorch.equal(dgamma, golden)                 // regbase：数值确定 → bitwise\ntorch.allclose(dgamma, golden, tol)         // big_m：非确定 → 容差 + 标注 M ≥ 阈值区间",
+      "min_repro": "同输入在 M<2048 与 M≥2048 各跑两次，比对 big_m 路径两次结果是否 bit 不等。",
+      "evidence": "跨分支核验 2026-09-13；`op_kernel/arch35/rms_norm_grad_regbase_dgamma_big_m.h:103` `SyncAll()`、`:106-108` 非零核早退、`:199` `ReduceSum<float,...,RA,true>`；对照 `rms_norm_grad_regbase_dgamma.h:138` `VFBinaryReduceSumWithoutTail`。",
+      "issues": [],
+      "verified_anchors": []
+    },
+    {
+      "case_id": "FP-A19-C4",
+      "fp_id": "FP-A19",
+      "skill": "fpa19-aclnn-review",
+      "title": "阈值含平台常量、同 shape 跨平台走不同路径 —— 触发条件（连打 FP-B02）",
+      "subtype": null,
+      "trigger": "`IsCapable()` 阈值引用 `vlFp32` / `aivCoreNum` / `UB_SIZE`，故同一 shape 在 A 平台走路径 1、B 平台走路径 2。",
+      "root_cause": "`rows_ >= 64×aivCoreNum/2` 与 `cols_ > vlFp32×aivCoreNum/2` 含平台常量 → 阈值**按平台不同** → 同 shape 跨平台命中模板不同（tilingKey 7000 族 vs 9000 族）→ 覆盖评估不按平台分算即漏判。",
+      "criteria": {
+        "locators": [
+          {
+            "file": "rms_norm_grad_regbase_big_m_tiling.cpp",
+            "lines": "40"
+          },
+          {
+            "file": "rms_norm_grad_tiling.h",
+            "lines": "90-93"
+          },
+          {
+            "file": "scripts/scan_fp.py",
+            "lines": ""
+          }
+        ],
+        "check": [
+          "提取阈值中全部平台常量并取目标平台实值；",
+          "各平台各算一套区间；",
+          "仅当「某平台整条路径 0 覆盖」时立缺口卡（阈值本身跨平台不同不是缺陷）。"
+        ]
+      },
+      "fix_pattern": "覆盖评估**按平台分别**算区间、分别判覆盖；同 shape 跨平台校验是否命中同一 tilingKey（平台常量导致的合理差异除外）。",
+      "fix_pattern_code": "",
+      "min_repro": "固定 M=N=x，在两种 `aivCoreNum` 取值下各算阈值，确认是否跨过 big_m 入口。",
+      "evidence": "`rms_norm_grad_regbase_big_m_tiling.cpp:40` `cols_ > vlFp32_ * aivCoreNum_ / 2`、`:45` `rows_ < cols_ * 2 || rows_ < 64 * aivCoreNum_ / 2`；`rms_norm_grad_tiling.h:90-93 / :125-126 / :140` key 族（7000 / 9000 / 8000）。\n### 语料基线与深挖起手式",
+      "issues": [],
+      "verified_anchors": []
+    },
+    {
+      "case_id": "FP-A20-C1",
+      "fp_id": "FP-A20",
+      "skill": "fpa20-determinism-review",
+      "title": "文档声明「默认非确定」而实现默认确定、tiling 不读开关 —— ops-nn #4890（BatchNorm / BatchNormElemt / BatchNormBackward / GroupNormBackward / RmsNormGrad / RmsNormGradQuant）",
+      "subtype": null,
+      "trigger": "六算子 A5 文档声明「默认非确定、支持 `aclrtCtxSetSysParamOpt` 开启」；用户按声明设定比对策略或依赖该开关。",
+      "root_cause": "`docs/` 声明开关可开 → 代码核查实际**默认确定性**且 tiling **不读取该开关** → 声明面与行为面整体错位（另录 FP-F03）→ 比对策略按声明设定即错（该 bitwise 的以为是非确定）。",
+      "criteria": {
+        "locators": [],
+        "check": [
+          "读 `docs/` 确定性声明；",
+          "`git grep -n \"aclrtCtxSetSysParamOpt\\|SysParamOpt\"` 核 tiling 是否有读取点；",
+          "逐算子重复运行实测默认确定性。"
+        ]
+      },
+      "fix_pattern": "",
+      "fix_pattern_code": "// ❌ 声明「默认非确定」但 tiling 无开关读取点\n// ✅ 二选一：实现真正读取开关；或修正文档为按输出 × 路径 × shape 区间的分级标注",
+      "min_repro": "同输入重复 100 次比对输出 bit 是否全等，与文档声明对照。",
+      "evidence": "#4890（closed），另收录于 FP-F03。",
+      "issues": [
+        "#4890"
+      ],
+      "verified_anchors": []
+    },
+    {
+      "case_id": "FP-A20-C2",
+      "fp_id": "FP-A20",
+      "skill": "fpa20-determinism-review",
+      "title": "同一算子内三种确定性等级并存、标注未分级 —— rms_norm_grad 跨分支核验（2026-09-13）",
+      "subtype": null,
+      "trigger": "同一算子的 `dx` 与 `dgamma` 两个输出、常规与 big_m 两条路径。",
+      "root_cause": "`dx` 两条路径（`RegbaseDxFullLoad` 用 `ReduceSum<AR>` / `RegbaseDxSplitD` 用 `ReduceSumImpl`）均**严格确定**；常规 `dgamma` 按 N 轴列切分、核间无交叉归约 = **数值确定**；big_m `dgamma`（tilingKey 9000/9010）= **非确定**；算子级二元标注无法承载三级差异 → 比对策略选错（表现① ②）。",
+      "criteria": {
+        "locators": [
+          {
+            "file": "rms_norm_grad_tiling.h",
+            "lines": ""
+          }
+        ],
+        "check": [
+          "`git grep -n \"ReduceSum\\|ReduceSumImpl\"` 逐输出定位归约原语；",
+          "判核内 / 跨核；",
+          "比对策略落地到输出级（非算子级）。"
+        ]
+      },
+      "fix_pattern": "按「输出 × 路径 × shape 区间」三列表给出每格等级，比对策略按格设定（严格确定 = `torch.equal` 重复 100 次；数值确定 = 同 tiling 多次 + 跨 tiling 容差；非确定 = 容差 + 标注触发区间）。",
+      "fix_pattern_code": "",
+      "min_repro": "分别对 `dx` 与 `dgamma` 同输入重复 100 次——`dx` 应 bitwise 全等，big_m `dgamma` 不必。",
+      "evidence": "跨分支核验 2026-09-13；`rms_norm_grad_tiling.h` 的 key 族（7000 / 9000 / 8000）。",
+      "issues": [],
+      "verified_anchors": []
+    },
+    {
+      "case_id": "FP-A20-C3",
+      "fp_id": "FP-A20",
+      "skill": "fpa20-determinism-review",
+      "title": "big_m dgamma 归约顺序依赖运行时参数（非确定的直接依据） —— 映射点③",
+      "subtype": null,
+      "trigger": "M ≥ 阈值进入 big_m 路径（tilingKey 9000/9010）。",
+      "root_cause": "`SyncAll()` 后 0 核做核间累加（`if (blockIdx != 0)` 早退）→ 核内累加顺序随 `BasicBlockLoop` 动态变化、参与核数随 M 变化 → 归约顺序**依赖运行时参数** → 非确定。",
+      "criteria": {
+        "locators": [
+          {
+            "file": "op_kernel/arch35/rms_norm_grad_regbase_dgamma_big_m.h",
+            "lines": "103"
+          }
+        ],
+        "check": [
+          "搜 `SyncAll()` + `if (blockIdx != 0)` 单核累加模式；",
+          "搜 `ReduceSum` 的 `srcShape` 是否含核数维度（如 `{usedCoreNum, ...}`）；",
+          "搜原子加 float 路径。"
+        ]
+      },
+      "fix_pattern": "",
+      "fix_pattern_code": "// ❌ 跨核累加顺序随运行时核数 / 循环块数变化\nSyncAll(); if (blockIdx != 0) return;   /* 0 核按动态顺序累加多核结果 */\n// ✅ 若需严格确定：改为按输出不重叠维度切核（核内归约、无跨核交互）",
+      "min_repro": "同 M 重复运行，检查 `dgamma` 两次结果是否 bit 不等。",
+      "evidence": "`op_kernel/arch35/rms_norm_grad_regbase_dgamma_big_m.h:103` `SyncAll()`、`:199` `ReduceSum<..., RA, true>`（跨分支核验 2026-09-13）。",
+      "issues": [],
+      "verified_anchors": []
+    },
+    {
+      "case_id": "FP-A20-C4",
+      "fp_id": "FP-A20",
+      "skill": "fpa20-determinism-review",
+      "title": "比对策略按算子级二元设定致假阴性 / 误报两面 —— 映射点⑤（典型表现① ② ③）",
+      "subtype": null,
+      "trigger": "测试用例的比对策略按「算子级」而非「输出级 + 路径级」设定。",
+      "root_cause": "对严格确定的输出用容差比对 → **掩盖真实缺陷**（假阴性）；对非确定输出做 bitwise 比对 → 长期误报 → 用例被标 flaky 后关停；文档写「该算子非确定」但线上同输入两次结果不同、仅特定 shape 才复现（表现③）。",
+      "criteria": {
+        "locators": [
+          {
+            "file": "scripts/scan_fp.py",
+            "lines": ""
+          }
+        ],
+        "check": [
+          "读 `tests/` 比对脚本判策略粒度（算子级 / 输出级）；",
+          "对照实现分级结论；",
+          "对判「确定」的输出保留 bitwise 看护用例。"
+        ]
+      },
+      "fix_pattern": "改三级矩阵——严格确定 `torch.equal`（重复 100 次全等）作看护；数值确定同 tiling 多次 + 跨 tiling 容差；非确定容差并**显式标注触发 shape 区间**；「用例 flaky 所以关停」改为分级后改容差并标注触发区间。",
+      "fix_pattern_code": "",
+      "min_repro": "把 big_m 路径 `dgamma` 用例改成 bitwise，观察是否 flaky；反向把 `dx` 用例放宽为容差，观察是否放过注入误差。",
+      "evidence": "映射点⑤ + 典型表现 ①②③，无 issue 实证（#4890 为声明面，见案例 1）。\n### 语料基线与深挖起手式",
+      "issues": [
+        "#4890"
+      ],
+      "verified_anchors": []
+    },
+    {
+      "case_id": "FP-A21-C1",
+      "fp_id": "FP-A21",
+      "skill": "fpa21-tiling-state-review",
+      "title": "连续执行 3D TND → 4D BNSD，4D 被按 TND 解析 —— ops-transformer #3758",
+      "subtype": null,
+      "trigger": "同一进程内先调用 3D TND（`xDimNum == 3`），再调用 4D BNSD/BSND；单算子用例因「一进程一 shape」无法复现。",
+      "root_cause": "`isTndLayout` 是匿名 namespace 内的 TU 级可变全局，唯一写点在 3D 分支体内；4D 路径没有任何写操作，读到上一次的 `true`，于是 `dimD` 从 `GetDim(3)` 变成 `GetDim(2)`，D 维取到原 S 或原 N。",
+      "criteria": {
+        "locators": [
+          {
+            "file": "test_rotary_position_embedding_grad_tiling.cpp",
+            "lines": ""
+          },
+          {
+            "file": "rope_half_grad_tiling.cpp",
+            "lines": "57"
+          },
+          {
+            "file": "rope_interleaved_grad_tiling.cpp",
+            "lines": "80"
+          },
+          {
+            "file": "posembedding/rotary_position_embedding_grad/op_host/rope_half_grad_tiling.cpp",
+            "lines": "57"
+          },
+          {
+            "file": "posembedding/apply_rotary_pos_emb_grad/op_host/apply_rotary_pos_emb_grad_tiling.cpp",
+            "lines": "199"
+          }
+        ],
+        "check": [
+          "UT 用例按「4D 在前、3D 在后」的声明序编写（`test_rotary_position_embedding_grad_tiling.cpp` 前三个 4D、TND 放最后），gtest 按声明序执行 → 顺序依赖被掩盖，全绿属运气；`--gtest_shuffle` 可当场证伪。"
+        ]
+      },
+      "fix_pattern": "把赋值改为无条件求值 `isTndLayout = (xDimNum == DIM_THREE);`（PR #8705）。**这是治标**：载体仍是全局，并发与其余 16 个标量未处理；正解是把状态搬进 tiling 类成员，与同仓 regbase 类的 `isTndLayout_` 一致。",
+      "fix_pattern_code": "",
+      "min_repro": "`rope_half_grad_tiling.cpp:57`（声明）、`:150`（唯一写点）、`:330`/`:355`（读取点）；同型 `rope_interleaved_grad_tiling.cpp:80`/`:248`/`:359-364`。",
+      "evidence": "ops-transformer #3758（PR #8705 已合入）；2026-10-19 复核确认载体未换。\n- **本仓实测锚（2026-11-05 核验，@ops-transformer HEAD `d5c0683`）**：\n- `posembedding/rotary_position_embedding_grad/op_host/rope_half_grad_tiling.cpp:57`（`bool isTndLayout = false;` 匿名 namespace 内 TU 级全局）、`:150`（**修复后形态** `isTndLayout = (xDimNum == DIM_THREE);` 无条件求值）、`:337`/`:362`（读取点，`:362` 即 `dimD = isTndLayout ? GetDim(DIM_TWO) : GetDim(DIM_THREE)` 的 D 维错取现场）。\n- **同族兄弟算子**：`posembedding/apply_rotary_pos_emb_grad/op_host/apply_rotary_pos_emb_grad_tiling.cpp:199` 已把状态做成**类成员** `isTndLayout_` 并无条件赋值，且 `:202`/`:209` 对「attr 与 shape 维度不匹配」显式返回 `GRAPH_FAILED`——**这是本案的正确解法样板**（治本 = 状态进类成员，而非修全局赋值），查同型缺陷时优先找这类同族实现做对照。",
+      "issues": [
+        "#3758",
+        "#8705"
+      ],
+      "verified_anchors": [
+        {
+          "file": "posembedding/rotary_position_embedding_grad/op_host/rope_half_grad_tiling.cpp",
+          "lines": "57,150,337,362",
+          "commit": "d5c0683",
+          "repo": "ops-transformer",
+          "note": "`:57` `bool isTndLayout = false;`（匿名 namespace 内 **TU 级可变全局**）；`:150` `isTndLayout = (xDimNum == DIM_THREE);`——**修复后形态：无条件求值**，取代「只在 TND 分支置 true」；`:337` 与 `:362` 是读取点，`:362` 即 `dimD = isTndLayout ? GetDim(DIM_TWO) : GetDim(DIM_THREE)` 的 D 维错取现场。**注意**：这是治标——载体仍是全局，并发场景与其余同类标量未处理。**同族兄弟样板**：`posembedding/apply_rotary_pos_emb_grad/op_host/apply_rotary_pos_emb_grad_tiling.cpp:199` 已把状态做成类成员 `isTndLayout_` 并无条件赋值，且 `:202`/`:209` 对 attr 与 shape 维度不匹配显式返回 `GRAPH_FAILED`——**正解是把状态搬进类成员**。",
+          "issue": "#3758"
+        }
+      ]
+    },
+    {
+      "case_id": "FP-A21-C2",
+      "fp_id": "FP-A21",
+      "skill": "fpa21-tiling-state-review",
+      "title": "全局 TilingData 对象跨调用串写 —— 静态命中，成簇分布",
+      "subtype": null,
+      "trigger": "tiling 用全局 `XxxTilingData tiling;` 承接本次参数，`set_*` 分散在多个 static 函数里，`SaveToBuffer` 在 `DoOpTiling` 末尾；并发 tiling 或中途返回失败后再次进入。",
+      "root_cause": "TilingData 语义是「本次调用的产物」，载体却是进程级单例；`set_*`→`SaveToBuffer` 窗口跨越整个切分计算，另一个线程的写入会混进来，device 侧收到「batchSize 来自 A、headDim 来自 B」这种单线程不可能出现的组合，索引计算越界。",
+      "criteria": {
+        "locators": [
+          {
+            "file": "rope_interleaved_grad_tiling.cpp",
+            "lines": "106"
+          },
+          {
+            "file": "rotary_position_embedding/op_host/rope_interleaved_tiling.cpp",
+            "lines": "47"
+          },
+          {
+            "file": "tril_tiling.cpp",
+            "lines": ""
+          },
+          {
+            "file": "triu_tiling.cpp",
+            "lines": ""
+          },
+          {
+            "file": "tril_tiling.cpp",
+            "lines": "45-56"
+          }
+        ],
+        "check": [
+          "`rope_interleaved_grad_tiling.cpp:106` 的对象声明在 `namespace optiling` 内、匿名 namespace 之外，属**外链接**，比内链接更暴露；前向算子 `rotary_position_embedding/op_host/rope_interleaved_tiling.cpp:47` 有同款，ops-math `tril_tiling.cpp` / `triu_tiling.cpp` 是另一对镜像副本。"
+        ]
+      },
+      "fix_pattern": "改为 tiling 类的私有成员（框架每次 tiling 新建实例）；退路是 `DoOpTiling` 全程持锁。",
+      "fix_pattern_code": "",
+      "min_repro": "`rope_interleaved_grad_tiling.cpp:106`（声明）、`:369-386`（set_* 写点）、`:436`（SaveToBuffer）；`tril_tiling.cpp:45-56`（11 个全局标量，`key_value` 为事实 tilingKey）。",
+      "evidence": "四仓静态扫描 2026-10-19（ops-transformer 1482 个 `op_host/*.cpp` 命中生产侧 3 个 / ops-math 2393 个命中 4 个，成簇：rope 前向+后向、tril+triu）；**逐条 issue 未立案**。",
+      "issues": [],
+      "verified_anchors": []
+    },
+    {
+      "case_id": "FP-A21-C3",
+      "fp_id": "FP-A21",
+      "skill": "fpa21-tiling-state-review",
+      "title": "`tilingKey` 与 `dtypeSize` 独立串味，组合出真实 dtype 不存在的错配 —— 并发变体（需实测）",
+      "subtype": null,
+      "trigger": "两个线程分别以 fp16 / fp32 调用同一算子（mode=1 路径），并发进入 `DoOpTiling`。",
+      "root_cause": "`tilingKey` 与 `dtypeSize` 是两个**独立**全局，各自被 `+=` / `=` 改写；交错后可能出现「`tilingKey` 已是 fp32 的 20020，但 `dtypeSize` 仍是 fp16 的 2」，或反之。任何单线程执行都不会产生这个组合，kernel 按该组合推导的元素数与 stride 必然错，fp16 数据被按 fp32 步长访问即越界。",
+      "criteria": {
+        "locators": [
+          {
+            "file": "rope_interleaved_grad_tiling.cpp",
+            "lines": "79"
+          },
+          {
+            "file": "scripts/scan_fp.py",
+            "lines": ""
+          }
+        ],
+        "check": [
+          "`tilingKey` 的基址在 `:416`、dtype 加成在 `:420/423/426`、needBackward 加成在 `:397/399`、最终使用在 `:435`——四处写入分散在一条长路径上，交错窗口极大。"
+        ]
+      },
+      "fix_pattern": "状态类成员化；仅在上板确认越界后按 S4 出卡。",
+      "fix_pattern_code": "",
+      "min_repro": "`rope_interleaved_grad_tiling.cpp:79`（`tilingKey` 声明）、`:64`（`dtypeSize`）、`:416-435`（读写链）。",
+      "evidence": "**推演，未实测**。须按第 5 节 Step 4 跑并发压测 + 打桩自证，确认后再升 S4；未坐实前只作观察项。\n### 语料基线与深挖起手式\n- 扫描命令：`python3 scripts/scan_fp.py --only FP-A21 --format json <op_host 目录>`，命中即候选。\n- 起手式：先看命中文件是否在**同一算子族内成簇**（前向/反向/镜像），再挑「写点在分支体内」的那个变量做路径完备性核查。\n- 负向基线：`constexpr` 常量表、`thread_local`、类成员 `xxx_`、UT fixture 的 `CompileInfo` 均不算候选，扫描器自带排除。",
+      "issues": [],
+      "verified_anchors": []
+    },
+    {
+      "case_id": "FP-A22-C1",
+      "fp_id": "FP-A22",
+      "skill": "fpa22-dtype-dispatch-review",
+      "title": "uint32 / int64 约一半输出未写 —— ops-math #3747",
+      "subtype": null,
+      "trigger": "`aclnnTril` 的 `self` dtype 为 `uint32` 或 `int64`，`diagonal=0`，任意 2D shape；`out` 预填魔数后可观察到后 `ceil(n/2)` 个元素原样保留。",
+      "root_cause": "该算子按元素 dtype 分派执行模板，`uint32` / `int64` 的模板映射条目疑似错配，落到只覆盖一半元素的循环上界；同宽度兄弟 dtype（`int32` 对、`uint64` 对）正常，排除「按字节宽度搬运」的单一解释。具体 kernel 文件与行号 issue 未给出，需按第 2 节命令在 `experimental/conversion/tril/op_kernel/` 下定位。",
+      "criteria": {
+        "locators": [
+          {
+            "file": "def.cpp",
+            "lines": ""
+          }
+        ],
+        "check": [
+          "单 dtype 用例（常用 fp32/int32）全绿；只断言返回码的 UT 完全看不出来——必须预填魔数并统计残留比例。同宽度兄弟 dtype 成对对照是最快判据。"
+        ]
+      },
+      "fix_pattern": "把 dtype→模板映射表改为与 `def.cpp` 支持集逐项对齐；`default:` 分支改为显式报错而非静默兜底；输出循环上界一律取自该 dtype 自身元素数。",
+      "fix_pattern_code": "",
+      "min_repro": "`experimental/conversion/tril/op_kernel/`（dtype 派发表，行号待定位）；对拍输入 4×4 ramp `[0..15]`，`out` 预填 `0x7FC07FC0`。",
+      "evidence": "ops-math #3747（2026-10-21，两段接口均返回 0）。",
+      "issues": [
+        "#3747"
+      ],
+      "verified_anchors": []
+    },
+    {
+      "case_id": "FP-A22-C2",
+      "fp_id": "FP-A22",
+      "skill": "fpa22-dtype-dispatch-review",
+      "title": "bool 掩码边界错位 —— ops-math #3748",
+      "subtype": null,
+      "trigger": "`aclnnTril` 的 `self` dtype 为 `bool`，`diagonal=0`；输出全量写出，但保留/置零边界按错误类型语义计算，误差随规模放大（3×3 错 4/9、4×4 错 12/16、8×8 错 42/64）。",
+      "root_cause": "`bool` 与其它 dtype 走同一条按字节宽度分派的路径，但掩码比较 `i + diagonal >= j` 的类型域/边界条件按非 bool 语义实现；属于类型特化路径缺失（子型 A22-2）。",
+      "criteria": {
+        "locators": [],
+        "check": [
+          "该接口其它 dtype 同条件全对，只有 bool 错——「按 dtype 全组合跑同一 shape」能一眼定位；只测 fp32 会漏。"
+        ]
+      },
+      "fix_pattern": "为 `bool` 建立独立掩码分支，比较在整型域完成、写回时归一为 `true/false`；或在统一模板中用 `if constexpr (IsSameType<T, bool>)` 特化。",
+      "fix_pattern_code": "",
+      "min_repro": "`experimental/conversion/tril/op_kernel/`（bool 掩码分支，行号待定位）；4×4 ramp 输入 `[0,1,1,...]`。",
+      "evidence": "ops-math #3748（2026-10-21）。",
+      "issues": [
+        "#3748"
+      ],
+      "verified_anchors": []
+    },
+    {
+      "case_id": "FP-A22-C3",
+      "fp_id": "FP-A22",
+      "skill": "fpa22-dtype-dispatch-review",
+      "title": "输出 dtype 被误当计算 dtype 推容量 —— 子型 A22-4",
+      "subtype": null,
+      "trigger": "`aclnnLinSpace` 输出 dtype 为 BF16 / INT8 / UINT8 / INT16（实际计算在 FP32 / FP16 上做），且连续调用；tiling 的 `CalcMaxOutNum` 用输出位宽推容量 → 尺寸估算错 → 报错。",
+      "root_cause": "`ge::GetSizeByDataType(outDataType)` 把**输出存储 dtype** 的宽度喂给容量推导，而该处需要的是**实际计算 dtype** 的宽度。BF16(2B)/INT8(1B) 与 FP32(4B) 差 2~4 倍 → 每核元素数、单次处理量系统性偏离。",
+      "criteria": {
+        "locators": [
+          {
+            "file": "lin_space_tiling.cpp",
+            "lines": "124-132"
+          },
+          {
+            "file": "math/lin_space/op_host/lin_space_tiling.cpp",
+            "lines": "122-132"
+          }
+        ],
+        "check": [
+          "grep `GetSizeByDataType\\s*\\(\\s*(outDataType|outputDtype)`；",
+          "看该尺寸喂给谁——若用于**临时 buffer 容量 / 每核元素数 / 单次处理量**而非输出分配，即须用计算 dtype；",
+          "同文件内已存在 `calcDataType` 却未用于该处 = 高危；",
+          "**连续调用**场景更易暴露（tiling 每次重算，累积偏差放大）。"
+        ]
+      },
+      "fix_pattern": "",
+      "fix_pattern_code": "// ❌ 输出存储类型直接当计算类型\nint32_t outTypeSize = ge::GetSizeByDataType(outDataType);\n// ✅ calcDataType 映射后再取宽度（lin_space_tiling.cpp:124-132）\nge::DataType calcDataType = outDataType;\nif (outDataType == ge::DT_BF16 || outDataType == ge::DT_INT32)          calcDataType = ge::DT_FLOAT;\nelse if (outDataType == ge::DT_INT8 || outDataType == ge::DT_UINT8 ||\n         outDataType == ge::DT_INT16)                                    calcDataType = ge::DT_FLOAT16;\nint32_t outTypeSize = ge::GetSizeByDataType(calcDataType);",
+      "min_repro": "BF16/INT8/INT16/INT32 四种输出 dtype 各跑「单次 + 连续 2 次」，断言返回码与数值；再取输出元素数跨 tiling 分块边界的 shape。tiling UT 直接断言 `CalcMaxOutNum` 返回值最快。",
+      "evidence": "ops-math issue #1004 `aclnnLinSpace连续调用导致报错`。修复后形态锚：`math/lin_space/op_host/lin_space_tiling.cpp:122-132`（@ops-math HEAD `9a37afe`，2026-11-05 本地核验）。**注意**：diff 只改了这一处尺寸推导、未清理任何跨调用状态，故本案不能按 FP-A21 跨调用残留定根因。",
+      "issues": [
+        "#1004"
+      ],
+      "verified_anchors": [
+        {
+          "file": "math/lin_space/op_host/lin_space_tiling.cpp",
+          "lines": "122-132",
+          "commit": "9a37afe",
+          "repo": "ops-math",
+          "note": "`CalcMaxOutNum` 内 `:124` `ge::DataType calcDataType = outDataType;`、`:126-130` BF16/INT32→`DT_FLOAT`、INT8/UINT8/INT16→`DT_FLOAT16` 映射、`:132` `int32_t outTypeSize = ge::GetSizeByDataType(calcDataType);`——**修复后形态**。`:351`/`:420` 两处调用 `CalcMaxOutNum` 共用该尺寸推导。判据：容量推导用输出位宽 ⇒ 若算子实际在更宽类型上计算即命中。",
+          "issue": "#1004"
+        }
+      ]
+    },
+    {
+      "case_id": "FP-B04-C1",
+      "fp_id": "FP-B04",
+      "skill": "fpb04-aclnn-review",
+      "title": "多入口共享校验函数不自校验 + 入口漏判（同根因四连发）—— #5531 / #5532",
+      "subtype": null,
+      "trigger": "GetWorkspaceSize 阶段属性串 `fusedOpType` 传 `nullptr`。",
+      "root_cause": "入口仅 `OP_CHECK_NULL(x1/x2)`（:296-297 / :331-332），`fusedOpType` 未判空即经 :232 解包 → :236 调 `CheckFusedOpType`(:164)，:166 `strcmp(fusedOpType,...)` 解空址 → SIGSEGV（期望 161001 实测 rc=139）。",
+      "criteria": {
+        "locators": [],
+        "check": [
+          "枚举文件**全部**入口；",
+          "找多入口共享的 `static` 校验函数；",
+          "对表「参数→判空行(或缺)→首次使用行」，**函数体内无判空解引用 + 任一入口漏判 ⇒ 命中**。"
+        ]
+      },
+      "fix_pattern": "",
+      "fix_pattern_code": "// ❌ 入口只判 x1/x2；共享函数内直接解引用属性串\nOP_CHECK_NULL(x1, ...); OP_CHECK_NULL(x2, ...);\nCHECK_RET(CheckFusedOpType(fusedOpType), ACLNN_ERR_PARAM_INVALID);   // :236 → :166 strcmp 崩溃\n// ✅ 每个必选参数都判空（含属性串/数组、tensor list）；或共享函数自校验\nif (fusedOpType == nullptr) return ACLNN_ERR_PARAM_NULLPTR;          // 161001（:298-300/:333-335 即修复后形态）",
+      "min_repro": "逐入口把 `fusedOpType` 置空，期望 161001（rc=139 / 断言 FAIL=缺陷）。",
+      "evidence": "#5531/#5532（四连发）、#5372/#5373。",
+      "issues": [
+        "#5372",
+        "#5373",
+        "#5531",
+        "#5532"
+      ],
+      "verified_anchors": []
+    },
+    {
+      "case_id": "FP-B04-C2",
+      "fp_id": "FP-B04",
+      "skill": "fpb04-aclnn-review",
+      "title": "校验命中后缺 return（防御形同虚设）—— #5705",
+      "subtype": null,
+      "trigger": "校验命中分支只 `OP_LOGE` 打日志、**无 return**，控制流继续按非法值访问。",
+      "root_cause": "`CheckDisContinuousStride` 命中后未返回错误 → 后续按非法 `dims` 访问 vector 越界 UB。",
+      "criteria": {
+        "locators": [],
+        "check": [
+          "遍历 `if (xxx == nullptr)` / `CHECK_RET` 命中分支，查**return 之后**是否仍有使用该参数的路径可达。"
+        ]
+      },
+      "fix_pattern": "",
+      "fix_pattern_code": "// ❌ 命中只打日志，继续执行\nif (!CheckDisContinuousStride(attrs)) { OP_LOGE(ACLNN_ERR_PARAM_INVALID, \"discontinuous\"); }   // 缺 return\n// ✅ 命中即带控制流返回\nif (!CheckDisContinuousStride(attrs)) { OP_LOGE(ACLNN_ERR_PARAM_INVALID, \"discontinuous\"); return ACLNN_ERR_PARAM_INVALID; }",
+      "min_repro": "构造命中该校验的非法 attrs，看是否在后续访问处崩溃而非命中处干净返回。",
+      "evidence": "#5705（closed，convolution_forward）。",
+      "issues": [
+        "#5705"
+      ],
+      "verified_anchors": []
+    },
+    {
+      "case_id": "FP-B04-C3",
+      "fp_id": "FP-B04",
+      "skill": "fpb04-aclnn-review",
+      "title": "错误码面：「有报错」≠「校验正确」—— #2501",
+      "subtype": null,
+      "trigger": "拦截返回码 ≠ 161001（如 561103）。",
+      "root_cause": "返回「看起来拦了」的错误码，语义与 `ACLNN_ERR_PARAM_NULLPTR` 不符 → 易误判为「已校验」而漏提。",
+      "criteria": {
+        "locators": [],
+        "check": []
+      },
+      "fix_pattern": "`CHECK_RET(..., ACLNN_ERR_PARAM_NULLPTR)`（=161001），必选参数逐个覆盖。\n- **发现 / 复现锚**：逐必选参数核对「有对应 `ACLNN_ERR_PARAM_NULLPTR` 分支且返回码 == 161001」；置空实测期望 161001。",
+      "fix_pattern_code": "",
+      "min_repro": "",
+      "evidence": "#2501（aclnnArange 预期 161001 实测 561103）。",
+      "issues": [
+        "#2501"
+      ],
+      "verified_anchors": []
+    },
+    {
+      "case_id": "FP-B04-C4",
+      "fp_id": "FP-B04",
+      "skill": "fpb04-aclnn-review",
+      "title": "先用后校验（校验晚于首次解引用）—— #4586 / #221",
+      "subtype": null,
+      "trigger": "判空位置**晚于**该参数首次解引用 / 透传（含 `L2_DFX_PHASE_1` 宏内解引用）。",
+      "root_cause": "入口顺序错误——先用后校验，校验形同虚设。",
+      "criteria": {
+        "locators": [],
+        "check": []
+      },
+      "fix_pattern": "判空**前置到函数开头、任何解引用 / 透传之前**。\n- **发现 / 复现锚**：逐参数比较「首次使用行号 < 判空行号」⇒ 命中；参数置空看是否在判空前崩溃。",
+      "fix_pattern_code": "",
+      "min_repro": "",
+      "evidence": "#4586（wqbmm）、#221（IouV2）、#4784（fqmm）。",
+      "issues": [
+        "#221",
+        "#4586",
+        "#4784"
+      ],
+      "verified_anchors": []
+    },
+    {
+      "case_id": "FP-B04-C5",
+      "fp_id": "FP-B04",
+      "skill": "fpb04-aclnn-review",
+      "title": "可选输出（output-mask）反向依赖：只算 dw 时读 dx 的 shape —— 子型 B04-2",
+      "subtype": null,
+      "trigger": "`aclnnConvolutionBackward` 只请求 `gradWeight`（dw），`gradInput`（dx）按 output-mask 契约传 `nullptr`。",
+      "root_cause": "dw 专用计算路径按「两侧梯度都存在」的所有权假设，读取 `gradInput` 的 shape 并用它作 `ViewWithShape` 的源创建视图；`gradInput == nullptr` 时解引用空地址 → **core dump**。缺陷不在校验层，在**输出的所有权边界**。",
+      "criteria": {
+        "locators": [
+          {
+            "file": "aclnn_convolution_backward.cpp",
+            "lines": "911-935"
+          },
+          {
+            "file": "conv/convolution_backward/op_api/aclnn_convolution_backward.cpp",
+            "lines": "911-935"
+          }
+        ],
+        "check": [
+          "找出所有 `(*outputMask)[i]` 门控点，划出「可能为 nullptr」的输出集合；",
+          "在这些输出集合内，搜索**跨角色读取**——`outputTensor.<B>->GetViewShape()/GetDataType()/GetShapeSize()` 出现在名为 `<A>` 的计算函数里；",
+          "反向误报排除必须给出「该 mask 恒真」的 `[文件]:[行号]`，无证据只能记观察项。"
+        ]
+      },
+      "fix_pattern": "",
+      "fix_pattern_code": "// ✅ 各输出后处理逐个被 outputMask 门控（aclnn_convolution_backward.cpp:911-935 OutputViewProcess）\nif ((*outputMask)[0]) { l0op::ViewCopy(ResultTensor.gradInput,  outputTensor.gradInput,  executor); }\nif ((*outputMask)[1]) { l0op::ViewCopy(ResultTensor.gradWeight, outputTensor.gradWeight, executor); }\nif ((*outputMask)[2]) { l0op::ViewCopy(ResultTensor.gradBias,   outputTensor.gradBias,   executor); }\n// ❌ 反例：dw 路径读 gradInput 的 shape —— gradInput 可为 nullptr，契约上完全合法\n//    auto dxShape = outputTensor.gradInput->GetViewShape();   // core dump",
+      "min_repro": "只用 dw、`gradInput=nullptr` 调 `aclnnConvolutionBackward` 两段式，期望不崩溃且 dw 与 CPU/CUDA 参考一致；再补「只算 dx」「全算」两档对照，确认三档都正确。",
+      "evidence": "ops-nn PR #1001。修复后形态锚：`conv/convolution_backward/op_api/aclnn_convolution_backward.cpp:911-935`（@ops-nn HEAD `b27fda2`，2026-11-05 本地核验）。",
+      "issues": [
+        "#1001"
+      ],
+      "verified_anchors": [
+        {
+          "file": "conv/convolution_backward/op_api/aclnn_convolution_backward.cpp",
+          "lines": "911-935",
+          "commit": "b27fda2",
+          "repo": "ops-nn",
+          "note": "`OutputViewProcess` 内 gradInput(:916-923) / gradWeight(:924-931) / gradBias(:932-939) 各自被 `if ((*outputMask)[i])` 门控——**修复后形态**。缺陷形态是 dw 路径读 `gradInput->GetViewShape()` 并作 `ViewWithShape` 源，`gradInput==nullptr` 时 core dump。判据：`outputMask[i]` 可假 ⇒ 该输出可为 nullptr ⇒ 任何跨该输出的 shape/view 读取都是候选。",
+          "issue": "#1001"
+        }
+      ]
+    },
+    {
+      "case_id": "FP-B06-C1",
+      "fp_id": "FP-B06",
+      "skill": "fpb06-aclnn-review",
+      "title": "只判 selfRef/mask、漏判第二输入 source —— #5149（masked_scatter）",
+      "subtype": null,
+      "trigger": "`aclnnInplaceMaskedScatter` 的 `source` 为 numel==0（如 `source=(0,8)`）而 `mask` 全 false、平台 A2/A3（非 regbase）。",
+      "root_cause": "`index/masked_scatter/op_api/aclnn_masked_scatter.cpp` 的 `aclnnInplaceMaskedScatterGetWorkspaceSize` 原早退 `if (selfRef->IsEmpty() || mask->IsEmpty())`（§9 例 :496）漏判 `source` → 0 元素 buffer 继续走 l0op → arch22 侧失败。修 PR #9197。",
+      "criteria": {
+        "locators": [
+          {
+            "file": "index/masked_scatter/op_api/aclnn_masked_scatter.cpp",
+            "lines": ""
+          }
+        ],
+        "check": []
+      },
+      "fix_pattern": "- **针对发现**：① 列 GetWorkspaceSize 全部输入张量（含 inplace/可选），逐个对表 `IsEmpty()`（§9 例 :496 selfRef/mask、:503 source）；② 覆盖数 < 输入数 ⇒ 子型①；③ grep `IsEmpty\\s*\\(` 与输入声明数比对。\n- **复现锚**：`target=(4,8), mask=(4,1) 或 (4,8), mask_true=0, source=(0,8)`；PyTorch CPU/CUDA 全 PASS 而 910b（A2）失败。",
+      "fix_pattern_code": "// ❌ 只覆盖 selfRef / mask\nif (selfRef->IsEmpty() || mask->IsEmpty()) { /* 早退 */ }\n// ✅ 补第二输入并 gate arch22（950 走 ProcessBroadcast 自带保护）\nif (!Ops::NN::AclnnUtil::IsRegbase() && source->IsEmpty()) {\n    *workspaceSize = 0; uniqueExecutor.ReleaseTo(executor); return ACLNN_SUCCESS;\n}",
+      "min_repro": "",
+      "evidence": "#5149 / PR #9197（§9 例 :496/:503/:505-507）。",
+      "issues": [
+        "#5149",
+        "#9197"
+      ],
+      "verified_anchors": [
+        {
+          "file": "index/masked_scatter/op_api/aclnn_masked_scatter.cpp",
+          "lines": "409",
+          "commit": "b27fda2",
+          "repo": "ops-nn",
+          "note": "`if (!source->IsEmpty()) { sourceProcessed = l0op::Contiguous(source, executor); CHECK_RET(...); }`——**修复后形态**：空 source 时整段连续化被跳过。**判据要点**：这只是「跳过连续化」，**并未早退整个算子**——0 元素 buffer 仍可能透传给算子构建，须按子型②继续核「早退是否完整（置 `workspaceSize=0` + `ReleaseTo` + `return SUCCESS`）」。同文件 `:386` `ProcessBroadcast` 是另一条受保护路径。",
+          "issue": "#5149"
+        }
+      ]
+    },
+    {
+      "case_id": "FP-B06-C2",
+      "fp_id": "FP-B06",
+      "skill": "fpb06-aclnn-review",
+      "title": "元素数不足（非恰为 0）致越界 / NaN —— 2026-04-29（masked_scatter，A3）",
+      "subtype": null,
+      "trigger": "`updates`/`source` 元素数 >0 但小于 mask 中 true 的数量；A3。",
+      "root_cause": "kernel `Init()` 用由 mask/shape 推导的元素数（非该 tensor 自身元素数）`SetGlobalBuffer` → 注册长度 > 实际字节 → 读出分配外地址（越界/NaN）；子型④。",
+      "criteria": {
+        "locators": [],
+        "check": []
+      },
+      "fix_pattern": "`xGm.SetGlobalBuffer((__gm__ T*)src, src->GetShapeSize());`（长度取自身元素数），0/不足时早退。\n- **针对发现**：① 核 `SetGlobalBuffer(tensor, 长度)` 长度来源；② 核 docs 元素数约束（§9 例 docs :98）与判空自洽。\n- **复现锚**：`mask_true=N` 而 `source` 元素数 < N，A3 跑 mssanitizer。",
+      "fix_pattern_code": "",
+      "min_repro": "",
+      "evidence": "卡内 2026-04-29 记录（同源另一侧，无 issue 号）。",
+      "issues": [],
+      "verified_anchors": []
+    },
+    {
+      "case_id": "FP-B06-C3",
+      "fp_id": "FP-B06",
+      "skill": "fpb06-aclnn-review",
+      "title": "判空仅跳过 Contiguous 的「半程保护」—— masked_scatter（子型②）",
+      "subtype": "②",
+      "trigger": "`source` 空，实现以「只跳过连续化」代替早退。",
+      "root_cause": "§9 例 :531 `if (source->IsEmpty()) sourceContiguous = source;` 只跳过 `l0op::Contiguous`，0 元素 buffer 仍透传给算子构建。",
+      "criteria": {
+        "locators": [
+          {
+            "file": "index/masked_scatter/op_api/aclnn_masked_scatter.cpp",
+            "lines": "409"
+          }
+        ],
+        "check": []
+      },
+      "fix_pattern": "空输入直接早退完整（置 `workspaceSize=0` + `ReleaseTo` + `return SUCCESS`）。\n- **针对发现**：① 全部 `IsEmpty()` 分支是否早退完整（缺 `ReleaseTo`/`return` 即命中）；② 空 tensor 是否仍进 `l0op::Contiguous`/`l0op::Xxx`。\n- **复现锚**：`source=(0,8)` 且 `mask` 全 false，核对早退前是否仍构建。",
+      "fix_pattern_code": "",
+      "min_repro": "",
+      "evidence": "§9 例 :531（形态样板）。**本仓实测锚（2026-11-05 核验）**：`index/masked_scatter/op_api/aclnn_masked_scatter.cpp:409` `if (!source->IsEmpty()) { sourceProcessed = l0op::Contiguous(source, executor); ... }` @ops-nn HEAD `b27fda2`——**修复后形态**：空 source 时整段连续化被跳过，`sourceProcessed` 保持原指针。**判据要点**：这只是「跳过连续化」，并未早退整个算子——0 元素 buffer 仍可能透传给算子构建，须按子型②继续核「是否早退完整（`ReleaseTo` + `return SUCCESS`）」。对应的现网单为 ops-nn PR #9197 / issue #5149（与本章案例 4、5 同源）。",
+      "issues": [
+        "#5149",
+        "#9197"
+      ],
+      "verified_anchors": [
+        {
+          "file": "index/masked_scatter/op_api/aclnn_masked_scatter.cpp",
+          "lines": "409",
+          "commit": "b27fda2",
+          "repo": "ops-nn",
+          "note": "`if (!source->IsEmpty()) { sourceProcessed = l0op::Contiguous(source, executor); CHECK_RET(...); }`——**修复后形态**：空 source 时整段连续化被跳过。**判据要点**：这只是「跳过连续化」，**并未早退整个算子**——0 元素 buffer 仍可能透传给算子构建，须按子型②继续核「早退是否完整（置 `workspaceSize=0` + `ReleaseTo` + `return SUCCESS`）」。同文件 `:386` `ProcessBroadcast` 是另一条受保护路径。",
+          "issue": "#5149"
+        }
+      ]
+    },
+    {
+      "case_id": "FP-B06-C4",
+      "fp_id": "FP-B06",
+      "skill": "fpb06-aclnn-review",
+      "title": "平台分支不对称：修复只 gate arch22 —— #5149 / PR #9197（950 侧）",
+      "subtype": null,
+      "trigger": "同案例 1 输入，平台为 950（regbase / arch35）。",
+      "root_cause": "修复行 `!IsRegbase() && source->IsEmpty()` 仅 gate arch22（§9 例 :503）；950 靠 `ProcessBroadcast`（:380）内 `if (!source->IsEmpty())`（:403）自有保护——两侧须分别立证。",
+      "criteria": {
+        "locators": [],
+        "check": []
+      },
+      "fix_pattern": "两侧各自有空 tensor 策略；判空平台条件须覆盖真正无保护一侧。\n- **针对发现**：① 双侧分核空 tensor 策略；② 核 `ProcessBroadcast` 是否自带保护；③ 空用例双平台同跑。\n- **复现锚**：案例 1 输入在 950 侧跑，核对是否走 regbase 保护路径。",
+      "fix_pattern_code": "",
+      "min_repro": "",
+      "evidence": "#5149 / PR #9197（§9 例 :503 / :380、:403）。",
+      "issues": [
+        "#5149",
+        "#9197"
+      ],
+      "verified_anchors": [
+        {
+          "file": "index/masked_scatter/op_api/aclnn_masked_scatter.cpp",
+          "lines": "409",
+          "commit": "b27fda2",
+          "repo": "ops-nn",
+          "note": "`if (!source->IsEmpty()) { sourceProcessed = l0op::Contiguous(source, executor); CHECK_RET(...); }`——**修复后形态**：空 source 时整段连续化被跳过。**判据要点**：这只是「跳过连续化」，**并未早退整个算子**——0 元素 buffer 仍可能透传给算子构建，须按子型②继续核「早退是否完整（置 `workspaceSize=0` + `ReleaseTo` + `return SUCCESS`）」。同文件 `:386` `ProcessBroadcast` 是另一条受保护路径。",
+          "issue": "#5149"
+        }
+      ]
+    },
+    {
+      "case_id": "FP-B06-C5",
+      "fp_id": "FP-B06",
+      "skill": "fpb06-aclnn-review",
+      "title": "修复未覆盖非 inplace 变体 + 未沉淀 ST 用例 —— #5149 / PR #9197（子型⑥）",
+      "subtype": null,
+      "trigger": "调用非 inplace 的 `aclnnMaskedScatter`。",
+      "root_cause": "修复仅作用 inplace 变体，非 inplace `aclnnMaskedScatter` 未同步补判空；200 条 ST 用例无 0 维 shape，未沉淀用例。",
+      "criteria": {
+        "locators": [
+          {
+            "file": "scripts/scan_fp.py",
+            "lines": ""
+          }
+        ],
+        "check": []
+      },
+      "fix_pattern": "同目录全部变体统一补 `source` 判空；新增 0 维 shape ST 用例。\n- **针对发现**：① 列同目录 `aclnn_*.cpp` 变体比对判空差；② 列 `tests/` shape 检索 0 维。\n- **复现锚**：对非 inplace 变体跑案例 1 输入。",
+      "fix_pattern_code": "",
+      "min_repro": "",
+      "evidence": "#5149 / PR #9197。\n### 语料基线与深挖起手式\n- 四仓基线（2026-09-14，1040 接口）：PARTIAL 141 / HIGH 461 / kernel 感知 88 / 全覆盖 328；ops-transformer 全覆盖 8/250，ops-math 182 HIGH。\n- 起手：`python3 scripts/scan_fp.py --only FP-B06 --format json <文件>`（四仓基线出自一次性审计脚本，该脚本**未收录本仓**、不能直接当 CI 门禁）。",
+      "issues": [
+        "#5149",
+        "#9197"
+      ],
+      "verified_anchors": [
+        {
+          "file": "index/masked_scatter/op_api/aclnn_masked_scatter.cpp",
+          "lines": "409",
+          "commit": "b27fda2",
+          "repo": "ops-nn",
+          "note": "`if (!source->IsEmpty()) { sourceProcessed = l0op::Contiguous(source, executor); CHECK_RET(...); }`——**修复后形态**：空 source 时整段连续化被跳过。**判据要点**：这只是「跳过连续化」，**并未早退整个算子**——0 元素 buffer 仍可能透传给算子构建，须按子型②继续核「早退是否完整（置 `workspaceSize=0` + `ReleaseTo` + `return SUCCESS`）」。同文件 `:386` `ProcessBroadcast` 是另一条受保护路径。",
+          "issue": "#5149"
+        }
+      ]
+    },
+    {
+      "case_id": "FP-B07-C1",
+      "fp_id": "FP-B07",
+      "skill": "fpb07-aclnn-review",
+      "title": "idxOffset 方向翻转致 indices 越界（同根因两连发）—— #1029 / #1182（EmbeddingDenseGradV2）",
+      "subtype": null,
+      "trigger": "indices 取边界/重复值；嵌入类算子（成因②）。",
+      "root_cause": "`EmbeddingDenseGradV2` idx 越界致 aic（#1029）修复后，同算子 `idxOffset` 翻转再致 indices 越界（#1182）——索引推进方向语义取反（成因②）。",
+      "criteria": {
+        "locators": [],
+        "check": []
+      },
+      "fix_pattern": "- **针对发现**：① 核 `idxOffset/startOffset/coefArr/*Stride` 符号方向；② 已修过越界的算子扩展核对全部方向与取整语义；③ grep `idxOffset|startOffset|offsetIndex|coefArr`。\n- **复现锚**：复跑 indices 边界/重复值用例，观 aic error 或错位取数。",
+      "fix_pattern_code": "// ❌ int64_t idxOffset = -coef * stride;  // 方向取反\n// ✅ int64_t idxOffset = coef * stride;   // 方向与 indices 语义一致",
+      "min_repro": "",
+      "evidence": "#1029 / #1182（同根因两连发）。",
+      "issues": [
+        "#1029",
+        "#1182"
+      ],
+      "verified_anchors": []
+    },
+    {
+      "case_id": "FP-B07-C2",
+      "fp_id": "FP-B07",
+      "skill": "fpb07-aclnn-review",
+      "title": "模板分支下 DataCopy 指令读越界 —— #1359（MatMulUnAlignedSingleCoreSplitKKernelGmToL1）",
+      "subtype": null,
+      "trigger": "模板分支（全载/切分/单核）切换处偏移语义不同；非对齐尾块。",
+      "root_cause": "该模板 `DataCopy` 读越界——切分/K 分核模板偏移未按分支语义修正（成因④）。",
+      "criteria": {
+        "locators": [],
+        "check": []
+      },
+      "fix_pattern": "按模板分支修正偏移与尾块长度（32B 对齐 + 尾核处理）。\n- **针对发现**：① 核 `DataCopy(Pad)?\\([^;]{0,60}(offset|Offset)` 偏移组合；② 核模板切换处语义差异与尾核；③ 非对齐末维 32B 对齐。\n- **复现锚**：末维/尾块 31/32/33 与分核数 1/2/±1 组合跑 mssanitizer。",
+      "fix_pattern_code": "",
+      "min_repro": "",
+      "evidence": "#1359。",
+      "issues": [
+        "#1359"
+      ],
+      "verified_anchors": []
+    },
+    {
+      "case_id": "FP-B07-C3",
+      "fp_id": "FP-B07",
+      "skill": "fpb07-aclnn-review",
+      "title": "32B DataCopy 越界 —— #1608",
+      "subtype": null,
+      "trigger": "搬运长度非 32B 对齐。",
+      "root_cause": "32B `DataCopy` blockLen 与 32B 对齐约束不符（成因④）。",
+      "criteria": {
+        "locators": [],
+        "check": []
+      },
+      "fix_pattern": "改 `DataCopyPad` 或补齐 blockLen 到 32B 对齐。\n- **针对发现**：① 核 blockLen 与 32B 对齐；② 核分核偏移叠加未对齐。\n- **复现锚**：非对齐末维用例跑 mssanitizer。",
+      "fix_pattern_code": "",
+      "min_repro": "",
+      "evidence": "#1608。",
+      "issues": [
+        "#1608"
+      ],
+      "verified_anchors": []
+    },
+    {
+      "case_id": "FP-B07-C4",
+      "fp_id": "FP-B07",
+      "skill": "fpb07-aclnn-review",
+      "title": "cubeMathType 数组越界引发 coredump —— #1483",
+      "subtype": null,
+      "trigger": "`cubeMathType` 枚举下标越界（成因⑤）。",
+      "root_cause": "`cubeMathType[<idx>]` 未做值域校验即取值 → 越界 → coredump。",
+      "criteria": {
+        "locators": [],
+        "check": []
+      },
+      "fix_pattern": "取值前值域校验，非法值先拦截（勿先参与下标运算）。\n- **针对发现**：① grep `cubeMathType\\s*\\[`；② 核 op_api 校验序列先后次序（非法值先参与运算即命中）。\n- **复现锚**：传入越界 `cubeMathType` 值观 coredump。",
+      "fix_pattern_code": "",
+      "min_repro": "",
+      "evidence": "#1483。",
+      "issues": [
+        "#1483"
+      ],
+      "verified_anchors": []
+    },
+    {
+      "case_id": "FP-B07-C5",
+      "fp_id": "FP-B07",
+      "skill": "fpb07-aclnn-review",
+      "title": "数据量超 int32 承载不足致地址越界风险 —— #1928（index_fill，与 FP-A18 交叠）",
+      "subtype": null,
+      "trigger": "元素数跨 2^31、单核偏移超 int32（成因①）。",
+      "root_cause": "`int32_t` 承载元素数/地址溢出；`GetShapeSize()` 与 `INT32_MAX` 比较可能已在溢出之后（比较失效）。",
+      "criteria": {
+        "locators": [],
+        "check": []
+      },
+      "fix_pattern": "- **针对发现**：① grep `int32_t[^\\n]{0,40}(idx|Idx|offset|Offset|addr|Addr)`、`GetShapeSize\\(\\)\\s*[<>]=?\\s*INT32_MAX`；② host shape 各维相乘是否超 int32。\n- **复现锚**：构造元素数跨 2^31 大 shape。",
+      "fix_pattern_code": "// ❌ int32_t total = dim0 * dim1 * dim2; if (total < INT32_MAX) {...}\n// ✅ int64_t total = static_cast<int64_t>(dim0) * dim1 * dim2;",
+      "min_repro": "",
+      "evidence": "#1928（与 FP-A18 交叠）。",
+      "issues": [
+        "#1928"
+      ],
+      "verified_anchors": []
+    },
+    {
+      "case_id": "FP-B07-C6",
+      "fp_id": "FP-B07",
+      "skill": "fpb07-aclnn-review",
+      "title": "GM 偏移 32 位计算域回绕致后段全 0（成因⑥ 静默型）—— #4494（rms_norm，910B2）",
+      "subtype": null,
+      "trigger": "合法大 shape，线性元素位置达 `2^32`（实测从 `4294969344` 起），GM 偏移链多因子相乘。",
+      "root_cause": "`uint64_t gmBias = i_o * rowFactor * numCol;` 右侧全 32 位 → 先 uint32 回绕再赋值；`blockIdx_*blockFactor*numCol`、`CopyIn/CopyOut` 同理——变量虽 64 位，回绕已发生。**无 aic error、无 coredump**，后段输出全 0（并看 FP-A04）。",
+      "criteria": {
+        "locators": [
+          {
+            "file": "scripts/scan_fp.py",
+            "lines": ""
+          }
+        ],
+        "check": []
+      },
+      "fix_pattern": "- **针对发现**：① 枚举全部 `SetGlobalBuffer((__gm__ T*)ptr + expr, size)`（第二 size 参数同查）与 `xGm[gmBias]`/`CopyIn`/`CopyOut`；② 同时看声明类型与右侧计算域；③ 反推最大可能值 ≥ `2^32` 且乘法前未进 64 位 → FAIL（成因⑥ 专法）。\n- **复现锚**：大 shape 从近 `2^32` 位置比对输出（后段全 0、无报错），跑 mssanitizer。",
+      "fix_pattern_code": "// ❌ uint64_t gmBias = i_o * rowFactor * numCol;\n// ✅ uint64_t gmBias = static_cast<uint64_t>(i_o) * rowFactor * numCol;",
+      "min_repro": "",
+      "evidence": "#4494（910B2；cannbot-skills 红线条例 9 收录）。\n### 语料基线与深挖起手式\n- 语料统计（2026-09-14，四仓缺陷类）：命中 125 条（已关闭 108）。\n- 起手：`python3 scripts/scan_fp.py --only FP-B07 --format json <文件>`。",
+      "issues": [
+        "#4494"
+      ],
+      "verified_anchors": []
+    },
+    {
+      "case_id": "FP-B07-C7",
+      "fp_id": "FP-B07",
+      "skill": "fpb07-aclnn-review",
+      "title": "固定 unroll 因子在奇数尾块上多搬，cache 记账与 copy 同步失真 —— 26-03（FlashAttentionScore）",
+      "subtype": null,
+      "trigger": "BMM2 的 K 维内部迭代数 `aColNum` 使某个 `curK` 之后只剩 1 个单元（`aColNum - curK == 1`），即奇数尾块；偶数或整除 shape 走主块完全正确，**放大小 shape 也测不出来**，因为可能全落在偶数路径。",
+      "root_cause": "搬运因子 `ndNum` 被硬编码为 2 个 ND 单元（`ndNum = 2`），尾块实际只剩 1 个单元时仍按 2 搬运——多读一个单元造成越界，同时 `cacheSize += ndNum` 与 `blockCount = mm2BaseK * ndNum / BLOCK_CUBE` 一并按 2 记账，导致 cache 水位与真实占用不符，后续 buffer 复用判断失效。",
+      "criteria": {
+        "locators": [
+          {
+            "file": "flash_attention_score_s1s2_bn2gs1_sab.h",
+            "lines": "2353"
+          },
+          {
+            "file": "attention/flash_attention_score/op_kernel/arch22/flash_attention_score_s1s2_bn2gs1_sab.h",
+            "lines": "2353"
+          }
+        ],
+        "check": [
+          "grep `ndNum = 2` / `cacheSize += 2` / `blockCount = ... * 2` 这类**硬编码因子**；",
+          "反推 `curK` 循环能否只剩 1 个单元（`aColNum` 为奇数即命中）；",
+          "`ndNum` / `blockCount` / `cacheSize` 三者必须**同源同变**，只改一处仍是缺陷；",
+          "小 shape 未必触发——要专门构造奇数尾块。"
+        ]
+      },
+      "fix_pattern": "",
+      "fix_pattern_code": "// ❌ 固定 2：尾块只剩 1 个单元时读越界 + cache 记账偏大\n//    int32_t ndNum = 2;\n// ✅ 按剩余单元数取值（flash_attention_score_s1s2_bn2gs1_sab.h:2353）\nint32_t ndNum = aColNum - curK == 1 ? 1 : 2;\nconst uint16_t blockCount = mm2BaseK * ndNum / BLOCK_CUBE;",
+      "min_repro": "让内部 K 迭代数为 1、3、5 等奇数；断言 `ndNum`/`blockCount`/`cacheSize` 三者一致变化，配 guard/canary 与 NaN 统计。",
+      "evidence": "现网 26-03（ops-transformer PR #2466；**该单无关联 issue，仅 PR**）。修复后形态锚：`attention/flash_attention_score/op_kernel/arch22/flash_attention_score_s1s2_bn2gs1_sab.h:2353`（@ops-transformer HEAD `d5c0683`，2026-11-05 本地核验）。同一函数内 `:2354` `blockCount`、`:2360` 与 `:2364` 两处 `mm2LoadData*(..., ndNum)` 均消费该变量——**这正是「改一处不够」的现场证据**。",
+      "issues": [
+        "#2466"
+      ],
+      "verified_anchors": [
+        {
+          "file": "attention/flash_attention_score/op_kernel/arch22/flash_attention_score_s1s2_bn2gs1_sab.h",
+          "lines": "2353",
+          "commit": "d5c0683",
+          "repo": "ops-transformer",
+          "note": "`int32_t ndNum = aColNum - curK == 1 ? 1 : 2;` ——**修复后形态**取代固定 `ndNum = 2`。同函数 `:2354` `blockCount = mm2BaseK * ndNum / BLOCK_CUBE`、`:2360`/`:2364` 两处 `mm2LoadData*(..., ndNum)` 均消费该变量 ⇒ **判据：搬运因子必须由剩余单元数推导，且 ndNum/blockCount/cacheSize 同源同变**。`cacheSize += ndNum` 见 `:1107`/`:1150`。",
+          "issue": "#2466"
+        }
+      ]
+    },
+    {
+      "case_id": "FP-B07-C8",
+      "fp_id": "FP-B07",
+      "skill": "fpb07-aclnn-review",
+      "title": "UB 容量恰好相等时漏入降级分支（`>` 应为 `>=`）—— 25-09（ScatterAddWithSort）",
+      "subtype": null,
+      "trigger": "`updatesAlign * inputSize` **恰好等于** `max_ub`。此时 UB 已经被占满，没有余量给 scratch，但 `>` 判断为假 → 不进入预留与重算分支 → 后续按 scratch 访问越界。",
+      "root_cause": "容量类比较用 `>`，把「刚好占满」误判为「还有余量」。等号边界是容量判断的经典 off-by-one：容量**等于**上限时必须走降级路径。",
+      "criteria": {
+        "locators": [
+          {
+            "file": "scatter_add_with_sorted_tiling.cpp",
+            "lines": "219"
+          },
+          {
+            "file": "index/scatter_add_with_sorted/op_host/scatter_add_with_sorted_tiling.cpp",
+            "lines": "219"
+          }
+        ],
+        "check": [
+          "枚举全部容量比较 `> max_ub` / `> ubSize` / `> l1Size` / `> L0ASize`；",
+          "对每个判断问「**等于**上限时是否还需要额外空间（scratch / 临时 buffer / 对齐 padding）」——需要则必须 `>=`；",
+          "等号边界要**独立成例**，`B-1/B/B+1` 三档，B 由实测反推而非猜；",
+          "单位要对（元素 / 字节 / block），`updatesAlign*inputSize` 是元素×字节混合乘出字节数，确认与 `max_ub` 同单位。"
+        ]
+      },
+      "fix_pattern": "",
+      "fix_pattern_code": "// ❌ 等号漏判：刚好占满仍当作有余量\n//    if (updatesAlign * inputSize > max_ub) {\n// ✅ 等于即视为占满（scatter_add_with_sorted_tiling.cpp:219）\nif (updatesAlign * inputSize >= max_ub) {\n    maxSize = MAX_SIZE;\n    max_ub = max_ub - maxSize * (SIZE_OF_INT32 + SIZE_OF_INT32);\n    updatesEach = max_ub / inputSize;\n    ...\n}",
+      "min_repro": "精确构造 `updatesAlign * inputSize == max_ub` 的 shape，记录 tiling key 与实际 UB 高水位；`B-1` 应正常、`B` 与 `B+1` 应走降级且都不越界。",
+      "evidence": "现网 25-09（canndev PR #69068；**该单无关联 issue，仅 PR**）。修复后形态锚：`index/scatter_add_with_sorted/op_host/scatter_add_with_sorted_tiling.cpp:219`（@ops-nn HEAD `b27fda2`，2026-11-05 本地核验）。同函数 `:202`/`:222`/`:228` 的 `updatesEach`、`maxSize` 计算均依赖该分支——**等号判断错了，后面整段降级逻辑都不会执行**。",
+      "issues": [
+        "#69068"
+      ],
+      "verified_anchors": [
+        {
+          "file": "index/scatter_add_with_sorted/op_host/scatter_add_with_sorted_tiling.cpp",
+          "lines": "219",
+          "commit": "b27fda2",
+          "repo": "ops-transformer",
+          "note": "`if (updatesAlign * inputSize >= max_ub)` ——**修复后形态**取代 `>`。同函数 `:202`/`:222` 的 `updatesEach`、`:228` 的 `maxSize` 均在该分支内计算 ⇒ **等号漏判会让整段降级逻辑不执行**。判据：容量比较须问「等于上限时还需不需要额外空间」。",
+          "issue": "#69068"
+        }
+      ]
+    },
+    {
+      "case_id": "FP-B08-C1",
+      "fp_id": "FP-B08",
+      "skill": "fpb08-fallback-review",
+      "title": "fallback 回调只看全局 allow_hf32、漏读节点 opImplMode —— #1790（MatMulV3）",
+      "subtype": null,
+      "trigger": "GE 图模式经 aclnn fallback 执行 MatMulV3，节点传 `opImplMode=0x40`（HF32）而全局 `allow_hf32` 关；aclnn 直调不触发。",
+      "root_cause": "`ops/built-in/op_fallback/fallback_common_2stages.cpp` 的 `GetMatmulPrecisionMode()` 只看全局 `GetAllowHf32()`，未读节点 `opImplMode` → HF32 未参与 `cubeMathType`。",
+      "criteria": {
+        "locators": [
+          {
+            "file": "ops/built-in/op_fallback/fallback_common_2stages.cpp",
+            "lines": ""
+          }
+        ],
+        "check": []
+      },
+      "fix_pattern": "读节点 `opImplMode`（`ENABLE_HF32=0x40`）与全局 OR，并判空 `GetAllowHf32()`。\n- **发现**：① 派发函数无 `GetAttr` ⇒ 只看全局；② `GetAllowHf32()` 未判空即 `strcmp` 会崩；③ `GetNodeType()` 仅 `MatMulV3`，`BatchMatMulV3` 漏。\n- **复现锚**：`ge 图设 opImplMode=0x40`，GE 图 vs aclnn 直调对拍。",
+      "fix_pattern_code": "",
+      "min_repro": "",
+      "evidence": "#1790 / PR #82099（master）+ #82101。",
+      "issues": [
+        "#1790",
+        "#82099",
+        "#82101"
+      ],
+      "verified_anchors": []
+    },
+    {
+      "case_id": "FP-B08-C2",
+      "fp_id": "FP-B08",
+      "skill": "fpb08-fallback-review",
+      "title": "ONNX 插件未透传新增属性 noop_with_empty_axes —— #1647（ReduceSum）",
+      "subtype": null,
+      "trigger": "ONNX13+ 新增 `noop_with_empty_axes`；前端升级引入新属性。",
+      "root_cause": "`ops/built-in/framework/onnx_plugin/reduce_sum_plugin.cc` 的 `ParseOpToGraphReduceSum13` 解析后未透传到 GE OP。",
+      "criteria": {
+        "locators": [
+          {
+            "file": "ops/built-in/framework/onnx_plugin/reduce_sum_plugin.cc",
+            "lines": ""
+          }
+        ],
+        "check": []
+      },
+      "fix_pattern": "属性纳入解析透传清单（属性名集 == proto 属性集）。\n- **发现**：① 属性名清单 vs proto 差集（非空即漏）；② 核对修复提交 `cce77adb`。\n- **复现锚**：ONNX13 reduceSum 带 `noop_with_empty_axes`，核对属性是否到 GE OP。",
+      "fix_pattern_code": "",
+      "min_repro": "",
+      "evidence": "#1647（open；提交 `cce77adb`，MR !81676）。",
+      "issues": [
+        "#1647"
+      ],
+      "verified_anchors": []
+    },
+    {
+      "case_id": "FP-B08-C3",
+      "fp_id": "FP-B08",
+      "skill": "fpb08-fallback-review",
+      "title": "fusion pass 未读源节点 groups / 未写新节点 —— #1639（ExtendConvTranspose）",
+      "subtype": null,
+      "trigger": "A16W8 量化，conv2dtranspose 融合出 rearrange。",
+      "root_cause": "`conv2d_transpose_fixpipe_fusion_pass.cc` 未取源 `groups`（`CheckConv2dTransposeDescInfo`），建 rearrange 未写 `groups`（`CreateRearrangeOp`）→ ATC 失败；两侧变量 `attrGroups`，跨函数。",
+      "criteria": {
+        "locators": [
+          {
+            "file": "conv2d_transpose_fixpipe_fusion_pass.cc",
+            "lines": ""
+          }
+        ],
+        "check": []
+      },
+      "fix_pattern": "- **发现**：① 按变量名跨函数核对读/写配对；② **只扫 AddNode 邻域会漏判**。\n- **复现锚**：A16W8 + `groups>1` 走 ATC。",
+      "fix_pattern_code": "GetInt(conv2dtransposeDesc_, GROUPS, attrGroups);  // 读端\nSetInt(opDesc, GROUPS, attrGroups);                // 写端（另一函数）",
+      "min_repro": "",
+      "evidence": "#1639（closed；提交 `1f65a691`，MR !81593）。",
+      "issues": [
+        "#1639"
+      ],
+      "verified_anchors": []
+    },
+    {
+      "case_id": "FP-B08-C4",
+      "fp_id": "FP-B08",
+      "skill": "fpb08-fallback-review",
+      "title": "同族原型改属性（按位置索引风险）—— #1771（BatchMatMulV3）",
+      "subtype": null,
+      "trigger": "原型把 `enable_hf32` 改 `opImplMode`。",
+      "root_cause": "`GetAttrPointer<T>(N)` 按位置索引，顺序/语义变更后静默取错。",
+      "criteria": {
+        "locators": [
+          {
+            "file": "scripts/scan_fp.py",
+            "lines": ""
+          }
+        ],
+        "check": []
+      },
+      "fix_pattern": "按属性名取，或索引与 proto 顺序一致性校验。\n- **发现**：① grep `GetAttrPointer\\s*<[^>]+>\\s*\\(\\s*\\d+\\s*\\)`；② 比对索引 N 与 proto 顺序。\n- **复现锚**：属性顺序变更单测/门禁。",
+      "fix_pattern_code": "",
+      "min_repro": "",
+      "evidence": "#1771（open）。\n### 语料基线与深挖起手式\n- 版本边界：载体③ 9.1.0-beta.2 起修复（早于 ①②）；①② 9.1.0 起修复。\n- 起手：`python3 scripts/scan_fp.py --only FP-B08 --format json <文件>`。",
+      "issues": [
+        "#1771"
+      ],
+      "verified_anchors": []
+    },
+    {
+      "case_id": "FP-B09-C1",
+      "fp_id": "FP-B09",
+      "skill": "fpb09-dynamic-shape-review",
+      "title": "infershape1.0 把 -2 当真实维度 —— #1673（AdaptiveAvgPool2dGrad）",
+      "subtype": null,
+      "trigger": "输入 `-2`（UNKNOWN_RANK）。",
+      "root_cause": "infershape1.0 将 `-2` 当真实维度参与「维度必须为 N」→ 必假 → 报错（形态①）。",
+      "criteria": {
+        "locators": [],
+        "check": []
+      },
+      "fix_pattern": "校验前判 `IsUnknownRank/IsUnknownShape` → 跳过维数/取值校验，输出置 `-1`。\n- **发现**：校验分支前是否有 `IsUnknownShape()/IsUnknownRank()` 前置门；新算子骨架是否静态版复制。\n- **复现锚**：`-2` 用例断言「无校验报错」。",
+      "fix_pattern_code": "",
+      "min_repro": "",
+      "evidence": "#1673（closed）。",
+      "issues": [
+        "#1673"
+      ],
+      "verified_anchors": []
+    },
+    {
+      "case_id": "FP-B09-C2",
+      "fp_id": "FP-B09",
+      "skill": "fpb09-dynamic-shape-review",
+      "title": "GetShapeRange 前未 MakeUpRange —— #1766（RGB2YUV422）",
+      "subtype": null,
+      "trigger": "UnknownRank；`(-2)` 与 `(-1,-1,-1)` 必现。",
+      "root_cause": "inferShape 未考虑 UnknownRank，且 `GetShapeRange()` 前无 `MakeUpRange` → 区间不完整（形态③，可对照 YUV4442YUV422）。",
+      "criteria": {
+        "locators": [],
+        "check": []
+      },
+      "fix_pattern": "- **发现**：`GetShapeRange()` 前 200 行无 `MakeUpRange` 即缺失型；对照 YUV4442YUV422。\n- **复现锚**：`(-2)`/`(-1,-1,-1)` 必现。",
+      "fix_pattern_code": "// ❌ auto range = input.GetShapeRange();\n// ✅ input.MakeUpRange(); auto range = input.GetShapeRange();",
+      "min_repro": "",
+      "evidence": "#1766（closed）。",
+      "issues": [
+        "#1766"
+      ],
+      "verified_anchors": []
+    },
+    {
+      "case_id": "FP-B09-C3",
+      "fp_id": "FP-B09",
+      "skill": "fpb09-dynamic-shape-review",
+      "title": "硬校验维数必须为 2（含官方修复范式）—— #1786（ProdVirialSeA）",
+      "subtype": null,
+      "trigger": "GEIR 通路跑 `-2`/`-1` 动态用例。",
+      "root_cause": "`ProdVirialSeAVerify`/`InferShape` 硬校验维度必须为 2；动态 `GetDims()` 返回 `{-2}`/`{-1}`，size≠2 报错（形态①）；动态编译能跑、GEIR 报错。",
+      "criteria": {
+        "locators": [],
+        "check": []
+      },
+      "fix_pattern": "校验前判动态 shape：动态时跳过维度与值校验、`nframes=-1`、输出置 `-1`；静态保持原逻辑。\n- **发现**：① `*Verify`/`*InferShape` 硬校验前是否有前置门；② 动态分支输出是否置 `-1`（形态④）。\n- **复现锚**：`-2`/`-1` 跑 GEIR 与动态编译通路应一致。",
+      "fix_pattern_code": "",
+      "min_repro": "",
+      "evidence": "#1786（open）。",
+      "issues": [
+        "#1786"
+      ],
+      "verified_anchors": []
+    },
+    {
+      "case_id": "FP-B09-C4",
+      "fp_id": "FP-B09",
+      "skill": "fpb09-dynamic-shape-review",
+      "title": "GetDims() 短向量下标越界崩溃 —— #1787（Yolo）",
+      "subtype": null,
+      "trigger": "完全未知 `(-2,)`（`GetDims()` size=1）；部分未知 `(-1,-1,-1,-1)`。",
+      "root_cause": "`YoloVerify` 的 `inputShape[1]` 在 `-2` 时越界崩溃（形态②）；`(-1,-1,-1,-1)` 时 `channelNum=-1` 一致性校验失败。",
+      "criteria": {
+        "locators": [],
+        "check": []
+      },
+      "fix_pattern": "- **发现**：下标访问前是否校验 `size > i`；grep `inputShape\\s*\\[\\s*[1-9]`。\n- **复现锚**：`(-2,)` 断言「不崩溃」。",
+      "fix_pattern_code": "// ❌ if (dims[1] != channelNum) return FAILED;\n// ✅ if (dims.size() > 1) {校验}; if (channelNum == -1) {跳过一致性校验}",
+      "min_repro": "",
+      "evidence": "#1787（open）。",
+      "issues": [
+        "#1787"
+      ],
+      "verified_anchors": []
+    },
+    {
+      "case_id": "FP-B09-C5",
+      "fp_id": "FP-B09",
+      "skill": "fpb09-dynamic-shape-review",
+      "title": "infershape 1.0 与 2.0 双套，屏蔽旧版规避 —— #1804（SparseApplyAdagradV2）",
+      "subtype": null,
+      "trigger": "动态组合（`var({-2},{-2})`/`accum({-1,-1},{-1,-1})`/`lr({-2},{-2})`）。",
+      "root_cause": "屏蔽 infershape1.0 改用 infershape2.0——「屏蔽旧版」即回避缺陷旁证（形态⑥）；期望 `{{-2},{-2}}`。",
+      "criteria": {
+        "locators": [
+          {
+            "file": "scripts/scan_fp.py",
+            "lines": ""
+          }
+        ],
+        "check": []
+      },
+      "fix_pattern": "统一 1.0/2.0 动态行为，两套同输入同断言。\n- **发现**：同目录是否并存 infershape1.0/2.0；两套对同一 `{-2}` 行为对照。\n- **复现锚**：按 #1804 UT 构造，期望 `{{-2},{-2}}`。",
+      "fix_pattern_code": "",
+      "min_repro": "",
+      "evidence": "#1804（open）。\n### 语料基线与深挖起手式\n- 实证基线（canndev）：6 条同机理独立实证（3 closed / 3 open，6 算子）。\n- 起手：`python3 scripts/scan_fp.py --only FP-B09 --format json <文件>`。",
+      "issues": [
+        "#1804"
+      ],
+      "verified_anchors": []
+    },
+    {
+      "case_id": "FP-B10-C1",
+      "fp_id": "FP-B10",
+      "skill": "fpb10-hccl-review",
+      "title": "多级结构收缩后取多级下标 → 越界读污染拓扑变量 —— #744（AllToAllV）",
+      "subtype": null,
+      "trigger": "Mesh1D 多级拓扑走 AllToAllV 模板（基线 `27d0ea5a`）。",
+      "root_cause": "`src/ops/all_to_all_v/algorithm/template/` 把 `subCommRanks_` 收缩为单层后仍取 `[1]` → 越界读污染 `templateRankSize_` → 取模可致除零 → 结果错位。",
+      "criteria": {
+        "locators": [],
+        "check": [
+          "grep `subCommRanks_` 定位下标点（全仓 1952 次，仅提示）；",
+          "下标须 < 结构规模。"
+        ]
+      },
+      "fix_pattern": "",
+      "fix_pattern_code": "rank = subCommRanks_[1];                    // ❌ 越界读\nif (subCommRanks_.size() <= idx) return HCCL_E_PARA;   // ✅ 规模与下标成对校验",
+      "min_repro": "Mesh1D 多卡 vs 单机 2 卡对拍 AllToAllV。",
+      "evidence": "#744（open）。",
+      "issues": [
+        "#744"
+      ],
+      "verified_anchors": []
+    },
+    {
+      "case_id": "FP-B10-C2",
+      "fp_id": "FP-B10",
+      "skill": "fpb10-hccl-review",
+      "title": "声明动态 count 却从未写 UNKNOWN_DIM —— #749（ReduceScatterV）",
+      "subtype": null,
+      "trigger": "`recv_count`/`send_counts` 作**图输入**（编译期不可知）。",
+      "root_cause": "`src/ops/reduce_scatter_v/op_graph` 的 `HcomReduceScatterVInferShapeV2` 把输入形状**原样赋给输出并 return 成功**，日志称 unknown 却**从未** `SetDim(0, ge::UNKNOWN_DIM)`。",
+      "criteria": {
+        "locators": [],
+        "check": [
+          "grep 锚点 `SetDim(\\w+, ge::UNKNOWN_DIM)`（命中=已正确）；",
+          "跨行差集：有 unknown 日志无 `SetDim` ⇒ 命中（**只打日志不算**）。"
+        ]
+      },
+      "fix_pattern": "",
+      "fix_pattern_code": "outputShape->SetDim(0, ge::UNKNOWN_DIM);    // ✅ 真的写进 IR",
+      "min_repro": "count 作 graph 输入，IR 上校验置未知维。",
+      "evidence": "#749（open）。",
+      "issues": [
+        "#749"
+      ],
+      "verified_anchors": []
+    },
+    {
+      "case_id": "FP-B10-C3",
+      "fp_id": "FP-B10",
+      "skill": "fpb10-hccl-review",
+      "title": "配置 get<T>() 直接窄化 → 错误命中通信域并改写 cost —— #738（调优插件）",
+      "subtype": null,
+      "trigger": "`min_ranks`/`max_ranks` 超 `uint32_t` 或为负。",
+      "root_cause": "`examples/07_tuner_plugin/plugin.cpp::ParseMatchField` 用 `get<uint32_t>()` **不拒窄化**；`4294967304`（2^32+8）被转成 **8** → **错误命中 8-rank 通信域** → cost 2→0。",
+      "criteria": {
+        "locators": [
+          {
+            "file": "examples/07_tuner_plugin/plugin.cpp",
+            "lines": ""
+          }
+        ],
+        "check": [
+          "grep 指纹 `get<(u?int(32|64)_t|size_t)>()`（实测 13 处）；",
+          "无范围校验且值参与通信域匹配或 cost ⇒ 命中。"
+        ]
+      },
+      "fix_pattern": "",
+      "fix_pattern_code": "uint32_t v = json.get<uint32_t>();          // ❌ 负数回绕 / 超大值截断\nif (!json.is_number_unsigned() || json.get<uint64_t>() > kMaxRankSize) return false;  // ✅",
+      "min_repro": "配置给 `2^32±k` 与负值，断言明确报错而非静默错配。",
+      "evidence": "#738（open）。",
+      "issues": [
+        "#738"
+      ],
+      "verified_anchors": []
+    },
+    {
+      "case_id": "FP-B10-C4",
+      "fp_id": "FP-B10",
+      "skill": "fpb10-hccl-review",
+      "title": "同族 executor 精度类型不对称 → 大数据量切片不均 —— #275（Broadcast vs AllReduce）",
+      "subtype": null,
+      "trigger": "Broadcast 数据量跨 **2^24（16M）**。",
+      "root_cause": "`src/ops/broadcast/executor/ins_v2_broadcast_parallel_executor.cc` 用 `float()` 转 u64 `sliceCount`，>2^24 丢精度致切片不均；AllReduce 却用 `double()`+`std::floor`——同族不对称。",
+      "criteria": {
+        "locators": [
+          {
+            "file": "src/ops/broadcast/executor/ins_v2_broadcast_parallel_executor.cc",
+            "lines": ""
+          },
+          {
+            "file": "scripts/scan_fp.py",
+            "lines": ""
+          }
+        ],
+        "check": [
+          "grep 指纹 `float(\\w*[Ss]lice[Cc]ount`（实测 1 处）；",
+          "同族精度/取整不对称且无高位保护 ⇒ 命中。"
+        ]
+      },
+      "fix_pattern": "",
+      "fix_pattern_code": "uint64_t slice = (uint64_t)std::floor((double)sliceCount);   // ✅ 与 AllReduce 对齐",
+      "min_repro": "数据量跨 2^24 的 Broadcast 与 AllReduce 对拍。",
+      "evidence": "#275（closed）。\n### 语料基线与深挖起手式\n- 深挖：`python3 scripts/scan_fp.py --only FP-B10 --format json <目标文件>`；语料 cann/hccl **714 条**（2026-09-19：关键词 235、超时/挂死 16、精度 3，拓扑变量 1952 次仅定位提示）。同型其余 **#609**（AICPU+CCLBuffer>2GB）、**#106**、**#141**（泄漏，挂死归 FP-G01）。",
+      "issues": [
+        "#106",
+        "#141",
+        "#275",
+        "#609"
+      ],
+      "verified_anchors": []
+    },
+    {
+      "case_id": "FP-B11-C1",
+      "fp_id": "FP-B11",
+      "skill": "fpb11-validation-review",
+      "title": "上限检查读错张量（校验对象选错） —— #1017（aclnnUpsampleNearestExact3dBackward）",
+      "subtype": null,
+      "trigger": "`inputSize`/`gradInput` 的任一维超 `INT32_MAX`，而 `gradOut` 各维合法。",
+      "root_cause": "`image/upsample_nearest_exact3d_grad/op_host/op_api/aclnn_upsample_nearest_exact3d_backward.cpp:139-168` 的 `CheckUplimit` **五个维度全部取自 `gradOut`**，`inputSize`/`gradInput` 从未参与 → 超限输入被放行。",
+      "criteria": {
+        "locators": [
+          {
+            "file": "image/upsample_nearest_exact3d_grad/op_host/op_api/aclnn_upsample_nearest_exact3d_backward.cpp",
+            "lines": "139-168"
+          }
+        ],
+        "check": [
+          "打开该函数，逐参数核对检查实参是否与形参语义一致；",
+          "确认 `inputSize`/`gradInput` 是否进入任一上限检查；",
+          "存在「读错张量」且合法语义未被覆盖 ⇒ 命中（子形态",
+          "）。"
+        ]
+      },
+      "fix_pattern": "",
+      "fix_pattern_code": "// ❌ CheckUplimit 五个维度全取自 gradOut —— inputSize/gradInput 从未参与\nCheckUplimit(gradOut);        // inputSize 超 INT32_MAX 被放行\n// ✅ 逐实参张量分别检查，实参与形参语义对应\nCheckUplimit(inputSize);      // 每个受约束张量都要过上限检查\nCheckUplimit(gradInput);",
+      "min_repro": "`inputSize` 单维设 `2^31`、`gradOut` 全合法，断言第一段返回 161002。",
+      "evidence": "#1017（ops-cv）。",
+      "issues": [
+        "#1017"
+      ],
+      "verified_anchors": [
+        {
+          "file": "image/upsample_nearest_exact3d_grad/op_host/op_api/aclnn_upsample_nearest_exact3d_backward.cpp",
+          "lines": "139-167",
+          "commit": "79680a9",
+          "repo": "ops-cv",
+          "note": "签名已扩为 `CheckUplimit(const aclTensor* gradOut, const aclIntArray* inputSize, const aclTensor* gradInput)`；`:150-155` 校 `gradOut` 五维 ≤ `INT32_MAX`，**`:157-167` 新增 `inputSize` 五维校验**（`OP_CHECK(inputN <= INT32_MAX && … inputW <= INT32_MAX, …, return false)`）——这正是时点「五个维度全取自 `gradOut`」缺口的修复",
+          "issue": "#1017"
+        }
+      ]
+    },
+    {
+      "case_id": "FP-B11-C2",
+      "fp_id": "FP-B11",
+      "skill": "fpb11-validation-review",
+      "title": "InferShape 放行、tiling 拒绝（前后段不一致） —— #1020（ResizeLinear）",
+      "subtype": null,
+      "trigger": "零 batch（shape 首维为 0）。",
+      "root_cause": "`image/resize_linear/op_host/resize_linear_infershape.cpp` **放行零 batch**，而 arch35 的 tiling 拒绝 → 同一输入一侧放行、一侧拒绝 → 契约未统一。",
+      "criteria": {
+        "locators": [
+          {
+            "file": "image/resize_linear/op_host/resize_linear_infershape.cpp",
+            "lines": ""
+          },
+          {
+            "file": "_infershape.cpp",
+            "lines": ""
+          },
+          {
+            "file": "_tiling.cpp",
+            "lines": ""
+          }
+        ],
+        "check": [
+          "交叉读 `*_infershape.cpp` 与 `*_tiling.cpp` 对同一输入的接受集合；",
+          "出现「A 放行 / B 拒绝」即命中（子形态",
+          "，无论哪侧「对」都是契约未统一）。"
+        ]
+      },
+      "fix_pattern": "InferShape 与 tiling **共用同一校验函数**，对同一非法输入两侧结论一致（`OP_CHECK(dim0 > 0, ...)`）。",
+      "fix_pattern_code": "",
+      "min_repro": "零 batch 输入分别过 InferShape 与 tiling，断言两侧结论一致。",
+      "evidence": "#1020（ops-cv）。",
+      "issues": [
+        "#1020"
+      ],
+      "verified_anchors": [
+        {
+          "file": "image/resize_linear/op_host/resize_linear_infershape.cpp",
+          "lines": "61-62",
+          "commit": "79680a9",
+          "repo": "ops-cv",
+          "note": "(xShape->GetDim(IDX_L - 1) == 0), OP_LOGE(nodeName, \"input size should be greater than 0\"), return GRAPH_FAILED)` —— InferShape 侧显式拒绝零维，与 arch35 tiling 对齐",
+          "issue": "#1020"
+        }
+      ]
+    },
+    {
+      "case_id": "FP-B11-C3",
+      "fp_id": "FP-B11",
+      "skill": "fpb11-validation-review",
+      "title": "ListInt 长度未校验 → 越界读属性数组 —— #1004 / #939（UpsampleNearest3d / UpsampleNearest）",
+      "subtype": null,
+      "trigger": "`output_size` 属性长度不足（如只传 1 个）或为空数组。",
+      "root_cause": "`op_host/upsample_nearest3d_tiling.cpp`（#1004）与 UpsampleNearest 同类（#939，卡片记 `:138-139`）在读取属性数组前**未判长度**，直接按下标取 → 越界读（读到相邻属性）；空 `outputSize` 数组曾致 coredump。",
+      "criteria": {
+        "locators": [
+          {
+            "file": "op_host/upsample_nearest3d_tiling.cpp",
+            "lines": ""
+          }
+        ],
+        "check": [
+          "grep `GetAttrPointer`/`GetValue` 后是否跟随 `size()` 判断；",
+          "该属性长度不足/超长即命中（子形态",
+          "未校验）。"
+        ]
+      },
+      "fix_pattern": "",
+      "fix_pattern_code": "// ❌ 直接按下标取，未判长度\nh = outputSize[0]; w = outputSize[1];      // size()<2 时越界读\n// ✅ 读前校验长度上下限\nOP_CHECK(outputSize.size() >= 2, ACLNN_ERR_PARAM_INVALID, \"output_size length insufficient\");",
+      "min_repro": "`output_size` 只传 1 个 / 传空数组，断言第一段返回 161002（而非 coredump 或读到相邻属性）。",
+      "evidence": "#1004、#939（ops-cv）。",
+      "issues": [
+        "#1004",
+        "#939"
+      ],
+      "verified_anchors": [
+        {
+          "file": "image/upsample_nearest3d/op_host/upsample_nearest3d_tiling.cpp",
+          "lines": "87-91",
+          "commit": "79680a9",
+          "repo": "ops-cv",
+          "note": "新增长度校验：`size_t outputSizeNum = outputSize->GetSize(); if (outputSizeNum != DIM) { OP_LOGE(… \"output_size length must be %zu, but got %zu.\" …); return ge::GRAPH_FAILED; }` —— 堵住 `reinterpret_cast` 后按 `DIM` 越界读",
+          "issue": "#1004"
+        }
+      ]
+    },
+    {
+      "case_id": "FP-B11-C4",
+      "fp_id": "FP-B11",
+      "skill": "fpb11-validation-review",
+      "title": "标量属性值域写错 + 接受非有限值 —— #951（aclnnRoiAlignV2）",
+      "subtype": null,
+      "trigger": "`spatialScale` 取边界值（如 0）或 NaN/Inf。",
+      "root_cause": "`objdetect/roi_align/op_host/op_api/aclnn_roi_align_v2.cpp` 的 `spatialScale` **校验边界写错**（如只判 `< 0` 未判 `== 0`）且**未做非有限性检查** → 边界值穿过校验、NaN/Inf 参与除法/取整。",
+      "criteria": {
+        "locators": [
+          {
+            "file": "objdetect/roi_align/op_host/op_api/aclnn_roi_align_v2.cpp",
+            "lines": ""
+          }
+        ],
+        "check": [
+          "核对 `spatial_scale`/`iou_threshold`/`pooled_h` 类标量的 `OP_CHECK` 条件（`<0` vs `<=0`）；",
+          "参与除法/取整的属性是否 `std::isfinite`；",
+          "缺一即命中（子形态",
+          "放行 /",
+          "有限性）。"
+        ]
+      },
+      "fix_pattern": "",
+      "fix_pattern_code": "// ❌ 边界写宽且不拒非有限值\nif (spatialScale < 0) { return error; }     // ==0 与非有限值穿过\n// ✅ 值域 + 有限性一并校验\nOP_CHECK(std::isfinite(spatialScale) && spatialScale > 0, ACLNN_ERR_PARAM_INVALID, \"...\");",
+      "min_repro": "`spatialScale` 取 0 与 NaN 两例，断言第一段返回 161002。",
+      "evidence": "#951（ops-cv）。",
+      "issues": [
+        "#951"
+      ],
+      "verified_anchors": [
+        {
+          "file": "objdetect/roi_align/op_api/aclnn_roi_align_v2.cpp",
+          "lines": "128-139",
+          "commit": "79680a9",
+          "repo": "ops-cv",
+          "note": "spatialScale <= 0.0f)`**，报错串为 `\"spatialScale [%f] should be finite and greater than 0\"`——同时补上「非有限值」与「边界比较方向」两处",
+          "issue": "#951"
+        }
+      ]
+    },
+    {
+      "case_id": "FP-B11-C5",
+      "fp_id": "FP-B11",
+      "skill": "fpb11-validation-review",
+      "title": "「一维即连续」的豁免假设，辅助输入切片未连续化 —— 26-04（QuantMatmul v4/v5）",
+      "subtype": null,
+      "trigger": "`scale` / `offset` / `per-token scale` 这类**辅助输入**由用户以切片方式传入（如 `slice(64)[16:32]`），是非连续 view。主输入都做了连续化，唯独辅助输入因「一维张量天然连续」的假设被跳过。",
+      "root_cause": "把「rank == 1」当作「一定连续」。rank-1 张量**同样可以是非连续 view**（stride ≠ 1 或 storage offset ≠ 0）。一旦跳过连续化，下游按 origin shape 读取真实存储，读到的元素位置与预期错位——issue 给出 `origin shape=64`、切片后实际只想取 16 个，n 对不上。",
+      "criteria": {
+        "locators": [
+          {
+            "file": "aclnn_quant_matmul_v5.cpp",
+            "lines": "1003-1019"
+          },
+          {
+            "file": "matmul/quant_batch_matmul_v4/op_host/op_api/aclnn_quant_matmul_v5.cpp",
+            "lines": "1003-1019"
+          },
+          {
+            "file": "scripts/scan_fp.py",
+            "lines": ""
+          }
+        ],
+        "check": [
+          "列出全部辅助输入（scale / offset / zeroPoint / bias / per-token / per-channel / yScale）；",
+          "逐个确认是否有连续化调用，**不要因为是 rank-1 就豁免**；",
+          "grep `GetDimNum() == 1` 附近的「跳过连续化」分支——这往往是豁免假设的落点；",
+          "**v4 与 v5 要分别查**（本案 v4 漏处理、v5 把「一维」误当无需连续化，是同一缺陷的两个变体）；",
+          "连续化产物必须真正被下游消费，算了不用同样无效。"
+        ]
+      },
+      "fix_pattern": "",
+      "fix_pattern_code": "// ❌ 按「一维不用连续化」跳过辅助输入\n// ✅ 每个辅助输入都过 TensorContiguousProcess（aclnn_quant_matmul_v5.cpp:1003-1019）\nCHECK_RET(TensorContiguousProcess(x1, transposeX1, executor), ACLNN_ERR_INNER_NULLPTR);\nif (x1Scale != nullptr) {\n    if (IsMicroScaling(...)) { CHECK_RET(MxScaleContiguousProcess(x1Scale, executor), ...); }\n    else { CHECK_RET(TensorContiguousProcess(x1Scale, tempTransposeValue, executor), ...); }\n}\n...  // x2Scale / bias / x2Offset / yScale 逐个处理",
+      "min_repro": "对 scale / offset / per-token scale **分别**做「等值非连续 view」单变量实验（同一份数据，只改变 stride 不改数值），contiguous 版作对照；原始切片路径 `64 → [16:32] → [:16]`；断言数值一致且返回码正常。",
+      "evidence": "ops-nn issue #1516（`aclnnQuantMatmul` 未对输入 Tensor 做 contiguous 导致切片输入报错，issue 给出 origin shape=64、n=16 的报错现场）。修复后形态锚：`matmul/quant_batch_matmul_v4/op_host/op_api/aclnn_quant_matmul_v5.cpp:1003-1019`（@ops-nn HEAD `b27fda2`，2026-11-05 本地核验）。**注意**：`bias`、`x2Offset` 无条件走 `TensorContiguousProcess`，而 `x1Scale`/`x2Scale`/`yScale` 还要先判 `IsMicroScaling` 分流到 `MxScaleContiguousProcess`——**两条分支的连续化语义不同，只覆盖其中一条仍是缺陷**。\n### 语料基线与深挖起手式\n- 语料基线：ops-cv 全量 issue（2026-10-17，1 250 条中 232 条 bug-report）本簇 **52 条**，受理 32 条——20 条「已拒绝」说明契约边界尚未固化，属流程层缺口。\n- 深挖起手式：`python3 scripts/scan_fp.py --only FP-B11 --format json <目标文件>` —— 扫描「aclnn 接口 × `CheckShape` 内是否出现 `rank`/`GetDimNum`/`size()`/`IsFinite`/`INT32_MAX`」，只有一致性比较而无上述任一者即 HIGH 候选。",
+      "issues": [
+        "#1516"
+      ],
+      "verified_anchors": [
+        {
+          "file": "matmul/quant_batch_matmul_v4/op_host/op_api/aclnn_quant_matmul_v5.cpp",
+          "lines": "1003-1019",
+          "commit": "b27fda2",
+          "repo": "ops-cv",
+          "note": "`x1` 无条件 `TensorContiguousProcess`(:1003)；`x1Scale` 先判 `IsMicroScaling` 分流 `MxScaleContiguousProcess`(:1006-1011)、否则 `TensorContiguousProcess`(:1012-1013)；`x2Scale`(:1014-1018)、`bias`(:1016)、`x2Offset`(:1017)、`yScale`(:1019) 逐个处理——**修复后形态**：所有辅助输入都不再享「rank-1 豁免」。注意两路连续化语义不同，只覆盖一路仍是缺陷。",
+          "issue": "#1516"
+        }
+      ]
+    },
+    {
+      "case_id": "FP-B12-C1",
+      "fp_id": "FP-B12",
+      "skill": "fpb12-early-exit-review",
+      "title": "`grid`/`gradOutput` 为空而 `inputGrad` 非空，早退不写输出 → NaN 梯度 —— #1252（aclnnGridSampler3DBackward）",
+      "subtype": null,
+      "trigger": "`grid` 或 `gradOutput` 为 `numel==0`，而 `input`/输出非空。",
+      "root_cause": "`image/grid_sampler3_d_grad/op_host/op_api/aclnn_grid_sampler3d_backward.cpp:230-237` 的判空早退体（`gradOutput->IsEmpty() || input->IsEmpty() || grid->IsEmpty()`）只做 `*workspaceSize=0; ReleaseTo(executor); return ACLNN_SUCCESS;`，**从不写 `inputGrad`** → 调用方读到预分配的未初始化内存（NaN/随机值）。",
+      "criteria": {
+        "locators": [
+          {
+            "file": "image/grid_sampler3_d_grad/op_host/op_api/aclnn_grid_sampler3d_backward.cpp",
+            "lines": "230-237"
+          }
+        ],
+        "check": [
+          "grep `IsEmpty()` 定位所有早退块，逐块检查 `return ACLNN_SUCCESS` 前是否遍历并写每个非 inplace `aclTensor*` 输出；",
+          "该接口输出是否与某个非空输入同形（存在「输入空 × 输出非空」组合）；",
+          "早退块内无任何写输出调用 ⇒ 命中。"
+        ]
+      },
+      "fix_pattern": "",
+      "fix_pattern_code": "// ❌ 判空早退：只置 workspaceSize 后返回，输出未写\nif (grid->IsEmpty()) { *workspaceSize = 0; return ACLNN_SUCCESS; }\n// ✅ 早退前对每个非空输出显式清零（grad 语义：无贡献点应为 0）\nl0op::Duplicate(zeroTensor, inputGrad, executor);",
+      "min_repro": "`grid` 置空、输出 buffer 预填魔数，断言返回 0 且非空输出全 0、无残留魔数。",
+      "evidence": "#1252（ops-cv，进行中）。",
+      "issues": [
+        "#1252"
+      ],
+      "verified_anchors": [
+        {
+          "file": "image/grid_sampler3_d_grad/op_host/op_api/aclnn_grid_sampler3d_backward.cpp",
+          "lines": "244-265/207",
+          "commit": "79680a9",
+          "repo": "ops-cv",
+          "note": "已修，且比统一范式多一层掩码条件：`:249-250`（`outputMask[0] && !inputGrad->IsEmpty()` → 写 `inputGrad`）、`:256-257`（`outputMask[1] && !gridGrad` → 写 `gridGrad`）",
+          "issue": "#1252"
+        }
+      ]
+    },
+    {
+      "case_id": "FP-B12-C2",
+      "fp_id": "FP-B12",
+      "skill": "fpb12-early-exit-review",
+      "title": "`n==0` 早退不写 `grad_y` —— #1243（aclnnThreeInterpolateBackward）",
+      "subtype": null,
+      "trigger": "`n==0`（采样点数为 0），而正向输入非空。",
+      "root_cause": "`op_host/op_api/aclnn_three_interpolate_backward.cpp:109-113` 的 `n==0` 早退分支不写 `grad_y` → 未初始化输出被当作合法梯度返回。",
+      "criteria": {
+        "locators": [
+          {
+            "file": "op_host/op_api/aclnn_three_interpolate_backward.cpp",
+            "lines": "109-113"
+          }
+        ],
+        "check": [
+          "核对早退条件是否逐输入（此处以 `n==0` 触发）；",
+          "检查早退体是否写 `grad_y`；",
+          "未写且 `grad_y` 非空 ⇒ 命中。"
+        ]
+      },
+      "fix_pattern": "早退前对非空 `grad_y` 清零（`l0op::Duplicate`），或不早退、交由 kernel 处理 0 元素。",
+      "fix_pattern_code": "",
+      "min_repro": "`n=0` 输入 + canary 预填 `grad_y`，断言输出全 0。",
+      "evidence": "#1243（ops-cv，进行中）。",
+      "issues": [
+        "#1243"
+      ],
+      "verified_anchors": [
+        {
+          "file": "image/three_interpolate_backward/op_host/op_api/aclnn_three_interpolate_backward.cpp",
+          "lines": "121-133",
+          "commit": "79680a9",
+          "repo": "ops-cv",
+          "note": "已修",
+          "issue": "#1243"
+        }
+      ]
+    },
+    {
+      "case_id": "FP-B12-C3",
+      "fp_id": "FP-B12",
+      "skill": "fpb12-early-exit-review",
+      "title": "`roisN==0` 未写 `gradInputRef` —— #1230（aclnnRoiPoolingGradWithArgMax）",
+      "subtype": null,
+      "trigger": "`roisN==0`（无 ROI），而 `gradInput` 非空。",
+      "root_cause": "`objdetect/roi_pooling_grad_with_arg_max/op_api/aclnn_roi_pooling_grad_with_arg_max.cpp:183-188` 的 `roisN==0` 早退块未写 `gradInputRef`。",
+      "criteria": {
+        "locators": [
+          {
+            "file": "objdetect/roi_pooling_grad_with_arg_max/op_api/aclnn_roi_pooling_grad_with_arg_max.cpp",
+            "lines": "183-188"
+          }
+        ],
+        "check": [
+          "grep `IsEmpty()`/`roisN` 早退；",
+          "确认输出 `gradInputRef` 是否与别的非空输入同形；",
+          "早退不写 ⇒ 命中。"
+        ]
+      },
+      "fix_pattern": "早退前对 `gradInputRef` 清零；`CheckShape` 不能把「空 ROI × 非空 gradInput」判合法放行后又不产出输出。",
+      "fix_pattern_code": "",
+      "min_repro": "`roisN=0` + 预填魔数，断言 `gradInputRef` 全 0。",
+      "evidence": "#1230（ops-cv，进行中）。",
+      "issues": [
+        "#1230"
+      ],
+      "verified_anchors": [
+        {
+          "file": "objdetect/roi_pooling_grad_with_arg_max/op_api/aclnn_roi_pooling_grad_with_arg_max.cpp",
+          "lines": "218-233",
+          "commit": "79680a9",
+          "repo": "ops-cv",
+          "note": "已修",
+          "issue": "#1230"
+        }
+      ]
+    },
+    {
+      "case_id": "FP-B12-C4",
+      "fp_id": "FP-B12",
+      "skill": "fpb12-early-exit-review",
+      "title": "同范式跨目录复现（image / objdetect），非单点疏忽 —— #1247（Im2colBackward）、#1124（UpsampleBilinear2dAABackward）",
+      "subtype": null,
+      "trigger": "反向算子任一输入 `numel==0` 而输出非空。",
+      "root_cause": "`image/col2im/op_api/aclnn_im2col_backward.cpp:245-250`（#1247）与 `op_host/op_api/aclnn_upsample_bilinear2d_aa_backward.cpp:204-208`（#1124）同属「有判空分支但早退体不写输出」的**同一范式**——五条 issue 分布在 image 与 objdetect 两个目录，说明是范式缺口而非单点缺失。",
+      "criteria": {
+        "locators": [
+          {
+            "file": "image/col2im/op_api/aclnn_im2col_backward.cpp",
+            "lines": "245-250"
+          },
+          {
+            "file": "op_host/op_api/aclnn_upsample_bilinear2d_aa_backward.cpp",
+            "lines": "204-208"
+          }
+        ],
+        "check": [
+          "对每个 `*Backward`/`*Grad` 逐输入置空，检查早退块写输出的覆盖度；",
+          "反证：该组合下输出也为空（`numel==0`）时不存在「未写」，判反证排除。"
+        ]
+      },
+      "fix_pattern": "统一在早退前对每个非空输出清零（可抽公共 `InitEmptyGradOutputs` 辅助函数逐输出遍历）；两条平台实现（arch22 非 regbase 与 regbase）共用同一逻辑，避免一侧做一侧没做导致「仅某平台复现」。",
+      "fix_pattern_code": "",
+      "min_repro": "空输入 × 输出非空矩阵 + canary 魔数残留检查。",
+      "evidence": "#1247、#1124（ops-cv，进行中）。",
+      "issues": [
+        "#1124",
+        "#1247"
+      ],
+      "verified_anchors": [
+        {
+          "file": "image/upsample_bilinear2d_aa_backward/op_host/op_api/aclnn_upsample_bilinear2d_aa_backward.cpp",
+          "lines": "215-232",
+          "commit": "79680a9",
+          "repo": "ops-cv",
+          "note": "已修",
+          "issue": "#1124"
+        },
+        {
+          "file": "image/col2im/op_api/aclnn_im2col_backward.cpp",
+          "lines": "260-276",
+          "commit": "79680a9",
+          "repo": "ops-cv",
+          "note": "**路径已迁移**：`im2col_backward`→`col2im`、`op_host/op_api`→`op_api`，**旧锚已不可达**",
+          "issue": "#1247"
+        }
+      ]
+    },
+    {
+      "case_id": "FP-B12-C5",
+      "fp_id": "FP-B12",
+      "skill": "fpb12-early-exit-review",
+      "title": "主输出为空是对的，受害的是非空辅助输出 —— B12-3（2026-11-06 四连发）",
+      "subtype": null,
+      "trigger": "早退由「主输入 / 主输出为空」触发，而**至少一个辅助输出的 shape 由属性或非空输入决定**、numel>0。典型：`n==0` / `batch==0` / 空 `x` / 空 `offsets`。",
+      "root_cause": "早退体只处理了主输出（或主输出本来就该为空、什么都不用写），辅助输出被整块跳过。四例：`aclnnEmbeddingBag` 的 `bagSize`/`maxIndices`（形状由 `offsets`+attr 决定，#8239）、`aclnnGroupedMatmulSwigluQuantV2` 的 `outputScale`（恒 `[m]`，#7164）、`aclnnPreluBackward` 的 `gradWeight`（形状 == weight，#8246）、`aclnnQuantMax` 的 `amax`（强制 `[1]`，#8249）。",
+      "criteria": {
+        "locators": [
+          {
+            "file": "scripts/scan_fp.py",
+            "lines": ""
+          }
+        ],
+        "check": [
+          "先给每个输出标 shape 域来源（attr / 非空输入 / 触发早退的输入）；",
+          "挑出「与空维无关且非空」者；",
+          "在早退块文本内检索其变量名，找不到写调用 ⇒ 命中；",
+          "反证：该输出在早退条件下本身也 `IsEmpty()`。"
+        ]
+      },
+      "fix_pattern": "早退块内**按输出逐个判空**，非空者写 0——主输出为空不是跳过其余输出的理由：",
+      "fix_pattern_code": "// ❌ 只照看主输出（output 空 → 什么都不写），辅助输出 outputScale 被跳过\nif (output->IsEmpty()) { *workspaceSize = 0; return ACLNN_SUCCESS; }\n// ✅ 逐个输出判空，非空者清零（辅助输出与触发早退的空维无关）\nif (output->IsEmpty()) {\n    if (!outputScale->IsEmpty()) {\n        auto fill = GetOutTensorWithValueZero(outputScale, uniqueExecutor.get());\n        CHECK_RET(l0op::ViewCopy(fill, outputScale, uniqueExecutor.get()) != nullptr, ACLNN_ERR_INNER_NULLPTR);\n    }\n    *workspaceSize = 0; uniqueExecutor.ReleaseTo(executor); return ACLNN_SUCCESS;\n}",
+      "min_repro": "把触发早退的维度置 0，**所有输出 buffer 逐个预填不同魔数**，跑后逐输出检查残留——只查主输出正是本子型长期漏检的原因。",
+      "evidence": "ops-nn #8239（`bagSize`/`maxIndices`）、ops-transformer #7164（`outputScale`，基线 256/256 写、变异 0/256）、ops-nn #8246（`gradWeight`，基线 8/8 写、变异 0/8）、ops-nn #8249（`amax`，A5 双 device + 910C 三路复核）。\n### 语料基线与深挖起手式\n- 语料基线：ops-cv **5 连发**（2026-09~10，全部 `进行中`）：#1252 / #1247 / #1243 / #1230 / #1124，**全部为反向/梯度算子**；PyTorch 语义基线：无贡献点的梯度应为 **0**，不是随机值或 NaN。\n- 深挖起手式：`python3 scripts/scan_fp.py --only FP-B12 --format json <目标文件>` —— 扫描「函数体内含 `IsEmpty()` 且其后 `return ACLNN_SUCCESS` 的早退块」×「签名存在非 inplace `aclTensor*` 输出」×「早退块内无 `Duplicate|InitOutput|Memset|l0op::` 写输出调用」，再核对 `CheckShape` 是否已排除「空输入 × 非空输出」。\n- **禁止只断言返回码**——这正是 5 条 issue 长期未被发现的原因；建议 ST 中输出 buffer 预填魔数，跑后检查残留魔数比例。",
+      "issues": [
+        "#1124",
+        "#1230",
+        "#1243",
+        "#1247",
+        "#1252",
+        "#7164",
+        "#8239",
+        "#8246",
+        "#8249"
+      ],
+      "verified_anchors": [
+        {
+          "file": "image/upsample_bilinear2d_aa_backward/op_host/op_api/aclnn_upsample_bilinear2d_aa_backward.cpp",
+          "lines": "215-232",
+          "commit": "79680a9",
+          "repo": "ops-cv",
+          "note": "已修",
+          "issue": "#1124"
+        },
+        {
+          "file": "objdetect/roi_pooling_grad_with_arg_max/op_api/aclnn_roi_pooling_grad_with_arg_max.cpp",
+          "lines": "218-233",
+          "commit": "79680a9",
+          "repo": "ops-cv",
+          "note": "已修",
+          "issue": "#1230"
+        },
+        {
+          "file": "image/three_interpolate_backward/op_host/op_api/aclnn_three_interpolate_backward.cpp",
+          "lines": "121-133",
+          "commit": "79680a9",
+          "repo": "ops-cv",
+          "note": "已修",
+          "issue": "#1243"
+        },
+        {
+          "file": "image/col2im/op_api/aclnn_im2col_backward.cpp",
+          "lines": "260-276",
+          "commit": "79680a9",
+          "repo": "ops-cv",
+          "note": "**路径已迁移**：`im2col_backward`→`col2im`、`op_host/op_api`→`op_api`，**旧锚已不可达**",
+          "issue": "#1247"
+        },
+        {
+          "file": "image/grid_sampler3_d_grad/op_host/op_api/aclnn_grid_sampler3d_backward.cpp",
+          "lines": "244-265/207",
+          "commit": "79680a9",
+          "repo": "ops-cv",
+          "note": "已修，且比统一范式多一层掩码条件：`:249-250`（`outputMask[0] && !inputGrad->IsEmpty()` → 写 `inputGrad`）、`:256-257`（`outputMask[1] && !gridGrad` → 写 `gridGrad`）",
+          "issue": "#1252"
+        }
+      ]
+    },
+    {
+      "case_id": "FP-B14-C1",
+      "fp_id": "FP-B14",
+      "skill": "fpb14-graph-path-review",
+      "title": "proto attr 默认值不在 tiling 接受域内 → 图模式缺省被拒 —— #5201（swiglu_group_grad）",
+      "subtype": null,
+      "trigger": "图模式不传 `clamp_limit`，取 proto 默认值 **0**。",
+      "root_cause": "`op_graph/*_proto.h` 的 `Attr(...).DefaultValue(0)` 与 `op_host/*tiling*.cpp` 的 `ParseAttrs` 合法值域（tiling 在 **#8844** 后要求 **-1 或 >0**）**不同步** → 图模式缺省即被拒；aclnn 侧显式传合法值不受影响，故**仅图模式暴露**。",
+      "criteria": {
+        "locators": [
+          {
+            "file": "_proto.h",
+            "lines": ""
+          }
+        ],
+        "check": [
+          "逐项比对 proto `DefaultValue` 与 tiling `ParseAttrs` 合法值域，做差集；",
+          "默认值 ∉ 接受域 ⇒ 命中（子型",
+          "）；",
+          "新增 attr 后加「proto 默认值 ∈ tiling 接受域」的静态断言。"
+        ]
+      },
+      "fix_pattern": "",
+      "fix_pattern_code": "// ❌ proto 默认 0，tiling 只收 -1 或 >0\nAttr(\"clamp_limit\").DefaultValue(0);          // 图模式缺省即失败\n// ✅ 默认值对齐 tiling 接受域\nAttr(\"clamp_limit\").DefaultValue(-1);         // 与 ParseAttrs 一致",
+      "min_repro": "图模式不传 `clamp_limit` 跑冒烟，与同输入 aclnn 对拍，断言不抛 GRAPH_FAILED。",
+      "evidence": "#5201（ops-nn）。",
+      "issues": [
+        "#5201"
+      ],
+      "verified_anchors": [
+        {
+          "file": "activation/swiglu_group_grad/op_graph/swiglu_group_grad_proto.h",
+          "lines": "61",
+          "commit": "a7539b",
+          "repo": "ops-nn",
+          "note": "**proto 默认值已从 0 同步为 `-1.0f`**：`.ATTR(clamp_limit, Float, -1.0f)`；文档 `:20`「Attribute: clamp_limit (Float, default=-1 → no clamp)」、`:51`「default -1 means no clamp (c=+∞)」——与 tiling 侧要求一致",
+          "issue": "#5201"
+        },
+        {
+          "file": "activation/swiglu_group_grad/op_host/arch35/swiglu_group_grad_tiling_base.cpp",
+          "lines": "205-209",
+          "commit": "a7539b",
+          "repo": "ops-nn",
+          "note": "`OP_CHECK_IF(*clampLimitAttr != -1.0f && !(*clampLimitAttr > 0.0f), OP_LOGE(… \"clamp_limit must be -1.0 (no clamp) or > 0.0, but got %f\" …), return ge::GRAPH_FAILED)` —— tiling **要求 -1 或 >0**，正是 proto 默认 0 被拒的根源（#8844 后收口）",
+          "issue": "#5201"
+        }
+      ]
+    },
+    {
+      "case_id": "FP-B14-C2",
+      "fp_id": "FP-B14",
+      "skill": "fpb14-graph-path-review",
+      "title": "format 白名单过窄 → 图优化插格式被判非法 —— #5477（BNInferGrad）",
+      "subtype": null,
+      "trigger": "图优化插入 `NC1HWC0` 元数据。",
+      "root_cause": "`ValidateTensorDescs`/`CheckFormat` 的 format 白名单**过严**，把 `NC1HWC0` 元数据判为非法 → GEIR **GRAPH_FAILED**；aclnn 直调不走该插格式路径，故正常。",
+      "criteria": {
+        "locators": [],
+        "check": [
+          "读 `CheckFormat`/`ValidateTensorDescs` 白名单，核对是否覆盖图优化常见格式；",
+          "白名单只有 ND/NCHW/NHWC 且算子进图会插格式 ⇒ 命中（子型",
+          "）。"
+        ]
+      },
+      "fix_pattern": "",
+      "fix_pattern_code": "// ❌ 白名单只有 ND/NCHW/NHWC，图优化插 NC1HWC0 被判非法\nif (!IsOneOf(format, {ND, NCHW, NHWC})) { return GRAPH_FAILED; }\n// ✅ 白名单覆盖图优化常见格式\nif (!IsOneOf(format, {ND, NCHW, NHWC, NC1HWC0, FRACTAL_Z})) { return GRAPH_FAILED; }",
+      "min_repro": "图模式用例构造 `NC1HWC0` 输入元数据，断言不被误拒。",
+      "evidence": "#5477（ops-nn）。",
+      "issues": [
+        "#5477"
+      ],
+      "verified_anchors": [
+        {
+          "file": "norm/bn_infer_grad/op_host/bn_infer_grad_def.cpp",
+          "lines": "37-49",
+          "commit": "a7539b",
+          "repo": "ops-nn",
+          "note": "def 声明 `grads`/`x_backprop` 为 `{FORMAT_NCHW, …, FORMAT_NHWC}`、`scale`/`batch_variance` 为 `{FORMAT_ND}`；tiling 侧 `ValidateOutputTensorDesc(ge::DataType gradsDtype, ge::Format gradsFormat)` **`:290 (void)gradsFormat;` 显式不使用 format**，仅 `:291` 校 dtype 相等 —— 即缺陷修复形态是「**tiling 不再按 format 拦 GEIR 元数据**」",
+          "issue": "#5477"
+        },
+        {
+          "file": "norm/bn_infer_grad/op_host/arch35/bn_infer_grad_tiling_arch35.cpp",
+          "lines": "286-291",
+          "commit": "a7539b",
+          "repo": "ops-nn",
+          "note": "def 声明 `grads`/`x_backprop` 为 `{FORMAT_NCHW, …, FORMAT_NHWC}`、`scale`/`batch_variance` 为 `{FORMAT_ND}`；tiling 侧 `ValidateOutputTensorDesc(ge::DataType gradsDtype, ge::Format gradsFormat)` **`:290 (void)gradsFormat;` 显式不使用 format**，仅 `:291` 校 dtype 相等 —— 即缺陷修复形态是「**tiling 不再按 format 拦 GEIR 元数据**」",
+          "issue": "#5477"
+        }
+      ]
+    },
+    {
+      "case_id": "FP-B14-C3",
+      "fp_id": "FP-B14",
+      "skill": "fpb14-graph-path-review",
+      "title": "L0 路径缺 dtype 属性声明 → aclnngraph 编译失败 —— #3188（ArgMaxV2）",
+      "subtype": null,
+      "trigger": "950/L0 图模式编译需显式传 dtype 属性。",
+      "root_cause": "`op_host/*_def.cpp` **未为 950/L0 声明必需属性（dtype）** → 图编译缺属性/符号，`aclnngraph` 编译失败（E40021 类）；aclnn 直调不经该声明路径，故正常。",
+      "criteria": {
+        "locators": [
+          {
+            "file": "_def.cpp",
+            "lines": ""
+          },
+          {
+            "file": "def.cpp",
+            "lines": ""
+          }
+        ],
+        "check": [
+          "核对 `def.cpp` 是否为 950/L0 声明了图编译必需属性；",
+          "缺该声明时 aclnngraph 编译失败 ⇒ 命中（子型",
+          "属性未声明/未下发）。"
+        ]
+      },
+      "fix_pattern": "",
+      "fix_pattern_code": "// ✅ def.cpp 为 L0 显式声明编译所需属性\nREG_OP(ArgMaxV2)\n    .INPUT(x, ...)\n    .ATTR(dtype, Int, 0)          // L0 编译必需，缺失即编译失败\n    .OP_END_FACTORY_REG(ArgMaxV2);",
+      "min_repro": "L0 图模式编译该算子，断言不报 E40021 且属性到达执行侧。",
+      "evidence": "#3188（ops-math）。",
+      "issues": [
+        "#3188"
+      ],
+      "verified_anchors": [
+        {
+          "file": "math/arg_max_v2/op_graph/arg_max_v2_proto.h",
+          "lines": "48",
+          "commit": "f94a6cd6d",
+          "repo": "ops-math",
+          "note": "`.ATTR(dtype, Type, DT_INT64)` —— **L0 已声明 `dtype` 属性**；文档 `:32`「dtype: The output type, either \"int32\" or \"int64\". Defaults to \"int64\"」——图模式编译失败所需的属性已补齐。**v6.19 修正**：本行原与上三行同标 `@a7539b`（ops-nn），但 `arg_max_v2` 实际位于 **ops-math**，ops-nn 无此算子——属跨仓错用；行号 `:48`/`:32` 已在 ops-math HEAD 逐字复核吻合",
+          "issue": "#3188"
+        }
+      ]
+    },
+    {
+      "case_id": "FP-B14-C4",
+      "fp_id": "FP-B14",
+      "skill": "fpb14-graph-path-review",
+      "title": "aclgraph 执行期失败（device fault） —— #5736（qfa quant_mode=6）",
+      "subtype": null,
+      "trigger": "`quant_mode=6`，`torch.compile`/aclgraph 路径。",
+      "root_cause": "图模式执行阶段报 **507011 AICore device fault**，而 eager 正常——图模式通路的入口契约（属性/format/属性透传）与执行侧期望不一致，走到与 aclnn 直调不同的实现分支。",
+      "criteria": {
+        "locators": [
+          {
+            "file": "torch.c",
+            "lines": ""
+          },
+          {
+            "file": "scripts/scan_fp.py",
+            "lines": ""
+          }
+        ],
+        "check": [
+          "属性透传探针：节点级设置 `quant_mode` 后读执行侧，确认原样到达；",
+          "图模式失败而 aclnn 直调正常且非精度差异 ⇒ 命中（子型",
+          "/",
+          "）。"
+        ]
+      },
+      "fix_pattern": "图模式侧属性/format 透传与执行侧期望对齐，属性值原样到达执行体，避免走到不支持的 `quant_mode` 分支。",
+      "fix_pattern_code": "",
+      "min_repro": "aclgraph 下同输入分别跑图模式与 aclnn，断言结果一致且无 507011。",
+      "evidence": "#5736（ops-transformer）。\n### 语料基线与深挖起手式\n- 语料基线：ops-math/ops-nn/ops-transformer 全量 issue（2026-10-17，16 270 条中 3 011 条 bug-report），图模式相关 **69 条**（math 13 / nn 26 / transformer 30）。其余同型实证（aclnn 正常、图模式失败）：**#5922** `matmulEmuSplitWeight`、**#6017** `deformable_offsets_grad`（ops-nn）、**#2619** `reducesum/reducemean`、**#3361** `fillv2`（ops-math）。\n- 深挖起手式：`python3 scripts/scan_fp.py --only FP-B14 --format json <目标文件>` —— 静态比对「proto attr 默认值 ⊄ tiling 接受值域」；扫描 `GetOptionalInputShape` 与 `GetOptionalInputDesc` 误用；核查仓内图模式用例覆盖。\n- 结论纪律：**单条通路正常不构成反证**；同一输入图模式与 aclnn 直调结果/行为不一致才是判据。",
+      "issues": [
+        "#2619",
+        "#3361",
+        "#5736",
+        "#5922",
+        "#6017"
+      ],
+      "verified_anchors": []
+    },
+    {
+      "case_id": "FP-C01-C1",
+      "fp_id": "FP-C01",
+      "skill": "fpc01-aclnn-review",
+      "title": "kernel 模板内每轮重复初始化 / 冗余指令致单次调用耗时高 —— ops-nn #3151 等（子型①）",
+      "subtype": "①",
+      "trigger": "模板化变体算子（多 tilingkey / dtype / 架构变体）位于高频调用路径上，循环内每轮重复初始化不变量。",
+      "root_cause": "kernel 主循环体内**重复初始化每迭代不变的量**（`LocalTensor` 每轮重 Init）→ 同一指令 / 搬运在循环内执行 N 次而其结果与执行 1 次等价 → 单次调用耗时高。同族：`#5277` smallkernel 模板 `fix_m` 冗余、`#3988` 16in32out mm 劣化、`#2231` dynamic_mx_quant 劣化、`#1197` DequantSwigluQuant 950 部分劣化、`#4960` mm hf32 劣化、`#2402` 950 DispatchV2 状态问题、`#1228` AICPU RealDiv complex 性能差。",
+      "criteria": {
+        "locators": [],
+        "check": [
+          "定位 kernel 主循环体与 `tilingkey` 分发的各模板变体（同一冗余常在多变体重复出现）；",
+          "写出「该指令 / 搬运在循环内执行 N 次而其结果与 1 次等价」的推导；",
+          "对照同仓已优化样板反证。"
+        ]
+      },
+      "fix_pattern": "",
+      "fix_pattern_code": "// ❌ 循环内每轮重 Init 不变的 LocalTensor / 重复搬运\nfor (int i = 0; i < loop; ++i) {\n    LocalTensor<half> buf = inQue.AllocTensor<half>();   // 每轮重复初始化\n    ...\n}\n// ✅ 循环不变量外提 / 合并搬运\nLocalTensor<half> buf = inQue.AllocTensor<half>();\nfor (int i = 0; i < loop; ++i) { ... }   // 与执行 1 次等价的部分只做一次",
+      "min_repro": "同 shape 对照「循环内 Init 外提」前后的算子级耗时（profiler 占比）。",
+      "evidence": "ops-nn `#5277`、`#3988`、`#3151`、`#2231`、`#1197`、`#4960`；ops-transformer `#2402`；ops-math `#1228`。",
+      "issues": [
+        "#1197",
+        "#1228",
+        "#2231",
+        "#2402",
+        "#3151",
+        "#3988",
+        "#4960",
+        "#5277"
+      ],
+      "verified_anchors": []
+    },
+    {
+      "case_id": "FP-C01-C2",
+      "fp_id": "FP-C01",
+      "skill": "fpc01-aclnn-review",
+      "title": "构建期 `foreach` 循环变量被摘除、循环体退化为重复配置 N 次 —— catlass `83_ascend950_hstu_infer/CMakeLists.txt`（子型②，团队笔记）",
+      "subtype": "②",
+      "trigger": "增量构建或模板规模大的仓（重复配置开销随模板 / 源文件数线性放大）。",
+      "root_cause": "新增 `get_filename_component(_SRC_NAME ${_SRC} NAME)` 后**从未使用**，且 `foreach(_SRC ${_HSTU_950_SOURCES})` 循环体内已不再引用 `_SRC` → 外层循环退化为「把同一批 compile definitions / include dirs **重复设置 N 次**（N=源文件数）×2（`_ms` 变体）」→ 未完成重构遗留，循环变量被摘除后循环体失去意义但结构未删。",
+      "criteria": {
+        "locators": [
+          {
+            "file": "83_ascend950_hstu_infer/CMakeLists.txt",
+            "lines": ""
+          },
+          {
+            "file": "CMakeLists.txt",
+            "lines": ""
+          },
+          {
+            "file": "tests/optest/kernels/83_ascend950_hstu_infer/CMakeLists.txt",
+            "lines": ""
+          }
+        ],
+        "check": [
+          "搜构建脚本 `foreach` / `for` 循环体内是否**未使用循环变量**；",
+          "核 `_SRC_NAME` 类变量的引入点与使用点（引入未用 = 重构遗留信号）；",
+          "用增量构建耗时 / 配置次数做旁证。"
+        ]
+      },
+      "fix_pattern": "",
+      "fix_pattern_code": "# ❌ 循环变量被摘除后循环体失去意义，结构未删（重复设置 N 次）\nforeach(_SRC ${_HSTU_950_SOURCES})\n  target_compile_definitions(...); target_include_directories(...)\nendforeach()\n# ✅ 移出循环或整体删除\ntarget_compile_definitions(...)\ntarget_include_directories(...)",
+      "min_repro": "对照该 `CMakeLists.txt` 的构建配置耗时（或 `--trace` 计数）在删循环前后的差异。",
+      "evidence": "catlass `tests/optest/kernels/83_ascend950_hstu_infer/CMakeLists.txt`（PR 检视日报_20260911 P2），无 issue 实证。",
+      "issues": [],
+      "verified_anchors": []
+    },
+    {
+      "case_id": "FP-C01-C3",
+      "fp_id": "FP-C01",
+      "skill": "fpc01-aclnn-review",
+      "title": "host 迭代求解循环空转 / 多算 —— ops-nn `swi_glu_tiling.cpp:367`（子型②，待人工确认）",
+      "subtype": "②",
+      "trigger": "`while (true)` 迭代求解循环（`CalcOptBaseShape`）处于「小 shape 不显、大 shape 放大」区间且算子位于端到端热点路径。",
+      "root_cause": "`ops-nn/activation/swi_glu/op_host/swi_glu_tiling.cpp:367` 命中 `F5/无退出条件循环`（`while(true)`）→ 若异常分支不推进则**空转**（归 FP-G01 成因①，锚 `#5032` `AdjustCVTiling` 死循环同构）；C01 视角另看迭代次数是否收敛、有无全区间扫描浪费。",
+      "criteria": {
+        "locators": [
+          {
+            "file": "swi_glu_tiling.cpp",
+            "lines": "367"
+          },
+          {
+            "file": "ops-nn/activation/swi_glu/op_host/swi_glu_tiling.cpp",
+            "lines": "367"
+          }
+        ],
+        "check": [
+          "搜 `while\\s*\\(\\s*true|for\\s*\\(\\s*;\\s*;\\s*\\)`；",
+          "先按 FP-G01 成因",
+          "核推进 / 退出语义（空转归 G01），再按 C01 看迭代次数与收敛性；",
+          "构造「上界 ±1 两侧」shape 探针对（阈值 2048 取 2047/2048/2049）。"
+        ]
+      },
+      "fix_pattern": "",
+      "fix_pattern_code": "// ❌ 每次迭代都全区间扫描 / 无收敛判据\nwhile (true) { /* 无推进则空转（归 G01）；有推进但多算则只是慢（归本条） */ }\n// ✅ 迭代求解须有收敛判据与迭代上限\nfor (int it = 0; it < MAX_IT && !converged; ++it) { ... }",
+      "min_repro": "2047 / 2048 / 2049 三档 shape 的算子级耗时，断言两侧不出现**非整数倍台阶**。",
+      "evidence": "`ops-nn/activation/swi_glu/op_host/swi_glu_tiling.cpp:367` 静态命中待人工确认；同构锚 ops-transformer `#5032`。",
+      "issues": [
+        "#5032"
+      ],
+      "verified_anchors": []
+    },
+    {
+      "case_id": "FP-C01-C4",
+      "fp_id": "FP-C01",
+      "skill": "fpc01-aclnn-review",
+      "title": "变更把原本合格的表现推坏（版本基线回归） —— 子型③（88 条语料，无 issue）",
+      "subtype": "③",
+      "trigger": "存在**可比基线**（同一 shape / dtype / 芯片 / 编译选项四要素一致），劣化由**一次变更**划界（可二分 commit 定位）。",
+      "root_cause": "某次变更新增冗余计算或同步、tiling / 分核阈值漂移使原最优点被跨过、dtype 或派发路径变化、模板实例化规模放大、新增确定性 / 原子约束 → 绝对耗时未超标、结构上也未必冗余，但**与自身基线对比**出现劣化（常见 5%~15%）；单看新版本绝对值可能仍「合格」，只有基线对比才暴露。",
+      "criteria": {
+        "locators": [
+          {
+            "file": "scripts/scan_fp.py",
+            "lines": ""
+          }
+        ],
+        "check": [
+          "diff 中搜**新增**循环 / 同步 / 类型转换 / 边界判断（可省 `Cast`、`SyncAll`、逐元素回退）；",
+          "核分核阈值常量（`2048`/`4096` 类魔数）是否被改动；",
+          "核向量化 / 合并搬运是否被改为分步、模板实例化数量是否放大（编译产物 size 旁证）。"
+        ]
+      },
+      "fix_pattern": "",
+      "fix_pattern_code": "// ❌ 只看新版本绝对值\"合格\"即放过；阈值常被改动使原最优点被跨过\n// ✅ 每次合入的候选版本与上一基线同 shape 对拍，比值劣化超阈值即阻断合入\n//    基线必须记录 shape / dtype / 芯片 / 编译选项 四要素",
+      "min_repro": "同 shape 跨版本耗时比值（比值 > 1.15 告警），劣化后用**二分 commit** 定位首次劣化点。",
+      "evidence": "子型③ 语料补充（v2.16，2026-09-19）——归类中「性能回归 / 基线劣化」**88 条**，主体为「相比基线性能劣化超过 5%」，暂无 issue 实证。\n### 语料基线与深挖起手式",
+      "issues": [],
+      "verified_anchors": []
+    },
+    {
+      "case_id": "FP-G01-C1",
+      "fp_id": "FP-G01",
+      "skill": "fpg01-hang-review",
+      "title": "迭代求解循环异常分支不推进致 CPU 空转死循环 —— ops-transformer #5032（PromptFlashAttention，PR #11411）",
+      "subtype": null,
+      "trigger": "`PromptFlashAttentionTiling310P` UT（`PromptFlashAttention_310p_tiling_0`）`bash build.sh --PR_UT` 卡死（CPU 空转 90%+）；触发依赖 FASG 前置用例（`FlashAttentionScoreGrad_tiling_1/2`）单例污染，单独跑不复现。",
+      "root_cause": "`CheckArgsLegal` 失败且**不置 `updateDivRect`** → `AdjustCVTiling` 的 `while(true)` **无法推进**且无「不推进即退出」防护 → CPU 空转死循环（「死循环 + 无防护 + 无超时熔断」三件套叠加，卡死掩盖真实失败点）。",
+      "criteria": {
+        "locators": [
+          {
+            "file": "prompt_flash_attention_tiling.cpp",
+            "lines": "6028"
+          }
+        ],
+        "check": [
+          "搜 `while\\s*\\(\\s*(true|1)\\s*\\)` / `for\\s*\\(\\s*;\\s*;\\s*\\)`；",
+          "逐循环人工确认**循环体是否含推进变量更新 + 不推进退出**两要素；",
+          "核 fixture 是否重置全局单例、用例是否显式 `SetSocVersion`。"
+        ]
+      },
+      "fix_pattern": "",
+      "fix_pattern_code": "// ❌ 校验失败不置推进变量、也不退出 → while(true) 空转\nwhile (true) { PromptFlashAttentionCheckArgsLegal(...); /* 无退出 */ ... }\n// ✅ 不推进即退出（PR #11411，产品代码 1 行防御修复）\nwhile (true) {\n    PromptFlashAttentionCheckArgsLegal(...);\n    if (!updateDivRect) { return GRAPH_FAILED; }\n    ...\n}",
+      "min_repro": "复现用例序列 = `FlashAttentionScoreGrad_tiling_1/2` → `PromptFlashAttention_310p_tiling_0`；若本地已含 `!updateDivRect → return GRAPH_FAILED` 防护，记为防护面证据。",
+      "evidence": "#5032（closed），修复 PR #11411；`prompt_flash_attention_tiling.cpp:6028` `AdjustCVTiling`、`:6065` `while (true)`、`:6066` 声明 `updateDivRect = false`、`:6067` 调用校验（定义 `:1483`）、`:4965 / :4973` 两处调用点。",
+      "issues": [
+        "#11411",
+        "#5032"
+      ],
+      "verified_anchors": []
+    },
+    {
+      "case_id": "FP-G01-C2",
+      "fp_id": "FP-G01",
+      "skill": "fpg01-hang-review",
+      "title": "rank-0 输入 `size_t` 的 `x - 1` 回绕为 SIZE_MAX 致长循环 —— ops-cv #933（NMSWithMask，MR !1571）",
+      "subtype": null,
+      "trigger": "experimental `NMSWithMask` InferShape 收到 rank-0（空）输入。",
+      "root_cause": "对 rank-0 输入做 `size_t` 的 `x - 1` → **回绕为 `SIZE_MAX`** → 按该上限循环 → Host 线程长时不返回（3s 超时、退出码 124）；同族 6 条（`#946` / `#938` / `#925` / `#923` / `#935` / `#915`）同基线 commit 同日关闭。",
+      "criteria": {
+        "locators": [],
+        "check": [
+          "搜 `static_cast<size_t>|\\(size_t\\)` 与 `-` 同现处，逐个确认**是否用作循环上界**（正常转换占绝大多数）；",
+          "定位 infershape / tiling 的 shape 推导段；",
+          "边界输入探针：rank-0 / 空 tensor / 退化 shape 单独成类。"
+        ]
+      },
+      "fix_pattern": "",
+      "fix_pattern_code": "// ❌ rank-0 输入直接做 size_t 减法 → 下溢回绕\nsize_t hi = dim - 1;                 // dim == 0 时 = SIZE_MAX\n// ✅ 先判 rank / 零维度，再钳制下限\nif (dim == 0) { return GRAPH_FAILED; }\nsize_t hi = (dim > 0) ? (dim - 1) : 0;",
+      "min_repro": "对 `NMSWithMask` 传 rank-0 输入，观察 Host 线程是否长时不返回（`Exit code 124`）。",
+      "evidence": "#933（closed），修复 MR `!1571`。",
+      "issues": [
+        "#933"
+      ],
+      "verified_anchors": []
+    },
+    {
+      "case_id": "FP-G01-C3",
+      "fp_id": "FP-G01",
+      "skill": "fpg01-hang-review",
+      "title": "设备侧 kernel 执行超时（vector core timed out → aic error） —— ops-transformer #5337（MoeInitRoutingV4）",
+      "subtype": null,
+      "trigger": "arch35（Ascend950）+ quant + mode=0（静态量化）+ fullload，**可复现挂死**。",
+      "root_cause": "kernel 在该模板组合 + 大 shape 下长时占用且**无早退路径** → 超时报 `vector core execution timed out` 并升级为 `aic error`（设备侧执行超时，子型④）。",
+      "criteria": {
+        "locators": [
+          {
+            "file": "_binary.json",
+            "lines": ""
+          }
+        ],
+        "check": [
+          "核 op_kernel 主循环与早退条件；",
+          "列 tilingkey 模板特化组合 × `config/<soc>/*_binary.json` 分核配置；",
+          "定位「无早退路径的超大循环」观察项，与用户实测超时证据合并后升级命中。"
+        ]
+      },
+      "fix_pattern": "为 kernel 主循环增加早退路径 / 拆分模板或调整分核，使单核工作量有界（无真实修复代码来源，仅示意）。",
+      "fix_pattern_code": "",
+      "min_repro": "在 arch35 + quant + mode=0 + fullload 组合下跑，观察日志是否出现 `vector core execution timed out`。",
+      "evidence": "#5337（closed）。",
+      "issues": [
+        "#5337"
+      ],
+      "verified_anchors": []
+    },
+    {
+      "case_id": "FP-G01-C4",
+      "fp_id": "FP-G01",
+      "skill": "fpg01-hang-review",
+      "title": "超时判定溢出检查是死代码致大超时值被截断误超时 —— cann/hccl #567（`hccl_aiv_utils.cc:368-374`）",
+      "subtype": null,
+      "trigger": "用户配置的超时值较大（超过 `uint32_t` 可表示范围）。",
+      "root_cause": "`timeoutUs = execTimeOut * TIME_S_TO_US`（`double` 先截断为 `u32`）→ 第 369 行再判 `timeoutUs > UINT32_MAX` **必然为假**（死代码）→ 大超时值被截断，反而**误超时**；横切于子型②④ 的超时判定面。",
+      "criteria": {
+        "locators": [
+          {
+            "file": "hccl_aiv_utils.cc",
+            "lines": "368-374"
+          },
+          {
+            "file": "src/ops/op_common/template/aiv/hccl_aiv_utils.cc",
+            "lines": "368-374"
+          }
+        ],
+        "check": [
+          "搜 `setTimeout|SetTimeout|TIME_S_TO_US`；",
+          "核 `UINT32_MAX|numeric_limits<u32>::max()` 之前的溢出判断是否**先截断再比较**（必然为假 = 死代码）；",
+          "核超时换算链是否存在宽度丢失点。"
+        ]
+      },
+      "fix_pattern": "",
+      "fix_pattern_code": "// ❌ double 已截断为 u32，再判 > UINT32_MAX 必然为假（死代码）\nu32 timeoutUs = execTimeOut * TIME_S_TO_US;\nif (timeoutUs > UINT32_MAX) { /* 不可达 */ }\n// ✅ 先用宽类型判溢出，再安全转换\ndouble timeoutUsD = static_cast<double>(execTimeOut) * TIME_S_TO_US;\nif (timeoutUsD > static_cast<double>(UINT32_MAX)) { /* 报错 / 夹取 */ }\nu32 timeoutUs = static_cast<u32>(timeoutUsD);",
+      "min_repro": "配置超时值 > 2^32 微秒，观察是否被截断为小值而误超时。",
+      "evidence": "#567（closed）；`src/ops/op_common/template/aiv/hccl_aiv_utils.cc:368-374` `GetAivTimeout`。",
+      "issues": [
+        "#567"
+      ],
+      "verified_anchors": []
+    },
+    {
+      "case_id": "FP-G01-C5",
+      "fp_id": "FP-G01",
+      "skill": "fpg01-hang-review",
+      "title": "动态申请异常分支未释放、累积致内存耗尽后挂死 —— cann/hccl #141（`BatchSendRecvOutPlace`）",
+      "subtype": null,
+      "trigger": "长期高频调用（累积型，子型⑤）。",
+      "root_cause": "动态申请堆内存后**异常分支未释放** → 设备内存随调用次数上涨 → **最终耗尽报错、任务卡死 / 闪退**（资源泄漏 → 挂死完整链条）；D01 管容量，本条管后果。",
+      "criteria": {
+        "locators": [],
+        "check": [
+          "搜 `malloc|new\\s` 与多分支 `return` 同现且无统一释放；",
+          "核申请-释放是否成对、异常分支 `return` 前是否释放；",
+          "长稳看护（设备内存持续上涨即告警）。"
+        ]
+      },
+      "fix_pattern": "",
+      "fix_pattern_code": "// ❌ 异常分支提前 return 未释放\nauto* buf = new Buffer(...);\nif (err) { return ERR; }        // 泄漏\ndelete buf;\n// ✅ 异常分支补释放 / 用 RAII 统一回收\nauto buf = std::make_unique<Buffer>(...);\nif (err) { return ERR; }        // 自动释放",
+      "min_repro": "循环高频调用 `BatchSendRecvOutPlace`，观测设备内存是否持续上涨至耗尽。",
+      "evidence": "#141（closed）。",
+      "issues": [
+        "#141"
+      ],
+      "verified_anchors": []
+    },
+    {
+      "case_id": "FP-G01-C6",
+      "fp_id": "FP-G01",
+      "skill": "fpg01-hang-review",
+      "title": "多卡通信初始化连接超时 / rank 掉线（配置面） —— cann/hccl #147",
+      "subtype": null,
+      "trigger": "多卡分布式训练，`rank_table` 配置无误仍**随机**出现初始化连接超时、个别 rank 掉线。",
+      "root_cause": "等待时长由超时 / 重传配置项决定——`HCCL_CONNECT_TIMEOUT`（建链超时）/ `HCCL_EXEC_TIMEOUT`（执行超时）/ `HCCL_RETRY_CNT` / `HCCL_DFS_CONFIG`；配置缺失或换算错误 → 等待无界 / 超时（子型②）。",
+      "criteria": {
+        "locators": [
+          {
+            "file": "scripts/scan_fp.py",
+            "lines": ""
+          }
+        ],
+        "check": [
+          "核算子内同步 / 等待调用点与超时配置项；",
+          "核换算链是否丢精度 / 宽度；",
+          "结合横切面核超时判定是否死代码（对照案例 4）。"
+        ]
+      },
+      "fix_pattern": "确保超时 / 重传配置项可设且换算链无宽度丢失，等待有界（无真实修复代码来源，仅示意）。",
+      "fix_pattern_code": "",
+      "min_repro": "多卡场景重跑并采集 `HCCL_*_TIMEOUT` 取值，观察是否随机掉线。",
+      "evidence": "#147（closed）。\n### 语料基线与深挖起手式",
+      "issues": [
+        "#147"
+      ],
+      "verified_anchors": []
+    },
+    {
+      "case_id": "FP-G02-C1",
+      "fp_id": "FP-G02",
+      "skill": "fpg02-sync-review",
+      "title": "标量写与 vector 读之间缺 S_V 硬事件同步 —— ops-nn #5960（group_norm_swish，PR !10683）",
+      "subtype": null,
+      "trigger": "`group_norm_swish` 走 `arch35` 分支，`CastMeanAndRstd` 用标量（S）写 mean/rstd、随后 vector（V）读同一 UB。",
+      "root_cause": "`arch35/group_norm_swish_base.h` 的 `CastMeanAndRstd` **标量写与 vector 读之间缺 `S_V` 硬事件同步** → V 可能先于 S 读到旧值。",
+      "criteria": {
+        "locators": [
+          {
+            "file": "arch35/group_norm_swish_base.h",
+            "lines": ""
+          }
+        ],
+        "check": [
+          "搜 `CastMeanAndRstd|MeanAndRstd` 与标量写、vector 读同段处；",
+          "核该段有无 `HardEvent::S_V` 配对；",
+          "`SetFlag`/`WaitFlag` 逐个人工确认配对。"
+        ]
+      },
+      "fix_pattern": "",
+      "fix_pattern_code": "// ❌ 标量写 mean/rstd 后直接 vector 读，缺 S_V 同步\n// ✅ 补 S_V 硬事件同步对\nevent_t e = GetTPipePtr()->AllocEventID<HardEvent::S_V>();\nSetFlag<HardEvent::S_V>(e);\n// ... 标量写 mean/rstd ...\nWaitFlag<HardEvent::S_V>(e);\nGetTPipePtr()->ReleaseEventID<HardEvent::S_V>(e);\n// ... vector 读 ...",
+      "min_repro": "跑 group_norm_swish arch35 用例，对比加/不加 `S_V` 同步时 mean/rstd 相关输出。",
+      "evidence": "#5960（closed），修复 PR `!10683`。",
+      "issues": [
+        "#5960"
+      ],
+      "paired_primitives": [
+        {
+          "a": "SetFlag<HardEvent::S_V>",
+          "b": "WaitFlag<HardEvent::S_V>",
+          "kind": "event",
+          "source": "case"
+        },
+        {
+          "a": "AllocEventID<HardEvent::X>",
+          "b": "ReleaseEventID<HardEvent::X>",
+          "kind": "event_id",
+          "source": "case"
+        }
+      ],
+      "verified_anchors": []
+    },
+    {
+      "case_id": "FP-G02-C2",
+      "fp_id": "FP-G02",
+      "skill": "fpg02-sync-review",
+      "title": "一核双 AIV 清同一 workspace 无同步（VerifyResult 通过但隐患） —— ops-nn #5513（conv3d_backprop_filter_v2）",
+      "subtype": null,
+      "trigger": "Ascend950 **一核双 AIV**，`ClearWorkspace` 对同一块 GM workspace 清零。",
+      "root_cause": "双 AIV 清同一块 GM workspace **无 AIV 间同步**，racecheck 检出 **28 条 GM `WAW`**；`conv3d_backprop_filter_v2.h:316`、`conv3d_dw_v2_basic_block.h:125,236` 的偏移**不含 `GetSubBlockIdx()`**，两 AIV 写同址。",
+      "criteria": {
+        "locators": [
+          {
+            "file": "conv3d_backprop_filter_v2.h",
+            "lines": "316"
+          },
+          {
+            "file": "conv3d_dw_v2_basic_block.h",
+            "lines": "125,236"
+          }
+        ],
+        "check": [
+          "搜 `ClearWorkspace` 与 `GetSubBlockIdx` （是否缺失）；",
+          "跑 racecheck 看 GM `WAW` 地址对；",
+          "核双 AIV 是否冗余写同址。"
+        ]
+      },
+      "fix_pattern": "",
+      "fix_pattern_code": "// ❌ 双 AIV 清同一 GM 地址，无核间同步\n// ✅ AIV 间加同步，或使偏移含 GetSubBlockIdx() 使两 AIV 写不同地址（二选一，按语义定）\nuint64_t off = base + GetSubBlockIdx() * blockSize;  // 分址\n// 或：CrossCoreSetFlag/WaitFlag 保证两 AIV 清零串行",
+      "min_repro": "Ascend950 双 AIV 环境跑该算子 racecheck，观察 GM `WAW` 计数（实证为 28）。",
+      "evidence": "#5513（closed）；`conv3d_backprop_filter_v2.h:316`、`conv3d_dw_v2_basic_block.h:125,236`。",
+      "issues": [
+        "#5513"
+      ],
+      "paired_primitives": [
+        {
+          "a": "CrossCoreSetFlag<mode,pipe>",
+          "b": "CrossCoreWaitFlag<mode,pipe>",
+          "kind": "cross_core",
+          "source": "case"
+        }
+      ],
+      "verified_anchors": []
+    },
+    {
+      "case_id": "FP-G02-C3",
+      "fp_id": "FP-G02",
+      "skill": "fpg02-sync-review",
+      "title": "同地址两次访问缺 PipeBarrier（WAW + RAW） —— ops-nn #3802（conv3d_v2，PR #6896）",
+      "subtype": null,
+      "trigger": "`conv3d_v2` 的 `InitConstValue` 与 `DataCopy` 同 L1 地址；`Cast` 与 `TransDataTo5HD` 同 UB。",
+      "root_cause": "`conv3d_sub_api.h:56/61` 两处同 L1 地址访问之间**缺 `PipeBarrier<PIPE_MTE2>`** → `WAW`；`quant_conv3d_common_func.h:298/341` 同 UB 访问之间**缺 `PipeBarrier<PIPE_V>`** → `RAW`。",
+      "criteria": {
+        "locators": [
+          {
+            "file": "conv3d_sub_api.h",
+            "lines": "56/61"
+          },
+          {
+            "file": "quant_conv3d_common_func.h",
+            "lines": "298/341"
+          }
+        ],
+        "check": [
+          "定位同地址的两次 `DataCopy`/计算；",
+          "核两者之间是否同管线缺 `PipeBarrier<PIPE_*>`（注意：barrier 只护**同管线**）；",
+          "racecheck 看 `WAW`/`RAW` 地址对。"
+        ]
+      },
+      "fix_pattern": "",
+      "fix_pattern_code": "// ❌ 同地址连续访问，无同管线 barrier\nDataCopy(l1, ...);  InitConstValue(l1, ...);         // 同 L1，缺 PIPE_MTE2\n// ✅ 同 pipe 内冲突访问之间补 PipeBarrier\nDataCopy(l1, ...);\nPipeBarrier<PIPE_MTE2>();\nInitConstValue(l1, ...);",
+      "min_repro": "对该算子跑 racecheck，观察 `conv3d_sub_api` / `quant_conv3d_common_func` 处 `WAW` / `RAW`。",
+      "evidence": "#3802（closed），修复 PR #6896；`conv3d_sub_api.h:56/61`、`quant_conv3d_common_func.h:298/341`。",
+      "issues": [
+        "#3802",
+        "#6896"
+      ],
+      "paired_primitives": [
+        {
+          "a": "（同管线两次内存访问）",
+          "b": "PipeBarrier<PIPE_MTE2>",
+          "kind": "same_pipe_barrier",
+          "source": "case"
+        },
+        {
+          "a": "（同管线两次内存访问）",
+          "b": "PipeBarrier<PIPE_V>",
+          "kind": "same_pipe_barrier",
+          "source": "case"
+        }
+      ],
+      "verified_anchors": []
+    },
+    {
+      "case_id": "FP-G02-C4",
+      "fp_id": "FP-G02",
+      "skill": "fpg02-sync-review",
+      "title": "固定 UB buffer 复用缺反向同步（V→MTE2） —— asc-devkit #1762（matmul_gelu）",
+      "subtype": null,
+      "trigger": "`matmul_gelu` 样例 `xUB` 被 tile 循环**反复复用**。",
+      "root_cause": "两次 `DataCopyPad` 之间**只有 `MTE2_V` 产出方 flag**，**缺 V→MTE2 反向同步**——MTE2 可能在 V 尚未读完 `xUB` 时就覆写 → racecheck 报 UB `WAW`（`mmad_gelu.asc:594` 写 / `:619` 后补同步；修复后 racecheck 1→0）。",
+      "criteria": {
+        "locators": [
+          {
+            "file": "mmad_gelu.asc",
+            "lines": "594"
+          },
+          {
+            "file": "mmad_gelu.asc",
+            "lines": ""
+          }
+        ],
+        "check": [
+          "搜固定 UB buffer（如 `xUB`）在循环内的复用点；",
+          "核两次搬运之间有无 `V_MTE2`（反向）同步——只有 `MTE2_V` 不够；",
+          "racecheck 看 UB `WAW`。"
+        ]
+      },
+      "fix_pattern": "",
+      "fix_pattern_code": "// ❌ 循环复用 xUB：只等 MTE2→V（产出方），不等 V 读完就覆写\nDataCopyPad(xUB, xGm, ...); SetFlag<MTE2_V>(e); WaitFlag<MTE2_V>(e); /* compute */ \nDataCopyPad(xUB, xGmNext, ...);   // 未等 V 读完 → WAW\n// ✅ 覆写前先等 V 读完（反向同步 V→MTE2）\nWaitFlag<HardEvent::V_MTE2>(eV2mte2);\nDataCopyPad(xUB, xGmNext, ...);",
+      "min_repro": "跑 `mmad_gelu.asc` 样例 racecheck，观察 `xUB` 处 `WAW`（实证修复后 1→0）。",
+      "evidence": "#1762（closed）；`mmad_gelu.asc:594` 写 / `:619` 补同步。",
+      "issues": [
+        "#1762"
+      ],
+      "paired_primitives": [
+        {
+          "a": "SetFlag<HardEvent::MTE2_V>",
+          "b": "WaitFlag<HardEvent::MTE2_V>",
+          "kind": "event",
+          "source": "case"
+        },
+        {
+          "a": "SetFlag<HardEvent::V_MTE2>",
+          "b": "WaitFlag<HardEvent::V_MTE2>",
+          "kind": "event",
+          "source": "case"
+        }
+      ],
+      "verified_anchors": []
+    },
+    {
+      "case_id": "FP-G02-C5",
+      "fp_id": "FP-G02",
+      "skill": "fpg02-sync-review",
+      "title": "用错同步边（SToMTE3Sync 覆盖不到 V→MTE3） —— ops-math #3604（RadixTopK）",
+      "subtype": null,
+      "trigger": "`RadixTopK` WS 变体走 `HandleLastRoundBoundary`。",
+      "root_cause": "V 写 `tileTopK` 后 MTE3 读同一 UB，原代码用 `SToMTE3Sync`——`PipeBarrier<PIPE_V>` 只保证 V 内部、`SToMTE3Sync` 只覆盖 S→MTE3，**两者都覆盖不到 V→MTE3** → k 配额错乱。",
+      "criteria": {
+        "locators": [
+          {
+            "file": "radix_top_k_ws.h",
+            "lines": ""
+          }
+        ],
+        "check": [
+          "列出「谁写、谁读、方向」三要素；",
+          "核所用手写同步的**方向**是否匹配（S→MTE3 ≠ V→MTE3）；",
+          "核 `PipeBarrier` 是否被误当跨管线保护。"
+        ]
+      },
+      "fix_pattern": "",
+      "fix_pattern_code": "// ❌ 用 SToMTE3Sync 护 V→MTE3 —— 方向错，覆盖不到\n// ✅ 用真正对应方向的事件（V→MTE3）\nSetFlag<HardEvent::V_MTE3>(e); // ... MTE3 读之前\nWaitFlag<HardEvent::V_MTE3>(e);",
+      "min_repro": "跑 RadixTopK WS 变体（尾轮边界），观察 k 配额结果。",
+      "evidence": "#3604（closed）；`radix_top_k_ws.h` `HandleLastRoundBoundary`。",
+      "issues": [
+        "#3604"
+      ],
+      "paired_primitives": [
+        {
+          "a": "SetFlag<HardEvent::S_MTE3>",
+          "b": "WaitFlag<HardEvent::S_MTE3>",
+          "kind": "event",
+          "source": "case"
+        },
+        {
+          "a": "SetFlag<HardEvent::V_MTE3>",
+          "b": "WaitFlag<HardEvent::V_MTE3>",
+          "kind": "event",
+          "source": "case"
+        },
+        {
+          "a": "（同管线两次内存访问）",
+          "b": "PipeBarrier<PIPE_V>",
+          "kind": "same_pipe_barrier",
+          "source": "case"
+        }
+      ],
+      "verified_anchors": []
+    },
+    {
+      "case_id": "FP-G02-C6",
+      "fp_id": "FP-G02",
+      "skill": "fpg02-sync-review",
+      "title": "SetFlag 用错 event ID 致永久等待 —— ops-nn #1606（quant_batch_matmul_v4 perblock）",
+      "subtype": null,
+      "trigger": "B 矩阵搬运路径 `CopyInBL1` 等待的 event ID 与实际 `SetFlag` 的 ID 不一致。",
+      "root_cause": "`quant_batch_matmul_v4/op_kernel/quant_batch_matmul_v4_perblock.h:281` 的 `CopyInBL1` **SetFlag 用错 event ID** → 等待方永远等不到正确信号 → **永久等待**。",
+      "criteria": {
+        "locators": [
+          {
+            "file": "quant_batch_matmul_v4/op_kernel/quant_batch_matmul_v4_perblock.h",
+            "lines": "281"
+          },
+          {
+            "file": "quant_batch_matmul_v4_perblock.h",
+            "lines": "281"
+          }
+        ],
+        "check": [
+          "逐对核 `SetFlag(e)` 与 `WaitFlag(e)` 的 **ID 是否相同**；",
+          "核同一事件的 set/wait 是否跨分支；",
+          "定位「wait 无对应 set」的孤儿。"
+        ]
+      },
+      "fix_pattern": "",
+      "fix_pattern_code": "// ❌ set 的 ID 与 wait 的 ID 不一致 → 等待方永远等不到\n// ✅ set/wait 用同一 ID\nint32_t e = ...; SetFlag<HardEvent::MTE2_V>(e); WaitFlag<HardEvent::MTE2_V>(e);",
+      "min_repro": "跑该算子 B 矩阵搬运路径，观察是否卡在 `CopyInBL1`。",
+      "evidence": "#1606（closed）；`quant_batch_matmul_v4_perblock.h:281`。",
+      "issues": [
+        "#1606"
+      ],
+      "paired_primitives": [
+        {
+          "a": "SetFlag<HardEvent::MTE2_V>",
+          "b": "WaitFlag<HardEvent::MTE2_V>",
+          "kind": "event",
+          "source": "case"
+        }
+      ],
+      "verified_anchors": []
+    },
+    {
+      "case_id": "FP-G02-C7",
+      "fp_id": "FP-G02",
+      "skill": "fpg02-sync-review",
+      "title": "两个事件常量共用同一 ID —— ops-transformer #3798（chunk_gated_delta_rule，PR #8802）",
+      "subtype": null,
+      "trigger": "`chunk_gated_delta_rule` 同时使用 FIX→MTE2 与 S→MTE3 两个事件。",
+      "root_cause": "`chunk_gated_delta_rule_utils.h:32-33` 的 `FIX_MTE2_EVENT` 与 `S_MTE3_EVENT` **共用 ID 6** → 两类信号互相覆盖。",
+      "criteria": {
+        "locators": [
+          {
+            "file": "chunk_gated_delta_rule_utils.h",
+            "lines": "32-33"
+          }
+        ],
+        "check": [
+          "列出 kernel 全部事件常量定义，核**是否两两互异**；",
+          "核 `id % N` 的 N 是否 ≥ 实际 buffer 数；",
+          "核 ID 是否落在池容量内。"
+        ]
+      },
+      "fix_pattern": "",
+      "fix_pattern_code": "// ❌ 两个语义不同的事件常量共用 ID 6\nconstexpr int32_t FIX_MTE2_EVENT = 6;\nconstexpr int32_t S_MTE3_EVENT  = 6;\n// ✅ 各用互异 ID\nconstexpr int32_t FIX_MTE2_EVENT = 6;\nconstexpr int32_t S_MTE3_EVENT  = 7;",
+      "min_repro": "跑该算子同时触发两类事件的用例，观察结果是否错乱。",
+      "evidence": "#3798（closed），关联 PR #8802；`chunk_gated_delta_rule_utils.h:32-33`。",
+      "issues": [
+        "#3798",
+        "#8802"
+      ],
+      "paired_primitives": [
+        {
+          "a": "SetFlag<HardEvent::FIX_MTE2>",
+          "b": "WaitFlag<HardEvent::FIX_MTE2>",
+          "kind": "event",
+          "source": "case"
+        },
+        {
+          "a": "SetFlag<HardEvent::S_MTE3>",
+          "b": "WaitFlag<HardEvent::S_MTE3>",
+          "kind": "event",
+          "source": "case"
+        },
+        {
+          "a": "FIX_MTE2_EVENT",
+          "b": "（同类信号常量）",
+          "kind": "event_id_conflict",
+          "source": "case"
+        },
+        {
+          "a": "S_MTE3_EVENT",
+          "b": "（同类信号常量）",
+          "kind": "event_id_conflict",
+          "source": "case"
+        }
+      ],
+      "verified_anchors": []
+    },
+    {
+      "case_id": "FP-G02-C8",
+      "fp_id": "FP-G02",
+      "skill": "fpg02-sync-review",
+      "title": "AllocEventID 泄漏（循环内申请不释放）+ V 链缺 PipeBarrier —— ops-transformer #6123（fused_infer_attention_score，PR #13801）",
+      "subtype": null,
+      "trigger": "noquant 路径 S2 循环 + 长序列 MLA + attenMask。",
+      "root_cause": "`AllocEventID<MTE2_V>` 在 S2 循环内**每迭代申请且从不释放**，事件池仅 8 个，累计**越界**后 ID 直送 set/wait；且同块 UB 的 V 链（拷入/FlashUpdate → LastDivNew 原地除 → 就地 Cast）全走 `PIPE_V` 但中间**缺 `PipeBarrier<PIPE_V>`**，`RAW` 无保护 → 输出偶发错值 / 挂死。",
+      "criteria": {
+        "locators": [],
+        "check": [
+          "搜 `AllocEventID` 是否位于循环体内且无配对 `ReleaseEventID`；",
+          "核事件池容量与累计申请数；",
+          "核同 UB 同 pipe 连续操作间有无 `PipeBarrier<PIPE_V>`。"
+        ]
+      },
+      "fix_pattern": "",
+      "fix_pattern_code": "// ❌ Alloc 在循环内、不 Release → 池耗尽越界\n// ✅ 循环外申请一次、或每次成对 Release\nint32_t e = GetTPipePtr()->AllocEventID<HardEvent::MTE2_V>();  // 循环外\nfor (...) { SetFlag<HardEvent::MTE2_V>(e); /* ... */ WaitFlag<HardEvent::MTE2_V>(e); }\nGetTPipePtr()->ReleaseEventID<HardEvent::MTE2_V>(e);\n// V 链中间补：PipeBarrier<PIPE_V>();",
+      "min_repro": "跑长序列 MLA + attenMask 用例（S2 循环多迭代），观察是否挂死 / 出错值。",
+      "evidence": "#6123（open），关联 PR #13801。",
+      "issues": [
+        "#13801",
+        "#6123"
+      ],
+      "paired_primitives": [
+        {
+          "a": "SetFlag<HardEvent::MTE2_V>",
+          "b": "WaitFlag<HardEvent::MTE2_V>",
+          "kind": "event",
+          "source": "case"
+        },
+        {
+          "a": "AllocEventID<HardEvent::X>",
+          "b": "ReleaseEventID<HardEvent::X>",
+          "kind": "event_id",
+          "source": "case"
+        },
+        {
+          "a": "（同管线两次内存访问）",
+          "b": "PipeBarrier<PIPE_V>",
+          "kind": "same_pipe_barrier",
+          "source": "case"
+        }
+      ],
+      "verified_anchors": []
+    },
+    {
+      "case_id": "FP-G02-C9",
+      "fp_id": "FP-G02",
+      "skill": "fpg02-sync-review",
+      "title": "mode4 flagId 只覆盖部分 AIV（跨核覆盖不全） —— asc-devkit #1723（matmul_s4）",
+      "subtype": null,
+      "trigger": "`matmul_s4` 样例，两个 AIV 与一个 AIC。",
+      "root_cause": "两 AIV 都 `CrossCoreSetFlag<4, PIPE_MTE3>(8)`，AIC 只 `CrossCoreWaitFlag<4, PIPE_MTE2>(8)`——**mode 4 flagId 8 只覆盖 AIV0**，AIV1 的写未被 AIC 感知 → racecheck **1 条 `WAW` + 513 条 `RAW`**（`matmul_s4.asc:102-107/135/158`）。",
+      "criteria": {
+        "locators": [
+          {
+            "file": "matmul_s4.asc",
+            "lines": "102-107/135/158"
+          },
+          {
+            "file": "matmul_s4.asc",
+            "lines": ""
+          }
+        ],
+        "check": [
+          "核 `CrossCoreSetFlag`/`CrossCoreWaitFlag` 的 mode+flagId 映射；",
+          "核等待方是否感知**全部** AIV；",
+          "racecheck 看 RAW 计数与源 AIV。"
+        ]
+      },
+      "fix_pattern": "",
+      "fix_pattern_code": "// ❌ mode 4 flagId 8 只让等待方感知 AIV0，AIV1 未覆盖\n// ✅ 让等待方感知全部参与 AIV（按 mode 语义对每个 AIV 覆盖，或分 flagId）",
+      "min_repro": "跑 `matmul_s4.asc` 样例 racecheck，观察 RAW 条数（实证 513）。",
+      "evidence": "#1723（closed）；`matmul_s4.asc:102-107/135/158`。",
+      "issues": [
+        "#1723"
+      ],
+      "paired_primitives": [
+        {
+          "a": "CrossCoreSetFlag<mode,pipe>",
+          "b": "CrossCoreWaitFlag<mode,pipe>",
+          "kind": "cross_core",
+          "source": "case"
+        }
+      ],
+      "verified_anchors": []
+    },
+    {
+      "case_id": "FP-G02-C10",
+      "fp_id": "FP-G02",
+      "skill": "fpg02-sync-review",
+      "title": "SyncAll 未配 SetScheduleMode(1)（调度约束缺失） —— ops-nn #3937（add_layer_norm_quant，PR #7200）",
+      "subtype": null,
+      "trigger": "`add_layer_norm_quant` arch35 动态量化 full-load、`rowsPerCore==1`。",
+      "root_cause": "kernel 用 `SyncAll` 合并各核 outScale，但 host 侧 `add_layer_norm_quant_tiling_arch35.cpp` **未 `SetScheduleMode(1)`** → 无法保证所有参与核同时驻留，`SyncAll` 语义失效。",
+      "criteria": {
+        "locators": [
+          {
+            "file": "add_layer_norm_quant_tiling_arch35.cpp",
+            "lines": ""
+          }
+        ],
+        "check": [
+          "搜 kernel 的 `SyncAll<` 调用与 host tiling 的 `SetScheduleMode`；",
+          "核两者是否成对；",
+          "核涉及核间同步的算子是否都设了 `schedule_mode=1`。"
+        ]
+      },
+      "fix_pattern": "",
+      "fix_pattern_code": "// ❌ 用 SyncAll 合并各核结果，host 未设 schedule_mode\n// ✅ host tiling 补 SetScheduleMode(1)，保证所有核同时驻留\ncontext->SetScheduleMode(1);",
+      "min_repro": "跑 `rowsPerCore==1` 组合，观察 `SyncAll` 是否卡死。",
+      "evidence": "#3937（closed），修复 PR #7200；`add_layer_norm_quant_tiling_arch35.cpp`。另见 #598（涉及核间同步的算子必须设 `schedule_mode=1`，防双流并发卡死）。",
+      "issues": [
+        "#3937",
+        "#598",
+        "#7200"
+      ],
+      "paired_primitives": [
+        {
+          "a": "SyncAll<...>",
+          "b": "SetScheduleMode(1)",
+          "kind": "schedule",
+          "source": "case"
+        }
+      ],
+      "verified_anchors": []
+    },
+    {
+      "case_id": "FP-G02-C11",
+      "fp_id": "FP-G02",
+      "skill": "fpg02-sync-review",
+      "title": "同步四件套被条件分支独占，另一路径整体失同步（作用域错配） —— ops-transformer #5836（FlashAttentionScore）",
+      "subtype": null,
+      "trigger": "`FlashAttentionScore` 走 `arch22` 模板，`ProcessVec1` 内 `pseEndogenous`（内源 PSE）与外源 PSE 两条路径**复用同一 UB buffer**，PSE 丢弃 / 搬运走 V→MTE2 同步。",
+      "root_cause": "`op_kernel/arch22/flash_attention_score_bn2gs1s2_b.h` 的 `ProcessVec1` 中，`eventIdPseDropVToMte2B` 的 `AllocEventID` / `SetFlag` / `WaitFlag` / `ReleaseEventID` **四件套全部被 `!this->pseInfo.pseEndogenous` 包裹**——外源路径有这条 V→MTE2 边，内源路径走 `PseSlopeCopyIn` 时**整体丢失**该边。四件套各一次、ID 相同、方向正确、**完全配平**，配对完整性检查全部放行。",
+      "criteria": {
+        "locators": [
+          {
+            "file": "op_kernel/arch22/flash_attention_score_bn2gs1s2_b.h",
+            "lines": ""
+          }
+        ],
+        "check": [
+          "对每个同步四件套求**共同最内层块**，判断是否为 `if/else` / 三元 / 模板分支；",
+          "在分支**外**搜同一 buffer / 同一地址的访问点（`DataCopy` / `PseSlopeCopyIn` / `Duplicate` 等）；",
+          "若有访问而该路径无等价同步 → 子型",
+          "成立；",
+          "注意别把它记成子型",
+          "——",
+          "是「边不存在」，",
+          "是「边存在但管不到」。"
+        ]
+      },
+      "fix_pattern": "",
+      "fix_pattern_code": "// ❌ 四件套全在分支内 —— 另一分支复用同一 buffer 却无等价同步\nif (!this->pseInfo.pseEndogenous) {\n    int32_t e = AllocEventID<HardEvent::V_MTE2>();\n    SetFlag<HardEvent::V_MTE2>(e);\n    // ... MTE2 搬运 ...\n    WaitFlag<HardEvent::V_MTE2>(e);\n    ReleaseEventID<HardEvent::V_MTE2>(e);\n}\n// ✅ 把同步边提到分支外（两条路径都要）或为内源路径补一套等价四件套\nint32_t e = AllocEventID<HardEvent::V_MTE2>();\nif (!this->pseInfo.pseEndogenous) { /* 外源路径 */ } else { /* 内源路径：PseSlopeCopyIn */ }\nSetFlag<HardEvent::V_MTE2>(e); /* ... 搬运 ... */ WaitFlag<HardEvent::V_MTE2>(e);\nReleaseEventID<HardEvent::V_MTE2>(e);",
+      "min_repro": "构造 `pseEndogenous=true`（内源 PSE）的 FlashAttentionScore 用例跑 racecheck，观察 `ProcessVec1` 处 UB/GM 的 `RAW`/`WAW`；再与 `pseEndogenous=false` 对比告警数量差异。",
+      "evidence": "#5836（closed）；`op_kernel/arch22/flash_attention_score_bn2gs1s2_b.h` 的 `ProcessVec1`（`eventIdPseDropVToMte2B`）。",
+      "issues": [
+        "#5836"
+      ],
+      "paired_primitives": [
+        {
+          "a": "SetFlag<HardEvent::V_MTE2>",
+          "b": "WaitFlag<HardEvent::V_MTE2>",
+          "kind": "event",
+          "source": "case"
+        },
+        {
+          "a": "AllocEventID<HardEvent::X>",
+          "b": "ReleaseEventID<HardEvent::X>",
+          "kind": "event_id",
+          "source": "case"
+        }
+      ],
+      "verified_anchors": []
+    },
+    {
+      "case_id": "FP-G02-C12",
+      "fp_id": "FP-G02",
+      "skill": "fpg02-sync-review",
+      "title": "同 pipe 同址漏 PipeBarrier（「同管线天然安全」的误读） —— ops-transformer #12772 / #12555 / #13398（stage1PingBuf）",
+      "subtype": null,
+      "trigger": "attention 类 kernel 用 `stage1PingBuf` 这类**固定复用** buffer，`ProcessVec1()` 的前序 PSE / `Muls` / `AttenMask` 写，与 `SoftMaxCompute()` 内 `Duplicate()` / `SoftmaxFlashV2()` 读**交替**发生在同一 `PIPE_V` 上。",
+      "root_cause": "同一 `PIPE_V` 上对**同一 UB 地址**的两次访问之间**既无 `PipeBarrier<PIPE_V>` 也无事件边**——被「`PipeBarrier` 只保证同管线内部顺序 ⇒ 同管线天然安全」这句**反向误读**放过；实际指令队列下写与读可能乱序，构成 `WAW` / `RAW`。",
+      "criteria": {
+        "locators": [
+          {
+            "file": "scripts/scan_fp.py",
+            "lines": ""
+          },
+          {
+            "file": "scripts/scan_sync.py",
+            "lines": ""
+          },
+          {
+            "file": "scripts/scan_sync_scope.py",
+            "lines": ""
+          }
+        ],
+        "check": [
+          "列同一 `PIPE_*` 上命中**同一 buffer 名 / 同一地址表达式**的两次访问；",
+          "核两者之间有无 `PipeBarrier<PIPE_该管线>` 或事件边；",
+          "无 → 候选 `WAW`/`RAW`，**禁止以「同管线」为由豁免**；",
+          "固定复用 buffer（`stage1PingBuf` 一类）优先审。"
+        ]
+      },
+      "fix_pattern": "",
+      "fix_pattern_code": "// ❌ 同 PIPE_V 同址，两条访问之间无任何 barrier（被误认为「同管线天然安全」）\nMuls(stage1PingBuf, ...);                 // 写\nSoftmaxFlashV2(stage1PingBuf, ...);       // 读 —— 可能乱序\n// ✅ 同 pipe 同址也必须显式串行\nMuls(stage1PingBuf, ...);\nPipeBarrier<PIPE_V>();\nSoftmaxFlashV2(stage1PingBuf, ...);",
+      "min_repro": "跑该 attention 模板 racecheck，观察 `stage1PingBuf` 处 `WAW`/`RAW`；补 `PipeBarrier<PIPE_V>()` 后对比告警是否归零。",
+      "evidence": "#12772 / #12555 / #13398（三例同机理，均为 `ProcessVec1` 前序写与 `SoftMaxCompute` 内读写重叠，补 `PipeBarrier<PIPE_V>()` 修复）。\n### 语料基线与深挖起手式",
+      "issues": [
+        "#12555",
+        "#12772",
+        "#13398"
+      ],
+      "paired_primitives": [
+        {
+          "a": "（同管线两次内存访问）",
+          "b": "PipeBarrier<PIPE_V>",
+          "kind": "same_pipe_barrier",
+          "source": "case"
+        },
+        {
+          "a": "（同管线两次内存访问）",
+          "b": "PipeBarrier<PIPE_该管线>",
+          "kind": "same_pipe_barrier",
+          "source": "case"
+        }
+      ],
+      "verified_anchors": []
+    },
+    {
+      "case_id": "FP-G02-C13",
+      "fp_id": "FP-G02",
+      "skill": "fpg02-sync-review",
+      "title": "零迭代分支绕过循环体内的同步等待（zero-trip）—— 26-05（FlashAttentionScoreGrad）",
+      "subtype": null,
+      "trigger": "`SFTS1Times`（S1 方向 SFT 迭代数）算出来为 **0**。此时 `for (SFTLoopS1 = 0; SFTLoopS1 < rp.SFTS1Times; ...)` 一次都不进，循环体内为 MM1 结果准备的 `WaitEvent(SYNC_C1_V1_FLAG)` 全部跳过，但**循环之前已经下发了 MM1 的 cube 侧工作**，后置条件不成立：下游拿到的 vec 结果是陈旧/未就绪的。",
+      "root_cause": "同步后置条件只装在**循环体内**，而循环可能零次执行。健全的写法要求「无论循环执行几次（含 0 次），出循环时 post-condition 都成立」。这属于**控制流覆盖**缺陷，不是配对缺失——`Set`/`Wait` 数量在非零路径上完全配平。",
+      "criteria": {
+        "locators": [
+          {
+            "file": "attention/flash_attention_score_grad/op_kernel/arch22/flash_attention_score_grad_s1s2_bn2.h",
+            "lines": "3147-3151"
+          }
+        ],
+        "check": [
+          "枚举所有 `for` / `while` 循环内的 `SetFlag`/`WaitFlag`/`WaitEvent`/`WaitIterateAll`；",
+          "逐循环问「**迭代数能否为 0**」（`(x + unit - 1) / unit` 中 `x == 0`、`realSize` 为 0、尾块被整除后余数为 0）；",
+          "若能为 0，检查循环前是否已发出异步工作、以及零次路径上是否有等价等待；",
+          "**等待次数要与在飞工作量对应**（本案两次 Wait 对应 MM1 两笔，只补一次同样错）。"
+        ]
+      },
+      "fix_pattern": "",
+      "fix_pattern_code": "// ❌ 只在循环体内 Wait：Times==0 时一次都不执行\n// ✅ 零迭代提前返回前，补齐与非零路径等价的后置等待（:3147-3151）\nif (rp.SFTS1Times == 0) {\n    AscendC::WaitEvent(SYNC_C1_V1_FLAG);\n    AscendC::WaitEvent(SYNC_C1_V1_FLAG);   // 两次对应 MM1 的两笔在飞工作\n    return;\n}\nfor (uint32_t SFTLoopS1 = 0; SFTLoopS1 < rp.SFTS1Times; SFTLoopS1++) { ... }",
+      "min_repro": "`SFTS1Times = 0` 与 `= 1` 对照；记录实际 wait 次数与模板名；配时序压力（重复执行 + 输出毒化）与梯度数值对拍。**只断言「不崩溃」不够**，零迭代漏同步的典型表现是偶发错值而非崩溃。",
+      "evidence": "现网 26-05（ops-transformer-dev PR #5966；该单无关联 issue，仅 PR）。修复后形态锚：`attention/flash_attention_score_grad/op_kernel/arch22/flash_attention_score_grad_s1s2_bn2.h:3147-3151`（@ops-transformer HEAD `d5c0683`，2026-11-05 本地核验）。同文件 `:3131` 与 `:3153` 是 `SFTS1Times` 的两个赋值来源（SAB 分支 / 普通分支），`:3159` 才是被绕过的循环——**零迭代路径与主路径的赋值来源不同，容易只测其中一条**。",
+      "issues": [
+        "#5966"
+      ],
+      "paired_primitives": [
+        {
+          "a": "SetFlag<HardEvent::X>",
+          "b": "WaitFlag<HardEvent::X>",
+          "kind": "event",
+          "source": "case"
+        }
+      ],
+      "verified_anchors": [
+        {
+          "file": "attention/flash_attention_score_grad/op_kernel/arch22/flash_attention_score_grad_s1s2_bn2.h",
+          "lines": "3147-3151",
+          "commit": "d5c0683",
+          "repo": "ops-transformer",
+          "note": "`if (rp.SFTS1Times == 0) { AscendC::WaitEvent(SYNC_C1_V1_FLAG); AscendC::WaitEvent(SYNC_C1_V1_FLAG); return; }`——**修复后形态**：零迭代提前返回前补齐两笔后置等待。判据：① 循环上界能否为 0；② 循环前是否已下达异步工作；③ 零次路径是否有**等价且等量**的等待（本案两次对应 MM1 两笔，只补一次同样错）。同文件 `:3131`/`:3153` 是 `SFTS1Times` 的两个赋值来源，`:3159` 才是被绕过的循环。",
+          "issue": "#5966"
+        }
+      ]
+    }
+  ]
+}
