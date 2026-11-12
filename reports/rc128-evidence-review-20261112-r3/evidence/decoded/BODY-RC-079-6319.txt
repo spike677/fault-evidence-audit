@@ -1,0 +1,149 @@
+### System Info
+
+----------Python Info----------
+Version      : 3.12.3
+Compiler     : GCC 13.3.0
+Build        : ('main', 'Mar  3 2026 12:15:18')
+Arch         : ('64bit', '')
+------------Pip Info-----------
+Version      : 26.0.1
+Directory    : /usr/local/lib/python3.12/dist-packages/pip
+vllm         : 0.19.0
+sglang       : not found.
+ray          : 2.54.1
+torch        : 2.10.0+cu129
+----------verl Info-----------
+Version      : 0.8.0.dev
+Directory    : /root/workspace/verl/verl
+Error running git command: fatal: not a git repository (or any parent up to mount point /root/workspace)
+Stopping at filesystem boundary (GIT_DISCOVERY_ACROSS_FILESYSTEM not set).
+Commit Hash  : None
+----------Platform Info----------
+Platform     : Linux-5.10.134-16.3.al8.x86_64-x86_64-with-glibc2.39
+system       : Linux
+node         : zzh-t3e2wjad-0000
+release      : 5.10.134-16.3.al8.x86_64
+version      : #1 SMP Tue Mar 26 18:54:05 CST 2024
+----------Environment----------
+CUDA Runtime : 12.9
+CUDA Compiler : Cuda compilation tools, release 12.9, V12.9.86
+----------System Info----------
+CPU Memory      : 2014.75 GB
+GPU Count       : 8
+GPU 1   Type    : NVIDIA H20
+GPU 1   Memory  : 95.58 GB
+GPU 2   Type    : NVIDIA H20
+GPU 2   Memory  : 95.58 GB
+GPU 3   Type    : NVIDIA H20
+GPU 3   Memory  : 95.58 GB
+GPU 4   Type    : NVIDIA H20
+GPU 4   Memory  : 95.58 GB
+GPU 5   Type    : NVIDIA H20
+GPU 5   Memory  : 95.58 GB
+GPU 6   Type    : NVIDIA H20
+GPU 6   Memory  : 95.58 GB
+GPU 7   Type    : NVIDIA H20
+GPU 7   Memory  : 95.58 GB
+GPU 8   Type    : NVIDIA H20
+GPU 8   Memory  : 95.58 GB
+
+### Information
+
+- [ ] The official example scripts
+- [x] My own modified scripts
+
+### Tasks
+
+- [x] An officially supported task in the `examples` folder (such as GLUE/SQuAD, ...)
+- [ ] My own task or dataset (give details below)
+
+### Reproduction
+
+```bash
+
+set -xeuo pipefail
+
+if [ "$#" -lt 2 ]; then
+    echo "Usage: run_qwen3_8b_fsdp.sh <nproc_per_node> <save_path> [other_configs...]"
+    echo "  Env: SP_SIZE (default 2), USE_PEFT (0|1, default 1)"
+    exit 1
+fi
+
+nproc_per_node=$1
+save_path=$2
+shift 2
+
+MODEL_PATH=${MODEL_PATH:-Qwen/Qwen3.5-2B}
+SP_SIZE=${SP_SIZE:-1}
+USE_PEFT=${USE_PEFT:-0}
+MICRO_BATCH_SIZE_PER_GPU=${MICRO_BATCH_SIZE_PER_GPU:-1}
+LR=${LR:-1e-6}
+TOTAL_EPOCHS=${TOTAL_EPOCHS:-1}
+PROJECT_NAME=${PROJECT_NAME:-2b-sft}
+EXPERIMENT_NAME=${EXPERIMENT_NAME:-2b_test}
+MAX_PROMPT=${MAX_PROMPT:-30000}
+MAX_RESPONSE_LENGTH=${MAX_RESPONSE_LENGTH:-1024}
+
+TRAIN_FILES="['$HOME/data/gsm8k/train.parquet']"
+TEST_FILES="['$HOME/data/gsm8k/test.parquet']"
+DATA=(
+    data.train_files="$TRAIN_FILES"
+    data.val_files="$TEST_FILES"
+    data.messages_key=prompt
+    data.max_length=${MAX_PROMPT}
+    data.truncation=error
+    data.train_batch_size=${nproc_per_node}
+    data.micro_batch_size_per_gpu=${MICRO_BATCH_SIZE_PER_GPU}
+    data.max_token_len_per_gpu=32768
+    data.ignore_input_ids_mismatch=True
+    data.enable_thinking_default=False
+)
+
+MODEL=(
+    model.use_liger=False
+    model.use_fused_kernels=False
+    model.use_remove_padding=False
+    model.enable_gradient_checkpointing=False
+    model.enable_activation_offload=False
+)
+
+ENGINE=(
+    engine=fsdp
+    engine.ulysses_sequence_parallel_size=${SP_SIZE}
+)
+
+torchrun --standalone --nnodes=1 --nproc_per_node=${nproc_per_node} \
+    -m verl.trainer.sft_trainer \
+    "${DATA[@]}" \
+    "${MODEL[@]}" \
+    "${ENGINE[@]}" \
+    optim.lr=${LR} \
+    model.path="${MODEL_PATH}" \
+    trainer.default_local_dir="${save_path}" \
+    trainer.project_name="${PROJECT_NAME}" \
+    trainer.experiment_name="${EXPERIMENT_NAME}" \
+    trainer.logger='["console"]' \
+    trainer.total_epochs=${TOTAL_EPOCHS} \
+    "$@"
+
+```
+
+```bash
+step:1 - perf/max_memory_allocated_gb:5.781707763671875 - perf/max_memory_reserved_gb:11.556640625 - perf/cpu_memory_used_gb:131.44873809814453 - train/loss:nan - train/grad_norm:0.0 - train/lr:1e-06 - train/mfu:0.0 - train/global_tokens:1621 - train/total_tokens(B):1.621e-06
+Epoch 1/1:   0%|▊                                                                                                                                                                                                              | 1/262 [00:04<19:05,  4.39s/it]
+step:2 - perf/max_memory_allocated_gb:7.844405651092529 - perf/max_memory_reserved_gb:13.638671875 - perf/cpu_memory_used_gb:131.57899856567383 - train/loss:nan - train/grad_norm:0.0 - train/lr:1e-06 - train/mfu:0.0 - train/global_tokens:1812 - train/total_tokens(B):3.433e-06
+Epoch 1/1:   1%|█▌                                                                                                                                                                                                             | 2/262 [00:04<08:56,  2.06s/it]
+step:3 - perf/max_memory_allocated_gb:7.844405651092529 - perf/max_memory_reserved_gb:13.876953125 - perf/cpu_memory_used_gb:131.6811752319336 - train/loss:nan - train/grad_norm:0.0 - train/lr:1e-06 - train/mfu:0.0 - train/global_tokens:1748 - train/total_tokens(B):5.181e-06
+Epoch 1/1:   1%|██▎                                                                                                                                                                                                            | 3/262 [00:05<05:36,  1.30s/it]
+step:4 - perf/max_memory_allocated_gb:7.844405651092529 - perf/max_memory_reserved_gb:13.876953125 - perf/cpu_memory_used_gb:131.8024673461914 - train/loss:nan - train/grad_norm:0.0 - train/lr:1e-06 - train/mfu:0.0 - train/global_tokens:1532 - train/total_tokens(B):6.713e-06
+Epoch 1/1:   2%|███▏                                                                                                                                                                                                           | 4/262 [00:05<03:57,  1.08it/s]
+step:5 - perf/max_memory_allocated_gb:7.844405651092529 - perf/max_memory_reserved_gb:13.876953125 - perf/cpu_memory_used_gb:131.989013671875 - train/loss:nan - train/grad_norm:0.0 - train/lr:1e-06 - train/mfu:0.0 - train/global_tokens:1231 - train/total_tokens(B):7.944e-06
+Epoch 1/1:   2%|███▉                                                                                                                                                                                                           | 5/262 [00:05<03:02,  1.41it/s]
+step:6 - perf/max_memory_allocated_gb:8.06339168548584 - perf/max_memory_reserved_gb:14.82421875 - perf/cpu_memory_used_gb:132.13319396972656 - train/loss:nan - train/grad_norm:0.0 - train/lr:1e-06 - train/mfu:0.0 - train/global_tokens:1757 - train/total_tokens(B):9.701e-06
+
+```
+
+
+### Expected behavior
+
+get a valid loss 

@@ -1,0 +1,28 @@
+{
+  "id": "PATCH-RC-062-7620-1",
+  "task_ids": [
+    "RC-062"
+  ],
+  "tool": "mcp__codex_apps__github_fetch_pr_file_patch",
+  "args": {
+    "repo_full_name": "verl-project/verl",
+    "pr_number": 7620,
+    "path": "verl/models/transformers/glm4v.py"
+  },
+  "captured_at": "2026-11-12T03:12:35.662Z",
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "Action completed."
+      }
+    ],
+    "structuredContent": {
+      "patch": {
+        "filename": "verl/models/transformers/glm4v.py",
+        "patch": "@@ -288,7 +288,7 @@ def glm4v_attn_forward(\n     position_embeddings: Optional[tuple[torch.Tensor, torch.Tensor]] = None,  # will become mandatory in v4.46\n     **kwargs,\n ) -> tuple[torch.Tensor, None, None]:\n-    from transformers.models.glm4v.modeling_glm4v import apply_multimodal_rotary_pos_emb, repeat_kv\n+    from transformers.models.glm4v.modeling_glm4v import apply_rotary_pos_emb, repeat_kv\n \n     bsz, q_len, _ = hidden_states.size()  # q_len = seq_length / sp_size\n     query_states = self.q_proj(hidden_states)  # (batch_size, seq_length / sp_size, num_heads * head_size)\n@@ -300,17 +300,10 @@ def glm4v_attn_forward(\n     value_states = value_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)\n \n     # Because the input can be padded, the absolute sequence length depends on the max position id.\n+    # Glm4vTextRotaryEmbedding already folds mrope_section into cos/sin, so this is the plain\n+    # application, exactly as Glm4vTextAttention.forward does it.\n     cos, sin = position_embeddings\n-    if getattr(self, \"rope_scaling\", None) is not None:\n-        # for transformers < 5.0.0\n-        mrope_section = self.rope_scaling.get(\"mrope_section\", None)\n-    else:\n-        # for transformers >= 5.0.0, only rope_parameters present in the config\n-        assert getattr(self, \"rope_parameter\", None) is not None, (\n-            \"Either rope_scaling or rope_parameter should be defined in the config for GLM4V.\"\n-        )\n-        mrope_section = self.rope_parameter.get(\"mrope_section\", None)\n-    query_states, key_states = apply_multimodal_rotary_pos_emb(query_states, key_states, cos, sin, mrope_section)\n+    query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin)\n     key_states = repeat_kv(key_states, self.num_key_value_groups)\n     value_states = repeat_kv(value_states, self.num_key_value_groups)\n     dropout_rate = 0.0 if not self.training else self.attention_dropout"
+      }
+    },
+    "isError": false
+  }
+}

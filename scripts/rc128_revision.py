@@ -366,7 +366,7 @@ def validate_quantities(qs):
     return True
 
 
-def verify_revision(folder,git_index=False):
+def verify_revision(folder,git_index=False,historical_policy=False):
     folder=Path(folder);checks=[]
     def check(name,test):
         try:
@@ -420,7 +420,11 @@ def verify_revision(folder,git_index=False):
     check('manifest_covers_complete_payload',lambda:set(file_hashes(folder))-EXCLUDED==set(manifest['payload_sha256']))
     code={p:core.sha(core.REPO/p)for p in CODE}
     fingerprint=hashlib.sha256(json.dumps(dict(code=code,policy=core.read(folder/'review_policy.json')),sort_keys=True,ensure_ascii=False).encode()).hexdigest()
-    check('current_policy_code_budget_fingerprint',lambda:code==manifest['analysis_code_sha256']and fingerprint==manifest['policy_fingerprint']and fingerprint!=info['policy_fingerprint'])
+    if historical_policy:
+        old_fp=hashlib.sha256(json.dumps(dict(code=manifest['analysis_code_sha256'],policy=core.read(folder/'review_policy.json')),sort_keys=True,ensure_ascii=False).encode()).hexdigest()
+        check('historical_policy_fingerprint_self_consistent_not_current',lambda:old_fp==manifest['policy_fingerprint']and old_fp!=info['policy_fingerprint'])
+    else:
+        check('current_policy_code_budget_fingerprint',lambda:code==manifest['analysis_code_sha256']and fingerprint==manifest['policy_fingerprint']and fingerprint!=info['policy_fingerprint'])
     if git_index:
         def staged():
             for p,h in manifest['payload_sha256'].items():
@@ -435,6 +439,7 @@ def verify_revision(folder,git_index=False):
         except importlib.metadata.PackageNotFoundError:dependencies[name]='NOT_INSTALLED'
     result=dict(status='FAIL'if any(c['status']=='FAIL'for c in checks)else'PASS',policy_version=VERSION,
         policy_fingerprint=manifest['policy_fingerprint'],checks=checks,check_count=len(checks),
+        policy_status='HISTORICAL_POLICY_NOT_CURRENT_REVIEW'if historical_policy else'CURRENT_POLICY',
         records=128,driving_quantities=len(qs),read_only=True,python=sys.version,executable=sys.executable,
         dependencies=dependencies,device_runs=0,scope='OFFLINE_DATA_AND_REPORT_NOT_REPRODUCTION_OR_FULL_SOURCE_CONFIRMATION')
     if result['status']=='FAIL':raise ValueError(json.dumps(result,ensure_ascii=False))

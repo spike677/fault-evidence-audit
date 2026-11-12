@@ -1,0 +1,84 @@
+{
+  "id": "SEARCH-R2-RC-021",
+  "task_ids": [
+    "RC-021"
+  ],
+  "round": 2,
+  "question": "\"causal_conv1d\" accuracy",
+  "tool": "mcp__codex_apps__github_search_prs",
+  "args": {
+    "query": "\"causal_conv1d\" accuracy",
+    "repository_full_name": "vllm-project/vllm-ascend",
+    "topn": 3,
+    "state": "all"
+  },
+  "started_at": "2026-11-12T03:16:59.596Z",
+  "captured_at": "2026-11-12T03:17:00.825Z",
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "Action completed."
+      }
+    ],
+    "structuredContent": {
+      "issues": [
+        {
+          "url": "https://github.com/vllm-project/vllm-ascend/pull/13940",
+          "title": "[Doc][BugFix] Fix Qwen3-Reranker deploy guide",
+          "issue_number": 13940,
+          "body": "What this PR does / why we need it?\r\nThis PR corrects a typo in the Qwen3-Reranker deployment guide. The architectures override within the hf_overrides parameter was incorrectly specified as Qwen3VLForSequenceClassification. This has been corrected to Qwen3ForSequenceClassification to match the text-based nature of the reranker model.\r\n\r\nThis fix is applied consistently across all command-line examples and code snippets in the document, ensuring that users can follow the guide without encountering errors.\r\n\r\nfix https://github.com/vllm-project/vllm-ascend/issues/13446\r\n\r\nDoes this PR introduce any user-facing change?\r\nNo, this is a documentation-only update and does not affect any user-facing functionality.\r\n\r\nHow was this patch tested?\r\nThe changes are limited to documentation and have been visually verified for correctness. The corrected commands are now aligned with the model's expected configuration.\n- vLLM version: v0.26.0\n- vLLM main: https://github.com/vllm-project/vllm/commit/0351e9aa1fdf1a51329d1906881528dfe61fc88e\n",
+          "state": null,
+          "user": null,
+          "assignees": null,
+          "labels": null,
+          "milestone": null,
+          "state_reason": null,
+          "comments": null,
+          "created_at": null,
+          "updated_at": null,
+          "closed_at": null,
+          "display_url": "https://github.com/vllm-project/vllm-ascend/pull/13940",
+          "display_title": "[Doc][BugFix] Fix Qwen3-Reranker deploy guide"
+        },
+        {
+          "url": "https://github.com/vllm-project/vllm-ascend/pull/18498",
+          "title": "[BugFix][Model] Enable torch.compile for GLM-5.3-Flash on v0.30.0",
+          "issue_number": 18498,
+          "body": "### What this PR does / why we need it?\n\nBackport #18461 to `releases/v0.30.0`. Add `support_torch_compile` to the GLM-5.3-Flash main and MTP models. Keep KDA runtime metadata behind a custom op so the metadata-free profiling branch cannot replace attention dispatch in the compiled graph, and normalize convolution cache indices for the AscendC API.\n\nRefs #15665\n\n### Does this PR introduce _any_ user-facing change?\n\nYes. GLM-5.3-Flash main and MTP models can enable `npugraph_ex` and static-kernel compilation.\n\n### How was this patch tested?\n\n- Focused model compilation, KDA dispatch, convolution, PP, and MTP regressions for head `fcd5c0d073cef550314d42e04f159f33ea6a5351`: **46 passed** with vLLM v0.30.0.\n\n```bash\nTORCH_DEVICE_BACKEND_AUTOLOAD=0 pytest -q \\\n  tests/ut/models/test_glm5next_kda_dispatch.py \\\n  tests/ut/models/test_glm5_next_mtp.py \\\n  tests/ut/models/test_glm5next_pp.py \\\n  tests/ut/models/test_glm5next_conv_dispatch.py \\\n  tests/ut/models/test_glm5next_kda_contracts.py \\\n  tests/ut/models/test_glm5next_mtp_rotation.py\n```\n- `git diff --check`: passed. [Latest-head pre-commit CI](https://github.com/vllm-project/vllm-ascend/actions/runs/38345119816/job/115124619324): **passed**, including mypy. Both full CPU UT CI jobs passed: **9872 passed, 74 skipped** each (vLLM v0.30.0 and verified commit `ced6857afa0ea7b2e3f0846a62e1394e90f15607`). The CI gate is blocked until a maintainer adds a test-enabling label; selected hardware tests, including A5, were skipped.\n- A3 real-weight validation of #18461 on host 192.168.13.168 passed with TP16, EP, FlashComm1, MTP3, FULL decode capture, and text/math requests for both static-kernel + npugraph_ex and npugraph_ex-only.\n- A5 validation on 177.11.25.1 with real GLM-5.3-Flash MXFP8 weights, vLLM v0.30.0, and CANN 9.2.0 reproduced a failure of the unchanged release quantization path with multiple weight tensors in this environment, even in eager mode. Successful A5 static/npugraph_ex text and image smoke runs used an additional temporary MXFP8 layout fix that has now been removed from this PR; those runs do not establish standalone A5 validation of the current PR head. The latest Quay A5 openEuler tag was checked again and still resolves to digest `e96110a90739` with image-native CANN 9.1.0; the official CANN 950 base image `quay.io/ascend/cann:9.2.0-beta.2-950-openeuler24.03-py3.12` has now been verified by Quay/DockerHub ARM64 metadata, but no CANN 9.2-native vLLM A5 image or standalone inference on that base image has been verified. Its public installer packages are dated September 1, earlier than the September 24 CANN 9.2.0 SDK used in the previous A5 runs.\n- Functional smoke only; no full accuracy or performance benchmark. Temporary validation scripts and results are outside this PR.\n\n- vLLM main: https://github.com/vllm-project/vllm/commit/ced6857afa0ea7b2e3f0846a62e1394e90f15607\n",
+          "state": null,
+          "user": null,
+          "assignees": null,
+          "labels": null,
+          "milestone": null,
+          "state_reason": null,
+          "comments": null,
+          "created_at": null,
+          "updated_at": null,
+          "closed_at": null,
+          "display_url": "https://github.com/vllm-project/vllm-ascend/pull/18498",
+          "display_title": "[BugFix][Model] Enable torch.compile for GLM-5.3-Flash on v0.30.0"
+        },
+        {
+          "url": "https://github.com/vllm-project/vllm-ascend/pull/17010",
+          "title": "[Performance] Optimize GLM-5.3-Flash convolution state copies",
+          "issue_number": 17010,
+          "body": "### What this PR does / why we need it?\n\nReduce GLM-5.3-Flash convolution-state copy overhead with stride-aware addressing and a bounded Triton launch grid. The model calls `copy_conv_state()` in `vllm_ascend/ops/triton/kda/conv_state.py`; state layout, cache capacity and convolution ordering stay unchanged.\n\nRefs #15665.\n\n### Does this PR introduce _any_ user-facing change?\n\nLower copy latency, with no API or configuration changes.\n\n### How was this patch tested?\n\n- **Performance (implementation `1ab02088`, Ascend A3):** TP1 × DP16 / EP16, 32K/64K input, 1K/4K output, global concurrency 16/64: TPOT decreased **12.48–16.84%**. Before/candidate had three rounds; after-baseline had one. Baseline drift was below 0.2%. All arms used the same KDA runtime library with the workspace fix.\n- **Accuracy in that comparison:** fixed long-output tokens matched the baselines. GSM8K before/candidate/after: **1260/1263/1262 of 1319**; per-question differences remain, including six candidate errors correct in both baselines. Long-context numerical answers: 32/32 in each arm. No claim of universal generation equivalence.\n- **Operator coverage:** both existing conv-layout cases passed; combined with #17011, **11/11 NPU cases passed**. Conv assertions use default tolerances; writeback uses zero tolerance. No new test cases or CI routes in this follow-up.\n- **Combined model smoke:** TP4 × DP2 / EP8 with decode graphs: **5/5 requests generated successfully**, three natural stops and two 128-token limits. This used base `972fcd5c` plus both optimization overlays and the recorded existing native runtime. Tested conv files are identical at head `be9ac27f2`; this is not a complete rerun of its rebased main tree or a new accuracy/performance comparison.\n\n- vLLM main: https://github.com/vllm-project/vllm/commit/ced6857afa0ea7b2e3f0846a62e1394e90f15607\n",
+          "state": null,
+          "user": null,
+          "assignees": null,
+          "labels": null,
+          "milestone": null,
+          "state_reason": null,
+          "comments": null,
+          "created_at": null,
+          "updated_at": null,
+          "closed_at": null,
+          "display_url": "https://github.com/vllm-project/vllm-ascend/pull/17010",
+          "display_title": "[Performance] Optimize GLM-5.3-Flash convolution state copies"
+        }
+      ]
+    },
+    "isError": false
+  }
+}

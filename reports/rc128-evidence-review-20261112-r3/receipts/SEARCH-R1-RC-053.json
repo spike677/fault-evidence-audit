@@ -1,0 +1,84 @@
+{
+  "id": "SEARCH-R1-RC-053",
+  "task_ids": [
+    "RC-053"
+  ],
+  "round": 1,
+  "question": "npu_transpose_batchmatmul",
+  "tool": "mcp__codex_apps__github_search_prs",
+  "args": {
+    "query": "npu_transpose_batchmatmul",
+    "repository_full_name": "vllm-project/vllm-ascend",
+    "topn": 3,
+    "state": "all"
+  },
+  "started_at": "2026-11-12T03:04:39.602Z",
+  "captured_at": "2026-11-12T03:04:40.789Z",
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "Action completed."
+      }
+    ],
+    "structuredContent": {
+      "issues": [
+        {
+          "url": "https://github.com/vllm-project/vllm-ascend/pull/16874",
+          "title": "[Refactor][Ops] Remove batch_matmul_transpose custom operator",
+          "issue_number": 16874,
+          "body": "### What this PR does / why we need it?\n\nPort PR #14269 (merged into releases/v0.26.0rc) to the releases/v0.23.0 branch. Removes the batch_matmul_transpose custom operator and all of its build wiring. The operator is no longer needed: the MLA v_up_proj path already had a fallback to torch_npu.npu_transpose_batchmatmul (and torch.bmm), which now becomes the primary path.\n\n- Delete csrc/batch_matmul_transpose/ (kernel, op_host, tiling, adapter)\n- Drop CMakeLists.txt entries: kernel sources, the A5 exclude list and its status message, tiling_data.cpp, and the op_host include directory\n- Remove the op def/impl registration in torch_binding.cpp and the meta implementation in torch_binding_meta.cpp; drop the batch_matmul_transpose_impl extern declaration in csrc/ops.h\n- Remove the batch_matmul_transpose branch in sfa_v1.py::_v_up_proj and the now-unused BMM_TRANS_MAX_SUPPORTED_TOKENS constant; split the npu_transpose_batchmatmul path by the N*L<65536 aclnn constraint, including the ACL graph K*B<65536 bypass\n- Delete the nightly test test_batch_matmul_transpose.py\n\nCommits are cherry-picked from PR #14269 (5 commits, no conflicts on this branch).\n\n### Does this PR introduce _any_ user-facing change?\n\nNo public API change. The MLA v_up_proj computation result is unchanged; only the underlying kernel selection changes (falls back to the existing npu_transpose_batchmatmul / torch.bmm path).\n\n### How was this patch tested?\n\n- ruff check / format pass on the modified sfa_v1.py\n- Existing MLA/SFA tests cover the now-primary npu_transpose_batchmatmul path\n\n- vLLM main: https://github.com/vllm-project/vllm/commit/ee0da84ab9e04ac7610e28580af62c365e898389\n",
+          "state": null,
+          "user": null,
+          "assignees": null,
+          "labels": null,
+          "milestone": null,
+          "state_reason": null,
+          "comments": null,
+          "created_at": null,
+          "updated_at": null,
+          "closed_at": null,
+          "display_url": "https://github.com/vllm-project/vllm-ascend/pull/16874",
+          "display_title": "[Refactor][Ops] Remove batch_matmul_transpose custom operator"
+        },
+        {
+          "url": "https://github.com/vllm-project/vllm-ascend/pull/15588",
+          "title": "perf: fuse MLA query projection transposes",
+          "issue_number": 15588,
+          "body": "### What this PR does / why we need it?\r\n\r\nThis PR optimizes the MLA query projection path by using `npu_transpose_batchmatmul` to fuse the input and output transposes into the batched matrix multiplication.\r\n\r\nThe change:\r\n\r\n- Avoids materializing the intermediate `(B, N, P) -> (N, B, P)` and `(N, B, L) -> (B, N, L)` transposes.\r\n- Produces a contiguous batch-major query projection output.\r\n- Keeps `W_UK_T` in ND format when the fused operator is available, as required by `npu_transpose_batchmatmul`.\r\n- Preserves the existing `torch.bmm` and NZ-format path as a fallback when the fused operator is unavailable.\r\n\r\nThis reduces layout-conversion overhead in the MLA attention hot path while preserving numerical behavior and backward compatibility.\r\n\r\n<img width=\"1920\" height=\"1036\" alt=\"screenshot_2026-09-04_10-36-54\" src=\"https://github.com/user-attachments/assets/b5abf63f-6425-4f46-8910-189cb85613f9\" />\r\n<img width=\"1920\" height=\"1042\" alt=\"screenshot_2026-09-04_10-52-45\" src=\"https://github.com/user-attachments/assets/b8e49606-a02f-4a4d-a00e-540d030c690a\" />\r\n<img width=\"1920\" height=\"1038\" alt=\"screenshot_2026-09-04_10-52-21\" src=\"https://github.com/user-attachments/assets/2c690d8d-db27-438a-b783-9dd176ce1f7f\" />\r\n\r\n### Does this PR introduce _any_ user-facing change?\r\n\r\nNo. This is an internal performance optimization and does not change any public API or user-visible behavior.\r\n\r\n### How was this patch tested?\r\n\r\nUnit tests were added and updated in `tests/ut/attention/a2/test_mla_v1.py` to cover:\r\n\r\n- Numerical correctness of the original fallback path.\r\n- Correct invocation and numerical behavior of `npu_transpose_batchmatmul`.\r\n- Contiguity and stride of the fused operator output.\r\n- Fused-operator availability detection.\r\n- Preservation of `W_UK_T` in ND format when the fused path is enabled.",
+          "state": null,
+          "user": null,
+          "assignees": null,
+          "labels": null,
+          "milestone": null,
+          "state_reason": null,
+          "comments": null,
+          "created_at": null,
+          "updated_at": null,
+          "closed_at": null,
+          "display_url": "https://github.com/vllm-project/vllm-ascend/pull/15588",
+          "display_title": "perf: fuse MLA query projection transposes"
+        },
+        {
+          "url": "https://github.com/vllm-project/vllm-ascend/pull/21494",
+          "title": "[BugFix][Attention] Keep SFA q up-projection batch-invariant past 65536 packed tokens",
+          "issue_number": 21494,
+          "body": "### What this PR does / why we need it?\n\n`AscendSFAImpl._q_proj_and_k_up_proj` projected `q_nope` with\n`npu_transpose_batchmatmul` while `q_nope.shape[0] < TRANSPOSE_BMM_MAX_SUPPORTED_DIM`\n(65536), and fell back to `transpose -> torch.bmm -> transpose` otherwise.\n\n`q_nope.shape[0]` is the token count of the *current launch*, i.e. the packed\nprefill batch, not the length of a single request. Since the two paths do not\nround identically, the same prompt got a different projection as soon as one\nprefill step packed 65536 tokens or more. With `VLLM_BATCH_INVARIANT=1` that is a\nbatch-invariance violation: BS=1 and BS=N produce different logits for the same\nrequest, and the first sampled token already diverges.\n\nThis PR always uses the fused operator, but launches it on a fixed token grid of\n`TRANSPOSE_BMM_CHUNK` = `TRANSPOSE_BMM_MAX_SUPPORTED_DIM - 1` tokens. The split is\nsound because the fused op is row independent; the grid size is deliberately the\nlargest launch the old guard already allowed, so **any token count that already\ntook a single launch keeps exactly one launch with unchanged arguments** -- the\nonly shapes whose behaviour changes are the ones that used to fall back to\n`torch.bmm`. The `torch.bmm` path is kept only for unsupported dtypes and for\n`torch_npu` builds without the fused op.\n\nMeasurements on Ascend 910 (A3, build platform `ascend910_93`), torch_npu\n2.10.0.post4, GLM-5.x DSA models:\n\n- The two paths disagree on identical input at identical T: 7622 / 167,772,160\n  bf16 elements differ, max_abs = 2^-11 (one bf16 ulp). Both paths are\n  self-consistent across repeats, so this is a real rounding difference, not\n  noise.\n- The fused op is bitwise row independent: a fixed set of rows gives identical\n  output for T = 8192, 32768, 61440, 65000, 65640 and 66048. `_v_up_proj`, which\n  has no such guard, has always used it at large T.\n- The grid split is bitwise identical to a single launch: 537,722,880 elements\n  compared, 0 differences.\n- End-to-end with an equivalent runtime patch (same fixed-grid split), TP=4,\n  BS=8, prompt 20480 / max_tokens 2048, `max_num_batched_tokens=131072`:\n  without the change 6/8 prompts fail, with it all 8 pass; likewise for the\n  authoritative TP=4 / BS=64 shape (whole harness passes) and for the\n  65072-vs-65712 packed-token knee.\n\n`_v_up_proj` is intentionally left untouched: it has no T guard today and was\nmeasured to work at large T. Chunking it as well would be a behaviour-neutral\ncleanup, better done separately.\n\n### Does this PR introduce _any_ user-facing change?\n\nNo API or interface change. The only behaviour change is the corrected numerics\nfor packed prefills that previously switched to the `torch.bmm` fallback, which is\nthe bug being fixed.\n\n### How was this patch tested?\n\nNew unit test `tests/ut/attention/test_sfa_batch_invariant_up_proj.py`:\n\n- `test_method_uses_the_fused_grid_not_the_bmm_fallback` drives\n  `_q_proj_and_k_up_proj` itself with a bf16 input and makes `torch.bmm` raise, so\n  the test fails if the projection ever takes the fallback again;\n- `test_every_launch_uses_the_fixed_grid` asserts the number of launches is\n  `ceil(T / chunk)` and every launch is `<= chunk`, for T = chunk-1, chunk,\n  chunk+1, 65712;\n- `test_a_row_is_unaffected_by_the_packed_batch` asserts a row's output is\n  unchanged when the same rows are packed into a batch 3x larger;\n- `test_chunk_stays_under_the_operand_limit` asserts\n  `0 < TRANSPOSE_BMM_CHUNK <= TRANSPOSE_BMM_MAX_SUPPORTED_DIM`.\n\nThe helper is exercised with a recording stand-in for\n`npu_transpose_batchmatmul`, so the tests run on CPU. End-to-end validation was\ndone on A3 with GLM-5.2 / GLM-5.1 as described above.\n\n- vLLM main: https://github.com/vllm-project/vllm/commit/24420b7a341af37a9bc3186e6fc6062512e0aa58\n",
+          "state": null,
+          "user": null,
+          "assignees": null,
+          "labels": null,
+          "milestone": null,
+          "state_reason": null,
+          "comments": null,
+          "created_at": null,
+          "updated_at": null,
+          "closed_at": null,
+          "display_url": "https://github.com/vllm-project/vllm-ascend/pull/21494",
+          "display_title": "[BugFix][Attention] Keep SFA q up-projection batch-invariant past 65536 packed tokens"
+        }
+      ]
+    },
+    "isError": false
+  }
+}

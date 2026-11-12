@@ -957,20 +957,29 @@ def expected_for_subproblem(n, contract, fallback):
     return EXPECTED.get(f'RC-{n:03}', fallback)
 
 
-def build(folder=DEFAULT, source_bundle=LEGACY_BUNDLE):
+def build(folder=DEFAULT, source_bundle=LEGACY_BUNDLE, field_audit=False):
     from rc128_decisions import DECISIONS_INPUT_SHA256
     folder=writable_output(folder)
     if (folder/'sources/original/handoff.jsonl').exists() and sha(folder/'sources/original/handoff.jsonl') != DECISIONS_INPUT_SHA256:
         raise ValueError('Curated review belongs to a different input SHA; not ID-only reuse.')
+    if field_audit:
+        from rc128_field_audit import build as build_field_audit
+        return build_field_audit(folder, Path(source_bundle))
     from rc128_revision import build_revision
     return build_revision(folder, Path(source_bundle))
 
 
 def verify(folder=DEFAULT,git_index=False):
     folder=Path(folder)
-    if read(folder/'manifest.json')['schema_version']=='RC128-BUNDLE-2':
+    version=read(folder/'manifest.json')['schema_version']
+    if version=='RC128-BUNDLE-3':
+        from rc128_field_audit import verify as verify_field_audit
+        return verify_field_audit(folder,git_index)
+    if version=='RC128-BUNDLE-2':
         from rc128_revision import verify_revision
-        return verify_revision(folder,git_index)
+        # Old reports retain their original policy, rather than pretending a
+        # byte-valid R2 report was reviewed under the new R3 source policy.
+        return verify_revision(folder,git_index,historical_policy=True)
     return _verify_v1(folder,git_index)
 
 
@@ -980,9 +989,10 @@ def main():
     p.add_argument('folder', nargs='?', type=Path, default=DEFAULT)
     p.add_argument('--git-index',action='store_true')
     p.add_argument('--source-bundle',type=Path,default=LEGACY_BUNDLE)
+    p.add_argument('--field-audit',action='store_true',help='Build the explicit R3 source-audit overlay from an R2 archive.')
     args=p.parse_args()
     if args.command == 'init': result=init(args.folder)
-    elif args.command == 'build': result=build(args.folder,args.source_bundle)
+    elif args.command == 'build': result=build(args.folder,args.source_bundle,args.field_audit)
     else: result=verify(args.folder,args.git_index)
     print(json.dumps(result, ensure_ascii=False, indent=2))
 

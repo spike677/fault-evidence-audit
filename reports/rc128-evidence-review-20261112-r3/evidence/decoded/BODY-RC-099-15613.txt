@@ -1,0 +1,27 @@
+### What this PR does / why we need it?
+
+The MoE sequence-parallel prepare step (`_prepare_with_ep_group`) quantizes `hidden_states` for dynamic-quant schemes **before routing**: `W8A8 -> int8`, `W8A8MXFP/W4A8MXFP -> float8_e4m3fn`, `W4A4MXFP -> uint8` (fp4 packs). `AscendRoutedExperts._select_experts` then propagated that dtype to `topk_weights`, which:
+
+- breaks `topk_weights * mask` in the token dispatcher (fp8 x bool promotion is unsupported),
+- silently truncates int8 weights (0..1 values become 0) — a live correctness bug on main for SP-MoE + W8A8,
+- violates `npu_moe_token_unpermute`'s fp32 `probs` expectation.
+
+Changes:
+- `routed_experts.py`: only follow `hidden_states.dtype` for floating compute dtypes (fp32/fp16/bf16); otherwise fall back to `float32`. This whitelist subsumes the previous uint8/float8_e4m3fn skip added for MXFP4 and covers the int8 case the skip missed.
+- `grouped_topk_router.py`: apply the same guard — without it the renormalization and `routed_scaling_factor` multiply would run in a quantized dtype.
+- Add a UT covering the dtype contract for fp32/fp16/bf16 and quantized hidden_states dtypes.
+
+### Does this PR introduce _any_ user-facing change?
+
+No API/config change. Fixes a crash and a silent-precision bug when activations arrive pre-quantized from the MoE sequence-parallel prepare step.
+
+### How was this patch tested?
+
+```
+pytest tests/ut/ops/test_routed_experts.py
+# 16 passed (10 existing + 6 new parametrized dtype cases)
+```
+
+Validated on A5 nodes with dsa_cp + W4A8/W8A8 quantized models.
+
+Signed-off-by: dsxsteven <dsxsteven@sina.com>

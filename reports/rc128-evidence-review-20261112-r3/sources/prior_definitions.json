@@ -1,0 +1,3430 @@
+{
+  "conditions": [
+    {
+      "condition_id": "1.1.1",
+      "name": "Zero dimension",
+      "definition": "某维 shape=0。\nRequires: `CON-SHAPE` on tensor-like.  \r\nGenerator: shape 含 0。",
+      "requires": [
+        "`CON-SHAPE` on tensor-like."
+      ],
+      "skip_if": [],
+      "family_requires": [
+        "任一 `TEN-*` 带 `CON-SHAPE`，或控制循环次数的 `scalar`/`attr`，或 `TEN-MOE-ROUTE` / `SEM-MOE-DIST`。"
+      ],
+      "family_skip_if": [
+        "算子无张量 shape、无循环计数、无路由——无可退化对象。"
+      ],
+      "source_quote": "`[ / ]` **1.1.1 Zero dimension** — 某维 shape=0。  \r\nRequires: `CON-SHAPE` on tensor-like.  \r\nGenerator: shape 含 0。\r\n",
+      "line_start": 185,
+      "line_end": 187,
+      "condition_system": "API42",
+      "definition_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+      "class_ids": [
+        "1.1"
+      ],
+      "themes": []
+    },
+    {
+      "condition_id": "1.1.2",
+      "name": "Zero repeat/loop count",
+      "definition": "repeat/loop/r=0。\nRequires: `SEM-SCALAR-COEFF` 或相关 attr/scalar 表示次数。  \r\nSkip if: 无此类参数。",
+      "requires": [
+        "`SEM-SCALAR-COEFF` 或相关 attr/scalar 表示次数。"
+      ],
+      "skip_if": [
+        "无此类参数。"
+      ],
+      "family_requires": [
+        "任一 `TEN-*` 带 `CON-SHAPE`，或控制循环次数的 `scalar`/`attr`，或 `TEN-MOE-ROUTE` / `SEM-MOE-DIST`。"
+      ],
+      "family_skip_if": [
+        "算子无张量 shape、无循环计数、无路由——无可退化对象。"
+      ],
+      "source_quote": "`[ / ]` **1.1.2 Zero repeat/loop count** — repeat/loop/r=0。  \r\nRequires: `SEM-SCALAR-COEFF` 或相关 attr/scalar 表示次数。  \r\nSkip if: 无此类参数。\r\n",
+      "line_start": 189,
+      "line_end": 191,
+      "condition_system": "API42",
+      "definition_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+      "class_ids": [
+        "1.1"
+      ],
+      "themes": []
+    },
+    {
+      "condition_id": "1.1.3",
+      "name": "All-zero rows/blocks",
+      "definition": "shape 非空但值全 0。\nRequires: 浮点/量化相关 `TEN-PRIMARY`（或参与 ReduceMax/scale 的张量）。  \r\nSkip if: 无数据张量或纯布尔逻辑且无数值归约。",
+      "requires": [
+        "浮点/量化相关 `TEN-PRIMARY`（或参与 ReduceMax/scale 的张量）。"
+      ],
+      "skip_if": [
+        "无数据张量或纯布尔逻辑且无数值归约。"
+      ],
+      "family_requires": [
+        "任一 `TEN-*` 带 `CON-SHAPE`，或控制循环次数的 `scalar`/`attr`，或 `TEN-MOE-ROUTE` / `SEM-MOE-DIST`。"
+      ],
+      "family_skip_if": [
+        "算子无张量 shape、无循环计数、无路由——无可退化对象。"
+      ],
+      "source_quote": "`[ / ]` **1.1.3 All-zero rows/blocks** — shape 非空但值全 0。  \r\nRequires: 浮点/量化相关 `TEN-PRIMARY`（或参与 ReduceMax/scale 的张量）。  \r\nSkip if: 无数据张量或纯布尔逻辑且无数值归约。\r\n",
+      "line_start": 193,
+      "line_end": 195,
+      "condition_system": "API42",
+      "definition_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+      "class_ids": [
+        "1.1"
+      ],
+      "themes": []
+    },
+    {
+      "condition_id": "1.1.4",
+      "name": "Empty expert (MoE)",
+      "definition": "某 expert token 数=0。\nRequires: `TEN-MOE-ROUTE` 或 `SEM-MOE-DIST`。  \r\nSkip if: 非 MoE。",
+      "requires": [
+        "`TEN-MOE-ROUTE` 或 `SEM-MOE-DIST`。"
+      ],
+      "skip_if": [
+        "非 MoE。"
+      ],
+      "family_requires": [
+        "任一 `TEN-*` 带 `CON-SHAPE`，或控制循环次数的 `scalar`/`attr`，或 `TEN-MOE-ROUTE` / `SEM-MOE-DIST`。"
+      ],
+      "family_skip_if": [
+        "算子无张量 shape、无循环计数、无路由——无可退化对象。"
+      ],
+      "source_quote": "`[ / ]` **1.1.4 Empty expert (MoE)** — 某 expert token 数=0。  \r\nRequires: `TEN-MOE-ROUTE` 或 `SEM-MOE-DIST`。  \r\nSkip if: 非 MoE。\r\n",
+      "line_start": 197,
+      "line_end": 199,
+      "condition_system": "API42",
+      "definition_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+      "class_ids": [
+        "1.1"
+      ],
+      "themes": []
+    },
+    {
+      "condition_id": "1.1.5",
+      "name": "Empty partition/shard",
+      "definition": "分核后某核 0 数据（靠 shape 间接）。\nRequires: `CON-SHAPE` + 多核切分可能（大/怪 shape）。",
+      "requires": [
+        "`CON-SHAPE` + 多核切分可能（大/怪 shape）。"
+      ],
+      "skip_if": [],
+      "family_requires": [
+        "任一 `TEN-*` 带 `CON-SHAPE`，或控制循环次数的 `scalar`/`attr`，或 `TEN-MOE-ROUTE` / `SEM-MOE-DIST`。"
+      ],
+      "family_skip_if": [
+        "算子无张量 shape、无循环计数、无路由——无可退化对象。"
+      ],
+      "source_quote": "`[ / ]` **1.1.5 Empty partition/shard** — 分核后某核 0 数据（靠 shape 间接）。  \r\nRequires: `CON-SHAPE` + 多核切分可能（大/怪 shape）。  \r\n",
+      "line_start": 201,
+      "line_end": 202,
+      "condition_system": "API42",
+      "definition_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+      "class_ids": [
+        "1.1"
+      ],
+      "themes": []
+    },
+    {
+      "condition_id": "1.2.1",
+      "name": "Minimal dimension (M/N/K=1)",
+      "definition": "核心维=1。\nRequires: 存在可解释为 M/N/K/L 的 shape 维。",
+      "requires": [
+        "存在可解释为 M/N/K/L 的 shape 维。"
+      ],
+      "skip_if": [],
+      "family_requires": [
+        "任一 tensor-like 的 `CON-SHAPE-*`，或 `SEM-GEOM`（卷积组合）。"
+      ],
+      "family_skip_if": [
+        "无 shape 可配（极罕见）。"
+      ],
+      "source_quote": "`[ / ]` **1.2.1 Minimal dimension (M/N/K=1)** — 核心维=1。  \r\nRequires: 存在可解释为 M/N/K/L 的 shape 维。\r\n",
+      "line_start": 211,
+      "line_end": 212,
+      "condition_system": "API42",
+      "definition_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+      "class_ids": [
+        "1.2"
+      ],
+      "themes": []
+    },
+    {
+      "condition_id": "1.2.2",
+      "name": "Tail-block misalignment",
+      "definition": "维长 ∉ 对齐（16/32/64/128/256）。\nValues: 1,3,7,13,17,33,65,69,127,129,255,257。",
+      "requires": [],
+      "skip_if": [],
+      "family_requires": [
+        "任一 tensor-like 的 `CON-SHAPE-*`，或 `SEM-GEOM`（卷积组合）。"
+      ],
+      "family_skip_if": [
+        "无 shape 可配（极罕见）。"
+      ],
+      "source_quote": "`[ / ]` **1.2.2 Tail-block misalignment** — 维长 ∉ 对齐（16/32/64/128/256）。  \r\nValues: 1,3,7,13,17,33,65,69,127,129,255,257。\r\n",
+      "line_start": 214,
+      "line_end": 215,
+      "condition_system": "API42",
+      "definition_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+      "class_ids": [
+        "1.2"
+      ],
+      "themes": []
+    },
+    {
+      "condition_id": "1.2.3",
+      "name": "Split count exceeds limit",
+      "definition": "split/chunk 数超内部数组。\nRequires: `SEM-SLICE` / split 类 attr 或可推导 split 的 shape。  \r\nSkip if: 无 split。",
+      "requires": [
+        "`SEM-SLICE` / split 类 attr 或可推导 split 的 shape。"
+      ],
+      "skip_if": [
+        "无 split。"
+      ],
+      "family_requires": [
+        "任一 tensor-like 的 `CON-SHAPE-*`，或 `SEM-GEOM`（卷积组合）。"
+      ],
+      "family_skip_if": [
+        "无 shape 可配（极罕见）。"
+      ],
+      "source_quote": "`[ / ]` **1.2.3 Split count exceeds limit** — split/chunk 数超内部数组。  \r\nRequires: `SEM-SLICE` / split 类 attr 或可推导 split 的 shape。  \r\nSkip if: 无 split。\r\n",
+      "line_start": 217,
+      "line_end": 219,
+      "condition_system": "API42",
+      "definition_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+      "class_ids": [
+        "1.2"
+      ],
+      "themes": []
+    },
+    {
+      "condition_id": "1.2.4",
+      "name": "Very large dimension (int overflow)",
+      "definition": "近 uint16/int32/2^24。\nValues: 65535, 65536, 16777217, 2^31 边界。  \r\n代码信号: 窄整型存 offset。",
+      "requires": [],
+      "skip_if": [],
+      "family_requires": [
+        "任一 tensor-like 的 `CON-SHAPE-*`，或 `SEM-GEOM`（卷积组合）。"
+      ],
+      "family_skip_if": [
+        "无 shape 可配（极罕见）。"
+      ],
+      "source_quote": "`[ / ]` **1.2.4 Very large dimension (int overflow)** — 近 uint16/int32/2^24。  \r\nValues: 65535, 65536, 16777217, 2^31 边界。  \r\n代码信号: 窄整型存 offset。\r\n",
+      "line_start": 221,
+      "line_end": 223,
+      "condition_system": "API42",
+      "definition_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+      "class_ids": [
+        "1.2"
+      ],
+      "themes": []
+    },
+    {
+      "condition_id": "1.2.5",
+      "name": "Broadcast degeneration",
+      "definition": "广播维=1 / stride 0。\nRequires: ≥2 个可广播 tensor 操作数（PRIMARY+OTHER 或列表）。",
+      "requires": [
+        "≥2 个可广播 tensor 操作数（PRIMARY+OTHER 或列表）。"
+      ],
+      "skip_if": [],
+      "family_requires": [
+        "任一 tensor-like 的 `CON-SHAPE-*`，或 `SEM-GEOM`（卷积组合）。"
+      ],
+      "family_skip_if": [
+        "无 shape 可配（极罕见）。"
+      ],
+      "source_quote": "`[ / ]` **1.2.5 Broadcast degeneration** — 广播维=1 / stride 0。  \r\nRequires: ≥2 个可广播 tensor 操作数（PRIMARY+OTHER 或列表）。\r\n",
+      "line_start": 225,
+      "line_end": 226,
+      "condition_system": "API42",
+      "definition_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+      "class_ids": [
+        "1.2"
+      ],
+      "themes": []
+    },
+    {
+      "condition_id": "1.2.6",
+      "name": "Tiling template boundary (off-by-one)",
+      "definition": "落在模板选择边界 ±1。\nRequires: 从 src 读出边界常量 + `CON-SHAPE`。",
+      "requires": [
+        "从 src 读出边界常量 + `CON-SHAPE`。"
+      ],
+      "skip_if": [],
+      "family_requires": [
+        "任一 tensor-like 的 `CON-SHAPE-*`，或 `SEM-GEOM`（卷积组合）。"
+      ],
+      "family_skip_if": [
+        "无 shape 可配（极罕见）。"
+      ],
+      "source_quote": "`[ / ]` **1.2.6 Tiling template boundary (off-by-one)** — 落在模板选择边界 ±1。  \r\nRequires: 从 src 读出边界常量 + `CON-SHAPE`。\r\n",
+      "line_start": 228,
+      "line_end": 229,
+      "condition_system": "API42",
+      "definition_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+      "class_ids": [
+        "1.2"
+      ],
+      "themes": []
+    },
+    {
+      "condition_id": "1.2.7",
+      "name": "Convolution special shape combo",
+      "definition": "input×kernel×stride×dilation×pad。\nRequires: `SEM-GEOM`（attrs/attr_tuple）+ 特征/权重张量。  \r\nSkip if: 非 conv/pool 几何类。",
+      "requires": [
+        "`SEM-GEOM`（attrs/attr_tuple）+ 特征/权重张量。"
+      ],
+      "skip_if": [
+        "非 conv/pool 几何类。"
+      ],
+      "family_requires": [
+        "任一 tensor-like 的 `CON-SHAPE-*`，或 `SEM-GEOM`（卷积组合）。"
+      ],
+      "family_skip_if": [
+        "无 shape 可配（极罕见）。"
+      ],
+      "source_quote": "`[ / ]` **1.2.7 Convolution special shape combo** — input×kernel×stride×dilation×pad。  \r\nRequires: `SEM-GEOM`（attrs/attr_tuple）+ 特征/权重张量。  \r\nSkip if: 非 conv/pool 几何类。\r\n",
+      "line_start": 231,
+      "line_end": 233,
+      "condition_system": "API42",
+      "definition_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+      "class_ids": [
+        "1.2"
+      ],
+      "themes": []
+    },
+    {
+      "condition_id": "1.2.8",
+      "name": "Output dim < minimum transfer granularity",
+      "definition": "输出 < 32B 等。\nRequires: 可推出 output 元素数与 dtype 宽度。",
+      "requires": [
+        "可推出 output 元素数与 dtype 宽度。"
+      ],
+      "skip_if": [],
+      "family_requires": [
+        "任一 tensor-like 的 `CON-SHAPE-*`，或 `SEM-GEOM`（卷积组合）。"
+      ],
+      "family_skip_if": [
+        "无 shape 可配（极罕见）。"
+      ],
+      "source_quote": "`[ / ]` **1.2.8 Output dim < minimum transfer granularity** — 输出 < 32B 等。  \r\nRequires: 可推出 output 元素数与 dtype 宽度。\r\n",
+      "line_start": 235,
+      "line_end": 236,
+      "condition_system": "API42",
+      "definition_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+      "class_ids": [
+        "1.2"
+      ],
+      "themes": []
+    },
+    {
+      "condition_id": "1.3.1",
+      "name": "Index OOB / extreme",
+      "definition": "0, -1, MAX_INT, ≥dim。\nRequires: `TEN-INDEX`（dtype 多为 int32/64）。",
+      "requires": [
+        "`TEN-INDEX`（dtype 多为 int32/64）。"
+      ],
+      "skip_if": [],
+      "family_requires": [
+        "- `TEN-INDEX` 或 `tensor_tuple` 索引，或\n- `TEN-MOE-ROUTE` 中的 expert/token 下标，或\n- `SEM-INDEX-CTRL` / `SEM-SLICE`（begin/end/window）且参与地址映射。"
+      ],
+      "family_skip_if": [
+        "仅有 `TEN-PRIMARY` 等数据张量、无任何索引/下标/窗映射实参 —— 禁止给 1.3 分配预算。\n（这是「张量输入不会有 index 触发」的形式化表述。）"
+      ],
+      "source_quote": "`[ / ]` **1.3.1 Index OOB / extreme** — 0, -1, MAX_INT, ≥dim。  \r\nRequires: `TEN-INDEX`（dtype 多为 int32/64）。\r\n",
+      "line_start": 251,
+      "line_end": 252,
+      "condition_system": "API42",
+      "definition_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+      "class_ids": [
+        "1.3"
+      ],
+      "themes": []
+    },
+    {
+      "condition_id": "1.3.2",
+      "name": "Offset overflow (>uint16 / >int32)",
+      "definition": "算址偏移溢出。\nRequires: shape/index 使 offset 公式 > 阈值；常与 1.2.4 组合。",
+      "requires": [
+        "shape/index 使 offset 公式 > 阈值；常与 1.2.4 组合。"
+      ],
+      "skip_if": [],
+      "family_requires": [
+        "- `TEN-INDEX` 或 `tensor_tuple` 索引，或\n- `TEN-MOE-ROUTE` 中的 expert/token 下标，或\n- `SEM-INDEX-CTRL` / `SEM-SLICE`（begin/end/window）且参与地址映射。"
+      ],
+      "family_skip_if": [
+        "仅有 `TEN-PRIMARY` 等数据张量、无任何索引/下标/窗映射实参 —— 禁止给 1.3 分配预算。\n（这是「张量输入不会有 index 触发」的形式化表述。）"
+      ],
+      "source_quote": "`[ / ]` **1.3.2 Offset overflow (>uint16 / >int32)** — 算址偏移溢出。  \r\nRequires: shape/index 使 offset 公式 > 阈值；常与 1.2.4 组合。\r\n",
+      "line_start": 254,
+      "line_end": 255,
+      "condition_system": "API42",
+      "definition_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+      "class_ids": [
+        "1.3"
+      ],
+      "themes": []
+    },
+    {
+      "condition_id": "1.3.3",
+      "name": "Sliding window / attention window boundary",
+      "definition": "窗起止非法。\nRequires: `SEM-ATTN-STRUCT` / `SEM-GEOM` 窗参数或 mask 窗。  \r\nSkip if: 无窗。",
+      "requires": [
+        "`SEM-ATTN-STRUCT` / `SEM-GEOM` 窗参数或 mask 窗。"
+      ],
+      "skip_if": [
+        "无窗。"
+      ],
+      "family_requires": [
+        "- `TEN-INDEX` 或 `tensor_tuple` 索引，或\n- `TEN-MOE-ROUTE` 中的 expert/token 下标，或\n- `SEM-INDEX-CTRL` / `SEM-SLICE`（begin/end/window）且参与地址映射。"
+      ],
+      "family_skip_if": [
+        "仅有 `TEN-PRIMARY` 等数据张量、无任何索引/下标/窗映射实参 —— 禁止给 1.3 分配预算。\n（这是「张量输入不会有 index 触发」的形式化表述。）"
+      ],
+      "source_quote": "`[ / ]` **1.3.3 Sliding window / attention window boundary** — 窗起止非法。  \r\nRequires: `SEM-ATTN-STRUCT` / `SEM-GEOM` 窗参数或 mask 窗。  \r\nSkip if: 无窗。\r\n",
+      "line_start": 257,
+      "line_end": 259,
+      "condition_system": "API42",
+      "definition_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+      "class_ids": [
+        "1.3"
+      ],
+      "themes": []
+    },
+    {
+      "condition_id": "1.3.4",
+      "name": "Expert/routing index combo (MoE)",
+      "definition": "极端/全同/重复路由。\nRequires: `TEN-MOE-ROUTE` 或 `SEM-MOE-DIST`。  \r\nSkip if: 非 MoE。",
+      "requires": [
+        "`TEN-MOE-ROUTE` 或 `SEM-MOE-DIST`。"
+      ],
+      "skip_if": [
+        "非 MoE。"
+      ],
+      "family_requires": [
+        "- `TEN-INDEX` 或 `tensor_tuple` 索引，或\n- `TEN-MOE-ROUTE` 中的 expert/token 下标，或\n- `SEM-INDEX-CTRL` / `SEM-SLICE`（begin/end/window）且参与地址映射。"
+      ],
+      "family_skip_if": [
+        "仅有 `TEN-PRIMARY` 等数据张量、无任何索引/下标/窗映射实参 —— 禁止给 1.3 分配预算。\n（这是「张量输入不会有 index 触发」的形式化表述。）"
+      ],
+      "source_quote": "`[ / ]` **1.3.4 Expert/routing index combo (MoE)** — 极端/全同/重复路由。  \r\nRequires: `TEN-MOE-ROUTE` 或 `SEM-MOE-DIST`。  \r\nSkip if: 非 MoE。\r\n",
+      "line_start": 261,
+      "line_end": 263,
+      "condition_system": "API42",
+      "definition_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+      "class_ids": [
+        "1.3"
+      ],
+      "themes": []
+    },
+    {
+      "condition_id": "1.4.1",
+      "name": "Non-contiguous tensor",
+      "definition": "`[not testable]` — 除非 schema 暴露 stride。",
+      "requires": [],
+      "skip_if": [],
+      "family_requires": [
+        "`SEM-LAYOUT`，或 `SEM-TRANSPOSE` 导致非平凡 stride，或 schema 暴露 format/stride，或 `CON-ALIGN`。"
+      ],
+      "family_skip_if": [
+        "固定 ND、无 format/transpose/align 实参且框架不可控 stride（多项标 `[not testable]`）。"
+      ],
+      "source_quote": "`[ / ]` **1.4.1 Non-contiguous tensor** `[not testable]` — 除非 schema 暴露 stride。  \r\n",
+      "line_start": 272,
+      "line_end": 272,
+      "condition_system": "API42",
+      "definition_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+      "class_ids": [
+        "1.4"
+      ],
+      "themes": []
+    },
+    {
+      "condition_id": "1.4.2",
+      "name": "Large stride (>65535)",
+      "definition": "由 shape 推出使 stride>65535。\nRequires: 高维大尾维 + 地址按 stride 计算的实现。",
+      "requires": [
+        "高维大尾维 + 地址按 stride 计算的实现。"
+      ],
+      "skip_if": [],
+      "family_requires": [
+        "`SEM-LAYOUT`，或 `SEM-TRANSPOSE` 导致非平凡 stride，或 schema 暴露 format/stride，或 `CON-ALIGN`。"
+      ],
+      "family_skip_if": [
+        "固定 ND、无 format/transpose/align 实参且框架不可控 stride（多项标 `[not testable]`）。"
+      ],
+      "source_quote": "`[ / ]` **1.4.2 Large stride (>65535)** — 由 shape 推出使 stride>65535。  \r\nRequires: 高维大尾维 + 地址按 stride 计算的实现。  \r\n",
+      "line_start": 273,
+      "line_end": 274,
+      "condition_system": "API42",
+      "definition_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+      "class_ids": [
+        "1.4"
+      ],
+      "themes": []
+    },
+    {
+      "condition_id": "1.4.3",
+      "name": "Special format (NZ, TND)",
+      "definition": "Requires: `SEM-LAYOUT` 可选 NZ/TND 等。  \r\nSkip if: 仅 ND。",
+      "requires": [
+        "`SEM-LAYOUT` 可选 NZ/TND 等。"
+      ],
+      "skip_if": [
+        "仅 ND。"
+      ],
+      "family_requires": [
+        "`SEM-LAYOUT`，或 `SEM-TRANSPOSE` 导致非平凡 stride，或 schema 暴露 format/stride，或 `CON-ALIGN`。"
+      ],
+      "family_skip_if": [
+        "固定 ND、无 format/transpose/align 实参且框架不可控 stride（多项标 `[not testable]`）。"
+      ],
+      "source_quote": "`[ / ]` **1.4.3 Special format (NZ, TND)** —  \r\nRequires: `SEM-LAYOUT` 可选 NZ/TND 等。  \r\nSkip if: 仅 ND。\r\n",
+      "line_start": 275,
+      "line_end": 277,
+      "condition_system": "API42",
+      "definition_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+      "class_ids": [
+        "1.4"
+      ],
+      "themes": []
+    },
+    {
+      "condition_id": "1.5.1",
+      "name": "Non-aligned sequence length",
+      "definition": "seq ∉ 16/32/64/128 倍数。",
+      "requires": [],
+      "skip_if": [],
+      "family_requires": [
+        "`SEM-SEQ-LEN` / `TEN-SEQ-META` / `SEM-ATTN-STRUCT` / `TEN-ATTN-QKV` 上可解释的 seq/head 维。"
+      ],
+      "family_skip_if": [
+        "无序列维语义（纯点对点 elemwise 且无 seq）。"
+      ],
+      "source_quote": "`[ / ]` **1.5.1 Non-aligned sequence length** — seq ∉ 16/32/64/128 倍数。  \r\n",
+      "line_start": 286,
+      "line_end": 286,
+      "condition_system": "API42",
+      "definition_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+      "class_ids": [
+        "1.5"
+      ],
+      "themes": []
+    },
+    {
+      "condition_id": "1.5.2",
+      "name": "Very long sequence",
+      "definition": "2048/4096/8192…",
+      "requires": [],
+      "skip_if": [],
+      "family_requires": [
+        "`SEM-SEQ-LEN` / `TEN-SEQ-META` / `SEM-ATTN-STRUCT` / `TEN-ATTN-QKV` 上可解释的 seq/head 维。"
+      ],
+      "family_skip_if": [
+        "无序列维语义（纯点对点 elemwise 且无 seq）。"
+      ],
+      "source_quote": "`[ / ]` **1.5.2 Very long sequence** — 2048/4096/8192…  \r\n",
+      "line_start": 287,
+      "line_end": 287,
+      "condition_system": "API42",
+      "definition_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+      "class_ids": [
+        "1.5"
+      ],
+      "themes": []
+    },
+    {
+      "condition_id": "1.5.3",
+      "name": "Decode-length (seq_len=1)",
+      "definition": "单步 decode 路径。",
+      "requires": [],
+      "skip_if": [],
+      "family_requires": [
+        "`SEM-SEQ-LEN` / `TEN-SEQ-META` / `SEM-ATTN-STRUCT` / `TEN-ATTN-QKV` 上可解释的 seq/head 维。"
+      ],
+      "family_skip_if": [
+        "无序列维语义（纯点对点 elemwise 且无 seq）。"
+      ],
+      "source_quote": "`[ / ]` **1.5.3 Decode-length (seq_len=1)** — 单步 decode 路径。  \r\n",
+      "line_start": 288,
+      "line_end": 288,
+      "condition_system": "API42",
+      "definition_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+      "class_ids": [
+        "1.5"
+      ],
+      "themes": []
+    },
+    {
+      "condition_id": "1.5.4",
+      "name": "Head dim not aligned",
+      "definition": "dSize 非标准对齐。\nRequires: head 维存在（ATTN-STRUCT 或 QKV shape）。",
+      "requires": [
+        "head 维存在（ATTN-STRUCT 或 QKV shape）。"
+      ],
+      "skip_if": [],
+      "family_requires": [
+        "`SEM-SEQ-LEN` / `TEN-SEQ-META` / `SEM-ATTN-STRUCT` / `TEN-ATTN-QKV` 上可解释的 seq/head 维。"
+      ],
+      "family_skip_if": [
+        "无序列维语义（纯点对点 elemwise 且无 seq）。"
+      ],
+      "source_quote": "`[ / ]` **1.5.4 Head dim not aligned** — dSize 非标准对齐。  \r\nRequires: head 维存在（ATTN-STRUCT 或 QKV shape）。\r\n",
+      "line_start": 289,
+      "line_end": 290,
+      "condition_system": "API42",
+      "definition_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+      "class_ids": [
+        "1.5"
+      ],
+      "themes": []
+    },
+    {
+      "condition_id": "1.6.1",
+      "name": "Batch > 1",
+      "definition": "batch=2/4 激活不同 offset/workspace。",
+      "requires": [],
+      "skip_if": [],
+      "family_requires": [
+        "shape 上存在 batch/sample 维，或 MoE token 分配。"
+      ],
+      "family_skip_if": [
+        "无 batch 概念的标量核。"
+      ],
+      "source_quote": "`[ / ]` **1.6.1 Batch > 1** — batch=2/4 激活不同 offset/workspace。  \r\n",
+      "line_start": 299,
+      "line_end": 299,
+      "condition_system": "API42",
+      "definition_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+      "class_ids": [
+        "1.6"
+      ],
+      "themes": []
+    },
+    {
+      "condition_id": "1.6.2",
+      "name": "Uneven expert/token allocation",
+      "definition": "Requires: MoE 路由实参（同 1.1.4/1.3.4）。  \r\nSkip if: 非 MoE。",
+      "requires": [
+        "MoE 路由实参（同 1.1.4/1.3.4）。"
+      ],
+      "skip_if": [
+        "非 MoE。"
+      ],
+      "family_requires": [
+        "shape 上存在 batch/sample 维，或 MoE token 分配。"
+      ],
+      "family_skip_if": [
+        "无 batch 概念的标量核。"
+      ],
+      "source_quote": "`[ / ]` **1.6.2 Uneven expert/token allocation** —  \r\nRequires: MoE 路由实参（同 1.1.4/1.3.4）。  \r\nSkip if: 非 MoE。\r\n",
+      "line_start": 300,
+      "line_end": 302,
+      "condition_system": "API42",
+      "definition_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+      "class_ids": [
+        "1.6"
+      ],
+      "themes": []
+    },
+    {
+      "condition_id": "1.7.1",
+      "name": "All-zero → div-by-zero (scale=INF)",
+      "definition": "`constant(0)`；常与动态量化 attr 联用。",
+      "requires": [],
+      "skip_if": [],
+      "family_requires": [
+        "至少一数值型 `TEN-PRIMARY` / `OTHER-OPERAND` / `WEIGHT` / `SCALE-ZP` / `SEM-SCALAR-COEFF`（浮点或会转浮点）。"
+      ],
+      "family_skip_if": [
+        "无数值载荷（纯 shape 推导算子且无 data）。"
+      ],
+      "source_quote": "`[ / ]` **1.7.1 All-zero → div-by-zero (scale=INF)** — `constant(0)`；常与动态量化 attr 联用。  \r\n",
+      "line_start": 312,
+      "line_end": 312,
+      "condition_system": "API42",
+      "definition_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+      "class_ids": [
+        "1.7"
+      ],
+      "themes": []
+    },
+    {
+      "condition_id": "1.7.2",
+      "name": "NaN / Inf",
+      "definition": "Requires: `CON-BOUNDARY-INFNAN` 或 dtype 为浮点。",
+      "requires": [],
+      "skip_if": [],
+      "family_requires": [
+        "至少一数值型 `TEN-PRIMARY` / `OTHER-OPERAND` / `WEIGHT` / `SCALE-ZP` / `SEM-SCALAR-COEFF`（浮点或会转浮点）。"
+      ],
+      "family_skip_if": [
+        "无数值载荷（纯 shape 推导算子且无 data）。"
+      ],
+      "source_quote": "`[ / ]` **1.7.2 NaN / Inf** — Requires: `CON-BOUNDARY-INFNAN` 或 dtype 为浮点。  \r\n",
+      "line_start": 313,
+      "line_end": 313,
+      "condition_system": "API42",
+      "definition_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+      "class_ids": [
+        "1.7"
+      ],
+      "themes": []
+    },
+    {
+      "condition_id": "1.7.3",
+      "name": "Extreme large values",
+      "definition": "近 FP 上限 / exp 溢出区。",
+      "requires": [],
+      "skip_if": [],
+      "family_requires": [
+        "至少一数值型 `TEN-PRIMARY` / `OTHER-OPERAND` / `WEIGHT` / `SCALE-ZP` / `SEM-SCALAR-COEFF`（浮点或会转浮点）。"
+      ],
+      "family_skip_if": [
+        "无数值载荷（纯 shape 推导算子且无 data）。"
+      ],
+      "source_quote": "`[ / ]` **1.7.3 Extreme large values** — 近 FP 上限 / exp 溢出区。  \r\n",
+      "line_start": 314,
+      "line_end": 314,
+      "condition_system": "API42",
+      "definition_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+      "class_ids": [
+        "1.7"
+      ],
+      "themes": []
+    },
+    {
+      "condition_id": "1.7.4",
+      "name": "Near-zero denominator",
+      "definition": "scale/除数 ~0。\nRequires: 除数角色张量或 scalar。",
+      "requires": [
+        "除数角色张量或 scalar。"
+      ],
+      "skip_if": [],
+      "family_requires": [
+        "至少一数值型 `TEN-PRIMARY` / `OTHER-OPERAND` / `WEIGHT` / `SCALE-ZP` / `SEM-SCALAR-COEFF`（浮点或会转浮点）。"
+      ],
+      "family_skip_if": [
+        "无数值载荷（纯 shape 推导算子且无 data）。"
+      ],
+      "source_quote": "`[ / ]` **1.7.4 Near-zero denominator** — scale/除数 ~0。  \r\nRequires: 除数角色张量或 scalar。  \r\n",
+      "line_start": 315,
+      "line_end": 316,
+      "condition_system": "API42",
+      "definition_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+      "class_ids": [
+        "1.7"
+      ],
+      "themes": []
+    },
+    {
+      "condition_id": "1.7.5",
+      "name": "Log-domain instability",
+      "definition": "概率近 0/1。\nRequires: 进入 log/softmax 的输入。",
+      "requires": [
+        "进入 log/softmax 的输入。"
+      ],
+      "skip_if": [],
+      "family_requires": [
+        "至少一数值型 `TEN-PRIMARY` / `OTHER-OPERAND` / `WEIGHT` / `SCALE-ZP` / `SEM-SCALAR-COEFF`（浮点或会转浮点）。"
+      ],
+      "family_skip_if": [
+        "无数值载荷（纯 shape 推导算子且无 data）。"
+      ],
+      "source_quote": "`[ / ]` **1.7.5 Log-domain instability** — 概率近 0/1。  \r\nRequires: 进入 log/softmax 的输入。  \r\n",
+      "line_start": 317,
+      "line_end": 318,
+      "condition_system": "API42",
+      "definition_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+      "class_ids": [
+        "1.7"
+      ],
+      "themes": []
+    },
+    {
+      "condition_id": "1.7.6",
+      "name": "Intermediate overflow (mul before div)",
+      "definition": "大值触发中间溢出。",
+      "requires": [],
+      "skip_if": [],
+      "family_requires": [
+        "至少一数值型 `TEN-PRIMARY` / `OTHER-OPERAND` / `WEIGHT` / `SCALE-ZP` / `SEM-SCALAR-COEFF`（浮点或会转浮点）。"
+      ],
+      "family_skip_if": [
+        "无数值载荷（纯 shape 推导算子且无 data）。"
+      ],
+      "source_quote": "`[ / ]` **1.7.6 Intermediate overflow (mul before div)** — 大值触发中间溢出。\r\n",
+      "line_start": 319,
+      "line_end": 319,
+      "condition_system": "API42",
+      "definition_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+      "class_ids": [
+        "1.7"
+      ],
+      "themes": []
+    },
+    {
+      "condition_id": "1.8.1",
+      "name": "Packed variable-length sequence",
+      "definition": "batchSizes/packed 实参。\nRequires: pack 相关 attr 或 SEQ-LEN 数组。",
+      "requires": [
+        "pack 相关 attr 或 SEQ-LEN 数组。"
+      ],
+      "skip_if": [],
+      "family_requires": [
+        "`TEN-MASK` / `SEM-SPARSE-MASK` / `SEM-PADDED-MODE` / packed 相关 attr / `SEM-GEOM` 负 padding。"
+      ],
+      "family_skip_if": [
+        "无 mask、无 pack/pad 组织、无 crop。"
+      ],
+      "source_quote": "`[ / ]` **1.8.1 Packed variable-length sequence** — batchSizes/packed 实参。  \r\nRequires: pack 相关 attr 或 SEQ-LEN 数组。  \r\n",
+      "line_start": 328,
+      "line_end": 329,
+      "condition_system": "API42",
+      "definition_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+      "class_ids": [
+        "1.8"
+      ],
+      "themes": []
+    },
+    {
+      "condition_id": "1.8.2",
+      "name": "Mask type/combination",
+      "definition": "causal/SWA/custom + GQA 等。\nRequires: `TEN-MASK` 或 `SEM-SPARSE-MASK`。",
+      "requires": [
+        "`TEN-MASK` 或 `SEM-SPARSE-MASK`。"
+      ],
+      "skip_if": [],
+      "family_requires": [
+        "`TEN-MASK` / `SEM-SPARSE-MASK` / `SEM-PADDED-MODE` / packed 相关 attr / `SEM-GEOM` 负 padding。"
+      ],
+      "family_skip_if": [
+        "无 mask、无 pack/pad 组织、无 crop。"
+      ],
+      "source_quote": "`[ / ]` **1.8.2 Mask type/combination** — causal/SWA/custom + GQA 等。  \r\nRequires: `TEN-MASK` 或 `SEM-SPARSE-MASK`。  \r\n",
+      "line_start": 330,
+      "line_end": 331,
+      "condition_system": "API42",
+      "definition_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+      "class_ids": [
+        "1.8"
+      ],
+      "themes": []
+    },
+    {
+      "condition_id": "1.8.3",
+      "name": "Negative padding (crop)",
+      "definition": "Requires: `SEM-GEOM` padding 允许负值。",
+      "requires": [
+        "`SEM-GEOM` padding 允许负值。"
+      ],
+      "skip_if": [],
+      "family_requires": [
+        "`TEN-MASK` / `SEM-SPARSE-MASK` / `SEM-PADDED-MODE` / packed 相关 attr / `SEM-GEOM` 负 padding。"
+      ],
+      "family_skip_if": [
+        "无 mask、无 pack/pad 组织、无 crop。"
+      ],
+      "source_quote": "`[ / ]` **1.8.3 Negative padding (crop)** —  \r\nRequires: `SEM-GEOM` padding 允许负值。\r\n",
+      "line_start": 332,
+      "line_end": 333,
+      "condition_system": "API42",
+      "definition_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+      "class_ids": [
+        "1.8"
+      ],
+      "themes": []
+    },
+    {
+      "condition_id": "1.C.1",
+      "name": "动态/静态量化、quant 粒度",
+      "definition": "动态/静态量化、quant 粒度",
+      "requires": [
+        "`SEM-QUANT`"
+      ],
+      "skip_if": [],
+      "family_requires": [],
+      "family_skip_if": [],
+      "source_quote": "| **1.C.1** | 动态/静态量化、quant 粒度    | `SEM-QUANT`                                 | 1.7.1      |\r\n",
+      "line_start": 344,
+      "line_end": 344,
+      "condition_system": "API42",
+      "definition_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+      "class_ids": [
+        "1.C"
+      ],
+      "themes": []
+    },
+    {
+      "condition_id": "1.C.2",
+      "name": "输出低精度 / out dtype",
+      "definition": "输出低精度 / out dtype",
+      "requires": [
+        "`SEM-DTYPE-OUT` / `SEM-QUANT`"
+      ],
+      "skip_if": [],
+      "family_requires": [],
+      "family_skip_if": [],
+      "source_quote": "| **1.C.2** | 输出低精度 / out dtype       | `SEM-DTYPE-OUT` / `SEM-QUANT`               | 1.7        |\r\n",
+      "line_start": 345,
+      "line_end": 345,
+      "condition_system": "API42",
+      "definition_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+      "class_ids": [
+        "1.C"
+      ],
+      "themes": []
+    },
+    {
+      "condition_id": "1.C.3",
+      "name": "cubeMathType / KEEP_DTYPE",
+      "definition": "cubeMathType / KEEP_DTYPE",
+      "requires": [
+        "`SEM-MATH-MODE`"
+      ],
+      "skip_if": [],
+      "family_requires": [],
+      "family_skip_if": [],
+      "source_quote": "| **1.C.3** | cubeMathType / KEEP_DTYPE    | `SEM-MATH-MODE`                             | 1.2, 1.7   |\r\n",
+      "line_start": 346,
+      "line_end": 346,
+      "condition_system": "API42",
+      "definition_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+      "class_ids": [
+        "1.C"
+      ],
+      "themes": []
+    },
+    {
+      "condition_id": "1.C.4",
+      "name": "RoPE / sink / dual-IO 等模式",
+      "definition": "RoPE / sink / dual-IO 等模式",
+      "requires": [
+        "`SEM-ATTN-STRUCT` 等"
+      ],
+      "skip_if": [],
+      "family_requires": [],
+      "family_skip_if": [],
+      "source_quote": "| **1.C.4** | RoPE / sink / dual-IO 等模式 | `SEM-ATTN-STRUCT` 等                        | 1.5, 1.8   |\r\n",
+      "line_start": 347,
+      "line_end": 347,
+      "condition_system": "API42",
+      "definition_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+      "class_ids": [
+        "1.C"
+      ],
+      "themes": []
+    },
+    {
+      "condition_id": "1.C.5",
+      "name": "deterministic / accumulate",
+      "definition": "deterministic / accumulate",
+      "requires": [
+        "`SEM-DETERMINISTIC` / `SEM-INDEX-CTRL`"
+      ],
+      "skip_if": [],
+      "family_requires": [],
+      "family_skip_if": [],
+      "source_quote": "| **1.C.5** | deterministic / accumulate   | `SEM-DETERMINISTIC` / `SEM-INDEX-CTRL`      | 1.3        |\r\n",
+      "line_start": 348,
+      "line_end": 348,
+      "condition_system": "API42",
+      "definition_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+      "class_ids": [
+        "1.C"
+      ],
+      "themes": []
+    },
+    {
+      "condition_id": "1.C.6",
+      "name": "format / NZ",
+      "definition": "format / NZ",
+      "requires": [
+        "`SEM-LAYOUT`"
+      ],
+      "skip_if": [],
+      "family_requires": [],
+      "family_skip_if": [],
+      "source_quote": "| **1.C.6** | format / NZ                  | `SEM-LAYOUT`                                | 1.4        |\r\n",
+      "line_start": 349,
+      "line_end": 349,
+      "condition_system": "API42",
+      "definition_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+      "class_ids": [
+        "1.C"
+      ],
+      "themes": []
+    },
+    {
+      "condition_id": "1.C.7",
+      "name": "reduction / dim / transpose",
+      "definition": "reduction / dim / transpose",
+      "requires": [
+        "`SEM-REDUCE` / `SEM-AXIS` / `SEM-TRANSPOSE`"
+      ],
+      "skip_if": [],
+      "family_requires": [],
+      "family_skip_if": [],
+      "source_quote": "| **1.C.7** | reduction / dim / transpose  | `SEM-REDUCE` / `SEM-AXIS` / `SEM-TRANSPOSE` | 1.2        |\r\n",
+      "line_start": 350,
+      "line_end": 350,
+      "condition_system": "API42",
+      "definition_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+      "class_ids": [
+        "1.C"
+      ],
+      "themes": []
+    },
+    {
+      "condition_id": "optional_absent",
+      "name": "optional输入省略 / null",
+      "definition": "仅按契约省略参数或传null，以检验缺省路径。",
+      "original_class_ids": [
+        "D1"
+      ],
+      "original_theme_ids": [
+        "D"
+      ],
+      "original_source_occurrences": [
+        {
+          "line_start": 48,
+          "line_end": 48,
+          "source_quote": "  - `optional_absent` — **optional输入省略 / null**：仅按契约省略参数或传null，以检验缺省路径。"
+        }
+      ],
+      "condition_system": "V4",
+      "definition_sha256": "e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+      "class_ids": [
+        "D1"
+      ],
+      "themes": [
+        "D"
+      ],
+      "class_predicates": [
+        {
+          "id": "D1",
+          "name": "省略输入（Omitted Input）",
+          "definition": "对接口允许省略的输入，构造省略、契约认可的 null、显式默认值及显式非默认值，比较缺省行为与参数生效后的路径。",
+          "original_requires": [
+            "接口有可选 bias、mask、scale、padding_idx 或辅助状态。"
+          ],
+          "original_skip_if": [
+            "所有参数均必填，或执行器不能保留省略与显式传值的差别。"
+          ],
+          "line_start": 40,
+          "line_end": 58
+        }
+      ]
+    },
+    {
+      "condition_id": "optional_present",
+      "name": "optional输入显式提供",
+      "definition": "显式提供有效可选参数并与缺省对照，以检验启用该输入后的路径。",
+      "original_class_ids": [
+        "D1"
+      ],
+      "original_theme_ids": [
+        "D"
+      ],
+      "original_source_occurrences": [
+        {
+          "line_start": 49,
+          "line_end": 49,
+          "source_quote": "  - `optional_present` — **optional输入显式提供**：显式提供有效可选参数并与缺省对照，以检验启用该输入后的路径。"
+        }
+      ],
+      "condition_system": "V4",
+      "definition_sha256": "e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+      "class_ids": [
+        "D1"
+      ],
+      "themes": [
+        "D"
+      ],
+      "class_predicates": [
+        {
+          "id": "D1",
+          "name": "省略输入（Omitted Input）",
+          "definition": "对接口允许省略的输入，构造省略、契约认可的 null、显式默认值及显式非默认值，比较缺省行为与参数生效后的路径。",
+          "original_requires": [
+            "接口有可选 bias、mask、scale、padding_idx 或辅助状态。"
+          ],
+          "original_skip_if": [
+            "所有参数均必填，或执行器不能保留省略与显式传值的差别。"
+          ],
+          "line_start": 40,
+          "line_end": 58
+        }
+      ]
+    },
+    {
+      "condition_id": "zero_scalar",
+      "name": "控制标量为0",
+      "definition": "将合法次数、阈值、系数或零点设为0，以检验提前返回与零值分支。",
+      "original_class_ids": [
+        "D2"
+      ],
+      "original_theme_ids": [
+        "D"
+      ],
+      "original_source_occurrences": [
+        {
+          "line_start": 67,
+          "line_end": 67,
+          "source_quote": "  - `zero_scalar` — **控制标量为0**：将合法次数、阈值、系数或零点设为0，以检验提前返回与零值分支。"
+        }
+      ],
+      "condition_system": "V4",
+      "definition_sha256": "e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+      "class_ids": [
+        "D2"
+      ],
+      "themes": [
+        "D"
+      ],
+      "class_predicates": [
+        {
+          "id": "D2",
+          "name": "退化控制值（Degenerate Control Values）",
+          "definition": "将合法控制量取0、1、负值或-1哨兵；只在接口契约允许时使用。",
+          "original_requires": [
+            "有次数、系数、概率、步长、推断维或哨兵等控制实参。"
+          ],
+          "original_skip_if": [
+            "参数没有退化取值，或候选值越出合法域。"
+          ],
+          "line_start": 59,
+          "line_end": 80
+        }
+      ]
+    },
+    {
+      "condition_id": "unit_scalar",
+      "name": "控制标量为1 / 概率端点",
+      "definition": "取合法的1及其邻域，概率参数取0/1端点，以检验恒等路径和端点处理。",
+      "original_class_ids": [
+        "D2"
+      ],
+      "original_theme_ids": [
+        "D"
+      ],
+      "original_source_occurrences": [
+        {
+          "line_start": 68,
+          "line_end": 68,
+          "source_quote": "  - `unit_scalar` — **控制标量为1 / 概率端点**：取合法的1及其邻域，概率参数取0/1端点，以检验恒等路径和端点处理。"
+        }
+      ],
+      "condition_system": "V4",
+      "definition_sha256": "e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+      "class_ids": [
+        "D2"
+      ],
+      "themes": [
+        "D"
+      ],
+      "class_predicates": [
+        {
+          "id": "D2",
+          "name": "退化控制值（Degenerate Control Values）",
+          "definition": "将合法控制量取0、1、负值或-1哨兵；只在接口契约允许时使用。",
+          "original_requires": [
+            "有次数、系数、概率、步长、推断维或哨兵等控制实参。"
+          ],
+          "original_skip_if": [
+            "参数没有退化取值，或候选值越出合法域。"
+          ],
+          "line_start": 59,
+          "line_end": 80
+        }
+      ]
+    },
+    {
+      "condition_id": "negative_control",
+      "name": "负阈值 / 负步长参数 / 负覆盖系数",
+      "definition": "在允许负值的控制参数上对比负数、零与正数，以检验符号相关分支。",
+      "original_class_ids": [
+        "D2"
+      ],
+      "original_theme_ids": [
+        "D"
+      ],
+      "original_source_occurrences": [
+        {
+          "line_start": 69,
+          "line_end": 69,
+          "source_quote": "  - `negative_control` — **负阈值 / 负步长参数 / 负覆盖系数**：在允许负值的控制参数上对比负数、零与正数，以检验符号相关分支。"
+        }
+      ],
+      "condition_system": "V4",
+      "definition_sha256": "e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+      "class_ids": [
+        "D2"
+      ],
+      "themes": [
+        "D"
+      ],
+      "class_predicates": [
+        {
+          "id": "D2",
+          "name": "退化控制值（Degenerate Control Values）",
+          "definition": "将合法控制量取0、1、负值或-1哨兵；只在接口契约允许时使用。",
+          "original_requires": [
+            "有次数、系数、概率、步长、推断维或哨兵等控制实参。"
+          ],
+          "original_skip_if": [
+            "参数没有退化取值，或候选值越出合法域。"
+          ],
+          "line_start": 59,
+          "line_end": 80
+        }
+      ]
+    },
+    {
+      "condition_id": "minus_one",
+      "name": "-1：推断维度 / 动态标记 / 哨兵",
+      "definition": "在合法推断维、动态标记、负轴或哨兵位置使用-1，以检验其解释与规范化。",
+      "original_class_ids": [
+        "D2",
+        "I1"
+      ],
+      "original_theme_ids": [
+        "D",
+        "I"
+      ],
+      "original_source_occurrences": [
+        {
+          "line_start": 70,
+          "line_end": 70,
+          "source_quote": "  - `minus_one` — **-1：推断维度 / 动态标记 / 哨兵**：在合法推断维、动态标记、负轴或哨兵位置使用-1，以检验其解释与规范化。"
+        },
+        {
+          "line_start": 442,
+          "line_end": 442,
+          "source_quote": "  - `minus_one` — **-1：推断维度 / 动态标记 / 哨兵**：在合法推断维、动态标记、负轴或哨兵位置使用-1，以检验其解释与规范化。"
+        }
+      ],
+      "condition_system": "V4",
+      "definition_sha256": "e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+      "class_ids": [
+        "D2",
+        "I1"
+      ],
+      "themes": [
+        "D",
+        "I"
+      ],
+      "class_predicates": [
+        {
+          "id": "D2",
+          "name": "退化控制值（Degenerate Control Values）",
+          "definition": "将合法控制量取0、1、负值或-1哨兵；只在接口契约允许时使用。",
+          "original_requires": [
+            "有次数、系数、概率、步长、推断维或哨兵等控制实参。"
+          ],
+          "original_skip_if": [
+            "参数没有退化取值，或候选值越出合法域。"
+          ],
+          "line_start": 59,
+          "line_end": 80
+        },
+        {
+          "id": "I1",
+          "name": "负数索引（Negative Indices）",
+          "definition": "构造合法负轴、负索引、负坐标，以及动态形状、推断维和缺省参数中的负值标记。",
+          "original_requires": [
+            "参数允许负轴、负索引、负坐标或 -1/-2 等推断/缺省标记。"
+          ],
+          "original_skip_if": [
+            "参数没有合法负轴、负下标、负坐标或负值标记。"
+          ],
+          "line_start": 433,
+          "line_end": 451
+        }
+      ]
+    },
+    {
+      "condition_id": "zero_extent",
+      "name": "某维长度为0 / 零元素张量",
+      "definition": "将合法轴或有效序列长度设为0，以检验零元素输入的初始化与返回路径。",
+      "original_class_ids": [
+        "D3"
+      ],
+      "original_theme_ids": [
+        "D"
+      ],
+      "original_source_occurrences": [
+        {
+          "line_start": 89,
+          "line_end": 89,
+          "source_quote": "  - `zero_extent` — **某维长度为0 / 零元素张量**：将合法轴或有效序列长度设为0，以检验零元素输入的初始化与返回路径。"
+        }
+      ],
+      "condition_system": "V4",
+      "definition_sha256": "e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+      "class_ids": [
+        "D3"
+      ],
+      "themes": [
+        "D"
+      ],
+      "class_predicates": [
+        {
+          "id": "D3",
+          "name": "退化形状（Degenerate Shapes）",
+          "definition": "构造零长度轴、零元素输入、shape=[]和最小非空输入。",
+          "original_requires": [
+            "支持标量、空输入或有效长度为 0 的张量接口。"
+          ],
+          "original_skip_if": [
+            "接口不支持目标空形状或标量形状。"
+          ],
+          "line_start": 81,
+          "line_end": 102
+        }
+      ]
+    },
+    {
+      "condition_id": "rank_zero",
+      "name": "无轴标量",
+      "definition": "对比合法的shape=[]、[1]和[0]，以区分无轴标量、单元素向量与零元素张量的秩处理。",
+      "original_class_ids": [
+        "D3"
+      ],
+      "original_theme_ids": [
+        "D"
+      ],
+      "original_source_occurrences": [
+        {
+          "line_start": 90,
+          "line_end": 90,
+          "source_quote": "  - `rank_zero` — **无轴标量**：对比合法的shape=[]、[1]和[0]，以区分无轴标量、单元素向量与零元素张量的秩处理。"
+        }
+      ],
+      "condition_system": "V4",
+      "definition_sha256": "e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+      "class_ids": [
+        "D3"
+      ],
+      "themes": [
+        "D"
+      ],
+      "class_predicates": [
+        {
+          "id": "D3",
+          "name": "退化形状（Degenerate Shapes）",
+          "definition": "构造零长度轴、零元素输入、shape=[]和最小非空输入。",
+          "original_requires": [
+            "支持标量、空输入或有效长度为 0 的张量接口。"
+          ],
+          "original_skip_if": [
+            "接口不支持目标空形状或标量形状。"
+          ],
+          "line_start": 81,
+          "line_end": 102
+        }
+      ]
+    },
+    {
+      "condition_id": "positive_extent",
+      "name": "空与非空对照",
+      "definition": "对照合法空输入与正元素数输入，并保持同case其他条件，以检验空/非空路径切换。",
+      "original_class_ids": [
+        "D3"
+      ],
+      "original_theme_ids": [
+        "D"
+      ],
+      "original_source_occurrences": [
+        {
+          "line_start": 91,
+          "line_end": 91,
+          "source_quote": "  - `positive_extent` — **空与非空对照**：对照合法空输入与正元素数输入，并保持同case其他条件，以检验空/非空路径切换。"
+        }
+      ],
+      "condition_system": "V4",
+      "definition_sha256": "e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+      "class_ids": [
+        "D3"
+      ],
+      "themes": [
+        "D"
+      ],
+      "class_predicates": [
+        {
+          "id": "D3",
+          "name": "退化形状（Degenerate Shapes）",
+          "definition": "构造零长度轴、零元素输入、shape=[]和最小非空输入。",
+          "original_requires": [
+            "支持标量、空输入或有效长度为 0 的张量接口。"
+          ],
+          "original_skip_if": [
+            "接口不支持目标空形状或标量形状。"
+          ],
+          "line_start": 81,
+          "line_end": 102
+        }
+      ]
+    },
+    {
+      "condition_id": "range_collapsed",
+      "name": "数值区间收缩",
+      "definition": "令区间两端相等或非常接近，构造零宽或窄区间。 检验缩放、归一化、插值和边界处理对非零区间宽度的假设。",
+      "original_class_ids": [
+        "D4"
+      ],
+      "original_theme_ids": [
+        "D"
+      ],
+      "original_source_occurrences": [
+        {
+          "line_start": 111,
+          "line_end": 111,
+          "source_quote": "  - `range_collapsed` — **数值区间收缩**：令区间两端相等或非常接近，构造零宽或窄区间。 检验缩放、归一化、插值和边界处理对非零区间宽度的假设。"
+        }
+      ],
+      "condition_system": "V4",
+      "definition_sha256": "e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+      "class_ids": [
+        "D4"
+      ],
+      "themes": [
+        "D"
+      ],
+      "class_predicates": [
+        {
+          "id": "D4",
+          "name": "覆盖收缩（Collapsed Coverage）",
+          "definition": "缩小数值区间的宽度，或减少索引实际覆盖的不同目标，直至退化为单点。",
+          "original_requires": [
+            "存在数值区间、重复索引更新或低多样性输入。"
+          ],
+          "original_skip_if": [
+            "没有区间宽度或目标覆盖语义。"
+          ],
+          "line_start": 103,
+          "line_end": 122
+        }
+      ]
+    },
+    {
+      "condition_id": "index_repeat",
+      "name": "索引目标集中",
+      "definition": "让多个合法索引集中指向少量目标或同一目标，覆盖相邻位置和跨块重复。 检验重复目标下的累加、覆盖、去重与更新顺序。",
+      "original_class_ids": [
+        "D4"
+      ],
+      "original_theme_ids": [
+        "D"
+      ],
+      "original_source_occurrences": [
+        {
+          "line_start": 112,
+          "line_end": 112,
+          "source_quote": "  - `index_repeat` — **索引目标集中**：让多个合法索引集中指向少量目标或同一目标，覆盖相邻位置和跨块重复。 检验重复目标下的累加、覆盖、去重与更新顺序。"
+        }
+      ],
+      "condition_system": "V4",
+      "definition_sha256": "e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+      "class_ids": [
+        "D4"
+      ],
+      "themes": [
+        "D"
+      ],
+      "class_predicates": [
+        {
+          "id": "D4",
+          "name": "覆盖收缩（Collapsed Coverage）",
+          "definition": "缩小数值区间的宽度，或减少索引实际覆盖的不同目标，直至退化为单点。",
+          "original_requires": [
+            "存在数值区间、重复索引更新或低多样性输入。"
+          ],
+          "original_skip_if": [
+            "没有区间宽度或目标覆盖语义。"
+          ],
+          "line_start": 103,
+          "line_end": 122
+        }
+      ]
+    },
+    {
+      "condition_id": "scalar_limit",
+      "name": "控制标量取类型极限或算法上限",
+      "definition": "取合法类型/算法上限及其邻域，以检验上限处理；区分参数上限和存储类型上限。",
+      "original_class_ids": [
+        "N1"
+      ],
+      "original_theme_ids": [
+        "N"
+      ],
+      "original_source_occurrences": [
+        {
+          "line_start": 131,
+          "line_end": 131,
+          "source_quote": "  - `scalar_limit` — **控制标量取类型极限或算法上限**：取合法类型/算法上限及其邻域，以检验上限处理；区分参数上限和存储类型上限。"
+        }
+      ],
+      "condition_system": "V4",
+      "definition_sha256": "e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+      "class_ids": [
+        "N1"
+      ],
+      "themes": [
+        "N"
+      ],
+      "class_predicates": [
+        {
+          "id": "N1",
+          "name": "极值与特殊值（Extreme and Special Values）",
+          "definition": "取类型/算法上限、NaN、±Inf、±0、次正规值和最大有限值。",
+          "original_requires": [
+            "数值 dtype 或控制标量允许特殊值、类型极限或算法上限。"
+          ],
+          "original_skip_if": [
+            "无数值载荷，或候选特殊值在契约中未定义。"
+          ],
+          "line_start": 123,
+          "line_end": 143
+        }
+      ]
+    },
+    {
+      "condition_id": "special_values",
+      "name": "NaN、±Inf、±0、次正规及最大有限值",
+      "definition": "在部分或全部元素注入NaN、±Inf、±0、次正规值或最大有限值，以检验特殊浮点数传播。",
+      "original_class_ids": [
+        "N1"
+      ],
+      "original_theme_ids": [
+        "N"
+      ],
+      "original_source_occurrences": [
+        {
+          "line_start": 132,
+          "line_end": 132,
+          "source_quote": "  - `special_values` — **NaN、±Inf、±0、次正规及最大有限值**：在部分或全部元素注入NaN、±Inf、±0、次正规值或最大有限值，以检验特殊浮点数传播。"
+        }
+      ],
+      "condition_system": "V4",
+      "definition_sha256": "e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+      "class_ids": [
+        "N1"
+      ],
+      "themes": [
+        "N"
+      ],
+      "class_predicates": [
+        {
+          "id": "N1",
+          "name": "极值与特殊值（Extreme and Special Values）",
+          "definition": "取类型/算法上限、NaN、±Inf、±0、次正规值和最大有限值。",
+          "original_requires": [
+            "数值 dtype 或控制标量允许特殊值、类型极限或算法上限。"
+          ],
+          "original_skip_if": [
+            "无数值载荷，或候选特殊值在契约中未定义。"
+          ],
+          "line_start": 123,
+          "line_end": 143
+        }
+      ]
+    },
+    {
+      "condition_id": "near_singular",
+      "name": "归一化量趋零 / 除零或定义域边界",
+      "definition": "构造低方差、小范数或靠近log/sqrt定义域边界的输入，在合法域内检查近奇异量及其邻域。",
+      "original_class_ids": [
+        "N2"
+      ],
+      "original_theme_ids": [
+        "N"
+      ],
+      "original_source_occurrences": [
+        {
+          "line_start": 152,
+          "line_end": 152,
+          "source_quote": "  - `near_singular` — **归一化量趋零 / 除零或定义域边界**：构造低方差、小范数或靠近log/sqrt定义域边界的输入，在合法域内检查近奇异量及其邻域。"
+        }
+      ],
+      "condition_system": "V4",
+      "definition_sha256": "e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+      "class_ids": [
+        "N2"
+      ],
+      "themes": [
+        "N"
+      ],
+      "class_predicates": [
+        {
+          "id": "N2",
+          "name": "近零值（Near-Zero Values）",
+          "definition": "构造小范数、低方差及接近定义域边界的值。",
+          "original_requires": [
+            "除法、归一化、范数、方差、log/sqrt 或数据驱动 scale 路径。"
+          ],
+          "original_skip_if": [
+            "数值没有进入近奇异量，或构造直接违反定义域。"
+          ],
+          "line_start": 144,
+          "line_end": 161
+        }
+      ]
+    },
+    {
+      "condition_id": "zeros",
+      "name": "全0 / 稀疏 / 特定行列或分块为0",
+      "definition": "构造全零、稀疏或整行/列/尾块为零，以检验零分布对应的退化路径。",
+      "original_class_ids": [
+        "N3"
+      ],
+      "original_theme_ids": [
+        "N"
+      ],
+      "original_source_occurrences": [
+        {
+          "line_start": 170,
+          "line_end": 170,
+          "source_quote": "  - `zeros` — **全0 / 稀疏 / 特定行列或分块为0**：构造全零、稀疏或整行/列/尾块为零，以检验零分布对应的退化路径。"
+        }
+      ],
+      "condition_system": "V4",
+      "definition_sha256": "e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+      "class_ids": [
+        "N3"
+      ],
+      "themes": [
+        "N"
+      ],
+      "class_predicates": [
+        {
+          "id": "N3",
+          "name": "稀疏分布（Sparse Distributions）",
+          "definition": "构造全零、大部分为零、整行/整块为零及少量重复值。",
+          "original_requires": [
+            "数值张量、统计/排序输入或产生稀疏命中的 mask。"
+          ],
+          "original_skip_if": [
+            "接口仅处理 shape 等元数据，没有数值或有效位置分布。"
+          ],
+          "line_start": 162,
+          "line_end": 179
+        }
+      ]
+    },
+    {
+      "condition_id": "constant_repeat",
+      "name": "全等 / 大量重复 / 相等值并列",
+      "definition": "构造全等、少数值大量重复或跨块重复，以检验并列值处理和低多样性统计。",
+      "original_class_ids": [
+        "N3"
+      ],
+      "original_theme_ids": [
+        "N"
+      ],
+      "original_source_occurrences": [
+        {
+          "line_start": 171,
+          "line_end": 171,
+          "source_quote": "  - `constant_repeat` — **全等 / 大量重复 / 相等值并列**：构造全等、少数值大量重复或跨块重复，以检验并列值处理和低多样性统计。"
+        }
+      ],
+      "condition_system": "V4",
+      "definition_sha256": "e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+      "class_ids": [
+        "N3"
+      ],
+      "themes": [
+        "N"
+      ],
+      "class_predicates": [
+        {
+          "id": "N3",
+          "name": "稀疏分布（Sparse Distributions）",
+          "definition": "构造全零、大部分为零、整行/整块为零及少量重复值。",
+          "original_requires": [
+            "数值张量、统计/排序输入或产生稀疏命中的 mask。"
+          ],
+          "original_skip_if": [
+            "接口仅处理 shape 等元数据，没有数值或有效位置分布。"
+          ],
+          "line_start": 162,
+          "line_end": 179
+        }
+      ]
+    },
+    {
+      "condition_id": "cancellation",
+      "name": "正负抵消 / 近消减 / 计算顺序敏感",
+      "definition": "构造接近的大数相减或正负成对抵消，以暴露有效位丢失与求值顺序敏感性。",
+      "original_class_ids": [
+        "N4"
+      ],
+      "original_theme_ids": [
+        "N"
+      ],
+      "original_source_occurrences": [
+        {
+          "line_start": 188,
+          "line_end": 188,
+          "source_quote": "  - `cancellation` — **正负抵消 / 近消减 / 计算顺序敏感**：构造接近的大数相减或正负成对抵消，以暴露有效位丢失与求值顺序敏感性。"
+        }
+      ],
+      "condition_system": "V4",
+      "definition_sha256": "e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+      "class_ids": [
+        "N4"
+      ],
+      "themes": [
+        "N"
+      ],
+      "class_predicates": [
+        {
+          "id": "N4",
+          "name": "抵消与吸收（Cancellation and Absorption）",
+          "definition": "构造接近大数相减、正负项抵消，或极大/极小幅值混合的累加累乘；对照不同求值顺序。",
+          "original_requires": [
+            "浮点加减、长归约、乘加链或量级差异明显的中间表达式。"
+          ],
+          "original_skip_if": [
+            "纯拷贝/索引等不执行浮点运算的路径。"
+          ],
+          "line_start": 180,
+          "line_end": 197
+        }
+      ]
+    },
+    {
+      "condition_id": "intermediate_overflow",
+      "name": "中间乘加溢出 / 大小量级混合",
+      "definition": "组合大小幅值、符号和系数，并形成浮点累加/累乘，以检验中间范围和小量吞没。",
+      "original_class_ids": [
+        "N4"
+      ],
+      "original_theme_ids": [
+        "N"
+      ],
+      "original_source_occurrences": [
+        {
+          "line_start": 189,
+          "line_end": 189,
+          "source_quote": "  - `intermediate_overflow` — **中间乘加溢出 / 大小量级混合**：组合大小幅值、符号和系数，并形成浮点累加/累乘，以检验中间范围和小量吞没。"
+        }
+      ],
+      "condition_system": "V4",
+      "definition_sha256": "e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+      "class_ids": [
+        "N4"
+      ],
+      "themes": [
+        "N"
+      ],
+      "class_predicates": [
+        {
+          "id": "N4",
+          "name": "抵消与吸收（Cancellation and Absorption）",
+          "definition": "构造接近大数相减、正负项抵消，或极大/极小幅值混合的累加累乘；对照不同求值顺序。",
+          "original_requires": [
+            "浮点加减、长归约、乘加链或量级差异明显的中间表达式。"
+          ],
+          "original_skip_if": [
+            "纯拷贝/索引等不执行浮点运算的路径。"
+          ],
+          "line_start": 180,
+          "line_end": 197
+        }
+      ]
+    },
+    {
+      "condition_id": "rounding",
+      "name": "舍入临界值",
+      "definition": "取相邻可表示数a、b及中点(a+b)/2两侧，或窄化转换临界值，以检验舍入与有效位丢失；用更高精度生成中点。",
+      "original_class_ids": [
+        "N5"
+      ],
+      "original_theme_ids": [
+        "N"
+      ],
+      "original_source_occurrences": [
+        {
+          "line_start": 206,
+          "line_end": 206,
+          "source_quote": "  - `rounding` — **舍入临界值**：取相邻可表示数a、b及中点(a+b)/2两侧，或窄化转换临界值，以检验舍入与有效位丢失；用更高精度生成中点。"
+        }
+      ],
+      "condition_system": "V4",
+      "definition_sha256": "e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+      "class_ids": [
+        "N5"
+      ],
+      "themes": [
+        "N"
+      ],
+      "class_predicates": [
+        {
+          "id": "N5",
+          "name": "舍入与转换损失（Rounding and Conversion Loss）",
+          "definition": "取舍入中点两侧、相邻可表示数、转换临界值及接近量化格点/饱和端点的值。",
+          "original_requires": [
+            "cast、布尔转换、量化、整数取整或低精度输出。"
+          ],
+          "original_skip_if": [
+            "没有转换或可辨别的舍入路径。"
+          ],
+          "line_start": 198,
+          "line_end": 219
+        }
+      ]
+    },
+    {
+      "condition_id": "nonzero_truth",
+      "name": "非零小数的真假语义 / 小数转整数",
+      "definition": "取接近0但非0的小数及正负非零值，以检验转整数后变0与直接转布尔的语义差异。",
+      "original_class_ids": [
+        "N5"
+      ],
+      "original_theme_ids": [
+        "N"
+      ],
+      "original_source_occurrences": [
+        {
+          "line_start": 207,
+          "line_end": 207,
+          "source_quote": "  - `nonzero_truth` — **非零小数的真假语义 / 小数转整数**：取接近0但非0的小数及正负非零值，以检验转整数后变0与直接转布尔的语义差异。"
+        }
+      ],
+      "condition_system": "V4",
+      "definition_sha256": "e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+      "class_ids": [
+        "N5"
+      ],
+      "themes": [
+        "N"
+      ],
+      "class_predicates": [
+        {
+          "id": "N5",
+          "name": "舍入与转换损失（Rounding and Conversion Loss）",
+          "definition": "取舍入中点两侧、相邻可表示数、转换临界值及接近量化格点/饱和端点的值。",
+          "original_requires": [
+            "cast、布尔转换、量化、整数取整或低精度输出。"
+          ],
+          "original_skip_if": [
+            "没有转换或可辨别的舍入路径。"
+          ],
+          "line_start": 198,
+          "line_end": 219
+        }
+      ]
+    },
+    {
+      "condition_id": "quant_scale",
+      "name": "量化scale / 零点 / 饱和边界",
+      "definition": "改变合法scale和zero point，使变换值靠近舍入或clip边界，以检验量化数值误差；区分共享与分组scale。",
+      "original_class_ids": [
+        "N5",
+        "C5"
+      ],
+      "original_theme_ids": [
+        "C",
+        "N"
+      ],
+      "original_source_occurrences": [
+        {
+          "line_start": 208,
+          "line_end": 208,
+          "source_quote": "  - `quant_scale` — **量化scale / 零点 / 饱和边界**：改变合法scale和zero point，使变换值靠近舍入或clip边界，以检验量化数值误差；区分共享与分组scale。"
+        },
+        {
+          "line_start": 671,
+          "line_end": 671,
+          "source_quote": "  - `quant_scale` — **量化scale / 零点 / 饱和边界**：改变合法scale和zero point，使变换值靠近舍入或clip边界，以检验量化数值误差；区分共享与分组scale。"
+        }
+      ],
+      "condition_system": "V4",
+      "definition_sha256": "e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+      "class_ids": [
+        "N5",
+        "C5"
+      ],
+      "themes": [
+        "C",
+        "N"
+      ],
+      "class_predicates": [
+        {
+          "id": "N5",
+          "name": "舍入与转换损失（Rounding and Conversion Loss）",
+          "definition": "取舍入中点两侧、相邻可表示数、转换临界值及接近量化格点/饱和端点的值。",
+          "original_requires": [
+            "cast、布尔转换、量化、整数取整或低精度输出。"
+          ],
+          "original_skip_if": [
+            "没有转换或可辨别的舍入路径。"
+          ],
+          "line_start": 198,
+          "line_end": 219
+        },
+        {
+          "id": "C5",
+          "name": "阈值边界（Threshold Boundaries）",
+          "definition": "在控制分段阈值及其两侧构造合法参数或数据；选取极小或极大的操作系数、scale及其邻域，使缩放结果接近数值或分支边界。",
+          "original_requires": [
+            "有已知分段阈值、特殊函数参数或 scale/系数导致的数值边界。"
+          ],
+          "original_skip_if": [
+            "不知道阈值含义，或扰动转换后落在同一个可表示值上。"
+          ],
+          "line_start": 661,
+          "line_end": 680
+        }
+      ]
+    },
+    {
+      "condition_id": "position",
+      "name": "按行 / 按块分布不均，顺序与位置敏感",
+      "definition": "安排可区分的行、列、块和特殊尾值，或改变升降序，以暴露位置与处理顺序错误。",
+      "original_class_ids": [
+        "N6"
+      ],
+      "original_theme_ids": [
+        "N"
+      ],
+      "original_source_occurrences": [
+        {
+          "line_start": 228,
+          "line_end": 228,
+          "source_quote": "  - `position` — **按行 / 按块分布不均，顺序与位置敏感**：安排可区分的行、列、块和特殊尾值，或改变升降序，以暴露位置与处理顺序错误。"
+        }
+      ],
+      "condition_system": "V4",
+      "definition_sha256": "e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+      "class_ids": [
+        "N6"
+      ],
+      "themes": [
+        "N"
+      ],
+      "class_predicates": [
+        {
+          "id": "N6",
+          "name": "位置相关不均（Positional Imbalance）",
+          "definition": "让不同行、块、尾部或mask位置具有不同数据分布；改变归约顺序，或构造有序、乱序、非降序及严格递增的索引。",
+          "original_requires": [
+            "行/列/块、mask 位、索引顺序或分组 scale 具有位置语义。"
+          ],
+          "original_skip_if": [
+            "输入对称到无法辨别位置，且未提供位置差异构造。"
+          ],
+          "line_start": 220,
+          "line_end": 242
+        }
+      ]
+    },
+    {
+      "condition_id": "mask_pattern",
+      "name": "mask按位打包 / 部分有效的块内分布",
+      "definition": "在块内混合有效/无效位，或让打包mask跨字节/块边界，以检验掩码读取，并明确布尔/加性编码。",
+      "original_class_ids": [
+        "N6"
+      ],
+      "original_theme_ids": [
+        "N"
+      ],
+      "original_source_occurrences": [
+        {
+          "line_start": 229,
+          "line_end": 229,
+          "source_quote": "  - `mask_pattern` — **mask按位打包 / 部分有效的块内分布**：在块内混合有效/无效位，或让打包mask跨字节/块边界，以检验掩码读取，并明确布尔/加性编码。"
+        }
+      ],
+      "condition_system": "V4",
+      "definition_sha256": "e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+      "class_ids": [
+        "N6"
+      ],
+      "themes": [
+        "N"
+      ],
+      "class_predicates": [
+        {
+          "id": "N6",
+          "name": "位置相关不均（Positional Imbalance）",
+          "definition": "让不同行、块、尾部或mask位置具有不同数据分布；改变归约顺序，或构造有序、乱序、非降序及严格递增的索引。",
+          "original_requires": [
+            "行/列/块、mask 位、索引顺序或分组 scale 具有位置语义。"
+          ],
+          "original_skip_if": [
+            "输入对称到无法辨别位置，且未提供位置差异构造。"
+          ],
+          "line_start": 220,
+          "line_end": 242
+        }
+      ]
+    },
+    {
+      "condition_id": "index_order",
+      "name": "索引排列 / 乱序 / 分段累计边界",
+      "definition": "构造合法有序/乱序索引及非降序或严格递增的分段边界，以检验遍历与前缀和契约。",
+      "original_class_ids": [
+        "N6"
+      ],
+      "original_theme_ids": [
+        "N"
+      ],
+      "original_source_occurrences": [
+        {
+          "line_start": 230,
+          "line_end": 230,
+          "source_quote": "  - `index_order` — **索引排列 / 乱序 / 分段累计边界**：构造合法有序/乱序索引及非降序或严格递增的分段边界，以检验遍历与前缀和契约。"
+        }
+      ],
+      "condition_system": "V4",
+      "definition_sha256": "e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+      "class_ids": [
+        "N6"
+      ],
+      "themes": [
+        "N"
+      ],
+      "class_predicates": [
+        {
+          "id": "N6",
+          "name": "位置相关不均（Positional Imbalance）",
+          "definition": "让不同行、块、尾部或mask位置具有不同数据分布；改变归约顺序，或构造有序、乱序、非降序及严格递增的索引。",
+          "original_requires": [
+            "行/列/块、mask 位、索引顺序或分组 scale 具有位置语义。"
+          ],
+          "original_skip_if": [
+            "输入对称到无法辨别位置，且未提供位置差异构造。"
+          ],
+          "line_start": 220,
+          "line_end": 242
+        }
+      ]
+    },
+    {
+      "condition_id": "small_axis",
+      "name": "小形状：关键轴取1、2、4",
+      "definition": "分别将batch、归约或分组等关键轴设为1、2、4并与邻近尺寸对照，以检验微小维度特殊路径。",
+      "original_class_ids": [
+        "S1"
+      ],
+      "original_theme_ids": [
+        "S"
+      ],
+      "original_source_occurrences": [
+        {
+          "line_start": 251,
+          "line_end": 251,
+          "source_quote": "  - `small_axis` — **小形状：关键轴取1、2、4**：分别将batch、归约或分组等关键轴设为1、2、4并与邻近尺寸对照，以检验微小维度特殊路径。"
+        }
+      ],
+      "condition_system": "V4",
+      "definition_sha256": "e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+      "class_ids": [
+        "S1"
+      ],
+      "themes": [
+        "S"
+      ],
+      "class_predicates": [
+        {
+          "id": "S1",
+          "name": "微小形状（Tiny Shapes）",
+          "definition": "让整个输入块小于一个处理/搬运单元，关键轴取1、2、4。",
+          "original_requires": [
+            "有关键 shape 轴及最小处理/搬运粒度。"
+          ],
+          "original_skip_if": [
+            "没有 shape 可控项，或执行器自动补齐后无法保留目标小尺寸。"
+          ],
+          "line_start": 243,
+          "line_end": 263
+        }
+      ]
+    },
+    {
+      "condition_id": "subunit",
+      "name": "数据量小于一个搬运 / 分块单元",
+      "definition": "使行或输入/输出小于一个搬运/处理单元，并区分元素和字节单位，以检验不足整单元的处理。",
+      "original_class_ids": [
+        "S1"
+      ],
+      "original_theme_ids": [
+        "S"
+      ],
+      "original_source_occurrences": [
+        {
+          "line_start": 252,
+          "line_end": 252,
+          "source_quote": "  - `subunit` — **数据量小于一个搬运 / 分块单元**：使行或输入/输出小于一个搬运/处理单元，并区分元素和字节单位，以检验不足整单元的处理。"
+        }
+      ],
+      "condition_system": "V4",
+      "definition_sha256": "e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+      "class_ids": [
+        "S1"
+      ],
+      "themes": [
+        "S"
+      ],
+      "class_predicates": [
+        {
+          "id": "S1",
+          "name": "微小形状（Tiny Shapes）",
+          "definition": "让整个输入块小于一个处理/搬运单元，关键轴取1、2、4。",
+          "original_requires": [
+            "有关键 shape 轴及最小处理/搬运粒度。"
+          ],
+          "original_skip_if": [
+            "没有 shape 可控项，或执行器自动补齐后无法保留目标小尺寸。"
+          ],
+          "line_start": 243,
+          "line_end": 263
+        }
+      ]
+    },
+    {
+      "condition_id": "huge_shape",
+      "name": "超大维度 / 元素数 / 地址跨度",
+      "definition": "围绕相关位宽或地址跨度边界构造合法大形状，以检验超大单维、总元素数及字节跨度。",
+      "original_class_ids": [
+        "S2"
+      ],
+      "original_theme_ids": [
+        "S"
+      ],
+      "original_source_occurrences": [
+        {
+          "line_start": 272,
+          "line_end": 272,
+          "source_quote": "  - `huge_shape` — **超大维度 / 元素数 / 地址跨度**：围绕相关位宽或地址跨度边界构造合法大形状，以检验超大单维、总元素数及字节跨度。"
+        }
+      ],
+      "condition_system": "V4",
+      "definition_sha256": "e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+      "class_ids": [
+        "S2"
+      ],
+      "themes": [
+        "S"
+      ],
+      "class_predicates": [
+        {
+          "id": "S2",
+          "name": "超大形状（Oversized Shapes）",
+          "definition": "增大单维、元素总数、地址跨度和工作集，跨越UB/L1/L0或表示范围。",
+          "original_requires": [
+            "shape 可扩大，且实现存在容量/表示范围/大规模分支。"
+          ],
+          "original_skip_if": [
+            "可用存储或执行器范围无法承载目标规模；记录可达规模和内存需求。"
+          ],
+          "line_start": 264,
+          "line_end": 284
+        }
+      ]
+    },
+    {
+      "condition_id": "buffer_fit",
+      "name": "工作集跨越片上缓冲 / 临时空间容量",
+      "definition": "使工作集位于UB/L1/L0或临时空间容量两侧，并保留字节数公式，以检验容量估计与空间分配。",
+      "original_class_ids": [
+        "S2"
+      ],
+      "original_theme_ids": [
+        "S"
+      ],
+      "original_source_occurrences": [
+        {
+          "line_start": 273,
+          "line_end": 273,
+          "source_quote": "  - `buffer_fit` — **工作集跨越片上缓冲 / 临时空间容量**：使工作集位于UB/L1/L0或临时空间容量两侧，并保留字节数公式，以检验容量估计与空间分配。"
+        }
+      ],
+      "condition_system": "V4",
+      "definition_sha256": "e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+      "class_ids": [
+        "S2"
+      ],
+      "themes": [
+        "S"
+      ],
+      "class_predicates": [
+        {
+          "id": "S2",
+          "name": "超大形状（Oversized Shapes）",
+          "definition": "增大单维、元素总数、地址跨度和工作集，跨越UB/L1/L0或表示范围。",
+          "original_requires": [
+            "shape 可扩大，且实现存在容量/表示范围/大规模分支。"
+          ],
+          "original_skip_if": [
+            "可用存储或执行器范围无法承载目标规模；记录可达规模和内存需求。"
+          ],
+          "line_start": 264,
+          "line_end": 284
+        }
+      ]
+    },
+    {
+      "condition_id": "aspect",
+      "name": "长条 / 各轴强烈不均衡",
+      "definition": "构造M远大于N、N远大于M或悬殊输入/输出空间尺寸，以暴露均衡形状假设。",
+      "original_class_ids": [
+        "S3"
+      ],
+      "original_theme_ids": [
+        "S"
+      ],
+      "original_source_occurrences": [
+        {
+          "line_start": 293,
+          "line_end": 293,
+          "source_quote": "  - `aspect` — **长条 / 各轴强烈不均衡**：构造M远大于N、N远大于M或悬殊输入/输出空间尺寸，以暴露均衡形状假设。"
+        }
+      ],
+      "condition_system": "V4",
+      "definition_sha256": "e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+      "class_ids": [
+        "S3"
+      ],
+      "themes": [
+        "S"
+      ],
+      "class_predicates": [
+        {
+          "id": "S3",
+          "name": "细长与不规则形状（Skinny and Irregular Shapes）",
+          "definition": "让某轴远大于另一轴，或令相关轴不等；包括关键轴为1的细长结构。",
+          "original_requires": [
+            "矩阵、空间维或多输入长度存在可独立变化的轴。"
+          ],
+          "original_skip_if": [
+            "契约强制相关轴相等，无法构造合法不规则关系。"
+          ],
+          "line_start": 285,
+          "line_end": 302
+        }
+      ]
+    },
+    {
+      "condition_id": "unequal_axes",
+      "name": "轴长 / 输入长度不相等，暴露维度混用",
+      "definition": "构造相关轴长不等并与相等形状对照，以暴露维度混用，同时覆盖相近但不同与比例悬殊的轴长。",
+      "original_class_ids": [
+        "S3"
+      ],
+      "original_theme_ids": [
+        "S"
+      ],
+      "original_source_occurrences": [
+        {
+          "line_start": 294,
+          "line_end": 294,
+          "source_quote": "  - `unequal_axes` — **轴长 / 输入长度不相等，暴露维度混用**：构造相关轴长不等并与相等形状对照，以暴露维度混用，同时覆盖相近但不同与比例悬殊的轴长。"
+        }
+      ],
+      "condition_system": "V4",
+      "definition_sha256": "e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+      "class_ids": [
+        "S3"
+      ],
+      "themes": [
+        "S"
+      ],
+      "class_predicates": [
+        {
+          "id": "S3",
+          "name": "细长与不规则形状（Skinny and Irregular Shapes）",
+          "definition": "让某轴远大于另一轴，或令相关轴不等；包括关键轴为1的细长结构。",
+          "original_requires": [
+            "矩阵、空间维或多输入长度存在可独立变化的轴。"
+          ],
+          "original_skip_if": [
+            "契约强制相关轴相等，无法构造合法不规则关系。"
+          ],
+          "line_start": 285,
+          "line_end": 302
+        }
+      ]
+    },
+    {
+      "condition_id": "power_shape",
+      "name": "二次幂边界附近、倍数与非对齐",
+      "definition": "采样合法2ⁿ−1、2ⁿ、2ⁿ+1及倍数，以检验二次幂敏感路径，并核对它实际代表对齐还是位宽。",
+      "original_class_ids": [
+        "S4"
+      ],
+      "original_theme_ids": [
+        "S"
+      ],
+      "original_source_occurrences": [
+        {
+          "line_start": 311,
+          "line_end": 311,
+          "source_quote": "  - `power_shape` — **二次幂边界附近、倍数与非对齐**：采样合法2ⁿ−1、2ⁿ、2ⁿ+1及倍数，以检验二次幂敏感路径，并核对它实际代表对齐还是位宽。"
+        }
+      ],
+      "condition_system": "V4",
+      "definition_sha256": "e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+      "class_ids": [
+        "S4"
+      ],
+      "themes": [
+        "S"
+      ],
+      "class_predicates": [
+        {
+          "id": "S4",
+          "name": "二次幂对齐（Power-of-Two Alignment）",
+          "definition": "围绕2^n−1、2^n、2^n+1及相关倍数采样。",
+          "original_requires": [
+            "源码或契约给出二次幂敏感的处理粒度/边界。"
+          ],
+          "original_skip_if": [
+            "仅样例恰好含 16/32/128 等数字而没有对应语义。"
+          ],
+          "line_start": 303,
+          "line_end": 319
+        }
+      ]
+    },
+    {
+      "condition_id": "tile_shape",
+      "name": "tile / block / 分桶边界与尾块",
+      "definition": "围绕场景内的tile/partition尺寸A取kA−1、kA、kA+1及不足一块的量，以检验边界和尾块处理。",
+      "original_class_ids": [
+        "S5",
+        "C4"
+      ],
+      "original_theme_ids": [
+        "C",
+        "S"
+      ],
+      "original_source_occurrences": [
+        {
+          "line_start": 328,
+          "line_end": 328,
+          "source_quote": "  - `tile_shape` — **tile / block / 分桶边界与尾块**：围绕场景内的tile/partition尺寸A取kA−1、kA、kA+1及不足一块的量，以检验边界和尾块处理。"
+        },
+        {
+          "line_start": 648,
+          "line_end": 648,
+          "source_quote": "  - `tile_shape` — **tile / block / 分桶边界与尾块**：围绕场景内的tile/partition尺寸A取kA−1、kA、kA+1及不足一块的量，以检验边界和尾块处理。"
+        }
+      ],
+      "condition_system": "V4",
+      "definition_sha256": "e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+      "class_ids": [
+        "S5",
+        "C4"
+      ],
+      "themes": [
+        "C",
+        "S"
+      ],
+      "class_predicates": [
+        {
+          "id": "S5",
+          "name": "分块对齐（Tiling Alignment）",
+          "definition": "围绕具体tile/partition大小构造整块、非对齐和不足一块。",
+          "original_requires": [
+            "有可确认的 tile/block/bucket/partition 尺寸或尾块谓词。"
+          ],
+          "original_skip_if": [
+            "没有分块证据；只有猜测时记为候选用例。"
+          ],
+          "line_start": 320,
+          "line_end": 342
+        },
+        {
+          "id": "C4",
+          "name": "自适应控制（Adaptive Control）",
+          "definition": "根据显式行为模式、shape、容量、分块规模或过滤结果，构造实现分派条件两侧的合法输入。",
+          "original_requires": [
+            "有显式行为模式，或可追踪的 shape/过滤结果到实现分派的完整谓词。"
+          ],
+          "original_skip_if": [
+            "实现没有可识别的模式选择或输入驱动分派条件。"
+          ],
+          "line_start": 640,
+          "line_end": 660
+        }
+      ]
+    },
+    {
+      "condition_id": "geometry",
+      "name": "卷积 / 切片 / 窗口的边缘几何",
+      "definition": "构造贴边或跨边窗口，以及合法的大小、步长、padding、dilation组合，以检验有效覆盖范围和裁切。",
+      "original_class_ids": [
+        "S6"
+      ],
+      "original_theme_ids": [
+        "S"
+      ],
+      "original_source_occurrences": [
+        {
+          "line_start": 351,
+          "line_end": 351,
+          "source_quote": "  - `geometry` — **卷积 / 切片 / 窗口的边缘几何**：构造贴边或跨边窗口，以及合法的大小、步长、padding、dilation组合，以检验有效覆盖范围和裁切。"
+        }
+      ],
+      "condition_system": "V4",
+      "definition_sha256": "e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+      "class_ids": [
+        "S6"
+      ],
+      "themes": [
+        "S"
+      ],
+      "class_predicates": [
+        {
+          "id": "S6",
+          "name": "窗口几何（Window Geometry）",
+          "definition": "构造有效窗口贴边、跨边、覆盖不足或步长跳过的合法形状。",
+          "original_requires": [
+            "卷积、池化、滑窗、裁剪或有几何含义的切片。"
+          ],
+          "original_skip_if": [
+            "算子无窗口几何；非法输出尺寸仅属契约校验。"
+          ],
+          "line_start": 343,
+          "line_end": 363
+        }
+      ]
+    },
+    {
+      "condition_id": "resize_coordinates",
+      "name": "插值采样边界",
+      "definition": "改变输出尺寸/缩放比例，使采样坐标靠近整数点或边缘，并对照支持的align_corners模式，以检验取整、插值权重及边缘延拓。",
+      "original_class_ids": [
+        "S7"
+      ],
+      "original_theme_ids": [
+        "S"
+      ],
+      "original_source_occurrences": [
+        {
+          "line_start": 372,
+          "line_end": 372,
+          "source_quote": "  - `resize_coordinates` — **插值采样边界**：改变输出尺寸/缩放比例，使采样坐标靠近整数点或边缘，并对照支持的align_corners模式，以检验取整、插值权重及边缘延拓。"
+        }
+      ],
+      "condition_system": "V4",
+      "definition_sha256": "e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+      "class_ids": [
+        "S7"
+      ],
+      "themes": [
+        "S"
+      ],
+      "class_predicates": [
+        {
+          "id": "S7",
+          "name": "形状不匹配（Shape Mismatch）",
+          "definition": "构造不同输入之间合法的shape不一致与广播；或使输入输出shape不同，通过特殊插值/外推位置进行重采样。",
+          "original_requires": [
+            "有广播、多输入轴对应、scale 辅助形状或重采样关系。"
+          ],
+          "original_skip_if": [
+            "目标形状关系不在接口允许的广播、轴对应或重采样范围内。"
+          ],
+          "line_start": 364,
+          "line_end": 383
+        }
+      ]
+    },
+    {
+      "condition_id": "broadcast",
+      "name": "广播轴为1或跨输入shape不一致",
+      "definition": "在支持广播的不同输入轴上设1并组合广播，以检验输出shape与广播索引。",
+      "original_class_ids": [
+        "S7"
+      ],
+      "original_theme_ids": [
+        "S"
+      ],
+      "original_source_occurrences": [
+        {
+          "line_start": 373,
+          "line_end": 373,
+          "source_quote": "  - `broadcast` — **广播轴为1或跨输入shape不一致**：在支持广播的不同输入轴上设1并组合广播，以检验输出shape与广播索引。"
+        }
+      ],
+      "condition_system": "V4",
+      "definition_sha256": "e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+      "class_ids": [
+        "S7"
+      ],
+      "themes": [
+        "S"
+      ],
+      "class_predicates": [
+        {
+          "id": "S7",
+          "name": "形状不匹配（Shape Mismatch）",
+          "definition": "构造不同输入之间合法的shape不一致与广播；或使输入输出shape不同，通过特殊插值/外推位置进行重采样。",
+          "original_requires": [
+            "有广播、多输入轴对应、scale 辅助形状或重采样关系。"
+          ],
+          "original_skip_if": [
+            "目标形状关系不在接口允许的广播、轴对应或重采样范围内。"
+          ],
+          "line_start": 364,
+          "line_end": 383
+        }
+      ]
+    },
+    {
+      "condition_id": "scale_structure",
+      "name": "scale形状对应",
+      "definition": "构造合法per-tensor/token/channel/group的scale形状，并配合转置或共享batch，以检验辅助shape与载荷轴匹配。",
+      "original_class_ids": [
+        "S7"
+      ],
+      "original_theme_ids": [
+        "S"
+      ],
+      "original_source_occurrences": [
+        {
+          "line_start": 374,
+          "line_end": 374,
+          "source_quote": "  - `scale_structure` — **scale形状对应**：构造合法per-tensor/token/channel/group的scale形状，并配合转置或共享batch，以检验辅助shape与载荷轴匹配。"
+        }
+      ],
+      "condition_system": "V4",
+      "definition_sha256": "e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+      "class_ids": [
+        "S7"
+      ],
+      "themes": [
+        "S"
+      ],
+      "class_predicates": [
+        {
+          "id": "S7",
+          "name": "形状不匹配（Shape Mismatch）",
+          "definition": "构造不同输入之间合法的shape不一致与广播；或使输入输出shape不同，通过特殊插值/外推位置进行重采样。",
+          "original_requires": [
+            "有广播、多输入轴对应、scale 辅助形状或重采样关系。"
+          ],
+          "original_skip_if": [
+            "目标形状关系不在接口允许的广播、轴对应或重采样范围内。"
+          ],
+          "line_start": 364,
+          "line_end": 383
+        }
+      ]
+    },
+    {
+      "condition_id": "group_shape",
+      "name": "分组大小关系",
+      "definition": "在契约允许时改变组数、每组长度及整除关系，含最后一组，以检验分组计数与偏移，记录实际组间对应关系。",
+      "original_class_ids": [
+        "S8"
+      ],
+      "original_theme_ids": [
+        "S"
+      ],
+      "original_source_occurrences": [
+        {
+          "line_start": 392,
+          "line_end": 392,
+          "source_quote": "  - `group_shape` — **分组大小关系**：在契约允许时改变组数、每组长度及整除关系，含最后一组，以检验分组计数与偏移，记录实际组间对应关系。"
+        }
+      ],
+      "condition_system": "V4",
+      "definition_sha256": "e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+      "class_ids": [
+        "S8"
+      ],
+      "themes": [
+        "S"
+      ],
+      "class_predicates": [
+        {
+          "id": "S8",
+          "name": "不均匀分组结构（Uneven Group Structure）",
+          "definition": "让多输入成员、有效序列、group/head/expert/shard的大小或数量不一致。",
+          "original_requires": [
+            "有 group/head/expert/shard、变长序列或 tensor list 语义。"
+          ],
+          "original_skip_if": [
+            "接口没有分组、成员或变长结构，或不支持相应组间大小关系。"
+          ],
+          "line_start": 384,
+          "line_end": 406
+        }
+      ]
+    },
+    {
+      "condition_id": "unequal_sequence",
+      "name": "Q/KV或有效序列长度不相等",
+      "definition": "构造Q/KV或不同batch有效长度不等，并保持容量契约，以检验长度对应及分段偏移。",
+      "original_class_ids": [
+        "S8"
+      ],
+      "original_theme_ids": [
+        "S"
+      ],
+      "original_source_occurrences": [
+        {
+          "line_start": 393,
+          "line_end": 393,
+          "source_quote": "  - `unequal_sequence` — **Q/KV或有效序列长度不相等**：构造Q/KV或不同batch有效长度不等，并保持容量契约，以检验长度对应及分段偏移。"
+        }
+      ],
+      "condition_system": "V4",
+      "definition_sha256": "e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+      "class_ids": [
+        "S8"
+      ],
+      "themes": [
+        "S"
+      ],
+      "class_predicates": [
+        {
+          "id": "S8",
+          "name": "不均匀分组结构（Uneven Group Structure）",
+          "definition": "让多输入成员、有效序列、group/head/expert/shard的大小或数量不一致。",
+          "original_requires": [
+            "有 group/head/expert/shard、变长序列或 tensor list 语义。"
+          ],
+          "original_skip_if": [
+            "接口没有分组、成员或变长结构，或不支持相应组间大小关系。"
+          ],
+          "line_start": 384,
+          "line_end": 406
+        }
+      ]
+    },
+    {
+      "condition_id": "tuple_size",
+      "name": "张量列表 / 元组成员数量",
+      "definition": "改变支持的列表成员数或构造成员shape不等，以检验成员遍历和独立计数，逐成员记录形状和长度。",
+      "original_class_ids": [
+        "S8"
+      ],
+      "original_theme_ids": [
+        "S"
+      ],
+      "original_source_occurrences": [
+        {
+          "line_start": 394,
+          "line_end": 394,
+          "source_quote": "  - `tuple_size` — **张量列表 / 元组成员数量**：改变支持的列表成员数或构造成员shape不等，以检验成员遍历和独立计数，逐成员记录形状和长度。"
+        }
+      ],
+      "condition_system": "V4",
+      "definition_sha256": "e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+      "class_ids": [
+        "S8"
+      ],
+      "themes": [
+        "S"
+      ],
+      "class_predicates": [
+        {
+          "id": "S8",
+          "name": "不均匀分组结构（Uneven Group Structure）",
+          "definition": "让多输入成员、有效序列、group/head/expert/shard的大小或数量不一致。",
+          "original_requires": [
+            "有 group/head/expert/shard、变长序列或 tensor list 语义。"
+          ],
+          "original_skip_if": [
+            "接口没有分组、成员或变长结构，或不支持相应组间大小关系。"
+          ],
+          "line_start": 384,
+          "line_end": 406
+        }
+      ]
+    },
+    {
+      "condition_id": "nondegenerate",
+      "name": "多轮处理",
+      "definition": "将相关规模从单次扩至多次并继续增大，覆盖合法中间空批次和最后一轮，以检验循环推进与批次偏移。",
+      "original_class_ids": [
+        "S9"
+      ],
+      "original_theme_ids": [
+        "S"
+      ],
+      "original_source_occurrences": [
+        {
+          "line_start": 415,
+          "line_end": 415,
+          "source_quote": "  - `nondegenerate` — **多轮处理**：将相关规模从单次扩至多次并继续增大，覆盖合法中间空批次和最后一轮，以检验循环推进与批次偏移。"
+        }
+      ],
+      "condition_system": "V4",
+      "definition_sha256": "e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+      "class_ids": [
+        "S9"
+      ],
+      "themes": [
+        "S"
+      ],
+      "class_predicates": [
+        {
+          "id": "S9",
+          "name": "重复与批处理（Repetition and Batching）",
+          "definition": "构造大batch、大规模归约和需要多轮处理的输入。",
+          "original_requires": [
+            "输入规模引起多 batch、多轮处理或长归约。"
+          ],
+          "original_skip_if": [
+            "单次调用中没有随输入规模变化的批次、轮次或归约长度。"
+          ],
+          "line_start": 407,
+          "line_end": 432
+        }
+      ]
+    },
+    {
+      "condition_id": "long_reduce",
+      "name": "长归约 / 大K导致累计误差或归约路径切换",
+      "definition": "增大已确定归约轴，并在实现切换点两侧对照，以检验长归约累计误差和分段处理。",
+      "original_class_ids": [
+        "S9"
+      ],
+      "original_theme_ids": [
+        "S"
+      ],
+      "original_source_occurrences": [
+        {
+          "line_start": 416,
+          "line_end": 416,
+          "source_quote": "  - `long_reduce` — **长归约 / 大K导致累计误差或归约路径切换**：增大已确定归约轴，并在实现切换点两侧对照，以检验长归约累计误差和分段处理。"
+        }
+      ],
+      "condition_system": "V4",
+      "definition_sha256": "e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+      "class_ids": [
+        "S9"
+      ],
+      "themes": [
+        "S"
+      ],
+      "class_predicates": [
+        {
+          "id": "S9",
+          "name": "重复与批处理（Repetition and Batching）",
+          "definition": "构造大batch、大规模归约和需要多轮处理的输入。",
+          "original_requires": [
+            "输入规模引起多 batch、多轮处理或长归约。"
+          ],
+          "original_skip_if": [
+            "单次调用中没有随输入规模变化的批次、轮次或归约长度。"
+          ],
+          "line_start": 407,
+          "line_end": 432
+        }
+      ]
+    },
+    {
+      "condition_id": "axis_order",
+      "name": "维序 / rank / 归约轴选择",
+      "definition": "切换合法首末轴、负轴与轴组合，以检验轴规范化、秩和视图索引路径。",
+      "original_class_ids": [
+        "I1",
+        "T3"
+      ],
+      "original_theme_ids": [
+        "I",
+        "T"
+      ],
+      "original_source_occurrences": [
+        {
+          "line_start": 441,
+          "line_end": 441,
+          "source_quote": "  - `axis_order` — **维序 / rank / 归约轴选择**：切换合法首末轴、负轴与轴组合，以检验轴规范化、秩和视图索引路径。"
+        },
+        {
+          "line_start": 558,
+          "line_end": 558,
+          "source_quote": "  - `axis_order` — **维序 / rank / 归约轴选择**：切换合法首末轴、负轴与轴组合，以检验轴规范化、秩和视图索引路径。"
+        }
+      ],
+      "condition_system": "V4",
+      "definition_sha256": "e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+      "class_ids": [
+        "I1",
+        "T3"
+      ],
+      "themes": [
+        "I",
+        "T"
+      ],
+      "class_predicates": [
+        {
+          "id": "I1",
+          "name": "负数索引（Negative Indices）",
+          "definition": "构造合法负轴、负索引、负坐标，以及动态形状、推断维和缺省参数中的负值标记。",
+          "original_requires": [
+            "参数允许负轴、负索引、负坐标或 -1/-2 等推断/缺省标记。"
+          ],
+          "original_skip_if": [
+            "参数没有合法负轴、负下标、负坐标或负值标记。"
+          ],
+          "line_start": 433,
+          "line_end": 451
+        },
+        {
+          "id": "T3",
+          "name": "格式转换（Format Conversion）",
+          "definition": "特意构造输入/输出格式不同、转置和轴顺序替换。",
+          "original_requires": [
+            "存在格式、轴顺序、表示或 dtype 写出转换。"
+          ],
+          "original_skip_if": [
+            "调用过程没有目标格式、维序或类型转换。"
+          ],
+          "line_start": 550,
+          "line_end": 570
+        }
+      ]
+    },
+    {
+      "condition_id": "index_edge",
+      "name": "索引0、1、-1及N边界邻域",
+      "definition": "覆盖首末合法索引与允许的负索引/哨兵，以检验有效域端点；越界值另作校验测试。",
+      "original_class_ids": [
+        "I2"
+      ],
+      "original_theme_ids": [
+        "I"
+      ],
+      "original_source_occurrences": [
+        {
+          "line_start": 460,
+          "line_end": 460,
+          "source_quote": "  - `index_edge` — **索引0、1、-1及N边界邻域**：覆盖首末合法索引与允许的负索引/哨兵，以检验有效域端点；越界值另作校验测试。"
+        }
+      ],
+      "condition_system": "V4",
+      "definition_sha256": "e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+      "class_ids": [
+        "I2"
+      ],
+      "themes": [
+        "I"
+      ],
+      "class_predicates": [
+        {
+          "id": "I2",
+          "name": "索引端点（Index Endpoints）",
+          "definition": "覆盖0、1、N−1、padding边界、block边界及允许的N/N+1语义。",
+          "original_requires": [
+            "存在显式索引、切片端点或可由 shape/几何推导的地址边界。"
+          ],
+          "original_skip_if": [
+            "接口与实现中没有目标有效域或端点映射。"
+          ],
+          "line_start": 452,
+          "line_end": 469
+        }
+      ]
+    },
+    {
+      "condition_id": "index_overflow",
+      "name": "大张量引起内部索引 / 地址乘积溢出",
+      "definition": "增大参与地址计算的轴并检查乘积与累计offset，以检验合法寻址中的内部索引位宽。",
+      "original_class_ids": [
+        "I3"
+      ],
+      "original_theme_ids": [
+        "I"
+      ],
+      "original_source_occurrences": [
+        {
+          "line_start": 478,
+          "line_end": 478,
+          "source_quote": "  - `index_overflow` — **大张量引起内部索引 / 地址乘积溢出**：增大参与地址计算的轴并检查乘积与累计offset，以检验合法寻址中的内部索引位宽。"
+        }
+      ],
+      "condition_system": "V4",
+      "definition_sha256": "e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+      "class_ids": [
+        "I3"
+      ],
+      "themes": [
+        "I"
+      ],
+      "class_predicates": [
+        {
+          "id": "I3",
+          "name": "地址溢出（Address Overflow）",
+          "definition": "增大参与地址计算的合法维度和offset乘积。",
+          "original_requires": [
+            "shape/stride/index 进入内部窄整数计数、乘积或字节偏移计算。"
+          ],
+          "original_skip_if": [
+            "实现不存在相应位宽边界，或资源不足以承载目标地址跨度。"
+          ],
+          "line_start": 470,
+          "line_end": 487
+        }
+      ]
+    },
+    {
+      "condition_id": "index_mask",
+      "name": "索引命中或避开mask / padding / 无效位置",
+      "definition": "固定mask或有效域并构造全命中、全避开、混合命中，以检验筛选和跳过行为。",
+      "original_class_ids": [
+        "I4",
+        "C4"
+      ],
+      "original_theme_ids": [
+        "C",
+        "I"
+      ],
+      "original_source_occurrences": [
+        {
+          "line_start": 496,
+          "line_end": 496,
+          "source_quote": "  - `index_mask` — **索引命中或避开mask / padding / 无效位置**：固定mask或有效域并构造全命中、全避开、混合命中，以检验筛选和跳过行为。"
+        },
+        {
+          "line_start": 649,
+          "line_end": 649,
+          "source_quote": "  - `index_mask` — **索引命中或避开mask / padding / 无效位置**：固定mask或有效域并构造全命中、全避开、混合命中，以检验筛选和跳过行为。"
+        }
+      ],
+      "condition_system": "V4",
+      "definition_sha256": "e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+      "class_ids": [
+        "I4",
+        "C4"
+      ],
+      "themes": [
+        "C",
+        "I"
+      ],
+      "class_predicates": [
+        {
+          "id": "I4",
+          "name": "有效命中（Valid Coverage）",
+          "definition": "构造部分有效、全部有效、全部被mask和混合命中。",
+          "original_requires": [
+            "mask/padding/有效索引集合、过滤或内部有效块选择存在。"
+          ],
+          "original_skip_if": [
+            "没有有效/无效集合或跳过语义。"
+          ],
+          "line_start": 488,
+          "line_end": 506
+        },
+        {
+          "id": "C4",
+          "name": "自适应控制（Adaptive Control）",
+          "definition": "根据显式行为模式、shape、容量、分块规模或过滤结果，构造实现分派条件两侧的合法输入。",
+          "original_requires": [
+            "有显式行为模式，或可追踪的 shape/过滤结果到实现分派的完整谓词。"
+          ],
+          "original_skip_if": [
+            "实现没有可识别的模式选择或输入驱动分派条件。"
+          ],
+          "line_start": 640,
+          "line_end": 660
+        }
+      ]
+    },
+    {
+      "condition_id": "view_stride",
+      "name": "视图寻址变化",
+      "definition": "以合法切片、转置、零步长广播或非零offset构造视图，并保证底层存储足够，以检验非标准寻址。",
+      "original_class_ids": [
+        "T1"
+      ],
+      "original_theme_ids": [
+        "T"
+      ],
+      "original_source_occurrences": [
+        {
+          "line_start": 515,
+          "line_end": 515,
+          "source_quote": "  - `view_stride` — **视图寻址变化**：以合法切片、转置、零步长广播或非零offset构造视图，并保证底层存储足够，以检验非标准寻址。"
+        }
+      ],
+      "condition_system": "V4",
+      "definition_sha256": "e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+      "class_ids": [
+        "T1"
+      ],
+      "themes": [
+        "T"
+      ],
+      "class_predicates": [
+        {
+          "id": "T1",
+          "name": "步长视图（Strided Views）",
+          "definition": "用转置、步进切片、零步长广播和非零offset构造合法view。",
+          "original_requires": [
+            "调用入口与执行器都能保留合法 stride/storage_offset。"
+          ],
+          "original_skip_if": [
+            "调用入口或执行器将输入统一实体化，无法保留目标 stride/offset。"
+          ],
+          "line_start": 507,
+          "line_end": 526
+        }
+      ]
+    },
+    {
+      "condition_id": "enum_layout",
+      "name": "layout / format / 转置模式",
+      "definition": "选择合法layout、format或转置模式并提供对应存储，以检验格式相关路径。",
+      "original_class_ids": [
+        "T2",
+        "T3"
+      ],
+      "original_theme_ids": [
+        "T"
+      ],
+      "original_source_occurrences": [
+        {
+          "line_start": 535,
+          "line_end": 535,
+          "source_quote": "  - `enum_layout` — **layout / format / 转置模式**：选择合法layout、format或转置模式并提供对应存储，以检验格式相关路径。"
+        },
+        {
+          "line_start": 559,
+          "line_end": 559,
+          "source_quote": "  - `enum_layout` — **layout / format / 转置模式**：选择合法layout、format或转置模式并提供对应存储，以检验格式相关路径。"
+        }
+      ],
+      "condition_system": "V4",
+      "definition_sha256": "e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+      "class_ids": [
+        "T2",
+        "T3"
+      ],
+      "themes": [
+        "T"
+      ],
+      "class_predicates": [
+        {
+          "id": "T2",
+          "name": "布局与打包格式（Layout and Packing Formats）",
+          "definition": "选择ND/NCHW/NHWC/NZ及接口支持的物理打包格式，并提供匹配storage。",
+          "original_requires": [
+            "API 支持多 layout/format 或物理打包表示，且可构造匹配存储。"
+          ],
+          "original_skip_if": [
+            "接口或执行器不支持目标布局及对应物理存储。"
+          ],
+          "line_start": 527,
+          "line_end": 549
+        },
+        {
+          "id": "T3",
+          "name": "格式转换（Format Conversion）",
+          "definition": "特意构造输入/输出格式不同、转置和轴顺序替换。",
+          "original_requires": [
+            "存在格式、轴顺序、表示或 dtype 写出转换。"
+          ],
+          "original_skip_if": [
+            "调用过程没有目标格式、维序或类型转换。"
+          ],
+          "line_start": 550,
+          "line_end": 570
+        }
+      ]
+    },
+    {
+      "condition_id": "enum_dtype",
+      "name": "dtype：低位宽与混合输入/输出类型",
+      "definition": "选择接口合法dtype及混合输入/输出组合，以检验对应精度与表示范围。",
+      "original_class_ids": [
+        "C1"
+      ],
+      "original_theme_ids": [
+        "C"
+      ],
+      "original_source_occurrences": [
+        {
+          "line_start": 579,
+          "line_end": 579,
+          "source_quote": "  - `enum_dtype` — **dtype：低位宽与混合输入/输出类型**：选择接口合法dtype及混合输入/输出组合，以检验对应精度与表示范围。"
+        }
+      ],
+      "condition_system": "V4",
+      "definition_sha256": "e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+      "class_ids": [
+        "C1"
+      ],
+      "themes": [
+        "C"
+      ],
+      "class_predicates": [
+        {
+          "id": "C1",
+          "name": "低精度与混合精度（Low and Mixed Precision）",
+          "definition": "组合低精度dtype、输入/输出/累加dtype和量化模式，配合长归约、抵消和尾块。",
+          "original_requires": [
+            "接口支持低位宽或混合输入/输出/累加 dtype、量化载荷。"
+          ],
+          "original_skip_if": [
+            "接口只提供固定精度，且没有低位宽或混合类型组合。"
+          ],
+          "line_start": 571,
+          "line_end": 592
+        }
+      ]
+    },
+    {
+      "condition_id": "enum_quant",
+      "name": "量化方法、位宽与粒度",
+      "definition": "选择合法量化方法、位宽、粒度与后处理，以检验各离散量化路径。",
+      "original_class_ids": [
+        "C1",
+        "C2"
+      ],
+      "original_theme_ids": [
+        "C"
+      ],
+      "original_source_occurrences": [
+        {
+          "line_start": 580,
+          "line_end": 580,
+          "source_quote": "  - `enum_quant` — **量化方法、位宽与粒度**：选择合法量化方法、位宽、粒度与后处理，以检验各离散量化路径。"
+        },
+        {
+          "line_start": 602,
+          "line_end": 602,
+          "source_quote": "  - `enum_quant` — **量化方法、位宽与粒度**：选择合法量化方法、位宽、粒度与后处理，以检验各离散量化路径。"
+        }
+      ],
+      "condition_system": "V4",
+      "definition_sha256": "e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+      "class_ids": [
+        "C1",
+        "C2"
+      ],
+      "themes": [
+        "C"
+      ],
+      "class_predicates": [
+        {
+          "id": "C1",
+          "name": "低精度与混合精度（Low and Mixed Precision）",
+          "definition": "组合低精度dtype、输入/输出/累加dtype和量化模式，配合长归约、抵消和尾块。",
+          "original_requires": [
+            "接口支持低位宽或混合输入/输出/累加 dtype、量化载荷。"
+          ],
+          "original_skip_if": [
+            "接口只提供固定精度，且没有低位宽或混合类型组合。"
+          ],
+          "line_start": 571,
+          "line_end": 592
+        },
+        {
+          "id": "C2",
+          "name": "数值策略（Numerical Policies）",
+          "definition": "选择计算精度、舍入、量化、累加、确定性和排序策略。",
+          "original_requires": [
+            "数值实现选项作为 API 参数暴露，如 compute/round/quant/accumulate/sort。"
+          ],
+          "original_skip_if": [
+            "数值策略既未作为 API 实参暴露，也无法通过合法实参选择相应路径。"
+          ],
+          "line_start": 593,
+          "line_end": 617
+        }
+      ]
+    },
+    {
+      "condition_id": "enum_compute",
+      "name": "计算精度 / 舍入模式",
+      "definition": "选择合法计算精度或舍入模式，以检验同一操作的不同数值实现。",
+      "original_class_ids": [
+        "C1",
+        "C2"
+      ],
+      "original_theme_ids": [
+        "C"
+      ],
+      "original_source_occurrences": [
+        {
+          "line_start": 581,
+          "line_end": 581,
+          "source_quote": "  - `enum_compute` — **计算精度 / 舍入模式**：选择合法计算精度或舍入模式，以检验同一操作的不同数值实现。"
+        },
+        {
+          "line_start": 601,
+          "line_end": 601,
+          "source_quote": "  - `enum_compute` — **计算精度 / 舍入模式**：选择合法计算精度或舍入模式，以检验同一操作的不同数值实现。"
+        }
+      ],
+      "condition_system": "V4",
+      "definition_sha256": "e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+      "class_ids": [
+        "C1",
+        "C2"
+      ],
+      "themes": [
+        "C"
+      ],
+      "class_predicates": [
+        {
+          "id": "C1",
+          "name": "低精度与混合精度（Low and Mixed Precision）",
+          "definition": "组合低精度dtype、输入/输出/累加dtype和量化模式，配合长归约、抵消和尾块。",
+          "original_requires": [
+            "接口支持低位宽或混合输入/输出/累加 dtype、量化载荷。"
+          ],
+          "original_skip_if": [
+            "接口只提供固定精度，且没有低位宽或混合类型组合。"
+          ],
+          "line_start": 571,
+          "line_end": 592
+        },
+        {
+          "id": "C2",
+          "name": "数值策略（Numerical Policies）",
+          "definition": "选择计算精度、舍入、量化、累加、确定性和排序策略。",
+          "original_requires": [
+            "数值实现选项作为 API 参数暴露，如 compute/round/quant/accumulate/sort。"
+          ],
+          "original_skip_if": [
+            "数值策略既未作为 API 实参暴露，也无法通过合法实参选择相应路径。"
+          ],
+          "line_start": 593,
+          "line_end": 617
+        }
+      ]
+    },
+    {
+      "condition_id": "enum_behavior",
+      "name": "训练、排序、累加等语义开关",
+      "definition": "选择合法训练、排序、累加或确定性选项，以检验行为相关路径。",
+      "original_class_ids": [
+        "C2",
+        "C4"
+      ],
+      "original_theme_ids": [
+        "C"
+      ],
+      "original_source_occurrences": [
+        {
+          "line_start": 603,
+          "line_end": 603,
+          "source_quote": "  - `enum_behavior` — **训练、排序、累加等语义开关**：选择合法训练、排序、累加或确定性选项，以检验行为相关路径。"
+        },
+        {
+          "line_start": 650,
+          "line_end": 650,
+          "source_quote": "  - `enum_behavior` — **训练、排序、累加等语义开关**：选择合法训练、排序、累加或确定性选项，以检验行为相关路径。"
+        }
+      ],
+      "condition_system": "V4",
+      "definition_sha256": "e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+      "class_ids": [
+        "C2",
+        "C4"
+      ],
+      "themes": [
+        "C"
+      ],
+      "class_predicates": [
+        {
+          "id": "C2",
+          "name": "数值策略（Numerical Policies）",
+          "definition": "选择计算精度、舍入、量化、累加、确定性和排序策略。",
+          "original_requires": [
+            "数值实现选项作为 API 参数暴露，如 compute/round/quant/accumulate/sort。"
+          ],
+          "original_skip_if": [
+            "数值策略既未作为 API 实参暴露，也无法通过合法实参选择相应路径。"
+          ],
+          "line_start": 593,
+          "line_end": 617
+        },
+        {
+          "id": "C4",
+          "name": "自适应控制（Adaptive Control）",
+          "definition": "根据显式行为模式、shape、容量、分块规模或过滤结果，构造实现分派条件两侧的合法输入。",
+          "original_requires": [
+            "有显式行为模式，或可追踪的 shape/过滤结果到实现分派的完整谓词。"
+          ],
+          "original_skip_if": [
+            "实现没有可识别的模式选择或输入驱动分派条件。"
+          ],
+          "line_start": 640,
+          "line_end": 660
+        }
+      ]
+    },
+    {
+      "condition_id": "enum_operation",
+      "name": "操作种类 / 融合路径",
+      "definition": "选择合法操作种类、算法变体或融合路径并使用对应参考，以检验各操作语义。",
+      "original_class_ids": [
+        "C3"
+      ],
+      "original_theme_ids": [
+        "C"
+      ],
+      "original_source_occurrences": [
+        {
+          "line_start": 626,
+          "line_end": 626,
+          "source_quote": "  - `enum_operation` — **操作种类 / 融合路径**：选择合法操作种类、算法变体或融合路径并使用对应参考，以检验各操作语义。"
+        }
+      ],
+      "condition_system": "V4",
+      "definition_sha256": "e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+      "class_ids": [
+        "C3"
+      ],
+      "themes": [
+        "C"
+      ],
+      "class_predicates": [
+        {
+          "id": "C3",
+          "name": "操作策略（Operation Policies）",
+          "definition": "选择reduce、norm、activation、interpolate、boundary和fusion变体。",
+          "original_requires": [
+            "输入属性选择 reduce/norm/activation/interpolate/boundary/fusion 等操作。"
+          ],
+          "original_skip_if": [
+            "接口没有操作、融合或有效区域的模式参数。"
+          ],
+          "line_start": 618,
+          "line_end": 639
+        }
+      ]
+    },
+    {
+      "condition_id": "enum_mask",
+      "name": "mask / 稀疏 / 边界模式",
+      "definition": "选择合法mask、稀疏或边缘模式，以检验模式规定的有效区域。",
+      "original_class_ids": [
+        "C3"
+      ],
+      "original_theme_ids": [
+        "C"
+      ],
+      "original_source_occurrences": [
+        {
+          "line_start": 627,
+          "line_end": 627,
+          "source_quote": "  - `enum_mask` — **mask / 稀疏 / 边界模式**：选择合法mask、稀疏或边缘模式，以检验模式规定的有效区域。"
+        }
+      ],
+      "condition_system": "V4",
+      "definition_sha256": "e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+      "class_ids": [
+        "C3"
+      ],
+      "themes": [
+        "C"
+      ],
+      "class_predicates": [
+        {
+          "id": "C3",
+          "name": "操作策略（Operation Policies）",
+          "definition": "选择reduce、norm、activation、interpolate、boundary和fusion变体。",
+          "original_requires": [
+            "输入属性选择 reduce/norm/activation/interpolate/boundary/fusion 等操作。"
+          ],
+          "original_skip_if": [
+            "接口没有操作、融合或有效区域的模式参数。"
+          ],
+          "line_start": 618,
+          "line_end": 639
+        }
+      ]
+    },
+    {
+      "condition_id": "scalar_branch",
+      "name": "特殊函数参数",
+      "definition": "使已知控制参数取p=2等特殊值，或使beta*x跨越已知阈值，以检验算子特定分支。",
+      "original_class_ids": [
+        "C5"
+      ],
+      "original_theme_ids": [
+        "C"
+      ],
+      "original_source_occurrences": [
+        {
+          "line_start": 669,
+          "line_end": 669,
+          "source_quote": "  - `scalar_branch` — **特殊函数参数**：使已知控制参数取p=2等特殊值，或使beta*x跨越已知阈值，以检验算子特定分支。"
+        }
+      ],
+      "condition_system": "V4",
+      "definition_sha256": "e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+      "class_ids": [
+        "C5"
+      ],
+      "themes": [
+        "C"
+      ],
+      "class_predicates": [
+        {
+          "id": "C5",
+          "name": "阈值边界（Threshold Boundaries）",
+          "definition": "在控制分段阈值及其两侧构造合法参数或数据；选取极小或极大的操作系数、scale及其邻域，使缩放结果接近数值或分支边界。",
+          "original_requires": [
+            "有已知分段阈值、特殊函数参数或 scale/系数导致的数值边界。"
+          ],
+          "original_skip_if": [
+            "不知道阈值含义，或扰动转换后落在同一个可表示值上。"
+          ],
+          "line_start": 661,
+          "line_end": 680
+        }
+      ]
+    },
+    {
+      "condition_id": "activation_boundary",
+      "name": "函数实参分段",
+      "definition": "使函数实参跨零、激活分段、指数饱和点或特定角度邻域，以检验输入驱动的函数分支。",
+      "original_class_ids": [
+        "C5"
+      ],
+      "original_theme_ids": [
+        "C"
+      ],
+      "original_source_occurrences": [
+        {
+          "line_start": 670,
+          "line_end": 670,
+          "source_quote": "  - `activation_boundary` — **函数实参分段**：使函数实参跨零、激活分段、指数饱和点或特定角度邻域，以检验输入驱动的函数分支。"
+        }
+      ],
+      "condition_system": "V4",
+      "definition_sha256": "e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+      "class_ids": [
+        "C5"
+      ],
+      "themes": [
+        "C"
+      ],
+      "class_predicates": [
+        {
+          "id": "C5",
+          "name": "阈值边界（Threshold Boundaries）",
+          "definition": "在控制分段阈值及其两侧构造合法参数或数据；选取极小或极大的操作系数、scale及其邻域，使缩放结果接近数值或分支边界。",
+          "original_requires": [
+            "有已知分段阈值、特殊函数参数或 scale/系数导致的数值边界。"
+          ],
+          "original_skip_if": [
+            "不知道阈值含义，或扰动转换后落在同一个可表示值上。"
+          ],
+          "line_start": 661,
+          "line_end": 680
+        }
+      ]
+    }
+  ],
+  "original_API42_sha256": "69f6cae46a021b5f242cd6bdf6600618bf63e2de7c87122c2187c90d08837a82",
+  "original_V4_sha256": "e4aafbd2aaa6054e2f721b3d23f8808670ea97ca65bdf6082188a280c67f3193",
+  "repository_API42_markdown_sha256": "6f03a7f27ce6395326a997db752e8da65158de2254b821bf9d8be87f5ad7720b",
+  "rule_scope": "FROZEN_ORIGINAL_DEFINITIONS_NO_CROSSWALK_CONVERSION",
+  "raw_local_source_paths_published": false
+}

@@ -1,0 +1,58 @@
+{
+  "id": "BODY-RC-079-6319",
+  "task_ids": [
+    "RC-079"
+  ],
+  "tool": "mcp__codex_apps__github_fetch_issue",
+  "args": {
+    "repository_full_name": "verl-project/verl",
+    "issue_number": 6319
+  },
+  "started_at": "2026-11-12T03:11:38.154Z",
+  "captured_at": "2026-11-12T03:11:39.149Z",
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "Action completed."
+      }
+    ],
+    "structuredContent": {
+      "issue": {
+        "url": "https://github.com/verl-project/verl/issues/6319",
+        "title": "[bug] loss always be nan when sft qwen3.5",
+        "issue_number": 6319,
+        "body": "### System Info\n\n----------Python Info----------\nVersion      : 3.12.3\nCompiler     : GCC 13.3.0\nBuild        : ('main', 'Mar  3 2026 12:15:18')\nArch         : ('64bit', '')\n------------Pip Info-----------\nVersion      : 26.0.1\nDirectory    : /usr/local/lib/python3.12/dist-packages/pip\nvllm         : 0.19.0\nsglang       : not found.\nray          : 2.54.1\ntorch        : 2.10.0+cu129\n----------verl Info-----------\nVersion      : 0.8.0.dev\nDirectory    : /root/workspace/verl/verl\nError running git command: fatal: not a git repository (or any parent up to mount point /root/workspace)\nStopping at filesystem boundary (GIT_DISCOVERY_ACROSS_FILESYSTEM not set).\nCommit Hash  : None\n----------Platform Info----------\nPlatform     : Linux-5.10.134-16.3.al8.x86_64-x86_64-with-glibc2.39\nsystem       : Linux\nnode         : zzh-t3e2wjad-0000\nrelease      : 5.10.134-16.3.al8.x86_64\nversion      : #1 SMP Tue Mar 26 18:54:05 CST 2024\n----------Environment----------\nCUDA Runtime : 12.9\nCUDA Compiler : Cuda compilation tools, release 12.9, V12.9.86\n----------System Info----------\nCPU Memory      : 2014.75 GB\nGPU Count       : 8\nGPU 1   Type    : NVIDIA H20\nGPU 1   Memory  : 95.58 GB\nGPU 2   Type    : NVIDIA H20\nGPU 2   Memory  : 95.58 GB\nGPU 3   Type    : NVIDIA H20\nGPU 3   Memory  : 95.58 GB\nGPU 4   Type    : NVIDIA H20\nGPU 4   Memory  : 95.58 GB\nGPU 5   Type    : NVIDIA H20\nGPU 5   Memory  : 95.58 GB\nGPU 6   Type    : NVIDIA H20\nGPU 6   Memory  : 95.58 GB\nGPU 7   Type    : NVIDIA H20\nGPU 7   Memory  : 95.58 GB\nGPU 8   Type    : NVIDIA H20\nGPU 8   Memory  : 95.58 GB\n\n### Information\n\n- [ ] The official example scripts\n- [x] My own modified scripts\n\n### Tasks\n\n- [x] An officially supported task in the `examples` folder (such as GLUE/SQuAD, ...)\n- [ ] My own task or dataset (give details below)\n\n### Reproduction\n\n```bash\n\nset -xeuo pipefail\n\nif [ \"$#\" -lt 2 ]; then\n    echo \"Usage: run_qwen3_8b_fsdp.sh <nproc_per_node> <save_path> [other_configs...]\"\n    echo \"  Env: SP_SIZE (default 2), USE_PEFT (0|1, default 1)\"\n    exit 1\nfi\n\nnproc_per_node=$1\nsave_path=$2\nshift 2\n\nMODEL_PATH=${MODEL_PATH:-Qwen/Qwen3.5-2B}\nSP_SIZE=${SP_SIZE:-1}\nUSE_PEFT=${USE_PEFT:-0}\nMICRO_BATCH_SIZE_PER_GPU=${MICRO_BATCH_SIZE_PER_GPU:-1}\nLR=${LR:-1e-6}\nTOTAL_EPOCHS=${TOTAL_EPOCHS:-1}\nPROJECT_NAME=${PROJECT_NAME:-2b-sft}\nEXPERIMENT_NAME=${EXPERIMENT_NAME:-2b_test}\nMAX_PROMPT=${MAX_PROMPT:-30000}\nMAX_RESPONSE_LENGTH=${MAX_RESPONSE_LENGTH:-1024}\n\nTRAIN_FILES=\"['$HOME/data/gsm8k/train.parquet']\"\nTEST_FILES=\"['$HOME/data/gsm8k/test.parquet']\"\nDATA=(\n    data.train_files=\"$TRAIN_FILES\"\n    data.val_files=\"$TEST_FILES\"\n    data.messages_key=prompt\n    data.max_length=${MAX_PROMPT}\n    data.truncation=error\n    data.train_batch_size=${nproc_per_node}\n    data.micro_batch_size_per_gpu=${MICRO_BATCH_SIZE_PER_GPU}\n    data.max_token_len_per_gpu=32768\n    data.ignore_input_ids_mismatch=True\n    data.enable_thinking_default=False\n)\n\nMODEL=(\n    model.use_liger=False\n    model.use_fused_kernels=False\n    model.use_remove_padding=False\n    model.enable_gradient_checkpointing=False\n    model.enable_activation_offload=False\n)\n\nENGINE=(\n    engine=fsdp\n    engine.ulysses_sequence_parallel_size=${SP_SIZE}\n)\n\ntorchrun --standalone --nnodes=1 --nproc_per_node=${nproc_per_node} \\\n    -m verl.trainer.sft_trainer \\\n    \"${DATA[@]}\" \\\n    \"${MODEL[@]}\" \\\n    \"${ENGINE[@]}\" \\\n    optim.lr=${LR} \\\n    model.path=\"${MODEL_PATH}\" \\\n    trainer.default_local_dir=\"${save_path}\" \\\n    trainer.project_name=\"${PROJECT_NAME}\" \\\n    trainer.experiment_name=\"${EXPERIMENT_NAME}\" \\\n    trainer.logger='[\"console\"]' \\\n    trainer.total_epochs=${TOTAL_EPOCHS} \\\n    \"$@\"\n\n```\n\n```bash\nstep:1 - perf/max_memory_allocated_gb:5.781707763671875 - perf/max_memory_reserved_gb:11.556640625 - perf/cpu_memory_used_gb:131.44873809814453 - train/loss:nan - train/grad_norm:0.0 - train/lr:1e-06 - train/mfu:0.0 - train/global_tokens:1621 - train/total_tokens(B):1.621e-06\nEpoch 1/1:   0%|▊                                                                                                                                                                                                              | 1/262 [00:04<19:05,  4.39s/it]\nstep:2 - perf/max_memory_allocated_gb:7.844405651092529 - perf/max_memory_reserved_gb:13.638671875 - perf/cpu_memory_used_gb:131.57899856567383 - train/loss:nan - train/grad_norm:0.0 - train/lr:1e-06 - train/mfu:0.0 - train/global_tokens:1812 - train/total_tokens(B):3.433e-06\nEpoch 1/1:   1%|█▌                                                                                                                                                                                                             | 2/262 [00:04<08:56,  2.06s/it]\nstep:3 - perf/max_memory_allocated_gb:7.844405651092529 - perf/max_memory_reserved_gb:13.876953125 - perf/cpu_memory_used_gb:131.6811752319336 - train/loss:nan - train/grad_norm:0.0 - train/lr:1e-06 - train/mfu:0.0 - train/global_tokens:1748 - train/total_tokens(B):5.181e-06\nEpoch 1/1:   1%|██▎                                                                                                                                                                                                            | 3/262 [00:05<05:36,  1.30s/it]\nstep:4 - perf/max_memory_allocated_gb:7.844405651092529 - perf/max_memory_reserved_gb:13.876953125 - perf/cpu_memory_used_gb:131.8024673461914 - train/loss:nan - train/grad_norm:0.0 - train/lr:1e-06 - train/mfu:0.0 - train/global_tokens:1532 - train/total_tokens(B):6.713e-06\nEpoch 1/1:   2%|███▏                                                                                                                                                                                                           | 4/262 [00:05<03:57,  1.08it/s]\nstep:5 - perf/max_memory_allocated_gb:7.844405651092529 - perf/max_memory_reserved_gb:13.876953125 - perf/cpu_memory_used_gb:131.989013671875 - train/loss:nan - train/grad_norm:0.0 - train/lr:1e-06 - train/mfu:0.0 - train/global_tokens:1231 - train/total_tokens(B):7.944e-06\nEpoch 1/1:   2%|███▉                                                                                                                                                                                                           | 5/262 [00:05<03:02,  1.41it/s]\nstep:6 - perf/max_memory_allocated_gb:8.06339168548584 - perf/max_memory_reserved_gb:14.82421875 - perf/cpu_memory_used_gb:132.13319396972656 - train/loss:nan - train/grad_norm:0.0 - train/lr:1e-06 - train/mfu:0.0 - train/global_tokens:1757 - train/total_tokens(B):9.701e-06\n\n```\n\n\n### Expected behavior\n\nget a valid loss ",
+        "state": "open",
+        "user": {
+          "login": "wizkdc",
+          "name": "wizkdc",
+          "email": null,
+          "avatar_url": "https://avatars.githubusercontent.com/u/49894673?v=4",
+          "id": 49894673
+        },
+        "assignees": null,
+        "labels": [
+          {
+            "name": "bug",
+            "color": "d73a4a",
+            "description": "Something isn't working"
+          }
+        ],
+        "milestone": null,
+        "state_reason": null,
+        "comments": 2,
+        "created_at": "2026-05-12T09:59:49Z",
+        "updated_at": "2026-05-13T02:17:55Z",
+        "closed_at": null,
+        "display_url": "https://github.com/verl-project/verl/issues/6319",
+        "display_title": "[bug] loss always be nan when sft qwen3.5"
+      },
+      "url": "https://github.com/verl-project/verl/issues/6319",
+      "title": "[bug] loss always be nan when sft qwen3.5",
+      "display_url": "https://github.com/verl-project/verl/issues/6319",
+      "display_title": "[bug] loss always be nan when sft qwen3.5"
+    },
+    "isError": false
+  }
+}

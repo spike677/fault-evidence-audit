@@ -1,0 +1,35 @@
+<!--  Thanks for sending a pull request!
+
+BEFORE SUBMITTING, PLEASE READ https://docs.vllm.ai/en/latest/contributing/overview.html
+
+-->
+### What this PR does / why we need it?
+<!--
+- Please clarify what changes you are proposing. The purpose of this section is to outline the changes and how this PR fixes the issue.
+If possible, please consider writing useful notes for better and faster reviews in your PR.
+
+- Please clarify why the changes are needed. For instance, the use case and bug description.
+
+- Fixes #
+-->
+Fix the issue of insufficient cached cosine and sine length in MLA's TorchAir graph mode, which causes accuracy deviation during long-sequence inference.
+
+Backported: https://github.com/vllm-project/vllm-ascend/pull/1331
+
+### Does this PR introduce _any_ user-facing change?
+<!--
+Note that it means *any* user-facing change including all aspects such as API, interface or other behavior changes.
+Documentation-only updates are not considered user-facing changes.
+-->
+No.
+
+### How was this patch tested?
+<!--
+CI passed with new added/existing test.
+If it was tested in a way different from regular unit tests, please clarify how you tested step by step, ideally copy and paste-able, so that other reviewers can test and check, and descendants can verify in the future.
+If tests were not added, please describe why they were not added and/or why it was difficult to add.
+-->
+We tested the accuracy of this patch with DeepSeek R1 e2e becnhmark serving, and get 83.33 sore for AIME2024 dataset with DP4TP4EP16 setting. 
+![image](https://github.com/user-attachments/assets/517c63bf-164a-493f-a3cd-6ecae84f502e)
+
+

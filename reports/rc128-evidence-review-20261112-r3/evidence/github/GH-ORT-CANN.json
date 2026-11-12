@@ -1,0 +1,27 @@
+{
+  "source_id": "GH-ORT-CANN",
+  "tool": "GitHub connector",
+  "captured_at": "2026-11-11T13:22:12.252Z",
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "Action completed."
+      }
+    ],
+    "structuredContent": {
+      "content": "// Copyright (c) Microsoft Corporation. All rights reserved.\n// Copyright (c) Huawei. All rights reserved.\n// Licensed under the MIT License.\n\n#pragma once\n\n#include <limits>\n#include <string>\n\n#include \"core/framework/arena_extend_strategy.h\"\n#include \"core/framework/ortdevice.h\"\n#include \"core/framework/provider_options.h\"\n#include \"core/session/onnxruntime_c_api.h\"\n\nnamespace onnxruntime {\nstruct CANNExecutionProviderInfo {\n  OrtDevice::DeviceId device_id{0};\n  size_t npu_mem_limit{std::numeric_limits<size_t>::max()};\n  ArenaExtendStrategy arena_extend_strategy{ArenaExtendStrategy::kNextPowerOfTwo};\n  bool enable_cann_graph{true};\n  bool dump_graphs{false};\n  bool dump_om_model{true};\n  std::string precision_mode;\n  std::string op_select_impl_mode;\n  std::string optypelist_for_implmode;\n  OrtArenaCfg* default_memory_arena_cfg{nullptr};\n\n  static CANNExecutionProviderInfo FromProviderOptions(const ProviderOptions& options);\n  static ProviderOptions ToProviderOptions(const CANNExecutionProviderInfo& info);\n  static ProviderOptions ToProviderOptions(const OrtCANNProviderOptions& info);\n};\n\n}  // namespace onnxruntime\n",
+      "title": "cann_execution_provider_info.h",
+      "modified_date": null,
+      "url": "https://api.github.com/repos/microsoft/onnxruntime/contents/onnxruntime/core/providers/cann/cann_execution_provider_info.h?ref=v1.20.0",
+      "display_url": "https://api.github.com/repos/microsoft/onnxruntime/contents/onnxruntime/core/providers/cann/cann_execution_provider_info.h?ref=v1.20.0",
+      "display_title": "cann_execution_provider_info.h",
+      "structuredContent": {
+        "title": "cann_execution_provider_info.h",
+        "content": "// Copyright (c) Microsoft Corporation. All rights reserved.\n// Copyright (c) Huawei. All rights reserved.\n// Licensed under the MIT License.\n\n#pragma once\n\n#include <limits>\n#include <string>\n\n#include \"core/framework/arena_extend_strategy.h\"\n#include \"core/framework/ortdevice.h\"\n#include \"core/framework/provider_options.h\"\n#include \"core/session/onnxruntime_c_api.h\"\n\nnamespace onnxruntime {\nstruct CANNExecutionProviderInfo {\n  OrtDevice::DeviceId device_id{0};\n  size_t npu_mem_limit{std::numeric_limits<size_t>::max()};\n  ArenaExtendStrategy arena_extend_strategy{ArenaExtendStrategy::kNextPowerOfTwo};\n  bool enable_cann_graph{true};\n  bool dump_graphs{false};\n  bool dump_om_model{true};\n  std::string precision_mode;\n  std::string op_select_impl_mode;\n  std::string optypelist_for_implmode;\n  OrtArenaCfg* default_memory_arena_cfg{nullptr};\n\n  static CANNExecutionProviderInfo FromProviderOptions(const ProviderOptions& options);\n  static ProviderOptions ToProviderOptions(const CANNExecutionProviderInfo& info);\n  static ProviderOptions ToProviderOptions(const OrtCANNProviderOptions& info);\n};\n\n}  // namespace onnxruntime\n",
+        "display_url": "https://api.github.com/repos/microsoft/onnxruntime/contents/onnxruntime/core/providers/cann/cann_execution_provider_info.h?ref=v1.20.0"
+      }
+    },
+    "isError": false
+  }
+}

@@ -1,0 +1,1 @@
+On this PR https://github.com/microsoft/DeepSpeed/pull/4695, the gradient synchronization operation is moved to the `allreduce_bucket` method, but on this method, rank is set to None, and it will never use the reduce method even if `use_multi_rank_bucket_allreduce` is set to False.

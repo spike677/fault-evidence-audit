@@ -1,0 +1,69 @@
+## Background
+
+PyTorch's [deterministic cumulative sum](https://github.com/pytorch/pytorch/blob/main/aten/src/ATen/cuda/cub.cuh#L457) (used when `torch.use_deterministic_algorithms(True)` is set) runs a custom CUDA kernel in two passes: the first pass adds up each block, the second pass reads the input again and scans each block starting from the sum of the blocks before it. Doing it this way keeps the add order fixed, so the result is the same every run, but it reads the input twice. Scan speed is limited by memory, so that extra read means this approach can only reach about 66% (2 of 3 memory passes) of the speed a single-pass scan can hit.
+
+CCCL now makes `cub::DeviceScan` reproducible on its own through a `run_to_run` env knob ([CCCL PR #9098](https://github.com/NVIDIA/cccl/pull/9098)), will be available in the upcoming CCCL 3.5 release. (Check here for the related blogpost  [Controlling Floating Point Determinism in NVIDIA CCCL](https://developer.nvidia.com/blog/controlling-floating-point-determinism-in-nvidia-cccl/), and [docs] (https://nvidia.github.io/cccl/unstable/cccl/determinism.html)).
+
+Building against the latest CCCL, instead of the copy that ships with the CUDA toolkit, lets us delete the custom kernel and call `DeviceScan` instead.
+
+## Build change: fetch CCCL from GitHub
+
+Today PyTorch uses CCCL from the headers bundled inside the CUDA toolkit (CTK). The `run_to_run` deterministic scan arrives in CCCL 3.5 (upcoming release), which is newer than the CCCL any released CTK ships with, so adopting it means building PyTorch against CCCL 3.5 instead of the toolkit's copy. There are a few ways to make this possible, one we tried locally is to do CMake fetch that pulls latest CCCL (master) from GitHub and prepends it to the include path, ahead of the toolkit's copy.
+
+This is safe because of CCCL's [compatibility policy](https://github.com/NVIDIA/cccl#cuda-toolkit-ctk-compatibility): the latest CCCL stays backward compatible with the current and previous CTK major versions (two major versions), and CCCL can be upgraded on its own, independently of the toolkit. So PyTorch keeps building against the CUDA version it already uses, with only the CCCL headers moved forward.
+
+## Determinism usage
+
+The whole deterministic path becomes a single `DeviceScan` call with a `run_to_run` env:
+
+```cpp
+auto env = ::cuda::std::execution::env{
+    stream,
+    ::cuda::execution::require(::cuda::execution::determinism::run_to_run),
+    caching_allocator_resource{}};
+cub::DeviceScan::InclusiveSum(input, output, num_items, env);
+```
+
+## Lines of code (`cub.cuh`, scan only)
+
+| | Lines |
+|---|---|
+| Removed (custom two-pass kernel + helpers) | - 126 |
+| Added (CCCL `DeviceScan` path) | + 21 |
+| **Net** | **-105** |
+
+## Performance
+
+
+<img width="2200" height="1000" alt="Image" src="https://github.com/user-attachments/assets/6b5b9dbd-2c7a-483c-95d8-bd402b2e198e" />
+
+
+PyTorch's two-pass kernel at best reaches a peak of 32%, while the new CCCL's `cub::DeviceScan` reaches about 91% on large inputs, because it reads the input once instead of twice, also because of the latest warp specialized kernel (warpspeed-lookahead-scan).
+
+
+<details>
+<summary>NVIDIA B200 - cumsum, fp32 (Ref = current PyTorch, Cmp = CCCL)</summary>
+
+|  Elements  |   Ref Time |   Ref Noise |   Cmp Time |   Cmp Noise |         Diff |   %Diff |  Status  |
+|------------|------------|-------------|------------|-------------|--------------|---------|----------|
+|    2^16    |  20.942 us |       7.12% |  23.195 us |      12.79% |     2.253 us |  10.76% |  🔴 SLOW  |
+|    2^18    |  21.356 us |       3.12% |  23.387 us |      53.42% |     2.031 us |   9.51% |  🔴 SLOW  |
+|    2^20    |  22.739 us |       5.02% |  25.528 us |       5.56% |     2.789 us |  12.26% |  🔴 SLOW  |
+|    2^22    |  33.401 us |       5.80% |  31.403 us |       5.37% |    -1.998 us |  -5.98% |  🟢 FAST  |
+|    2^24    |  78.007 us |       1.27% |  48.413 us |      38.83% |   -29.594 us | -37.94% |  🟢 FAST  |
+|    2^26    | 249.637 us |       0.90% | 104.738 us |       2.13% |  -144.898 us | -58.04% |  🟢 FAST  |
+|    2^28    | 904.171 us |       0.71% | 336.952 us |       0.52% |  -567.219 us | -62.73% |  🟢 FAST  |
+|    2^30    |   3.508 ms |       0.24% |   1.254 ms |       0.50% | -2254.109 us | -64.26% |  🟢 FAST  |
+|    2^32    |  13.888 ms |       0.10% |   4.922 ms |       0.08% | -8965.687 us | -64.56% |  🟢 FAST  |
+
+</details>
+
+On large inputs CCCL is up to **2.8x faster** (2^32: 13.9 ms -> 4.9 ms), starting from about 1.6x at 2^24 and staying near 2.8x for the biggest sizes.
+
+## Takeaway
+
+Building against the latest CCCL, instead of the version bundled with the CUDA toolkit (CTK), is what makes this work and it is seamless. We remove 105 lines of hand-written scan code and get a faster, reproducible `DeviceScan` in return. As CCCL adds more features, staying on the latest version lets PyTorch use them right away instead of waiting for a toolkit release.
+
+
+
+cc @ptrblck @msaroufim @eqy @tinglvv @nWEIdia @mruberry @kurtamohler
