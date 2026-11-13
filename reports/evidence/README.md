@@ -15,3 +15,5 @@
 NOT_FOUND表示有限检索和已读范围内没有采用为该原根因补证的代码，不表示全仓不存在修复。已排除的PR、读取受阻回执和未命中的具体查询仍分别保留。SUPPORTED/PARTIAL限定到说明中的技术主张，不是客户事件身份确认。
 
 本阶段只对不对应的旧候选按原根因做定向补查，没有重新对128条无差别扩搜。补证中新增的较强线索包括RC-094的a3a3d38固定提交、RC-030的ops-nn #5083/#9119，以及RC-062的vllm-ascend #17217未合并提案；它们的代码事实、版本和同事件缺口在当前HTML对应条目说明。
+
+验证：实际实现提交1263ba8独立检出，完整回归1013项通过（222.464秒），HTML交互11项通过。Python 3.12.14、pydantic 2.14.3、openpyxl 3.1.5；未验证Python 3.14.3或浏览器渲染。详见publication_validation.json、full_regression.txt、interaction_validation.json。后续提交仅补验证附件和更新包，不改变已验收代码与128条结果。
