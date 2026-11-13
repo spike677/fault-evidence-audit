@@ -1,0 +1,388 @@
+diff --git a/scripts/build.sh b/scripts/build.sh
+index eb82fc38507d366fe5829579d1fa16a3222fc024..316febdef5be7ea181c616104b49f15ae1adab16 100644
+--- a/scripts/build.sh
++++ b/scripts/build.sh
+@@ -869,7 +869,8 @@ function fn_main()
+             fn_make_run_package
+             ;;
+         "testframework")
+-            COMPILE_OPTIONS="${COMPILE_OPTIONS} -DBUILD_TEST_FRAMEWORK=ON"
++            COMPILE_OPTIONS="${COMPILE_OPTIONS} -DBUILD_TEST_FRAMEWORK=ON -DUSE_UNIT_TEST=ON -DUSE_KERNEL_UNIT_TEST=ON"
++            fn_build_3rdparty_for_test
+             fn_build
+             generate_atb_version_info
+             pack_testframework
+diff --git a/src/kernels/mixkernels/unpad_flash_attention/op_kernel/unpad_flash_attention_mla_bf16_mix.cce b/src/kernels/mixkernels/unpad_flash_attention/op_kernel/unpad_flash_attention_mla_bf16_mix.cce
+index a3deb9daf45937ac6c3094cd406ccc4be97bf798..f12da6f6ff044f7de1185aa0f6385c0cfc8ad30b 100644
+--- a/src/kernels/mixkernels/unpad_flash_attention/op_kernel/unpad_flash_attention_mla_bf16_mix.cce
++++ b/src/kernels/mixkernels/unpad_flash_attention/op_kernel/unpad_flash_attention_mla_bf16_mix.cce
+@@ -49,7 +49,7 @@ public:
+         __gm__ uint8_t *__restrict__ p_gm, __gm__ uint8_t *__restrict__ o_tmp_gm,
+         __gm__ uint8_t *__restrict__ upo_tmp_gm,
+         __gm__ uint8_t *__restrict__ tiling_para_gm) :
+-        q_gm(q_gm), s_gm(s_gm), p_gm(p_gm), o_tmp_gm(o_tmp_gm), upo_tmp_gm(upo_tmp_gm), 
++        q_gm(q_gm), s_gm(s_gm), p_gm(p_gm), o_tmp_gm(o_tmp_gm), upo_tmp_gm(upo_tmp_gm),
+         tiling_para_gm(tiling_para_gm)
+     {
+         SetFftsBaseAddr((unsigned long)sync);
+@@ -85,7 +85,7 @@ public:
+             this->stride_k = embd;
+             this->stride_v = embdv;
+         }
+-        
++
+         this->batch_stride_k = batch_size * max_kv_seqlen * stride_k * 2;
+         this->batch_stride_v = batch_size * max_kv_seqlen * stride_v * 2;
+ 
+@@ -110,8 +110,8 @@ public:
+         SET_FLAG(MTE1, MTE2, EVENT_ID1);
+         SET_FLAG(MTE1, MTE2, EVENT_ID2);
+         SET_FLAG(MTE1, MTE2, EVENT_ID3);
+-        SET_FLAG(MTE1, MTE2, EVENT_ID5); 
+-        SET_FLAG(MTE1, MTE2, EVENT_ID6);   
++        SET_FLAG(MTE1, MTE2, EVENT_ID5);
++        SET_FLAG(MTE1, MTE2, EVENT_ID6);
+         SET_FLAG(M, MTE1, EVENT_ID0);
+         SET_FLAG(M, MTE1, EVENT_ID1);
+         SET_FLAG(M, MTE1, EVENT_ID2);
+@@ -235,12 +235,12 @@ public:
+                q_offset = addr_q_scalar + head_idx * embd * max_seqlen+ (uint64_t)m_idx * pp_m_scalar * stride_qo;
+                k_offset = addr_k_scalar + (head_idx / group_num) * embd * max_kv_seqlen;
+             }
+-            
++
+             uint32_t loopQK = (this->embd + BLOCK_QK - 1) / BLOCK_QK;
+             uint32_t loopV = (this->embdv + BLOCK_QK - 1) / BLOCK_QK;
+             uint32_t qk_k = BLOCK_QK;
+             uint32_t qk_round_k = BLOCK_QK;
+-            
++
+             uint32_t sv_n = n_loop == 1 ? kv_seqlen : pp_n_scalar;
+             uint32_t sv_round_n = (sv_n + BLOCK_SIZE - 1) / BLOCK_SIZE * BLOCK_SIZE;
+             uint64_t v_offset = addr_v_scalar + (head_idx / group_num) * embdv;
+@@ -248,7 +248,7 @@ public:
+             {
+                 v_offset = addr_v_scalar + (head_idx / group_num) * embdv * max_kv_seqlen;
+             }
+-            
++
+             uint32_t n_end = n_loop;
+             if (is_triu_mask || window_size > 0) {
+                 n_end = m_idx + 1;
+@@ -324,7 +324,7 @@ public:
+                                 0,            // dstNzMatrixStride, unused
+                                 stride_k   // srcDValue
+                             );
+-            
++
+ 
+                             SET_FLAG(MTE2, MTE1, pingpong_flag + 4);
+                             WAIT_FLAG(MTE2, MTE1, pingpong_flag + 4);
+@@ -341,7 +341,7 @@ public:
+                             );
+                             SET_FLAG(MTE1, MTE2, pingpong_flag);
+                             SET_FLAG(MTE1, M, pingpong_flag + 2);
+-                            
++
+                             WAIT_FLAG(MTE1, M, pingpong_flag);
+                             WAIT_FLAG(MTE1, M, pingpong_flag + 2);
+                             if (split_idx == 0 && initc) {
+@@ -381,8 +381,8 @@ public:
+                         qk_round_m,  // srcStride
+                         sv_round_n  // dstStride_dst_D
+                     );
+-                    SET_FLAG(FIX, M, EVENT_ID0);  
+-                    SET_FLAG(FIX, M, EVENT_ID1);  
++                    SET_FLAG(FIX, M, EVENT_ID0);
++                    SET_FLAG(FIX, M, EVENT_ID1);
+                     FftsCrossCoreSync<PIPE_FIX, 2>(QK_READY);
+                 }
+                 if (n_idx >= launch_delay + n_start) {
+@@ -501,7 +501,7 @@ public:
+                         PIPE_BARRIER(M);
+                         if(k_idx == loopV - 1){
+                             SET_FLAG(M, MTE1, EVENT_ID0);
+-                            SET_FLAG(M, MTE1, EVENT_ID1);   
++                            SET_FLAG(M, MTE1, EVENT_ID1);
+                         }
+                         SET_FLAG(M, MTE1, EVENT_ID2);
+                         SET_FLAG(M, MTE1, EVENT_ID3);
+@@ -516,7 +516,7 @@ public:
+                             qk_round_m,  // srcStride
+                             qk_round_k     // dstStride_dst_D
+                         );
+-                        SET_FLAG(FIX, M, l0c_pingpong_flag);  
++                        SET_FLAG(FIX, M, l0c_pingpong_flag);
+                     }
+                     FftsCrossCoreSync<PIPE_FIX, 2>(UPDATE_READY);
+                     v_offset += sv_n * stride_v;
+@@ -611,7 +611,7 @@ public:
+         __gm__ uint8_t *__restrict__ o_gm, __gm__ uint8_t *__restrict__ s_gm,
+         __gm__ uint8_t *__restrict__ p_gm, __gm__ uint8_t *__restrict__ o_tmp_gm,
+         __gm__ uint8_t *__restrict__ upo_tmp_gm,
+-        __gm__ uint8_t *__restrict__ tiling_para_gm) 
++        __gm__ uint8_t *__restrict__ tiling_para_gm)
+         : mask_gm(mask_gm), o_gm(o_gm), alibi_coeff_gm(alibi_coeff_gm), s_gm(s_gm), p_gm(p_gm), o_tmp_gm(o_tmp_gm), upo_tmp_gm(upo_tmp_gm), tiling_para_gm(tiling_para_gm)
+     {
+         SetFftsBaseAddr((unsigned long)sync);
+@@ -641,7 +641,7 @@ public:
+         this->mask_type = (uint32_t)(*((__gm__ uint32_t *)tiling_para_gm + 20));
+         this->alibi_compress_offset = (uint32_t)(*((__gm__ uint32_t *)tiling_para_gm + 21));
+         this->alibi_left_align = (uint32_t)(*((__gm__ uint32_t *)tiling_para_gm + 22));
+- 
++
+         this->tiling_data_shape_type = (uint32_t)(*((__gm__ uint32_t *)tiling_para_gm + 24));
+         this->window_size = (uint32_t)(*((__gm__ int32_t *)tiling_para_gm + 27));
+         this->stride_qo = q_heads * embdv;
+@@ -650,7 +650,7 @@ public:
+         {
+             this->stride_qo = embdv;
+         }
+-        
++
+ 
+         SET_FLAG(MTE3, MTE2, EVENT_ID0);
+         SET_FLAG(MTE3, MTE2, EVENT_ID1);
+@@ -710,14 +710,14 @@ public:
+     template<bool IS_BF16 = true>
+     __aicore__ __attribute__((always_inline)) inline void Run()
+     {
+-        
++
+         uint64_t cur_batch = 0;
+         uint32_t pre_total_q_blk_num = 0;
+         uint32_t offset_tiling = tiling_head_size + tiling_para_size * cur_batch;
+         uint32_t cur_total_q_blk_num = (uint32_t)(*((__gm__ int32_t *)tiling_para_gm + 13 + offset_tiling));
+         uint32_t process_num = total_q_blk_num * q_heads;
+         float alibi_coeff = 1;
+- 
++
+         mask_gm_tensor.SetGlobalBuffer(reinterpret_cast<__gm__ IN_DATA_TYPE *>(mask_gm));
+         o_gm_tensor.SetGlobalBuffer(reinterpret_cast<__gm__ IN_DATA_TYPE *>(o_gm));
+         s_gm_tensor.SetGlobalBuffer(reinterpret_cast<__gm__ float *>(s_gm));
+@@ -807,7 +807,7 @@ public:
+                 );
+                 PIPE_BARRIER(V);
+                 muls_v<ArchType::ASCEND_V220, float>(
+-                    mask_ubuf_tensor, 
++                    mask_ubuf_tensor,
+                     mask_ubuf_tensor, (float)-3e38,
+                     sub_m * VECTOR_SIZE / FLOAT_VECTOR_SIZE, // repeat
+                     1,                                                                // dstBlockStride
+@@ -836,7 +836,7 @@ public:
+                     }
+                 }
+             }
+-            uint32_t qk_n_triu = n_end * pp_n_scalar; 
++            uint32_t qk_n_triu = n_end * pp_n_scalar;
+             uint32_t s_block_stack = n_end > 4 ? 2 : 1;
+             uint32_t launch_delay = s_block_stack * 2;
+             uint32_t vect_mod = 2 * launch_delay;
+@@ -1092,7 +1092,7 @@ public:
+                                 if (long_seq == 0) {
+                                     if constexpr (!swa_compress) {
+                                         add_v<ArchType::ASCEND_V220, float>(
+-                                            ls_ubuf_tensor, 
++                                            ls_ubuf_tensor,
+                                             ls_ubuf_tensor,
+                                             mask_ubuf_tensor,
+                                             (sub_m * qk_round_n + FLOAT_VECTOR_SIZE - 1) / FLOAT_VECTOR_SIZE, // repeat
+@@ -1106,7 +1106,7 @@ public:
+                                     } else {
+                                         if (!skip_mask) {
+                                             add_v<ArchType::ASCEND_V220, float>(
+-                                                ls_ubuf_tensor, 
++                                                ls_ubuf_tensor,
+                                                 ls_ubuf_tensor,
+                                                 mask_ubuf_tensor,
+                                                 (sub_m * qk_round_n + FLOAT_VECTOR_SIZE - 1) / FLOAT_VECTOR_SIZE, // repeat
+@@ -1123,7 +1123,7 @@ public:
+                                 } else if (pp_n_scalar == FLOAT_VECTOR_SIZE && s_block_stack == 2 && n_idx == n_end - 2) {
+                                     __set_mask(qk_n - FLOAT_VECTOR_SIZE);
+                                     add_v<ArchType::ASCEND_V220, float>(
+-                                        ls_ubuf_tensor[FLOAT_VECTOR_SIZE], 
++                                        ls_ubuf_tensor[FLOAT_VECTOR_SIZE],
+                                         ls_ubuf_tensor[FLOAT_VECTOR_SIZE],
+                                         mask_ubuf_tensor,
+                                         sub_m, // repeat
+@@ -1141,7 +1141,7 @@ public:
+                                         __set_mask(FLOAT_VECTOR_SIZE);
+                                     }
+                                     add_v<ArchType::ASCEND_V220, float>(
+-                                        ls_ubuf_tensor, 
++                                        ls_ubuf_tensor,
+                                         ls_ubuf_tensor,
+                                         mask_ubuf_tensor,
+                                         sub_m, // repeat
+@@ -1155,7 +1155,7 @@ public:
+                                     if (qk_n > FLOAT_VECTOR_SIZE) {
+                                         __set_mask(qk_n - FLOAT_VECTOR_SIZE);
+                                         add_v<ArchType::ASCEND_V220, float>(
+-                                            ls_ubuf_tensor[FLOAT_VECTOR_SIZE], 
++                                            ls_ubuf_tensor[FLOAT_VECTOR_SIZE],
+                                             ls_ubuf_tensor[FLOAT_VECTOR_SIZE],
+                                             mask_ubuf_tensor[FLOAT_VECTOR_SIZE],
+                                             sub_m, // repeat
+@@ -1411,7 +1411,7 @@ public:
+                                 );
+                             }
+                             PIPE_BARRIER(V);
+-                            
++
+                             SET_FLAG(V, MTE3, EVENT_ID0);
+                             WAIT_FLAG(V, MTE3, EVENT_ID0);
+                             ub_to_gm<ArchType::ASCEND_V220, IN_DATA_TYPE>(
+@@ -1536,7 +1536,7 @@ public:
+                                 if (alibi_coeff_gm != nullptr) {
+                                     mask_offset = BASE_MASK_SIZE * SOFTMAX_MAX_LENGTH;
+                                     if (alibi_left_align == 0) {
+-                                        delta = base_y * (n_idx + 1 - m_idx);
++                                        delta = base_y * (static_cast<int32_t>(n_idx) + 1 - static_cast<int32_t>(m_idx));
+                                     } else {
+                                         delta = -base_y * n_idx;
+                                     }
+@@ -1614,7 +1614,7 @@ public:
+                                         WAIT_FLAG(MTE2, V, EVENT_ID1);
+                                         if constexpr (!swa_compress) {
+                                             conv_v<ArchType::ASCEND_V220, IN_DATA_TYPE, float>(
+-                                                mask_ubuf_tensor, 
++                                                mask_ubuf_tensor,
+                                                 mask16_ubuf_tensor,
+                                                 (m_split * qk_round_n + FLOAT_VECTOR_SIZE - 1) / FLOAT_VECTOR_SIZE, // repeat
+                                                 1,                                                                // dstBlockStride
+@@ -1625,7 +1625,7 @@ public:
+                                         } else {
+                                             if (!skip_mask) {
+                                                 conv_v<ArchType::ASCEND_V220, IN_DATA_TYPE, float>(
+-                                                    mask_ubuf_tensor, 
++                                                    mask_ubuf_tensor,
+                                                     mask16_ubuf_tensor,
+                                                     (m_split * qk_round_n + FLOAT_VECTOR_SIZE - 1) / FLOAT_VECTOR_SIZE, // repeat
+                                                     1,                                                                // dstBlockStride
+@@ -1655,8 +1655,8 @@ public:
+                                                     PIPE_BARRIER(V);
+                                                 }
+                                                 adds_v<ArchType::ASCEND_V220, float>(
+-                                                    mask_ubuf_tensor, 
+-                                                    mask_ubuf_tensor, 
++                                                    mask_ubuf_tensor,
++                                                    mask_ubuf_tensor,
+                                                     (float)delta,
+                                                     (m_split * qk_round_n + FLOAT_VECTOR_SIZE - 1) / FLOAT_VECTOR_SIZE, // repeat
+                                                     1,                                                                // dstBlockStride
+@@ -1667,8 +1667,8 @@ public:
+                                                 PIPE_BARRIER(V);
+                                                 if (alibi_left_align == 1) {
+                                                     adds_v<ArchType::ASCEND_V220, float>(
+-                                                        mask_ubuf_tensor[128], 
+-                                                        mask_ubuf_tensor, 
++                                                        mask_ubuf_tensor[128],
++                                                        mask_ubuf_tensor,
+                                                         (float)-base_y,
+                                                         m_split, // repeat
+                                                         1,                                                                // dstBlockStride
+@@ -1677,8 +1677,8 @@ public:
+                                                         qk_round_n / 8                                                                 // srcRepeatStride
+                                                     );
+                                                     adds_v<ArchType::ASCEND_V220, float>(
+-                                                        mask_ubuf_tensor[128 + FLOAT_VECTOR_SIZE], 
+-                                                        mask_ubuf_tensor[FLOAT_VECTOR_SIZE], 
++                                                        mask_ubuf_tensor[128 + FLOAT_VECTOR_SIZE],
++                                                        mask_ubuf_tensor[FLOAT_VECTOR_SIZE],
+                                                         (float)-base_y,
+                                                         m_split, // repeat
+                                                         1,                                                                // dstBlockStride
+@@ -1688,8 +1688,8 @@ public:
+                                                     );
+                                                 } else {
+                                                     adds_v<ArchType::ASCEND_V220, float>(
+-                                                        mask_ubuf_tensor[128], 
+-                                                        mask_ubuf_tensor, 
++                                                        mask_ubuf_tensor[128],
++                                                        mask_ubuf_tensor,
+                                                         base_y,
+                                                         m_split, // repeat
+                                                         1,                                                                // dstBlockStride
+@@ -1698,8 +1698,8 @@ public:
+                                                         qk_round_n / 8                                                                 // srcRepeatStride
+                                                     );
+                                                     adds_v<ArchType::ASCEND_V220, float>(
+-                                                        mask_ubuf_tensor[128 + FLOAT_VECTOR_SIZE], 
+-                                                        mask_ubuf_tensor[FLOAT_VECTOR_SIZE], 
++                                                        mask_ubuf_tensor[128 + FLOAT_VECTOR_SIZE],
++                                                        mask_ubuf_tensor[FLOAT_VECTOR_SIZE],
+                                                         base_y,
+                                                         m_split, // repeat
+                                                         1,                                                                // dstBlockStride
+@@ -1723,8 +1723,8 @@ public:
+                                                 }
+                                             } else if (alibi_left_align == 1) {
+                                                 adds_v<ArchType::ASCEND_V220, float>(
+-                                                    mask_ubuf_tensor, 
+-                                                    mask_ubuf_tensor, 
++                                                    mask_ubuf_tensor,
++                                                    mask_ubuf_tensor,
+                                                     (float)delta,
+                                                     (m_split * qk_round_n + FLOAT_VECTOR_SIZE - 1) / FLOAT_VECTOR_SIZE, // repeat
+                                                     1,                                                                // dstBlockStride
+@@ -1833,7 +1833,7 @@ public:
+                                         if (long_seq == 0) {
+                                             if constexpr (!swa_compress) {
+                                                 add_v<ArchType::ASCEND_V220, float>(
+-                                                    ls_ubuf_tensor, 
++                                                    ls_ubuf_tensor,
+                                                     ls_ubuf_tensor,
+                                                     mask_ubuf_tensor,
+                                                     (m_split * qk_round_n + FLOAT_VECTOR_SIZE - 1) / FLOAT_VECTOR_SIZE, // repeat
+@@ -1847,7 +1847,7 @@ public:
+                                             } else {
+                                                 if (!skip_mask) {
+                                                     add_v<ArchType::ASCEND_V220, float>(
+-                                                        ls_ubuf_tensor, 
++                                                        ls_ubuf_tensor,
+                                                         ls_ubuf_tensor,
+                                                         mask_ubuf_tensor,
+                                                         (m_split * qk_round_n + FLOAT_VECTOR_SIZE - 1) / FLOAT_VECTOR_SIZE, // repeat
+@@ -1867,7 +1867,7 @@ public:
+                                                 __set_mask(FLOAT_VECTOR_SIZE);
+                                             }
+                                             add_v<ArchType::ASCEND_V220, float>(
+-                                                ls_ubuf_tensor[pp_n_scalar], 
++                                                ls_ubuf_tensor[pp_n_scalar],
+                                                 ls_ubuf_tensor[pp_n_scalar],
+                                                 mask_ubuf_tensor[split_idx * m_slice * VECTOR_SIZE],
+                                                 m_split, // repeat
+@@ -1881,7 +1881,7 @@ public:
+                                             if (qk_n - pp_n_scalar > FLOAT_VECTOR_SIZE) {
+                                                 __set_mask(qk_n - pp_n_scalar - FLOAT_VECTOR_SIZE);
+                                                 add_v<ArchType::ASCEND_V220, float>(
+-                                                    ls_ubuf_tensor[pp_n_scalar + FLOAT_VECTOR_SIZE], 
++                                                    ls_ubuf_tensor[pp_n_scalar + FLOAT_VECTOR_SIZE],
+                                                     ls_ubuf_tensor[pp_n_scalar + FLOAT_VECTOR_SIZE],
+                                                     mask_ubuf_tensor[FLOAT_VECTOR_SIZE + split_idx * m_slice * VECTOR_SIZE],
+                                                     m_split, // repeat
+@@ -2348,7 +2348,7 @@ public:
+                                     SetVectorMask<int8_t>((uint64_t)-1, (uint64_t)-1);
+                                 }
+                                 PIPE_BARRIER(V);
+-                                
++
+                                 // WAIT_FLAG(MTE2, V, EVENT_ID4);
+                                 WAIT_FLAG(MTE2, V, EVENT_ID2);
+                                 // *** go = lo + go
+@@ -2530,7 +2530,7 @@ private:
+     uint32_t total_q_blk_num{0};
+     uint32_t isClamp{0};
+     float clampMin;
+-    float clampMax; 
++    float clampMax;
+     uint64_t stride_qo{0};
+     uint32_t go_flag_scalar{1};
+ 
+@@ -2604,4 +2604,4 @@ extern "C" __global__ __aicore__ void unpad_flashattention_mla_bf16(
+         fa_vec.Run<false>();
+ #endif
+     }
+-}
+\ No newline at end of file
++}

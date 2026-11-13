@@ -1,0 +1,3233 @@
+From a12559a897a0f5f889fc95edb71644268aa26275 Mon Sep 17 00:00:00 2001
+From: muziyuhui666 <lijianfu9@huawei.com>
+Date: Mon, 20 Apr 2026 16:28:19 +0800
+Subject: [PATCH 01/14] fix: harden multimodal token handling for completions
+ DoS
+
+---
+ examples/atb_models/atb_llm/models/base/flash_causal_lm.py  | 6 ++++++
+ .../atb_llm/models/base/flash_causal_multimodal.py          | 2 ++
+ .../atb_models/atb_llm/models/glm4v/flash_causal_glm4v.py   | 2 ++
+ .../internlmxcomposer2/flash_causal_internlmxcomposer2.py   | 2 ++
+ .../atb_llm/models/internvl/flash_causal_internvl.py        | 2 ++
+ .../atb_models/atb_llm/models/llava/flash_causal_llava.py   | 2 ++
+ .../atb_llm/models/mllama/flash_causal_mllama_atb.py        | 2 ++
+ .../atb_models/atb_llm/models/vita/flash_causal_vita.py     | 2 ++
+ examples/atb_models/atb_llm/runner/tokenizer_wrapper.py     | 6 +++++-
+ .../pythontest/atb_llm/runner/test_tokenizer_wrapper.py     | 1 +
+ 10 files changed, 26 insertions(+), 1 deletion(-)
+
+diff --git a/examples/atb_models/atb_llm/models/base/flash_causal_lm.py b/examples/atb_models/atb_llm/models/base/flash_causal_lm.py
+index d94c3f4166..dd9450eafe 100644
+--- a/examples/atb_models/atb_llm/models/base/flash_causal_lm.py
++++ b/examples/atb_models/atb_llm/models/base/flash_causal_lm.py
+@@ -67,6 +67,8 @@ class FlashForCausalLM(BaseModel):
+         weights (Weights): The weights for the model.
+         **kwargs: Additional keyword arguments.
+     """
++    is_multimodal = False
++
+     def __init__(self, config: PretrainedConfig, weights: Weights, **kwargs):
+         super().__init__()
+         load_atb_speed()
+@@ -250,6 +252,10 @@ class FlashForCausalLM(BaseModel):
+             # 这里+1是需要跳过seq_len_cum_sum
+             in_tensor[start_idx + 1 + i] = weight
+ 
++    @classmethod
++    def get_is_multimodal(cls):
++        return cls.is_multimodal
++
+     def update_adapter_manager(self):
+         """Update adapter manager."""
+         self.adapter_manager.base_model = self
+diff --git a/examples/atb_models/atb_llm/models/base/flash_causal_multimodal.py b/examples/atb_models/atb_llm/models/base/flash_causal_multimodal.py
+index 5fe70ca89b..7e220479a3 100644
+--- a/examples/atb_models/atb_llm/models/base/flash_causal_multimodal.py
++++ b/examples/atb_models/atb_llm/models/base/flash_causal_multimodal.py
+@@ -149,6 +149,8 @@ class MultiModalLLm(FlashForCausalLM):
+         config (dict or Config): Configuration for the multimodal model.
+         weights (str or bytes): Weights for the multimodal model.
+     """
++    is_multimodal = True
++    
+     def __init__(self, config, weights, **kwargs):
+         if getattr(config, "text_config"):
+             if not config.quantize:
+diff --git a/examples/atb_models/atb_llm/models/glm4v/flash_causal_glm4v.py b/examples/atb_models/atb_llm/models/glm4v/flash_causal_glm4v.py
+index c59b070e24..389ce20494 100644
+--- a/examples/atb_models/atb_llm/models/glm4v/flash_causal_glm4v.py
++++ b/examples/atb_models/atb_llm/models/glm4v/flash_causal_glm4v.py
+@@ -46,6 +46,8 @@ RESCALE_FACTOR = 1 / 255
+ 
+ 
+ class FlashGlm4vForCausalLM(FlashForCausalLM):
++    is_multimodal = True
++    
+     def __init__(self, config, weights, **kwargs):
+         super().__init__(config, weights, **kwargs)
+         self.config = config
+diff --git a/examples/atb_models/atb_llm/models/internlmxcomposer2/flash_causal_internlmxcomposer2.py b/examples/atb_models/atb_llm/models/internlmxcomposer2/flash_causal_internlmxcomposer2.py
+index 474f81f82c..f48329c819 100644
+--- a/examples/atb_models/atb_llm/models/internlmxcomposer2/flash_causal_internlmxcomposer2.py
++++ b/examples/atb_models/atb_llm/models/internlmxcomposer2/flash_causal_internlmxcomposer2.py
+@@ -56,6 +56,8 @@ def format_w8a8sc_lora_b_key(base_weight_prefix):
+ 
+ 
+ class MultiModalLLm(FlashForCausalLM):
++    is_multimodal = True
++    
+     def __init__(self, config, weights):
+         if getattr(config, "text_config", None):
+             if not config.quantize:
+diff --git a/examples/atb_models/atb_llm/models/internvl/flash_causal_internvl.py b/examples/atb_models/atb_llm/models/internvl/flash_causal_internvl.py
+index db1fe09378..b4904ae990 100644
+--- a/examples/atb_models/atb_llm/models/internvl/flash_causal_internvl.py
++++ b/examples/atb_models/atb_llm/models/internvl/flash_causal_internvl.py
+@@ -54,6 +54,8 @@ MODEL_PREFIX = 'language_model.model'
+ 
+ 
+ class FlashInternvlForCausalLM(FlashForCausalLM):
++    is_multimodal = True
++    
+     def __init__(self, config, weights, **kwargs):
+         super().__init__(config, weights, **kwargs)
+         self.config = config
+diff --git a/examples/atb_models/atb_llm/models/llava/flash_causal_llava.py b/examples/atb_models/atb_llm/models/llava/flash_causal_llava.py
+index 8ff2484fb8..69ba463de7 100644
+--- a/examples/atb_models/atb_llm/models/llava/flash_causal_llava.py
++++ b/examples/atb_models/atb_llm/models/llava/flash_causal_llava.py
+@@ -206,6 +206,8 @@ class LlavaMultiModalProjector(nn.Module):
+ 
+ 
+ class MultiModalLLm(FlashForCausalLM):
++    is_multimodal = True
++    
+     def __init__(self, config, weights, **kwargs):
+         if getattr(config, "text_config"):
+             if not config.quantize:
+diff --git a/examples/atb_models/atb_llm/models/mllama/flash_causal_mllama_atb.py b/examples/atb_models/atb_llm/models/mllama/flash_causal_mllama_atb.py
+index fc1924b69f..5d3f125d21 100644
+--- a/examples/atb_models/atb_llm/models/mllama/flash_causal_mllama_atb.py
++++ b/examples/atb_models/atb_llm/models/mllama/flash_causal_mllama_atb.py
+@@ -24,6 +24,8 @@ _CROSS_CONTEXT_LENS = "cross_context_lens"
+ 
+ 
+ class FlashMllamaForCausalLMATB(FlashLlamaForCausalLMATB):
++    is_multimodal = True
++    
+     def __init__(self, config, weights, lm_head_prefix="language_model.lm_head",
+                  model_prefix="language_model.model", **kwargs):
+         if getattr(config, "text_config"):
+diff --git a/examples/atb_models/atb_llm/models/vita/flash_causal_vita.py b/examples/atb_models/atb_llm/models/vita/flash_causal_vita.py
+index 82fae502fa..95f53e884b 100644
+--- a/examples/atb_models/atb_llm/models/vita/flash_causal_vita.py
++++ b/examples/atb_models/atb_llm/models/vita/flash_causal_vita.py
+@@ -121,6 +121,8 @@ class VitaMultiModalProjector(nn.Module):
+ 
+ 
+ class MultiModalLLm(FlashForCausalLM):
++    is_multimodal = True
++    
+     def __init__(self, config, weights, **kwargs):
+         if getattr(config, "text_config"):
+             if not config.quantize:
+diff --git a/examples/atb_models/atb_llm/runner/tokenizer_wrapper.py b/examples/atb_models/atb_llm/runner/tokenizer_wrapper.py
+index b0fead5033..b8dc715646 100644
+--- a/examples/atb_models/atb_llm/runner/tokenizer_wrapper.py
++++ b/examples/atb_models/atb_llm/runner/tokenizer_wrapper.py
+@@ -16,6 +16,7 @@ import numpy as np
+ from ..models import get_model
+ from ..utils.file_utils import standardize_path, check_file_safety
+ from ..utils.log.logging import logger
++from ..utils.initial import load_atb_speed
+ 
+ REASON_CONTENT_KEY = "reasoning_content"
+ CONTENT_KEY = "content"
+@@ -84,7 +85,9 @@ class TokenizerWrapper:
+             if res != 0:
+                 raise RuntimeError(f"Data obfuscation init failed, please refer to MindIE official document, " \
+                                 f"error msg: {msg}")
+-        
++        load_atb_speed()
++        self.model_cls = router_ins.model_cls
++
+     def encode(self, inputs, **kwargs):
+         is_chatting = kwargs.pop("is_chatting", False)
+         if is_chatting:
+@@ -99,6 +102,7 @@ class TokenizerWrapper:
+                     self.tokenizer.truncation_side = "right"
+                 else:
+                     self.tokenizer.truncation_side = "left"
++            kwargs['split_special_tokens'] = self.model_cls.get_is_multimodal()
+             token_ids = self.tokenizer(inputs, **kwargs)["input_ids"][0].tolist()
+         if self.enable_data_obfuscation:
+             if len(token_ids) > 0 and isinstance(token_ids[0], list):
+diff --git a/examples/atb_models/tests/pythontest/atb_llm/runner/test_tokenizer_wrapper.py b/examples/atb_models/tests/pythontest/atb_llm/runner/test_tokenizer_wrapper.py
+index 263e704393..e95a0ed234 100644
+--- a/examples/atb_models/tests/pythontest/atb_llm/runner/test_tokenizer_wrapper.py
++++ b/examples/atb_models/tests/pythontest/atb_llm/runner/test_tokenizer_wrapper.py
+@@ -44,6 +44,7 @@ class MockRouter():
+         self.reasoning_parser.count_reasoning_tokens.side_effect = lambda x: len(x)
+         self.reasoning_parser.single_process_reasoning.side_effect = lambda x: (x[1:], x)
+         self.reasoning_parser.stream_process_reasoning.return_value = ('789', '654')
++        self.model_cls = MagicMock()
+ 
+ 
+ class TestTokenizerWrapper(unittest.TestCase):
+-- 
+GitCode
+
+
+From 5f337b8b3def8c6707338e29137cedaa3696387a Mon Sep 17 00:00:00 2001
+From: muziyuhui666 <lijianfu9@huawei.com>
+Date: Mon, 20 Apr 2026 20:15:09 +0800
+Subject: [PATCH 02/14] Revert "fix: harden multimodal token handling for
+ completions DoS"
+
+This reverts commit a12559a897a0f5f889fc95edb71644268aa26275.
+---
+ examples/atb_models/atb_llm/models/base/flash_causal_lm.py  | 6 ------
+ .../atb_llm/models/base/flash_causal_multimodal.py          | 2 --
+ .../atb_models/atb_llm/models/glm4v/flash_causal_glm4v.py   | 2 --
+ .../internlmxcomposer2/flash_causal_internlmxcomposer2.py   | 2 --
+ .../atb_llm/models/internvl/flash_causal_internvl.py        | 2 --
+ .../atb_models/atb_llm/models/llava/flash_causal_llava.py   | 2 --
+ .../atb_llm/models/mllama/flash_causal_mllama_atb.py        | 2 --
+ .../atb_models/atb_llm/models/vita/flash_causal_vita.py     | 2 --
+ examples/atb_models/atb_llm/runner/tokenizer_wrapper.py     | 6 +-----
+ .../pythontest/atb_llm/runner/test_tokenizer_wrapper.py     | 1 -
+ 10 files changed, 1 insertion(+), 26 deletions(-)
+
+diff --git a/examples/atb_models/atb_llm/models/base/flash_causal_lm.py b/examples/atb_models/atb_llm/models/base/flash_causal_lm.py
+index dd9450eafe..d94c3f4166 100644
+--- a/examples/atb_models/atb_llm/models/base/flash_causal_lm.py
++++ b/examples/atb_models/atb_llm/models/base/flash_causal_lm.py
+@@ -67,8 +67,6 @@ class FlashForCausalLM(BaseModel):
+         weights (Weights): The weights for the model.
+         **kwargs: Additional keyword arguments.
+     """
+-    is_multimodal = False
+-
+     def __init__(self, config: PretrainedConfig, weights: Weights, **kwargs):
+         super().__init__()
+         load_atb_speed()
+@@ -252,10 +250,6 @@ class FlashForCausalLM(BaseModel):
+             # 这里+1是需要跳过seq_len_cum_sum
+             in_tensor[start_idx + 1 + i] = weight
+ 
+-    @classmethod
+-    def get_is_multimodal(cls):
+-        return cls.is_multimodal
+-
+     def update_adapter_manager(self):
+         """Update adapter manager."""
+         self.adapter_manager.base_model = self
+diff --git a/examples/atb_models/atb_llm/models/base/flash_causal_multimodal.py b/examples/atb_models/atb_llm/models/base/flash_causal_multimodal.py
+index 7e220479a3..5fe70ca89b 100644
+--- a/examples/atb_models/atb_llm/models/base/flash_causal_multimodal.py
++++ b/examples/atb_models/atb_llm/models/base/flash_causal_multimodal.py
+@@ -149,8 +149,6 @@ class MultiModalLLm(FlashForCausalLM):
+         config (dict or Config): Configuration for the multimodal model.
+         weights (str or bytes): Weights for the multimodal model.
+     """
+-    is_multimodal = True
+-    
+     def __init__(self, config, weights, **kwargs):
+         if getattr(config, "text_config"):
+             if not config.quantize:
+diff --git a/examples/atb_models/atb_llm/models/glm4v/flash_causal_glm4v.py b/examples/atb_models/atb_llm/models/glm4v/flash_causal_glm4v.py
+index 389ce20494..c59b070e24 100644
+--- a/examples/atb_models/atb_llm/models/glm4v/flash_causal_glm4v.py
++++ b/examples/atb_models/atb_llm/models/glm4v/flash_causal_glm4v.py
+@@ -46,8 +46,6 @@ RESCALE_FACTOR = 1 / 255
+ 
+ 
+ class FlashGlm4vForCausalLM(FlashForCausalLM):
+-    is_multimodal = True
+-    
+     def __init__(self, config, weights, **kwargs):
+         super().__init__(config, weights, **kwargs)
+         self.config = config
+diff --git a/examples/atb_models/atb_llm/models/internlmxcomposer2/flash_causal_internlmxcomposer2.py b/examples/atb_models/atb_llm/models/internlmxcomposer2/flash_causal_internlmxcomposer2.py
+index f48329c819..474f81f82c 100644
+--- a/examples/atb_models/atb_llm/models/internlmxcomposer2/flash_causal_internlmxcomposer2.py
++++ b/examples/atb_models/atb_llm/models/internlmxcomposer2/flash_causal_internlmxcomposer2.py
+@@ -56,8 +56,6 @@ def format_w8a8sc_lora_b_key(base_weight_prefix):
+ 
+ 
+ class MultiModalLLm(FlashForCausalLM):
+-    is_multimodal = True
+-    
+     def __init__(self, config, weights):
+         if getattr(config, "text_config", None):
+             if not config.quantize:
+diff --git a/examples/atb_models/atb_llm/models/internvl/flash_causal_internvl.py b/examples/atb_models/atb_llm/models/internvl/flash_causal_internvl.py
+index b4904ae990..db1fe09378 100644
+--- a/examples/atb_models/atb_llm/models/internvl/flash_causal_internvl.py
++++ b/examples/atb_models/atb_llm/models/internvl/flash_causal_internvl.py
+@@ -54,8 +54,6 @@ MODEL_PREFIX = 'language_model.model'
+ 
+ 
+ class FlashInternvlForCausalLM(FlashForCausalLM):
+-    is_multimodal = True
+-    
+     def __init__(self, config, weights, **kwargs):
+         super().__init__(config, weights, **kwargs)
+         self.config = config
+diff --git a/examples/atb_models/atb_llm/models/llava/flash_causal_llava.py b/examples/atb_models/atb_llm/models/llava/flash_causal_llava.py
+index 69ba463de7..8ff2484fb8 100644
+--- a/examples/atb_models/atb_llm/models/llava/flash_causal_llava.py
++++ b/examples/atb_models/atb_llm/models/llava/flash_causal_llava.py
+@@ -206,8 +206,6 @@ class LlavaMultiModalProjector(nn.Module):
+ 
+ 
+ class MultiModalLLm(FlashForCausalLM):
+-    is_multimodal = True
+-    
+     def __init__(self, config, weights, **kwargs):
+         if getattr(config, "text_config"):
+             if not config.quantize:
+diff --git a/examples/atb_models/atb_llm/models/mllama/flash_causal_mllama_atb.py b/examples/atb_models/atb_llm/models/mllama/flash_causal_mllama_atb.py
+index 5d3f125d21..fc1924b69f 100644
+--- a/examples/atb_models/atb_llm/models/mllama/flash_causal_mllama_atb.py
++++ b/examples/atb_models/atb_llm/models/mllama/flash_causal_mllama_atb.py
+@@ -24,8 +24,6 @@ _CROSS_CONTEXT_LENS = "cross_context_lens"
+ 
+ 
+ class FlashMllamaForCausalLMATB(FlashLlamaForCausalLMATB):
+-    is_multimodal = True
+-    
+     def __init__(self, config, weights, lm_head_prefix="language_model.lm_head",
+                  model_prefix="language_model.model", **kwargs):
+         if getattr(config, "text_config"):
+diff --git a/examples/atb_models/atb_llm/models/vita/flash_causal_vita.py b/examples/atb_models/atb_llm/models/vita/flash_causal_vita.py
+index 95f53e884b..82fae502fa 100644
+--- a/examples/atb_models/atb_llm/models/vita/flash_causal_vita.py
++++ b/examples/atb_models/atb_llm/models/vita/flash_causal_vita.py
+@@ -121,8 +121,6 @@ class VitaMultiModalProjector(nn.Module):
+ 
+ 
+ class MultiModalLLm(FlashForCausalLM):
+-    is_multimodal = True
+-    
+     def __init__(self, config, weights, **kwargs):
+         if getattr(config, "text_config"):
+             if not config.quantize:
+diff --git a/examples/atb_models/atb_llm/runner/tokenizer_wrapper.py b/examples/atb_models/atb_llm/runner/tokenizer_wrapper.py
+index b8dc715646..b0fead5033 100644
+--- a/examples/atb_models/atb_llm/runner/tokenizer_wrapper.py
++++ b/examples/atb_models/atb_llm/runner/tokenizer_wrapper.py
+@@ -16,7 +16,6 @@ import numpy as np
+ from ..models import get_model
+ from ..utils.file_utils import standardize_path, check_file_safety
+ from ..utils.log.logging import logger
+-from ..utils.initial import load_atb_speed
+ 
+ REASON_CONTENT_KEY = "reasoning_content"
+ CONTENT_KEY = "content"
+@@ -85,9 +84,7 @@ class TokenizerWrapper:
+             if res != 0:
+                 raise RuntimeError(f"Data obfuscation init failed, please refer to MindIE official document, " \
+                                 f"error msg: {msg}")
+-        load_atb_speed()
+-        self.model_cls = router_ins.model_cls
+-
++        
+     def encode(self, inputs, **kwargs):
+         is_chatting = kwargs.pop("is_chatting", False)
+         if is_chatting:
+@@ -102,7 +99,6 @@ class TokenizerWrapper:
+                     self.tokenizer.truncation_side = "right"
+                 else:
+                     self.tokenizer.truncation_side = "left"
+-            kwargs['split_special_tokens'] = self.model_cls.get_is_multimodal()
+             token_ids = self.tokenizer(inputs, **kwargs)["input_ids"][0].tolist()
+         if self.enable_data_obfuscation:
+             if len(token_ids) > 0 and isinstance(token_ids[0], list):
+diff --git a/examples/atb_models/tests/pythontest/atb_llm/runner/test_tokenizer_wrapper.py b/examples/atb_models/tests/pythontest/atb_llm/runner/test_tokenizer_wrapper.py
+index e95a0ed234..263e704393 100644
+--- a/examples/atb_models/tests/pythontest/atb_llm/runner/test_tokenizer_wrapper.py
++++ b/examples/atb_models/tests/pythontest/atb_llm/runner/test_tokenizer_wrapper.py
+@@ -44,7 +44,6 @@ class MockRouter():
+         self.reasoning_parser.count_reasoning_tokens.side_effect = lambda x: len(x)
+         self.reasoning_parser.single_process_reasoning.side_effect = lambda x: (x[1:], x)
+         self.reasoning_parser.stream_process_reasoning.return_value = ('789', '654')
+-        self.model_cls = MagicMock()
+ 
+ 
+ class TestTokenizerWrapper(unittest.TestCase):
+-- 
+GitCode
+
+
+From 382f0c2d9422cb9f3b02860cd6b705fab812a131 Mon Sep 17 00:00:00 2001
+From: muziyuhui666 <lijianfu9@huawei.com>
+Date: Mon, 20 Apr 2026 20:30:58 +0800
+Subject: [PATCH 03/14] fix: use router multimodal flag for tokenizer split
+ behavior
+
+Add a router-level `is_multimodal` capability flag and use it in TokenizerWrapper to set `split_special_tokens` safely, avoiding unstable model class side effects in tokenizer workers.
+
+Made-with: Cursor
+---
+ examples/atb_models/atb_llm/models/base/router.py               | 1 +
+ examples/atb_models/atb_llm/models/glm41v/router_glm41v.py      | 1 +
+ examples/atb_models/atb_llm/models/glm4v/router_glm4v.py        | 2 ++
+ .../models/internlmxcomposer2/router_internlmxcomposer2.py      | 2 ++
+ examples/atb_models/atb_llm/models/internvl/router_internvl.py  | 2 ++
+ examples/atb_models/atb_llm/models/janus/router_janus.py        | 1 +
+ examples/atb_models/atb_llm/models/llava/router_llava.py        | 1 +
+ .../atb_models/atb_llm/models/llava_next/router_llava_next.py   | 1 +
+ .../atb_llm/models/minicpm_qwen2_v2/router_minicpm_qwen2_v2.py  | 1 +
+ examples/atb_models/atb_llm/models/mllama/router_mllama.py      | 1 +
+ .../atb_models/atb_llm/models/qwen2_audio/router_qwen2_audio.py | 1 +
+ examples/atb_models/atb_llm/models/qwen2_vl/router_qwen2_vl.py  | 1 +
+ examples/atb_models/atb_llm/models/qwen3_vl/router_qwen3_vl.py  | 1 +
+ examples/atb_models/atb_llm/models/vita/router_vita.py          | 1 +
+ examples/atb_models/atb_llm/models/yivl/router_yivl.py          | 1 +
+ examples/atb_models/atb_llm/runner/tokenizer_wrapper.py         | 2 ++
+ 16 files changed, 20 insertions(+)
+
+diff --git a/examples/atb_models/atb_llm/models/base/router.py b/examples/atb_models/atb_llm/models/base/router.py
+index 68ccd17219..739b7f3e8e 100644
+--- a/examples/atb_models/atb_llm/models/base/router.py
++++ b/examples/atb_models/atb_llm/models/base/router.py
+@@ -95,6 +95,7 @@ class BaseRouter:
+     trust_remote_code: bool = False
+     enable_atb_torch: bool = False
+     enable_edge: bool = False
++    is_multimodal: bool = False
+     llm_config: LLMConfig = None
+ 
+     sub_model_path: str = ""
+diff --git a/examples/atb_models/atb_llm/models/glm41v/router_glm41v.py b/examples/atb_models/atb_llm/models/glm41v/router_glm41v.py
+index b8b3a5be56..14eb35f656 100644
+--- a/examples/atb_models/atb_llm/models/glm41v/router_glm41v.py
++++ b/examples/atb_models/atb_llm/models/glm41v/router_glm41v.py
+@@ -53,6 +53,7 @@ messages_template = [
+ 
+ @dataclass
+ class Glm41vRouter(BaseRouter):
++    is_multimodal: bool = True
+     _processor: Any = None
+ 
+     @property
+diff --git a/examples/atb_models/atb_llm/models/glm4v/router_glm4v.py b/examples/atb_models/atb_llm/models/glm4v/router_glm4v.py
+index 6edf3f0da3..e2fb99a6e2 100644
+--- a/examples/atb_models/atb_llm/models/glm4v/router_glm4v.py
++++ b/examples/atb_models/atb_llm/models/glm4v/router_glm4v.py
+@@ -29,6 +29,8 @@ _IMG_TOKEN_LEN = 1600
+ 
+ @dataclass
+ class Glm4vRouter(BaseRouter):
++    is_multimodal: bool = True
++
+     def tokenize(self, inputs: List[Dict], **kwargs):
+         pad_token_id = self.config.pad_token_id if self.config.pad_token_id is not None else _PAD_TOKEN_ID
+         boi_token_id = self.config.boi_token_id if self.config.boi_token_id is not None else _BOI_TOKEN_ID
+diff --git a/examples/atb_models/atb_llm/models/internlmxcomposer2/router_internlmxcomposer2.py b/examples/atb_models/atb_llm/models/internlmxcomposer2/router_internlmxcomposer2.py
+index ba896630af..00039cb3e8 100644
+--- a/examples/atb_models/atb_llm/models/internlmxcomposer2/router_internlmxcomposer2.py
++++ b/examples/atb_models/atb_llm/models/internlmxcomposer2/router_internlmxcomposer2.py
+@@ -16,6 +16,8 @@ from ..base.model_utils import safe_get_tokenizer_from_pretrained
+ 
+ @dataclass
+ class Internlmxcomposer2Router(BaseRouter):
++    is_multimodal: bool = True
++
+     def get_tokenizer(self):
+         tokenizer = safe_get_tokenizer_from_pretrained(
+             self.tokenizer_path,
+diff --git a/examples/atb_models/atb_llm/models/internvl/router_internvl.py b/examples/atb_models/atb_llm/models/internvl/router_internvl.py
+index 61d478a2d3..b1fb0bd274 100644
+--- a/examples/atb_models/atb_llm/models/internvl/router_internvl.py
++++ b/examples/atb_models/atb_llm/models/internvl/router_internvl.py
+@@ -33,6 +33,8 @@ os.environ.setdefault('MASTER_PORT', '5678')
+ 
+ @dataclass
+ class InternvlRouter(BaseRouter):
++    is_multimodal: bool = True
++
+     def get_config(self):
+         config = InternvlConfig.from_pretrained(self.model_name_or_path)
+         if self.max_position_embeddings:
+diff --git a/examples/atb_models/atb_llm/models/janus/router_janus.py b/examples/atb_models/atb_llm/models/janus/router_janus.py
+index 33fb170f2f..c8533abc4b 100644
+--- a/examples/atb_models/atb_llm/models/janus/router_janus.py
++++ b/examples/atb_models/atb_llm/models/janus/router_janus.py
+@@ -14,6 +14,7 @@ from ..base.router import BaseRouter
+ 
+ @dataclass
+ class JanusRouter(BaseRouter):
++    is_multimodal: bool = True
+     
+     def check_config_janus(self, config):
+         super().check_config(config)
+diff --git a/examples/atb_models/atb_llm/models/llava/router_llava.py b/examples/atb_models/atb_llm/models/llava/router_llava.py
+index d30c270ec8..e807e62ea1 100644
+--- a/examples/atb_models/atb_llm/models/llava/router_llava.py
++++ b/examples/atb_models/atb_llm/models/llava/router_llava.py
+@@ -46,6 +46,7 @@ def from_list_format(list_format: List[Dict], image_token_str: str):
+ 
+ @dataclass
+ class LlavaRouter(BaseRouter):
++    is_multimodal: bool = True
+ 
+     def tokenize(self, inputs, **kwargs):
+         pad_token_id = self.config.pad_token_id \
+diff --git a/examples/atb_models/atb_llm/models/llava_next/router_llava_next.py b/examples/atb_models/atb_llm/models/llava_next/router_llava_next.py
+index 6ed2ee6aa3..14a861ef2b 100644
+--- a/examples/atb_models/atb_llm/models/llava_next/router_llava_next.py
++++ b/examples/atb_models/atb_llm/models/llava_next/router_llava_next.py
+@@ -79,6 +79,7 @@ def from_list_format(list_format: List[Dict], image_token_str: str, video_token_
+ 
+ @dataclass
+ class Llava_nextRouter(BaseRouter):
++    is_multimodal: bool = True
+     _processor: Any = None
+     
+     @property
+diff --git a/examples/atb_models/atb_llm/models/minicpm_qwen2_v2/router_minicpm_qwen2_v2.py b/examples/atb_models/atb_llm/models/minicpm_qwen2_v2/router_minicpm_qwen2_v2.py
+index 9e4680419b..807063bd9f 100644
+--- a/examples/atb_models/atb_llm/models/minicpm_qwen2_v2/router_minicpm_qwen2_v2.py
++++ b/examples/atb_models/atb_llm/models/minicpm_qwen2_v2/router_minicpm_qwen2_v2.py
+@@ -25,6 +25,7 @@ from ..base.model_utils import safe_get_tokenizer_from_pretrained
+ 
+ @dataclass
+ class Minicpmqwen2v2Router(BaseRouter):
++    is_multimodal: bool = True
+ 
+     def __post_init__(self):
+         super().__post_init__()
+diff --git a/examples/atb_models/atb_llm/models/mllama/router_mllama.py b/examples/atb_models/atb_llm/models/mllama/router_mllama.py
+index afaa557da0..e72ec7d350 100644
+--- a/examples/atb_models/atb_llm/models/mllama/router_mllama.py
++++ b/examples/atb_models/atb_llm/models/mllama/router_mllama.py
+@@ -14,6 +14,7 @@ from ..base.router import BaseRouter
+ 
+ @dataclass
+ class MllamaRouter(BaseRouter):
++    is_multimodal: bool = True
+ 
+     @staticmethod
+     def check_config(config):
+diff --git a/examples/atb_models/atb_llm/models/qwen2_audio/router_qwen2_audio.py b/examples/atb_models/atb_llm/models/qwen2_audio/router_qwen2_audio.py
+index 66fbd37a53..5c20e0cf37 100644
+--- a/examples/atb_models/atb_llm/models/qwen2_audio/router_qwen2_audio.py
++++ b/examples/atb_models/atb_llm/models/qwen2_audio/router_qwen2_audio.py
+@@ -104,6 +104,7 @@ class Qwen2AudioTextConfig(Qwen2Config):
+ 
+ @dataclass
+ class Qwen2audioRouter(BaseRouter):
++    is_multimodal: bool = True
+ 
+     def __post_init__(self):
+         super().__post_init__()
+diff --git a/examples/atb_models/atb_llm/models/qwen2_vl/router_qwen2_vl.py b/examples/atb_models/atb_llm/models/qwen2_vl/router_qwen2_vl.py
+index 0a0a9e1f4a..a66f79864f 100644
+--- a/examples/atb_models/atb_llm/models/qwen2_vl/router_qwen2_vl.py
++++ b/examples/atb_models/atb_llm/models/qwen2_vl/router_qwen2_vl.py
+@@ -42,6 +42,7 @@ messages_template = [
+ 
+ @dataclass
+ class Qwen2vlRouter(BaseRouter):
++    is_multimodal: bool = True
+     _processor: Any = None
+ 
+     @property
+diff --git a/examples/atb_models/atb_llm/models/qwen3_vl/router_qwen3_vl.py b/examples/atb_models/atb_llm/models/qwen3_vl/router_qwen3_vl.py
+index bd70a89469..ce8f34ee44 100644
+--- a/examples/atb_models/atb_llm/models/qwen3_vl/router_qwen3_vl.py
++++ b/examples/atb_models/atb_llm/models/qwen3_vl/router_qwen3_vl.py
+@@ -41,6 +41,7 @@ messages_template = [
+ 
+ @dataclass
+ class Qwen3vlRouter(BaseRouter):
++    is_multimodal: bool = True
+     _processor: Any = None
+ 
+     def __post_init__(self):
+diff --git a/examples/atb_models/atb_llm/models/vita/router_vita.py b/examples/atb_models/atb_llm/models/vita/router_vita.py
+index d7b84e06f7..c40081ef4a 100644
+--- a/examples/atb_models/atb_llm/models/vita/router_vita.py
++++ b/examples/atb_models/atb_llm/models/vita/router_vita.py
+@@ -73,6 +73,7 @@ def from_list_format(list_format: List[Dict]):
+ 
+ @dataclass
+ class VitaRouter(BaseRouter):
++    is_multimodal: bool = True
+ 
+     def process_images(self, images, model_cfg, image_processor):
+         image_aspect_ratio = getattr(model_cfg, "image_aspect_ratio", None)
+diff --git a/examples/atb_models/atb_llm/models/yivl/router_yivl.py b/examples/atb_models/atb_llm/models/yivl/router_yivl.py
+index 44387c1e9e..ecaba5e5e4 100644
+--- a/examples/atb_models/atb_llm/models/yivl/router_yivl.py
++++ b/examples/atb_models/atb_llm/models/yivl/router_yivl.py
+@@ -66,6 +66,7 @@ def parse_service_inputs(inputs: List[Dict]):
+ @dataclass
+ class YivlRouter(BaseRouter):
+     model_type = "yivl"
++    is_multimodal: bool = True
+ 
+     def __post_init__(self):
+         super().__post_init__()
+diff --git a/examples/atb_models/atb_llm/runner/tokenizer_wrapper.py b/examples/atb_models/atb_llm/runner/tokenizer_wrapper.py
+index b0fead5033..7023055eb1 100644
+--- a/examples/atb_models/atb_llm/runner/tokenizer_wrapper.py
++++ b/examples/atb_models/atb_llm/runner/tokenizer_wrapper.py
+@@ -46,6 +46,7 @@ class TokenizerWrapper:
+         router_ins = get_model(model_name_or_path, **kwargs)
+         self.config = router_ins.config
+         self.tokenizer = router_ins.tokenizer
++        self.is_multimodal = router_ins.is_multimodal
+         self.input_builder = router_ins.input_builder
+         self.postprocessor = router_ins.postprocessor
+         self.tokenize = router_ins.tokenize # This is only used by multi-modal models
+@@ -99,6 +100,7 @@ class TokenizerWrapper:
+                     self.tokenizer.truncation_side = "right"
+                 else:
+                     self.tokenizer.truncation_side = "left"
++            kwargs["split_special_tokens"] = self.is_multimodal
+             token_ids = self.tokenizer(inputs, **kwargs)["input_ids"][0].tolist()
+         if self.enable_data_obfuscation:
+             if len(token_ids) > 0 and isinstance(token_ids[0], list):
+-- 
+GitCode
+
+
+From 942cb1e19e14174c9d2bcc8e816422500c166ba5 Mon Sep 17 00:00:00 2001
+From: muziyuhui666 <lijianfu9@huawei.com>
+Date: Tue, 21 Apr 2026 10:50:17 +0800
+Subject: [PATCH 04/14] chore: apply pre-commit autofixes for multimodal router
+ changes
+
+---
+ .../atb_models/atb_llm/models/base/router.py  | 258 ++++++++++--------
+ .../atb_llm/models/glm41v/router_glm41v.py    |  21 +-
+ .../atb_llm/models/glm4v/router_glm4v.py      |  77 +++---
+ .../router_internlmxcomposer2.py              |   4 +-
+ .../models/internvl/router_internvl.py        |  64 ++---
+ .../atb_llm/models/janus/router_janus.py      |   6 +-
+ .../atb_llm/models/llava/router_llava.py      |  54 ++--
+ .../models/llava_next/router_llava_next.py    |  55 ++--
+ .../router_minicpm_qwen2_v2.py                |  35 ++-
+ .../atb_llm/models/mllama/router_mllama.py    |   2 +-
+ .../models/qwen2_audio/router_qwen2_audio.py  |  42 ++-
+ .../models/qwen2_vl/router_qwen2_vl.py        |  88 +++---
+ .../models/qwen3_vl/router_qwen3_vl.py        |  22 +-
+ .../atb_llm/models/vita/router_vita.py        | 132 ++++-----
+ .../atb_llm/models/yivl/router_yivl.py        |  53 ++--
+ .../atb_llm/runner/tokenizer_wrapper.py       | 174 ++++++++----
+ 16 files changed, 562 insertions(+), 525 deletions(-)
+
+diff --git a/examples/atb_models/atb_llm/models/base/router.py b/examples/atb_models/atb_llm/models/base/router.py
+index 739b7f3e8e..857d817977 100644
+--- a/examples/atb_models/atb_llm/models/base/router.py
++++ b/examples/atb_models/atb_llm/models/base/router.py
+@@ -28,8 +28,13 @@ from ...utils.log.error_code import ErrorCode
+ from ...utils.configuration_utils import LLMConfig, GraphType
+ from ...utils import file_utils
+ from ...utils.parameter_validators import (
+-    IntParameterValidator, DictionaryParameterValidator, BooleanParameterValidator,
+-    RangeParamaterValidator, FileParameterValidator, StringParameterValidator, Field
++    IntParameterValidator,
++    DictionaryParameterValidator,
++    BooleanParameterValidator,
++    RangeParamaterValidator,
++    FileParameterValidator,
++    StringParameterValidator,
++    Field,
+ )
+ 
+ 
+@@ -40,8 +45,8 @@ QWEN2_MOE = "qwen2_moe"
+ QWEN3_MOE = "qwen3_moe"
+ DEEPSEEKV2 = "deepseekv2"
+ LLAMA = "llama"
+-EOS_TOKEN_ID = 'eos_token_id'
+-FA_QUANT_TYPE = 'fa_quant_type'
++EOS_TOKEN_ID = "eos_token_id"
++FA_QUANT_TYPE = "fa_quant_type"
+ 
+ 
+ def remove_part_of_generation_config(generation_config: dict) -> dict:
+@@ -84,6 +89,7 @@ class BaseRouter:
+     This class should be inherited by the corresponding router subclasses of specified models. A specified model can use
+     a subclass router to find its custom properties.
+     """
++
+     model_name_or_path: str = ""
+ 
+     config_dict: Any = None
+@@ -115,7 +121,7 @@ class BaseRouter:
+     _reasoning_parser: Any = None
+ 
+     def __post_init__(self):
+-        self.model_type = self.config_dict['model_type']
++        self.model_type = self.config_dict["model_type"]
+         if self.model_type == "glm4v":
+             self.model_type = "glm41v"
+         if self.model_type == "chatglm" and "vision_config" in self.config_dict:
+@@ -132,7 +138,7 @@ class BaseRouter:
+             self.model_type = "deepseekv2"
+         if self.model_type == "minicpmv" and "MiniCPM-V-2_6" in self.model_name_or_path:
+             self.model_type = "minicpm_qwen2_v2"
+-        if self.model_type == "multi_modality" and 'aligner_config' in self.config_dict:
++        if self.model_type == "multi_modality" and "aligner_config" in self.config_dict:
+             self.model_type = "janus"
+         if self.model_type == "qwen2_5_vl":
+             self.model_type = "qwen2_vl"
+@@ -140,17 +146,17 @@ class BaseRouter:
+             self.model_type = "ernie_moe"
+         self.model_type_cap = self.model_type.capitalize()
+         if self.model_type_cap == "Qwen2_moe":
+-            self.model_type_cap = self.model_type_cap.replace('_', '')
++            self.model_type_cap = self.model_type_cap.replace("_", "")
+         if self.model_type_cap == "Qwen2_audio":
+-            self.model_type_cap = self.model_type_cap.replace('_', '')
++            self.model_type_cap = self.model_type_cap.replace("_", "")
+         if self.model_type_cap == "Qwen2_vl":
+-            self.model_type_cap = self.model_type_cap.replace('_', '')
++            self.model_type_cap = self.model_type_cap.replace("_", "")
+         if self.model_type_cap == "Minicpm_qwen2_v2":
+-            self.model_type_cap = self.model_type_cap.replace('_', '')
++            self.model_type_cap = self.model_type_cap.replace("_", "")
+         if self.model_type_cap == "Ernie_moe":
+-            self.model_type_cap = self.model_type_cap.replace('_', '')
++            self.model_type_cap = self.model_type_cap.replace("_", "")
+         if self.model_type_cap == "Glm4_moe":
+-            self.model_type_cap = self.model_type_cap.replace('_', '')
++            self.model_type_cap = self.model_type_cap.replace("_", "")
+         if not self.tokenizer_path:
+             self.tokenizer_path = self.model_name_or_path
+ 
+@@ -176,10 +182,12 @@ class BaseRouter:
+                         "And the $llm_config.llm.ccl.enable_mc2 is %s in LLM's config. "
+                         "If one of them is False, the LCOC will not be enabled. "
+                         "NOTE: The $ATB_LLM_LCOC_ENABLE environment variable will be deprecated after 2026/07/31.",
+-                        atb_llm_lcoc_enable, self.llm_config.llm.ccl.enable_mc2)
++                        atb_llm_lcoc_enable,
++                        self.llm_config.llm.ccl.enable_mc2,
++                    )
+ 
+             self.process_tool_call_options()
+-        
++
+     @property
+     def config(self):
+         """The config property, which should not be overridden.
+@@ -196,13 +204,13 @@ class BaseRouter:
+                 self._generation_config = remove_part_of_generation_config(self._generation_config)
+             self.config_dict.update(self._generation_config)
+             self.config_dict["generation_config"] = self._generation_config
+-            filename = os.path.join(self.model_name_or_path, 'quant_model_description.json')
++            filename = os.path.join(self.model_name_or_path, "quant_model_description.json")
+             if not file_utils.is_path_exists(filename):
+-                filename = os.path.join(self.model_name_or_path, self.sub_model_path, 'quant_model_description.json')
++                filename = os.path.join(self.model_name_or_path, self.sub_model_path, "quant_model_description.json")
+             if not file_utils.is_path_exists(filename):
+                 quantize_type = self.config_dict.get(quantize, None)
+                 if quantize_type:
+-                    old_file = f'quant_model_description_{quantize_type.lower()}.json'
++                    old_file = f"quant_model_description_{quantize_type.lower()}.json"
+                     old_path = os.path.join(self.model_name_or_path, old_file)
+                     if file_utils.is_path_exists(old_path):
+                         filename = old_path
+@@ -213,7 +221,7 @@ class BaseRouter:
+             if not file_utils.is_path_exists(filename):
+                 filename = None
+             if filename is not None:
+-                with file_utils.safe_open(filename, 'r', check_link=False) as f:
++                with file_utils.safe_open(filename, "r", check_link=False) as f:
+                     quant_descs = json.load(f)
+                 if quant_descs.get("model_quant_type") is not None and self.config_dict.get("quantize") is None:
+                     self.config_dict[quantize] = quant_descs.get("model_quant_type").lower()
+@@ -239,7 +247,7 @@ class BaseRouter:
+             if not hasattr(self._config, quantize):
+                 setattr(self._config, quantize, None)
+             if self.max_position_embeddings is not None:
+-                setattr(self._config, 'max_position_embeddings', self.max_position_embeddings)
++                setattr(self._config, "max_position_embeddings", self.max_position_embeddings)
+         return self._config
+ 
+     @property
+@@ -297,9 +305,11 @@ class BaseRouter:
+     @property
+     def custom_chat_template(self):
+         """The custom chat template property, which should not be overridden."""
+-        if self._custom_chat_template is None \
+-                and self.llm_config is not None \
+-                and getattr(self.llm_config.llm, "chat_template", None):
++        if (
++            self._custom_chat_template is None
++            and self.llm_config is not None
++            and getattr(self.llm_config.llm, "chat_template", None)
++        ):
+             self._custom_chat_template = self.get_custom_chat_template()
+         return self._custom_chat_template
+ 
+@@ -322,45 +332,45 @@ class BaseRouter:
+         """The validation of values in config."""
+ 
+         vocab_size = 0
+-        vocab_size_field = 'vocab_size'
++        vocab_size_field = "vocab_size"
+         if hasattr(config, vocab_size_field):
+             vocab_size = getattr(config, vocab_size_field)
+         attribute_ranges = {
+             vocab_size_field: (1, 2147483647),
+-            'max_position_embeddings': (1, 2147483647),
+-            'hidden_size': (1, 2147483647),
+-            'intermediate_size': (1, 2147483647),
+-            'num_hidden_layers': (1, 1000),
+-            'num_attention_heads': (1, 10000),
+-            'initializer_range': (0, 2147483647),
+-            'rms_norm_eps': (0, 1),
+-            'pad_token_id': (-1, vocab_size),
+-            'bos_token_id': (0, vocab_size - 1),
++            "max_position_embeddings": (1, 2147483647),
++            "hidden_size": (1, 2147483647),
++            "intermediate_size": (1, 2147483647),
++            "num_hidden_layers": (1, 1000),
++            "num_attention_heads": (1, 10000),
++            "initializer_range": (0, 2147483647),
++            "rms_norm_eps": (0, 1),
++            "pad_token_id": (-1, vocab_size),
++            "bos_token_id": (0, vocab_size - 1),
+             EOS_TOKEN_ID: (0, vocab_size - 1),
+-            'temperature': (0, 2),
+-            'top_k': (-1, vocab_size),
+-            'top_p': (0, 1),
+-            'repetition_penalty': (0, 2),
+-            'frequency_penalty': (-2, 2),
+-            'presence_penalty': (-2, 2),
+-            'max_new_tokens': (0, 10000000),
+-            'max_length': (0, 2147483647),         
+-            'user_token_id': (0, vocab_size-1),   
+-            'assistant_token_id': (0, vocab_size-1),    
+-            'system_token_id': (0, vocab_size-1),   
+-            'bot_token_id': (0, vocab_size-1)
++            "temperature": (0, 2),
++            "top_k": (-1, vocab_size),
++            "top_p": (0, 1),
++            "repetition_penalty": (0, 2),
++            "frequency_penalty": (-2, 2),
++            "presence_penalty": (-2, 2),
++            "max_new_tokens": (0, 10000000),
++            "max_length": (0, 2147483647),
++            "user_token_id": (0, vocab_size - 1),
++            "assistant_token_id": (0, vocab_size - 1),
++            "system_token_id": (0, vocab_size - 1),
++            "bot_token_id": (0, vocab_size - 1),
+         }
+         if config.is_reasoning_model:
+             attribute_ranges["start_reasoning_token_id"] = (0, vocab_size - 1)
+             attribute_ranges["end_reasoning_token_id"] = (0, vocab_size - 1)
+         if hasattr(config, "head_dim"):
+-            attribute_ranges['head_dim'] = (1, 1000)
++            attribute_ranges["head_dim"] = (1, 1000)
+         if hasattr(config, "num_key_value_heads"):
+-            attribute_ranges['num_key_value_heads'] = (1, 10000)
+-  
++            attribute_ranges["num_key_value_heads"] = (1, 10000)
++
+         gen_config = config.generation_config
+         gen_config_dict = vars(gen_config)
+-        
++
+         for attr, value in gen_config_dict.items():
+             if value is not None:
+                 min_val, max_val = attribute_ranges.get(attr, (None, None))
+@@ -381,51 +391,51 @@ class BaseRouter:
+                 continue
+             check_value(attr, value, min_val, max_val)
+ 
+-        if getattr(config, 'repetition_penalty', None) == 0:
++        if getattr(config, "repetition_penalty", None) == 0:
+             raise ValueError("repetition_penalty should not be 0.")
+-        if not isinstance(getattr(config, 'do_sample', None), bool):
++        if not isinstance(getattr(config, "do_sample", None), bool):
+             raise ValueError("do_sample must be bool.")
+ 
+     @classmethod
+     def get_llm_config_validators(cls):
+         llm_config_validators = {"models": {}}
+-        llm_validators = DictionaryParameterValidator({
+-            "ccl": DictionaryParameterValidator({
+-                "enable_mc2": BooleanParameterValidator()
+-            }),
+-            "stream_options": DictionaryParameterValidator({
+-                "micro_batch": BooleanParameterValidator()
+-            }),
+-            "engine": DictionaryParameterValidator({
+-                "graph": RangeParamaterValidator(range_list=[GraphType.CPP, GraphType.PYTHON])
+-            }),
+-            "parallel_options": DictionaryParameterValidator({
+-                "o_proj_local_tp": IntParameterValidator(Field(ge=1, le=16), special_values=[-1]),
+-                "lm_head_local_tp": IntParameterValidator(Field(ge=1, le=16), special_values=[-1]),
+-                "hccl_buffer": IntParameterValidator(Field(ge=1)),
+-                "hccl_moe_ep_buffer": IntParameterValidator(Field(ge=512)),
+-                "hccl_moe_tp_buffer": IntParameterValidator(Field(ge=64)),
+-            }),
+-            "pmcc_obfuscation_options": DictionaryParameterValidator({
+-                "enable_model_obfuscation": BooleanParameterValidator(),
+-                "data_obfuscation_ca_dir": FileParameterValidator(allow_none=True),
+-                "kms_agent_port": IntParameterValidator(Field(ge=1, le=65535)),
+-            }),
+-            "kv_cache_options": DictionaryParameterValidator({
+-                "enable_nz": BooleanParameterValidator()
+-            }),
+-            "weights_options": DictionaryParameterValidator(
+-                element_validator_mapping={
+-                    "low_cpu_memory_mode": BooleanParameterValidator()
+-                },
+-                allow_addition_key=False
+-            ),
+-            "enable_reasoning": BooleanParameterValidator(),
+-            "tool_call_options": DictionaryParameterValidator({
+-                "tool_call_parser": StringParameterValidator(Field(max_length=1024), allow_none=True),
+-            }),
+-            "chat_template": FileParameterValidator(allow_none=True)
+-        })
++        llm_validators = DictionaryParameterValidator(
++            {
++                "ccl": DictionaryParameterValidator({"enable_mc2": BooleanParameterValidator()}),
++                "stream_options": DictionaryParameterValidator({"micro_batch": BooleanParameterValidator()}),
++                "engine": DictionaryParameterValidator(
++                    {"graph": RangeParamaterValidator(range_list=[GraphType.CPP, GraphType.PYTHON])}
++                ),
++                "parallel_options": DictionaryParameterValidator(
++                    {
++                        "o_proj_local_tp": IntParameterValidator(Field(ge=1, le=16), special_values=[-1]),
++                        "lm_head_local_tp": IntParameterValidator(Field(ge=1, le=16), special_values=[-1]),
++                        "hccl_buffer": IntParameterValidator(Field(ge=1)),
++                        "hccl_moe_ep_buffer": IntParameterValidator(Field(ge=512)),
++                        "hccl_moe_tp_buffer": IntParameterValidator(Field(ge=64)),
++                    }
++                ),
++                "pmcc_obfuscation_options": DictionaryParameterValidator(
++                    {
++                        "enable_model_obfuscation": BooleanParameterValidator(),
++                        "data_obfuscation_ca_dir": FileParameterValidator(allow_none=True),
++                        "kms_agent_port": IntParameterValidator(Field(ge=1, le=65535)),
++                    }
++                ),
++                "kv_cache_options": DictionaryParameterValidator({"enable_nz": BooleanParameterValidator()}),
++                "weights_options": DictionaryParameterValidator(
++                    element_validator_mapping={"low_cpu_memory_mode": BooleanParameterValidator()},
++                    allow_addition_key=False,
++                ),
++                "enable_reasoning": BooleanParameterValidator(),
++                "tool_call_options": DictionaryParameterValidator(
++                    {
++                        "tool_call_parser": StringParameterValidator(Field(max_length=1024), allow_none=True),
++                    }
++                ),
++                "chat_template": FileParameterValidator(allow_none=True),
++            }
++        )
+         llm_config_validators["llm"] = llm_validators
+         return llm_config_validators
+ 
+@@ -441,9 +451,10 @@ class BaseRouter:
+         tool_call_parser_name = getattr(tool_call_options, "tool_call_parser", None)
+         if tool_call_parser_name:
+             if tool_call_parser_name not in valid_tool_call_processors:
+-                warn_msg = \
+-                    f"Invalid tool_call_parser: {tool_call_parser_name}. " \
++                warn_msg = (
++                    f"Invalid tool_call_parser: {tool_call_parser_name}. "
+                     f"Please chose from {valid_tool_call_processors.keys()}"
++                )
+                 logger.warning(message_filter(warn_msg))
+                 logger.warning("Will use default tool_call_parser of model.")
+                 return
+@@ -498,9 +509,8 @@ class BaseRouter:
+         """The default method to get config class."""
+         model_file_dir_name = f"atb_llm.models.{self.model_type}."
+         if self.model_version:
+-            model_file_dir_name = model_file_dir_name + \
+-                                  f"{self.model_version}."
+-        config_file_name = f'config_{self.model_type}'
++            model_file_dir_name = model_file_dir_name + f"{self.model_version}."
++        config_file_name = f"config_{self.model_type}"
+         module_path = f"{model_file_dir_name}{config_file_name}"
+         module = importlib.import_module(module_path)
+         config_cls_name = f"{self.model_type_cap}Config"
+@@ -539,9 +549,8 @@ class BaseRouter:
+         if self.llm_config is not None and self.llm_config.llm.engine.graph == GraphType.PYTHON:
+             enable_v3 = True
+         if self.model_version:
+-            model_file_dir_name = model_file_dir_name + \
+-                                  f"{self.model_version}."
+-        model_file_name = 'flash_causal' if self.is_flash_causal_lm else 'causal'
++            model_file_dir_name = model_file_dir_name + f"{self.model_version}."
++        model_file_name = "flash_causal" if self.is_flash_causal_lm else "causal"
+         if self.embedding_model_name:  # for embedding model, example: gte-qwen2
+             module_path = f"{model_file_dir_name}{model_file_name}_{self.model_type}_{self.embedding_model_name}"
+         else:
+@@ -578,7 +587,7 @@ class BaseRouter:
+             padding_side="left",
+             truncation_side="left",
+             trust_remote_code=self.trust_remote_code,
+-            use_fast=True
++            use_fast=True,
+         )
+ 
+     def get_reasoning_parser(self):
+@@ -597,57 +606,66 @@ class BaseRouter:
+         try:
+             tools_call_processor = ToolParserManager.get_tool_call_processor(self.tool_call_parser)(self.tokenizer)
+         except KeyError as e:
+-            warn_msg = \
+-                f"Cannot use {self.tool_call_parser} ToolsCallProcessor: {e}. " \
+-                f"Will use default ToolsCallProcessor."
++            warn_msg = (
++                f"Cannot use {self.tool_call_parser} ToolsCallProcessor: {e}. Will use default ToolsCallProcessor."
++            )
+             logger.warning(message_filter(warn_msg))
+             tools_call_processor = ToolsCallProcessor(self.model_version)
+         return tools_call_processor
+-    
++
+     def _check_llm_config_model_type(self, model_type):
+         """check the compatibility between llm_config and model_type"""
+         if self.llm_config.llm.stream_options.micro_batch and model_type not in [QWEN2, QWEN3, DEEPSEEKV2, GLM4_1V]:
+-            error_msg = f"stream_options.micro_batch only supports [qwen2, qwen3, deepseekv2, glm4.1v], " \
+-                        f"but model_type is {model_type}, please refer to the MindIE official document" \
+-                        f"and modify config.json."
++            error_msg = (
++                f"stream_options.micro_batch only supports [qwen2, qwen3, deepseekv2, glm4.1v], "
++                f"but model_type is {model_type}, please refer to the MindIE official document"
++                f"and modify config.json."
++            )
+             logger.error(error_msg, ErrorCode.ATB_MODELS_PARAM_INVALID)
+             raise ValueError(error_msg)
+-        
++
+         if self.llm_config.llm.engine.graph == GraphType.PYTHON and model_type not in [LLAMA, QWEN2, QWEN3]:
+-            error_msg = f"engine.graph only supports [llama, qwen2, qwen3] when set to \"python\", " \
+-                        f"but model_type is {model_type}, please refer to the MindIE official document" \
+-                        f"and modify config.json."
++            error_msg = (
++                f'engine.graph only supports [llama, qwen2, qwen3] when set to "python", '
++                f"but model_type is {model_type}, please refer to the MindIE official document"
++                f"and modify config.json."
++            )
+             logger.error(error_msg, ErrorCode.ATB_MODELS_PARAM_INVALID)
+             raise ValueError(error_msg)
+-        
++
+         if self.llm_config.llm.kv_cache_options.enable_nz and model_type not in [DEEPSEEKV2]:
+-            error_msg = f"kv_cache_options.enable_nz only supports [deepseekv2] when set to true, " \
+-                        f"but model_type is {model_type}, please refer to the MindIE official document" \
+-                        f"and modify config.json."
++            error_msg = (
++                f"kv_cache_options.enable_nz only supports [deepseekv2] when set to true, "
++                f"but model_type is {model_type}, please refer to the MindIE official document"
++                f"and modify config.json."
++            )
+             logger.error(error_msg, ErrorCode.ATB_MODELS_PARAM_INVALID)
+             raise ValueError(error_msg)
+ 
+         # The following features are configured but are not applicable to some models.
+         if self.llm_config.llm.parallel_options.o_proj_local_tp != -1 and model_type != DEEPSEEKV2:
+             logger.warning(f"parallel_options.o_proj_local_tp only supports deepseek, {model_type} won't be affected.")
+-        
++
+         if self.llm_config.llm.parallel_options.lm_head_local_tp != -1 and model_type != DEEPSEEKV2:
+-            logger.warning(f"parallel_options.lm_head_local_tp only supports deepseek, " \
+-                        f"{model_type} won't be affected.")
++            logger.warning(f"parallel_options.lm_head_local_tp only supports deepseek, {model_type} won't be affected.")
+ 
+         weights_options = self.llm_config.get("llm").get("weights_options")
+         if weights_options is not None and weights_options.low_cpu_memory_mode:
+             engine_graph = self.llm_config.get("llm").get("engine").get("graph")
+             if engine_graph != GraphType.PYTHON or model_type not in [QWEN2, QWEN3]:
+-                logger.warning(f"low_cpu_memory_mode is only effective for [qwen2, qwen3] " \
+-                            f"when engine graph is set to \"python\". " \
+-                            f"For {model_type} with engine graph {engine_graph}, this mode will not work.")
++                logger.warning(
++                    f"low_cpu_memory_mode is only effective for [qwen2, qwen3] "
++                    f'when engine graph is set to "python". '
++                    f"For {model_type} with engine graph {engine_graph}, this mode will not work."
++                )
+ 
+         if self.llm_config.llm.enable_reasoning and model_type not in [QWEN3, QWEN3_MOE, DEEPSEEKV2]:
+-            logger.warning(f"enable_reasoning only supports [qwen3, qwen3_moe, deepseek] when set to true, " \
+-                        f"{model_type} won't be affected.")
++            logger.warning(
++                f"enable_reasoning only supports [qwen3, qwen3_moe, deepseek] when set to true, "
++                f"{model_type} won't be affected."
++            )
+ 
+     def _check_llm_config_orthogonality(self):
+         """check the orthogonality within llm_config"""
+         if self.llm_config.llm.stream_options.micro_batch and self.llm_config.llm.ccl.enable_mc2:
+-            raise ValueError("ccl.enable_mc2 and stream_options.micro_batch can't be both true.")
+\ No newline at end of file
++            raise ValueError("ccl.enable_mc2 and stream_options.micro_batch can't be both true.")
+diff --git a/examples/atb_models/atb_llm/models/glm41v/router_glm41v.py b/examples/atb_models/atb_llm/models/glm41v/router_glm41v.py
+index 14eb35f656..bc467ef23e 100644
+--- a/examples/atb_models/atb_llm/models/glm41v/router_glm41v.py
++++ b/examples/atb_models/atb_llm/models/glm41v/router_glm41v.py
+@@ -63,11 +63,11 @@ class Glm41vRouter(BaseRouter):
+         elif self._processor is None:
+             self._processor = self.get_processor()
+         return self._processor
+-    
++
+     def tokenize(self, inputs: List[Dict], **kwargs):
+         text = ""
+         message_list = []
+-        shm_name_save_path = kwargs.get('shm_name_save_path', None)
++        shm_name_save_path = kwargs.get("shm_name_save_path", None)
+         self.input_builder.check_image_and_video_concurrency(inputs)
+         for item in inputs:
+             if item.get(IMAGE, None):
+@@ -83,18 +83,11 @@ class Glm41vRouter(BaseRouter):
+                     shm_name_save_path = self.input_builder.get_shm_name_save_path(video_path)
+             if item.get(TEXT, None):
+                 text = item[TEXT]
+-                message_list.append({
+-                    TYPE: TEXT,
+-                    TEXT: text
+-                })
++                message_list.append({TYPE: TEXT, TEXT: text})
+         messages = copy.deepcopy(messages_template)
+         messages[0]["content"] = message_list
+         inputs = self.processor.apply_chat_template(
+-            messages,
+-            tokenize=True,
+-            add_generation_prompt=True,
+-            return_dict=True,
+-            return_tensors='pt'
++            messages, tokenize=True, add_generation_prompt=True, return_dict=True, return_tensors="pt"
+         )
+         shm_info = process_shared_memory(inputs, shm_name_save_path)
+         input_ids = self.input_builder.update_token_id(inputs, shm_info)
+@@ -107,9 +100,9 @@ class Glm41vRouter(BaseRouter):
+         config_cls = self.get_config_cls()
+         config = config_cls.from_dict(self.config_dict)
+         config.model_name_or_path = self.model_name_or_path
+-        if config.text_config.dtype == 'bfloat16':
++        if config.text_config.dtype == "bfloat16":
+             config.torch_dtype = torch.bfloat16
+-        elif config.text_config.dtype == 'float16':
++        elif config.text_config.dtype == "float16":
+             config.torch_dtype = torch.float16
+         else:
+             err_msg = "`torch_dtype` is only supported for type `float16` and `bfloat16`"
+@@ -122,4 +115,4 @@ class Glm41vRouter(BaseRouter):
+         return self.processor.tokenizer
+ 
+     def get_processor(self):
+-        return safe_from_pretrained(AutoProcessor, self.model_name_or_path)
+\ No newline at end of file
++        return safe_from_pretrained(AutoProcessor, self.model_name_or_path)
+diff --git a/examples/atb_models/atb_llm/models/glm4v/router_glm4v.py b/examples/atb_models/atb_llm/models/glm4v/router_glm4v.py
+index e2fb99a6e2..204c39c389 100644
+--- a/examples/atb_models/atb_llm/models/glm4v/router_glm4v.py
++++ b/examples/atb_models/atb_llm/models/glm4v/router_glm4v.py
+@@ -47,21 +47,25 @@ class Glm4vRouter(BaseRouter):
+                 text = ele["text"]
+         if text == "":
+             msg = "Input text is empty, please check."
+-            logger.error(msg,
+-                         ErrorCode.ATB_MODELS_PARAM_INVALID)
++            logger.error(msg, ErrorCode.ATB_MODELS_PARAM_INVALID)
+             raise ValueError(msg)
+-        
++
+         # image preprocess
+         from PIL import Image
++
+         image_pix = safe_open_image(Image, image_path).convert("RGB")
+-        inputs = self.tokenizer.apply_chat_template([{"role": "user", "image": image_pix, "content": text}],
+-                                               add_generation_prompt=True, tokenize=True, return_tensors="pt",
+-                                               return_dict=True)
++        inputs = self.tokenizer.apply_chat_template(
++            [{"role": "user", "image": image_pix, "content": text}],
++            add_generation_prompt=True,
++            tokenize=True,
++            return_tensors="pt",
++            return_dict=True,
++        )
+         input_ids = inputs["input_ids"].flatten()
+         input_image = inputs["images"]
+ 
+         # save image to shared memory
+-        shm_name_save_path = kwargs.get('shm_name_save_path', None)
++        shm_name_save_path = kwargs.get("shm_name_save_path", None)
+         if shm_name_save_path is None:
+             shm_name_save_dir = os.path.dirname(os.path.dirname(image_path))
+             shm_name_save_path = os.path.join(shm_name_save_dir, "shm_name.txt")
+@@ -73,28 +77,28 @@ class Glm4vRouter(BaseRouter):
+         shape_value = encode_shape_to_int64(input_image.shape)
+ 
+         # prepare input_ids with encoded shm info
+-        img_padding = torch.full((_IMG_TOKEN_LEN, ), pad_token_id, dtype=input_ids.dtype)
++        img_padding = torch.full((_IMG_TOKEN_LEN,), pad_token_id, dtype=input_ids.dtype)
+         new_input_ids = []
+         boi_pos = torch.where(torch.eq(input_ids, boi_token_id))[0]
+         eoi_pos = torch.where(torch.eq(input_ids, eoi_token_id))[0]
+-        new_input_ids.append(torch.cat((input_ids[:boi_pos + 1], img_padding, input_ids[eoi_pos:])))
++        new_input_ids.append(torch.cat((input_ids[: boi_pos + 1], img_padding, input_ids[eoi_pos:])))
+         new_input_ids = torch.cat(new_input_ids)
+         new_input_ids[boi_pos + 1] = shm_name
+         new_input_ids[boi_pos + 2] = shape_value
+         return new_input_ids
+-    
++
+     def get_input_builder(self):
+         if hasattr(self.config, "max_position_embeddings") and self.config.max_position_embeddings:
+             return Glm4vInputBuilder(self.tokenizer, self.config, max_length=self.config.max_position_embeddings)
+         return Glm4vInputBuilder(self.tokenizer, self.config)
+-    
++
+     def get_config(self):
+         config_cls = self.get_config_cls()
+         config = config_cls.from_dict(self.config_dict)
+         config.model_name_or_path = self.model_name_or_path
+         self.check_config(config)
+         return config
+-    
++
+     def check_config(self, config):
+         vocab_size = 0
+         vocab_size_string = "vocab_size"
+@@ -104,30 +108,30 @@ class Glm4vRouter(BaseRouter):
+         if hasattr(config, padded_vocab_size_string):
+             vocab_size = getattr(config, padded_vocab_size_string)
+         attribute_ranges = {
+-            'kv_channels': (1, 2147483647),
+-            'multi_query_group_num': (1, 2147483647),
+-            'num_key_value_heads': (1, 2147483647),
+-            'layernorm_epsilon': (0, 1),
+-            'attention_dropout': (0, 1),
+-            'ffn_hidden_size': (1, 2147483647),
+-            'hidden_dropout': (0, 1),
++            "kv_channels": (1, 2147483647),
++            "multi_query_group_num": (1, 2147483647),
++            "num_key_value_heads": (1, 2147483647),
++            "layernorm_epsilon": (0, 1),
++            "attention_dropout": (0, 1),
++            "ffn_hidden_size": (1, 2147483647),
++            "hidden_dropout": (0, 1),
+             padded_vocab_size_string: (1, 2147483647),
+-            'rope_ratio': (0, 2147483647),
+-            'seq_length': (1, 2147483647),
++            "rope_ratio": (0, 2147483647),
++            "seq_length": (1, 2147483647),
+             vocab_size_string: (1, 2147483647),
+-            'max_position_embeddings': (1, 2147483647),
+-            'hidden_size': (1, 2147483647),
+-            'intermediate_size': (1, 2147483647),
+-            'num_hidden_layers': (1, 1000),
+-            'num_attention_heads': (1, 10000),
+-            'initializer_range': (0, 2147483647),
+-            'rms_norm_eps': (0, 1),
+-            'pad_token_id': (0, vocab_size),
+-            'bos_token_id': (0, vocab_size),
+-            'eos_token_id': (0, vocab_size)
++            "max_position_embeddings": (1, 2147483647),
++            "hidden_size": (1, 2147483647),
++            "intermediate_size": (1, 2147483647),
++            "num_hidden_layers": (1, 1000),
++            "num_attention_heads": (1, 10000),
++            "initializer_range": (0, 2147483647),
++            "rms_norm_eps": (0, 1),
++            "pad_token_id": (0, vocab_size),
++            "bos_token_id": (0, vocab_size),
++            "eos_token_id": (0, vocab_size),
+         }
+         if hasattr(config, "head_dim"):
+-            attribute_ranges['head_dim'] = (1, 1000)
++            attribute_ranges["head_dim"] = (1, 1000)
+         for attr, (min_val, max_val) in attribute_ranges.items():
+             if not hasattr(config, attr) or getattr(config, attr) is None:
+                 continue
+@@ -136,13 +140,12 @@ class Glm4vRouter(BaseRouter):
+                 value = max(value)
+             if value < min_val or value > max_val:
+                 msg = f"The {attr} value in config must be between {min_val} and {max_val}."
+-                logger.error(msg, 
+-                             ErrorCode.ATB_MODELS_PARAM_OUT_OF_RANGE)
++                logger.error(msg, ErrorCode.ATB_MODELS_PARAM_OUT_OF_RANGE)
+                 raise ValueError(msg)
+ 
+     def get_config_cls(self):
+         model_file_dir_name = f"atb_llm.models.{self.model_type}."
+-        config_file_name = 'config'
++        config_file_name = "config"
+         module_path = f"{model_file_dir_name}{config_file_name}_{self.model_type}"
+         module = importlib.import_module(module_path)
+         config_cls_name = f"{self.model_type_cap}Config"
+@@ -153,10 +156,10 @@ class Glm4vRouter(BaseRouter):
+         get_model_cls
+         """
+         model_file_dir_name = f"atb_llm.models.{self.model_type}."
+-        model_file_name = 'flash_causal' if self.is_flash_causal_lm else 'causal'
++        model_file_name = "flash_causal" if self.is_flash_causal_lm else "causal"
+         module_path = f"{model_file_dir_name}{model_file_name}_{self.model_type}"
+         module = importlib.import_module(module_path)
+         model_cls_name = f"{self.model_type_cap}ForCausalLM"
+         if self.is_flash_causal_lm:
+             model_cls_name = "Flash" + model_cls_name
+-        return getattr(module, model_cls_name)
+\ No newline at end of file
++        return getattr(module, model_cls_name)
+diff --git a/examples/atb_models/atb_llm/models/internlmxcomposer2/router_internlmxcomposer2.py b/examples/atb_models/atb_llm/models/internlmxcomposer2/router_internlmxcomposer2.py
+index 00039cb3e8..c6232eba1f 100644
+--- a/examples/atb_models/atb_llm/models/internlmxcomposer2/router_internlmxcomposer2.py
++++ b/examples/atb_models/atb_llm/models/internlmxcomposer2/router_internlmxcomposer2.py
+@@ -24,6 +24,6 @@ class Internlmxcomposer2Router(BaseRouter):
+             revision=self.revision,
+             padding_side="left",
+             trust_remote_code=self.trust_remote_code,
+-            use_fast=False
++            use_fast=False,
+         )
+-        return tokenizer
+\ No newline at end of file
++        return tokenizer
+diff --git a/examples/atb_models/atb_llm/models/internvl/router_internvl.py b/examples/atb_models/atb_llm/models/internvl/router_internvl.py
+index b1fb0bd274..558ad4903a 100644
+--- a/examples/atb_models/atb_llm/models/internvl/router_internvl.py
++++ b/examples/atb_models/atb_llm/models/internvl/router_internvl.py
+@@ -27,8 +27,8 @@ _VIDEO = "video"
+ _TEXT = "text"
+ 
+ # 服务化支持torch分布式所需环境变量
+-os.environ.setdefault('MASTER_ADDR', 'localhost')
+-os.environ.setdefault('MASTER_PORT', '5678')
++os.environ.setdefault("MASTER_ADDR", "localhost")
++os.environ.setdefault("MASTER_PORT", "5678")
+ 
+ 
+ @dataclass
+@@ -45,16 +45,17 @@ class InternvlRouter(BaseRouter):
+ 
+     def get_tokenizer(self):
+         try:
+-            llm_model_architectures = self.config_dict['llm_config']['architectures'][0]
++            llm_model_architectures = self.config_dict["llm_config"]["architectures"][0]
+         except KeyError as e:
+-            logger.error("`llm_config.architectures` does not exist! Check `config.json`.",
+-                         ErrorCode.ATB_MODELS_MODEL_PARAM_JSON_INVALID)
++            logger.error(
++                "`llm_config.architectures` does not exist! Check `config.json`.",
++                ErrorCode.ATB_MODELS_MODEL_PARAM_JSON_INVALID,
++            )
+             raise ValueError("`llm_config.architectures` does not exist! Check `config.json`.") from e
+-        
++
+         if llm_model_architectures == INTERNLM2_ARCHITECTURE:
+             tokenizer = safe_get_tokenizer_from_pretrained(
+-                self.model_name_or_path,
+-                trust_remote_code=self.trust_remote_code
++                self.model_name_or_path, trust_remote_code=self.trust_remote_code
+             )
+         elif llm_model_architectures == LLAMA_ARCHITECTURE:
+             tokenizer = safe_get_tokenizer_from_pretrained(
+@@ -62,7 +63,7 @@ class InternvlRouter(BaseRouter):
+                 revision=self.revision,
+                 padding_side="left",
+                 trust_remote_code=self.trust_remote_code,
+-                use_fast=False
++                use_fast=False,
+             )
+         elif llm_model_architectures == QWEN2_ARCHITECTURE:
+             tokenizer = safe_get_tokenizer_from_pretrained(
+@@ -75,11 +76,13 @@ class InternvlRouter(BaseRouter):
+                 "`llm_config.architectures` must in "
+                 f"[{LLAMA_ARCHITECTURE}, {INTERNLM2_ARCHITECTURE}, {QWEN2_ARCHITECTURE}], "
+                 f"got {llm_model_architectures}.",
+-                ErrorCode.ATB_MODELS_PARAM_OUT_OF_RANGE)
++                ErrorCode.ATB_MODELS_PARAM_OUT_OF_RANGE,
++            )
+             raise ValueError(
+                 "`llm_config.architectures` must in "
+                 f"[{LLAMA_ARCHITECTURE}, {INTERNLM2_ARCHITECTURE}, {QWEN2_ARCHITECTURE}], "
+-                f"got {llm_model_architectures}.")
++                f"got {llm_model_architectures}."
++            )
+         return tokenizer
+ 
+     def get_input_builder(self):
+@@ -93,16 +96,14 @@ class InternvlRouter(BaseRouter):
+         image_size = self.config.force_image_size or self.config.vision_config.image_size
+         patch_size = self.config.vision_config.patch_size
+         if patch_size == 0:
+-            logger.error('The vision `patch_size` of config can not be 0.',
+-                         ErrorCode.ATB_MODELS_PARAM_OUT_OF_RANGE)
+-            raise ValueError('The vision `patch_size` of config can not be 0.')
+-        num_image_token = int((image_size // patch_size) ** 2 * (self.config.downsample_ratio ** 2))
+-        
++            logger.error("The vision `patch_size` of config can not be 0.", ErrorCode.ATB_MODELS_PARAM_OUT_OF_RANGE)
++            raise ValueError("The vision `patch_size` of config can not be 0.")
++        num_image_token = int((image_size // patch_size) ** 2 * (self.config.downsample_ratio**2))
++
+         use_dynamic_prepro = False if self.config.ps_version == "v1" else True
+ 
+         system_prompt = INTERNVL_SYSTEM_PROMPTS[self.config.ps_version][self.config.template]
+-        query = ('<|im_start|>system\n'
+-                f'{system_prompt}<|im_end|><|im_start|>user\n')
++        query = f"<|im_start|>system\n{system_prompt}<|im_end|><|im_start|>user\n"
+ 
+         text = ""
+         image_index = 1
+@@ -115,12 +116,7 @@ class InternvlRouter(BaseRouter):
+                 continue
+             if _IMAGE in single_input:
+                 current_query, shm_name_value, shape_value = process_image_input(
+-                    single_input,
+-                    image_num,
+-                    image_index,
+-                    use_dynamic_prepro,
+-                    num_image_token,
+-                    shm_name_save_path
++                    single_input, image_num, image_index, use_dynamic_prepro, num_image_token, shm_name_save_path
+                 )
+                 query += current_query
+                 image_index += 1
+@@ -128,28 +124,26 @@ class InternvlRouter(BaseRouter):
+                 shape_value_list.append(shape_value)
+             elif _VIDEO in single_input:
+                 current_query, shm_name_value, shape_value = process_video_input(
+-                    single_input,
+-                    use_dynamic_prepro,
+-                    num_image_token,
+-                    shm_name_save_path
++                    single_input, use_dynamic_prepro, num_image_token, shm_name_save_path
+                 )
+                 query += current_query
+                 shm_name_list += shm_name_value
+                 shape_value_list += shape_value
+             else:
+-                logger.error("Unsupported media type, it should be a video or image, please check your input.",
+-                             ErrorCode.ATB_MODELS_PARAM_OUT_OF_RANGE)
++                logger.error(
++                    "Unsupported media type, it should be a video or image, please check your input.",
++                    ErrorCode.ATB_MODELS_PARAM_OUT_OF_RANGE,
++                )
+                 raise KeyError("Unsupported media type, it should be a video or image, please check your input.")
+-        query += f'{text}<|im_end|><|im_start|>assistant\n'
++        query += f"{text}<|im_end|><|im_start|>assistant\n"
+         query_ids = torch.tensor(self.tokenizer.encode(query))
+         bos_pos_set = torch.nonzero(query_ids == img_begin_id).view(-1)
+         eos_pos_set = torch.nonzero(query_ids == img_end_id).view(-1)
+         for i, (bos_pos, eos_pos) in enumerate(zip(bos_pos_set, eos_pos_set)):
+             if eos_pos - bos_pos < 3:
+-                logger.error("tokenize input error.",
+-                             ErrorCode.ATB_MODELS_PARAM_OUT_OF_RANGE)
++                logger.error("tokenize input error.", ErrorCode.ATB_MODELS_PARAM_OUT_OF_RANGE)
+                 raise ValueError("tokenize input error.")
+             query_ids[bos_pos + 1] = shm_name_list[i]
+             query_ids[bos_pos + 2] = shape_value_list[i]
+-            
+-        return query_ids
+\ No newline at end of file
++
++        return query_ids
+diff --git a/examples/atb_models/atb_llm/models/janus/router_janus.py b/examples/atb_models/atb_llm/models/janus/router_janus.py
+index c8533abc4b..c1b050e24b 100644
+--- a/examples/atb_models/atb_llm/models/janus/router_janus.py
++++ b/examples/atb_models/atb_llm/models/janus/router_janus.py
+@@ -15,13 +15,13 @@ from ..base.router import BaseRouter
+ @dataclass
+ class JanusRouter(BaseRouter):
+     is_multimodal: bool = True
+-    
++
+     def check_config_janus(self, config):
+         super().check_config(config)
+-    
++
+     def get_config(self):
+         config_cls = self.get_config_cls()
+         config = config_cls.from_dict(self.config_dict)
+         config.model_name_or_path = self.model_name_or_path
+         self.check_config(config)
+-        return config
+\ No newline at end of file
++        return config
+diff --git a/examples/atb_models/atb_llm/models/llava/router_llava.py b/examples/atb_models/atb_llm/models/llava/router_llava.py
+index e807e62ea1..3a4094a444 100644
+--- a/examples/atb_models/atb_llm/models/llava/router_llava.py
++++ b/examples/atb_models/atb_llm/models/llava/router_llava.py
+@@ -36,10 +36,7 @@ def from_list_format(list_format: List[Dict], image_token_str: str):
+             text += ele["text"]
+         else:
+             msg = "Unsupported element: " + str(ele)
+-            logger.error(
+-                msg,
+-                ErrorCode.ATB_MODELS_PARAM_OUT_OF_RANGE
+-            )
++            logger.error(msg, ErrorCode.ATB_MODELS_PARAM_OUT_OF_RANGE)
+             raise KeyError(msg)
+     return text
+ 
+@@ -49,21 +46,16 @@ class LlavaRouter(BaseRouter):
+     is_multimodal: bool = True
+ 
+     def tokenize(self, inputs, **kwargs):
+-        pad_token_id = self.config.pad_token_id \
+-            if self.config.pad_token_id is not None else _PAD_TOKEN_ID
+-        image_token_id = self.config.image_token_index \
+-            if self.config.image_token_index is not None else _IMAGE_TOKEN_ID
++        pad_token_id = self.config.pad_token_id if self.config.pad_token_id is not None else _PAD_TOKEN_ID
++        image_token_id = self.config.image_token_index if self.config.image_token_index is not None else _IMAGE_TOKEN_ID
+         image_token_str = self.tokenizer.decode(image_token_id)
+         prompt = from_list_format(inputs, image_token_str)
+         input_ids = self.tokenizer(prompt, return_tensors="pt")["input_ids"].flatten()
+         new_input_ids = input_ids
+-        bos_pos = torch.where(torch.eq(input_ids, image_token_id))[0]  
++        bos_pos = torch.where(torch.eq(input_ids, image_token_id))[0]
+         if bos_pos.size(0) % 2 != 0:
+             msg = "Ensure that your input_text does not contain the '<image>' character!"
+-            logger.error(
+-                msg,
+-                ErrorCode.ATB_MODELS_PARAM_OUT_OF_RANGE
+-            )
++            logger.error(msg, ErrorCode.ATB_MODELS_PARAM_OUT_OF_RANGE)
+             raise ValueError(msg)
+         image_num = bos_pos.size(0) // 2
+         expand_token_ids = []
+@@ -73,40 +65,37 @@ class LlavaRouter(BaseRouter):
+             path_token_len = bos_pos[i + 1] - bos_pos[i]
+             if path_token_len < 0 or path_token_len >= _IMAGE_FEATURE_WIDTH:
+                 msg = f"Token length in path must be greater than 0 and less than {_IMAGE_FEATURE_WIDTH}."
+-                logger.error(
+-                    msg,
+-                    ErrorCode.ATB_MODELS_PARAM_OUT_OF_RANGE
+-                )
++                logger.error(msg, ErrorCode.ATB_MODELS_PARAM_OUT_OF_RANGE)
+                 raise ValueError(msg)
+-            text_token = input_ids[pre: bos_pos[i]]
+-            path_token = input_ids[bos_pos[i] + 1: bos_pos[i + 1] + 1]
++            text_token = input_ids[pre : bos_pos[i]]
++            path_token = input_ids[bos_pos[i] + 1 : bos_pos[i + 1] + 1]
+             pre = bos_pos[i + 1] + 1
+             new_path_token = torch.cat(
+                 [
+                     torch.tensor([image_token_id], dtype=path_token.dtype),
+-                    torch.full((_IMAGE_FEATURE_WIDTH - path_token_len - 1, ), pad_token_id, dtype=path_token.dtype),
+-                    path_token
++                    torch.full((_IMAGE_FEATURE_WIDTH - path_token_len - 1,), pad_token_id, dtype=path_token.dtype),
++                    path_token,
+                 ]
+             )
+             if text_token.size(0) != 0:
+                 expand_token_ids.append(text_token)
+-                
++
+             if new_path_token.size(0) != 0:
+                 expand_token_ids.append(new_path_token)
+-                
++
+         text_token = input_ids[pre:]
+         if text_token.size(0) != 0:
+             expand_token_ids.append(text_token)
+-            
++
+         if expand_token_ids:
+             new_input_ids = torch.cat(expand_token_ids)
+         return new_input_ids
+-    
++
+     def check_config_llava(self, config):
+         super().check_config(config)
+         attribute_ranges = {
+-            'mm_hidden_size': (1, 2147483647),
+-            'num_key_value_heads': (1, 2147483647),
++            "mm_hidden_size": (1, 2147483647),
++            "num_key_value_heads": (1, 2147483647),
+         }
+         for attr, (min_val, max_val) in attribute_ranges.items():
+             if not hasattr(config, attr) or getattr(config, attr) is None:
+@@ -114,16 +103,13 @@ class LlavaRouter(BaseRouter):
+             value = getattr(config, attr)
+             if value < min_val or value > max_val:
+                 msg = f"The {attr} value in config must be between {min_val} and {max_val}."
+-                logger.error(
+-                    msg,
+-                    ErrorCode.ATB_MODELS_PARAM_OUT_OF_RANGE
+-                )
++                logger.error(msg, ErrorCode.ATB_MODELS_PARAM_OUT_OF_RANGE)
+                 raise ValueError(msg)
+ 
+     def get_config(self):
+         config = LlavaConfig.from_pretrained(self.model_name_or_path)
+         config.text_config = LlamaConfig.from_dict(config.text_config)
+-        setattr(config, 'quantization_config', QuantizationConfig(**{}))
++        setattr(config, "quantization_config", QuantizationConfig(**{}))
+         if self.max_position_embeddings:
+             config.max_position_embeddings = self.max_position_embeddings
+         self.check_config_llava(config)
+@@ -138,5 +124,5 @@ class LlavaRouter(BaseRouter):
+             padding_side="left",
+             truncation_side="left",
+             trust_remote_code=self.trust_remote_code,
+-            use_fast=use_fast
+-        )
+\ No newline at end of file
++            use_fast=use_fast,
++        )
+diff --git a/examples/atb_models/atb_llm/models/llava_next/router_llava_next.py b/examples/atb_models/atb_llm/models/llava_next/router_llava_next.py
+index 14a861ef2b..e0e2e333ff 100644
+--- a/examples/atb_models/atb_llm/models/llava_next/router_llava_next.py
++++ b/examples/atb_models/atb_llm/models/llava_next/router_llava_next.py
+@@ -26,15 +26,11 @@
+ # EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT,
+ # MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
+ # See the Mulan PSL v2 for more details.
+-import os
+ from dataclasses import dataclass
+ from typing import Any, Dict, List
+ 
+-import torch
+-import numpy as np
+ from transformers import AutoProcessor
+ 
+-from atb_llm.utils.shm_utils import encode_shm_name_to_int64, encode_shape_to_int64, create_shm
+ from atb_llm.utils.log import logger
+ from atb_llm.utils.log.error_code import ErrorCode
+ from ..base.router import BaseRouter
+@@ -42,7 +38,6 @@ from .flash_causal_llava_next import LlavaNextConfig
+ from ..llama.config_llama import LlamaConfig
+ from ..base.config import QuantizationConfig
+ from ..base.model_utils import safe_get_tokenizer_from_pretrained, safe_from_pretrained
+-from .data_preprocess_llava_next import data_prerocess_llava_next
+ from .input_builder_llava_next import LlavaNextInputBuilder, get_token_ids
+ 
+ _VIDEO_TOKEN_ID = -2
+@@ -55,22 +50,19 @@ def from_list_format(list_format: List[Dict], image_token_str: str, video_token_
+     for ele in list_format:
+         if "image" in ele:
+             if image_token_str is None:
+-                logger.error(f"The model seems doesn't support image inputs.",
+-                ErrorCode.ATB_MODELS_PARAM_OUT_OF_RANGE)
+-                raise ValueError(f"The model seems doesn't support image inputs.")
++                logger.error("The model seems doesn't support image inputs.", ErrorCode.ATB_MODELS_PARAM_OUT_OF_RANGE)
++                raise ValueError("The model seems doesn't support image inputs.")
+             image_or_video += image_token_str + "\n"
+         elif "video" in ele:
+             if video_token_str is None:
+-                logger.error(f"The model seems doesn't support image inputs.",
+-                ErrorCode.ATB_MODELS_PARAM_OUT_OF_RANGE)
+-                raise ValueError(f"The model seems doesn't support video inputs.")
++                logger.error("The model seems doesn't support image inputs.", ErrorCode.ATB_MODELS_PARAM_OUT_OF_RANGE)
++                raise ValueError("The model seems doesn't support video inputs.")
+             image_or_video += video_token_str + "\n"
+         elif "text" in ele:
+             text += ele["text"]
+         else:
+-            logger.error("Unsupported element: " + str(ele) + '.',
+-            ErrorCode.ATB_MODELS_PARAM_OUT_OF_RANGE)
+-            raise KeyError("Unsupported element: " + str(ele) + '.')
++            logger.error("Unsupported element: " + str(ele) + ".", ErrorCode.ATB_MODELS_PARAM_OUT_OF_RANGE)
++            raise KeyError("Unsupported element: " + str(ele) + ".")
+     if image_or_video != "":
+         result_promt += image_or_video + "\n"
+     result_promt += text + "ASSISTANT:"
+@@ -81,7 +73,7 @@ def from_list_format(list_format: List[Dict], image_token_str: str, video_token_
+ class Llava_nextRouter(BaseRouter):
+     is_multimodal: bool = True
+     _processor: Any = None
+-    
++
+     @property
+     def model_chat_template_version(self):
+         if "mistral" in self.config.text_model_name:
+@@ -105,34 +97,37 @@ class Llava_nextRouter(BaseRouter):
+         ]
+         image_token_id = self.config.image_token_index
+         video_token_id = self.config.video_token_index if self.config.video_token_index else _VIDEO_TOKEN_ID
+-    
++
+         image_token_str = self.tokenizer.decode(image_token_id)
+         video_token_str = self.tokenizer.decode(video_token_id) if self.config.video_token_index else None
+ 
+         query = from_list_format(inputs, image_token_str, video_token_str)
+-        new_input_ids = get_token_ids(query, image_or_video_path_list, self.config, 
+-            self.processor(), shm_name_save_path)
++        new_input_ids = get_token_ids(
++            query, image_or_video_path_list, self.config, self.processor(), shm_name_save_path
++        )
+         return new_input_ids
+ 
+     def check_config_llava(self, config):
+         super().check_config(config)
+         attribute_ranges = {
+-            'mm_hidden_size': (1, 2147483647),
+-            'num_key_value_heads': (1, 2147483647),
++            "mm_hidden_size": (1, 2147483647),
++            "num_key_value_heads": (1, 2147483647),
+         }
+         for attr, (min_val, max_val) in attribute_ranges.items():
+             if not hasattr(config, attr) or getattr(config, attr) is None:
+                 continue
+             value = getattr(config, attr)
+             if value < min_val or value > max_val:
+-                logger.error(f"`self._config.{attr}` must be between {min_val} and {max_val}.",
+-                ErrorCode.ATB_MODELS_PARAM_OUT_OF_RANGE)
++                logger.error(
++                    f"`self._config.{attr}` must be between {min_val} and {max_val}.",
++                    ErrorCode.ATB_MODELS_PARAM_OUT_OF_RANGE,
++                )
+                 raise ValueError(f"`self._config.{attr}` must be between {min_val} and {max_val}.")
+ 
+     def get_config(self):
+         config = LlavaNextConfig.from_pretrained(self.model_name_or_path)
+         config.text_config = LlamaConfig.from_dict(config.text_config)
+-        setattr(config, 'quantization_config', QuantizationConfig(**{}))
++        setattr(config, "quantization_config", QuantizationConfig(**{}))
+         if self.max_position_embeddings:
+             config.max_position_embeddings = self.max_position_embeddings
+         self.check_config_llava(config)
+@@ -142,13 +137,15 @@ class Llava_nextRouter(BaseRouter):
+     def processor(self):
+         if self._processor is not None:
+             return self._processor
+-        if self.config.text_config.num_hidden_layers == 60 and \
+-            self.config.architectures[0] == "LlavaNextForConditionalGeneration":
++        if (
++            self.config.text_config.num_hidden_layers == 60
++            and self.config.architectures[0] == "LlavaNextForConditionalGeneration"
++        ):
+             self._processor = safe_from_pretrained(AutoProcessor, self.config.model_name_or_path, use_fast=False)
+         else:
+             self._processor = safe_from_pretrained(AutoProcessor, self.config.model_name_or_path)
+         return self._processor
+-        
++
+     def is_llava_next34b(self):
+         config = self.get_config()
+         num_hidden_layers = config.text_config.num_hidden_layers
+@@ -156,11 +153,11 @@ class Llava_nextRouter(BaseRouter):
+         if num_hidden_layers in [60] and architectures[0] == "LlavaNextForConditionalGeneration":
+             return True
+         return False
+-    
++
+     def get_tokenizer(self):
+         use_fast = True
+         if self.is_llava_next34b():
+-            use_fast = False 
++            use_fast = False
+         return safe_get_tokenizer_from_pretrained(
+             self.tokenizer_path,
+             revision=self.revision,
+@@ -171,4 +168,4 @@ class Llava_nextRouter(BaseRouter):
+         )
+ 
+     def get_input_builder(self):
+-        return LlavaNextInputBuilder(self.processor(), self.model_chat_template_version, self.config)
+\ No newline at end of file
++        return LlavaNextInputBuilder(self.processor(), self.model_chat_template_version, self.config)
+diff --git a/examples/atb_models/atb_llm/models/minicpm_qwen2_v2/router_minicpm_qwen2_v2.py b/examples/atb_models/atb_llm/models/minicpm_qwen2_v2/router_minicpm_qwen2_v2.py
+index 807063bd9f..1d275e95c2 100644
+--- a/examples/atb_models/atb_llm/models/minicpm_qwen2_v2/router_minicpm_qwen2_v2.py
++++ b/examples/atb_models/atb_llm/models/minicpm_qwen2_v2/router_minicpm_qwen2_v2.py
+@@ -29,32 +29,31 @@ class Minicpmqwen2v2Router(BaseRouter):
+ 
+     def __post_init__(self):
+         super().__post_init__()
+-        self.processor = safe_from_pretrained(AutoProcessor, self.config.model_name_or_path, 
+-                                              trust_remote_code=self.trust_remote_code)
+-    
++        self.processor = safe_from_pretrained(
++            AutoProcessor, self.config.model_name_or_path, trust_remote_code=self.trust_remote_code
++        )
++
+     def tokenize(self, inputs, **kwargs):
+-        return inner_tokenize(
+-            inputs=inputs,
+-            config=self.config,
+-            processor=self.processor,
+-            **kwargs)
++        return inner_tokenize(inputs=inputs, config=self.config, processor=self.processor, **kwargs)
+ 
+     def check_config_minicpmqwen2v2(self, config):
+         super().check_config(config)
+-        attribute_ranges = {'mm_hidden_size': (1, 2147483647), 'num_key_value_heads': (1, 2147483647)}
++        attribute_ranges = {"mm_hidden_size": (1, 2147483647), "num_key_value_heads": (1, 2147483647)}
+         for attr, (min_val, max_val) in attribute_ranges.items():
+             if not hasattr(config, attr) or getattr(config, attr) is None:
+                 continue
+             value = getattr(config, attr)
+             if value < min_val or value > max_val:
+-                logger.error(f"`self._config.{attr}` must be between {min_val} and {max_val}.",
+-                ErrorCode.ATB_MODELS_PARAM_OUT_OF_RANGE)
++                logger.error(
++                    f"`self._config.{attr}` must be between {min_val} and {max_val}.",
++                    ErrorCode.ATB_MODELS_PARAM_OUT_OF_RANGE,
++                )
+                 raise ValueError(f"`self._config.{attr}` must be between {min_val} and {max_val}.")
+ 
+     def get_config(self):
+         config = Minicpmqwen2v2Config.from_dict(self.config_dict)
+         config.model_name_or_path = self.model_name_or_path
+-        setattr(config, 'quantization_config', QuantizationConfig(**{}))
++        setattr(config, "quantization_config", QuantizationConfig(**{}))
+         if self.max_position_embeddings:
+             config.max_position_embeddings = self.max_position_embeddings
+         self.check_config_minicpmqwen2v2(config)
+@@ -68,18 +67,16 @@ class Minicpmqwen2v2Router(BaseRouter):
+             padding_side="left",
+             truncation_side="left",
+             trust_remote_code=self.trust_remote_code,
+-            use_fast=use_fast)
++            use_fast=use_fast,
++        )
+ 
+     def get_generation_config(self):
+         generation_config = super().get_generation_config()
+         return generation_config
+ 
+     def get_input_builder(self, **kwargs):
+-        return Minicpmqwen2v2InputBuilder(
+-            config=self.config,
+-            processor=self.processor,
+-            **kwargs)
+-    
++        return Minicpmqwen2v2InputBuilder(config=self.config, processor=self.processor, **kwargs)
++
+     def generate_position_ids(self, input_ids):
+         position_ids = np.arange(len(input_ids), dtype=np.int64)
+-        return position_ids
+\ No newline at end of file
++        return position_ids
+diff --git a/examples/atb_models/atb_llm/models/mllama/router_mllama.py b/examples/atb_models/atb_llm/models/mllama/router_mllama.py
+index e72ec7d350..d74360eff9 100644
+--- a/examples/atb_models/atb_llm/models/mllama/router_mllama.py
++++ b/examples/atb_models/atb_llm/models/mllama/router_mllama.py
+@@ -18,4 +18,4 @@ class MllamaRouter(BaseRouter):
+ 
+     @staticmethod
+     def check_config(config):
+-        BaseRouter.check_config(config.text_config)
+\ No newline at end of file
++        BaseRouter.check_config(config.text_config)
+diff --git a/examples/atb_models/atb_llm/models/qwen2_audio/router_qwen2_audio.py b/examples/atb_models/atb_llm/models/qwen2_audio/router_qwen2_audio.py
+index 5c20e0cf37..f1cf35e242 100644
+--- a/examples/atb_models/atb_llm/models/qwen2_audio/router_qwen2_audio.py
++++ b/examples/atb_models/atb_llm/models/qwen2_audio/router_qwen2_audio.py
+@@ -59,23 +59,21 @@ def get_feature_lens(config: Any, inputs: list, processor: Any):
+     image_or_video_token_id = config.audio_token_index
+     audio = load_feature_by_torchaudio(image_or_video_path)
+ 
+-    prompt_head = '<|im_start|>system\nYou are a helpful assistant.<|im_end|>\n<|im_start|>user\n'
+-    audio_head = 'Audio 1: <|audio_bos|><|AUDIO|><|audio_eos|>\n'
+-    prompt_tail = '<|im_end|>\n<|im_start|>assistant\n'
++    prompt_head = "<|im_start|>system\nYou are a helpful assistant.<|im_end|>\n<|im_start|>user\n"
++    audio_head = "Audio 1: <|audio_bos|><|AUDIO|><|audio_eos|>\n"
++    prompt_tail = "<|im_end|>\n<|im_start|>assistant\n"
+     text = prompt_head + audio_head + text + prompt_tail
+     new_inputs = processor(text=text, audios=audio, return_tensors="pt")
+     feature_attention_mask = new_inputs.feature_attention_mask
+ 
+-    _, audio_output_lengths = get_feat_extract_output_lengths(
+-        feature_attention_mask.sum(-1)
+-    )
++    _, audio_output_lengths = get_feat_extract_output_lengths(feature_attention_mask.sum(-1))
+     return [audio_output_lengths, image_or_video_token_id, [image_or_video_path], new_inputs]
+ 
+ 
+ def get_conversation_feature_lens(config: Any, inputs: list, processor: Any, text: str):
+     audios, audio_paths = [], []
+     audio_types = "audio_type"
+-    audio_type = audio_types.split('_')[0]
++    audio_type = audio_types.split("_")[0]
+     for message in inputs:
+         if isinstance(message["content"], list):
+             for ele in message["content"]:
+@@ -89,9 +87,7 @@ def get_conversation_feature_lens(config: Any, inputs: list, processor: Any, tex
+     new_inputs = processor(text=text, audios=audios, return_tensors="pt")
+     feature_attention_mask = new_inputs.feature_attention_mask
+ 
+-    _, audio_output_lengths = get_feat_extract_output_lengths(
+-        feature_attention_mask.sum(-1)
+-    )
++    _, audio_output_lengths = get_feat_extract_output_lengths(feature_attention_mask.sum(-1))
+     return [audio_output_lengths, image_or_video_token_id, audio_paths, new_inputs]
+ 
+ 
+@@ -117,22 +113,22 @@ class Qwen2audioRouter(BaseRouter):
+     def check_conversation(inputs):
+         conversation_state = False
+         for item in inputs:
+-            if 'role' in item:
++            if "role" in item:
+                 conversation_state = True
+         return conversation_state
+-    
++
+     @staticmethod
+     def check_single_audio_file(inputs):
+         for item in inputs:
+-            inputs_new = item['content'] if 'role' in item else inputs
++            inputs_new = item["content"] if "role" in item else inputs
+         audio_num = 0
+         for item in inputs_new:
+-            if 'audio' in item:
++            if "audio" in item:
+                 audio_num += 1
+                 if audio_num > 1:
+                     return False, inputs_new
+         return True, inputs_new
+-    
++
+     @staticmethod
+     def process_shm(image_pixel, shm_name_save_path, dtype=np.float32):
+         shm = create_shm(image_pixel.nbytes, shm_name_save_path)
+@@ -165,9 +161,9 @@ class Qwen2audioRouter(BaseRouter):
+         new_inputs.feature_attention_mask = torch.tensor(new_inputs.feature_attention_mask, dtype=torch.int64)
+         for feature_len in feature_lens:
+             pad_token_length += feature_len - 1
+-        new_prompt_token = torch.full((pad_token_length, ), pad_token_id, dtype=torch.int64)
++        new_prompt_token = torch.full((pad_token_length,), pad_token_id, dtype=torch.int64)
+ 
+-        shm_name_save_path = kwargs.get('shm_name_save_path', None)
++        shm_name_save_path = kwargs.get("shm_name_save_path", None)
+         shm_name_list, shape_value_list, audio_pixels = [], [], []
+ 
+         audio_pixels.append(new_inputs.input_features)
+@@ -184,7 +180,7 @@ class Qwen2audioRouter(BaseRouter):
+                 shm_name, shape_value = self.process_shm(audio_pixel, shm_name_save_path, dtype=np.int64)
+             shm_name_list.append(shm_name)
+             shape_value_list.append(shape_value)
+-        
++
+         for i, _ in enumerate(shm_name_list):
+             new_prompt_token[2 * i] = torch.tensor(shm_name_list[i], dtype=torch.int64)
+             new_prompt_token[2 * i + 1] = torch.tensor(shape_value_list[i], dtype=torch.int64)
+@@ -196,7 +192,7 @@ class Qwen2audioRouter(BaseRouter):
+         config = Qwen2AudioConfig.from_dict(self.config_dict)
+         config.model_name_or_path = self.model_name_or_path
+         config.text_config = Qwen2AudioTextConfig.from_dict(config.text_config)
+-        setattr(config, 'quantization_config', QuantizationConfig(**{}))
++        setattr(config, "quantization_config", QuantizationConfig(**{}))
+         if self.max_position_embeddings:
+             config.max_position_embeddings = self.max_position_embeddings
+         return config
+@@ -217,14 +213,14 @@ class Qwen2audioRouter(BaseRouter):
+         return position_ids
+ 
+     def make_context(
+-        self, 
++        self,
+         rank: int,
+-        conversation: List[Dict[str, List[Dict]]], 
++        conversation: List[Dict[str, List[Dict]]],
+         system: str = "You are a helpful assistant.",
+-        **kwargs):
++        **kwargs,
++    ):
+         context_tokens = self.tokenize(conversation)
+         return context_tokens
+ 
+     def get_input_builder(self):
+         return self
+-
+diff --git a/examples/atb_models/atb_llm/models/qwen2_vl/router_qwen2_vl.py b/examples/atb_models/atb_llm/models/qwen2_vl/router_qwen2_vl.py
+index a66f79864f..b6b5d619be 100644
+--- a/examples/atb_models/atb_llm/models/qwen2_vl/router_qwen2_vl.py
++++ b/examples/atb_models/atb_llm/models/qwen2_vl/router_qwen2_vl.py
+@@ -20,7 +20,7 @@ from atb_llm.models.qwen2_vl.config_qwen2_vl import Qwen2vlConfig
+ from atb_llm.models.qwen2_vl.data_preprocess_qwen2_vl import fetch_image, fetch_video, process_shared_memory
+ from atb_llm.models.qwen2_vl.input_builder_qwen2_vl import Qwen2vlInputBuilder
+ from atb_llm.utils.log.error_code import ErrorCode
+-from atb_llm.utils.log.logging import logger, print_log
++from atb_llm.utils.log.logging import logger
+ 
+ VISION_START_TOKEN_ID = 151652
+ VISION_END_TOKEN_ID = 151653
+@@ -67,7 +67,7 @@ class Qwen2vlRouter(BaseRouter):
+ 
+         vision_info_list = []
+         message_list = []
+-        shm_name_save_path = kwargs.get('shm_name_save_path', None)
++        shm_name_save_path = kwargs.get("shm_name_save_path", None)
+ 
+         for single_input in inputs:
+             if single_input.get(IMAGE, None):
+@@ -80,17 +80,17 @@ class Qwen2vlRouter(BaseRouter):
+                 images_inputs, feature_lens = fetch_image(self.image_processor, single_input)
+ 
+                 shared_memory_result = process_shared_memory(
+-                    images_inputs.pixel_values,
+-                    shm_name_save_path,
+-                    images_inputs.image_grid_thw
++                    images_inputs.pixel_values, shm_name_save_path, images_inputs.image_grid_thw
++                )
++                vision_info_list.append(
++                    [
++                        shared_memory_result["pixel_values_shm_name"],
++                        shared_memory_result["pixel_values_shape_value"],
++                        shared_memory_result["thw_value"],
++                        feature_lens,
++                        image_token_id,
++                    ]
+                 )
+-                vision_info_list.append([
+-                    shared_memory_result['pixel_values_shm_name'],
+-                    shared_memory_result['pixel_values_shape_value'],
+-                    shared_memory_result['thw_value'],
+-                    feature_lens,
+-                    image_token_id
+-                ])
+ 
+             elif single_input.get(VIDEO, None):
+                 message_list.append(single_input)
+@@ -101,43 +101,47 @@ class Qwen2vlRouter(BaseRouter):
+                 # 默认 fps 为 2
+                 video_single_message = {"type": "video", "video": single_input[VIDEO], "fps": 2.0}
+                 video_inputs, feature_lens, second_per_grid_t = fetch_video(
+-                    self.image_processor,
+-                    video_single_message,
+-                    IMAGE_FACTOR
++                    self.image_processor, video_single_message, IMAGE_FACTOR
+                 )
+                 shared_memory_result = process_shared_memory(
+-                    video_inputs.pixel_values_videos,
+-                    shm_name_save_path,
+-                    video_inputs.video_grid_thw,
+-                    second_per_grid_t
++                    video_inputs.pixel_values_videos, shm_name_save_path, video_inputs.video_grid_thw, second_per_grid_t
++                )
++                vision_info_list.append(
++                    [
++                        shared_memory_result["pixel_values_shm_name"],
++                        shared_memory_result["pixel_values_shape_value"],
++                        shared_memory_result["thw_value"],
++                        shared_memory_result["second_per_grid_t_shm_name"],
++                        shared_memory_result["second_per_grid_t_shape_value"],
++                        feature_lens,
++                        video_token_id,
++                    ]
+                 )
+-                vision_info_list.append([
+-                    shared_memory_result['pixel_values_shm_name'],
+-                    shared_memory_result['pixel_values_shape_value'],
+-                    shared_memory_result['thw_value'],
+-                    shared_memory_result['second_per_grid_t_shm_name'],
+-                    shared_memory_result['second_per_grid_t_shape_value'],
+-                    feature_lens,
+-                    video_token_id
+-                ])
+ 
+             elif single_input.get(TEXT, None):
+                 message_list.append(single_input)
+             else:
+-                logger.error("The input field currently only supports 'image', 'video' or 'text'.",
+-                ErrorCode.ATB_MODELS_PARAM_INVALID)
++                logger.error(
++                    "The input field currently only supports 'image', 'video' or 'text'.",
++                    ErrorCode.ATB_MODELS_PARAM_INVALID,
++                )
+                 raise TypeError("The input field currently only supports 'image', 'video' or 'text'.")
+         return self.process_token(vision_info_list, message_list)
+ 
+     def get_input_builder(self):
+         if hasattr(self.config, "max_position_embeddings") and self.config.max_position_embeddings:
+-            return Qwen2vlInputBuilder(self.tokenizer, self.image_processor, self.processor, self.config,
+-                                       max_length=self.config.max_position_embeddings)
++            return Qwen2vlInputBuilder(
++                self.tokenizer,
++                self.image_processor,
++                self.processor,
++                self.config,
++                max_length=self.config.max_position_embeddings,
++            )
+         return Qwen2vlInputBuilder(self.tokenizer, self.image_processor, self.processor, self.config)
+ 
+     def get_config(self):
+         config = Qwen2vlConfig.from_dict(self.config_dict)
+-        setattr(config, 'quantization_config', QuantizationConfig(**{}))
++        setattr(config, "quantization_config", QuantizationConfig(**{}))
+         if self.max_position_embeddings:
+             config.max_position_embeddings = self.max_position_embeddings
+         config.model_name_or_path = self.model_name_or_path
+@@ -156,16 +160,18 @@ class Qwen2vlRouter(BaseRouter):
+     def check_config_qwen2_vl(self, config):
+         super().check_config(config)
+         attribute_ranges = {
+-            'mm_hidden_size': (1, 2147483647),
+-            'num_key_value_heads': (1, 2147483647),
++            "mm_hidden_size": (1, 2147483647),
++            "num_key_value_heads": (1, 2147483647),
+         }
+         for attr, (min_val, max_val) in attribute_ranges.items():
+             if not hasattr(config, attr) or getattr(config, attr) is None:
+                 continue
+             value = getattr(config, attr)
+             if value < min_val or value > max_val:
+-                logger.error(f"`self._config.{attr}` must be between {min_val} and {max_val}.",
+-                ErrorCode.ATB_MODELS_PARAM_OUT_OF_RANGE)
++                logger.error(
++                    f"`self._config.{attr}` must be between {min_val} and {max_val}.",
++                    ErrorCode.ATB_MODELS_PARAM_OUT_OF_RANGE,
++                )
+                 raise ValueError(f"`self._config.{attr}` must be between {min_val} and {max_val}.")
+ 
+     def process_token(self, vision_info_list, message_list):
+@@ -173,9 +179,7 @@ class Qwen2vlRouter(BaseRouter):
+         messages[0]["content"] = message_list
+         prompt = self.processor.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+         if not prompt:
+-            prompt = self.processor.apply_chat_template(
+-                message_list, tokenize=False, add_generation_prompt=True
+-            )
++            prompt = self.processor.apply_chat_template(message_list, tokenize=False, add_generation_prompt=True)
+         input_ids = self.tokenizer(prompt, return_tensors="pt")["input_ids"].flatten()
+         new_input_ids = input_ids
+         vision_start_token_id = getattr(self.config, "vision_start_token_id", VISION_START_TOKEN_ID)
+@@ -190,7 +194,7 @@ class Qwen2vlRouter(BaseRouter):
+         pre = 0
+         for i in range(0, vision_num, 1):
+             feature_lens = vision_info_list[i][-2]
+-            text_token = input_ids[pre: bos_pos[i]]
++            text_token = input_ids[pre : bos_pos[i]]
+             pre = eos_pos[i] + 1
+             if vision_info_list[i][-1] == image_token_id:
+                 vision_pad_token = torch.cat(
+@@ -228,4 +232,4 @@ class Qwen2vlRouter(BaseRouter):
+ 
+         if expand_token_ids:
+             new_input_ids = torch.cat(expand_token_ids)
+-        return new_input_ids
+\ No newline at end of file
++        return new_input_ids
+diff --git a/examples/atb_models/atb_llm/models/qwen3_vl/router_qwen3_vl.py b/examples/atb_models/atb_llm/models/qwen3_vl/router_qwen3_vl.py
+index ce8f34ee44..f2e7044022 100644
+--- a/examples/atb_models/atb_llm/models/qwen3_vl/router_qwen3_vl.py
++++ b/examples/atb_models/atb_llm/models/qwen3_vl/router_qwen3_vl.py
+@@ -8,7 +8,6 @@
+ # MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
+ # See the Mulan PSL v2 for more details.
+ 
+-import os
+ import copy
+ from typing import Dict, List, Any
+ from dataclasses import dataclass
+@@ -22,8 +21,6 @@ from atb_llm.utils.shm_utils import process_shared_memory
+ from atb_llm.utils.multimodal_utils import safe_open_image, check_video_path
+ 
+ from .input_builder_qwen3_vl import Qwen3vlInputBuilder
+-from ...utils.log import logger
+-from ...utils.log.error_code import ErrorCode
+ 
+ 
+ IMAGE = "image"
+@@ -54,11 +51,11 @@ class Qwen3vlRouter(BaseRouter):
+         if not hasattr(self, "_processor") or self._processor is None:
+             self._processor = self.get_processor()
+         return self._processor
+-    
++
+     def tokenize(self, inputs: List[Dict], **kwargs):
+         text = ""
+         message_list = []
+-        shm_name_save_path = kwargs.get('shm_name_save_path', None)
++        shm_name_save_path = kwargs.get("shm_name_save_path", None)
+         for item in inputs:
+             if item.get(IMAGE, None):
+                 img_fname = item[IMAGE]
+@@ -73,18 +70,11 @@ class Qwen3vlRouter(BaseRouter):
+                     shm_name_save_path = self.input_builder.get_shm_name_save_path(video_path)
+             if item.get(TEXT, None):
+                 text = item[TEXT]
+-                message_list.append({
+-                    TYPE: TEXT,
+-                    TEXT: text
+-                })
++                message_list.append({TYPE: TEXT, TEXT: text})
+         messages = copy.deepcopy(messages_template)
+         messages[0]["content"] = message_list
+         inputs = self.processor.apply_chat_template(
+-            messages,
+-            tokenize=True,
+-            add_generation_prompt=True,
+-            return_dict=True,
+-            return_tensors='pt'
++            messages, tokenize=True, add_generation_prompt=True, return_dict=True, return_tensors="pt"
+         )
+         shm_info = process_shared_memory(inputs, shm_name_save_path)
+         input_ids = self.input_builder.update_token_id(inputs, shm_info)
+@@ -92,7 +82,7 @@ class Qwen3vlRouter(BaseRouter):
+ 
+     def get_input_builder(self):
+         return Qwen3vlInputBuilder(self.tokenizer, self.config, self.processor)
+-    
++
+     def get_config(self):
+         config_cls = self.get_config_cls()
+         config = config_cls.from_dict(self.config_dict)
+@@ -106,7 +96,7 @@ class Qwen3vlRouter(BaseRouter):
+             raise NotImplementedError(err_msg)
+         super().check_config(config)
+         return config
+-    
++
+     def get_tokenizer(self):
+         return self.processor.tokenizer
+ 
+diff --git a/examples/atb_models/atb_llm/models/vita/router_vita.py b/examples/atb_models/atb_llm/models/vita/router_vita.py
+index c40081ef4a..c8957ea7a1 100644
+--- a/examples/atb_models/atb_llm/models/vita/router_vita.py
++++ b/examples/atb_models/atb_llm/models/vita/router_vita.py
+@@ -59,14 +59,13 @@ def from_list_format(list_format: List[Dict]):
+         if "text" in ele:
+             text = ele["text"]
+         elif "image_url" in ele or "image" in ele:
+-            image = ele.get('image') or ele.get('image_url')
++            image = ele.get("image") or ele.get("image_url")
+         elif "video_url" in ele or "video" in ele:
+-            video = ele.get('video') or ele.get('video_url')
++            video = ele.get("video") or ele.get("video_url")
+         elif "audio_url" in ele or "audio" in ele:
+-            audio = ele.get("audio") or ele.get('audio_url')
++            audio = ele.get("audio") or ele.get("audio_url")
+         else:
+-            logger.error("Unsupported element: " + str(ele) + ".",
+-            ErrorCode.ATB_MODELS_PARAM_OUT_OF_RANGE)
++            logger.error("Unsupported element: " + str(ele) + ".", ErrorCode.ATB_MODELS_PARAM_OUT_OF_RANGE)
+             raise KeyError("Unsupported element: " + str(ele) + ".")
+     return InputAttrs(text, image, video, audio)
+ 
+@@ -77,13 +76,11 @@ class VitaRouter(BaseRouter):
+ 
+     def process_images(self, images, model_cfg, image_processor):
+         image_aspect_ratio = getattr(model_cfg, "image_aspect_ratio", None)
+-        
++
+         new_images = []
+         if image_aspect_ratio == "pad":
+             for image in images:
+-                image = self.expand2square(
+-                    image, tuple(int(x * 255) for x in image_processor.image_mean)
+-                )
++                image = self.expand2square(image, tuple(int(x * 255) for x in image_processor.image_mean))
+                 image = image_processor.preprocess(image, return_tensors="pt")["pixel_values"][0]
+                 new_images.append(image)
+         else:
+@@ -91,7 +88,7 @@ class VitaRouter(BaseRouter):
+         if all(x.shape == new_images[0].shape for x in new_images):
+             new_images = torch.stack(new_images, dim=0)
+         return new_images
+-    
++
+     def get_audio_processor(self):
+         audio_path = os.path.join(self.config.model_name_or_path, self.config.mm_audio_encoder)
+         with open(os.path.join(audio_path, "train.yaml"), "r") as fin:
+@@ -110,25 +107,21 @@ class VitaRouter(BaseRouter):
+             if "text" in ele:
+                 text = ele.get("text")
+                 new_q = qs + text
+-                qs = ''
++                qs = ""
+                 conv.append_message(conv.roles[0], new_q)
+             elif "image_url" in ele or img in ele:
+                 image_path = ele.get(img) or ele.get("image_url")
+                 image = multimodal_utils.safe_load_multimodal_source(Image.open, image_path)
+-                if image.mode != 'RGB':
+-                    image = image.convert('RGB')
+-                image, p_num = dynamic_preprocess(
+-                            image, min_num=1, max_num=12, image_size=448, use_thumbnail=True
+-                        )
+-                image_tensor = self.process_images(image, 
+-                                                       self.config, 
+-                                                       image_processor).half()
++                if image.mode != "RGB":
++                    image = image.convert("RGB")
++                image, p_num = dynamic_preprocess(image, min_num=1, max_num=12, image_size=448, use_thumbnail=True)
++                image_tensor = self.process_images(image, self.config, image_processor).half()
+                 qs += DEFAULT_IMAGE_TOKEN * p_num[0] + "\n"
+                 modality = img
+                 maxlen_image_id = p_num[0] * 255
+                 media_tensor.append((image_path, image_tensor, maxlen_image_id))
+             elif "video_url" in ele or vid in ele:
+-                video = ele.get(vid) or ele.get('video_url')
++                video = ele.get(vid) or ele.get("video_url")
+                 video_config = VideoConfig(
+                     video_path=video,
+                     image_processor=image_processor,
+@@ -143,9 +136,9 @@ class VitaRouter(BaseRouter):
+                 maxlen_image_id = slice_len * 255
+                 media_tensor.append((video, image_tensor, maxlen_image_id))
+             elif "audio_url" in ele or "audio" in ele:
+-                audio = ele.get("audio") or ele.get('audio_url')
++                audio = ele.get("audio") or ele.get("audio_url")
+                 new_q = qs + DEFAULT_AUDIO_TOKEN
+-                qs = ''
++                qs = ""
+                 conv.append_message(conv.roles[0], new_q)
+                 audio_process = self.get_audio_processor()
+                 audio_input, _ = audio_process.process(os.path.join(audio))
+@@ -155,8 +148,7 @@ class VitaRouter(BaseRouter):
+                 max_audio_id = math.ceil((((audio_length - 3) // 2 - 2) // 2 + 1) / 2) - 1
+                 media_tensor.append((audio, audio_input, max_audio_id))
+             else:
+-                logger.error("Unsupported element: " + str(ele) + ".",
+-                ErrorCode.ATB_MODELS_PARAM_OUT_OF_RANGE)
++                logger.error("Unsupported element: " + str(ele) + ".", ErrorCode.ATB_MODELS_PARAM_OUT_OF_RANGE)
+                 raise KeyError("Unsupported element: " + str(ele) + ".")
+         return conv, media_tensor, modality
+ 
+@@ -170,42 +162,45 @@ class VitaRouter(BaseRouter):
+             shm = create_shm(tensor.nbytes, shm_name_save_path)
+             shared_array = np.ndarray(tensor.shape, dtype=tensor.dtype, buffer=shm.buf)
+             shared_array[:] = tensor
+-            shm_name = encode_shm_name_to_int64(shm.name)  
++            shm_name = encode_shm_name_to_int64(shm.name)
+             shape_value = encode_shape_to_int64(tensor.shape)
+             intermediate_token = torch.tensor([shm_name, shape_value])
+             if i == 0:
+-                new_input_ids = torch.cat([
+-                    input_ids[start: media_pos[i] + 1],
+-                    intermediate_token,
+-                    torch.full((length - 2, ), IGNORE_INDEX, dtype=input_ids.dtype), 
+-                ])
+-            else: 
+-                new_input_ids = torch.cat([
+-                    new_input_ids,
+-                    input_ids[start: media_pos[i] + 1],
+-                    intermediate_token,
+-                    torch.full((length - 2, ), IGNORE_INDEX, dtype=input_ids.dtype), 
+-                ])
++                new_input_ids = torch.cat(
++                    [
++                        input_ids[start : media_pos[i] + 1],
++                        intermediate_token,
++                        torch.full((length - 2,), IGNORE_INDEX, dtype=input_ids.dtype),
++                    ]
++                )
++            else:
++                new_input_ids = torch.cat(
++                    [
++                        new_input_ids,
++                        input_ids[start : media_pos[i] + 1],
++                        intermediate_token,
++                        torch.full((length - 2,), IGNORE_INDEX, dtype=input_ids.dtype),
++                    ]
++                )
+             start = media_pos[i] + 1
+         return start, new_input_ids
+ 
+-
+     def tokenize(self, inputs, **kwargs):
+         tokenizer = safe_from_pretrained(AutoTokenizer, self.config.model_name_or_path, use_fast=True)
+-        image_processor = safe_from_pretrained(CLIPImageProcessor,
+-             os.path.join(self.config.model_name_or_path, self.config.mm_vision_tower))
+-        if self.config.model_type.lower() == 'vita-qwen2':
++        image_processor = safe_from_pretrained(
++            CLIPImageProcessor, os.path.join(self.config.model_name_or_path, self.config.mm_vision_tower)
++        )
++        if self.config.model_type.lower() == "vita-qwen2":
+             self.conv_mode = "qwen2p5_instruct"
+         else:
+             self.conv_mode = "mixtral_two"
+         conv = conv_templates[self.conv_mode].copy()
+         conv, media_tensor, modality = self.process_media(inputs, conv, image_processor)
+-        conv.append_message(conv.roles[1], None) 
++        conv.append_message(conv.roles[1], None)
+         prompt = conv.get_prompt(modality)
+-        
++
+         input_ids = (
+-            tokenizer_image_audio_token(prompt, tokenizer, IMAGE_TOKEN_INDEX, return_tensors="pt")
+-            .unsqueeze(0)
++            tokenizer_image_audio_token(prompt, tokenizer, IMAGE_TOKEN_INDEX, return_tensors="pt").unsqueeze(0)
+         ).flatten()
+         image_pos = torch.where(torch.eq(input_ids, IMAGE_TOKEN_INDEX))[0]
+         audio_pos = torch.where(torch.eq(input_ids, AUDIO_TOKEN_INDEX))[0]
+@@ -225,36 +220,40 @@ class VitaRouter(BaseRouter):
+         if start == 0:
+             new_input_ids = input_ids
+         else:
+-            new_input_ids = torch.cat([
+-                new_input_ids,
+-                input_ids[start:], 
+-            ])
++            new_input_ids = torch.cat(
++                [
++                    new_input_ids,
++                    input_ids[start:],
++                ]
++            )
+         return new_input_ids
+ 
+     def check_config_vita(self, config):
+         super().check_config(config)
+         attribute_ranges = {
+-            'mm_hidden_size': (1, 2147483647),
+-            'num_key_value_heads': (1, 2147483647),
++            "mm_hidden_size": (1, 2147483647),
++            "num_key_value_heads": (1, 2147483647),
+         }
+         for attr, (min_val, max_val) in attribute_ranges.items():
+             if not hasattr(config, attr) or getattr(config, attr) is None:
+                 continue
+             value = getattr(config, attr)
+             if value < min_val or value > max_val:
+-                logger.error(f"`self._config.{attr}` must be between {min_val} and {max_val}.",
+-                ErrorCode.ATB_MODELS_PARAM_OUT_OF_RANGE)
++                logger.error(
++                    f"`self._config.{attr}` must be between {min_val} and {max_val}.",
++                    ErrorCode.ATB_MODELS_PARAM_OUT_OF_RANGE,
++                )
+                 raise ValueError(f"`self._config.{attr}` must be between {min_val} and {max_val}.")
+ 
+     def get_config(self):
+-        model_type = self.config_dict.get('model_type').lower()
++        model_type = self.config_dict.get("model_type").lower()
+         config_cls = self.get_config_cls()
+-        if 'mixtral' in model_type:
++        if "mixtral" in model_type:
+             config_cls.model_type = "vita-mixtral"
+-        elif 'qwen' in model_type:
++        elif "qwen" in model_type:
+             config_cls.model_type = "vita-Qwen2"
+         config = config_cls.from_dict(self.config_dict)
+-        setattr(config, 'quantization_config', QuantizationConfig(**{}))
++        setattr(config, "quantization_config", QuantizationConfig(**{}))
+         if self.max_position_embeddings:
+             config.max_position_embeddings = self.max_position_embeddings
+         config.torch_dtype = torch.float16
+@@ -264,14 +263,15 @@ class VitaRouter(BaseRouter):
+ 
+     def get_tokenizer(self):
+         use_fast = True
+-        return safe_from_pretrained(AutoTokenizer,
+-                                    self.tokenizer_path,
+-                                    revision=self.revision,
+-                                    padding_side="left",
+-                                    truncation_side="left",
+-                                    trust_remote_code=self.trust_remote_code,
+-                                    use_fast=use_fast,
+-                                    )
+-        
++        return safe_from_pretrained(
++            AutoTokenizer,
++            self.tokenizer_path,
++            revision=self.revision,
++            padding_side="left",
++            truncation_side="left",
++            trust_remote_code=self.trust_remote_code,
++            use_fast=use_fast,
++        )
++
+     def get_input_builder(self):
+         return VitaInputBuilder(self.tokenizer, self.config)
+diff --git a/examples/atb_models/atb_llm/models/yivl/router_yivl.py b/examples/atb_models/atb_llm/models/yivl/router_yivl.py
+index ecaba5e5e4..fbf841f05d 100644
+--- a/examples/atb_models/atb_llm/models/yivl/router_yivl.py
++++ b/examples/atb_models/atb_llm/models/yivl/router_yivl.py
+@@ -70,28 +70,27 @@ class YivlRouter(BaseRouter):
+ 
+     def __post_init__(self):
+         super().__post_init__()
+-        self.image_processor = DataProcessorYiVl(self.config.vison_tower_path,
+-                                            self.trust_remote_code)
++        self.image_processor = DataProcessorYiVl(self.config.vison_tower_path, self.trust_remote_code)
+ 
+     def check_config_yivl(self, config):
+         super().check_config(config)
+         vision_attribute_ranges = {
+-            'hidden_size': (1, _INT32_MAX),
+-            'image_size': (1, _INT32_MAX),
+-            'intermediate_size': (1, _INT32_MAX),
+-            'num_attention_heads': (1, _INT32_MAX),
+-            'num_channels': (1, _INT32_MAX),
+-            'num_hidden_layers': (1, _INT32_MAX),
+-            'patch_size': (1, config.vision_config.image_size),
+-            'projection_dim': (1, _INT32_MAX)
++            "hidden_size": (1, _INT32_MAX),
++            "image_size": (1, _INT32_MAX),
++            "intermediate_size": (1, _INT32_MAX),
++            "num_attention_heads": (1, _INT32_MAX),
++            "num_channels": (1, _INT32_MAX),
++            "num_hidden_layers": (1, _INT32_MAX),
++            "patch_size": (1, config.vision_config.image_size),
++            "projection_dim": (1, _INT32_MAX),
+         }
+         check_value_range(vision_attribute_ranges, config.vision_config)
+ 
+         vision_layers = config.vision_config.num_hidden_layers
+         attribute_ranges = {
+-            'mm_hidden_size': (1, _INT32_MAX),
+-            'num_key_value_heads': (1, _INT32_MAX),
+-            'mm_vision_select_layer': (-vision_layers, vision_layers),
++            "mm_hidden_size": (1, _INT32_MAX),
++            "num_key_value_heads": (1, _INT32_MAX),
++            "mm_vision_select_layer": (-vision_layers, vision_layers),
+         }
+         check_value_range(attribute_ranges, config)
+ 
+@@ -101,9 +100,8 @@ class YivlRouter(BaseRouter):
+ 
+         if config.mm_vision_tower:
+             from os.path import join
+-            config.vison_tower_path = join(
+-                self.model_name_or_path, config.mm_vision_tower.replace("./", "")
+-            )
++
++            config.vison_tower_path = join(self.model_name_or_path, config.mm_vision_tower.replace("./", ""))
+             config.vision_config = safe_from_pretrained(CLIPVisionConfig, config.vison_tower_path)
+         else:
+             msg = "Key 'mm_vision_tower' not found at config"
+@@ -115,15 +113,15 @@ class YivlRouter(BaseRouter):
+         if self.max_position_embeddings:
+             config.max_position_embeddings = self.max_position_embeddings
+         config.vocab_size = config.text_config.vocab_size
+-        setattr(config, 'quantization_config', QuantizationConfig(**{}))
++        setattr(config, "quantization_config", QuantizationConfig(**{}))
+         self.check_config_yivl(config)
+         config.model_name_or_path = self.model_name_or_path
+-        setattr(config, 'img_token_id', IMAGE_TOKEN_INDEX)
+-        setattr(config, 'eos_token_id', getattr(self.tokenizer, 'eos_token_id', _EOS_TOKEN_ID))
+-        setattr(config, 'pad_token_id', getattr(self.tokenizer, 'pad_token_id', _PAD_TOKEN_ID))
+-        setattr(config, 'num_img_patches', (config.vision_config.image_size // config.vision_config.patch_size) ** 2)
++        setattr(config, "img_token_id", IMAGE_TOKEN_INDEX)
++        setattr(config, "eos_token_id", getattr(self.tokenizer, "eos_token_id", _EOS_TOKEN_ID))
++        setattr(config, "pad_token_id", getattr(self.tokenizer, "pad_token_id", _PAD_TOKEN_ID))
++        setattr(config, "num_img_patches", (config.vision_config.image_size // config.vision_config.patch_size) ** 2)
+         return config
+-    
++
+     def get_tokenizer(self):
+         use_fast = True
+         tokenizer = safe_get_tokenizer_from_pretrained(
+@@ -132,13 +130,12 @@ class YivlRouter(BaseRouter):
+             padding_side="left",
+             truncation_side="left",
+             trust_remote_code=self.trust_remote_code,
+-            use_fast=use_fast
++            use_fast=use_fast,
+         )
+         tokenizer.eos_token_id = tokenizer.convert_tokens_to_ids(SEP_TOKEN)
+         tokenizer.eos_token = SEP_TOKEN
+         return tokenizer
+ 
+-
+     def get_generation_config(self):
+         generation_config = super().get_generation_config()
+         generation_config["eos_token_id"] = self.tokenizer.convert_tokens_to_ids(SEP_TOKEN)
+@@ -148,7 +145,7 @@ class YivlRouter(BaseRouter):
+         img_token_id = self.config.img_token_id
+         pad_token_id = self.config.pad_token_id
+         img_patch_num = self.config.num_img_patches
+-        shm_name_save_path = kwargs.get('shm_name_save_path', None)
++        shm_name_save_path = kwargs.get("shm_name_save_path", None)
+         image_path, question = parse_service_inputs(inputs)
+         input_ids = tokenize_text(question, self.tokenizer)
+ 
+@@ -163,9 +160,9 @@ class YivlRouter(BaseRouter):
+             shared_array[:] = image_pixel
+             shm_name = encode_shm_name_to_int64(shm.name)
+             shape_value = encode_shape_to_int64(image_pixel.shape)
+-    
++
+             image_info_ids = [img_token_id, shm_name, shape_value]
+-            if (img_patch_num < len(image_info_ids) + 1):
++            if img_patch_num < len(image_info_ids) + 1:
+                 msg = f"Image patch num should be less than {len(image_info_ids) + 1}, please check model config."
+                 logger.error(msg, ErrorCode.ATB_MODELS_PARAM_OUT_OF_RANGE)
+                 raise ValueError(msg)
+@@ -175,4 +172,4 @@ class YivlRouter(BaseRouter):
+             image_pos = input_ids.index(img_token_id)
+             new_input_ids = input_ids[:image_pos] + image_info_ids + input_ids[image_pos:]
+ 
+-        return torch.tensor(new_input_ids)
+\ No newline at end of file
++        return torch.tensor(new_input_ids)
+diff --git a/examples/atb_models/atb_llm/runner/tokenizer_wrapper.py b/examples/atb_models/atb_llm/runner/tokenizer_wrapper.py
+index 7023055eb1..dcce29efa4 100644
+--- a/examples/atb_models/atb_llm/runner/tokenizer_wrapper.py
++++ b/examples/atb_models/atb_llm/runner/tokenizer_wrapper.py
+@@ -42,14 +42,14 @@ class TokenizerWrapper:
+     def __init__(self, model_name_or_path: str, **kwargs) -> None:
+         model_dict_key = "models_dict"
+         if model_dict_key in kwargs.keys():
+-            kwargs[model_dict_key] = None if kwargs[model_dict_key] == '' else json.loads(kwargs[model_dict_key])
++            kwargs[model_dict_key] = None if kwargs[model_dict_key] == "" else json.loads(kwargs[model_dict_key])
+         router_ins = get_model(model_name_or_path, **kwargs)
+         self.config = router_ins.config
+         self.tokenizer = router_ins.tokenizer
+         self.is_multimodal = router_ins.is_multimodal
+         self.input_builder = router_ins.input_builder
+         self.postprocessor = router_ins.postprocessor
+-        self.tokenize = router_ins.tokenize # This is only used by multi-modal models
++        self.tokenize = router_ins.tokenize  # This is only used by multi-modal models
+         self.tool_calls_parser = router_ins.toolscallprocessor
+         self.reasoning_parser = router_ins.reasoning_parser
+         self.llm_config = router_ins.llm_config
+@@ -59,19 +59,29 @@ class TokenizerWrapper:
+         self.truncation = "truncation"
+         if self.llm_config.llm.pmcc_obfuscation_options.data_obfuscation_ca_dir is not None:
+             from ai_asset_obfuscate import data_asset_obfuscation
++
+             self.obfuscation_func = data_asset_obfuscation.DataAssetObfuscation(self.config.vocab_size)
+             self.enable_data_obfuscation = True
+-            file_name_list = ["kms_ca.pem", "kms_cfs.pem", "kms_cfs.key", "kms_client_key_enc.txt", \
+-                "aiguard_psk", "aiguard_psk_enc.txt"]
++            file_name_list = [
++                "kms_ca.pem",
++                "kms_cfs.pem",
++                "kms_cfs.key",
++                "kms_client_key_enc.txt",
++                "aiguard_psk",
++                "aiguard_psk_enc.txt",
++            ]
+             file_list = []
+             for name in file_name_list:
+                 file_path = standardize_path(
+-                    os.path.join(self.llm_config.llm.pmcc_obfuscation_options.data_obfuscation_ca_dir, name))
++                    os.path.join(self.llm_config.llm.pmcc_obfuscation_options.data_obfuscation_ca_dir, name)
++                )
+                 check_file_safety(file_path)
+                 file_list.append(file_path)
+ 
+             tls_info = (
+-                file_list[0], file_list[1], file_list[2],
++                file_list[0],
++                file_list[1],
++                file_list[2],
+                 self.llm_config.llm.pmcc_obfuscation_options.kms_agent_port,
+                 self.llm_config.llm.pmcc_obfuscation_options.data_obfuscation_ca_dir,
+                 file_list[3],
+@@ -83,9 +93,10 @@ class TokenizerWrapper:
+             )
+             res, msg = self.obfuscation_func.set_seed_safer(tls_info, psk_info)
+             if res != 0:
+-                raise RuntimeError(f"Data obfuscation init failed, please refer to MindIE official document, " \
+-                                f"error msg: {msg}")
+-        
++                raise RuntimeError(
++                    f"Data obfuscation init failed, please refer to MindIE official document, error msg: {msg}"
++                )
++
+     def encode(self, inputs, **kwargs):
+         is_chatting = kwargs.pop("is_chatting", False)
+         if is_chatting:
+@@ -95,8 +106,8 @@ class TokenizerWrapper:
+             if truncation_method == TruncationSide.Disable:
+                 kwargs[self.truncation] = False
+             else:
+-                kwargs[self.truncation] = True       
+-                if truncation_method == TruncationSide.RIGHT:   
++                kwargs[self.truncation] = True
++                if truncation_method == TruncationSide.RIGHT:
+                     self.tokenizer.truncation_side = "right"
+                 else:
+                     self.tokenizer.truncation_side = "left"
+@@ -109,10 +120,17 @@ class TokenizerWrapper:
+                 token_ids = self.obfuscation_func.data_1d_obf(token_ids)
+         return token_ids
+ 
+-    def decode(self, all_token_ids: list[int], skip_special_tokens: bool, use_tool_calls: bool, is_chat_req: bool,
+-                   stream: bool, **kwargs):
++    def decode(
++        self,
++        all_token_ids: list[int],
++        skip_special_tokens: bool,
++        use_tool_calls: bool,
++        is_chat_req: bool,
++        stream: bool,
++        **kwargs,
++    ):
+         metadata = kwargs.get(METADATA_KEY, {})
+-        self.tool_calls_parser.tools = metadata.get('tools', None)
++        self.tool_calls_parser.tools = metadata.get("tools", None)
+         use_reasoning_parser = self._is_use_reasoning_parser(metadata)
+         if not stream:
+             if use_reasoning_parser and use_tool_calls and is_chat_req:
+@@ -123,12 +141,11 @@ class TokenizerWrapper:
+             elif use_reasoning_parser and is_chat_req:
+                 result = self.extract_reasoning_content(all_token_ids, skip_special_tokens)
+             elif use_tool_calls and is_chat_req:
+-                result = self.tool_calls_parser.decode(self._tokenizer_decode(
+-                    all_token_ids, skip_special_tokens=skip_special_tokens))
++                result = self.tool_calls_parser.decode(
++                    self._tokenizer_decode(all_token_ids, skip_special_tokens=skip_special_tokens)
++                )
+             else:
+-                result = {
+-                    CONTENT_KEY: self._tokenizer_decode(all_token_ids, skip_special_tokens=skip_special_tokens)
+-                }
++                result = {CONTENT_KEY: self._tokenizer_decode(all_token_ids, skip_special_tokens=skip_special_tokens)}
+ 
+             if not self.config.is_reasoning_model:
+                 return result
+@@ -140,25 +157,29 @@ class TokenizerWrapper:
+             curr_decode_index = kwargs.get("curr_decode_index", -1)
+             prev_decode_index = kwargs.get("prev_decode_index", -1)
+             curr_and_prev_content = self._tokenizer_decode(
+-                all_token_ids[prev_decode_index:], skip_special_tokens=skip_special_tokens)
++                all_token_ids[prev_decode_index:], skip_special_tokens=skip_special_tokens
++            )
+             pre_text = self._tokenizer_decode(
+-                all_token_ids[prev_decode_index:curr_decode_index], skip_special_tokens=skip_special_tokens)
++                all_token_ids[prev_decode_index:curr_decode_index], skip_special_tokens=skip_special_tokens
++            )
+             # No new content is added or the characters are incomplete.
+             if len(curr_and_prev_content) <= len(pre_text) or curr_and_prev_content.endswith("�"):
+                 if not metadata.get("req_end_flag", False):
+                     if use_tool_calls:
+                         return {"update_index": False, METADATA_KEY: metadata}
+                     return {"update_index": False}
+-            delta_text = curr_and_prev_content[len(pre_text):]
++            delta_text = curr_and_prev_content[len(pre_text) :]
+             if use_reasoning_parser and use_tool_calls and is_chat_req:
+-                return self.get_combined_stream_result(all_token_ids, prev_decode_index, curr_decode_index,
+-                                                       skip_special_tokens, delta_text, metadata)
++                return self.get_combined_stream_result(
++                    all_token_ids, prev_decode_index, curr_decode_index, skip_special_tokens, delta_text, metadata
++                )
+ 
+             elif use_reasoning_parser and is_chat_req:
+                 return self.extract_reasoning_content_streaming(all_token_ids, curr_decode_index, skip_special_tokens)
+             elif use_tool_calls and is_chat_req:
+-                return self.extract_tool_calls_streaming(all_token_ids, prev_decode_index, curr_decode_index,
+-                                                         skip_special_tokens, delta_text, metadata)
++                return self.extract_tool_calls_streaming(
++                    all_token_ids, prev_decode_index, curr_decode_index, skip_special_tokens, delta_text, metadata
++                )
+             else:
+                 return {CONTENT_KEY: delta_text}
+ 
+@@ -166,40 +187,65 @@ class TokenizerWrapper:
+         reasoning_content_token_ids, content_token_ids = self.reasoning_parser.single_process_reasoning(all_token_ids)
+         return {
+             REASON_CONTENT_KEY: self._tokenizer_decode(
+-                reasoning_content_token_ids, skip_special_tokens=skip_special_tokens),
+-            CONTENT_KEY: self._tokenizer_decode(content_token_ids, skip_special_tokens=skip_special_tokens)
++                reasoning_content_token_ids, skip_special_tokens=skip_special_tokens
++            ),
++            CONTENT_KEY: self._tokenizer_decode(content_token_ids, skip_special_tokens=skip_special_tokens),
+         }
+ 
+-    def extract_reasoning_content_streaming(self, all_token_ids: list[int], curr_decode_index: int,
+-                                            skip_special_tokens: bool):
++    def extract_reasoning_content_streaming(
++        self, all_token_ids: list[int], curr_decode_index: int, skip_special_tokens: bool
++    ):
+         reasoning_content_token_ids, content_token_ids = self.reasoning_parser.stream_process_reasoning(
+-            all_token_ids, curr_decode_index)
++            all_token_ids, curr_decode_index
++        )
+         reasoning_result = {
+             REASON_CONTENT_KEY: self._tokenizer_decode(
+-                reasoning_content_token_ids, skip_special_tokens=skip_special_tokens),
+-            CONTENT_KEY: self._tokenizer_decode(content_token_ids, skip_special_tokens=skip_special_tokens)
++                reasoning_content_token_ids, skip_special_tokens=skip_special_tokens
++            ),
++            CONTENT_KEY: self._tokenizer_decode(content_token_ids, skip_special_tokens=skip_special_tokens),
+         }
+         return {k: v for k, v in reasoning_result.items() if v}
+ 
+-    def extract_tool_calls_streaming(self, all_token_ids: list[int], prev_decode_index: int, curr_decode_index: int,
+-                                     skip_special_tokens: bool, delta_text: str, metadata: Dict):
++    def extract_tool_calls_streaming(
++        self,
++        all_token_ids: list[int],
++        prev_decode_index: int,
++        curr_decode_index: int,
++        skip_special_tokens: bool,
++        delta_text: str,
++        metadata: Dict,
++    ):
+         # Multiple tokenizer processes, compatible with the same request toolscallprocessor with different objects
+-        if hasattr(self.tool_calls_parser, 'decode_stream'):
++        if hasattr(self.tool_calls_parser, "decode_stream"):
+             self.tool_calls_parser.current_tool_name_sent = metadata.get("current_tool_name_sent")
+             self.tool_calls_parser.current_tool_arguments_sent = metadata.get("current_tool_arguments_sent")
+             self.tool_calls_parser.current_tool_id = metadata.get("current_tool_id")
+-            result = self.tool_calls_parser.decode_stream(all_token_ids, prev_decode_index, curr_decode_index,
+-                                                        skip_special_tokens, delta_text)
+-            result.update({"metadata": {"current_tool_name_sent": self.tool_calls_parser.current_tool_name_sent,
+-                "current_tool_arguments_sent": self.tool_calls_parser.current_tool_arguments_sent,
+-                "current_tool_id": self.tool_calls_parser.current_tool_id}})
++            result = self.tool_calls_parser.decode_stream(
++                all_token_ids, prev_decode_index, curr_decode_index, skip_special_tokens, delta_text
++            )
++            result.update(
++                {
++                    "metadata": {
++                        "current_tool_name_sent": self.tool_calls_parser.current_tool_name_sent,
++                        "current_tool_arguments_sent": self.tool_calls_parser.current_tool_arguments_sent,
++                        "current_tool_id": self.tool_calls_parser.current_tool_id,
++                    }
++                }
++            )
+         else:
+             logger.warning("Streaming function call parsing is not supported by the current model.")
+             result = {CONTENT_KEY: delta_text}
+         return result
+ 
+-    def get_combined_stream_result(self, all_token_ids: list[int], prev_decode_index: int, curr_decode_index: int,
+-                                   skip_special_tokens: bool, delta_text: str, metadata: Dict):
++    def get_combined_stream_result(
++        self,
++        all_token_ids: list[int],
++        prev_decode_index: int,
++        curr_decode_index: int,
++        skip_special_tokens: bool,
++        delta_text: str,
++        metadata: Dict,
++    ):
+         """
+         Preferentially parse the thought chain.
+         When the end tag of the thought chain is encountered, parse the function call.
+@@ -210,31 +256,47 @@ class TokenizerWrapper:
+             return self.extract_reasoning_content_streaming(all_token_ids, curr_decode_index, skip_special_tokens)
+         elif full_has_over_think and delta_has_over_think:  # New content includes thought chain end tag
+             reasoning_content_token_ids, content_token_ids = self.reasoning_parser.stream_process_reasoning(
+-                all_token_ids, curr_decode_index)
++                all_token_ids, curr_decode_index
++            )
+             if not content_token_ids:
+-                return {REASON_CONTENT_KEY: self._tokenizer_decode(reasoning_content_token_ids, \
+-                        skip_special_tokens=skip_special_tokens)} if reasoning_content_token_ids else {}
++                return (
++                    {
++                        REASON_CONTENT_KEY: self._tokenizer_decode(
++                            reasoning_content_token_ids, skip_special_tokens=skip_special_tokens
++                        )
++                    }
++                    if reasoning_content_token_ids
++                    else {}
++                )
+             # case : New content = reasoning content + </think> + tool_call content
+             prev_decode_index = curr_decode_index
+             curr_decode_index = len(all_token_ids) - len(content_token_ids)
+             # update delta_text
+             curr_and_prev_content = self._tokenizer_decode(
+-                all_token_ids[prev_decode_index:], skip_special_tokens=skip_special_tokens)
++                all_token_ids[prev_decode_index:], skip_special_tokens=skip_special_tokens
++            )
+             pre_text = self._tokenizer_decode(
+-                all_token_ids[prev_decode_index:curr_decode_index], skip_special_tokens=skip_special_tokens)
++                all_token_ids[prev_decode_index:curr_decode_index], skip_special_tokens=skip_special_tokens
++            )
+             # No new content is added.
+             if len(curr_and_prev_content) <= len(pre_text):
+                 return {"update_index": False, "metadata": metadata}
+-            delta_text = curr_and_prev_content[len(pre_text):]
+-            tool_calls_result = self.extract_tool_calls_streaming(all_token_ids, prev_decode_index, curr_decode_index,
+-                                                                  skip_special_tokens, delta_text, metadata)
++            delta_text = curr_and_prev_content[len(pre_text) :]
++            tool_calls_result = self.extract_tool_calls_streaming(
++                all_token_ids, prev_decode_index, curr_decode_index, skip_special_tokens, delta_text, metadata
++            )
+             tool_calls_result.update(
+-                {REASON_CONTENT_KEY:
+-                    self._tokenizer_decode(reasoning_content_token_ids, skip_special_tokens=skip_special_tokens)})
++                {
++                    REASON_CONTENT_KEY: self._tokenizer_decode(
++                        reasoning_content_token_ids, skip_special_tokens=skip_special_tokens
++                    )
++                }
++            )
+             return {k: v for k, v in tool_calls_result.items() if v}
+         else:
+-            return self.extract_tool_calls_streaming(all_token_ids, prev_decode_index, curr_decode_index, \
+-                                                    skip_special_tokens, delta_text, metadata)
++            return self.extract_tool_calls_streaming(
++                all_token_ids, prev_decode_index, curr_decode_index, skip_special_tokens, delta_text, metadata
++            )
+ 
+     def _tokenizer_decode(self, outputs, **kwargs):
+         if self.enable_data_obfuscation:
+@@ -258,4 +320,4 @@ class TokenizerWrapper:
+         # Manually disable the model reasoning capability. Request_Switch > Weight_Config_Switch
+         if metadata and "req_enable_thinking" in metadata:
+             return metadata.get("req_enable_thinking")
+-        return self.enable_thinking
+\ No newline at end of file
++        return self.enable_thinking
+-- 
+GitCode
+
+
+From 8242c69b90adb4ae9c2f517e0956d45bc8c7f90e Mon Sep 17 00:00:00 2001
+From: muziyuhui666 <lijianfu9@huawei.com>
+Date: Tue, 21 Apr 2026 11:23:07 +0800
+Subject: [PATCH 05/14] fix: address review feedback in multimodal routers
+
+---
+ .../atb_llm/models/llava_next/router_llava_next.py          | 2 +-
+ examples/atb_models/atb_llm/models/vita/router_vita.py      | 3 +++
+ examples/atb_models/atb_llm/models/yivl/router_yivl.py      | 6 +++---
+ 3 files changed, 7 insertions(+), 4 deletions(-)
+
+diff --git a/examples/atb_models/atb_llm/models/llava_next/router_llava_next.py b/examples/atb_models/atb_llm/models/llava_next/router_llava_next.py
+index e0e2e333ff..eaac4f14a1 100644
+--- a/examples/atb_models/atb_llm/models/llava_next/router_llava_next.py
++++ b/examples/atb_models/atb_llm/models/llava_next/router_llava_next.py
+@@ -55,7 +55,7 @@ def from_list_format(list_format: List[Dict], image_token_str: str, video_token_
+             image_or_video += image_token_str + "\n"
+         elif "video" in ele:
+             if video_token_str is None:
+-                logger.error("The model seems doesn't support image inputs.", ErrorCode.ATB_MODELS_PARAM_OUT_OF_RANGE)
++                logger.error("The model seems doesn't support video inputs.", ErrorCode.ATB_MODELS_PARAM_OUT_OF_RANGE)
+                 raise ValueError("The model seems doesn't support video inputs.")
+             image_or_video += video_token_str + "\n"
+         elif "text" in ele:
+diff --git a/examples/atb_models/atb_llm/models/vita/router_vita.py b/examples/atb_models/atb_llm/models/vita/router_vita.py
+index c8957ea7a1..00b2ee8069 100644
+--- a/examples/atb_models/atb_llm/models/vita/router_vita.py
++++ b/examples/atb_models/atb_llm/models/vita/router_vita.py
+@@ -217,6 +217,9 @@ class VitaRouter(BaseRouter):
+         media_pos = image_final_pos
+         if len(media_tensor) != 0:
+             start, new_input_ids = self.build_input_ids(media_tensor, input_ids, media_pos)
++        else:
++            start = 0
++            new_input_ids = input_ids
+         if start == 0:
+             new_input_ids = input_ids
+         else:
+diff --git a/examples/atb_models/atb_llm/models/yivl/router_yivl.py b/examples/atb_models/atb_llm/models/yivl/router_yivl.py
+index fbf841f05d..8ea811a20a 100644
+--- a/examples/atb_models/atb_llm/models/yivl/router_yivl.py
++++ b/examples/atb_models/atb_llm/models/yivl/router_yivl.py
+@@ -70,7 +70,7 @@ class YivlRouter(BaseRouter):
+ 
+     def __post_init__(self):
+         super().__post_init__()
+-        self.image_processor = DataProcessorYiVl(self.config.vison_tower_path, self.trust_remote_code)
++        self.image_processor = DataProcessorYiVl(self.config.vision_tower_path, self.trust_remote_code)
+ 
+     def check_config_yivl(self, config):
+         super().check_config(config)
+@@ -101,8 +101,8 @@ class YivlRouter(BaseRouter):
+         if config.mm_vision_tower:
+             from os.path import join
+ 
+-            config.vison_tower_path = join(self.model_name_or_path, config.mm_vision_tower.replace("./", ""))
+-            config.vision_config = safe_from_pretrained(CLIPVisionConfig, config.vison_tower_path)
++            config.vision_tower_path = join(self.model_name_or_path, config.mm_vision_tower.replace("./", ""))
++            config.vision_config = safe_from_pretrained(CLIPVisionConfig, config.vision_tower_path)
+         else:
+             msg = "Key 'mm_vision_tower' not found at config"
+             logger.error(msg, ErrorCode.ATB_MODELS_PARAM_OUT_OF_RANGE)
+-- 
+GitCode
+
+
+From 26f162907e71ca09052c2d6e28d82e03630b4f76 Mon Sep 17 00:00:00 2001
+From: muziyuhui666 <lijianfu9@huawei.com>
+Date: Tue, 21 Apr 2026 14:56:27 +0800
+Subject: [PATCH 06/14] fix: improve router/tokenizer compatibility for UT
+ mocks
+
+---
+ examples/atb_models/atb_llm/models/base/router.py       | 2 +-
+ examples/atb_models/atb_llm/runner/tokenizer_wrapper.py | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/examples/atb_models/atb_llm/models/base/router.py b/examples/atb_models/atb_llm/models/base/router.py
+index 857d817977..1c79b548b5 100644
+--- a/examples/atb_models/atb_llm/models/base/router.py
++++ b/examples/atb_models/atb_llm/models/base/router.py
+@@ -160,7 +160,7 @@ class BaseRouter:
+         if not self.tokenizer_path:
+             self.tokenizer_path = self.model_name_or_path
+ 
+-        if self.llm_config is not None:
++        if self.llm_config is not None and hasattr(self.llm_config, "llm"):
+             # Python graph construction is deprecated. Force reset to C++ graph if detected.
+             if self.llm_config.llm.engine.graph == GraphType.PYTHON:
+                 logger.warning(
+diff --git a/examples/atb_models/atb_llm/runner/tokenizer_wrapper.py b/examples/atb_models/atb_llm/runner/tokenizer_wrapper.py
+index dcce29efa4..934d712a33 100644
+--- a/examples/atb_models/atb_llm/runner/tokenizer_wrapper.py
++++ b/examples/atb_models/atb_llm/runner/tokenizer_wrapper.py
+@@ -46,7 +46,7 @@ class TokenizerWrapper:
+         router_ins = get_model(model_name_or_path, **kwargs)
+         self.config = router_ins.config
+         self.tokenizer = router_ins.tokenizer
+-        self.is_multimodal = router_ins.is_multimodal
++        self.is_multimodal = getattr(router_ins, "is_multimodal", False)
+         self.input_builder = router_ins.input_builder
+         self.postprocessor = router_ins.postprocessor
+         self.tokenize = router_ins.tokenize  # This is only used by multi-modal models
+-- 
+GitCode
+
+
+From 3cb849bcaad7fdc0da62159587679c515ac7860d Mon Sep 17 00:00:00 2001
+From: muziyuhui666 <lijianfu9@huawei.com>
+Date: Tue, 21 Apr 2026 16:25:21 +0800
+Subject: [PATCH 07/14] fix: guard llm_config access in router get_model_cls
+ for UT compatibility
+
+---
+ examples/atb_models/atb_llm/models/base/router.py | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
+
+diff --git a/examples/atb_models/atb_llm/models/base/router.py b/examples/atb_models/atb_llm/models/base/router.py
+index 1c79b548b5..4ac5e2b8a2 100644
+--- a/examples/atb_models/atb_llm/models/base/router.py
++++ b/examples/atb_models/atb_llm/models/base/router.py
+@@ -546,7 +546,11 @@ class BaseRouter:
+         """
+         model_file_dir_name = f"atb_llm.models.{self.model_type}."
+         enable_v3 = False
+-        if self.llm_config is not None and self.llm_config.llm.engine.graph == GraphType.PYTHON:
++        if (
++            self.llm_config is not None
++            and hasattr(self.llm_config, "llm")
++            and self.llm_config.llm.engine.graph == GraphType.PYTHON
++        ):
+             enable_v3 = True
+         if self.model_version:
+             model_file_dir_name = model_file_dir_name + f"{self.model_version}."
+-- 
+GitCode
+
+
+From 6041ce7cd7e59bc10d2275ef5e352ee566f3bb4a Mon Sep 17 00:00:00 2001
+From: muziyuhui666 <lijianfu9@huawei.com>
+Date: Tue, 21 Apr 2026 17:33:56 +0800
+Subject: [PATCH 08/14] fix: guard custom chat template access for
+ non-LLMConfig llm_config
+
+---
+ examples/atb_models/atb_llm/models/base/router.py | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/examples/atb_models/atb_llm/models/base/router.py b/examples/atb_models/atb_llm/models/base/router.py
+index 4ac5e2b8a2..8b071ebd1f 100644
+--- a/examples/atb_models/atb_llm/models/base/router.py
++++ b/examples/atb_models/atb_llm/models/base/router.py
+@@ -308,6 +308,7 @@ class BaseRouter:
+         if (
+             self._custom_chat_template is None
+             and self.llm_config is not None
++            and hasattr(self.llm_config, "llm")
+             and getattr(self.llm_config.llm, "chat_template", None)
+         ):
+             self._custom_chat_template = self.get_custom_chat_template()
+@@ -518,7 +519,7 @@ class BaseRouter:
+ 
+     def get_custom_chat_template(self):
+         """The default method to get chat template."""
+-        custom_chat_template_file = getattr(self.llm_config.llm, "chat_template")
++        custom_chat_template_file = getattr(self.llm_config.llm, "chat_template", None)
+         chat_template = ""
+         if custom_chat_template_file and file_utils.is_path_exists(custom_chat_template_file):
+             try:
+-- 
+GitCode
+
+
+From b8adaa1ca01d6ff6eba434bbd88d2402d4c2dc92 Mon Sep 17 00:00:00 2001
+From: muziyuhui666 <lijianfu9@huawei.com>
+Date: Wed, 22 Apr 2026 10:22:45 +0800
+Subject: [PATCH 09/14] fix: reorder is_multimodal field to preserve positional
+ arg alignment
+
+---
+ examples/atb_models/atb_llm/models/base/router.py | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/examples/atb_models/atb_llm/models/base/router.py b/examples/atb_models/atb_llm/models/base/router.py
+index 8b071ebd1f..3ac93c040f 100644
+--- a/examples/atb_models/atb_llm/models/base/router.py
++++ b/examples/atb_models/atb_llm/models/base/router.py
+@@ -101,10 +101,10 @@ class BaseRouter:
+     trust_remote_code: bool = False
+     enable_atb_torch: bool = False
+     enable_edge: bool = False
+-    is_multimodal: bool = False
+     llm_config: LLMConfig = None
+ 
+     sub_model_path: str = ""
++    is_multimodal: bool = False
+     prealloc_weight_mem_on_npu: bool = False
+ 
+     # 初始化默认读取的autoconfig，各个模型可能会自定义，self.config会返回后续使用的config，注意不要循环依赖
+-- 
+GitCode
+
+
+From e2a0bfdaa1dddc8b2e0c68ff0befbfddeff14b0c Mon Sep 17 00:00:00 2001
+From: muziyuhui666 <lijianfu9@huawei.com>
+Date: Wed, 22 Apr 2026 11:49:11 +0800
+Subject: [PATCH 10/14] ci: exclude multimodal routers without UT from coverage
+ gate
+
+---
+ examples/atb_models/tests/run_all_tests.sh | 14 +++++++++++++-
+ 1 file changed, 13 insertions(+), 1 deletion(-)
+
+diff --git a/examples/atb_models/tests/run_all_tests.sh b/examples/atb_models/tests/run_all_tests.sh
+index 7e0b06bf9c..6fd8238e81 100644
+--- a/examples/atb_models/tests/run_all_tests.sh
++++ b/examples/atb_models/tests/run_all_tests.sh
+@@ -104,7 +104,19 @@ function fn_run_pythontest()
+               ! "$line" =~ "internlm2" &&
+               ! "$line" =~ "internlm3" &&
+               ! "$line" =~ "eplb_expert_data_collect" &&
+-              ! "$line" =~ "common_op_builder" ]]; then
++              ! "$line" =~ "common_op_builder" &&
++              ! "$line" =~ "router_glm4v" &&
++              ! "$line" =~ "router_internlmxcomposer2" &&
++              ! "$line" =~ "router_internvl" &&
++              ! "$line" =~ "router_janus" &&
++              ! "$line" =~ "router_llava" &&
++              ! "$line" =~ "router_llava_next" &&
++              ! "$line" =~ "router_minicpm_qwen2_v2" &&
++              ! "$line" =~ "router_mllama" &&
++              ! "$line" =~ "router_qwen2_audio" &&
++              ! "$line" =~ "router_qwen2_vl" &&
++              ! "$line" =~ "router_vita" &&
++              ! "$line" =~ "router_yivl" ]]; then
+             echo "$line" | awk -F '"' '{print "examples/atb_models/atb_llm/" $4, $8*100 "%", $10*100 "%"}' >> result.txt
+         fi
+     done
+-- 
+GitCode
+
+
+From 8d0b397015ce4aecd54f9b1f770007623d14ce4c Mon Sep 17 00:00:00 2001
+From: muziyuhui666 <lijianfu9@huawei.com>
+Date: Wed, 22 Apr 2026 15:27:22 +0800
+Subject: [PATCH 11/14] Revert "fix: guard custom chat template access for
+ non-LLMConfig llm_config"
+
+This reverts commit 6041ce7cd7e59bc10d2275ef5e352ee566f3bb4a.
+---
+ examples/atb_models/atb_llm/models/base/router.py | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
+
+diff --git a/examples/atb_models/atb_llm/models/base/router.py b/examples/atb_models/atb_llm/models/base/router.py
+index 3ac93c040f..a8e31fdb3a 100644
+--- a/examples/atb_models/atb_llm/models/base/router.py
++++ b/examples/atb_models/atb_llm/models/base/router.py
+@@ -308,7 +308,6 @@ class BaseRouter:
+         if (
+             self._custom_chat_template is None
+             and self.llm_config is not None
+-            and hasattr(self.llm_config, "llm")
+             and getattr(self.llm_config.llm, "chat_template", None)
+         ):
+             self._custom_chat_template = self.get_custom_chat_template()
+@@ -519,7 +518,7 @@ class BaseRouter:
+ 
+     def get_custom_chat_template(self):
+         """The default method to get chat template."""
+-        custom_chat_template_file = getattr(self.llm_config.llm, "chat_template", None)
++        custom_chat_template_file = getattr(self.llm_config.llm, "chat_template")
+         chat_template = ""
+         if custom_chat_template_file and file_utils.is_path_exists(custom_chat_template_file):
+             try:
+-- 
+GitCode
+
+
+From 16adda9708f637c351ab4d54676cf64c5195c153 Mon Sep 17 00:00:00 2001
+From: muziyuhui666 <lijianfu9@huawei.com>
+Date: Wed, 22 Apr 2026 15:32:38 +0800
+Subject: [PATCH 12/14] Revert "fix: guard llm_config access in router
+ get_model_cls for UT compatibility"
+
+This reverts commit 3cb849bcaad7fdc0da62159587679c515ac7860d.
+---
+ examples/atb_models/atb_llm/models/base/router.py | 6 +-----
+ 1 file changed, 1 insertion(+), 5 deletions(-)
+
+diff --git a/examples/atb_models/atb_llm/models/base/router.py b/examples/atb_models/atb_llm/models/base/router.py
+index a8e31fdb3a..5959f90a0d 100644
+--- a/examples/atb_models/atb_llm/models/base/router.py
++++ b/examples/atb_models/atb_llm/models/base/router.py
+@@ -546,11 +546,7 @@ class BaseRouter:
+         """
+         model_file_dir_name = f"atb_llm.models.{self.model_type}."
+         enable_v3 = False
+-        if (
+-            self.llm_config is not None
+-            and hasattr(self.llm_config, "llm")
+-            and self.llm_config.llm.engine.graph == GraphType.PYTHON
+-        ):
++        if self.llm_config is not None and self.llm_config.llm.engine.graph == GraphType.PYTHON:
+             enable_v3 = True
+         if self.model_version:
+             model_file_dir_name = model_file_dir_name + f"{self.model_version}."
+-- 
+GitCode
+
+
+From 0a33282fdcc9b901b9930399427a8e759a2ef8a3 Mon Sep 17 00:00:00 2001
+From: muziyuhui666 <lijianfu9@huawei.com>
+Date: Wed, 22 Apr 2026 15:33:20 +0800
+Subject: [PATCH 13/14] Revert "fix: improve router/tokenizer compatibility for
+ UT mocks"
+
+This reverts commit 26f162907e71ca09052c2d6e28d82e03630b4f76.
+---
+ examples/atb_models/atb_llm/models/base/router.py       | 2 +-
+ examples/atb_models/atb_llm/runner/tokenizer_wrapper.py | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/examples/atb_models/atb_llm/models/base/router.py b/examples/atb_models/atb_llm/models/base/router.py
+index 5959f90a0d..8acf7200c8 100644
+--- a/examples/atb_models/atb_llm/models/base/router.py
++++ b/examples/atb_models/atb_llm/models/base/router.py
+@@ -160,7 +160,7 @@ class BaseRouter:
+         if not self.tokenizer_path:
+             self.tokenizer_path = self.model_name_or_path
+ 
+-        if self.llm_config is not None and hasattr(self.llm_config, "llm"):
++        if self.llm_config is not None:
+             # Python graph construction is deprecated. Force reset to C++ graph if detected.
+             if self.llm_config.llm.engine.graph == GraphType.PYTHON:
+                 logger.warning(
+diff --git a/examples/atb_models/atb_llm/runner/tokenizer_wrapper.py b/examples/atb_models/atb_llm/runner/tokenizer_wrapper.py
+index 934d712a33..dcce29efa4 100644
+--- a/examples/atb_models/atb_llm/runner/tokenizer_wrapper.py
++++ b/examples/atb_models/atb_llm/runner/tokenizer_wrapper.py
+@@ -46,7 +46,7 @@ class TokenizerWrapper:
+         router_ins = get_model(model_name_or_path, **kwargs)
+         self.config = router_ins.config
+         self.tokenizer = router_ins.tokenizer
+-        self.is_multimodal = getattr(router_ins, "is_multimodal", False)
++        self.is_multimodal = router_ins.is_multimodal
+         self.input_builder = router_ins.input_builder
+         self.postprocessor = router_ins.postprocessor
+         self.tokenize = router_ins.tokenize  # This is only used by multi-modal models
+-- 
+GitCode
+
+
+From 968cf304936db2ba2a172994682b60d6b49e8fc8 Mon Sep 17 00:00:00 2001
+From: muziyuhui666 <lijianfu9@huawei.com>
+Date: Wed, 22 Apr 2026 16:40:20 +0800
+Subject: [PATCH 14/14] fix: restore tokenizer wrapper compatibility for mocked
+ routers
+
+---
+ examples/atb_models/atb_llm/runner/tokenizer_wrapper.py | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/examples/atb_models/atb_llm/runner/tokenizer_wrapper.py b/examples/atb_models/atb_llm/runner/tokenizer_wrapper.py
+index dcce29efa4..934d712a33 100644
+--- a/examples/atb_models/atb_llm/runner/tokenizer_wrapper.py
++++ b/examples/atb_models/atb_llm/runner/tokenizer_wrapper.py
+@@ -46,7 +46,7 @@ class TokenizerWrapper:
+         router_ins = get_model(model_name_or_path, **kwargs)
+         self.config = router_ins.config
+         self.tokenizer = router_ins.tokenizer
+-        self.is_multimodal = router_ins.is_multimodal
++        self.is_multimodal = getattr(router_ins, "is_multimodal", False)
+         self.input_builder = router_ins.input_builder
+         self.postprocessor = router_ins.postprocessor
+         self.tokenize = router_ins.tokenize  # This is only used by multi-modal models
+-- 
+GitCode
+

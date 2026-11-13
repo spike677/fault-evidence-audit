@@ -1,0 +1,746 @@
+From b46c50914a82fb36b9613f3bccd2575c4d08d78b Mon Sep 17 00:00:00 2001
+From: henry_21st <qianlong3@huawei.com>
+Date: Wed, 11 Nov 2026 16:57:11 +0800
+Subject: [PATCH 1/7] fix(engram): pass scalar SF metadata in training graph
+
+---
+ .../torch_extension/csrc/elastic_buffer.cpp   | 23 +++++----
+ mc2/common/torch_extension/elastic_buffer.py  | 51 +++++++++++++------
+ 2 files changed, 49 insertions(+), 25 deletions(-)
+
+diff --git a/mc2/common/torch_extension/csrc/elastic_buffer.cpp b/mc2/common/torch_extension/csrc/elastic_buffer.cpp
+index 4dc0d351c69..e92ac78ba5f 100644
+--- a/mc2/common/torch_extension/csrc/elastic_buffer.cpp
++++ b/mc2/common/torch_extension/csrc/elastic_buffer.cpp
+@@ -1837,9 +1837,10 @@ public:
+         std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor>;
+     static EngramFetchTrainOutput EngramFetchTrain(const at::Tensor& context, const at::Tensor& indices,
+                                                    int64_t hiddenSize, int64_t numEntries, int64_t dtypeEnum,
+-                                                   const at::Tensor& localStorageAddr, const at::Tensor& sfTable,
+-                                                   const at::Tensor& sfTableAddr, int64_t numMaxTokensPerRank,
+-                                                   int64_t commBufferSize, int64_t rankSize);
++                                                   const at::Tensor& localStorageAddr, int64_t sfDtypeEnum,
++                                                   int64_t sfPacks, const at::Tensor& sfTableAddr,
++                                                   int64_t numMaxTokensPerRank, int64_t commBufferSize,
++                                                   int64_t rankSize);
+     static at::Tensor EngramFetchWait(const at::Tensor& context, const at::Tensor& fetched);
+ 
+     // Stateless static method for training backward (graph-mode compatible).
+@@ -2223,13 +2224,15 @@ ElasticBuffer::EngramFetchOutput ElasticBuffer::EngramFetch(const at::Tensor& co
+ 
+ // EngramFetchTrain - stateless static method for training forward (graph-mode compatible).
+ // Outputs: fetched, fetchedSf, and save-for-backward ctx tensors (perm, sendCounts, recvCounts, recvLocalEntry,
+-// numRecv). sfTable provides the output shape/dtype; sfTableAddr remains the training kernel's mapped address.
++// numRecv). The scalar SF metadata provides the output shape/dtype; sfTableAddr
++// remains the training kernel's mapped host-table address.
+ ElasticBuffer::EngramFetchTrainOutput ElasticBuffer::EngramFetchTrain(
+     const at::Tensor& context, const at::Tensor& indices, int64_t hiddenSize, int64_t numEntries, int64_t dtypeEnum,
+-    const at::Tensor& localStorageAddr, const at::Tensor& sfTable, const at::Tensor& sfTableAddr,
++    const at::Tensor& localStorageAddr, int64_t sfDtypeEnum, int64_t sfPacks, const at::Tensor& sfTableAddr,
+     int64_t numMaxTokensPerRank, int64_t commBufferSize, int64_t rankSize)
+ {
+     auto dtype = static_cast<at::ScalarType>(dtypeEnum);
++    auto sfDtype = static_cast<at::ScalarType>(sfDtypeEnum);
+     int64_t numTokens = indices.size(0);
+     auto fetched = at::empty({numTokens, hiddenSize}, at::TensorOptions().dtype(dtype).device(indices.device()));
+     auto intOpts = at::TensorOptions().dtype(at::kInt).device(indices.device());
+@@ -2242,8 +2245,10 @@ ElasticBuffer::EngramFetchTrainOutput ElasticBuffer::EngramFetchTrain(
+     at::Tensor recvCounts = at::zeros({rankSize}, intOpts);
+     at::Tensor recvLocalEntry = at::zeros({maxR}, intOpts);
+     at::Tensor numRecv = at::zeros({1}, intOpts);
+-    int64_t sfPacks = (sfTable.dim() == 2 && sfTable.size(1) > 0) ? sfTable.size(1) : 0;
+-    auto sfOpts = at::TensorOptions().dtype(sfTable.scalar_type()).device(indices.device());
++    TORCH_CHECK(sfPacks >= 0, "sf_packs must be non-negative, got ", sfPacks);
++    TORCH_CHECK(sfDtype == at::kFloat || sfDtype == at::kFloat8_e8m0fnu,
++                "sf_dtype must be float32 or float8_e8m0fnu, got ", static_cast<int64_t>(sfDtype));
++    auto sfOpts = at::TensorOptions().dtype(sfDtype).device(indices.device());
+     at::Tensor fetchedSf = sfPacks > 0 ? at::empty({numTokens, sfPacks}, sfOpts) : at::empty({0}, sfOpts);
+ 
+     if (numTokens > 0) {
+@@ -2667,8 +2672,8 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m)
+                     pybind11::arg("num_entries"), pybind11::arg("dtype"), pybind11::arg("sf_table"))
+         .def_static("engram_fetch_train", &Mc2Api::ElasticBuffer::EngramFetchTrain, pybind11::arg("context"),
+                     pybind11::arg("indices"), pybind11::arg("hidden_size"), pybind11::arg("num_entries"),
+-                    pybind11::arg("dtype"), pybind11::arg("local_storage_addr"), pybind11::arg("sf_table"),
+-                    pybind11::arg("sf_table_addr"), pybind11::arg("num_max_tokens_per_rank"),
++                    pybind11::arg("dtype"), pybind11::arg("local_storage_addr"), pybind11::arg("sf_dtype"),
++                    pybind11::arg("sf_packs"), pybind11::arg("sf_table_addr"), pybind11::arg("num_max_tokens_per_rank"),
+                     pybind11::arg("comm_buffer_size"), pybind11::arg("rank_size"))
+         .def_static("engram_fetch_wait", &Mc2Api::ElasticBuffer::EngramFetchWait, pybind11::arg("context"),
+                     pybind11::arg("fetched"))
+diff --git a/mc2/common/torch_extension/elastic_buffer.py b/mc2/common/torch_extension/elastic_buffer.py
+index 2173472ec4b..9a51ffce34c 100644
+--- a/mc2/common/torch_extension/elastic_buffer.py
++++ b/mc2/common/torch_extension/elastic_buffer.py
+@@ -29,6 +29,11 @@ _ENGRAM_DTYPE_TO_INT = {
+ }
+ _ENGRAM_INT_TO_DTYPE = {v: k for k, v in _ENGRAM_DTYPE_TO_INT.items()}
+ _ENGRAM_SF_DTYPES = (torch.float32, torch.float8_e8m0fnu)
++_ENGRAM_SF_DTYPE_TO_INT = {
++    torch.float32: 6,
++    torch.float8_e8m0fnu: 44,
++}
++_ENGRAM_INT_TO_SF_DTYPE = {v: k for k, v in _ENGRAM_SF_DTYPE_TO_INT.items()}
+ _ENGRAM_GRAD_DTYPES = (torch.bfloat16, torch.float16, torch.float32)
+ _MOE_EP_METADATA_FIELDS = 5
+ _MOE_SHARED_JETTY_NUM = 32
+@@ -167,7 +172,7 @@ class ElasticBufferOpBuilder(OpBuilder):
+             "int num_entries, int dtype, Tensor sf_table) -> (Tensor, Tensor)",
+             "engram_fetch_train(Tensor context, Tensor indices, int hidden_size, "
+             "int num_entries, int dtype, Tensor local_storage_addr, "
+-            "Tensor sf_table, Tensor sf_table_addr, "
++            "int sf_dtype, int sf_packs, Tensor sf_table_addr, "
+             "int num_max_tokens_per_rank, int comm_buffer_size, int rank_size) "
+             "-> (Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor)",
+             "engram_fetch_wait(Tensor context, Tensor fetched) -> Tensor",
+@@ -214,7 +219,8 @@ class ElasticBufferOpBuilder(OpBuilder):
+             num_entries,
+             dtype,
+             local_storage_addr,
+-            sf_table,
++            sf_dtype,
++            sf_packs,
+             sf_table_addr,
+             num_max_tokens_per_rank,
+             comm_buffer_size,
+@@ -233,14 +239,12 @@ class ElasticBufferOpBuilder(OpBuilder):
+             recv_counts = torch.empty((rank_size,), dtype=torch.int32, device="meta")
+             recv_local_entry = torch.empty((max_r,), dtype=torch.int32, device="meta")
+             num_recv = torch.empty((1,), dtype=torch.int32, device="meta")
+-            if sf_table.dim() == 2 and sf_table.size(1) > 0:
+-                fetched_sf = torch.empty(
+-                    (num_tokens, sf_table.size(1)),
+-                    dtype=sf_table.dtype,
+-                    device="meta",
+-                )
+-            else:
+-                fetched_sf = torch.empty((0,), dtype=sf_table.dtype, device="meta")
++            sf_dtype_value = _ENGRAM_INT_TO_SF_DTYPE[sf_dtype]
++            fetched_sf = (
++                torch.empty((num_tokens, sf_packs), dtype=sf_dtype_value, device="meta")
++                if sf_packs > 0
++                else torch.empty((0,), dtype=sf_dtype_value, device="meta")
++            )
+             fetch_result = (
+                 fetched,
+                 fetched_sf,
+@@ -344,7 +348,8 @@ def engram_fetch_train(
+     num_entries,
+     dtype,
+     local_storage_addr,
+-    sf_table,
++    sf_dtype,
++    sf_packs,
+     sf_table_addr,
+     num_max_tokens_per_rank,
+     comm_buffer_size,
+@@ -358,7 +363,8 @@ def engram_fetch_train(
+         num_entries,
+         dtype,
+         local_storage_addr,
+-        sf_table,
++        sf_dtype,
++        sf_packs,
+         sf_table_addr,
+         num_max_tokens_per_rank,
+         comm_buffer_size,
+@@ -798,6 +804,8 @@ class ElasticBuffer:
+         self._engram_hidden_size = None
+         self._engram_num_entries = None
+         self._engram_dtype = None
++        self._engram_sf_dtype_enum = _ENGRAM_SF_DTYPE_TO_INT[torch.float32]
++        self._engram_sf_packs = 0
+         self._engram_fetch_in_progress = False
+         self._engram_storage_ref = None
+         self._engram_sf_ref = None
+@@ -1062,6 +1070,12 @@ class ElasticBuffer:
+         self._engram_num_entries = storage.size(0)
+         self._engram_dtype = storage.dtype
+         self._engram_sf = sf
++        self._engram_sf_dtype_enum = (
++            _ENGRAM_SF_DTYPE_TO_INT[sf.dtype]
++            if sf is not None
++            else _ENGRAM_SF_DTYPE_TO_INT[torch.float32]
++        )
++        self._engram_sf_packs = sf.size(1) if sf is not None else 0
+         self._local_storage_addr = self._runtime.get_local_storage_addr()
+         if self._with_grad and sf is not None:
+             self._local_sf_table_addr = self._runtime.get_local_sf_table_addr()
+@@ -1088,10 +1102,12 @@ class ElasticBuffer:
+         sf = self._engram_sf
+ 
+         if self._with_grad:
+-            sf_table = sf if sf is not None else torch.empty(0, device=indices.device)
++            has_sf = sf is not None
+             sf_table_addr = torch.empty(0, device=indices.device)
+-            if sf is not None:
++            if has_sf:
+                 sf_table_addr = self._local_sf_table_addr
++            sf_dtype = self._engram_sf_dtype_enum
++            sf_packs = self._engram_sf_packs
+             (
+                 fetched,
+                 fetched_sf,
+@@ -1107,7 +1123,8 @@ class ElasticBuffer:
+                 self._engram_num_entries,
+                 _ENGRAM_DTYPE_TO_INT[self._engram_dtype],
+                 self._local_storage_addr,
+-                sf_table,
++                sf_dtype,
++                sf_packs,
+                 sf_table_addr,
+                 self._num_max_tokens_per_rank,
+                 self._comm_buffer_size,
+@@ -1123,7 +1140,7 @@ class ElasticBuffer:
+ 
+             def _wait_train():
+                 self._engram_fetch_in_progress = False
+-                if sf is not None:
++                if has_sf:
+                     return fetched, fetched_sf, ctx
+                 return fetched, ctx
+ 
+@@ -1530,6 +1547,8 @@ class ElasticBuffer:
+         self._engram_hidden_size = None
+         self._engram_num_entries = None
+         self._engram_dtype = None
++        self._engram_sf_dtype_enum = _ENGRAM_SF_DTYPE_TO_INT[torch.float32]
++        self._engram_sf_packs = 0
+         self._engram_fetch_in_progress = False
+         self._engram_storage_ref = None
+         self._engram_sf_ref = None
+-- 
+GitCode
+
+
+From 2751c1c7cfd2550eb2eba29972066b2fb4514f00 Mon Sep 17 00:00:00 2001
+From: henry_21st <qianlong3@huawei.com>
+Date: Thu, 12 Nov 2026 09:25:00 +0800
+Subject: [PATCH 2/7] fix(engram): validate scalar SF metadata early
+
+---
+ .../torch_extension/csrc/elastic_buffer.cpp   | 12 ++--
+ mc2/common/torch_extension/elastic_buffer.py  | 11 ++-
+ .../python/test_engram_fetch_train_schema.py  | 71 +++++++++++++++++++
+ 3 files changed, 87 insertions(+), 7 deletions(-)
+ create mode 100644 tests/ut/python/test_engram_fetch_train_schema.py
+
+diff --git a/mc2/common/torch_extension/csrc/elastic_buffer.cpp b/mc2/common/torch_extension/csrc/elastic_buffer.cpp
+index e92ac78ba5f..aa91bf4bf97 100644
+--- a/mc2/common/torch_extension/csrc/elastic_buffer.cpp
++++ b/mc2/common/torch_extension/csrc/elastic_buffer.cpp
+@@ -2233,21 +2233,21 @@ ElasticBuffer::EngramFetchTrainOutput ElasticBuffer::EngramFetchTrain(
+ {
+     auto dtype = static_cast<at::ScalarType>(dtypeEnum);
+     auto sfDtype = static_cast<at::ScalarType>(sfDtypeEnum);
+-    int64_t numTokens = indices.size(0);
+-    auto fetched = at::empty({numTokens, hiddenSize}, at::TensorOptions().dtype(dtype).device(indices.device()));
+-    auto intOpts = at::TensorOptions().dtype(at::kInt).device(indices.device());
+     TORCH_CHECK(rankSize > 0 && numMaxTokensPerRank <= INT64_MAX / rankSize,
+                 "numMaxTokensPerRank * rankSize overflow, got numMaxTokensPerRank=", numMaxTokensPerRank,
+                 ", rankSize=", rankSize);
++    TORCH_CHECK(sfPacks >= 0, "sf_packs must be non-negative, got ", sfPacks);
++    TORCH_CHECK(sfDtype == at::kFloat || sfDtype == at::kFloat8_e8m0fnu,
++                "sf_dtype must be float32 or float8_e8m0fnu, got ", static_cast<int64_t>(sfDtype));
++    int64_t numTokens = indices.size(0);
++    auto fetched = at::empty({numTokens, hiddenSize}, at::TensorOptions().dtype(dtype).device(indices.device()));
++    auto intOpts = at::TensorOptions().dtype(at::kInt).device(indices.device());
+     int64_t maxR = numMaxTokensPerRank * rankSize;
+     at::Tensor perm = at::zeros({numTokens}, intOpts);
+     at::Tensor sendCounts = at::zeros({rankSize * SEND_COUNTS_ALIGN_FACTOR}, intOpts); // 32b对齐
+     at::Tensor recvCounts = at::zeros({rankSize}, intOpts);
+     at::Tensor recvLocalEntry = at::zeros({maxR}, intOpts);
+     at::Tensor numRecv = at::zeros({1}, intOpts);
+-    TORCH_CHECK(sfPacks >= 0, "sf_packs must be non-negative, got ", sfPacks);
+-    TORCH_CHECK(sfDtype == at::kFloat || sfDtype == at::kFloat8_e8m0fnu,
+-                "sf_dtype must be float32 or float8_e8m0fnu, got ", static_cast<int64_t>(sfDtype));
+     auto sfOpts = at::TensorOptions().dtype(sfDtype).device(indices.device());
+     at::Tensor fetchedSf = sfPacks > 0 ? at::empty({numTokens, sfPacks}, sfOpts) : at::empty({0}, sfOpts);
+ 
+diff --git a/mc2/common/torch_extension/elastic_buffer.py b/mc2/common/torch_extension/elastic_buffer.py
+index 9a51ffce34c..34b83923d15 100644
+--- a/mc2/common/torch_extension/elastic_buffer.py
++++ b/mc2/common/torch_extension/elastic_buffer.py
+@@ -29,8 +29,9 @@ _ENGRAM_DTYPE_TO_INT = {
+ }
+ _ENGRAM_INT_TO_DTYPE = {v: k for k, v in _ENGRAM_DTYPE_TO_INT.items()}
+ _ENGRAM_SF_DTYPES = (torch.float32, torch.float8_e8m0fnu)
++# These values cross the Python/C++ boundary as at::ScalarType enum integers.
+ _ENGRAM_SF_DTYPE_TO_INT = {
+-    torch.float32: 6,
++    torch.float32: _ENGRAM_DTYPE_TO_INT[torch.float32],
+     torch.float8_e8m0fnu: 44,
+ }
+ _ENGRAM_INT_TO_SF_DTYPE = {v: k for k, v in _ENGRAM_SF_DTYPE_TO_INT.items()}
+@@ -226,6 +227,14 @@ class ElasticBufferOpBuilder(OpBuilder):
+             comm_buffer_size,
+             rank_size,
+         ):
++            torch._check(
++                sf_packs >= 0,
++                lambda: f"sf_packs must be non-negative, got {sf_packs}",
++            )
++            torch._check(
++                sf_dtype in _ENGRAM_INT_TO_SF_DTYPE,
++                lambda: (f"sf_dtype must be float32 or float8_e8m0fnu, got {sf_dtype}"),
++            )
+             num_tokens = indices.size(0)
+             max_r = num_max_tokens_per_rank * rank_size
+             data_dtype = _ENGRAM_INT_TO_DTYPE[dtype]
+diff --git a/tests/ut/python/test_engram_fetch_train_schema.py b/tests/ut/python/test_engram_fetch_train_schema.py
+new file mode 100644
+index 00000000000..9a987cfa4d6
+--- /dev/null
++++ b/tests/ut/python/test_engram_fetch_train_schema.py
+@@ -0,0 +1,71 @@
++#!/usr/bin/env python3
++# Copyright (c) 2026 Huawei Technologies Co., Ltd.
++# This program is free software, you can redistribute it and/or modify it under the terms and conditions of
++# CANN Open Software License Agreement Version 2.0 (the "License").
++# Please refer to the License for details. You may not use this file except in compliance with the License.
++# THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
++# INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE.
++# See LICENSE in the root of the software repository for the full text of the License.
++
++"""Validate the public engram_fetch_train schema on Meta and real dispatch."""
++
++import unittest
++
++import torch
++from torch._subclasses.fake_tensor import FakeTensorMode
++
++from cann_ops_transformer.ops.mc2.common.elastic_buffer import (
++    _ENGRAM_SF_DTYPE_TO_INT,
++)
++
++
++OP = torch.ops.cann_ops_transformer.engram_fetch_train
++
++
++def call_args(sf_dtype, sf_packs):
++    return (
++        torch.empty(4100, dtype=torch.int32),
++        torch.empty(128, dtype=torch.int32),
++        128,
++        16384,
++        15,
++        torch.empty(1, dtype=torch.int64),
++        sf_dtype,
++        sf_packs,
++        torch.empty(1, dtype=torch.int64),
++        128,
++        419430400,
++        4,
++    )
++
++
++class EngramFetchTrainSchemaTest(unittest.TestCase):
++    def assert_invalid(self, sf_dtype, sf_packs, message):
++        with FakeTensorMode():
++            args = call_args(sf_dtype, sf_packs)
++            with self.assertRaises(RuntimeError) as context:
++                OP(*args)
++        self.assertIn(message, str(context.exception))
++
++        args = call_args(sf_dtype, sf_packs)
++        with self.assertRaises(RuntimeError) as context:
++            OP(*args)
++        self.assertIn(message, str(context.exception))
++
++    def test_meta_and_real_reject_negative_sf_packs(self):
++        self.assert_invalid(
++            _ENGRAM_SF_DTYPE_TO_INT[torch.float32],
++            -1,
++            "sf_packs must be non-negative, got -1",
++        )
++
++    def test_meta_and_real_reject_invalid_sf_dtype(self):
++        self.assert_invalid(
++            7,
++            0,
++            "sf_dtype must be float32 or float8_e8m0fnu, got 7",
++        )
++
++
++if __name__ == "__main__":
++    unittest.main()
+-- 
+GitCode
+
+
+From 4e8e689ba4c4b9d2fd07e158eaf77755d2417936 Mon Sep 17 00:00:00 2001
+From: henry_21st <qianlong3@huawei.com>
+Date: Thu, 12 Nov 2026 09:28:32 +0800
+Subject: [PATCH 3/7] test: use NPU dispatch for SF schema checks
+
+---
+ .../python/test_engram_fetch_train_schema.py   | 18 ++++++++++--------
+ 1 file changed, 10 insertions(+), 8 deletions(-)
+
+diff --git a/tests/ut/python/test_engram_fetch_train_schema.py b/tests/ut/python/test_engram_fetch_train_schema.py
+index 9a987cfa4d6..69a7b2add41 100644
+--- a/tests/ut/python/test_engram_fetch_train_schema.py
++++ b/tests/ut/python/test_engram_fetch_train_schema.py
+@@ -7,7 +7,7 @@
+ # INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE.
+ # See LICENSE in the root of the software repository for the full text of the License.
+ 
+-"""Validate the public engram_fetch_train schema on Meta and real dispatch."""
++"""Validate the public engram_fetch_train schema on Meta and NPU dispatch."""
+ 
+ import unittest
+ 
+@@ -22,17 +22,17 @@ from cann_ops_transformer.ops.mc2.common.elastic_buffer import (
+ OP = torch.ops.cann_ops_transformer.engram_fetch_train
+ 
+ 
+-def call_args(sf_dtype, sf_packs):
++def call_args(sf_dtype, sf_packs, device):
+     return (
+-        torch.empty(4100, dtype=torch.int32),
+-        torch.empty(128, dtype=torch.int32),
++        torch.empty(4100, dtype=torch.int32, device=device),
++        torch.empty(128, dtype=torch.int32, device=device),
+         128,
+         16384,
+         15,
+-        torch.empty(1, dtype=torch.int64),
++        torch.empty(1, dtype=torch.int64, device=device),
+         sf_dtype,
+         sf_packs,
+-        torch.empty(1, dtype=torch.int64),
++        torch.empty(1, dtype=torch.int64, device=device),
+         128,
+         419430400,
+         4,
+@@ -42,12 +42,14 @@ def call_args(sf_dtype, sf_packs):
+ class EngramFetchTrainSchemaTest(unittest.TestCase):
+     def assert_invalid(self, sf_dtype, sf_packs, message):
+         with FakeTensorMode():
+-            args = call_args(sf_dtype, sf_packs)
++            args = call_args(sf_dtype, sf_packs, device="cpu")
+             with self.assertRaises(RuntimeError) as context:
+                 OP(*args)
+         self.assertIn(message, str(context.exception))
+ 
+-        args = call_args(sf_dtype, sf_packs)
++        if not torch.npu.is_available():
++            self.skipTest("The real dispatch path requires an NPU device")
++        args = call_args(sf_dtype, sf_packs, device="npu")
+         with self.assertRaises(RuntimeError) as context:
+             OP(*args)
+         self.assertIn(message, str(context.exception))
+-- 
+GitCode
+
+
+From 9d3dc35c1d74d220bbfca5d6e8a7240b47e6e7f3 Mon Sep 17 00:00:00 2001
+From: henry_21st <qianlong3@huawei.com>
+Date: Thu, 12 Nov 2026 09:48:38 +0800
+Subject: [PATCH 4/7] test: initialize NPU before schema checks
+
+---
+ tests/ut/python/test_engram_fetch_train_schema.py | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/tests/ut/python/test_engram_fetch_train_schema.py b/tests/ut/python/test_engram_fetch_train_schema.py
+index 69a7b2add41..48bb9a201b5 100644
+--- a/tests/ut/python/test_engram_fetch_train_schema.py
++++ b/tests/ut/python/test_engram_fetch_train_schema.py
+@@ -49,6 +49,7 @@ class EngramFetchTrainSchemaTest(unittest.TestCase):
+ 
+         if not torch.npu.is_available():
+             self.skipTest("The real dispatch path requires an NPU device")
++        torch.npu.set_device(0)
+         args = call_args(sf_dtype, sf_packs, device="npu")
+         with self.assertRaises(RuntimeError) as context:
+             OP(*args)
+-- 
+GitCode
+
+
+From 676bfd69d758b9653b8a8ab5597bb0217707d7c1 Mon Sep 17 00:00:00 2001
+From: henry_21st <qianlong3@huawei.com>
+Date: Thu, 12 Nov 2026 10:00:40 +0800
+Subject: [PATCH 5/7] fix(engram): validate SF dtype before narrowing
+
+---
+ mc2/common/torch_extension/csrc/elastic_buffer.cpp |  7 ++++---
+ tests/ut/python/test_engram_fetch_train_schema.py  | 12 +++++++-----
+ 2 files changed, 11 insertions(+), 8 deletions(-)
+
+diff --git a/mc2/common/torch_extension/csrc/elastic_buffer.cpp b/mc2/common/torch_extension/csrc/elastic_buffer.cpp
+index aa91bf4bf97..1061c875a80 100644
+--- a/mc2/common/torch_extension/csrc/elastic_buffer.cpp
++++ b/mc2/common/torch_extension/csrc/elastic_buffer.cpp
+@@ -2232,13 +2232,14 @@ ElasticBuffer::EngramFetchTrainOutput ElasticBuffer::EngramFetchTrain(
+     int64_t numMaxTokensPerRank, int64_t commBufferSize, int64_t rankSize)
+ {
+     auto dtype = static_cast<at::ScalarType>(dtypeEnum);
+-    auto sfDtype = static_cast<at::ScalarType>(sfDtypeEnum);
+     TORCH_CHECK(rankSize > 0 && numMaxTokensPerRank <= INT64_MAX / rankSize,
+                 "numMaxTokensPerRank * rankSize overflow, got numMaxTokensPerRank=", numMaxTokensPerRank,
+                 ", rankSize=", rankSize);
+     TORCH_CHECK(sfPacks >= 0, "sf_packs must be non-negative, got ", sfPacks);
+-    TORCH_CHECK(sfDtype == at::kFloat || sfDtype == at::kFloat8_e8m0fnu,
+-                "sf_dtype must be float32 or float8_e8m0fnu, got ", static_cast<int64_t>(sfDtype));
++    TORCH_CHECK(
++        sfDtypeEnum == static_cast<int64_t>(at::kFloat) || sfDtypeEnum == static_cast<int64_t>(at::kFloat8_e8m0fnu),
++        "sf_dtype must be float32 or float8_e8m0fnu, got ", sfDtypeEnum);
++    auto sfDtype = static_cast<at::ScalarType>(sfDtypeEnum);
+     int64_t numTokens = indices.size(0);
+     auto fetched = at::empty({numTokens, hiddenSize}, at::TensorOptions().dtype(dtype).device(indices.device()));
+     auto intOpts = at::TensorOptions().dtype(at::kInt).device(indices.device());
+diff --git a/tests/ut/python/test_engram_fetch_train_schema.py b/tests/ut/python/test_engram_fetch_train_schema.py
+index 48bb9a201b5..cb16c00660a 100644
+--- a/tests/ut/python/test_engram_fetch_train_schema.py
++++ b/tests/ut/python/test_engram_fetch_train_schema.py
+@@ -63,11 +63,13 @@ class EngramFetchTrainSchemaTest(unittest.TestCase):
+         )
+ 
+     def test_meta_and_real_reject_invalid_sf_dtype(self):
+-        self.assert_invalid(
+-            7,
+-            0,
+-            "sf_dtype must be float32 or float8_e8m0fnu, got 7",
+-        )
++        for sf_dtype in (7, 262, 300):
++            with self.subTest(sf_dtype=sf_dtype):
++                self.assert_invalid(
++                    sf_dtype,
++                    0,
++                    f"sf_dtype must be float32 or float8_e8m0fnu, got {sf_dtype}",
++                )
+ 
+ 
+ if __name__ == "__main__":
+-- 
+GitCode
+
+
+From e5cbb273f71a274534bcec4a3efc5e73edfb1e45 Mon Sep 17 00:00:00 2001
+From: henry_21st <qianlong3@huawei.com>
+Date: Thu, 12 Nov 2026 17:33:58 +0800
+Subject: [PATCH 6/7] fix(engram): use ScalarType for training SF metadata
+
+---
+ .../torch_extension/csrc/elastic_buffer.cpp   | 10 +++----
+ mc2/common/torch_extension/elastic_buffer.py  | 27 ++++++-------------
+ .../python/test_engram_fetch_train_schema.py  | 26 +++++++++++++-----
+ 3 files changed, 32 insertions(+), 31 deletions(-)
+
+diff --git a/mc2/common/torch_extension/csrc/elastic_buffer.cpp b/mc2/common/torch_extension/csrc/elastic_buffer.cpp
+index 1061c875a80..8cf40019351 100644
+--- a/mc2/common/torch_extension/csrc/elastic_buffer.cpp
++++ b/mc2/common/torch_extension/csrc/elastic_buffer.cpp
+@@ -1837,7 +1837,7 @@ public:
+         std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor>;
+     static EngramFetchTrainOutput EngramFetchTrain(const at::Tensor& context, const at::Tensor& indices,
+                                                    int64_t hiddenSize, int64_t numEntries, int64_t dtypeEnum,
+-                                                   const at::Tensor& localStorageAddr, int64_t sfDtypeEnum,
++                                                   const at::Tensor& localStorageAddr, at::ScalarType sfDtype,
+                                                    int64_t sfPacks, const at::Tensor& sfTableAddr,
+                                                    int64_t numMaxTokensPerRank, int64_t commBufferSize,
+                                                    int64_t rankSize);
+@@ -2228,7 +2228,7 @@ ElasticBuffer::EngramFetchOutput ElasticBuffer::EngramFetch(const at::Tensor& co
+ // remains the training kernel's mapped host-table address.
+ ElasticBuffer::EngramFetchTrainOutput ElasticBuffer::EngramFetchTrain(
+     const at::Tensor& context, const at::Tensor& indices, int64_t hiddenSize, int64_t numEntries, int64_t dtypeEnum,
+-    const at::Tensor& localStorageAddr, int64_t sfDtypeEnum, int64_t sfPacks, const at::Tensor& sfTableAddr,
++    const at::Tensor& localStorageAddr, at::ScalarType sfDtype, int64_t sfPacks, const at::Tensor& sfTableAddr,
+     int64_t numMaxTokensPerRank, int64_t commBufferSize, int64_t rankSize)
+ {
+     auto dtype = static_cast<at::ScalarType>(dtypeEnum);
+@@ -2236,10 +2236,8 @@ ElasticBuffer::EngramFetchTrainOutput ElasticBuffer::EngramFetchTrain(
+                 "numMaxTokensPerRank * rankSize overflow, got numMaxTokensPerRank=", numMaxTokensPerRank,
+                 ", rankSize=", rankSize);
+     TORCH_CHECK(sfPacks >= 0, "sf_packs must be non-negative, got ", sfPacks);
+-    TORCH_CHECK(
+-        sfDtypeEnum == static_cast<int64_t>(at::kFloat) || sfDtypeEnum == static_cast<int64_t>(at::kFloat8_e8m0fnu),
+-        "sf_dtype must be float32 or float8_e8m0fnu, got ", sfDtypeEnum);
+-    auto sfDtype = static_cast<at::ScalarType>(sfDtypeEnum);
++    TORCH_CHECK(sfDtype == at::kFloat || sfDtype == at::kFloat8_e8m0fnu,
++                "sf_dtype must be float32 or float8_e8m0fnu, got ", sfDtype);
+     int64_t numTokens = indices.size(0);
+     auto fetched = at::empty({numTokens, hiddenSize}, at::TensorOptions().dtype(dtype).device(indices.device()));
+     auto intOpts = at::TensorOptions().dtype(at::kInt).device(indices.device());
+diff --git a/mc2/common/torch_extension/elastic_buffer.py b/mc2/common/torch_extension/elastic_buffer.py
+index 34b83923d15..4967e70691b 100644
+--- a/mc2/common/torch_extension/elastic_buffer.py
++++ b/mc2/common/torch_extension/elastic_buffer.py
+@@ -29,12 +29,6 @@ _ENGRAM_DTYPE_TO_INT = {
+ }
+ _ENGRAM_INT_TO_DTYPE = {v: k for k, v in _ENGRAM_DTYPE_TO_INT.items()}
+ _ENGRAM_SF_DTYPES = (torch.float32, torch.float8_e8m0fnu)
+-# These values cross the Python/C++ boundary as at::ScalarType enum integers.
+-_ENGRAM_SF_DTYPE_TO_INT = {
+-    torch.float32: _ENGRAM_DTYPE_TO_INT[torch.float32],
+-    torch.float8_e8m0fnu: 44,
+-}
+-_ENGRAM_INT_TO_SF_DTYPE = {v: k for k, v in _ENGRAM_SF_DTYPE_TO_INT.items()}
+ _ENGRAM_GRAD_DTYPES = (torch.bfloat16, torch.float16, torch.float32)
+ _MOE_EP_METADATA_FIELDS = 5
+ _MOE_SHARED_JETTY_NUM = 32
+@@ -173,7 +167,7 @@ class ElasticBufferOpBuilder(OpBuilder):
+             "int num_entries, int dtype, Tensor sf_table) -> (Tensor, Tensor)",
+             "engram_fetch_train(Tensor context, Tensor indices, int hidden_size, "
+             "int num_entries, int dtype, Tensor local_storage_addr, "
+-            "int sf_dtype, int sf_packs, Tensor sf_table_addr, "
++            "ScalarType sf_dtype, int sf_packs, Tensor sf_table_addr, "
+             "int num_max_tokens_per_rank, int comm_buffer_size, int rank_size) "
+             "-> (Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor)",
+             "engram_fetch_wait(Tensor context, Tensor fetched) -> Tensor",
+@@ -232,7 +226,7 @@ class ElasticBufferOpBuilder(OpBuilder):
+                 lambda: f"sf_packs must be non-negative, got {sf_packs}",
+             )
+             torch._check(
+-                sf_dtype in _ENGRAM_INT_TO_SF_DTYPE,
++                sf_dtype in _ENGRAM_SF_DTYPES,
+                 lambda: (f"sf_dtype must be float32 or float8_e8m0fnu, got {sf_dtype}"),
+             )
+             num_tokens = indices.size(0)
+@@ -248,11 +242,10 @@ class ElasticBufferOpBuilder(OpBuilder):
+             recv_counts = torch.empty((rank_size,), dtype=torch.int32, device="meta")
+             recv_local_entry = torch.empty((max_r,), dtype=torch.int32, device="meta")
+             num_recv = torch.empty((1,), dtype=torch.int32, device="meta")
+-            sf_dtype_value = _ENGRAM_INT_TO_SF_DTYPE[sf_dtype]
+             fetched_sf = (
+-                torch.empty((num_tokens, sf_packs), dtype=sf_dtype_value, device="meta")
++                torch.empty((num_tokens, sf_packs), dtype=sf_dtype, device="meta")
+                 if sf_packs > 0
+-                else torch.empty((0,), dtype=sf_dtype_value, device="meta")
++                else torch.empty((0,), dtype=sf_dtype, device="meta")
+             )
+             fetch_result = (
+                 fetched,
+@@ -813,7 +806,7 @@ class ElasticBuffer:
+         self._engram_hidden_size = None
+         self._engram_num_entries = None
+         self._engram_dtype = None
+-        self._engram_sf_dtype_enum = _ENGRAM_SF_DTYPE_TO_INT[torch.float32]
++        self._engram_sf_dtype = torch.float32
+         self._engram_sf_packs = 0
+         self._engram_fetch_in_progress = False
+         self._engram_storage_ref = None
+@@ -1079,11 +1072,7 @@ class ElasticBuffer:
+         self._engram_num_entries = storage.size(0)
+         self._engram_dtype = storage.dtype
+         self._engram_sf = sf
+-        self._engram_sf_dtype_enum = (
+-            _ENGRAM_SF_DTYPE_TO_INT[sf.dtype]
+-            if sf is not None
+-            else _ENGRAM_SF_DTYPE_TO_INT[torch.float32]
+-        )
++        self._engram_sf_dtype = sf.dtype if sf is not None else torch.float32
+         self._engram_sf_packs = sf.size(1) if sf is not None else 0
+         self._local_storage_addr = self._runtime.get_local_storage_addr()
+         if self._with_grad and sf is not None:
+@@ -1115,7 +1104,7 @@ class ElasticBuffer:
+             sf_table_addr = torch.empty(0, device=indices.device)
+             if has_sf:
+                 sf_table_addr = self._local_sf_table_addr
+-            sf_dtype = self._engram_sf_dtype_enum
++            sf_dtype = self._engram_sf_dtype
+             sf_packs = self._engram_sf_packs
+             (
+                 fetched,
+@@ -1556,7 +1545,7 @@ class ElasticBuffer:
+         self._engram_hidden_size = None
+         self._engram_num_entries = None
+         self._engram_dtype = None
+-        self._engram_sf_dtype_enum = _ENGRAM_SF_DTYPE_TO_INT[torch.float32]
++        self._engram_sf_dtype = torch.float32
+         self._engram_sf_packs = 0
+         self._engram_fetch_in_progress = False
+         self._engram_storage_ref = None
+diff --git a/tests/ut/python/test_engram_fetch_train_schema.py b/tests/ut/python/test_engram_fetch_train_schema.py
+index cb16c00660a..c1fbaee919b 100644
+--- a/tests/ut/python/test_engram_fetch_train_schema.py
++++ b/tests/ut/python/test_engram_fetch_train_schema.py
+@@ -15,17 +15,17 @@ import torch
+ from torch._subclasses.fake_tensor import FakeTensorMode
+ 
+ from cann_ops_transformer.ops.mc2.common.elastic_buffer import (
+-    _ENGRAM_SF_DTYPE_TO_INT,
++    _ENGRAM_SF_DTYPES,
+ )
+ 
+ 
+ OP = torch.ops.cann_ops_transformer.engram_fetch_train
+ 
+ 
+-def call_args(sf_dtype, sf_packs, device):
++def call_args(sf_dtype, sf_packs, device, num_tokens=128):
+     return (
+         torch.empty(4100, dtype=torch.int32, device=device),
+-        torch.empty(128, dtype=torch.int32, device=device),
++        torch.empty(num_tokens, dtype=torch.int32, device=device),
+         128,
+         16384,
+         15,
+@@ -57,20 +57,34 @@ class EngramFetchTrainSchemaTest(unittest.TestCase):
+ 
+     def test_meta_and_real_reject_negative_sf_packs(self):
+         self.assert_invalid(
+-            _ENGRAM_SF_DTYPE_TO_INT[torch.float32],
++            torch.float32,
+             -1,
+             "sf_packs must be non-negative, got -1",
+         )
+ 
+     def test_meta_and_real_reject_invalid_sf_dtype(self):
+-        for sf_dtype in (7, 262, 300):
++        for sf_dtype in (torch.float16, torch.bfloat16):
+             with self.subTest(sf_dtype=sf_dtype):
+                 self.assert_invalid(
+                     sf_dtype,
+                     0,
+-                    f"sf_dtype must be float32 or float8_e8m0fnu, got {sf_dtype}",
++                    "sf_dtype must be float32 or float8_e8m0fnu",
+                 )
+ 
++    def test_meta_and_real_accept_supported_sf_dtypes(self):
++        for sf_dtype in _ENGRAM_SF_DTYPES:
++            with self.subTest(sf_dtype=sf_dtype), FakeTensorMode():
++                result = OP(*call_args(sf_dtype, 40, device="cpu", num_tokens=0))
++                self.assertEqual(result[1].shape, (0, 40))
++                self.assertEqual(result[1].dtype, sf_dtype)
++
++            if not torch.npu.is_available():
++                self.skipTest("The real dispatch path requires an NPU device")
++            torch.npu.set_device(0)
++            result = OP(*call_args(sf_dtype, 40, device="npu", num_tokens=0))
++            self.assertEqual(result[1].shape, (0, 40))
++            self.assertEqual(result[1].dtype, sf_dtype)
++
+ 
+ if __name__ == "__main__":
+     unittest.main()
+-- 
+GitCode
+
+
+From 635d6fa17f7fb981971b823d464cd6db0ca26f9e Mon Sep 17 00:00:00 2001
+From: henry_21st <qianlong3@huawei.com>
+Date: Thu, 12 Nov 2026 17:38:46 +0800
+Subject: [PATCH 7/7] test(engram): assert NPU SF schema output device
+
+---
+ tests/ut/python/test_engram_fetch_train_schema.py | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/tests/ut/python/test_engram_fetch_train_schema.py b/tests/ut/python/test_engram_fetch_train_schema.py
+index c1fbaee919b..857a20d958a 100644
+--- a/tests/ut/python/test_engram_fetch_train_schema.py
++++ b/tests/ut/python/test_engram_fetch_train_schema.py
+@@ -84,6 +84,7 @@ class EngramFetchTrainSchemaTest(unittest.TestCase):
+             result = OP(*call_args(sf_dtype, 40, device="npu", num_tokens=0))
+             self.assertEqual(result[1].shape, (0, 40))
+             self.assertEqual(result[1].dtype, sf_dtype)
++            self.assertEqual(result[1].device.type, "npu")
+ 
+ 
+ if __name__ == "__main__":
+-- 
+GitCode
+

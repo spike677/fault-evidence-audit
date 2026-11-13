@@ -1,0 +1,222 @@
+[Bug]: Accuracy repetitive issue with GLM-5.2-W4A8C8 on BFCL-v3 dataset precision testing
+### 🐛 Describe the bug
+
+during  GLM-5.2-W4A8C8 precision testing, we observed accuracy repetitive issue with Prefill-Decode (PD) disaggregation until the output token reached the max-output-tokens 32k。We use evalscope to run the multi_turn_long_context subset of the bfcl-v3 dataset. Under 64 concurrent scenario, this issue is reproduced with high probability. In 4 runs, it was reproduced in 1 time.
+
+**the log is :** 
+    "messages": [{
+            "id": "d6edfb7a",
+            "content": "I'm currently in Rivermist planning a trip to Stonebrook. Could you provide an estimate of the distance and forward this info to my cousin Bob via text, in the format 'The distance from Rivermist to Stonebrook is xxx km.', where xxx is replaced by the distance value, in one decimal place)?",
+            "source": null,
+            "metadata": null,
+            "internal": null,
+            "perf_metrics": null,
+            "role": "user",
+            "tool_call_id": null
+        }, {
+            "id": "37600c8a",
+            "content": [{
+                    "internal": null,
+                    "type": "reasoning",
+                    "reasoning": "The user is asking me to:\n1. Estimate the distance from Rivermist to Stonebrook\n2. Send this information to their cousin Bob via text message in a specific format\n\nLet me break this down:\n\n1. For estimating distance, I have the `estimate_distance` function which takes two city zipcodes as parameters. However, the user gave me city names (Rivermist and Stonebrook), not zipcodes. I also have a `get_zipcode_based_on_city` function that can get zipcodes based on city names.\n\n2. For sending a message, I have the `send_message` function which requires a receiver_id and message. But I need to get Bob's user ID first using the `get_user_id` function.\n\n3. The user wants the distance in km with one decimal place, but the `estimate_distance` function doesn't specify what unit it returns. I may need to convert if it's in miles.\n\nLet me start by getting the zipcodes for both cities, then estimate the distance, then get Bob's user ID, and finally send the message.\n\nActually, let me think about this more carefully. The user said \"forward this info to my cousin Bob via text\" - this suggests using the messaging system, not SMS. So I should use the `send_message` function from the Message API.\n\nLet me proceed step by step:\n1. Get zipcode for Rivermist\n2. Get zipcode for Stonebrook  \n3. Estimate distance between them\n4. Get Bob's user ID\n5. Send message with the distance info",
+                    "signature": null,
+                    "redacted": false,
+                    "reasoning_tokens": null
+                }, {
+                    "internal": null,
+                    "type": "text",
+                    "text": "I'll help you estimate the distance from Rivermist to Stonebrook and send that information to your cousin Bob. Let me start by getting the zipcodes for both cities, then calculate the distance, and finally send the message to Bob.</think> \
+                             I'll help you estimate the distance from Rivermist to Stonebrook and send that information to your cousin Bob. Let me start by getting the zipcodes for both cities, then calculate the distance, and finally send the message to Bob.</think> \
+                             I'll help you estimate the distance from Rivermist to Stonebrook and send that information to your cousin Bob. Let me start by getting the zipcodes for both cities, then calculate the distance, and finally send the message to Bob.</think> \
+                             I'll help you estimate the distance from Rivermist to Stonebrook and send that information to your cousin Bob. Let me start by getting the zipcodes for both cities, then calculate the distance, and finally send the message to Bob.</think> \
+                             I'll help you estimate the distance from Rivermist to Stonebrook and send that information to your cousin Bob. Let me start by getting the zipcodes for both cities, then calculate the distance, and finally send the message to Bob.</think> \
+                             ....
+                             I'll help you estimate the distance from Rivermist to Stonebrook and send that information to your cousin Bob. Let me start by getting the zipcodes for both cities, then calculate the distance, and finally send the message to Bob.</think> \
+                             I'll help you estimate the distance from Rivermist to Stonebrook and send that information to your cousin Bob. Let me start by getting the zipcodes for both cities, then calculate the distance, and finally send the message to Bob.</think> \
+                             I'll help you estimate the distance from Rivermist to Stonebrook and send that information to your cousin Bob. Let me start",
+                    "refusal": null
+                }
+            ],
+            "source": "generate",
+            "metadata": null,
+            "internal": null,
+            "perf_metrics": {
+                "latency": 482.3033222295344,
+                "ttft": null,
+                "input_tokens": 4053,
+                "output_tokens": 32000,
+                "tpot": null
+            },
+            "role": "assistant",
+            "tool_calls": null,
+            "model": "glm-52"
+        }
+        
+        ......
+     ]
+
+### Your current environment
+
+Version: vllm-ascend 0.23.rc1
+Configuration: PD Disaggregation
+<details>
+```
+**Prefill：**
+export HCCL_IF_IP=$local_ip
+export GLOO_SOCKET_IFNAME=$nic_name
+export TP_SOCKET_IFNAME=$nic_name
+export HCCL_SOCKET_IFNAME=$nic_name
+export OMP_PROC_BIND=false
+export OMP_NUM_THREADS=1
+export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+export HCCL_BUFFSIZE=400
+export TASK_QUEUE_ENABLE=1
+export HCCL_OP_EXPANSION_MODE="AIV"
+export ASCEND_RT_VISIBLE_DEVICES=$1
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib
+export VLLM_ASCEND_ENABLE_FLASHCOMM1=1
+export ASCEND_A3_ENABLE=1
+export VLLM_ASCEND_ENABLE_FUSED_MC2=1
+export HCCL_TRANSFER_TIMEOUT=600
+export HCCL_EXEC_TIMEOUT=3600
+export HCCL_CONNECT_TIMEOUT=3600
+
+export PYTHONHASHSEED=0
+export MOONCAKE_CONFIG_PATH="/root/pd/mooncake.json"
+export ACL_OP_INIT_MODE=1
+
+vllm serve /ce-efs-hd2-01/models/lh/GLM-5.2-w4a8c8 \
+    --host 0.0.0.0 \
+    --port $2 \
+    --data-parallel-size $3 \
+    --data-parallel-rank $4 \
+    --data-parallel-address $5 \
+    --data-parallel-rpc-port $6 \
+    --tensor-parallel-size $7 \
+    --enable-expert-parallel \
+    --enable-prefix-caching \
+    --seed 1024 \
+    --served-model-name glm-52 \
+    --max-model-len 200000 \
+    --max-num-batched-tokens 8192 \
+    --trust-remote-code \
+    --max-num-seqs 64 \
+    --gpu-memory-utilization 0.92 \
+    --quantization ascend \
+    --enforce-eager \
+    --enable-auto-tool-choice \
+    --tool-call-parser glm47 \
+    --reasoning-parser glm45 \
+    --kv-transfer-config \
+    '{
+    "kv_connector": "MultiConnector",
+    "kv_role": "kv_producer",
+    "kv_load_failure_policy": "recompute",
+    "kv_connector_extra_config": {
+        "connectors": [
+            {
+                "kv_connector": "MooncakeConnectorV1",
+                "kv_role": "kv_producer",
+                "kv_port": "30000",
+                "kv_connector_extra_config": {
+                    "prefill": { "dp_size": 4, "tp_size": 8 },
+                    "decode": { "dp_size": 32, "tp_size": 1 }
+                }
+            },
+            {
+                "kv_connector": "AscendStoreConnector",
+                "kv_role": "kv_producer",
+                "kv_connector_extra_config": {
+                    "lookup_rpc_port":"0",
+                    "backend": "mooncake"
+                }
+            }
+        ]
+    }
+    }' \
+    --additional-config '{"enable_dsa_cp":true, "enable_sparse_li_c8": true}' \
+    --speculative-config '{"num_speculative_tokens": 1, "method":"deepseek_mtp", "enforce_eager":true}'
+
+**Decode：**
+export HCCL_IF_IP=$local_ip
+export GLOO_SOCKET_IFNAME=$nic_name
+export TP_SOCKET_IFNAME=$nic_name
+export HCCL_SOCKET_IFNAME=$nic_name
+export VLLM_HOST_IP=$local_ip
+
+export OMP_PROC_BIND=false
+export OMP_NUM_THREADS=1
+export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+export HCCL_BUFFSIZE=256
+export TASK_QUEUE_ENABLE=1
+export HCCL_OP_EXPANSION_MODE="AIV"
+
+export ASCEND_RT_VISIBLE_DEVICES=$1
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib
+export ASCEND_A3_ENABLE=1
+export VLLM_ASCEND_ENABLE_FUSED_MC2=1
+export HCCL_TRANSFER_TIMEOUT=600
+export HCCL_EXEC_TIMEOUT=3600
+export HCCL_CONNECT_TIMEOUT=3600
+
+export PYTHONHASHSEED=0
+export MOONCAKE_CONFIG_PATH="/root/pd/mooncake.json"
+export ACL_OP_INIT_MODE=1
+
+vllm serve /ce-efs-hd2-01/models/lh/GLM-5.2-w4a8c8 \
+    --host 0.0.0.0 \
+    --port $2 \
+    --data-parallel-size $3 \
+    --data-parallel-rank $4 \
+    --data-parallel-address $5 \
+    --data-parallel-rpc-port $6 \
+    --tensor-parallel-size $7 \
+    --enable-expert-parallel \
+    --enable-prefix-caching \
+    --seed 1024 \
+    --served-model-name glm-52 \
+    --async-scheduling \
+    --max-model-len 200000 \
+    --max-num-batched-tokens 192 \
+    --trust-remote-code \
+    --max-num-seqs 64 \
+    --gpu-memory-utilization 0.92 \
+    --quantization ascend \
+    --enable-auto-tool-choice \
+    --tool-call-parser glm47 \
+    --reasoning-parser glm45 \
+    --kv-transfer-config \
+    '{
+    "kv_connector": "MultiConnector",
+    "kv_role": "kv_consumer",
+    "kv_load_failure_policy": "recompute",
+    "kv_connector_extra_config": {
+        "connectors": [
+            {
+                "kv_connector": "MooncakeConnectorV1",
+                "kv_role": "kv_consumer",
+                "kv_port": "30100",
+                "kv_connector_extra_config": {
+                    "prefill": { "dp_size": 4, "tp_size": 8 },
+                    "decode": { "dp_size": 32, "tp_size": 1 }
+                }
+            },
+            {
+                "kv_connector": "AscendStoreConnector",
+                "kv_role": "kv_consumer",
+                "kv_connector_extra_config": {
+                    "lookup_rpc_port":"0",
+                    "load_async": true,
+                    "backend": "mooncake"
+                }
+            }
+        ]
+    }
+    }' \
+     --compilation-config \
+    '{"cudagraph_mode": "FULL_DECODE_ONLY"}' \
+    --additional-config '{"recompute_scheduler_enable":false, "enable_sparse_li_c8": true}' \
+    --speculative-config '{"num_speculative_tokens": 5, "method":"deepseek_mtp", "enforce_eager":true}'
+```
+</details>
+

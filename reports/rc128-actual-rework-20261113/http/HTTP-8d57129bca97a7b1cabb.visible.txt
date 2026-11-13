@@ -1,0 +1,611 @@
+fix(matmul_v3): 按输出 dtype 选择 fixpipe 1V1/1V2-ops-nn-AtomGit
+Star
+1418
+Fork
+2159
+Code
+Introduction
+Code
+Issues
+937
+Pull Requests
+736
+Pipeline
+Actions
+Discussion
+Wiki
+Members
+474
+Analysis
+Settings
+Star
+1418
+Fork
+2159
+Merged
+fix(matmul_v3): 按输出 dtype 选择 fixpipe 1V1/1V2
+#14100
+link164735
+Add on
+2 days ago
+Merged from
+huangkejie1647/ops-nn：
+fix_matmul_v3_fixpipe_output_dtype
+into
+cann/ops-nn：
+master
+fix(matmul_v3): 按输出 dtype 选择 fixpipe 1V1/1V2
+#14100
+Merged
+link164735
+Add on
+2 days ago
+Merged from
+huangkejie1647/ops-nn
+fix_matmul_v3_fixpipe_output_dtype
+into
+cann/ops-nn
+master
+Merge checks
+Discussion
+0
+Commits
+0
+Checks
+0
+Files changed
+0
+Clone/Download
+0
+link164735
+Collaborators
+2 days ago
+2 days ago
+描述
+背景
+Ascend950（DAV_3510）MatMulV3 在 fixpipe 绑定（Bound）场景下，
+低精度输入 + FP32 输出
+（fp16/bf16 -> float）原走
+ND_FIXPIPE_1_1
+且未置位
+splitM
+，输出精度异常（实测 74.78%）。
+根因
+GetL0C2OutDav3510
+（
+matmul/mat_mul_v3/op_host/op_tiling/arch35/matmul_v3_tiling_helper.cpp
+）此前按
+输入 dtype
+选择 fixpipe 模式：fp16/bf16 输入一律 1V1，仅 FP32 输入时才置位
+splitM
+。但
+splitM
+的语义是“fixpipe 场景 FP32 输出按 M 轴切分、由双 AIV 拷出”，应由
+输出 dtype
+决定。
+改动
+按输出 dtype（
+cType == DT_FLOAT
+）选择
+ND_FIXPIPE_1_2
+并置位
+splitM
+；
+删除不可达的
+aType == DT_FLOAT
+分支（DAV_3510 支持的 dtype 组合中 FP32 输入必然 FP32 输出）；
+兜底由
+ND_FIXPIPE_1_2
+收敛为
+ON_THE_FLY
+；
+补充 1V1/1V2 与
+splitM
+选择的 UT。
+影响面
+fp16/bf16 -> fp32：由 1V1 改为 1V2 + splitM（本次修复）；
+fp32 -> fp32、fp16/bf16 -> fp16/bf16：行为不变；
+未改动 kernel：B 全载 + 1V2 在 kernel 侧已有分支（
+mat_mul_v3.cpp
+中
+FULL_LOAD == MAT_MUL_B_FULL_LOAD && MODEL == MAT_MUL_BASIC && L0C2OUT_MODEL == MAT_MUL_1V2_ND_ALIG_FIXPIPE
+），
+mat_mul_tiling_key.h
+也已注册该组合，无需在
+CheckBL1FullLoad
+中排除 fixpipe。
+关联的Issue
+关联 Issue #8656：
+https://gitcode.com/cann/ops-nn/issues/8656
+测试
+新增 UT（
+matmul/mat_mul_v3/tests/ut/op_host/arch35/test_matmul_v3_tiling.cpp
+）：
+GetL0C2Out_Dav3510_Fp32Out_Fixpipe1V2WithSplitM
+（fp32 -> fp32，1V2 + splitM）
+GetL0C2Out_Dav3510_Fp16InFp32Out_Fixpipe1V2WithSplitM
+（fp16 -> fp32，1V2 + splitM）
+GetL0C2Out_Dav3510_Fp16Out_Fixpipe1V1WithoutSplitM
+（fp16 -> fp16，1V1，无 splitM）
+mat_mul_v3 op_host UT 全量：380/380 通过（
+bash build.sh -u --ophost --ops=mat_mul_v3 --soc=ascend950
+，CANN 9.3.0）
+Ascend950PR_9589 实测：CANN 10-28、11-04 包各 42/42 用例通过
+文档更新
+无。
+类型标签
+Bug修复
+新特性
+性能优化
+文档更新
+其他，请描述：
+AI/Agent生成声明
+AI辅助编写
+Save
+Cancel
+Pull Request has been successfully merged by CANN-robot.
+（Thank you for link164735's contribution.）
+link164735
+Collaborators
+2 days ago
+Created pull request, commit
+a6d895eb
+2 days ago
+Created pull request, commit
+a6d895eb
+atomgit-bot
+2 days ago
+Comments：
+2 days ago
+Comments：
+变更摘要
+本 PR 调整了
+matmul/mat_mul_v3/op_host/op_tiling/arch35/matmul_v3_tiling_helper.cpp
+中
+GetL0C2OutDav3510
+在选择 fixpipe 模式时的判断顺序：改为优先根据输出 dtype（
+args.cType
+）决定使用 1V1 还是 1V2 的 fixpipe，而不是优先看输入 dtype（
+args.aType
+）。
+主要改动
+按输出 dtype 优先判定
+: 在 fixpipe 绑定检查之后新增
+args.cType == ge::DT_FLOAT
+分支，直接设置
+runInfo.splitM = true
+并返回
+MatMulV3L0C2Out::ND_FIXPIPE_1_2
+，使输出为
+DT_FLOAT
+的场景固定使用 1V2 fixpipe。
+输入 dtype 分支语义调整
+: 原
+args.aType == ge::DT_FLOAT
+分支不再设置
+runInfo.splitM
+，仅返回
+ND_FIXPIPE_1_2
+，避免与输出 dtype 判定重复。
+默认返回值收敛
+: 函数末尾的兜底返回值由
+MatMulV3L0C2Out::ND_FIXPIPE_1_2
+改为
+MatMulV3L0C2Out::ON_THE_FLY
+，即未匹配
+FP16
+、
+BF16
+、
+FP32
+输入时不再默认走 1V2 fixpipe。
+🧩 本次 Review 已使用自定义 Skill：
+ascendc-code-review
+Save
+Cancel
+Incorrect?
+atomgit-bot
+2 days ago
+Comments：
+2 days ago
+Comments：
+代码审查
+审查结论
+审查覆盖
+matmul/mat_mul_v3/op_host/op_tiling/arch35/matmul_v3_tiling_helper.cpp
+：已逐行审查改动的
+GetL0C2OutDav3510
+（183-193 行），并交叉核对了调用方（
+MatMulV3BasicAswtTiling::DoOpTiling
+、
+MatMulV3AswTiling::GetTilingKey
+）、
+splitM
+的消费链（
+MatMulV3BasicTilingData.splitM
+→
+matmul_fixpipe.h
+/
+mat_mul_v3.cpp
+1V2 分支）、dtype 校验表、B 全载准入条件与 kernel 模板注册，共发现 3 个问题（1 个 P2、2 个 P3）。
+发现汇总
+优先级
+数量
+摘要
+P2
+1
+新增
+cType==DT_FLOAT → 1V2
+后，B 全载准入（
+CheckBL1FullLoad
+未排除 fixpipe）可能形成 (B_FULL_LOAD, 1V2) 的 tiling key，而 kernel dispatch 中没有对应分支，需核实
+P3
+2
+① 190-192 行
+aType==DT_FLOAT
+分支在合法 dtype 下不可达，属冗余且与前面分支的 splitM 语义不对称；② DAV_3510 的 1V1/1V2 与 splitM 选择无任何 UT 覆盖
+总体风险判断
+改动方向（按输出 dtype 选 fixpipe 1V1/1V2，并把
+splitM
+从“输入 fp32”改为“输出 fp32”）与
+splitM
+的字段语义注释一致，逻辑上是对原实现的修正，主路径（basic aswt）的 tiling key 与 tiling data 保持一致，未发现无条件的正确性错误。剩余风险集中在两点：新让 fp16/bf16→fp32（最常见 dtype 组合）进入 1V2 后，与 B 全载路径的组合是否被 kernel 支持尚未确认（P2，需核对
+mat_mul_v3.cpp
+dispatch），以及该高危分支完全缺少单测兜底。整体判断为
+风险中等、可合入但建议先确认 P2 项并补测试
+。
+类型
+数量
+🔴 阻塞
+0
+🟡 建议
+1
+💬 仅评论
+🧩 本次 Review 已使用自定义 Skill：
+ascendc-code-review
+Save
+Cancel
+Incorrect?
+CANN-robot
+Collaborators
+2 days ago
+Added label:
+cann-cla/yes
+2 days ago
+Added label:
+cann-cla/yes
+CANN-robot
+Collaborators
+2 days ago
+Comments：
+2 days ago
+Comments：
+Thanks for your pull-request.
+The full list of commands accepted by me can be found at
+here
+.
+You can get sig-info at
+here
+.
+You can self-configure the PR merge rules for this repository. For more details, please refer to
+Here
+.
+For more, you also can visit
+HICANN
+.
+PR Approval Progress
+✅
+Congratulations! All modules have met the lgtm and approve requirements.
+Module Approval Details
+module
+lgtm status
+approve status
+matmul
+✅
+商晓波
+,
+林鹏翔
+(2/2)
+✅
+商晓波
+(1/1)
+💡 Tip:
+Committer
+can comment
+/approve
+or
+/lgtm
+Commenting
+/approve
+implies both code review (lgtm) and intent to merge (approve)
+CLA Signature Pass
+huangkejie1647, thanks for your pull request. All authors of the commits have signed the CLA. 👍
+Save
+Cancel
+CANN-robot
+Collaborators
+2 days ago
+Set zengjuan,oscillated,sxb154714,chaotang233,crystalhu,yangyang016,fanqirui,chenqi317,LinPX,liubo75,tangweiwei2,wangzitao_leo,void_ptr,xubinglin,zhaoyingchao2,rueenov11,pingchuantang,liuyang_806 as approver
+2 days ago
+Set zengjuan,oscillated,sxb154714,chaotang233,crystalhu,yangyang016,fanqirui,chenqi317,LinPX,liubo75,tangweiwei2,wangzitao_leo,void_ptr,xubinglin,zhaoyingchao2,rueenov11,pingchuantang,liuyang_806 as approver
+CANN-robot
+Collaborators
+2 days ago
+Set oscillated,sxb154714,chaotang233,yangyang016,fanqirui,chenqi317,LinPX,tangweiwei2,wangzitao_leo,void_ptr,xubinglin,zhaoyingchao2,rueenov11,liuyang_806 as approver
+2 days ago
+Set oscillated,sxb154714,chaotang233,yangyang016,fanqirui,chenqi317,LinPX,tangweiwei2,wangzitao_leo,void_ptr,xubinglin,zhaoyingchao2,rueenov11,liuyang_806 as approver
+atomgit-bot
+2 days ago
+Start code review
+1
+matmul/mat_mul_v3/op_host/op_tiling/arch35/matmul_v3_tiling_helper.cpp
+Resolved
+@@ -193,0 +183,4 @@
+183
++
+if
+(args.cType == ge::DT_FLOAT) {
+184
++
+runInfo.splitM =
+true
+;
+185
++
+return
+MatMulV3L0C2Out::ND_FIXPIPE_1_2;
+186
++
+}
+atomgit-bot
+2 days ago
+Comments：
+🟡
+Medium Priority
+改动行 183-186：新增
+if (args.cType == ge::DT_FLOAT) { runInfo.splitM = true; return ND_FIXPIPE_1_2; }
+，使 fp16/bf16 输入 + fp32 输出（dtype 支持表中
+{FLOAT16,FLOAT16,FLOAT,...}
+/
+{BF16,BF16,FLOAT,...}
+，属最常见组合）由原来的 ND_FIXPIPE_1_1 变为 ND_FIXPIPE_1_2。
+证据链：
+GetL0C2Out
+的结果经
+MatMulV3BasicAswtTiling::DoOpTiling
+（matmul_v3_basic_aswt_tiling.cpp:341）进入 tiling key 的 L0C2OUT 字段（同文件 383 行）。
+CheckBL1FullLoad()
+（matmul_v3_basic_aswt_tiling.cpp:102-102 起）
+没有
+l0C2Out_ != ON_THE_FLY
+的拦截（该拦截只存在于
+CheckAL1FullLoad()
+，见 68-71 行），因此满足 B 全载条件的算例会形成 (TENSOR_LEVEL, BASIC, B_FULL_LOAD, 1V2) 的 key。
+kernel 侧 dispatch 中可见的分支为：
+B_FULL_LOAD + BASIC + 1V1
+（mat_mul_v3.cpp:168-174，注释即“Fixpipe B全载fp16场景”）、
+NO_FULL_LOAD + BASIC + 1V1
+、
+NO_FULL_LOAD + SLICE + 1V1
+、
+NO_FULL_LOAD + BASIC + 1V2
+（190-193）以及 streamK/splitK+1V2；而 tiling key 的模板 SEL 又把 (B_FULL_LOAD, 1V2) 注册为合法组合（mat_mul_tiling_key.h:174-177）。
+失败模式：若 kernel 的 if constexpr 链确实没有 (B_FULL_LOAD, BASIC, 1V2) 分支，改动后“fp16/bf16 输入 + fp32 输出 + 满足 B 全载”的算例会命中一个无 kernel 实现的 key，落到无分支/空实现，输出为未初始化数据（静默精度/正确性错误），而改动前该算例走的是已实现的 B全载+1V1 分支。触发条件明确但需要确认 dispatch 完整体（本次审查无法读取 op_kernel 目录全文）。
+Save
+Cancel
+Incorrect?
+yuning_chen
+Collaborators
+2 days ago
+Start code review
+2
+matmul/mat_mul_v3/op_host/op_tiling/arch35/matmul_v3_tiling_helper.cpp
+Outdated
+Resolved
+@@ -180,13 +180,17 @@ MatMulV3L0C2Out GetL0C2OutDav3510(const MatmulV3CompileInfo& compileInfo, const
+180
+180
+if
+(!fixpipeBound || (compileInfo.aivNum != (compileInfo.aicNum * NUM_TWO)) || isSplitK) {
+181
+181
+return
+MatMulV3L0C2Out::ON_THE_FLY;
+182
+182
+}
+183
++
+if
+(args.cType == ge::DT_FLOAT) {
+yuning_chen
+2 days ago
+Comments：
+请问 aType 为 FLOAT 且 cType 不是 FLOAT 时，splitM 是否还需要置位？
+现在代码看来先按 cType == DT_FLOAT 提前返回 ND_FIXPIPE_1_2 并 set splitM=true；后面 aType == DT_FLOAT 的分支只 return ND_FIXPIPE_1_2，原来在这个分支里的 runInfo.splitM = true 被挪走了
+可能存在有 FP32 输入、非 FP32 输出时不再开 splitM 的问题，1V2 路径少了双 AIV 分 M，和改前行为不一致，也可能踩到注释里说的设备侧缺口
+建议可以确认 cType 非 FLOAT、aType 为 FLOAT 的组合是否仍要 splitM；若要，建议在 aType == DT_FLOAT 分支里把 splitM = true 补回去
+Save
+Cancel
+System Message
+System
+1 day ago
+Comments：
+1 day ago
+Comments：
+changed this line on
+9795864d
+view
+diff detail
+Save
+Cancel
+link164735
+Collaborators
+1 day ago
+Pre merge succeeded (commit_id: 4cf98cbdeaacdb0731a14982f378c63d28c86f42)
+1 day ago
+Pre merge succeeded (commit_id: 4cf98cbdeaacdb0731a14982f378c63d28c86f42)
+17 event messages are collapsed here。
+See more
+CANN-robot
+Collaborators
+1 day ago
+Added label:
+cann-cla/yes
+1 day ago
+Added label:
+cann-cla/yes
+link164735
+Collaborators
+1 day ago
+Comments：
+1 day ago
+Comments：
+/compile
+Save
+Cancel
+link164735
+Collaborators
+1 day ago
+Pre merge succeeded (commit_id: 1cb2cb4365109ec150d0deae094ce4d6d53e0cb1)
+1 day ago
+Pre merge succeeded (commit_id: 1cb2cb4365109ec150d0deae094ce4d6d53e0cb1)
+CANN-robot
+Collaborators
+1 day ago
+Comments：
+1 day ago
+Comments：
+🚀 CI 流水线已启动
+📋 执行详情:
+点击查看流水线
+Save
+Cancel
+CANN-robot
+Collaborators
+1 day ago
+Added label:
+ci-pipeline-running
+1 day ago
+Added label:
+ci-pipeline-running
+link164735
+Collaborators
+1 day ago
+Modify description of pull request
+1 day ago
+Modify description of pull request
+link164735
+Collaborators
+23 hours ago
+Modify description of pull request
+23 hours ago
+Modify description of pull request
+CANN-robot
+Collaborators
+23 hours ago
+Removed label:
+ci-pipeline-running
+23 hours ago
+Removed label:
+ci-pipeline-running
+CANN-robot
+Collaborators
+23 hours ago
+Added label:
+ci-pipeline-passed
+23 hours ago
+Added label:
+ci-pipeline-passed
+yuning_chen
+Collaborators
+23 hours ago
+Comments：
+23 hours ago
+Comments：
+您好，pr合入已准备就绪，请尽快联系committer进行检视，谢谢！
+@xubinglin
+@wangzitao_leo
+@LinPX
+@yangyang016
+@liuyang_806
+@oscillated
+@zhaoyingchao2
+@void_ptr
+Save
+Cancel
+林
+林鹏翔
+Collaborators
+22 hours ago
+Comments：
+22 hours ago
+Comments：
+/lgtm
+Save
+Cancel
+sxb154714
+Collaborators
+22 hours ago
+Comments：
+22 hours ago
+Comments：
+/lgtm
+/approve
+Save
+Cancel
+CANN-robot
+Collaborators
+22 hours ago
+Added label:
+lgtm
+approved
+22 hours ago
+Added label:
+lgtm
+approved
+CANN-robot
+Collaborators
+22 hours ago
+Closed associated issue
+22 hours ago
+Closed associated issue
+CANN-robot
+Collaborators
+22 hours ago
+Merged pull request
+22 hours ago
+Merged pull request
+CANN-robot
+Collaborators
+22 hours ago
+Comments：
+22 hours ago
+Comments：
+Pull Request 已合并或已关闭。
+If you want to solve this problem,
+you can click here to do it in the
+FAQs
+.
+Save
+Cancel
+Merger
+Not assigned
+Approver
+Not assigned
+Tester
+Not assigned
+Reviewer
+Not assigned
+Label
+stat/needs-squash
+cann-cla/yes
+ci-pipeline-passed
+approved
+lgtm
+Milestones
+No related milestones
+Kanban
+No related boards
+Link Issue
+No related Issues

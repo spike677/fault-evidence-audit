@@ -1,0 +1,413 @@
+修复 aclnnAllGatherMatmul算子错误码表并统一 Full Mesh 组网表述-ops-transformer-AtomGit
+Star
+1681
+Fork
+3393
+Code
+Introduction
+Code
+Issues
+429
+Pull Requests
+726
+Pipeline
+Actions
+Discussion
+Wiki
+Members
+620
+Analysis
+Settings
+Star
+1681
+Fork
+3393
+Merged
+修复 aclnnAllGatherMatmul算子错误码表并统一 Full Mesh 组网表述
+#15461
+wangfuhao
+Add on
+6 days ago
+Merged from
+w00951525/ops-transformer：
+agmm_doc_fix
+into
+cann/ops-transformer：
+master
+修复 aclnnAllGatherMatmul算子错误码表并统一 Full Mesh 组网表述
+#15461
+Merged
+wangfuhao
+Add on
+6 days ago
+Merged from
+w00951525/ops-transformer
+agmm_doc_fix
+into
+cann/ops-transformer
+master
+Merge checks
+Discussion
+0
+Commits
+0
+Checks
+0
+Files changed
+0
+Clone/Download
+0
+W
+wangfuhao
+Collaborators
+6 days ago
+6 days ago
+描述
+本次提交针对社区 issue #6788/#6789（共性问题）修复了 all_gather_matmul 与 all_gather_matmul_v2 两个算子的中英文 API 文档及 README 共 5 个文件：为 aclnnAllGatherMatmul 错误码表补齐"x1的k轴为0"的 161002 场景并修正 rowspan 与描述行数不匹配问题；将 aclnnAllGatherMatmulV2 错误码表由 1 行精简补齐为 3 行（数据类型和 shape 维度/尺寸、streamMode/commMode 取值、format 约束及量化/fp16/bf16 场景下 scale 与 amaxOut 空指针约束），rowspan 同步对齐；经源码裁决 quantScale 以 tiling 层端到端口径为准，维持"仅支持空指针"表述不变；并将"all mesh组网"统一改为"Full Mesh（全互连）组网"（英文 full mesh networking），与代码侧 full_mesh 实现命名一致。
+关联的Issue
+https://gitcode.com/cann/ops-transformer/issues/6788
+aclnnAllGatherMatmul 错误码表格式错误且缺"k轴=0"场景（2处）
+https://gitcode.com/cann/ops-transformer/issues/6789
+aclnnAllGatherMatmulV2 错误码表不完整、quantScale 支持口径与源码冲突（3处）
+测试
+文档更新
+类型标签
+🐛 Bug修复
+✨ 新特性
+⚡ 性能优化
+♻️ 重构
+🧪 测试
+📦 构建/CI
+🔧 配置变更
+📝 文档更新
+⬆️ 依赖升级
+🔒 安全修复
+🧹 代码清理
+❓ 其他，请描述：
+Save
+Cancel
+Pull Request has been successfully merged by CANN-robot.
+（Thank you for wangfuhao's contribution.）
+W
+wangfuhao
+Collaborators
+6 days ago
+Created pull request, commit
+d827577e
+6 days ago
+Created pull request, commit
+d827577e
+atomgit-bot
+6 days ago
+Comments：
+6 days ago
+Comments：
+变更摘要
+本 PR 主要针对
+aclnnAllGatherMatmul
+系列算子文档进行修正与统一：在
+aclnnAllGatherMatmul
+的错误码表中补充
+x1
+的
+k
+轴为 0 的校验失败场景，在
+aclnnAllGatherMatmulV2
+的
+ACLNN_ERR_PARAM_INVALID
+（161002）错误码表中细化了参数数据类型、shape、
+streamMode
+/
+commMode
+取值以及 format 与空指针相关描述，同时将 Atlas A2 与 Ascend 950PR&950DT 系列产品的组网表述由 "all mesh" 统一为 "Full Mesh（全互连）"，并同步更新中英文文档。
+主要改动
+aclnnAllGatherMatmul
+错误码表补充
+: 在中文与英文文档的
+ACLNN_ERR_PARAM_INVALID
+错误码表中新增"
+x1
+的
+k
+轴为 0"这一返回条件，明确该参数非法场景。
+aclnnAllGatherMatmulV2
+错误码描述细化
+: 将原单条错误描述拆分为三条，分别覆盖数据类型与 shape（维度/尺寸）越界、
+streamMode
+/
+commMode
+取值非法、以及 format（
+ND
+/
+NCL
+、
+x2
+为 INT4 时不支持
+FRACTAL_NZ
+）和
+x1Scale
+/
+x2Scale
+/
+amaxOut
+空指针约束。
+组网表述统一
+: 将
+mc2/all_gather_matmul
+的 README 及
+aclnnAllGatherMatmul.md
+中 Atlas A2、Ascend 950PR&950DT 的 "all mesh" 统一为 "Full Mesh（全互连）"。
+英文文档同步
+:
+aclnnAllGatherMatmul_en.md
+与
+aclnnAllGatherMatmulV2_en.md
+同步英文表述，将 "all mesh networking" 改为 "full mesh networking"，并对应补充错误码条目。
+🧩 本次 Review 已使用自定义 Skill：
+ascendc-code-review
+Save
+Cancel
+Incorrect?
+CANN-robot
+Collaborators
+6 days ago
+Added label:
+cann-cla/yes
+6 days ago
+Added label:
+cann-cla/yes
+CANN-robot
+Collaborators
+6 days ago
+Comments：
+6 days ago
+Comments：
+Thanks for your pull-request.
+The full list of commands accepted by me can be found at
+here
+.
+You can get sig-info at
+here
+.
+You can self-configure the PR merge rules for this repository. For more details, please refer to
+Here
+.
+For more, you also can visit
+HICANN
+.
+PR Approval Progress
+✅
+Congratulations! All modules have met the lgtm and approve requirements.
+Module Approval Details
+module
+lgtm status
+approve status
+*/*/README.md
+✅
+陈娇
+,
+adamlwang
+(2/2)
+✅
+陈娇
+(1/1)
+*/*/docs/acl*.md
+✅
+陈娇
+,
+adamlwang
+(2/2)
+✅
+陈娇
+(1/1)
+💡 Tip:
+Committer
+can comment
+/approve
+or
+/lgtm
+Commenting
+/approve
+implies both code review (lgtm) and intent to merge (approve)
+CLA Signature Pass
+w00951525, thanks for your pull request. All authors of the commits have signed the CLA. 👍
+Save
+Cancel
+CANN-robot
+Collaborators
+6 days ago
+Set zzg_code,monologue815,zhu-mingzhe71,jiang-lirui,Allan_Yu,yayahello,gitee-duhuiping,wang-minbo,claire8090,tgwsakiko_,liudan12,chenjunjian11,yangzeheng,liuboxi,gitcode-chenjiao,ryan_li,luobaiqing,zhong-zixin,Ww7012,mabing1118,dingwei002,macech,chuguowei,fengying555682,huangshuai59,adamlwang,zzzzzzyf_,caiwenwen,yanglu-1 as approver
+6 days ago
+Set zzg_code,monologue815,zhu-mingzhe71,jiang-lirui,Allan_Yu,yayahello,gitee-duhuiping,wang-minbo,claire8090,tgwsakiko_,liudan12,chenjunjian11,yangzeheng,liuboxi,gitcode-chenjiao,ryan_li,luobaiqing,zhong-zixin,Ww7012,mabing1118,dingwei002,macech,chuguowei,fengying555682,huangshuai59,adamlwang,zzzzzzyf_,caiwenwen,yanglu-1 as approver
+5 event messages are collapsed here。
+See more
+W
+wangfuhao
+Collaborators
+6 days ago
+Associated issue: [Documentation|文档反馈]: aclnnAllGatherMatmulV2 错误码表不完整、quantScale 支持口径与源码冲突（3处）
+6 days ago
+Associated issue: [Documentation|文档反馈]: aclnnAllGatherMatmulV2 错误码表不完整、quantScale 支持口径与源码冲突（3处）
+W
+wangfuhao
+Collaborators
+6 days ago
+Comments：
+6 days ago
+Comments：
+compile
+Save
+Cancel
+W
+wangfuhao
+Collaborators
+6 days ago
+Pre merge succeeded (commit_id: 09f511613ada7879c7c82f2ce08729f443fc2501)
+6 days ago
+Pre merge succeeded (commit_id: 09f511613ada7879c7c82f2ce08729f443fc2501)
+CANN-robot
+Collaborators
+6 days ago
+Comments：
+6 days ago
+Comments：
+🚀 CI 流水线已启动
+📋 执行详情:
+点击查看流水线
+Save
+Cancel
+CANN-robot
+Collaborators
+6 days ago
+Added label:
+ci-pipeline-running
+6 days ago
+Added label:
+ci-pipeline-running
+W
+wangfuhao
+Collaborators
+6 days ago
+Modify description of pull request
+6 days ago
+Modify description of pull request
+CANN-robot
+Collaborators
+6 days ago
+Removed label:
+ci-pipeline-running
+6 days ago
+Removed label:
+ci-pipeline-running
+CANN-robot
+Collaborators
+6 days ago
+Added label:
+ci-pipeline-passed
+6 days ago
+Added label:
+ci-pipeline-passed
+C
+chenjiao
+Collaborators
+6 days ago
+Comments：
+6 days ago
+Comments：
+/approve
+Save
+Cancel
+CANN-robot
+Collaborators
+6 days ago
+Added label:
+approved
+6 days ago
+Added label:
+approved
+W
+wangfuhao
+Collaborators
+6 days ago
+Modify description of pull request
+6 days ago
+Modify description of pull request
+W
+wangfuhao
+Collaborators
+6 days ago
+Modify description of pull request
+6 days ago
+Modify description of pull request
+W
+wangfuhao
+Collaborators
+6 days ago
+Modify description of pull request
+6 days ago
+Modify description of pull request
+A
+adamlwang
+Collaborators
+6 days ago
+Comments：
+6 days ago
+Comments：
+/approve
+/lgtm
+Save
+Cancel
+CANN-robot
+Collaborators
+6 days ago
+Comments：
+6 days ago
+Comments：
+The following users do not have permission to comment
+/lgtm
+or
+/approve
+on any module in this PR:
+/approve:
+adamlwang
+Save
+Cancel
+CANN-robot
+Collaborators
+6 days ago
+Added label:
+lgtm
+6 days ago
+Added label:
+lgtm
+CANN-robot
+Collaborators
+6 days ago
+Closed associated issue
+6 days ago
+Closed associated issue
+CANN-robot
+Collaborators
+6 days ago
+Merged pull request
+6 days ago
+Merged pull request
+Merger
+Not assigned
+Approver
+Not assigned
+Tester
+Not assigned
+Reviewer
+Not assigned
+Label
+cann-cla/yes
+ci-pipeline-passed
+approved
+lgtm
+Milestones
+No related milestones
+Kanban
+No related boards
+Link Issue
+No related Issues

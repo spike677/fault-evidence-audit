@@ -1,0 +1,475 @@
+[Bug-Report|缺陷反馈]: [ReduceSum] bool 输入 + dtype=INT64 且 dims 含负轴时结果丢末位（负轴未归一导致 promoteType 误选 FLOAT）-ops-math-AtomGit
+Star
+1754
+Fork
+1658
+Code
+Introduction
+Code
+Issues
+495
+Pull Requests
+578
+Pipeline
+Actions
+Discussion
+Wiki
+Members
+299
+Analysis
+Settings
+Star
+1754
+Fork
+1658
+Closed
+[Bug-Report|缺陷反馈]: [ReduceSum] bool 输入 + dtype=INT64 且 dims 含负轴时结果丢末位（负轴未归一导致 promoteType 误选 FLOAT）
+#4298
+liuhanwen8
+Add on
+13 days ago
+Closed at
+11 days ago
+liuhanwen8
+13 days ago
+Create
+13 days ago
+Create
+一、问题描述 （必填）
+aclnnReduceSum
+在
+self
+为 BOOL、
+dtype
+为 INT64，且
+dims
+使用负轴
+时，
+归约结果会
+丢末位
+（少 1），且无任何告警。
+同一份数据、同样归约全部轴，只改轴的书写方式：
+dims
+实际结果
+期望
+[0,1]
+（正轴）
+16785409
+16785409 ✅
+[]
+16785409
+16785409 ✅
+[1,0]
+（顺序颠倒）
+16785409
+16785409 ✅
+[-2,-1]
+16785408
+16785409 ❌
+[-1,-2]
+16785408
+16785409 ❌
+[-2,1]
+/
+[0,-1]
+（混合正负）
+16785408
+16785409 ❌
+重复 3 次结果完全一致，是
+确定性缺陷
+，不是竞争。
+根因定位
+（
+ops-math/math/reduce_sum/op_api/aclnn_reduce_sum.cpp:261-268
+）：
+if
+(selfType == op::DataType::DT_BOOL && dataType == op::DataType::DT_INT64) {
+static
+const
+size_t
+maxDim =
+16777216
+;
+// 2^24
+size_t
+reduceDims =
+1
+;
+for
+(
+int
+i =
+0
+; i < dims->
+Size
+(); i++) {
+        reduceDims *= shape[(*dims)[i]];
+// ← 未做负轴归一
+}
+    promoteType = (reduceDims < maxDim) ? op::DataType::DT_FLOAT : op::DataType::DT_INT64;
+}
+(*dims)[i]
+为负时，
+shape[-1]
+以
+size_t
+索引
+越界
+→
+reduceDims
+变成错值
+（落到
+< 2^24
+）→
+promoteType
+误选
+DT_FLOAT
+→ 在 fp32 上累加 16785409 个 1。
+fp32 尾数只有 24 位，最大精确整数是 2^24 = 16777216，结果被舍入成
+16785408
+（正是
+fp32(16785409)
+的最近可表示值）。
+对照：同函数约 30 行之前的
+CheckDimValid
+明确支持负轴（
+GetPosDim
+做了归一），
+说明
+负轴本身是合法输入
+，越界只发生在上面这一处。
+判别矩阵
+（证明只有这一条路径受影响）：
+组
+self→dtype
+正轴
+负轴
+结论
+D1
+bool→int64
+16785409
+16785408
+命中
+D2
+bool→int32
+16785409
+16785409
+不走该分支
+D4
+int32→int64
+16785409
+16785409
+不走该分支
+D5
+uint8→int64
+16785409
+16785409
+不走该分支
+D6
+bool→int64，和
+偶数
+16789506
+正确
+正确
+fp32 可精确表示 → 错误被掩盖
+D7
+bool→int64，和 = 2^24 / 2^24+2
+正确
+正确
+同上
+D8
+bool→int64，keepDims=1
+16785409
+16785408
+与 keepDims 无关
+D6/D7 是关键反证：
+不是「负轴一律错」，而是「负轴 + 和不可被 fp32 精确表示」才错
+，
+与「promoteType 误选 FLOAT」的机理完全吻合。
+二、环境信息 （可选）
+昇腾硬件型号：Ascend 910B2
+CANN 版本：9.2.0（
+V100R001C12SPC001B237
+）
+操作系统：Linux aarch64
+其他：Python 3.12.15 / torch 2.14.0 / torch_npu 2.14.0
+三、重现步骤 （可选）
+自包含 C++ 探针（纯 ACL 接口，不依赖 torch），同一进程内先后用正轴与负轴各调一次：
+// 编译
+// g++ -O2 -std=c++17 repro.cpp -o repro \
+//   -I$ASCEND_HOME_PATH/include -L$ASCEND_HOME_PATH/lib64 \
+//   -lascendcl -lnnopbase -lopapi_math -lopapi
+static
+const
+int64_t
+R =
+4097
+;
+// 4097*4097 = 16785409（奇数，> 2^24）
+static
+const
+int64_t
+TOTAL = R * R;
+// self = bool[R,R] 全 1（host 侧 std::vector<uint8_t> 填 1）
+// out  = int64[1]
+// dtype = ACL_INT64，keepDims = false
+int64_t
+probe
+(
+int64_t
+a,
+int64_t
+b)
+{
+int64_t
+dimsData[
+2
+] = {a, b};
+    aclIntArray *dims =
+aclCreateIntArray
+(dimsData,
+2
+);
+uint64_t
+wsSize =
+0
+; aclOpExecutor *exec =
+nullptr
+;
+aclnnReduceSumGetWorkspaceSize
+(self, dims,
+false
+, ACL_INT64, out, &wsSize, &exec);
+void
+*ws =
+nullptr
+;
+if
+(wsSize >
+0
+)
+aclrtMalloc
+(&ws, wsSize, ACL_MEM_MALLOC_HUGE_FIRST);
+aclnnReduceSum
+(ws, wsSize, exec, stream);
+aclrtSynchronizeStream
+(stream);
+int64_t
+got =
+0
+;
+aclrtMemcpy
+(&got,
+sizeof
+(got), devOut,
+sizeof
+(got), ACL_MEMCPY_DEVICE_TO_HOST);
+if
+(ws)
+aclrtFree
+(ws);
+aclDestroyIntArray
+(dims);
+return
+got;
+}
+printf
+(
+"dim=[0,1]   -> %lld\n"
+, (
+long
+long
+)
+probe
+(
+0
+,
+1
+));
+printf
+(
+"dim=[-2,-1] -> %lld\n"
+, (
+long
+long
+)
+probe
+(
+-2
+,
+-1
+));
+实测输出：
+bool[4097,4097] all-ones, dtype=INT64
+  dim=[0,1]   -> 16785409
+  dim=[-2,-1] -> 16785408
+  expect      -> 16785409
+可完整复现的工程见附件说明（
+repro_negaxis_bool_int64.cpp
+）。
+四、预期结果 （可选）
+两种轴写法的结果必须相同，都是
+16785409
+。
+「
+dims
+用负轴」在资料里是明确合法的（
+取值范围为 [-self.dim(), self.dim()-1]
+），
+不应因书写方式改变结果；更不应因内部
+promoteType
+的选择而在超过 2^24 时丢精度。
+修复方向（供参考）：在计算
+reduceDims
+前先做负轴归一，例如
+int64_t
+ax = (*dims)[i] <
+0
+? (*dims)[i] +
+static_cast
+<
+int64_t
+>(shape.
+GetDimNum
+())
+                            : (*dims)[i];
+reduceDims *= shape[ax];
+（该处已通过
+CheckDimValid
+，可保证归一后的
+ax
+落在
+[0, dimNum)
+。）
+💡 备注（选填）
+影响面
+：bool mask 的计数类归约（mask 面积、有效 token 数）在归约元素数 > 2^24
+且和不可被 fp32 精确表示时会
+静默少 1
+，无任何告警；调用方普遍使用
+dims=[-1]
+这种写法。
+发现方式
+：aclnn 接口六线自主挖掘（精度 / 确定性 / 契约 / 正常与异常场景 fuzz /
+并发）；该缺陷由精度线的定向用例族检出，另有独立 C++ 探针与判别矩阵交叉验证。
+该问题与已有 issue（#4208 bf16 不支持、#4122 ASCEND960 走 aicpu、#4193/#4192 UT 失败）
+均不同，属新问题。
+Save
+Cancel
+陈思
+Collaborators
+13 days ago
+Comments：
+13 days ago
+Comments：
+您好，感谢反馈！
+问题分析
+核查 ops-math 提交
+8c1f633e3679f83b55a237c552f842cdcf80462f
+的
+aclnn_reduce_sum.cpp
+，
+CheckDimValid
+接受合法负轴，并用
+GetPosDim
+进行轴检查；但 BOOL→INT64 分支计算
+reduceDims
+时仍直接使用原始
+dims
+索引 shape，两处处理确实不一致。
+该分支按归约元素数是否小于
+2^24
+选择 FLOAT 或 INT64，随后先将输入转换到所选类型再做归约。负轴未归一会破坏归约规模判断；若误入 FLOAT，16785409 无法被 fp32 精确表示，最后转回 INT64 也无法恢复精度。这与您提供的正负轴对照和奇偶计数结果一致。源码核查支持这一问题机制，设备结果以您报告的 910B2 / CANN 9.2.0 实测为依据。
+处理方向
+一个可行方案是在计算归约规模前将每个合法负轴归一到对应正轴，再计算
+reduceDims
+，保留大规模 BOOL 计数使用 INT64 的路径。同时需关注乘积溢出保护，以及空 dims、混合正负轴和
+2^24
+附近计数的边界。对当前例子，可先使用等价正轴
+[0,1]
+，您提供的对照结果表明该写法能得到正确计数。
+我们会继续跟踪该问题。
+Save
+Cancel
+陈思
+Collaborators
+13 days ago
+Assign chen_0715 as responsible person
+13 days ago
+Assign chen_0715 as responsible person
+陈思
+Collaborators
+13 days ago
+Added label:
+pending-confirmation
+13 days ago
+Added label:
+pending-confirmation
+庄昭雄
+13 days ago
+Associated pull request
+13 days ago
+Associated pull request
+庄昭雄
+13 days ago
+Comments：
+13 days ago
+Comments：
+已提交修复 MR !6878（
+fix/reduce_sum: 负轴在 bool→INT64 的 promote 判断里未归一
+）。
+910B3 / CANN 8.5.1 实测：
+self=bool[16785409]
+，
+dtype=INT64
+，
+dims={-1}
+改前 16785408、改后 16785409；
+dims={0}
+两者均 16785409。
+Save
+Cancel
+C
+chenyifeng
+Collaborators
+13 days ago
+Assign m0_55003149 as responsible person
+13 days ago
+Assign m0_55003149 as responsible person
+C
+chenyifeng
+Collaborators
+13 days ago
+Removed responsible person chen_0715
+13 days ago
+Removed responsible person chen_0715
+weike
+Collaborators
+12 days ago
+Associated pull request
+12 days ago
+Associated pull request
+weike
+Collaborators
+11 days ago
+changed custom state from 进行中 to 已完成
+11 days ago
+changed custom state from 进行中 to 已完成
+weike
+Collaborators
+11 days ago
+Close issue
+11 days ago
+Close issue
+Assignees
+weike
+Label
+pending-confirmation
+Kanban
+No board linked yet
+Milestones
+No related milestones
+Link PR
+No related PR
+Branch
+No branches linked yet

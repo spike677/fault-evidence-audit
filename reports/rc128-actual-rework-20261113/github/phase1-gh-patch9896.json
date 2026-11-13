@@ -1,0 +1,32 @@
+[
+  {
+    "url": "https://github.com/vllm-project/vllm-ascend/pull/9896",
+    "task_ids": [
+      "RC-055",
+      "RC-076"
+    ],
+    "kind": "DIFF",
+    "round": 1,
+    "response": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Action completed."
+        }
+      ],
+      "structuredContent": {
+        "patches": [
+          {
+            "filename": "vllm_ascend/platform.py",
+            "patch": "@@ -421,7 +421,7 @@ def check_and_update_config(cls, vllm_config: VllmConfig) -> None:\n             # This will cause in scenarios where both piecewise and splitting ops are configured simultaneously,\n             # If splitting ops does not contain the vllm::mla forward value, this configuration issue will\n             # not be detected in advance assert.\n-            compilation_config.splitting_ops.extend([\"vllm::mla_forward\"])\n+            compilation_config.splitting_ops.extend([\"vllm::mla_forward\", \"vllm::dsa_forward\"])\n             update_aclgraph_sizes(vllm_config)\n             ascend_config.ascend_compilation_config.enable_npugraph_ex = False\n         elif ("
+          }
+        ],
+        "url": "https://github.com/vllm-project/vllm-ascend/pull/9896",
+        "title": "vllm-project/vllm-ascend#9896 (patch)",
+        "display_url": "https://github.com/vllm-project/vllm-ascend/pull/9896",
+        "display_title": "vllm-project/vllm-ascend#9896 (patch)"
+      },
+      "isError": false
+    }
+  }
+]

@@ -1,0 +1,161 @@
+[Bug]: not support Optional[List[Tensor]] for custom op when turning on cpp wrapper-pytorch-AtomGit
+Star
+937
+Fork
+1522
+Code
+Introduction
+Code
+Issues
+1956
+Pull Requests
+1850
+Pipeline
+Actions
+Discussion
+Wiki
+Members
+392
+Analysis
+Settings
+Star
+937
+Fork
+1522
+Closed
+[Bug]: not support Optional[List[Tensor]] for custom op when turning on cpp wrapper
+#4247
+pangjiayi
+Add on
+Aug 21
+Closed at
+Aug 21
+pangjiayi
+Aug 21
+Create
+Aug 21
+Create
+欢迎加入社区，感谢您对社区的贡献 🎉!
+欢迎加入社区，感谢您对社区的贡献 🎉!
+环境信息
+A5机器
+torch：2.10
+torch_npu：2.10
+🐛 问题描述
+NotImplementedError: arg type List[Tensor] is not yet supported by custom_op_wrapper
+Traceback (most recent call last):
+File ".../bytedance/lagrange_torch/runner/inference/inference_runner.py", line 277, in inference
+outputs = module_callable(inputs)
+File ".../bytedance/lagrange_torch/module/sequential_module.py", line 28, in forward
+input = module()
+File ".../bytedance/lagrange_torch/module/runstep_module.py", line 105, in forward
+return self.runstep_modules[runstep_name](*arg, **kwargs)
+File ".../bytedance/lagrange_torch/module/runstep_module.py", line 38, in forward
+return self._runstep.func(*arg, **kwargs, **self._runstep.module_dict)
+File "/opt/hh4m/assets/runtime/npu/haven_dump/main_model.py", line 3453, in predict_online
+result = cvr()
+File ".../torch/_dynamo/eval_frame.py", line 977, in compile_wrapper
+raise e.remove_dynamo_frames() from None
+File ".../torch/_inductor/compile_fx.py", line 1028, in _compile_fx_inner
+raise InductorError(e, currentframe()).with_traceback(...)
+File ".../torch/_inductor/compile_fx.py", line 1012, in _compile_fx_inner
+mb_compiled_graph = fx_codegen_and_compile(...)
+File ".../torch/_inductor/compile_fx.py", line 1781, in fx_codegen_and_compile
+return scheme.codegen_and_compile(...)
+File ".../torch/_inductor/compile_fx.py", line 1550, in codegen_and_compile
+compiled_module = graph.compile_to_module()
+File ".../torch/_inductor/graph.py", line 2422, in _compile_to_module
+self.codegen_with_cpp_wrapper() if self.cpp_wrapper else self.codegen()
+File ".../torch_npu/_inductor/graph.py", line 50, in npu_codegen_with_cpp_wrapper
+return self.codegen()
+File ".../torch/_inductor/scheduler.py", line 6259, in _codegen
+self.codegen_extern_call(node)
+File ".../torch/_inductor/scheduler.py", line 5424, in codegen_extern_call
+node.codegen(V.graph.wrapper_code)
+File ".../torch/_inductor/ir.py", line 8109, in codegen
+wrapper.generate_fallback_kernel_with_runtime_lookup(...)
+File ".../torch/_inductor/codegen/cpp_wrapper_cpu.py", line 2398, in generate_fallback_kernel_with_runtime_lookup
+self.generate_fallback_kernel_with_runtime_lookup_python(...)
+File ".../torch/_inductor/codegen/cpp_wrapper_cpu.py", line 2699, in generate_fallback_kernel_with_runtime_lookup_python
+lines += self.generate_py_arg(...)
+File ".../torch/_inductor/codegen/cpp_wrapper_cpu.py", line 2546, in generate_py_arg
+PyTuple_SetItem(... generate_py_arg_inner(lines, raw_arg, arg_type))
+File ".../torch/_inductor/codegen/cpp_wrapper_cpu.py", line 2494, in generate_py_arg_inner
+return generate_py_arg_inner(lines, raw_arg, arg_type.getElementType())
+File ".../torch/_inductor/codegen/cpp_wrapper_cpu.py", line 2527, in generate_py_arg_inner
+raise NotImplementedError(
+torch._inductor.exc.InductorError:
+NotImplementedError: arg type List[Tensor] is not yet supported by custom_op_wrapper
+欢迎加入社区，感谢您对社区的贡献 🎉!
+Save
+Cancel
+pangjiayi
+Aug 21
+associated Kanban: FrameworkPTAdapter 版本issue看板
+Aug 21
+associated Kanban: FrameworkPTAdapter 版本issue看板
+TorchNPU-Bot
+Collaborators
+Aug 21
+Added label:
+triage-review
+Aug 21
+Added label:
+triage-review
+ascend-robot
+Collaborators
+Aug 21
+Added label: bug
+Aug 21
+Added label: bug
+TorchNPU-Bot
+Collaborators
+Aug 21
+Comments：
+Aug 21
+Comments：
+issue待分派，添加
+triage-review
+标签
+Save
+Cancel
+ascend-robot
+Collaborators
+Aug 21
+Close issue
+Aug 21
+Close issue
+ascend-robot
+Collaborators
+Aug 21
+Added label:
+resolved
+Aug 21
+Added label:
+resolved
+chenrayray
+Collaborators
+Sep 24
+Associated milestone: v26.2.0
+Sep 24
+Associated milestone: v26.2.0
+ascend-robot
+Collaborators
+Sep 24
+changed custom state from TODO to DONE
+Sep 24
+changed custom state from TODO to DONE
+Assignees
+Not assigned
+Label
+triage-review
+bug
+resolved
+Kanban
+No board linked yet
+Milestones
+v26.2.0
+Link PR
+No related PR
+Branch
+No branches linked yet

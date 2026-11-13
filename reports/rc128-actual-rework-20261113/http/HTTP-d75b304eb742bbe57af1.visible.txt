@@ -1,0 +1,73 @@
+From 45600336cf2736eb677b4d12e0e75e2dee42c778 Mon Sep 17 00:00:00 2001
+From: hz36amy_00 <zhouyangfan8@huawei.com>
+Date: Tue, 7 Jul 2026 11:41:51 +0800
+Subject: [PATCH] fix NsaCompAtten topk tempUBSize
+
+---
+ .../op_host/nsa_compress_attention_tiling.h         |  1 +
+ .../nsa_compress_attention_tiling_general.cpp       | 13 +++++++++++++
+ .../nsa_compress_attention_s1s2_bn2gs1_sab.h        |  5 +++--
+ 3 files changed, 17 insertions(+), 2 deletions(-)
+
+diff --git a/attention/nsa_compress_attention/op_host/nsa_compress_attention_tiling.h b/attention/nsa_compress_attention/op_host/nsa_compress_attention_tiling.h
+index dd1306babb0..e9bf864f028 100644
+--- a/attention/nsa_compress_attention/op_host/nsa_compress_attention_tiling.h
++++ b/attention/nsa_compress_attention/op_host/nsa_compress_attention_tiling.h
+@@ -63,6 +63,7 @@ TILING_DATA_FIELD_DEF(uint64_t, innerLoop); // s2方向上一次l 切分循环
+ TILING_DATA_FIELD_DEF(uint64_t, s2ScoreLoopLen); // s2方向一次加载的长度
+ TILING_DATA_FIELD_DEF(uint64_t, lastLoopLen); // s2方向加载的尾块大小
+ TILING_DATA_FIELD_DEF(uint64_t, s2Loop); // s2方向上循环次数
++TILING_DATA_FIELD_DEF(uint64_t, tmpUbSize);
+ TILING_DATA_FIELD_DEF_STRUCT(ConfusionTransposeTiling, confusionTransposeTilingData); // api tiling
+ TILING_DATA_FIELD_DEF_STRUCT(ConfusionTransposeTiling, confusionTransposeTilingData2); // api tiling
+ TILING_DATA_FIELD_DEF_STRUCT(ConfusionTransposeTiling, confusionTransposeTilingDataLast); // api tiling
+diff --git a/attention/nsa_compress_attention/op_host/nsa_compress_attention_tiling_general.cpp b/attention/nsa_compress_attention/op_host/nsa_compress_attention_tiling_general.cpp
+index be94308c58f..647197c86a1 100644
+--- a/attention/nsa_compress_attention/op_host/nsa_compress_attention_tiling_general.cpp
++++ b/attention/nsa_compress_attention/op_host/nsa_compress_attention_tiling_general.cpp
+@@ -772,6 +772,19 @@ void NsaCompressAttentionTilingBase::TopKTiling()
+                         AscendC::TopKMode::TOPK_NORMAL, 
+                         true,                 //islargest
+                         tilingData.topkTilingData);
++    uint32_t maxsize = 0;
++    uint32_t minsize = 0;
++    AscendC::GetTopKMaxMinTmpSize(ascendcPlatform,
++        S2sizeAlign32,   // inner
++        topkBase,        // outter
++        false,           // isReuseSource
++        false,           // isInitIndex
++        AscendC::TopKMode::TOPK_NORMAL,
++        true,            // islargest
++        dtypesize,
++        maxsize,
++        minsize);
++    tilingData.importanceScoreParams.set_tmpUbSize(static_cast<uint64_t>(maxsize));
+ }
+ 
+ bool NsaCompressAttentionTilingBase::CheckUbSize(uint64_t &s2ScoreLoopLen, uint64_t &outerLoop)
+diff --git a/attention/nsa_compress_attention/op_kernel/nsa_compress_attention_s1s2_bn2gs1_sab.h b/attention/nsa_compress_attention/op_kernel/nsa_compress_attention_s1s2_bn2gs1_sab.h
+index cb2fbe1adfc..abf0325a361 100644
+--- a/attention/nsa_compress_attention/op_kernel/nsa_compress_attention_s1s2_bn2gs1_sab.h
++++ b/attention/nsa_compress_attention/op_kernel/nsa_compress_attention_s1s2_bn2gs1_sab.h
+@@ -813,7 +813,8 @@ NsaCompressAttentionS1s2Bn2gs1SameAB<layOutType, hasAtten, hasTopkMask, INPUT_T,
+     uint32_t k_pad = (k + 8 - 1) / 8 * 8; //float数据类型对齐，暂时不考虑其他
+     uint32_t S2sizeAlign32 = (S2sizeTopK + blockLength - 1) / blockLength * blockLength;
+     uint32_t S2sizeAlign8 = (S2sizeTopK + 8 - 1) / 8 * 8;
+-    uint32_t maxTopkBase = (190 * 1024 - 20 * S2sizeAlign32) / (4 * S2sizeAlign32 + 8 * k_pad);
++    uint32_t tmpUbSize = this->tilingData->importanceScoreParams.tmpUbSize;
++    uint32_t maxTopkBase = (190 * 1024 - tmpUbSize) / (4 * S2sizeAlign32 + 8 * k_pad);
+     maxTopkBase = maxTopkBase > 0 ? maxTopkBase : 1;
+     uint32_t topkBase = maxTopkBase > S1Base ? S1Base : maxTopkBase;
+     AscendC::DataCopyExtParams copyInParamsV1, copyInParamsPad;
+@@ -832,7 +833,7 @@ NsaCompressAttentionS1s2Bn2gs1SameAB<layOutType, hasAtten, hasTopkMask, INPUT_T,
+     addrOffset = addrOffset + topkBase * k_pad * sizeof(int32_t);
+     topKValueLocal = allUbBuffer.GetWithOffset<T>(topkBase * k_pad, addrOffset);
+     addrOffset = addrOffset + topkBase * k_pad * sizeof(float);
+-    topKTmpLocal = allUbBuffer.GetWithOffset<uint8_t>(20 * S2sizeTopK, addrOffset);
++    topKTmpLocal = allUbBuffer.GetWithOffset<uint8_t>(tmpUbSize, addrOffset);
+ 
+     int64_t bOffset = 0;
+     int64_t n2Offset = 0;
+-- 
+GitCode
+

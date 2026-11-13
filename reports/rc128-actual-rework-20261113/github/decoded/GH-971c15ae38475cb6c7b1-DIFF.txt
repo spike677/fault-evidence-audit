@@ -1,0 +1,41 @@
+FILE: vllm_ascend/device/device_op.py
+@@ -781,6 +781,12 @@ def split_qkv_rmsnorm_rope(
+         )
+         return results
+ 
++    @staticmethod
++    def npu_moe_token_unpermute(permuted_tokens, sorted_indices, probs):
++        return torch_npu.npu_moe_token_unpermute(
++            permuted_tokens=permuted_tokens, sorted_indices=torch.abs(sorted_indices), probs=probs
++        )
++
+ 
+ class A5DeviceAdaptor(BaseDeviceAdaptor):
+     @classmethod
+@@ -1673,6 +1679,12 @@ def split_qkv_rmsnorm_rope(
+         )
+         return results
+ 
++    @staticmethod
++    def npu_moe_token_unpermute(permuted_tokens, sorted_indices, probs):
++        return torch_npu.npu_moe_token_unpermute(
++            permuted_tokens=permuted_tokens, sorted_indices=sorted_indices, probs=probs
++        )
++
+ 
+ def get_device_adaptor() -> type["BaseDeviceAdaptor"]:
+     ascend_device_type = get_ascend_device_type()
+
+FILE: vllm_ascend/ops/fused_moe/token_dispatcher.py
+@@ -426,9 +426,9 @@ def token_dispatch(
+         )
+ 
+     def token_combine(self, hidden_states, combine_metadata, bias=None):
+-        final_hidden_states = torch_npu.npu_moe_token_unpermute(
++        final_hidden_states = DeviceOperator.npu_moe_token_unpermute(
+             permuted_tokens=hidden_states,
+-            sorted_indices=torch.abs(combine_metadata.expanded_row_idx),
++            sorted_indices=combine_metadata.expanded_row_idx,
+             probs=combine_metadata.topk_weights,
+         )
+         if len(combine_metadata.restore_shape) == 3:

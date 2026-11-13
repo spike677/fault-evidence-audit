@@ -1,0 +1,500 @@
+[Bugfix][ops]修复调频plugin异步执行资源管理问题-MindIE-SD-AtomGit
+Star
+135
+Fork
+219
+Code
+Introduction
+Code
+Issues
+17
+Pull Requests
+26
+Pipeline
+Actions
+Discussion
+Wiki
+Members
+114
+Analysis
+Settings
+Star
+135
+Fork
+219
+Merged
+[Bugfix][ops]修复调频plugin异步执行资源管理问题
+#548
+betta18
+Add on
+Aug 26
+Merged from
+betta18/MindIE-SD：
+fix_plugin_of_frequency_regulator
+into
+Ascend/MindIE-SD：
+dev
+[Bugfix][ops]修复调频plugin异步执行资源管理问题
+#548
+Merged
+betta18
+Add on
+Aug 26
+Merged from
+betta18/MindIE-SD
+fix_plugin_of_frequency_regulator
+into
+Ascend/MindIE-SD
+dev
+Merge checks
+Discussion
+0
+Commits
+0
+Checks
+0
+Files changed
+0
+Clone/Download
+0
+B
+betta18
+Collaborators
+Aug 26
+Aug 26
+Which issue(s) this PR fixes or accomplishes
+Fixes #328
+Purpose
+使用统一的
+EXEC_NPU_CMD
+框架调用
+aclnnFrequencyRegulator
+。
+由公共插件框架管理 workspace、executor 和 ACL Tensor 生命周期。
+移除手工流同步及 D2H/H2D 状态拷贝，保持算子异步执行。
+使用
+ACL_UINT32
+接收算子状态，并转换为接口约定的
+int64
+Tensor。
+与 MindIE-SD 其他 PyTorch plugin 的实现方式保持一致。
+Test Plan
+编译
+PTAExtensionOPS
+。
+在 A5 NPU 上启用调频能力。
+单次及连续调用
+frequency_regulator
+，检查返回状态和进程稳定性。
+Test Report
+PTAExtensionOPS
+编译通过。
+连续调用 3 次及 100 次均成功，返回状态为
+0
+。
+未出现 coredump 或 507035 异常。
+Save
+Cancel
+Pull Request has been successfully merged by ascend-robot.
+（Thank you for betta18's contribution.）
+B
+betta18
+Collaborators
+Aug 26
+Created pull request, commit
+7af58cdc
+Aug 26
+Created pull request, commit
+7af58cdc
+B
+betta18
+Collaborators
+Aug 26
+Associated issue: [Bug]: frequency_regulator plugin异步语义与资源生命周期管理不一致
+Aug 26
+Associated issue: [Bug]: frequency_regulator plugin异步语义与资源生命周期管理不一致
+atomgit-bot
+Aug 26
+Comments：
+Aug 26
+Comments：
+变更摘要
+本 PR 修复调频 plugin（
+csrc/plugin/frequency_regulator.cpp
+）异步执行时的资源管理问题（Fixes #328）。核心改动是移除手写的 workspace/executor/ACL Tensor 生命周期管理代码（
+AclTensorDeleter
+、
+AclWorkspaceDeleter
+、
+HugeMemSession
+、
+HugeMemReleaseGuard
+等自定义结构体及
+aclrtMalloc
+/
+aclDestroyTensor
+手工调用），改用统一的
+EXEC_NPU_CMD<FREQUENCY_REGULATOR_OP_NAME>
+框架调用
+aclnnFrequencyRegulator
+，将 workspace、executor 和 ACL Tensor 的生命周期交由公共插件框架统一管理，同时去掉手工流同步与 D2H/H2D 状态拷贝，保持算子异步执行，使该实现与 MindIE-SD 其他 PyTorch plugin 的方式保持一致。
+主要改动
+改用统一的
+EXEC_NPU_CMD
+调用框架
+: 删除全部自定义删除器、
+HugeMemSession
+/
+HugeMemReleaseGuard
+及
+AllocateFrequencyRegulatorWorkspace
+等资源管理辅助结构，改为
+EXEC_NPU_CMD<FREQUENCY_REGULATOR_OP_NAME>(frequency, output_wrapper)
+一行调用，由公共框架统一管理 workspace、executor 和 ACL Tensor 生命周期。
+移除手工流同步与状态拷贝
+: 删除
+aclrtSynchronizeStream
+同步以及
+CopyFrequencyRegulatorStatusToHost
+（D2H）、
+CreateFrequencyRegulatorResultTensor
+（H2D）等
+aclrtMemcpy
+拷贝逻辑，算子保持异步执行。
+状态类型改用
+ACL_UINT32
+并转换为
+int64
+: 用
+TensorWrapper{output, ACL_UINT32}
+包装输出张量直接接收算子状态，返回时通过
+output.to(c10::ScalarType::Long)
+转换为接口约定的
+int64
+Tensor，替代原先的
+CreateFrequencyRegulatorOutAclTensor
+校验与
+ACL_UINT32
+手动建张量逻辑。
+精简输出张量创建
+: 输出张量由
+empty_with_format({1}, options, ACL_FORMAT_ND)
+直接创建（
+Int
+类型），删除了原先的
+FREQUENCY_REGULATOR_OUTPUT_NUMEL
+常量与
+frequency_regulator_impl_npu
+内的多步组装逻辑，代码量从 132 行缩减至 11 行新增。
+Save
+Cancel
+Incorrect?
+atomgit-bot
+Aug 26
+Comments：
+Aug 26
+Comments：
+代码审查
+✅ 未发现问题
+Save
+Cancel
+Incorrect?
+B
+betta18
+Collaborators
+Aug 26
+associated Kanban: MindIE-SD
+Aug 26
+associated Kanban: MindIE-SD
+X
+xiangjie10
+Collaborators
+Aug 26
+Comments：
+Aug 26
+Comments：
+🔍 PR 规范审计未通过，以下项目需要修正：
+⚠️
+PR 代码变更未包含测试用例（变更文件路径中均不包含 test 或 ut），请确认已经备注原因！
+请修正后重新提交，或联系仓库管理员。
+Save
+Cancel
+ascend-robot
+Collaborators
+Aug 26
+Added label:
+ascend-cla/yes
+Aug 26
+Added label:
+ascend-cla/yes
+ascend-robot
+Collaborators
+Aug 26
+Comments：
+Aug 26
+Comments：
+Thanks for your pull-request.
+The full list of commands accepted by me can be found at
+here
+.
+You can get sig-info at
+here
+.
+You can self-configure the PR merge rules for this repository. For more details, please refer to
+Here
+.
+PR Approval Progress
+✅
+Congratulations! All modules have met the lgtm and approve requirements.
+Module Approval Details
+module
+lgtm status
+approve status
+repo-Ascend/MindIE-SD
+✅
+weixin_44144262
+,
+changetheway
+(2/2)
+✅
+weixin_44144262
+(1/1)
+💡 Tip:
+Committer
+can comment
+/approve
+or
+/lgtm
+Commenting
+/approve
+implies both code review (lgtm) and intent to merge (approve)
+CLA Signature Pass
+betta18, thanks for your pull request. All authors of the commits have signed the CLA. 👍
+Save
+Cancel
+ascend-robot
+Collaborators
+Aug 26
+Added label:
+ci-pipeline-running
+Aug 26
+Added label:
+ci-pipeline-running
+ascend-robot
+Collaborators
+Aug 26
+Comments：
+Aug 26
+Comments：
+ascend docs pipeline is running...
+Save
+Cancel
+ascend-robot
+Collaborators
+Aug 26
+Added label:
+docs-ci-pipeline-running
+Aug 26
+Added label:
+docs-ci-pipeline-running
+ascend-robot
+Collaborators
+Aug 26
+Comments：
+Aug 26
+Comments：
+✅ 跳过 docs ci 检查，没有需要检查的文档文件
+Save
+Cancel
+ascend-robot
+Collaborators
+Aug 26
+Removed label:
+docs-ci-pipeline-running
+Aug 26
+Removed label:
+docs-ci-pipeline-running
+ascend-robot
+Collaborators
+Aug 26
+Added label:
+docs-ci-pipeline-success
+Aug 26
+Added label:
+docs-ci-pipeline-success
+ascend-robot
+Collaborators
+Aug 26
+Removed label:
+ci-pipeline-running
+Aug 26
+Removed label:
+ci-pipeline-running
+ascend-robot
+Collaborators
+Aug 26
+Added label:
+ci-pipeline-passed
+Aug 26
+Added label:
+ci-pipeline-passed
+ascend-robot
+Collaborators
+Aug 26
+Comments：
+Aug 26
+Comments：
+流水线
+PR-pipeline_MindIE-SD_gitcode#1806
+[ commitID：f4537472 ] 已完成
+>>>
+代码风格自动修复执行失败，具体请查看日志，不影响流水线执行及PR合入
+阶段
+任务名
+状态
+详情
+编译构建
+Build_linux_x86_abi1
+✅
+>>>
+Build_linux_arm_abi1
+✅
+>>>
+Build_linux_arm_abi0
+✅
+>>>
+恶意代码检查
+Antipoison
+✅
+>>>
+开源片段检查
+SCA
+✅
+>>>
+开发者测试
+UT_linux_arm
+✅
+>>>
+流水线
+PR-pipeline_MindIE-SD_gitcode
+✅
+>>>
+此流水线已支持下列评论快捷指令，仅PR创建者和白名单成员评论有效
+compile
+:
+运行流水线
+retry
+:
+重试流水线所有失败子任务
+retry <任务名>
+:
+仅重试指定失败子任务
+stop
+:
+停止流水线
+Save
+Cancel
+C
+changetheway
+Collaborators
+Aug 26
+Comments：
+Aug 26
+Comments：
+/lgtm
+Save
+Cancel
+lijinxi
+Collaborators
+Aug 27
+Comments：
+Aug 27
+Comments：
+/lgtm
+Save
+Cancel
+ascend-robot
+Collaborators
+Aug 27
+Added label:
+lgtm
+Aug 27
+Added label:
+lgtm
+lijinxi
+Collaborators
+Aug 27
+Comments：
+Aug 27
+Comments：
+/approve
+Save
+Cancel
+ascend-robot
+Collaborators
+Aug 27
+Added label:
+approved
+Aug 27
+Added label:
+approved
+B
+betta18
+Collaborators
+Aug 27
+Comments：
+Aug 27
+Comments：
+🔍 PR 规范审计未通过，以下项目需要修正：
+⚠️
+PR 代码变更未包含测试用例（变更文件路径中均不包含 test 或 ut），请确认已经备注原因！
+请修正后重新提交，或联系仓库管理员。
+@xiangjie10
+bug修复，已有测试验证
+Save
+Cancel
+L
+lanwangli
+Collaborators
+Aug 27
+Comments：
+Aug 27
+Comments：
+/merge
+Save
+Cancel
+ascend-robot
+Collaborators
+Aug 27
+Added label:
+keeper_approved
+Aug 27
+Added label:
+keeper_approved
+ascend-robot
+Collaborators
+Aug 27
+Merged pull request
+Aug 27
+Merged pull request
+Merger
+Not assigned
+Approver
+Not assigned
+Tester
+Not assigned
+Reviewer
+Not assigned
+Label
+ascend-cla/yes
+docs-ci-pipeline-success
+ci-pipeline-passed
+lgtm
+approved
+keeper_approved
+Milestones
+No related milestones
+Kanban
+No related boards
+Link Issue
+No related Issues

@@ -1,0 +1,133 @@
+清理融合规则白名单中已迁移的 norm 与 softmax 系列规则-opbase-AtomGit
+Star
+928
+Fork
+292
+Code
+Introduction
+Code
+Issues
+34
+Pull Requests
+134
+Pipeline
+Actions
+Discussion
+Wiki
+Members
+120
+Analysis
+Settings
+Star
+928
+Fork
+292
+Closed
+清理融合规则白名单中已迁移的 norm 与 softmax 系列规则
+#569
+rk
+Add on
+14 days ago
+Closed at
+14 days ago
+R
+rk
+14 days ago
+Create
+14 days ago
+Create
+一、背景信息
+norm 系列融合规则（LayerNorm / AddLayerNorm / AddLayerNormQuant / AddRmsNorm 系列等）已迁移至 ops-nn 仓库统一维护。本仓库（opbase）融合规则白名单中仍保留这些规则及 softmax 系列规则（ASoftmaxFusionPass / ZConfusionSoftmaxGradFusionPass），新旧两处同时注册存在重复生效风险。
+二、价值/作用
+避免 opbase 与 ops-nn 两处同时注册相同融合规则导致重复生效
+白名单收敛，维护职责清晰
+三、设计方案
+从
+scripts/fusion_config/fusion_pass/config/support_fusion_pass.json
+移除：
+3510
+条目：norm 系列 11 条 + softmax 系列 2 条，共 13 条；
+5102
+条目：该条目中原有的 6 条 norm/softmax 规则；
+扩展平台条目：同样移除 13 条（与
+3510
+一致）。
+关联 PR：
+https://gitcode.com/cann/opbase/pull/1088
+Save
+Cancel
+R
+rk
+14 days ago
+Change title to "清理融合规则白名单中已迁移的 norm 与 softmax 系列规则", originally titled "[Feature Request|新需求]: 清理融合规则白名单中已迁移的 norm 与 softmax 系列规则".
+14 days ago
+Change title to "清理融合规则白名单中已迁移的 norm 与 softmax 系列规则", originally titled "[Feature Request|新需求]: 清理融合规则白名单中已迁移的 norm 与 softmax 系列规则".
+CANN-robot
+Collaborators
+14 days ago
+Close issue
+14 days ago
+Close issue
+CANN-robot
+Collaborators
+14 days ago
+Added label:
+resolved
+14 days ago
+Added label:
+resolved
+R
+rk
+11 days ago
+Comments：
+11 days ago
+Comments：
+需求：norm 与 softmax 系列融合规则已经在开源仓补充了es api形式的最新版实现，且在A5版本使能。
+修改：涉及相关规则关闭老仓白名单，旧规则不再使能。
+Save
+Cancel
+R
+rk
+11 days ago
+Comments：
+11 days ago
+Comments：
+方案：
+调整融合算子白名单配置文件 scripts/fusion_config/fusion_pass/config/support_fusion_pass.json，其目的是从各平台的白名单中移除已经完成迁移的融合 pass，避免这些 pass 继续通过白名单加载。改动覆盖 3510、5102、9201、9202 四个平台键，仅删除字符串中以逗号分隔的 pass 名称，没有涉及其他结构，因此白名单中实际生效的可选融合 pass 集合发生了变化。
+具体如下：
+移除 LayerNorm 系列融合 pass：3510、9201、9202 的白名单中删除了 LayerNormONNXFusionPass、LayerNormONNXMULFusionPass、LayerNormInferenceFusionPass、LayerNormFusionPass，5102 则删除了其中的 LayerNormONNXFusionPass、LayerNormONNXMULFusionPass。
+移除 AddLayerNorm 与 AddRmsNorm 相关 pass：四个平台均不再包含 AddLayerNormFusionPass、AddRmsNormFusionGraphPass、InplaceAddRmsNormFusionPass；3510、9201、9202 还额外删除了 AddRmsNormQuantFusionPass、AddRmsNormDynamicQuantFusionPass、AddLayerNormDynamicQuantFusionPass、QuantizeAddLayerNormPass。
+移除 Softmax 相关融合 pass：四个平台的白名单中，ASoftmaxFusionPass 都被移除；3510、9201、9202 同时移除了 ZConfusionSoftmaxGradFusionPass。
+平台间删除范围存在差异：3510、9201、9202 采用一致的删除集合；5102 由于原白名单本身包含较少的 Norm 类 pass，只删除了其中的 LayerNorm、AddLayerNorm、RmsNorm 相关项。其余融合 pass 及其顺序保持不变。
+Save
+Cancel
+R
+ren-botao
+Collaborators
+10 days ago
+Comments：
+10 days ago
+Comments：
+/assign
+@wangpengbo26
+Save
+Cancel
+CANN-robot
+Collaborators
+10 days ago
+Assign wangpengbo26 as responsible person
+10 days ago
+Assign wangpengbo26 as responsible person
+Assignees
+R
+rk
+Label
+resolved
+Kanban
+No board linked yet
+Milestones
+No related milestones
+Link PR
+No related PR
+Branch
+No branches linked yet

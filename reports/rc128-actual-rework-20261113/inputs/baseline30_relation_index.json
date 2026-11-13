@@ -1,0 +1,832 @@
+{
+  "basis": "原30条定义的归类索引，条件或语义不明的部分保留待核",
+  "version": "operator-mechanism-pilot-v1",
+  "baseline_sha256": "053e752990d6852ddc528bc708d1631d7ac23d4c5de804cde75bdc88deee22aa",
+  "rules_sha256": "0bdd0b4e9f0b16cf602c9127df5a3bbfa4f6d868d9a499859f7f5bb2d7544166",
+  "definition_statuses": {
+    "DECLARED": 11,
+    "CONDITIONAL": 13,
+    "PENDING": 6
+  },
+  "relation_index": {
+    "函数数值语义": {
+      "PENDING": [
+        "M025"
+      ]
+    },
+    "地址映射": {
+      "PENDING": [
+        "M004"
+      ]
+    },
+    "地址算术": {
+      "DECLARED": [
+        "M014"
+      ]
+    },
+    "存储所有权与范围": {
+      "DECLARED": [
+        "M015"
+      ]
+    },
+    "对象绑定": {
+      "DECLARED": [
+        "M022"
+      ]
+    },
+    "布局视图语义": {
+      "CONDITIONAL": [
+        "M027"
+      ]
+    },
+    "形状推导与传播": {
+      "DECLARED": [
+        "M006"
+      ]
+    },
+    "执行依赖": {
+      "PENDING": [
+        "M007"
+      ]
+    },
+    "执行可重复性": {
+      "CONDITIONAL": [
+        "M012",
+        "M017",
+        "M028"
+      ]
+    },
+    "接口能力与配置": {
+      "CONDITIONAL": [
+        "M013",
+        "M029"
+      ]
+    },
+    "数值参考一致性": {
+      "CONDITIONAL": [
+        "M005"
+      ]
+    },
+    "数值求值与表示": {
+      "DECLARED": [
+        "M001",
+        "M009",
+        "M019",
+        "M030"
+      ],
+      "CONDITIONAL": [
+        "M003",
+        "M008",
+        "M016",
+        "M018"
+      ]
+    },
+    "数学定义域": {
+      "DECLARED": [
+        "M002"
+      ]
+    },
+    "有效处理范围": {},
+    "空输入的输出约束": {
+      "PENDING": [
+        "M020"
+      ]
+    },
+    "编译路径语义一致性": {
+      "PENDING": [
+        "M021"
+      ]
+    },
+    "访问与切分边界": {
+      "PENDING": [
+        "M026"
+      ]
+    },
+    "路径适用性": {
+      "DECLARED": [
+        "M011",
+        "M023"
+      ]
+    },
+    "逻辑坐标与物理布局对应": {
+      "CONDITIONAL": [
+        "M024"
+      ]
+    },
+    "配置与参数传播": {
+      "CONDITIONAL": [
+        "M010"
+      ]
+    },
+    "量化数据流": {
+      "CONDITIONAL": [
+        "M010"
+      ]
+    },
+    "量化输出数值语义": {}
+  },
+  "modes": [
+    {
+      "mode_id": "M001",
+      "mode_name": "算子实现精度不一致：低精度误差累积",
+      "source": {
+        "column": "F",
+        "field_label_as_supplied": "故障原因（failure_mechanism_raw）",
+        "value": "混合精度模式下npu和gpu的实现行为不一致，如混精下gpu默认先转fp32再计算，npu先fp16计算再转fp32，单算子相同输入gpu侧输出可以正常（超fp16没超fp32）npu溢出",
+        "source_id": "SRC-c7807e71337064e3f929d7a1",
+        "cell_or_range": "F10"
+      },
+      "source_scope": "训练",
+      "status": "DECLARED",
+      "entries": [
+        {
+          "relation": "数值求值与表示",
+          "break": "低精度运算先于精度提升"
+        }
+      ],
+      "boundary": "适用于原定义的混精顺序差异。相同输入的允许计算精度、提升位置和对照契约待核。",
+      "historical_evidence": "SUMMARY_SUPPORTS",
+      "source_verified": false,
+      "hardware_validated": false
+    },
+    {
+      "mode_id": "M002",
+      "mode_name": "边界值异常",
+      "source": {
+        "column": "F",
+        "field_label_as_supplied": "故障原因（failure_mechanism_raw）",
+        "value": "INTrainingUpdataV2算子variance算出来有负值，导致开根后变为nan",
+        "source_id": "SRC-2b49dafe78f0f09e7f7f699a",
+        "cell_or_range": "F27"
+      },
+      "source_scope": "推理",
+      "status": "DECLARED",
+      "entries": [
+        {
+          "relation": "数学定义域",
+          "break": "负方差被送入平方根"
+        }
+      ],
+      "boundary": "定位到sqrt的输入域。负方差的具体生成式和是否涉及舍入消减待查。",
+      "historical_evidence": "SUMMARY_SUPPORTS",
+      "source_verified": false,
+      "hardware_validated": false
+    },
+    {
+      "mode_id": "M003",
+      "mode_name": "tiling切分策略的逻辑异常",
+      "source": {
+        "column": "F",
+        "field_label_as_supplied": "故障原因（failure_mechanism_raw）",
+        "value": "reduce轴没有切多核，但m轴在多batch下切分不同，由于FA是下三角的sparse计算，导致核内的reduce轴切分粒度不同",
+        "source_id": "SRC-a54baa324f56cf730d2392af",
+        "cell_or_range": "F25"
+      },
+      "source_scope": "推理",
+      "status": "CONDITIONAL",
+      "entries": [
+        {
+          "relation": "数值求值与表示",
+          "break": "切分改变核内归约粒度"
+        }
+      ],
+      "boundary": "原定义描述batch变化与归约粒度差异。需核对何种比较下应等价及容差，范围不延伸到末轮漏处理。",
+      "historical_evidence": "SUMMARY_SUPPORTS",
+      "source_verified": false,
+      "hardware_validated": false
+    },
+    {
+      "mode_id": "M004",
+      "mode_name": "越界读写：偏移量计算错误",
+      "source": {
+        "column": "F",
+        "field_label_as_supplied": "故障原因（failure_mechanism_raw）",
+        "value": "window区偏移计算存在问题,导致地址有踩踏，从而导致精度问题",
+        "source_id": "SRC-4f21e6a2eabd29c3123db333",
+        "cell_or_range": "F6"
+      },
+      "source_scope": "训练",
+      "status": "PENDING",
+      "entries": [
+        {
+          "relation": "地址映射",
+          "break": "原表声明window偏移算错"
+        }
+      ],
+      "boundary": "偏移算式和消费范围未闭合。此前useBufferType配置传递讨论另作解释线索，不能并为已证地址错。",
+      "historical_evidence": "SUMMARY_INTERNAL_CONFLICT",
+      "source_verified": false,
+      "hardware_validated": false
+    },
+    {
+      "mode_id": "M005",
+      "mode_name": "浮点数累加序不当",
+      "source": {
+        "column": "F",
+        "field_label_as_supplied": "故障原因（failure_mechanism_raw）",
+        "value": "通信累加顺序不一致导致测试不通过，如不同测试脚本目前是只按照一种求和顺序来比较，而集合通信ReduceScatter实现不同rank天然就会有不同的加法顺序，出现结果不相等的情况。",
+        "source_id": "SRC-e9b0aa69133aff043359d260",
+        "cell_or_range": "F12"
+      },
+      "source_scope": "训练",
+      "status": "CONDITIONAL",
+      "entries": [
+        {
+          "relation": "数值参考一致性",
+          "break": "归约顺序与单一顺序标杆不一致"
+        }
+      ],
+      "boundary": "先核对通信契约是否允许多种加法序和对应容差。测试标杆过严时需分流到参考问题。",
+      "historical_evidence": "SYMPTOM_ONLY",
+      "source_verified": false,
+      "hardware_validated": false
+    },
+    {
+      "mode_id": "M006",
+      "mode_name": "越界读写：shape错误",
+      "source": {
+        "column": "F",
+        "field_label_as_supplied": "故障原因（failure_mechanism_raw）",
+        "value": "SetSize算子的infershape接口存在问题，output shape是-1，导致其后面的算子ReduceSum推导出的shape是个标量，进而导致分配内存异常；",
+        "source_id": "SRC-bf19d6ead4761d9d1da7aeac",
+        "cell_or_range": "F4"
+      },
+      "source_scope": "训练",
+      "status": "DECLARED",
+      "entries": [
+        {
+          "relation": "形状推导与传播",
+          "break": "未知维被后续推导当作标量"
+        }
+      ],
+      "boundary": "原记录的-1和标量推导可定位形状关系。区分合法动态占位与后续错误消费，原版本证据待补。",
+      "historical_evidence": "SYMPTOM_ONLY",
+      "source_verified": false,
+      "hardware_validated": false
+    },
+    {
+      "mode_id": "M007",
+      "mode_name": "缺少同步",
+      "source": {
+        "column": "F",
+        "field_label_as_supplied": "故障原因（failure_mechanism_raw）",
+        "value": "多核同时搬运可能会导致偶现精度问题",
+        "source_id": "SRC-3b48bc17e29827c233b382aa",
+        "cell_or_range": "F7"
+      },
+      "source_scope": "训练",
+      "status": "PENDING",
+      "entries": [
+        {
+          "relation": "执行依赖",
+          "break": "疑似多核搬运缺少完成依赖"
+        }
+      ],
+      "boundary": "原表只声明多核同时搬运可能致偶现，具体生产者、消费者及依赖方向未知。",
+      "historical_evidence": "SYMPTOM_ONLY",
+      "source_verified": false,
+      "hardware_validated": false
+    },
+    {
+      "mode_id": "M008",
+      "mode_name": "浮点数累加序不当",
+      "source": {
+        "column": "F",
+        "field_label_as_supplied": "故障原因（failure_mechanism_raw）",
+        "value": "累加序实现不一致，如二分累加对比顺序累加，导致精度差异，如未设置export CLOSE_MATMUL_K_SHIFT=1时会有计算误差，具体可能是在router选择时容易出现较大偏差，导致评分下降",
+        "source_id": "SRC-c851534aabb5d657bb408d5f",
+        "cell_or_range": "F16"
+      },
+      "source_scope": "推理",
+      "status": "CONDITIONAL",
+      "entries": [
+        {
+          "relation": "数值求值与表示",
+          "break": "累加次序变化使误差经选路放大"
+        }
+      ],
+      "boundary": "要求明确相同数学输入、实际累加序和允许误差。仅有配置变化和router结果差异仍需定界。",
+      "historical_evidence": "SUMMARY_SUPPORTS",
+      "source_verified": false,
+      "hardware_validated": false
+    },
+    {
+      "mode_id": "M009",
+      "mode_name": "精度溢出：数值格式精度不够导致精度溢出",
+      "source": {
+        "column": "F",
+        "field_label_as_supplied": "故障原因（failure_mechanism_raw）",
+        "value": "baddbmm公式out=β input +α (batch1@batch2),计算时括号内为中间变量，超出fp16表示范围",
+        "source_id": "SRC-f0813efdc9daf08665ec6edb",
+        "cell_or_range": "F20"
+      },
+      "source_scope": "推理",
+      "status": "DECLARED",
+      "entries": [
+        {
+          "relation": "数值求值与表示",
+          "break": "中间乘积超过承载数值范围"
+        }
+      ],
+      "boundary": "原定义明确baddbmm中间乘积超FP16范围。与INT8格点内的舍入方式差异分开。",
+      "historical_evidence": "SUMMARY_SUPPORTS",
+      "source_verified": false,
+      "hardware_validated": false
+    },
+    {
+      "mode_id": "M010",
+      "mode_name": "融合算子反量化位置不当",
+      "source": {
+        "column": "F",
+        "field_label_as_supplied": "故障原因（failure_mechanism_raw）",
+        "value": "图优化阶段因反量化（Dequantize）节点摆放位置错误，导致本应以纯INT8执行的融合算子退化为“反量化+高精度计算+再量化”路径，或使量化参数（scale/zero_point）传递断裂，最终引发精度异常",
+        "source_id": "SRC-cbfd780ebe0ca7cb408a5873",
+        "cell_or_range": "F28"
+      },
+      "source_scope": "推理",
+      "status": "CONDITIONAL",
+      "entries": [
+        {
+          "relation": "量化数据流",
+          "break": "反量化处在错误阶段"
+        },
+        {
+          "relation": "配置与参数传播",
+          "break": "量化参数未到达融合消费者"
+        }
+      ],
+      "boundary": "原定义的反量化位置与量化参数传播是两种可分别检视的解释。需定位实际融合路径和量化参数消费者。",
+      "historical_evidence": "NO_HISTORICAL_LINK",
+      "source_verified": false,
+      "hardware_validated": false
+    },
+    {
+      "mode_id": "M011",
+      "mode_name": "tiling切分策略分支错误",
+      "source": {
+        "column": "F",
+        "field_label_as_supplied": "故障原因（failure_mechanism_raw）",
+        "value": "tiling逻辑判断或具体条件判断错误，导致走入错误分支",
+        "source_id": "SRC-379643568fa69a1dd317a863",
+        "cell_or_range": "F14"
+      },
+      "source_scope": "训练",
+      "status": "DECLARED",
+      "entries": [
+        {
+          "relation": "路径适用性",
+          "break": "边界谓词选错实现"
+        }
+      ],
+      "boundary": "原F14允许归入条件判错导致错误分支。仅循环末轮处理量算错时，应比较有效处理范围。",
+      "historical_evidence": "SYMPTOM_ONLY",
+      "source_verified": false,
+      "hardware_validated": false
+    },
+    {
+      "mode_id": "M012",
+      "mode_name": "确定性计算未实现",
+      "source": {
+        "column": "F",
+        "field_label_as_supplied": "故障原因（failure_mechanism_raw）",
+        "value": "RMSNorm小算子（Pow + ReduceMean + Add +Rsqrt）实现与RMSNorm算子不同；ReduceMean的确定性未能固定",
+        "source_id": "SRC-72c00c8db0479f6b30494648",
+        "cell_or_range": "F15"
+      },
+      "source_scope": "推理",
+      "status": "CONDITIONAL",
+      "entries": [
+        {
+          "relation": "执行可重复性",
+          "break": "归约未维持确定性要求"
+        }
+      ],
+      "boundary": "需核对确定性承诺及同实参、同配置重复。分解算子实现不同是对照线索。",
+      "historical_evidence": "SUMMARY_SUPPORTS",
+      "source_verified": false,
+      "hardware_validated": false
+    },
+    {
+      "mode_id": "M013",
+      "mode_name": "NPU适配引入额外参数",
+      "source": {
+        "column": "F",
+        "field_label_as_supplied": "故障原因（failure_mechanism_raw）",
+        "value": "tik底层对coreNum特性，block_dim为scalar时支持不够导致的，需添加常量折叠配置。",
+        "source_id": "SRC-3d65d6157051edd48713c3b6",
+        "cell_or_range": "F18"
+      },
+      "source_scope": "推理",
+      "status": "CONDITIONAL",
+      "entries": [
+        {
+          "relation": "接口能力与配置",
+          "break": "标量block_dim路径缺少所需编译配置"
+        }
+      ],
+      "boundary": "原表提到constant folding。适用配置和是否是缺失设置需从该平台编译契约核对。",
+      "historical_evidence": "SYMPTOM_ONLY",
+      "source_verified": false,
+      "hardware_validated": false
+    },
+    {
+      "mode_id": "M014",
+      "mode_name": "tensor下标超出数值范围",
+      "source": {
+        "column": "F",
+        "field_label_as_supplied": "故障原因（failure_mechanism_raw）",
+        "value": "偏移量超出INT32数值范围",
+        "source_id": "SRC-b711249e77351636e8a5f8fe",
+        "cell_or_range": "F19"
+      },
+      "source_scope": "推理",
+      "status": "DECLARED",
+      "entries": [
+        {
+          "relation": "地址算术",
+          "break": "地址偏移以不足位宽计算"
+        }
+      ],
+      "boundary": "原F19明确INT32。偏移单位、求值位置和消费者需随案例核验。UINT32算址能否扩展到本条，留待正式周报案例比较。",
+      "historical_evidence": "NO_HISTORICAL_LINK",
+      "source_verified": false,
+      "hardware_validated": false
+    },
+    {
+      "mode_id": "M015",
+      "mode_name": "越界读写：内存踩踏覆盖",
+      "source": {
+        "column": "F",
+        "field_label_as_supplied": "故障原因（failure_mechanism_raw）",
+        "value": "FIA算子踩踏reducesum的内存，导致传入残差入口（add_3算子）的数据发生误差，导致残差之后的误差会不断放大",
+        "source_id": "SRC-002a5d15b67dc7d53782149b",
+        "cell_or_range": "F23"
+      },
+      "source_scope": "推理",
+      "status": "DECLARED",
+      "entries": [
+        {
+          "relation": "存储所有权与范围",
+          "break": "写入覆盖其他计算仍使用的内存"
+        }
+      ],
+      "boundary": "原定义是一个算子写入影响另一算子的输入。实际越界跨度、分配重叠和生命周期需另证。",
+      "historical_evidence": "CONFLICTING_ATTRIBUTION",
+      "source_verified": false,
+      "hardware_validated": false
+    },
+    {
+      "mode_id": "M016",
+      "mode_name": "精度溢出：特定硬件数值格式导致精度溢出",
+      "source": {
+        "column": "F",
+        "field_label_as_supplied": "故障原因（failure_mechanism_raw）",
+        "value": "调用的是BNInferenceD算子，该算子在310P fp16场景有概率发生精度溢出",
+        "source_id": "SRC-bbb7aba1bd94da37493ad718",
+        "cell_or_range": "F26"
+      },
+      "source_scope": "推理",
+      "status": "CONDITIONAL",
+      "entries": [
+        {
+          "relation": "数值求值与表示",
+          "break": "特定硬件低精度路径发生溢出"
+        }
+      ],
+      "boundary": "原定义限定310P FP16，具体中间运算未由本条原文定位。",
+      "historical_evidence": "SUMMARY_SUPPORTS",
+      "source_verified": false,
+      "hardware_validated": false
+    },
+    {
+      "mode_id": "M017",
+      "mode_name": "tiling切分策略不同分支处理精度不一致",
+      "source": {
+        "column": "F",
+        "field_label_as_supplied": "故障原因（failure_mechanism_raw）",
+        "value": "PageAttention blockSize 不同时，会有不同的tiling选择，结果精度不能保持二进制一致",
+        "source_id": "SRC-f37548c4acf7cbb9dce8cb35",
+        "cell_or_range": "F30"
+      },
+      "source_scope": "推理",
+      "status": "CONDITIONAL",
+      "entries": [
+        {
+          "relation": "执行可重复性",
+          "break": "不同切分下的结果未满足确定性承诺"
+        }
+      ],
+      "boundary": "先区分同配置重复与跨blockSize比较，并核对该接口实际承诺的等价范围。",
+      "historical_evidence": "SUMMARY_SUPPORTS",
+      "source_verified": false,
+      "hardware_validated": false
+    },
+    {
+      "mode_id": "M018",
+      "mode_name": "浮点数累加序不当",
+      "source": {
+        "column": "F",
+        "field_label_as_supplied": "故障原因（failure_mechanism_raw）",
+        "value": "attention算子输入shape不一样导致Tiling 策略并行粒度变化，输出微小差异带来精度误差",
+        "source_id": "SRC-fd6787c70348dc9d6bbc5525",
+        "cell_or_range": "F32"
+      },
+      "source_scope": "推理",
+      "status": "CONDITIONAL",
+      "entries": [
+        {
+          "relation": "数值求值与表示",
+          "break": "并行粒度变化产生有限精度差异"
+        }
+      ],
+      "boundary": "原文给出shape到tiling的线索。需核对比较调用的可比性、实际运算次序和精度门槛。",
+      "historical_evidence": "UNRESOLVED_MECHANISM",
+      "source_verified": false,
+      "hardware_validated": false
+    },
+    {
+      "mode_id": "M019",
+      "mode_name": "数学等价但计算结果不等价",
+      "source": {
+        "column": "F",
+        "field_label_as_supplied": "故障原因（failure_mechanism_raw）",
+        "value": "FA反向计算时顺序不合适（数学等价）导致精度不足",
+        "source_id": "SRC-c676fafbbc8fc31a8e890df8",
+        "cell_or_range": "F11"
+      },
+      "source_scope": "训练",
+      "status": "DECLARED",
+      "entries": [
+        {
+          "relation": "数值求值与表示",
+          "break": "数学等价的求值顺序改变有限精度结果"
+        }
+      ],
+      "boundary": "仅在真实参考合同要求相应精度时成立。责任表达式及误差边界仍需案例证据。",
+      "historical_evidence": "NO_HISTORICAL_LINK",
+      "source_verified": false,
+      "hardware_validated": false
+    },
+    {
+      "mode_id": "M020",
+      "mode_name": "空tensor处理不当",
+      "source": {
+        "column": "F",
+        "field_label_as_supplied": "故障原因（failure_mechanism_raw）",
+        "value": "embedding前向输入为空导致反向NaN",
+        "source_id": "SRC-822d0018d96866ff063ad602",
+        "cell_or_range": "F3"
+      },
+      "source_scope": "训练",
+      "status": "PENDING",
+      "entries": [
+        {
+          "relation": "空输入的输出约束",
+          "break": "空前向输入后的反向异常，首错未定位"
+        }
+      ],
+      "boundary": "原表只有空输入及NaN，空输入允许域、反向应写值和责任消费者未明。",
+      "historical_evidence": "SUMMARY_PARTIAL",
+      "source_verified": false,
+      "hardware_validated": false
+    },
+    {
+      "mode_id": "M021",
+      "mode_name": "矩阵乘加融合后数据格式转换精度丢失",
+      "source": {
+        "column": "F",
+        "field_label_as_supplied": "故障原因（failure_mechanism_raw）",
+        "value": "MatmulAtomicAddUbFusion打开矩阵乘法加法融合，特定shape下matmul算子 在线编译和二进制的输出会有精度差距",
+        "source_id": "SRC-32cf3df1acb14a40aae88e3e",
+        "cell_or_range": "F31"
+      },
+      "source_scope": "推理",
+      "status": "PENDING",
+      "entries": [
+        {
+          "relation": "编译路径语义一致性",
+          "break": "融合路径之间有差异，首个违例未定位"
+        }
+      ],
+      "boundary": "原表说明在线编译与二进制差异。不能由开关位置推定特定Cast或算术错误。",
+      "historical_evidence": "SUMMARY_SUPPORTS",
+      "source_verified": false,
+      "hardware_validated": false
+    },
+    {
+      "mode_id": "M022",
+      "mode_name": "搬运逻辑错误：blocktable有错误",
+      "source": {
+        "column": "F",
+        "field_label_as_supplied": "故障原因（failure_mechanism_raw）",
+        "value": "Block Table 目前的索引和但kvCacheOut 的batch 偏移不一致",
+        "source_id": "SRC-d556251025040180c6bcf998",
+        "cell_or_range": "F8"
+      },
+      "source_scope": "训练",
+      "status": "DECLARED",
+      "entries": [
+        {
+          "relation": "对象绑定",
+          "break": "BlockTable索引与目标KV batch偏移不对应"
+        }
+      ],
+      "boundary": "要求确定映射的目标batch和KV消费者。地址算式正确但取错对象时按本关系判断。",
+      "historical_evidence": "SYMPTOM_ONLY",
+      "source_verified": false,
+      "hardware_validated": false
+    },
+    {
+      "mode_id": "M023",
+      "mode_name": "tiling切分策略的逻辑异常",
+      "source": {
+        "column": "F",
+        "field_label_as_supplied": "故障原因（failure_mechanism_raw）",
+        "value": "tiling逻辑计算有误，如未适配多种芯片核数，例310P3 8个核，310P1 10个核，前者能正常执行但后者报错",
+        "source_id": "SRC-0aaa41fed7b0efac00c8358a",
+        "cell_or_range": "F13"
+      },
+      "source_scope": "训练",
+      "status": "DECLARED",
+      "entries": [
+        {
+          "relation": "路径适用性",
+          "break": "切分资源参数与平台实际核数不符"
+        }
+      ],
+      "boundary": "原表限定不同芯片可用核数，保留平台和实际模板前提。与数值尾块长度错误分开。",
+      "historical_evidence": "BODY_UNAVAILABLE",
+      "source_verified": false,
+      "hardware_validated": false
+    },
+    {
+      "mode_id": "M024",
+      "mode_name": "数据排布转换错误",
+      "source": {
+        "column": "F",
+        "field_label_as_supplied": "故障原因（failure_mechanism_raw）",
+        "value": "数据在内存排布转换发生错误，如NZ排布转换实现方案存在问题。",
+        "source_id": "SRC-f781d0e3989ef1e15543920b",
+        "cell_or_range": "F9"
+      },
+      "source_scope": "训练",
+      "status": "CONDITIONAL",
+      "entries": [
+        {
+          "relation": "逻辑坐标与物理布局对应",
+          "break": "排布转换破坏数据对应"
+        }
+      ],
+      "boundary": "需明确逻辑坐标、原/目标物理布局和转换消费者。当前原文未给实际轴映射或首错。",
+      "historical_evidence": "SYMPTOM_ONLY",
+      "source_verified": false,
+      "hardware_validated": false
+    },
+    {
+      "mode_id": "M025",
+      "mode_name": "算子实现精度不一致：指数函数精度实现错误",
+      "source": {
+        "column": "F",
+        "field_label_as_supplied": "故障原因（failure_mechanism_raw）",
+        "value": "Tensor.exponoential_算子实现精度不一致",
+        "source_id": "SRC-c96b0044562c8f9e8c0aa49e",
+        "cell_or_range": "F21"
+      },
+      "source_scope": "推理",
+      "status": "PENDING",
+      "entries": [
+        {
+          "relation": "函数数值语义",
+          "break": "算子实现差异，责任计算未定位"
+        }
+      ],
+      "boundary": "原表未闭合API身份及算法差异。数学指数、采样或随机实现等解释不能互相继承。",
+      "historical_evidence": "SUMMARY_SUPPORTS",
+      "source_verified": false,
+      "hardware_validated": false
+    },
+    {
+      "mode_id": "M026",
+      "mode_name": "越界读写：tiling切分策略的逻辑错误",
+      "source": {
+        "column": "F",
+        "field_label_as_supplied": "故障原因（failure_mechanism_raw）",
+        "value": "测试脚本中输入的indices的tensor大小未对齐32b",
+        "source_id": "SRC-b961fd52f21dd94eb19cd215",
+        "cell_or_range": "F5"
+      },
+      "source_scope": "训练",
+      "status": "PENDING",
+      "entries": [
+        {
+          "relation": "访问与切分边界",
+          "break": "仅有indices对齐条件，破坏方式未定位"
+        }
+      ],
+      "boundary": "32b所指单位、对齐对象、实际指令消费者和可访问区未知。保留对齐线索，不按尾块或越界通用覆盖。",
+      "historical_evidence": "SYMPTOM_ONLY",
+      "source_verified": false,
+      "hardware_validated": false
+    },
+    {
+      "mode_id": "M027",
+      "mode_name": "竞品实现不一致：特定私有数据排列格式",
+      "source": {
+        "column": "F",
+        "field_label_as_supplied": "故障原因（failure_mechanism_raw）",
+        "value": "特定私有格式（NC1HWC0、NDHWC、NDC1HWC0、Z_3D）， 不支持as_strided的改变stride的view操作",
+        "source_id": "SRC-ad9e5647bba1a4975bf52e79",
+        "cell_or_range": "F24"
+      },
+      "source_scope": "推理",
+      "status": "CONDITIONAL",
+      "entries": [
+        {
+          "relation": "布局视图语义",
+          "break": "私有格式的stride变更未得到支持"
+        }
+      ],
+      "boundary": "核对as_strided支持面和inplace消费；若接口明确拒绝该操作，需要审查上游的能力选择。",
+      "historical_evidence": "SUMMARY_SUPPORTS",
+      "source_verified": false,
+      "hardware_validated": false
+    },
+    {
+      "mode_id": "M028",
+      "mode_name": "确定性计算未实现",
+      "source": {
+        "column": "F",
+        "field_label_as_supplied": "故障原因（failure_mechanism_raw）",
+        "value": "reducescatter算子，HCCL场景支持确定性计算，LCCL场景不支持确定性计算",
+        "source_id": "SRC-65917f4bff2a96fc2cdc8d9f",
+        "cell_or_range": "F22"
+      },
+      "source_scope": "推理",
+      "status": "CONDITIONAL",
+      "entries": [
+        {
+          "relation": "执行可重复性",
+          "break": "选用的通信后端缺少确定性能力"
+        }
+      ],
+      "boundary": "要求原调用确实承诺确定性且对应通信路径被选中。区分后端支持差异与实际执行依赖。",
+      "historical_evidence": "SUMMARY_SUPPORTS",
+      "source_verified": false,
+      "hardware_validated": false
+    },
+    {
+      "mode_id": "M029",
+      "mode_name": "硬件导致算子不支持未拦截",
+      "source": {
+        "column": "F",
+        "field_label_as_supplied": "故障原因（failure_mechanism_raw）",
+        "value": "如300I系列机器均不支持处理fp32的dtype数据，matmul算子先将输入cast为FP16后进行计算；如310P不支持inf nan；如reshapeAndCacheNd在输入shape较大时走入了使用DataCopyPad分支，在310p上不支持该指令",
+        "source_id": "SRC-7e5dbd3d6eb75a1c3dfb20a6",
+        "cell_or_range": "F17"
+      },
+      "source_scope": "推理",
+      "status": "CONDITIONAL",
+      "entries": [
+        {
+          "relation": "接口能力与配置",
+          "break": "所选指令路径不满足目标平台能力"
+        },
+        {
+          "relation": "接口能力与配置",
+          "break": "dtype不受平台支持时进入转换路径"
+        },
+        {
+          "relation": "接口能力与配置",
+          "break": "特殊值不受平台支持时未定界"
+        }
+      ],
+      "boundary": "按原表保留三项声明。平台、dtype、特殊值、指令是独立前提，必须逐项确认契约和执行路径。",
+      "historical_evidence": "MULTI_SUBCLAIM_PARTIAL",
+      "source_verified": false,
+      "hardware_validated": false
+    },
+    {
+      "mode_id": "M030",
+      "mode_name": "输入数据类型强转低精丢失",
+      "source": {
+        "column": "F",
+        "field_label_as_supplied": "故障原因（failure_mechanism_raw）",
+        "value": "conv2d算子在进行计算之前，会把输入的tensor强制转换成FP16格式的，因为算子内部不支持FP32格式。所以计算出的结果和onnx就不对齐",
+        "source_id": "SRC-b13d0b3f0eb6cf984980655c",
+        "cell_or_range": "F29"
+      },
+      "source_scope": "推理",
+      "status": "DECLARED",
+      "entries": [
+        {
+          "relation": "数值求值与表示",
+          "break": "计算前把输入强转为低精度"
+        }
+      ],
+      "boundary": "按原表定位到输入转换。只有与接口精度要求冲突才成立，与量化输出INT8舍入遗漏分开。",
+      "historical_evidence": "SUMMARY_SUPPORTS",
+      "source_verified": false,
+      "hardware_validated": false
+    }
+  ]
+}

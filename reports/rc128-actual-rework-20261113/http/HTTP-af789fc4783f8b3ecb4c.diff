@@ -1,0 +1,62 @@
+diff --git a/mindspeed_mm/data/dataloader/sampler.py b/mindspeed_mm/data/dataloader/sampler.py
+index 62a9da752e4229546e4537341d32c222c6feca58..1e73f5869cacaa38b1b1ff58534f4ba6fb278a77 100644
+--- a/mindspeed_mm/data/dataloader/sampler.py
++++ b/mindspeed_mm/data/dataloader/sampler.py
+@@ -452,7 +452,7 @@ class BaseRandomBatchSampler(DistributedSampler):
+             start_idx = self.rank * bucket_size
+             if self.shuffle:
+                 g = torch.Generator()
+-                g.manual_seed(self.epoch)
++                g.manual_seed(self.seed + self.epoch)
+                 idx_range_bucket = torch.randperm(bucket_size, generator=g).tolist()
+             else:
+                 idx_range_bucket = list(range(bucket_size))
+@@ -463,7 +463,7 @@ class BaseRandomBatchSampler(DistributedSampler):
+             full_bucket_offset = current_epoch_samples
+             if self.shuffle:
+                 g = torch.Generator()
+-                g.manual_seed(self.epoch)
++                g.manual_seed(self.seed + self.epoch)
+                 idx_range_total = \
+                     torch.randperm(full_bucket_size, generator=g).tolist()
+             else:
+@@ -641,7 +641,7 @@ class BucketBatchSampler(BaseRandomBatchSampler):
+                 start_idx = self.rank * bucket_size
+                 if self.shuffle:
+                     g = torch.Generator()
+-                    g.manual_seed(self.epoch)
++                    g.manual_seed(self.seed + self.epoch)
+                     idx_range_bucket = torch.randperm(bucket_size, generator=g).tolist()
+                 else:
+                     idx_range_bucket = list(range(bucket_size))
+@@ -652,7 +652,7 @@ class BucketBatchSampler(BaseRandomBatchSampler):
+                 full_bucket_offset = current_epoch_samples
+                 if self.shuffle:
+                     g = torch.Generator()
+-                    g.manual_seed(self.epoch)
++                    g.manual_seed(self.seed + self.epoch)
+                     idx_range_total = \
+                         torch.randperm(full_bucket_size, generator=g).tolist()
+                 else:
+diff --git a/mindspeed_mm/fsdp/data/dataloader/sampler.py b/mindspeed_mm/fsdp/data/dataloader/sampler.py
+index 313d776470c18fb20be1082aeed5d9bb90099de1..87678545233f43d75741179765d05924fbefee64 100644
+--- a/mindspeed_mm/fsdp/data/dataloader/sampler.py
++++ b/mindspeed_mm/fsdp/data/dataloader/sampler.py
+@@ -71,7 +71,7 @@ class BaseRandomBatchSampler(StatefulDistributedSampler):
+             start_idx = self.rank * bucket_size
+             if self.shuffle:
+                 g = torch.Generator()
+-                g.manual_seed(self.epoch)
++                g.manual_seed(self.seed + self.epoch)
+                 idx_range_bucket = torch.randperm(bucket_size, generator=g).tolist()
+             else:
+                 idx_range_bucket = list(range(bucket_size))
+@@ -82,7 +82,7 @@ class BaseRandomBatchSampler(StatefulDistributedSampler):
+             full_bucket_offset = current_epoch_samples
+             if self.shuffle:
+                 g = torch.Generator()
+-                g.manual_seed(self.epoch)
++                g.manual_seed(self.seed + self.epoch)
+                 idx_range_total = \
+                     torch.randperm(full_bucket_size, generator=g).tolist()
+             else:

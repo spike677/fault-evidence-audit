@@ -1,0 +1,143 @@
+[Requirement|需求建议]: compressor/quant_compressor/compressor_grad tiling 与 kernel 规范整改及缺陷修复-ops-transformer-AtomGit
+Star
+1681
+Fork
+3393
+Code
+Introduction
+Code
+Issues
+429
+Pull Requests
+726
+Pipeline
+Actions
+Discussion
+Wiki
+Members
+620
+Analysis
+Settings
+Star
+1681
+Fork
+3393
+Open
+[Requirement|需求建议]: compressor/quant_compressor/compressor_grad tiling 与 kernel 规范整改及缺陷修复
+#7448
+莫允扬
+Add on
+23 hours ago
+莫允扬
+Collaborators
+23 hours ago
+Create
+23 hours ago
+Create
+Backgroud（背景信息）
+compressor
+/
+quant_compressor
+/
+compressor_grad
+三个算子的 tiling 与 kernel 在前期 K/M 轴叠加切分整改后，仍遗留一批规范性问题与正确性缺陷：
+属性被重复读取、校验分散，存在 32 位宽化与溢出隐患；
+cu_seqlens
+首维、输出形状、stride 下界等校验缺失；
+tiling 与 kernel 各自实现
+ceil-div
+/
+align
+等公共逻辑，模板参数、变量命名不统一，VF 尾部处理口径不一致；
+arch92 融合路径仍引用旧常量；切分在空输入场景存在除零风险；
+910B 公共 Host 因 tiling 中残留无用的
+using namespace AscendC;
+导致编译失败；
+报错文本重复带算子名、example 的
+CHECK_RET
+不带日志信息，定位成本高。
+Benefit / Necessity（价值/作用）
+tiling 与 kernel 行为口径统一，降低后续修改回归风险；
+补齐入参与输出校验，把非法 shape/stride 挡在 Host 侧，避免核上越界；
+修复 arch92 旧常量引用、空输入除零、910B Host 编译失败等问题；
+清理死代码与无用头文件，报错与示例更易读易定位。
+Design（设计方案）
+tiling 规范整改
+：属性一次性读取并统一
+int64
+校验，整改 32 位宽化与溢出隐患；
+CheckFeature
+校验落点统一，补充
+cu_seqlens
+首维、输出形状、stride 下界校验；清理死代码、无用头文件与未使用的参数结构体。
+kernel / VF 收敛
+：kernel 与 tiling 复用公共
+ceil-div
+/
+align
+；统一模板参数与命名，除法改位移；提取 vf 公共常量，VF 尾部统一按循环处理，统一循环计数器口径。
+缺陷修复
+：arch92 融合路径旧常量引用；切分在空输入时除零；输出形状与 stride 下界校验补齐；910B 公共 Host 编译失败。
+示例与报错
+：example 的
+CHECK_RET
+改为传入日志信息与错误码；报错文本去掉重复算子名。
+改动范围：12 个提交、65 个文件（+5184 / −5367），集中在
+attention/
+（compressor 29、quant_compressor 31、compressor_grad 5）。
+实现 PR：见关联 MR。
+Save
+Cancel
+莫允扬
+Collaborators
+23 hours ago
+Added label:
+requirement
+23 hours ago
+Added label:
+requirement
+周云飞
+Collaborators
+23 hours ago
+Comments：
+23 hours ago
+Comments：
+/assign
+@myy268
+Save
+Cancel
+CANN-robot
+Collaborators
+23 hours ago
+Assign myy268 as responsible person
+23 hours ago
+Assign myy268 as responsible person
+周云飞
+Collaborators
+23 hours ago
+Comments：
+23 hours ago
+Comments：
+感谢提出整改建议。参数校验和空输入处理关系到算子正确性，可优先确认各路径的触发条件；公共工具、命名及 VF 尾部处理的统一则需兼顾不同平台的行为和性能。
+Host 侧可考虑统一属性读取和范围校验，并核对
+cu_seqlens
+、输出形状及 stride 的约束；空输入切分需在除法前明确处理。
+Kernel 侧可评估复用公共计算逻辑，并分别核对 arch92 常量引用和 910B Host 编译问题，避免统一实现改变现有边界行为。
+示例方面，当前 CompressorGrad 示例中，
+CHECK_RET
+的调用已包含日志和错误码；其他示例及报错文本的情况仍需分别确认。
+关联 MR 的具体内容和状态目前尚未确认，相关问题和调整范围会继续分析。
+Save
+Cancel
+Assignees
+莫允扬
+Label
+requirement
+Kanban
+No board linked yet
+Milestones
+No related milestones
+Link PR
+No related PR
+Branch
+No branches linked yet

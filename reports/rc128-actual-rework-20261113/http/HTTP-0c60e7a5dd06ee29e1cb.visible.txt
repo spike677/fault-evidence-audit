@@ -1,0 +1,1224 @@
+[Bug-Report|缺陷反馈]: 3 个算子（ClippedSwigluV2 / MoeGatingTopKBackward / MoeFinalizeRouting）对非连续出参该拒未拒（资料标 ×，物理 dump 100% 相同）-ops-nn-AtomGit
+Star
+1418
+Fork
+2158
+Code
+Introduction
+Code
+Issues
+935
+Pull Requests
+733
+Pipeline
+Actions
+Discussion
+Wiki
+Members
+474
+Analysis
+Settings
+Star
+1418
+Fork
+2158
+Open
+[Bug-Report|缺陷反馈]: 3 个算子（ClippedSwigluV2 / MoeGatingTopKBackward / MoeFinalizeRouting）对非连续出参该拒未拒（资料标 ×，物理 dump 100% 相同）
+#8748
+liuhanwen8
+Add on
+3 hours ago
+liuhanwen8
+3 hours ago
+Create
+3 hours ago
+Create
+[Bug-Report|缺陷反馈]: 3 个算子（ClippedSwigluV2 / MoeGatingTopKBackward / MoeFinalizeRouting）对非连续出参该拒未拒（资料标 ×，物理 dump 100% 相同）
+查重：三者各命中
+0
+条。
+MoeFinalizeRoutingV2
+/
+V2Grad
+是不同算子，不冲突。
+同类「该拒未拒」本仓已有先例：
+#8699
+、
+#8701
+、
+#8702
+、
+#8704
+、
+#8706
+。
+现象
+三个算子的出参在资料里都标
+×
+（不支持非连续）
+，实测传入 stride 带空洞的视图时
+两段均返回
+0/0
+（未拒绝）
+，结果按连续布局写入，按 stride 读回一半以上是未写过的哨兵：
+接口
+出参
+基线（连续）
+K=2
+非连续
+K=3
+非连续
+物理 dump
+ClippedSwigluV2
+out
+（
+[2,16]
+）
+哨兵 0/32
+哨兵
+16/32
+、超差
+29/32
+worst=777005 @1
+哨兵
+21/32
+、超差 30/32
+32/32 (100%)
+MoeGatingTopKBackward
+gradX
+（
+[4,8]
+）
+哨兵 0/32
+哨兵
+16/32
+、超差
+22/32
+worst=777000 @3
+哨兵
+21/32
+、超差 28/32
+32/32 (100%)
+MoeFinalizeRouting
+out
+（
+[3,4]
+）
+哨兵 0/12
+哨兵
+6/12
+、超差
+11/12
+worst=777005 @1
+哨兵
+8/12
+、超差 11/12
+12/12 (100%)
+基线数值均可核对：
+ClippedSwigluV2
+：
+out=0.0563 -3.296 -12.17 5.033 -0.9292 -7.066 -18.56 ...
+（
+Swish(x1)*x2
+后按
+limit=7
+clamp）
+MoeFinalizeRouting
+：
+out=2.025 2.73 3.435 4.14 2.225 2.93 3.635 4.34
+（
+expandX*scale
+后按
+expandedRowIdx
+累加）
+MoeGatingTopKBackward
+：
+gradX=0 0 -0 0.5785 -0 -0 -1.446 -0 ...
+期望
+三份资料的出参
+非连续Tensor 列都填
+×
+，同表输入标
+√
+。
+按官方文档模板该列只有
+√
+支持 /
+×
+不支持 /
+-
+不涉及
+三种取值。
+×
+即不支持 →
+正确行为是出参非连续时第一段接口返回
+161002
+拒绝
+。
+实测两段返回
+0/0
+（未拒绝）且一半以上位置未写 ——
+该拒未拒 + 静默错值
+。
+决定性证据
+① 物理 dump 与基线逐元素 100% 相同
+三个算子在
+K=2
+下
+storage
+前
+numel(view)
+个元素与连续基线完全一致
+（
+32/32
+、
+32/32
+、
+12/12
+），说明写入按
+storage[0],storage[1],…
+连续推进，
+stride 未参与寻址
+。
+② 哨兵随
+K
+单调增加
+16→21
+、
+16→21
+、
+6→8
+，证明这些位置
+从未被写过
+。
+③
+worst
+恰为哨兵值
+（
+777005
+/
+777000
+），读回拿到的就是调用方初值。
+④ 三组重复运行逐字节一致
+，非偶发。
+环境
+硬件 / CANN：Atlas A2（910B3）+ 9.2.0
+仓：
+cann/ops-nn
+@
+754a2ee9
+（
+ClippedSwigluV2
+）、
+cann/ops-transformer
+@
+5adf800c
+（两个 Moe 算子）
+构造：
+ClippedSwigluV2
+：
+x{2,32}
+、
+groupIndex={2}
+、
+dim=-1
+、
+alpha=1.0
+、
+limit=7.0
+、
+bias=1.702
+、
+interleaved=true
+、
+clampMode=1
+MoeGatingTopKBackward
+：
+xNorm{4,8}
+、
+gradY{4,2}
+、
+expertIdx{4,2}
+、
+renorm=0
+、
+normType=1
+、
+routedScalingFactor=2.5
+、
+eps=1e-20
+MoeFinalizeRouting
+：
+expandedX{6,4}
+、
+x1{3,4}
+、
+bias{2,4}
+、
+scales{3,2}
+、
+expandedExpertIdx{3,2}
+、
+expandedRowIdx{6}
+复现步骤
+存下方脚本为
+repro.cpp
+（
+MoeFinalizeRouting
+版），编译：
+g++ -std=c++17 -O1 repro.cpp -o repro -I$ASCEND_HOME_PATH/include -L$ASCEND_HOME_PATH/lib64 -lascendcl -lopapi -lnnopbase -Wl,--allow-shlib-undefined
+./repro 0 2
+（0 为 device，2 = 末维 stride 倍数）
+关键输出：
+[out非连 K=2] ret=0/0
+←
+未拒绝
+；
+哨兵 out 6/12
+；
+[FAIL] 超差 11/12 worst=777005 @1
+；
+[物理] 12 (100%)
+；末行打印「stride 未参与寻址（缺陷）」
+./repro 0 3
+哨兵升到 8/12
+另两个算子按同法替换头文件与接口名（
+aclnn_clipped_swiglu_v2.h
+/
+aclnn_moe_gating_top_k_backward.h
+），同样复现
+复现脚本
+// aclnnMoeFinalizeRouting 出参非连续探测（out 标 ×）
+// 资料 out 标 ×（不支持非连续）→ 正确行为是首段返回 161002 拒绝
+// mode 0 基线 / 1 出参非连续（K = 末维 stride 倍数）
+#
+include
+<cstdio>
+#
+include
+<cmath>
+#
+include
+<vector>
+#
+include
+<cstdint>
+#
+include
+<cstring>
+#
+include
+<cstdlib>
+#
+include
+<unistd.h>
+#
+include
+"acl/acl.h"
+#
+include
+"aclnn/acl_meta.h"
+#
+include
+"aclnnop/aclnn_moe_finalize_routing.h"
+static
+aclrtStream S;
+static
+int64_t
+Nel
+(
+const
+std::vector<
+int64_t
+>& s)
+{
+int64_t
+n=
+1
+;
+for
+(
+auto
+v:s)n*=v;
+return
+n;}
+static
+std::vector<
+int64_t
+>
+Cs
+(
+const
+std::vector<
+int64_t
+>& v)
+{
+std::vector<
+int64_t
+>
+s
+(v.size(),
+1
+)
+;
+for
+(
+int64_t
+i=(
+int64_t
+)v.
+size
+()
+-2
+;i>=
+0
+;i--) s[i]=s[i
++1
+]*v[i
++1
+];
+return
+s;}
+template
+<
+class
+T>
+static
+void
+*
+Up
+(
+const
+std::vector<T>& h)
+{
+void
+* p=
+nullptr
+;
+aclrtMalloc
+(&p,h.
+size
+()*
+sizeof
+(T),ACL_MEM_MALLOC_HUGE_FIRST);
+aclrtMemcpy
+(p,h.
+size
+()*
+sizeof
+(T),h.
+data
+(),h.
+size
+()*
+sizeof
+(T),ACL_MEMCPY_HOST_TO_DEVICE);
+return
+p;}
+static
+aclTensor*
+Mk
+(std::vector<
+int64_t
+> sh,aclDataType dt,std::vector<
+int64_t
+> st,
+                     std::vector<
+int64_t
+> ss,
+void
+* d)
+{
+return
+aclCreateTensor
+(sh.
+data
+(),(
+uint64_t
+)sh.
+size
+(),dt,st.
+data
+(),
+0
+,ACL_FORMAT_ND,
+                         ss.
+data
+(),(
+uint64_t
+)ss.
+size
+(),d);}
+static
+std::vector<
+float
+>
+Rd
+(
+void
+* d,std::vector<
+int64_t
+> v,std::vector<
+int64_t
+> st,std::vector<
+int64_t
+> ss)
+{
+std::vector<
+float
+>
+h
+((
+size_t
+)Nel(ss))
+, o
+;
+std::vector<
+int64_t
+>
+ix
+(v.size(),
+0
+)
+;
+aclrtMemcpy
+(h.
+data
+(),h.
+size
+()*
+4
+,d,h.
+size
+()*
+4
+,ACL_MEMCPY_DEVICE_TO_HOST);
+for
+(
+int64_t
+l=
+0
+,nv=
+Nel
+(v);l<nv;l++){
+int64_t
+off=
+0
+;
+for
+(
+size_t
+j=
+0
+;j<v.
+size
+();j++) off+=ix[j]*st[j]; o.
+push_back
+(h[(
+size_t
+)off]);
+for
+(
+int64_t
+j=(
+int64_t
+)v.
+size
+()
+-1
+;j>=
+0
+;j--){
+if
+(++ix[(
+size_t
+)j]<v[j])
+break
+; ix[(
+size_t
+)j]=
+0
+; } }
+return
+o;}
+static
+const
+float
+SENT=
+-777000.f
+;
+static
+std::vector<
+float
+> gB;
+static
+bool
+gH=
+false
+;
+static
+void
+Run
+(
+int
+mode,
+int
+K)
+{
+  std::vector<
+int64_t
+> shEX={
+6
+,
+4
+}, shX1={
+3
+,
+4
+}, shB={
+2
+,
+4
+}, shS={
+3
+,
+2
+},
+                       shE={
+3
+,
+2
+}, shR={
+6
+}, shO={
+3
+,
+4
+};
+  std::vector<
+int64_t
+> stO=
+Cs
+(shO), ssO=shO;
+if
+(mode==
+1
+){ stO={(
+int64_t
+)
+4
+*K,K}; ssO={
+3
+,(
+int64_t
+)
+4
+*K}; }
+if
+(mode){
+int64_t
+mo=(
+2
+)*stO[
+0
+]+(
+3
+)*stO[
+1
+];
+printf
+(
+"  [构造] out mo=%lld < storage=%lld %s\n"
+,(
+long
+long
+)mo,(
+long
+long
+)
+Nel
+(ssO),
+           mo<
+Nel
+(ssO)?
+"合法"
+:
+"非法"
+); }
+std::vector<
+float
+>
+exh
+(
+24
+)
+;
+for
+(
+int
+i=
+0
+;i<
+24
+;i++) exh[(
+size_t
+)i]=(
+float
+)((i%
+8
+)
++1
+)*
+0.5f
+;
+std::vector<
+float
+>
+x1h
+(
+12
+)
+;
+for
+(
+int
+i=
+0
+;i<
+12
+;i++) x1h[(
+size_t
+)i]=(
+float
+)(i
++1
+)*
+0.1f
+;
+std::vector<
+float
+>
+bh
+(
+8
+)
+;
+for
+(
+int
+i=
+0
+;i<
+8
+;i++)  bh[(
+size_t
+)i]=(
+float
+)(i
++1
+)*
+0.05f
+;
+std::vector<
+float
+>
+sh
+(
+6
+)
+;
+for
+(
+int
+i=
+0
+;i<
+6
+;i++)  sh[(
+size_t
+)i]=
+0.5f
++0.1f
+*(i%
+2
+);
+  std::vector<
+int32_t
+> eh={
+0
+,
+1
+,
+0
+,
+1
+,
+0
+,
+1
+};
+  std::vector<
+int32_t
+> rh={
+0
+,
+1
+,
+2
+,
+3
+,
+4
+,
+5
+};
+void
+* dEX=
+Up
+(exh);
+void
+* dX1=
+Up
+(x1h);
+void
+* dB=
+Up
+(bh);
+void
+* dS=
+Up
+(sh);
+void
+* dE=
+Up
+(eh);
+void
+* dR=
+Up
+(rh);
+void
+* dO=
+Up
+(std::
+vector
+<
+float
+>((
+size_t
+)
+Nel
+(ssO),SENT));
+  aclTensor* tEX=
+Mk
+(shEX,ACL_FLOAT,
+Cs
+(shEX),shEX,dEX);
+  aclTensor* tX1=
+Mk
+(shX1,ACL_FLOAT,
+Cs
+(shX1),shX1,dX1);
+  aclTensor* tB =
+Mk
+(shB, ACL_FLOAT,
+Cs
+(shB), shB, dB);
+  aclTensor* tS =
+Mk
+(shS, ACL_FLOAT,
+Cs
+(shS), shS, dS);
+  aclTensor* tE =
+Mk
+(shE, ACL_INT32,
+Cs
+(shE), shE, dE);
+  aclTensor* tR =
+Mk
+(shR, ACL_INT32,
+Cs
+(shR), shR, dR);
+  aclTensor* tO =
+Mk
+(shO, ACL_FLOAT,stO,ssO,dO);
+uint64_t
+ws=
+0
+; aclOpExecutor* ex=
+nullptr
+;
+int
+r1=(
+int
+)
+aclnnMoeFinalizeRoutingGetWorkspaceSize
+(tEX,tX1,
+/*x2*/
+nullptr
+,tB,tS,tR,tE,tO,&ws,&ex);
+int
+r2=
+-1
+;
+if
+(r1==
+0
+){
+void
+* wp=
+nullptr
+;
+if
+(ws)
+aclrtMalloc
+(&wp,ws,ACL_MEM_MALLOC_HUGE_FIRST);
+    r2=(
+int
+)
+aclnnMoeFinalizeRouting
+(wp,ws,ex,S);
+aclrtSynchronizeStream
+(S);
+if
+(wp)
+aclrtFree
+(wp); }
+printf
+(
+"[%-8s K=%d] ret=%d/%d\n"
+, mode?
+"out非连"
+:
+"基线"
+, K, r1, r2);
+if
+(r2!=
+0
+)
+return
+;
+
+  std::vector<
+float
+> v=
+Rd
+(dO,shO,stO,ssO);
+auto
+cn=[](
+const
+std::vector<
+float
+>&x){
+int
+c=
+0
+;
+for
+(
+auto
+y:x)
+if
+(y==SENT) c++;
+return
+c;};
+printf
+(
+"        哨兵 out %d/%zu  vals="
+,
+cn
+(v), v.
+size
+());
+for
+(
+size_t
+i=
+0
+;i<v.
+size
+()&&i<
+8
+;i++)
+printf
+(
+"%.4g "
+, v[i]);
+printf
+(
+"\n"
+);
+if
+(mode==
+0
+){ gB=v; gH=
+true
+;
+return
+; }
+if
+(!gH)
+return
+;
+int
+bad=
+0
+,f1=
+-1
+;
+float
+w=
+0
+;
+for
+(
+size_t
+i=
+0
+;i<v.
+size
+();i++){
+if
+(v[i]==gB[i])
+continue
+;
+float
+d=std::
+fabs
+(v[i]-gB[i]);
+if
+(!(d<=
+1e-5f
++1e-4f
+*std::
+fabs
+(gB[i]))){bad++;
+if
+(f1<
+0
+)f1=(
+int
+)i;
+if
+(d>w)w=d;} }
+printf
+(
+"  %s out(按stride) %s %d/%zu"
+, bad?
+"[FAIL]"
+:
+"[ OK ]"
+, bad?
+"超差"
+:
+"一致"
+, bad, v.
+size
+());
+if
+(bad)
+printf
+(
+" worst=%.6g @%d"
+, w, f1);
+printf
+(
+"\n"
+);
+std::vector<
+float
+>
+raw
+((
+size_t
+)Nel(ssO))
+;
+aclrtMemcpy
+(raw.
+data
+(),raw.
+size
+()*
+4
+,dO,raw.
+size
+()*
+4
+,ACL_MEMCPY_DEVICE_TO_HOST);
+int
+same=
+0
+;
+for
+(
+size_t
+i=
+0
+;i<v.
+size
+()&&i<raw.
+size
+();i++)
+if
+(raw[i]==gB[i]) same++;
+printf
+(
+"        [物理] storage 前 %zu 个中与基线相同 %d (%.0f%%)\n"
+,
+         v.
+size
+(),same,
+100.0
+*same/(
+double
+)v.
+size
+());
+if
+(same==(
+int
+)v.
+size
+() && bad>
+0
+)
+printf
+(
+"        => 物理与基线相同但读回不一致：按连续布局写，stride 未参与寻址（缺陷）\n"
+);
+if
+(same<(
+int
+)v.
+size
+() && bad==
+0
+)
+printf
+(
+"        => 物理不同但读回一致：stride 参与寻址（实现实际支持）\n"
+);
+
+}
+int
+main
+(
+int
+argc,
+char
+** argv)
+{
+int
+dev=(argc>
+1
+)?
+atoi
+(argv[
+1
+]):
+0
+, K=(argc>
+2
+)?
+atoi
+(argv[
+2
+]):
+2
+;
+aclInit
+(
+nullptr
+);
+aclrtSetDevice
+(dev);
+aclrtCreateStream
+(&S);
+Run
+(
+0
+,K);
+if
+(gH)
+Run
+(
+1
+,K);
+fflush
+(stdout); _exit(
+0
+);
+}
+影响
+AddLayerNorm
+/
+ClippedSwigluV2
+是 Transformer FFN 与归一化的融合算子，
+MoeGatingTopKBackward
+与
+MoeFinalizeRouting
+是 MoE 路由的正反向核心，均为训练高频路径。
+非连续出参时读回拿到
+未初始化哨兵或相邻元素错值
+，返回码为 0 无法感知，静默污染梯度。
+三者的
+物理 dump 100%
+形态完全一致，说明是同一处回写路径的问题，不是个别分支漏掉。
+建议
+二选一并统一：
+按资料
+首段增加「出参必须连续」校验返回
+161002
+；
+按能力
+补齐 ViewCopy 并把资料对应
+×
+改为
+√
+；
+建议把「出参标
+×
+但实现放行」做一次全仓扫描
+—— 本批 16 个
+×
+类接口里
+已确认 7 个属此类（
+ForeachDivScalarList
+/
+ForeachMulScalarList
+/
+MoeTokenPermute
+/
+MoeTokenUnpermuteWithEp
+/
+AddLayerNorm
+/本条 3 个），占比高到不像个例；
+加 ST 用例：
+×
+标注接口传非连续
+必须报 161002
+；
+√
+标注接口传非连续
+必须逐元素一致
+。
+Save
+Cancel
+liuhanwen8
+3 hours ago
+Added label:
+bug-report
+3 hours ago
+Added label:
+bug-report
+Assignees
+Not assigned
+Label
+bug-report
+Kanban
+No board linked yet
+Milestones
+No related milestones
+Link PR
+No related PR
+Branch
+No branches linked yet

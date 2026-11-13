@@ -1,0 +1,118 @@
+From c4427529cce16c96395c3cf7c72474b19f7f9996 Mon Sep 17 00:00:00 2001
+From: wangqi_ai <wangqi195@hisilicon.com>
+Date: Mon, 9 Nov 2026 14:01:18 +0800
+Subject: [PATCH] =?UTF-8?q?bitwise=5Fand/bitwise=5Fxor/equal=20InferDataTy?=
+ =?UTF-8?q?pe=20=E8=A1=A5=E5=9F=9F=E4=B8=8E=E7=AD=89=E5=80=BC=E6=A0=A1?=
+ =?UTF-8?q?=E9=AA=8C?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+---
+ .../op_graph/bitwise_and_graph_infer.cpp      | 28 ++++++++++++++++++-
+ .../op_graph/bitwise_xor_graph_infer.cpp      | 28 ++++++++++++++++++-
+ math/equal/op_graph/equal_graph_infer.cpp     |  8 ++++++
+ 3 files changed, 62 insertions(+), 2 deletions(-)
+
+diff --git a/math/bitwise_and/op_graph/bitwise_and_graph_infer.cpp b/math/bitwise_and/op_graph/bitwise_and_graph_infer.cpp
+index af3ad6c98b..fb7a69f005 100644
+--- a/math/bitwise_and/op_graph/bitwise_and_graph_infer.cpp
++++ b/math/bitwise_and/op_graph/bitwise_and_graph_infer.cpp
+@@ -10,8 +10,34 @@
+ 
+ #include "register/op_impl_registry.h"
+ #include "op_graph/graph_infer_comm_funcs.h"
++#include "log/log.h"
+ 
+ using namespace ge;
+ namespace ops {
+-IMPL_OP(BitwiseAnd).InferDataType(InferDataTypeOutputSameAsInput);
++static bool IsSupportedIntegerDtype(const ge::DataType dtype)
++{
++    return dtype == ge::DT_INT8 || dtype == ge::DT_INT16 || dtype == ge::DT_INT32 || dtype == ge::DT_INT64 ||
++           dtype == ge::DT_UINT8 || dtype == ge::DT_UINT16 || dtype == ge::DT_UINT32 || dtype == ge::DT_UINT64;
++}
++
++static ge::graphStatus InferDataType4BitwiseAnd(gert::InferDataTypeContext* context)
++{
++    OP_LOGD(context->GetNodeName(), "Begin to do InferDataType4BitwiseAnd");
++
++    const ge::DataType x1DataType = context->GetInputDataType(0);
++    const ge::DataType x2DataType = context->GetInputDataType(1);
++    OP_CHECK_IF(!IsSupportedIntegerDtype(x1DataType),
++                OP_LOGE_FOR_INVALID_DTYPE(context->GetNodeName(), "x1", Ops::Base::ToString(x1DataType).c_str(),
++                                          "int8, int16, int32, int64, uint8, uint16, uint32 or uint64"),
++                return ge::GRAPH_FAILED);
++    OP_CHECK_IF(x1DataType != x2DataType,
++                OP_LOGE_FOR_INVALID_DTYPES_WITH_REASON(
++                    "BitwiseAnd", "x1 and x2",
++                    (Ops::Base::ToString(x1DataType) + " and " + Ops::Base::ToString(x2DataType)).c_str(),
++                    "x1 and x2 must have the same dtype"),
++                return ge::GRAPH_FAILED);
++    return context->SetOutputDataType(0, x1DataType);
++}
++
++IMPL_OP(BitwiseAnd).InferDataType(InferDataType4BitwiseAnd);
+ } // namespace ops
+diff --git a/math/bitwise_xor/op_graph/bitwise_xor_graph_infer.cpp b/math/bitwise_xor/op_graph/bitwise_xor_graph_infer.cpp
+index 2537f62b4b..9b76f22f88 100644
+--- a/math/bitwise_xor/op_graph/bitwise_xor_graph_infer.cpp
++++ b/math/bitwise_xor/op_graph/bitwise_xor_graph_infer.cpp
+@@ -10,8 +10,34 @@
+ 
+ #include "register/op_impl_registry.h"
+ #include "op_graph/graph_infer_comm_funcs.h"
++#include "log/log.h"
+ 
+ using namespace ge;
+ namespace ops {
+-IMPL_OP(BitwiseXor).InferDataType(InferDataTypeOutputSameAsInput);
++static bool IsSupportedIntegerDtype(const ge::DataType dtype)
++{
++    return dtype == ge::DT_INT8 || dtype == ge::DT_INT16 || dtype == ge::DT_INT32 || dtype == ge::DT_INT64 ||
++           dtype == ge::DT_UINT8 || dtype == ge::DT_UINT16 || dtype == ge::DT_UINT32 || dtype == ge::DT_UINT64;
++}
++
++static ge::graphStatus InferDataType4BitwiseXor(gert::InferDataTypeContext* context)
++{
++    OP_LOGD(context->GetNodeName(), "Begin to do InferDataType4BitwiseXor");
++
++    const ge::DataType x1DataType = context->GetInputDataType(0);
++    const ge::DataType x2DataType = context->GetInputDataType(1);
++    OP_CHECK_IF(!IsSupportedIntegerDtype(x1DataType),
++                OP_LOGE_FOR_INVALID_DTYPE(context->GetNodeName(), "x1", Ops::Base::ToString(x1DataType).c_str(),
++                                          "int8, int16, int32, int64, uint8, uint16, uint32 or uint64"),
++                return ge::GRAPH_FAILED);
++    OP_CHECK_IF(x1DataType != x2DataType,
++                OP_LOGE_FOR_INVALID_DTYPES_WITH_REASON(
++                    "BitwiseXor", "x1 and x2",
++                    (Ops::Base::ToString(x1DataType) + " and " + Ops::Base::ToString(x2DataType)).c_str(),
++                    "x1 and x2 must have the same dtype"),
++                return ge::GRAPH_FAILED);
++    return context->SetOutputDataType(0, x1DataType);
++}
++
++IMPL_OP(BitwiseXor).InferDataType(InferDataType4BitwiseXor);
+ } // namespace ops
+diff --git a/math/equal/op_graph/equal_graph_infer.cpp b/math/equal/op_graph/equal_graph_infer.cpp
+index 29872172ce..ca6625ef36 100644
+--- a/math/equal/op_graph/equal_graph_infer.cpp
++++ b/math/equal/op_graph/equal_graph_infer.cpp
+@@ -16,6 +16,14 @@ namespace ops {
+ static ge::graphStatus InferDataType4Equal(gert::InferDataTypeContext* context)
+ {
+     OP_LOGI(context, "Enter InferDataType4Equal");
++    const ge::DataType x1DataType = context->GetInputDataType(0);
++    const ge::DataType x2DataType = context->GetInputDataType(1);
++    OP_CHECK_IF(x1DataType != x2DataType,
++                OP_LOGE_FOR_INVALID_DTYPES_WITH_REASON(
++                    "Equal", "x1 and x2",
++                    (Ops::Base::ToString(x1DataType) + " and " + Ops::Base::ToString(x2DataType)).c_str(),
++                    "x1 and x2 must have the same dtype"),
++                return ge::GRAPH_FAILED);
+     context->SetOutputDataType(0, DT_BOOL);
+     return ge::GRAPH_SUCCESS;
+ }
+-- 
+GitCode
+

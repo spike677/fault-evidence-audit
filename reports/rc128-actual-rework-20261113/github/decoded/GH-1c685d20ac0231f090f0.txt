@@ -1,0 +1,139 @@
+[Bug]: split_qkv_rmsnorm_rope returns wrong, non-deterministic Q/K due to a racy RoPE position read
+### Your current environment
+
+vLLM Ascend:    0.20.2rc2.dev0+g367b8e62d   (also verified present in main @ 10b4fb2a9)
+CANN:           9.1.0
+dtype:          bfloat16
+head_dim:       128
+rope_dim:       128 (full rope; partial rope not tested)
+
+### 🐛 Describe the bug
+
+`split_qkv_rmsnorm_rope` (the `vllm::qkv_rmsnorm_rope` fused op) returns **wrong and run-to-run non-deterministic** Q and K above a shape-dependent `num_tokens` threshold. V is always correct.
+
+This is not a tolerance issue. Measured against a fp32 reference, `max|err|` reaches **~9.4** while the op's own test allows `atol=5e-2`, and it fails on **every one of 6 consecutive calls** with identical inputs, producing different results each time.
+
+Present since the op was added in #4711 (Dec 2025), still in `main` as of `10b4fb2a9`.
+
+### Root cause
+
+In `vllm_ascend/ops/triton/linearnorm/split_qkv_rmsnorm_rope.py`, the RoPE position is staged into UB as a tile, then read back one element at a time as a scalar:
+
+```python
+x = tl.load(
+    positions_gm_ptr + pos_indices + pos_offset, mask=(pos_indices + pos_offset) < input_batch_offset_end
+)
+...
+for i in tl.range(batch_size_per_iter_per_vec):
+    pos = get_element(x, (i,))                      # <-- reads the UB tile
+    values_tmp3 = insert_slice(
+        values_tmp3.reshape(batch_size_per_iter_per_vec, ROPE_DIM),
+        tl.load(pos * ROPE_DIM + cos_sin_cache_offset[:, None]).reshape(1, ROPE_DIM),
+        ...
+    )
+```
+
+`get_element` reads the scalar out of the UB buffer that the *same* iteration's `tl.load` is still filling. Nothing orders the MTE transfer before the scalar read, so from the second outer iteration onward the scalar unit can still observe the **previous** iteration's position.
+
+The result is that `cos`/`sin` are fetched for the wrong position and the entire token row — every Q head and every K head — is rotated by the wrong angle. V is unaffected because it skips RoPE, which matches the observed signature exactly.
+
+This also explains the shape dependence. `x` is reloaded once per *outer* iteration, so the race needs `iter_num_per_vec > 1`. Since
+`batch_size_per_iter_per_vec` is sized from the UB budget, a larger `(q_hidden_size + kv_hidden_size)` means fewer rows per iteration, hence more iterations, hence failure at a smaller `num_tokens`:
+
+- `(num_q_heads, num_kv_heads) = (12, 1)` → first fails at `num_tokens=1024`
+- `(num_q_heads, num_kv_heads) = (64, 4)` → first fails at `num_tokens=257`
+
+`num_tokens` 1 and 16 pass on both because a single iteration reads a freshly-zeroed buffer.
+
+### Reproduction
+
+Self-contained, synthetic inputs only. Parameters are taken from the op's own nightly test (`NUM_QKV_HEADS`, `HEAD_SIZES`, `MAX_POSITION_EMBEDDINGS`, `DEFAULT_ATOL`).
+
+```python
+import torch
+import torch_npu  # noqa: F401
+
+from vllm_ascend.ops.triton.triton_utils import init_device_properties_triton 
+import vllm_ascend.ops.triton.linearnorm.split_qkv_rmsnorm_rope  # registers the op
+
+HEAD_DIM, EPS, MAX_POS, ATOL = 128, 1e-6, 262144, 5e-2
+
+torch.npu.init()
+init_device_properties_triton()
+
+
+def gold(src, weight, heads, cache, pos):
+    """fp32 RMSNorm + RoPE reference for one tensor."""
+    x = src.float().reshape(-1, heads, HEAD_DIM)
+    x = x / torch.sqrt((x * x).mean(-1, keepdim=True) + EPS) * weight.float()
+    cs = cache.float()[pos]
+    cos, sin = cs[:, : HEAD_DIM // 2], cs[:, HEAD_DIM // 2 :]
+    cos = torch.cat([cos, cos], -1).unsqueeze(1)
+    sin = torch.cat([sin, sin], -1).unsqueeze(1)
+    x1, x2 = x.chunk(2, -1)
+    return (x * cos + torch.cat((-x2, x1), -1) * sin).reshape(-1, heads * HEAD_DIM)
+
+
+for n_q, n_kv in ((12, 1), (64, 4)):
+    Q, KV = n_q * HEAD_DIM, n_kv * HEAD_DIM
+    print(f"\n=== num_q_heads={n_q} num_kv_heads={n_kv} head_dim={HEAD_DIM} bf16 ===")
+    for num_tokens in (1, 16, 257, 1024, 10240):
+        torch.manual_seed(0)
+        qkv = torch.randn(num_tokens, Q + 2 * KV, dtype=torch.bfloat16, device="npu")
+        qw = torch.randn(HEAD_DIM, dtype=torch.bfloat16, device="npu")
+        kw = torch.randn(HEAD_DIM, dtype=torch.bfloat16, device="npu")
+        cache = torch.rand(MAX_POS, HEAD_DIM, dtype=torch.bfloat16, device="npu")
+        pos = torch.randint(0, MAX_POS, (num_tokens,), dtype=torch.int64, device="npu")
+
+        eq = gold(qkv[:, :Q], qw, n_q, cache, pos).cpu()
+        ek = gold(qkv[:, Q : Q + KV], kw, n_kv, cache, pos).cpu()
+
+        outs, failed, dq, dk = [], 0, 0.0, 0.0
+        for _ in range(6):
+            q, k, v = torch.ops.vllm.qkv_rmsnorm_rope(
+                input=qkv, q_weight=qw, k_weight=kw,
+                q_hidden_size=Q, kv_hidden_size=KV, head_dim=HEAD_DIM, eps=EPS,
+                q_bias=None, k_bias=None, cos_sin_cache=cache, positions=pos,
+            )
+            torch.npu.synchronize()
+            dq = max(dq, (q.float().cpu() - eq).abs().max().item())
+            dk = max(dk, (k.float().cpu() - ek).abs().max().item())
+            failed += int(max(dq, dk) > ATOL)
+            outs.append(q.float().cpu().clone())
+
+        distinct = len({o.numpy().tobytes() for o in outs})
+        verdict = "OK " if max(dq, dk) <= ATOL and distinct == 1 else "BAD"
+        print(f"  num_tokens={num_tokens:<6} {verdict} max|err| q={dq:7.4f} k={dk:7.4f}"
+              f"  failed={failed}/6  distinct_outputs={distinct}")
+```
+
+### Results
+
+Ascend NPU, bf16, `head_dim=128`, full RoPE (`rope_dim=128`), `atol=5e-2`.
+
+`(num_q_heads, num_kv_heads) = (12, 1)`:
+
+| num_tokens | max\|err\| Q | max\|err\| K | rows off by one position | failed calls | run-to-run stable |
+|---:|---:|---:|---:|:---:|:---:|
+| 1 | 0.0119 | 0.0077 | 0 | 0/6 | yes |
+| 16 | 0.0156 | 0.0143 | 0 | 0/6 | yes |
+| 257 | 0.0300 | 0.0283 | 0 | 0/6 | yes |
+| 1024 | **7.8431** | **7.6423** | **118** | **6/6** | **no** |
+| 10240 | — | — | — | — | **no** |
+
+`(num_q_heads, num_kv_heads) = (64, 4)`:
+
+| num_tokens | max\|err\| Q | max\|err\| K | rows off by one position | failed calls | run-to-run stable |
+|---:|---:|---:|---:|:---:|:---:|
+| 1 | 0.0148 | 0.0077 | 0 | 0/6 | yes |
+| 16 | 0.0306 | 0.0146 | 0 | 0/6 | yes |
+| 257 | **8.0298** | **6.8400** | **56** | **6/6** | **no** |
+| 1024 | **9.3595** | **6.4640** | **257** | **6/6** | **no** |
+| 10240 | — | — | — | — | **no** |
+
+"rows off by one position" counts rows whose output matches the **preceding** token's position more closely than their own — i.e. a stale position, not numerical noise. Run-to-run stability is a bitwise comparison of 24 repeated calls with identical inputs.
+
+### Suggested fix
+
+Read the position directly from global memory as a scalar, removing the UB round-trip and the dependency with it. PR to follow.
+#16699 

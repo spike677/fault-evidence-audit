@@ -1,0 +1,348 @@
+n-gate-fix-ops-transformer-AtomGit
+Star
+1681
+Fork
+3393
+Code
+Introduction
+Code
+Issues
+429
+Pull Requests
+726
+Pipeline
+Actions
+Discussion
+Wiki
+Members
+620
+Analysis
+Settings
+Star
+1681
+Fork
+3393
+Closed
+n-gate-fix
+#10877
+葛梦白
+Add on
+Aug 29
+Closed at
+8 days ago
+Merged from
+Costanza_Bai/ops-transformer：
+dcw_p5
+into
+cann/ops-transformer：
+master
+n-gate-fix
+#10877
+Closed
+葛梦白
+Add on
+Aug 29
+Closed at
+8 days ago
+Merged from
+Costanza_Bai/ops-transformer
+dcw_p5
+into
+cann/ops-transformer
+master
+Merge checks
+Discussion
+0
+Commits
+0
+Checks
+0
+Files changed
+0
+Clone/Download
+0
+葛
+葛梦白
+Collaborators
+Aug 29
+Aug 29
+MegaMoe A8W8 wave 路径：dispatch/combine 与 GMM 全 wave 化的性能优化设计说明
+（分支 dcw_p5，端点 fac3f3ea9；穿刺 shape −7.8%，泛化最差劣化从 +17.5% 压到 +5.2%）
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+〇、30 秒总览
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+该算子在一个 kernel 内并行三类角色：AIC×28 做 GMM1/GMM2 矩阵计算，AIV0×28 做
+GMM1 epilogue（swiglu+量化），AIV1×28 独自承担 dispatch（跨卡收 token，喂 GMM1）
+和 combine（收 GMM2 结果发回跨卡）两类 MTE 重活。优化的本质是回答一个调度问题：
+AIV1 这一只手，什么时刻该做 dispatch、什么时刻该做 combine、每次做多大一口，
+才能既不饿着 AIC，又不让两类 MTE 流量挤压 AIC 的 mte2/fixpipe 带宽？
+答案由四个机制组成，每个机制都有单变量 A/B 数据和 kernel 内逐事件打点背书。
+实测终态：GMM1 逐 wave 时长稳定在中位 ±10% 内，即使 28 个 AIV1 核同时做 combine
+也零膨胀——不存在 token 粒度 combine 曾出现的 fixpipe 竞争放大现象。
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+一、四个核心机制
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+【机制 1】combine 的就绪信号：从"wave 计数"换成"专家槽即时置位"
+问题：早期实现里 combine 等待"全体 28 个 AIC 的 GMM2 wave 计数都越过 w"
+（min-scan）。专家负载不均衡时，各 AIC 走完同一 wave 的时刻天然拉开
+（实测偏斜可达 556us），min-scan 使 combine 每个 wave 都继承最慢核的
+偏斜——不均衡 shape 上曾劣化 +17.5%。
+改法：AIC 每完成一个专家的 GMM2 份额，立即在该专家的独占 cacheline 置位
+（NotifyWaveGmm2Ready，FIX_S 栅栏保证数据先于标志可见）；AIV1 对
+"下一个待收专家"做增量标量扫描（已确认的核不再重读 GM）。
+效果：就绪信号从"wave 边界对齐"变为"专家完成即达"，偏斜不再被放大。
+不均衡最差例 +17.5% → +1.6%。
+【机制 2】combine 就绪即收，靠依赖链免除额外同步
+非零专家的计数读取安全性由一条现成依赖链保证：
+专家槽全置位 ⇒ 该专家 GMM2 完成 ⇒ GMM1 已消费它 ⇒ GMM1 曾等到过
+token 计数 ⇒ 计数必已发布。
+因此 combine 收取一个专家不需要任何新增同步原语，也不受 dispatch 进度约束。
+（零 token 专家是唯一例外：GMM2 不会为它置位，凭 dispatch 重放进度读到
+计数=0 后跳过。越过该边界读计数是正确性红线：计数区不随 launch 清零，
+读到陈旧值会静默错数——代码注释已写明。）
+【机制 3】补给优先响应：combine 随时给 dispatch 让路（穿刺单项 −700us）
+问题：dispatch 以"领先 GMM 消费端 K=8 个 wave"的配额节流（防囤积）。若 AIV1
+进入 combine 后连续收完所有就绪专家才回头，一次 combine 长跑会耗尽
+dispatch 领先量；领先归零后系统会锁死在"每 wave 现等数据"的平衡点
+（补给速率被消费节奏封顶，领先无法重建——曾实测 +14% 的相位锁）。
+改法：combine 每收完一个专家就查一次 dispatch 放行额度（缓存增量探测，无
+GM 读风暴），额度一出现立即中断 combine 回去补 dispatch。
+效果：领先量滑落后一个突发即重建；穿刺 shape 单项 −700us。
+【机制 4】dispatch 分核域按形状自适应（两个 regime 的最优分工相反）
+dispatch 把一个 wave 的行按 28 核分工，有两种分法，实测各自在一类形状上正确：
+(a) 计算轻的形状（N 小，AIV1 时长直接决定 E2E）：按"专家全域"固定份额，
+每核持有专家内一段连续行、wave 只作时间闸门取交集——每核的远端读地址流
+跨 wave 头尾相接。若按 wave 切片均分（每核每 wave 换一段不相邻的行），
+行流碎片化，与基线打点对表坐实 dispatch 整体慢 2~3 倍。
+(b) 计算重的形状（N 大，AIC 是关键路径，要紧的是逐 wave 供数节奏）：跨多个
+wave 的大专家若按专家域分工，每个 wave 窗口只与 ~1/3 核的份额相交，
+供数并行度掉 3 倍（A/B +679us）——此时按 wave 切片全核均分。
+判据用 tiling 静态量 gmm1OutputDim（=gate+up 拼接维 2N）≥8192 区分，两端
+实测锚定。两种分工的各核区间之并恒等于 wave 窗口且两两不交，下游
+"按行数累加、等值判定"的就绪契约（PublishGmm1TileReady）不变。
+（继承自前一阶段、共同构成地基的三件：GMM2 消费目标滞后 GMM1 一个 wave，消掉
+AIC 等激活自旋，约 15% E2E 的自旋归零；dispatch 领先额度 K=8 的实测 K 曲线定版
+——K=3 相位余量过薄 +14%、K=5 双模态、K=8 单模态稳定；空转轮询用缓存增量探测，
+消除绕 DCache 的 GM 读风暴对 AIC mte2 权重流的挤压。）
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+二、为什么对 MTE 带宽竞争天然免疫（逐事件打点实证）
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+kernel 内逐事件打点（每核 [阶段,进入,退出] 序列，单次 launch，84 核 5509 事件）：
+GMM1 全部 39 个 wave 的时长（28 核均值）除启动 wave0 外落在 155~189us
+窄带（中位 173.4us）。尾段 28 个 AIV1 核全员 combine 时，GMM1 wave 仍为
+155~174us——零膨胀。GMM1 时长与 combine 活跃核数相关系数 −0.50（负）。
+稳态并发形态：dispatch 同时活跃 2~15 核（均值 ~6，节流摊匀）、combine
+中段稳定 13~18 核，两条曲线互补；AIC 在算核数几乎恒满。
+稳态相位：AIV1 发 dispatch wave k+6~7 时，AIC 在算 GMM1 wave k+1 /
+GMM2 wave k——供数始终富余、又不无界囤积。
+机理：combine 每核每次只发 512B 分片、行环深度有限（outstanding MTE3 天然
+有界），且逐专家分批错开；dispatch 被 K 配额钳制且被 combine 分时切碎——
+两类 MTE 流量在时间轴上被摊薄，避开了 fixpipe/mte2 的峰值叠加。这与
+"combine 从 token 粒度改 tile 粒度以分散下发"的改造方向同理，且更进一步：
+分散程度由反馈（GMM2 进度）动态决定，而非静态切块。
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+三、数据汇总（同时段 back-to-back，部署指纹自证，功能 x/expert_token_nums
+双指标逐 rank 全 PASS）
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+case                       基线(us)   本实现    Δ
+穿刺 bs8192/H7168/N6144     12824     11818    −7.8%
+H4096/N3072 泛化 8 例：
+bs512  均衡0               1015      1003    −1.2%
+bs1024 均衡0               1399      1392    −0.6%
+bs4096 均衡1               3120      3150    +0.9%（噪声带内）
+bs4096 均衡0               3929      3993    +1.6%（曾 +17.5%）
+bs2048 均衡0               2269      2326    +2.5%（曾 +10.8%）
+bs1024 均衡1               1101      1134    +3.0%
+bs512  均衡1                904       938    +3.9%
+bs2048 均衡1               1689      1777    +5.2%
+基线批间噪声 ±1~2%。剩余残差经打点归因为分散尾项（dispatch 已与基线同速：
+772 vs 770us；尾段等待为 GMM2 未完成的合法等待），无单一大头。
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+四、试过并被数据否决的方向（防止重复探索）
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+GMM2 滞后深度按形状条件化：关掉滞后仅在小 bs 均衡形状省 20~40us，却让
+穿刺 +911us、大 bs 不均衡 +31%——滞后的收益取决于运行时数据均衡性
+（等激活量），tiling 静态判不了，一刀切不可行。
+领先额度 K 按 wave 总数自适应：小 bs 时 wave 数 < K，节流全程不触发，
+该区间的劣化与 K 无关（直接证伪）。
+combine 整行单发替代 512B 分片：512B 是跨卡互联多描述符流水的调优值，
+整行单发慢 ~3 倍。
+GMM2 滞后深度 2：被消费 wave 的激活离 L2 更远 + tile 轮转共振，+0.7ms。
+Save
+Cancel
+The current Pull Request has been closed by 周云飞.
+葛
+葛梦白
+Collaborators
+Aug 29
+Created pull request, commit
+a9f6caf1
+Aug 29
+Created pull request, commit
+a9f6caf1
+CANN-robot
+Collaborators
+Aug 29
+Added label:
+cann-cla/no
+Aug 29
+Added label:
+cann-cla/no
+CANN-robot
+Collaborators
+Aug 29
+Added label:
+stat/needs-squash
+Aug 29
+Added label:
+stat/needs-squash
+CANN-robot
+Collaborators
+Aug 29
+Comments：
+Aug 29
+Comments：
+Thanks for your pull-request.
+The full list of commands accepted by me can be found at
+here
+.
+You can get sig-info at
+here
+.
+You can self-configure the PR merge rules for this repository. For more details, please refer to
+Here
+.
+For more, you also can visit
+HICANN
+.
+PR Approval Progress
+⚠️ This PR does not yet meet the following requirements:lgtm (requires ≥ 2 person(s) per module)、approve (requires ≥ 1 person(s) per module)
+Module Approval Details
+module
+lgtm status
+approve status
+mc2
+❌ (0/2)(You can also ask:
+liuboxi
+,
+libohao6
+,
+蒋礼锐
+,
+马兵
+,
+yangzeheng
+)
+❌ (0/1)(You can also ask:
+马兵
+,
+tgwsakiko_
+,
+俞郑中
+,
+蒋礼锐
+,
+libohao6
+)
+💡 Tip:
+Committer
+can comment
+/approve
+or
+/lgtm
+Commenting
+/approve
+implies both code review (lgtm) and intent to merge (approve)
+CLA Signature Guide
+@Costanza_Bai
+, thanks for your pull request.
+The following commit(s) have not signed
+Contributor License Agreement (CLA)
+.
+Commit
+Reason
+c48b30eb  n-gate
+the email used in the commit is platform default email: ***@noreply.gitcode.com!
+使用了Gitcode平台系统默认邮箱，需要在平台个人设置里绑定个人邮箱.
+If you need to sign CLA,
+you can click here to sign the CLA
+.
+If you need to check if the email is set up correctly,
+you can click here to do it in the
+FAQs
+.
+After signing the CLA or updating the email, you must comment
+/check-cla
+to check the CLA status again.
+Save
+Cancel
+CANN-robot
+Collaborators
+Aug 29
+Set captainmiaow,monologue815,jiang-lirui,Allan_Yu,wang-minbo,tgwsakiko_,liudan12,chenjunjian11,yangzeheng,liuboxi,luobaiqing,libohao6,mabing1118,macech as approver
+Aug 29
+Set captainmiaow,monologue815,jiang-lirui,Allan_Yu,wang-minbo,tgwsakiko_,liudan12,chenjunjian11,yangzeheng,liuboxi,luobaiqing,libohao6,mabing1118,macech as approver
+CANN-robot
+Collaborators
+Aug 29
+Set captainmiaow,monologue815,jiang-lirui,Allan_Yu,wang-minbo,tgwsakiko_,liudan12,chenjunjian11,yangzeheng,liuboxi,luobaiqing,libohao6,mabing1118,macech as approver
+Aug 29
+Set captainmiaow,monologue815,jiang-lirui,Allan_Yu,wang-minbo,tgwsakiko_,liudan12,chenjunjian11,yangzeheng,liuboxi,luobaiqing,libohao6,mabing1118,macech as approver
+葛
+葛梦白
+Collaborators
+Aug 29
+Modify description of pull request
+Aug 29
+Modify description of pull request
+葛
+葛梦白
+Collaborators
+Aug 29
+Modify description of pull request
+Aug 29
+Modify description of pull request
+W
+wang-minbo
+Collaborators
+9 days ago
+Comments：
+9 days ago
+Comments：
+未打上 ci-pipeline-passed 标签，请流水线通过后再提交评审
+Save
+Cancel
+周云飞
+Collaborators
+8 days ago
+Comments：
+8 days ago
+Comments：
+感谢您的贡献。该 PR 已较长时间未有新的提交或作者回复，目前仍存在与目标分支的合并冲突，且比较基线已明显落后于主线。
+本次清理先予关闭。若后续继续推进，欢迎基于最新目标分支整理改动、解决冲突并完成必要验证后，重新发起合入申请，同时关联本 PR，以便保留和追溯已有评审记录。
+感谢理解与支持。
+Save
+Cancel
+周云飞
+Collaborators
+8 days ago
+Close pull request
+8 days ago
+Close pull request
+Merger
+Not assigned
+Approver
+Not assigned
+Tester
+Not assigned
+Reviewer
+Not assigned
+Label
+cann-cla/no
+stat/needs-squash
+Milestones
+No related milestones
+Kanban
+No related boards
+Link Issue
+No related Issues

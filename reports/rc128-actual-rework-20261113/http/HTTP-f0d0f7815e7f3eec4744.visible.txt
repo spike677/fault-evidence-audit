@@ -1,0 +1,134 @@
+[Bug] matmul_v3 DAV_3510: fp16/bf16 输入 + fp32 输出未走 fixpipe 1V2 且 splitM 未置位，精度异常-ops-nn-AtomGit
+Star
+1418
+Fork
+2158
+Code
+Introduction
+Code
+Issues
+935
+Pull Requests
+733
+Pipeline
+Actions
+Discussion
+Wiki
+Members
+474
+Analysis
+Settings
+Star
+1418
+Fork
+2158
+Closed
+[Bug] matmul_v3 DAV_3510: fp16/bf16 输入 + fp32 输出未走 fixpipe 1V2 且 splitM 未置位，精度异常
+#8656
+link164735
+Add on
+23 hours ago
+Closed at
+22 hours ago
+link164735
+Collaborators
+23 hours ago
+Create
+23 hours ago
+Create
+问题现象
+Ascend950（DAV_3510）上 MatMulV3 在 fixpipe 绑定（Bound）场景下，
+低精度输入 + FP32 输出
+（fp16/bf16 -> float）时走了
+ND_FIXPIPE_1_1
+且
+splitM
+未置位，输出精度异常（实测 74.78%）。
+根因
+matmul/mat_mul_v3/op_host/op_tiling/arch35/matmul_v3_tiling_helper.cpp
+中
+GetL0C2OutDav3510
+此前按
+输入 dtype
+选择 fixpipe 模式：
+fp16/bf16 输入一律返回
+ND_FIXPIPE_1_1
+；
+仅输入为 FP32 时才置位
+splitM
+。
+但
+splitM
+的语义是「fixpipe 场景 FP32 输出按 M 轴切分、由双 AIV 拷出」，应由
+输出 dtype
+决定，导致 FP16/BF16 输入 + FP32 输出既不切 M，也未走 1V2 路径。
+期望行为
+输入/输出 dtype
+fixpipe 模式
+splitM
+任意输入 -> FP32 输出（含 fp16/bf16 -> fp32）
+ND_FIXPIPE_1_2
+true
+FP16/BF16 输入 -> FP16/BF16 输出
+ND_FIXPIPE_1_1
+false
+未满足 fixpipe 准入（k>256、aivNum != aicNum*2、isSplitK 等）
+ON_THE_FLY
+false
+修改方案
+PR !14100：
+GetL0C2OutDav3510
+改为按输出 dtype（
+args.cType == ge::DT_FLOAT
+）选择 1V2 并置位
+splitM
+；
+删除不可达的
+aType == ge::DT_FLOAT
+分支（DAV_3510 支持的 dtype 组合中 FP32 输入必然 FP32 输出）；
+未被前两个分支命中时兜底返回
+ON_THE_FLY
+；
+补充 UT 覆盖 fp32->fp32、fp16->fp32、fp16->fp16 三种组合。
+验证
+新增 UT：
+MatMulV3StreamKTilingDirectTest.GetL0C2Out_Dav3510_*
+3 个用例通过；
+mat_mul_v3 op_host UT 全量 380/380 通过（--soc=ascend950）；
+Ascend950PR_9589 实测 CANN 10-28/11-04 各 42/42 用例通过。
+关联 PR
+https://gitcode.com/cann/ops-nn/pull/14100
+Save
+Cancel
+CANN-robot
+Collaborators
+22 hours ago
+Close issue
+22 hours ago
+Close issue
+CANN-robot
+Collaborators
+22 hours ago
+changed custom state from 待办的 to 已完成
+22 hours ago
+changed custom state from 待办的 to 已完成
+CANN-robot
+Collaborators
+18 hours ago
+Added label:
+resolved
+18 hours ago
+Added label:
+resolved
+Assignees
+Not assigned
+Label
+resolved
+Kanban
+No board linked yet
+Milestones
+No related milestones
+Link PR
+No related PR
+Branch
+No branches linked yet

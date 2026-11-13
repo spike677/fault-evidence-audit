@@ -1,0 +1,352 @@
+fix: correct grad_probs dtype in npu_moe_token_unpermute_grad to match probs dtype-op-plugin-AtomGit
+Star
+198
+Fork
+940
+Code
+Introduction
+Code
+Issues
+263
+Pull Requests
+364
+Pipeline
+Actions
+Discussion
+Wiki
+Members
+272
+Analysis
+Settings
+Star
+198
+Fork
+940
+Merged
+fix: correct grad_probs dtype in npu_moe_token_unpermute_grad to match probs dtype
+#4833
+fgd_dragon
+Add on
+Apr 25
+Merged from
+wang-ziqi-code/op-plugin：
+fix/grad-probs-dtype
+into
+Ascend/op-plugin：
+master
+fix: correct grad_probs dtype in npu_moe_token_unpermute_grad to match probs dtype
+#4833
+Merged
+fgd_dragon
+Add on
+Apr 25
+Merged from
+wang-ziqi-code/op-plugin
+fix/grad-probs-dtype
+into
+Ascend/op-plugin
+master
+Merge checks
+Discussion
+0
+Commits
+0
+Checks
+0
+Files changed
+0
+Clone/Download
+0
+F
+fgd_dragon
+Apr 25
+Apr 25
+【合入来源】
+需求
+问题单
+issue/工单
+重构优化
+资料更新
+【修改方案】修复
+npu_moe_token_unpermute_grad
+的
+grad_probs
+dtype 推导错误问题
+问题现象
+：
+npu_moe_token_unpermute_grad
+中，
+grad_probs
+作为
+probs
+的梯度，理论上应与
+probs
+保持相同 dtype；
+原实现中，
+grad_probs
+的 dtype 推导错误地依赖了
+grad_unpermuted_tokens
+；
+在混合精度场景下，当
+probs=float32
+、
+grad_unpermuted_tokens=bfloat16
+时，会导致
+grad_probs
+dtype 错误；
+该问题可能进一步影响反向精度，严重时引发训练异常。
+问题根因
+：
+grad_probs
+的语义是
+probs
+的梯度；
+其 dtype 应与
+probs
+保持一致；
+但原实现中，无论是 meta 推导还是生成侧 dtype 配置，都错误地使用了
+grad_unpermuted_tokens
+的 dtype 作为
+grad_probs
+的 dtype 来源。
+修改内容
+：
+op_plugin/python/meta/_meta_registrations.py
+将
+grad_probs
+的 meta 推导从依赖
+grad_unpermuted_tokens.dtype
+修正为依赖
+probs.dtype
+；
+当
+probs is None
+时，保持
+grad_probs is None
+。
+op_plugin/config/op_plugin_functions.yaml
+将
+grad_probs
+的 dtype 配置从
+grad_unpermuted_tokens
+修正为依赖
+probs
+；
+当
+probs
+为空时，回退到
+grad_unpermuted_tokens.scalar_type()
+，保证兼容已有 optional 输入场景。
+test/core_tests/test_fake_tensor.py
+新增 FakeTensor 用例，覆盖：
+probs
+与
+grad_unpermuted_tokens
+dtype 不同的 mixed dtype 场景；
+probs=None
+场景。
+test/test_custom_ops/test_npu_moe_token_permute_and_unpermute_backward.py
+新增端到端回归用例，覆盖：
+mixed dtype 场景下
+grad_probs
+dtype 正确性；
+probs=None
+场景下 backward 行为。
+修改范围说明
+：
+本次修改仅修复
+npu_moe_token_unpermute_grad
+的
+grad_probs
+dtype 推导问题；
+不修改算子 schema 和接口定义；
+不改变对外接口行为。
+【资料变更】
+不涉及。
+【接口变更】
+不涉及。本次修复仅纠正
+npu_moe_token_unpermute_grad
+的内部 dtype 推导逻辑，不改变算子签名和接口行为。
+【功能验证】
+FakeTensor 验证：
+验证
+probs.dtype != grad_unpermuted_tokens.dtype
+时，
+grad_probs.dtype == probs.dtype
+验证
+probs=None
+时，
+grad_probs is None
+端到端验证：
+验证 mixed dtype 场景下
+probs.grad.dtype == probs.dtype
+验证
+probs=None
+场景下 backward 行为符合预期
+风险评估：
+修改仅影响
+npu_moe_token_unpermute_grad
+的
+grad_probs
+dtype 推导逻辑，影响范围小，回归风险可控
+【CheckList】
+代码注释完备，正确记录错误日志
+代码实现进行了返回值、空指针等校验
+PR标题正确使用类型标签，如：feat、fix、refactor、docs、test等
+PR持续集成流水线（CI）执行通过，代码检查无异常
+Save
+Cancel
+Pull Request has been successfully merged by ascend-robot.
+（Thank you for fgd_dragon's contribution.）
+F
+fgd_dragon
+Apr 25
+Created pull request, commit
+59493304
+Apr 25
+Created pull request, commit
+59493304
+ascend-robot
+Collaborators
+Apr 25
+Comments：
+Apr 25
+Comments：
+openLiBing可接管PR, PR详情链接:
+https://www.openlibing.com/apps/transitionPrDetail?owner=Ascend&repo=op-plugin&number=4833&platform=gitcode&codeHostingPlatformFlag=gitcode
+Save
+Cancel
+ascend-robot
+Collaborators
+Apr 25
+Comments：
+Apr 25
+Comments：
+Thanks for your pull-request.
+The full list of commands accepted by me can be found at
+here
+。
+You can get sig-info at
+here
+PR Approval Progress
+✅
+Congratulations! All modules have met the lgtm and approve requirements.
+Module Approval Details
+module
+lgtm status
+approve status
+repo-Ascend/op-plugin
+✅
+htchu
+,
+李伟
+(2/2)
+✅
+htchu
+(1/1)
+💡 Tip:
+Committer
+can comment
+/approve
+or
+/lgtm
+Commenting
+/approve
+implies both code review (lgtm) and intent to merge (approve)
+CLA Signature Pass
+wang-ziqi-code, thanks for your pull request. All authors of the commits have signed the CLA. 👍
+Save
+Cancel
+ascend-robot
+Collaborators
+Apr 25
+Added label:
+ascend-cla/yes
+Apr 25
+Added label:
+ascend-cla/yes
+F
+fgd_dragon
+Apr 25
+Modify description of pull request
+Apr 25
+Modify description of pull request
+125 messages are collapsed here。
+See more
+L
+liwei386
+Collaborators
+Apr 28
+Comments：
+Apr 28
+Comments：
+/lgtm
+Save
+Cancel
+ascend-robot
+Collaborators
+Apr 28
+Added label:
+lgtm
+Apr 28
+Added label:
+lgtm
+ascend-robot
+Collaborators
+Apr 28
+Comments：
+Apr 28
+Comments：
+Review Guide
+This pull-request
+passes review
+.
+Committers who wrote a comment of
+/approve
+are:
+htchu
+.
+Reviewers who wrote a comment of
+/lgtm
+are:
+htchu
+,
+李伟
+.
+Save
+Cancel
+ascend-robot
+Collaborators
+Apr 28
+Merged pull request
+Apr 28
+Merged pull request
+culechan
+Collaborators
+Apr 28
+Comments：
+Apr 28
+Comments：
+/lgtm
+Save
+Cancel
+Merger
+Not assigned
+Approver
+Not assigned
+Tester
+Not assigned
+Reviewer
+Not assigned
+Label
+ascend-cla/yes
+docs-ci-pipeline-success
+ci-pipeline-passed
+approved
+lgtm
+Milestones
+No related milestones
+Kanban
+No related boards
+Link Issue
+No related Issues

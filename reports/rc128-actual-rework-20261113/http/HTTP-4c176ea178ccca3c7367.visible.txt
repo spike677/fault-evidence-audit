@@ -1,0 +1,52 @@
+diff --git a/msit/components/llm/msit_llm/compare/cmp_utils.py b/msit/components/llm/msit_llm/compare/cmp_utils.py
+index ae3f9db0b2f2a9cd786913a4435f644086c4dcc6..fb214bb09c31f9e26a2baf57179e97094e48c204 100644
+--- a/msit/components/llm/msit_llm/compare/cmp_utils.py
++++ b/msit/components/llm/msit_llm/compare/cmp_utils.py
+@@ -250,8 +250,8 @@ def compare_data(golden_data, my_data):
+     if my_data_dtype != torch.float32:
+         message = f"The dtype of my_data with index {compare_data.index} is {my_data_dtype},"
+         logger.debug(message + "convert it to fp32")
+-    golden_data_fp32 = golden_data.float()
+-    my_data_fp32 = my_data.float()
++    golden_data_fp32 = golden_data.reshape(-1).float()
++    my_data_fp32 = my_data.reshape(-1).float()
+     compare_data.index += 1
+     return compare_tensor(golden_data_fp32, my_data_fp32)
+ 
+@@ -275,20 +275,13 @@ def read_data(data_path):
+ def compare_tensor(golden_data_fp32, my_data_fp32):
+     row_data, fail_messages = {}, []
+ 
+-    golden_data_fp32_flat = golden_data_fp32.clone().reshape(-1)
+-    my_data_fp32_flat = my_data_fp32.clone().reshape(-1)
+-
+     # 检查tensor的shape是否一致、是否存在NAN或inf
+-    tensor_pass, message = check_tensor(golden_data_fp32_flat, my_data_fp32_flat)
++    tensor_pass, message = check_tensor(golden_data_fp32, my_data_fp32)
+     if not tensor_pass:
+         logger.debug(f"check_tensor failed: {message}")
+         row_data[CMP_FAIL_REASON] = message
+         return row_data
+ 
+-    golden_data_fp32, my_data_fp32 = process_2_batch_size_tensor(golden_data_fp32, my_data_fp32)
+-    golden_data_fp32 = golden_data_fp32.reshape(-1)
+-    my_data_fp32 = my_data_fp32.reshape(-1)
+-
+     for name, cmp_func in list(CMP_ALG_MAP.items()) + list(CUSTOM_ALG_MAP.items()):
+         result, message = cmp_func(golden_data_fp32, my_data_fp32)
+         row_data[name] = result
+@@ -298,14 +291,6 @@ def compare_tensor(golden_data_fp32, my_data_fp32):
+     return row_data
+ 
+ 
+-def process_2_batch_size_tensor(golden_data_fp32, my_data_fp32):
+-    g_shape = list(golden_data_fp32.shape)
+-    if len(g_shape) >= 2 and g_shape[0] == 2:
+-        golden_data_fp32 = golden_data_fp32[0]
+-        my_data_fp32 = my_data_fp32[0]
+-    return golden_data_fp32, my_data_fp32
+-
+-
+ def check_tensor(golden_data_fp32, my_data_fp32):
+     tensor_pass = True
+     fail_reasons = []

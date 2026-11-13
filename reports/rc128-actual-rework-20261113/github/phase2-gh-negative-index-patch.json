@@ -1,0 +1,35 @@
+[
+  {
+    "task_ids": [
+      "RC-023"
+    ],
+    "kind": "DIFF",
+    "round": 2,
+    "url": "https://github.com/vllm-project/vllm-ascend/pull/10579",
+    "response": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Action completed."
+        }
+      ],
+      "structuredContent": {
+        "patches": [
+          {
+            "filename": "vllm_ascend/device/device_op.py",
+            "patch": "@@ -781,6 +781,12 @@ def split_qkv_rmsnorm_rope(\n         )\n         return results\n \n+    @staticmethod\n+    def npu_moe_token_unpermute(permuted_tokens, sorted_indices, probs):\n+        return torch_npu.npu_moe_token_unpermute(\n+            permuted_tokens=permuted_tokens, sorted_indices=torch.abs(sorted_indices), probs=probs\n+        )\n+\n \n class A5DeviceAdaptor(BaseDeviceAdaptor):\n     @classmethod\n@@ -1673,6 +1679,12 @@ def split_qkv_rmsnorm_rope(\n         )\n         return results\n \n+    @staticmethod\n+    def npu_moe_token_unpermute(permuted_tokens, sorted_indices, probs):\n+        return torch_npu.npu_moe_token_unpermute(\n+            permuted_tokens=permuted_tokens, sorted_indices=sorted_indices, probs=probs\n+        )\n+\n \n def get_device_adaptor() -> type[\"BaseDeviceAdaptor\"]:\n     ascend_device_type = get_ascend_device_type()"
+          },
+          {
+            "filename": "vllm_ascend/ops/fused_moe/token_dispatcher.py",
+            "patch": "@@ -426,9 +426,9 @@ def token_dispatch(\n         )\n \n     def token_combine(self, hidden_states, combine_metadata, bias=None):\n-        final_hidden_states = torch_npu.npu_moe_token_unpermute(\n+        final_hidden_states = DeviceOperator.npu_moe_token_unpermute(\n             permuted_tokens=hidden_states,\n-            sorted_indices=torch.abs(combine_metadata.expanded_row_idx),\n+            sorted_indices=combine_metadata.expanded_row_idx,\n             probs=combine_metadata.topk_weights,\n         )\n         if len(combine_metadata.restore_shape) == 3:"
+          }
+        ],
+        "url": "https://github.com/vllm-project/vllm-ascend/pull/10579",
+        "title": "vllm-project/vllm-ascend#10579 (patch)",
+        "display_url": "https://github.com/vllm-project/vllm-ascend/pull/10579",
+        "display_title": "vllm-project/vllm-ascend#10579 (patch)"
+      },
+      "isError": false
+    }
+  }
+]

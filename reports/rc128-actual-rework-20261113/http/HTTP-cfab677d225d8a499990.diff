@@ -1,0 +1,36 @@
+diff --git a/tests/framework/python/CsvOpsTestTool/atb_csv_ops_test.py b/tests/framework/python/CsvOpsTestTool/atb_csv_ops_test.py
+index 0f0ab234856cd02319d5fc5deb00bac19551b9f7..8f80a285389b371f7e8f92da4fe056d3a982c7ee 100755
+--- a/tests/framework/python/CsvOpsTestTool/atb_csv_ops_test.py
++++ b/tests/framework/python/CsvOpsTestTool/atb_csv_ops_test.py
+@@ -841,6 +841,17 @@ class CsvOpsTest:
+         eb_percent = '0' if eb == 0 else str(torch.sum(eb).to(torch.float).numpy() / eb_threshold * 100)[:5]
+         return precision_percent, eb_percent
+ 
++    @staticmethod
++    def __nonfinite_patterns_match(actual_output, golden_output):
++        actual_output, golden_output = torch.broadcast_tensors(actual_output, golden_output)
++        actual_inf = torch.isinf(actual_output)
++        golden_inf = torch.isinf(golden_output)
++        return (
++            torch.equal(torch.isnan(actual_output), torch.isnan(golden_output))
++            and torch.equal(actual_inf, golden_inf)
++            and torch.equal(actual_output[actual_inf], golden_output[golden_inf])
++        )
++
+     def precision_performance_analysis(self):
+         if len(self.output_tensor_list) == 0:
+             self.output_tensor_list = self.input_tensor_list
+@@ -849,6 +860,13 @@ class CsvOpsTest:
+             self.__dump_tensor(actual_output, 'output', i, 'index: {}'.format(i))
+             golden_output = self.golden_output_tensor_list[i]
+             self.__dump_tensor(golden_output, 'golden', i, 'index: {}'.format(i))
++            if actual_output.dtype not in [torch.float8_e5m2, torch.float8_e4m3fn, torch.bits8]:
++                if not self.__nonfinite_patterns_match(actual_output, golden_output):
++                    self.file_data.loc[self.index, 'Result'] = 'fail'
++                    self.file_data.loc[self.index, 'ActualError'] = (
++                        'nonfinite values mismatch, output index: {}'.format(i)
++                    )
++                    return
+             if self.args.precision_standard == 'new':
+                 if self.op_type in [data_generation.OpTypes.CV_FUSION]:
+                     gpu_golden_output = self.gpu_golden_output_tensor_list[i]

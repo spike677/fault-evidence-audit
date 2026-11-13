@@ -1,0 +1,41 @@
+From 7fe5541c1db634f9771207ab3a90ead1d9da4d0a Mon Sep 17 00:00:00 2001
+From: zhang-song-rui <zhangsongrui@h-partners.com>
+Date: Mon, 12 Oct 2026 14:24:24 +0800
+Subject: [PATCH] fix: initialize broadcast workspace to zero
+
+---
+ pkg_inc/op_common/atvoss/broadcast/broadcast_tiling.h      | 5 +----
+ pkg_inc/op_common/atvoss/broadcast/broadcast_tiling_base.h | 1 +
+ 2 files changed, 2 insertions(+), 4 deletions(-)
+
+diff --git a/pkg_inc/op_common/atvoss/broadcast/broadcast_tiling.h b/pkg_inc/op_common/atvoss/broadcast/broadcast_tiling.h
+index 068b7572..6ad4fcc4 100644
+--- a/pkg_inc/op_common/atvoss/broadcast/broadcast_tiling.h
++++ b/pkg_inc/op_common/atvoss/broadcast/broadcast_tiling.h
+@@ -174,10 +174,7 @@ public:
+         // set workspace
+         size_t* workspaces = context_->GetWorkspaceSizes(1);
+         OP_CHECK_NULL_WITH_CONTEXT(context_, workspaces);
+-        auto platformInfo = context_->GetPlatformInfo();
+-        OP_CHECK_NULL_WITH_CONTEXT(context_, platformInfo);
+-        auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfo);
+-        workspaces[0] = ascendcPlatform.GetLibApiWorkSpaceSize();
++        workspaces[0] = DEFAULT_TILING_WORKSPACE_SIZE;
+ 
+         return ge::GRAPH_SUCCESS;
+     }
+diff --git a/pkg_inc/op_common/atvoss/broadcast/broadcast_tiling_base.h b/pkg_inc/op_common/atvoss/broadcast/broadcast_tiling_base.h
+index 26897343..dea28a6a 100644
+--- a/pkg_inc/op_common/atvoss/broadcast/broadcast_tiling_base.h
++++ b/pkg_inc/op_common/atvoss/broadcast/broadcast_tiling_base.h
+@@ -44,6 +44,7 @@ constexpr int32_t HIGH_PERF_RANK = 4;
+ constexpr int32_t DEFAULT_ADD_VALUE = 9;
+ constexpr int64_t VALUE_TWO = 2;
+ constexpr int64_t MAX_IN_OUT_ARGS_NUMBER = 4;
++constexpr uint64_t DEFAULT_TILING_WORKSPACE_SIZE = 0;
+ constexpr int64_t PER_CORE_MIN_UB_BYTE = 8 * 1024;
+ constexpr uint64_t HALF_CORE_NUM_DIVIDE = 2;
+ constexpr int64_t CACHE_LINE = 128;
+-- 
+GitCode
+

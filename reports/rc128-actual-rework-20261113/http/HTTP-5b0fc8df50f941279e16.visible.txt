@@ -1,0 +1,1478 @@
+[RFC]: DeepSeek-MoE（allgather dispatcher + CP=2）跨版本 loss 精度差异-MindSpeed-AtomGit
+Star
+92
+Fork
+416
+Code
+Introduction
+Code
+Issues
+33
+Pull Requests
+163
+Pipeline
+Actions
+Discussion
+Wiki
+Members
+87
+Analysis
+Settings
+Star
+92
+Fork
+416
+Open
+[RFC]: DeepSeek-MoE（allgather dispatcher + CP=2）跨版本 loss 精度差异
+#341
+Fanlu
+Add on
+Sep 20
+F
+Fanlu
+Collaborators
+Sep 20
+Create
+Sep 20
+Create
+DeepSeek-MoE（allgather dispatcher + CP=2）跨版本 loss 精度差异 — 问题分析文档
+报告日期：2026-09-20
+分析对象：MindSpeed + Megatron-LM 在 NPU 上的两套版本组合，脚本
+deepseek_moe_4k_gloo.sh
+上游/关联文档：
+grad_norm_diff_analysis_report.md
+（2026-09-18，针对
+deepseek_moe_4k_FusedEmaAdamW.sh
+、CP=1/EP=2/alltoall 配置，已确认 RoPE 融合为当时的主要种子）
+一句话结论：
+本次（+CP=2、allgather dispatcher、MoE aux loss 生效）暴露出一个 0.12 与 0.18 在"CP 语义"上不等价的根因——MoE 辅助 loss 的梯度缩放相差
+cp
+倍；它与第二处实现层差异（RoPE 融合路径）共同解释了 step3 与 step11 的可见 loss 偏差。两者都可由"归一化口径核对 + 算子路径对照"直接推导出来，不依赖试错；残余差异则已证明为算子栈级舍入种子被 MoE 离散路由放大的地板。
+0. 结论摘要（TL;DR）
+根因一（语义层，主因）：MoE 辅助 loss 在 CP 下的梯度缩放不等价。
+0.12：
+MoEAuxLossAutoScaler.set_loss_scale(loss_scale / num_microbatches)
+0.18：
+MoEAuxLossAutoScaler.set_loss_scale(loss_scale * cp_group_size / num_microbatches)
+因两侧 DDP 都在
+dp_cp
+组上做
+均值
+规约（÷dp·cp），而 aux loss 的
+值
+是"全局 token 归一"定义、逐 rank 只算部分量（Σ_j A_j = 全局 aux），其梯度必须"对 CP 求和"，
+故
+S
+必须含
+×cp
+。结论：0.18 的写法使 aux 有效权重 =
+--moe-aux-loss-coeff
+（与 cp 无关），0.12 的写法使其 =
+coeff / cp
+（cp=2 时等于 coeff 减半）。
+该结论由代数推导得出（§3.3），并由 4 条可证伪预言核验（§3.5），
+不是由"改完就对齐"倒推
+。
+等价性已由实验逐位证实
+：
+0.18(×cp, coeff=0.01)
+与
+0.18(无 cp, coeff=0.02)
+的 50 步 loss / grad norm 与验证集 loss
+完全逐位一致
+（§3.5.2）→
+×cp
+精确等于"把 aux 有效系数乘 cp"。
+根因二（实现层）：RoPE 路径不同。
+0.12 侧因缺 apex 被 MindSpeed 强制
+config.apply_rope_fusion = False
+，走手写非融合
+t*cos + rotate_half(t)*sin
+；0.18 侧
+apply_rope_fusion=True
+走 TE 融合 RoPE。二者公式等价、算子不同 → 逐层逐 token 舍入不同。由代码路径对照直接推出（§4.1），预言与实测一致（§4.3）。
+两处差异的判别特征（可推导、已验证）
+：aux 缩放
+不进前向
+，故只改它时 step1 的
+lm loss
+与
+load_balancing_loss
+逐位不变、只有 grad norm 变；RoPE 改的是前向，故它同时改变 step1 的
+lm loss
+末位与
+load_balancing_loss
+末位（§3.5 P1/P4、§4.3）。
+残余差异是"地板"，不是残留 bug
+：任何 1e-6 级相对种子在 MoE 离散路由 + grad 尖峰动力学下都会被放大到中后段 2%~6%。由两个
+同版本受控实验
+量化（§6）：0.12 基线自身可逐位复现（50 步 loss/grad norm/验证集 loss 全等），而给它加一个纯舍入级开关（
+--use-fused-rotary-pos-emb
+）后，后半段出现
+第 19~50 步连续 32 步单边 +2.4%~+4.8%
+、验证集 loss
++2.4%
+。
+验收判据（重要）
+：在非 bit 一致前提下，"每步 loss 相对误差 <2%"
+不可达
+——上述纯舍入级开关就能让 50 步中
+30 步
+超 2%。有效判据是：
+step1~5 逐位或 ≤1e-6 相对差
+、
+验证集 loss 落在同配置多次运行的散布内
+、曲线趋势一致。
+归责
+：属
+Megatron（mcore）侧
+的行为/语义变化，不是 MindSpeed 需要适配的问题（本配置生效的是 Megatron 自己的
+schedules.py
+；MindSpeed 自带副本只在 ripipe/dualpipev/fb_overlap/multi_parameter 下生效，且其写法与 0.12 一致，无 cp 因子）。建议把
+cp_size_for_scaling
+做成
+显式可配开关
+（默认随上游语义），而不是硬编码为 1。
+1. 问题定义（从问题本身出发）
+1.1 现象
+同一份脚本（
+deepseek_moe_4k_gloo.sh
+）、同一份数据与种子，两套版本组合训练 50 步：
+侧
+Megatron
+MindSpeed
+conda
+transformer_engine
+脚本
+0.18
+Megatron-LM
+@
+dc0ee41ad
+（0.18.x）
+MindSpeed
+@
+9bb71055
+（branch
+core_r0.18.0
+）
+fanlu_py312
+有
+（
+TransformerEngineNPU
+2.13.0）
+Megatron-LM/deepseek_moe_4k_gloo.sh
+0.12
+Megatron-LM-core_r0.12.0
+@
+5cb6dbb3e
+（core_v0.12.3）
+MindSpeed-26.1
+@
+bd48c699
+（branch
+26.1.0_core_r0.12.1
+）
+fanlu_py312_2
+无
+（由
+mindspeed.te
+顶替 TE 模块）
+Megatron-LM-core_r0.12.0/deepseek_moe_4k_gloo.sh
+（与上者逐行相同）
+关键配置（两侧一致）：
+TP=1, PP=2, VPP=2, CP=2, EP=4, num_layers=8, seq_len=4096, num_experts=16, router_topk=4, dispatcher=allgather, moe_aux_loss_coeff=0.02, global_batch_size=24, micro_batch_size=1, 12 microbatches, lr=2e-4(常量, lr==min_lr), clip_grad=1.0, bf16, npu_deterministic=True, train_iters=50, eval_iters=10
+。
+注意：
+calculate_per_token_loss=False
+、
+moe_router_load_balancing_type=aux_loss
+（即 MoE 辅助 loss 生效）、
+context_parallel_algo=megatron_cp_algo
+。
+原始观测：
+lm loss
+在
+step3
+与
+step11
+两处出现肉眼可见差异（step3: 10.10832 vs 10.21726，
+−1.1%
+（偏低）；step11: 6.896748 vs 6.640252，
++3.9%
+）。
+1.2 把"loss 差异"拆成可推理的三层子问题
+一个训练步的 loss 由三段决定，逐段核对即可定位，无需先试错：
+L1 目标函数的值
+：给定同一份权重与数据，前向算出的 loss 值是否一致？（aux 缩放不应影响它；任何前向算子差异会影响它）
+L2 反向的梯度
+：loss 值若一致，梯度是否一致？→ 取决于
+所有对 loss/梯度做缩放的归一化项
+是否逐项等价。
+L3 参数更新与后续前向
+：优化器/DDP 规约/分片是否一致；以及 L1、L2 的差异如何随步数累积。
+判别推论（后面反复用到）
+：
+若差异只出现在 L2（梯度缩放类），则 step1 的
+前向 loss 与 aux 值必须逐位不变
+，只有 grad norm 变；
+若差异出现在 L1（前向算子类），则 step1 的
+loss 值本身就会变
+（可能只在末位）。
+1.3 基线与判据
+基准：
+core_v0.12.1
+行为（用户指定）。
+用户判据：每步 loss 相对误差 < 2%。
+本轮元结论
+：该判据在"非 bit 一致实现"下不可达（§6.3），需替换（§7.3）。
+2. 推导框架：两张等价性核对表
+定位任何"跨版本数值不一致"，本质是核对这些环节是否等价。先建表，再找
+唯一不等价项
+。
+2.1 表 A：所有会缩放 loss / 梯度的归一化环节
+#
+环节
+0.12 实现
+0.18 实现
+是否等价
+A1
+初始权重/数据
+同种子同数据；两侧 dataset cache hash 不同但样本一致
+同
+✅（step1~5 逐位/1e-6 为证）
+A2
+lm loss 的 CP 归约位置
+loss_func
+内对
+(Σloss, num_tokens)
+做
+CP all_reduce
+→ 返回
+(S_global, T_global)
+不做
+CP reduce → 返回
+(S_j, n_j)
+局部量
+✅ 位置不同
+A3
+lm loss 节点归一化
+/= T_global
+（已是全局均值）→
+*= cp
+→
+/= N_mb
+/= clamp(n_j)
+（局部均值）→
+/= N_mb
+✅ 与 A2 配套抵消：两式代数恒等
+A4
+DDP 规约口径
+gradient_scaling_factor = 1/dp_cp_size
++ SUM →
+对 dp_cp 取均值
+同
+✅（0.12 有 assert 校验该值）
+A5
+aux loss 的
+值
+分母用全局 token 数
+probs.shape[0]*num_sub_sequence
+；
+tokens_per_expert
+在 tp_cp 组 SUM
+分母用
+local_num_tokens*reduce_group.size()
+；
+tokens_per_expert
+在 tp_cp 组 SUM
+✅ 公式与值等价
+A6
+aux loss 的
+尺度 S
+loss_scale / N_mb
+loss_scale * cp / N_mb
+❌
+差 cp 倍
+← 根因一
+A7
+MTP loss 尺度
+—
+loss_scale / N_mb
+（无 cp）
+本次
+mtp_num_layers=None
+，不生效
+A8
+per-token-loss 分支
+loss_scale / N_mb
+loss_scale
+（无 cp）
+本次
+calculate_per_token_loss=False
+，不生效
+表 A 唯一不等价项 = A6。
+且注意 A3/A2 的"位置不同"是
+成对
+的，A6 则是孤立的一处，这本身就提示 A6 是可疑点（孤立不等价项）。
+2.2 表 B：前向算子/实现路径
+#
+环节
+0.12
+0.18
+是否等价
+B1
+RoPE
+apex 缺失 → 强制
+config.apply_rope_fusion=False
+，手写
+(t*cos)+(rotate_half(t)*sin)
+（cos/sin 转 bf16）
+apply_rope_fusion=True
+→ TE 融合 RoPE
+❌ 公式等价、算子不同 ← 根因二
+B2
+MoE permute / unpermute / routing map 构造
+masked_select
+permute、
+zeros+scatter_add_
+unpermute、
+scatter
+构造 routing map
+MindSpeed
+moe_npu_fast_ops
+（默认开）把三者逐一还原为 0.12 的算子选择
+✅ 逐行等价（已比对）
+B3
+TE 模块栈（Linear/GroupedLinear/Norm/Attention）
+无真 TE，由
+mindspeed.te
+顶替
+真
+TransformerEngineNPU
+❌ 不同实现（无法归零）
+B4
+CP attention（
+megatron_cp_algo
+）
+MindSpeed-26.1 实现
+MindSpeed-core_r0.18.0 实现
+❌ 同族但版本不同
+B5
+分布式优化器分片
+data_parallel_sharding_strategy='no_shard'
+（每卡 ~7.71B 参数）
+'optim_grads_params'
+（每卡 ~2.58B）
+❌ 切分与 reduce-scatter 分组不同
+B6
+其他算子开关
+use_fused_rotary_pos_emb=False
+、无
+moe_npu_fast_ops
+apply_rope_in_complex=False
+、
+moe_npu_fast_ops=True
+、
+cache_get_batch_config
+(host 侧 config 缓存)
+⚠️ 见 §5
+表 B 中 B1 是唯一"公式等价但实现不同"的
+（B3~B5 属整栈不同，只能定性），所以 B1 是第一个值得单变量消融的候选 —— 这也是可推导的优先级，而非试出来的。
+3. 根因一：MoE 辅助 loss 的 CP 缩放（语义层）
+3.0 白话版（先看这段，再看推导）
+CP 做了什么
+：CP=2 时把一条序列切成两半，前半放 NPU-A、后半放 NPU-B；每个 rank 只看得见自己那半的 token。
+主 loss（lm loss）为什么两版一致
+：它的定义是"全 batch 所有 token 的平均"。两版用两条不同但等价的路得到同一个数——
+0.12：在
+loss_func
+里把两个 rank 的一加（CP all_reduce），直接得到全 batch 的均值；因为值已经是"全局均值"，而 DDP 后面还会把 CP 维的梯度
+取平均
+（÷cp），所以要在 schedules 里先
+× cp
+把这次平均抵消掉。
+0.18：不加、也不乘，每个 rank 只留自己那半的
+局部均值
+，让 DDP 的"÷cp 取平均"正好完成"两半合成全体"。
+两条路代数上恒等（§2.1 表 A 的 A2+A3），所以主 loss 与 grad norm 能对上——
+主 loss 不是问题所在
+。
+aux loss（MoE 负载均衡 loss）的问题
+：它的定义用
+全 batch 的 token 统计
+（
+f_i
+= 全 batch 中分给专家 i 的 token 占比，
+P_i
+= 全 batch 的平均路由概率），所以它的
+值本身是与 cp 无关的一个全局数
+；但实现上每个 rank 只能拿自己那半的
+probs
+去算，于是
+每个 rank 只算出这个全局数的一部分
+，两份
+相加
+才等于全 batch 的值。
+类比：两个人数一筐苹果，各数一半，各自报"我这半有 5 个"。总数必须
+相加
+（5+5=10）。如果主管把两份报数
+取平均
+（10/2=5），结果就少了一半。
+而 DDP 对 CP 维的梯度做的正是
+取平均
+（÷cp）。所以每个 rank 必须先把 aux
+乘上 cp
+再交给 DDP，平均之后才等价于"相加"。这就是
+cp_size_for_scaling
+的作用：
+侧
+aux 交给反向前的系数
+DDP 平均后
+实际效果
+0.18
+× cp
+变成"对 CP 求和"
+aux 力度 = 你设的
+--moe-aux-loss-coeff
+（与 cp 无关）
+0.12
+不乘
+变成"对 CP 取平均"
+aux 力度 = coeff / cp
+（cp=2 时 0.02 实际只有 0.01）
+两个可自证方向的事实（不看代数也能确认"×cp = 力度 2 倍"，方向没搞反）
+：
+0.18 原始（带 ×cp）step1 的
+grad norm = 68.922
+，改成不带 cp 后是
+68.277
+—— 力度更大 → 梯度范数更大；
+带 ×cp 的那次 logged
+load_balancing_loss
+更低
+（step11：2.4725 vs 2.9234）—— aux 推力更大才会把负载压得更均衡。
+所以是不是"0.12 有问题"？分两种口径
+：
+按"aux loss 自己的定义"（全局量、
+--moe-aux-loss-coeff
+应等于实际权重）：
+0.12 是缺陷
+——它的 aux 力度被 CP 稀释了 1/cp，且同一个 coeff 在 cp=1 与 cp=2 下含义不同（用户换个 CP 配置就会静默变弱）。0.18 的写法则是一致的。
+按"与 0.12.1 数值对齐"这个目标：0.18 的
+×cp
+是
+行为变更
+，删掉它（你现在的做法）就是回到 0.12 语义，这是对的。
+注意：不带 cp 的 aux 力度 = 你设的 coeff ÷ cp，等于把
+0.02
+实际变成
+0.01
+。
+另外要留个心眼：0.18 只在 aux 这一处加了 cp，
+MTP loss 与
+calculate_per_token_loss=True
+分支都没有
+，说明上游也未必把它当成系统性修正，更像局部补丁（详见 §3.6）。
+一句话
+：不是"0.12 算错了数"，而是
+两版对"CP 下 aux loss 该用多大力度"的口径不同——0.18 用的是 coeff，0.12 用的是 coeff/cp
+；你要复现 0.12.1，就得用 0.12 的口径。
+3.1 aux loss 的值：两版一致，且是"全局定义 + 逐 rank 部分量"
+两侧同一个公式（E=专家数，topk，coeff=
+moe_aux_loss_coeff
+）：
+A_j = E·coeff·Σ_i (S_ij / T_global) · (F_i / (T_global·topk))
+F_i
+（每个专家的 token 数）=
+tokens_per_expert
+在
+tp_cp 组 all_reduce（SUM）
+得到 →
+全局量
+；
+S_ij
+= 本 rank 上所有 token 对专家 i 的概率和 →
+局部量
+；
+分母
+T_global
+=
+全局
+token 数：
+0.12：
+num_tokens = probs.shape[0] * num_sub_sequence
+（
+probs
+只有本 rank 的 n 行，故乘 cp）；
+0.18：
+total_num_tokens = local_num_tokens * reduce_group.size()
+；
+两者都等于
+cp·n
+。
+因此
+Σ_j A_j = 全局 aux
+（0.18 的 docstring 专门写出了这个分解：
+loss = Σ_j E·Σ_i f_i P_ij
+）。
+推论：
+aux loss 的"值"是与 cp 无关的全局量
+（同一 global batch、同一权重下，cp=1 与 cp=2 的 aux 值相同，只是被摊到多个 rank 上算）。
+3.2 aux loss 的梯度如何进图
+aux 不进入最终 loss 张量，而是挂在每层 router 的输出上（
+MoEAuxLossAutoScaler.apply(activation, aux_loss)
+），其"上游梯度"由 schedules
+每步显式设置
+S
+，反向时返回
+ones_like(aux_loss) * S
+：
+实际 aux 梯度(每 rank) = S · ∂A_j/∂θ
+随后与主 loss 一起经过 A4 的
+dp_cp 均值规约
+（÷dp÷cp）。
+3.3 代数推导：
+S
+必须含
+×cp
+以"每 DP 副本的目标 = mean_global_tokens(lm loss) + aux_global"，并取 DP 副本平均为约定：
+期望的 aux 梯度贡献 =
+(1/N_mb)·(1/dp)·Σ_j ∂A_j/∂θ
+实现得到的 =
+(1/(dp·cp))·S·Σ_j ∂A_j/∂θ
+令二者相等 ⇒
+S = cp / N_mb
+（再乘 loss_scale）。
+侧
+S
+规约后 aux 梯度
+与全局定义的比值
+有效权重
+0.18
+cp/N_mb
+(1/(dp·N_mb))·Σ_j ∂A_j
+1
+= coeff（与 cp 无关）
+0.12
+1/N_mb
+(1/(dp·cp·N_mb))·Σ_j ∂A_j
+1/cp
+= coeff/cp（被稀释）
+即：
+cp=2 时，0.12 语义把
+--moe-aux-loss-coeff 0.02
+实际变成 0.01。
+这不是舍入问题，是 2 倍的语义差。
+等价关系（可用于验收）
+：
+0.18语义(×cp) + coeff
+≡
+0.12语义(无cp) + coeff×cp
+。在 cp=2、coeff=0.02 下，"删掉 cp 因子"等价于"把 coeff 减半"。
+3.4 由此得到的可证伪预言（先给预言，再看数据）
+编号
+预言
+理由
+P1
+step1 的
+lm loss
+必须
+逐位相同
+aux 缩放不进前向
+P2
+step1 的
+load_balancing_loss
+（aux 值本身）必须
+逐位相同
+同上；aux 值由前向决定
+P3
+step1 的
+grad norm
+必须
+不同
+，且差异与 aux 梯度贡献量级相符
+aux 只进反向
+P4
+loss 的可见差异应从
+step2/3
+才出现（不是 step1）
+前向误差需 1~2 步累积才超出打印精度（7 位有效数字 ≈1e-4）
+P5
+【已降级：非推导项】
+"带
+×cp
+的一侧 router 负载更均衡"
+无法由代数推出
+（它取决于训练动力学）；实测该趋势只在 step≥8 成立，而第 3~7 步方向
+相反
+（§3.5.1 读数 5）
+——
+3.5 观测核验（逐条，全部命中）
+用 0.18 侧"只改
+schedules.py
+"的两次运行对照（其余完全相同，是干净单变量）：
+指标
+0.18 原始（0918）
+0.18 修 aux 后（0920）
+0.12 基线
+结论
+step1
+lm loss
+1.049095E+01
+1.049095E+01
+1.049094E+01
+P1 ✅ 逐位不变
+step1
+load_balancing_loss
+1.646663E+00
+1.646663E+00
+（0.12 不打印该字段）
+P2 ✅ 逐位不变
+step1
+grad norm
+68.922
+68.277
+68.276
+P3 ✅ 只有梯度变
+；修后与 0.12 三位小数相同
+step2
+lm loss
+1.049309E+01
+1.049309E+01（打印相同，实际相差 <1e-4）
+1.049521E+01
+P4 ✅
+step3
+lm loss
+1.010832E+01
+1.021624E+01
+1.021726E+01
+P4 ✅ 差异恰好从 step3 开始显形
+（修后差 1.0e-4，原始差 1.1e-2）
+step11
+load_balancing_loss
+2.4725
+（低）
+2.9234
+—
+P5（
+仅中期经验趋势，非推导项
+；第 3~7 步方向相反，见 §3.5.1 读数 5）
+step11
+lm loss
+6.896748
+6.639931
+6.640252
+原始侧 +3.9%；修后 4.8e-5
+P3 的定量自洽性：step1 权重相同，两侧梯度只差 aux 部分。
+‖g_main + 2·g_aux‖ = 68.922
+、
+‖g_main + g_aux‖ = 68.277
+，两式相减可得 aux 梯度在总梯度中占比仅有百分之几 —— 与
+coeff=0.02
+的量级相符，说明"2×"确实只作用在 aux 分量上。
+3.5.1 四格因子实验（新增 run A4：回退
+schedules.py
++ 保留
+--no-rope-fusion
+）
+在
+exp1_no_rope_fusion.sh
+下把
+schedules.py
+的修改
+回退
+（恢复 0.18 原语义
+aux × cp
+）后重跑，日志
+exp1_no_rope_fusion_0920_144730.log
+。它与既有三次运行构成完整的 2×2 因子实验（数值均以重新 grep 日志为准）：
+run
+aux 缩放
+RoPE
+step1 loss
+step1 lb
+step1 grad
+step3 loss
+step4 loss
+step11 loss
+val loss
+B0（0.12 基线）
+（无 cp）
+非融合
+1.049094E+01
+—
+68.276
+1.021726E+01
+1.404144E+01
+6.640252E+00
+4.870522
+A3（exp1 11:23）
+无 cp
+关
+1.049094E+01
+1.646665
+68.276
+1.021727E+01
+1.404134E+01
+6.636606E+00
+4.895675
+A4（新 14:47）
+× cp
+关
+1.049094E+01
+1.646665
+68.922
+1.010893E+01
+1.469501E+01
+6.887161E+00
+4.952467
+A1（0920 10:15）
+无 cp
+开
+1.049095E+01
+1.646663
+68.277
+1.021624E+01
+1.404898E+01
+6.639931E+00
+4.841352
+A0（0918 原始）
+× cp
+开
+1.049095E+01
+1.646663
+68.922
+1.010832E+01
+1.469767E+01
+6.896748E+00
+4.858736
+读数（对应 §3.4 与 §4.2 的预言）
+：
+step1 的
+lm loss
+与 lb 只随 RoPE 变、与 aux 无关
+：{A3,A4}（RoPE 关）= loss
+1.049094E+01
+、lb
+1.646665
+；{A1,A0}（RoPE 开）= loss
+1.049095E+01
+、lb
+1.646663
+。→ P1/P2 在新格子上再次成立，§4.2 的 Q3 成立。
+step1 的
+grad norm
+只随 aux 变、与 RoPE 无关
+：{A4,A0} =
+68.922
+；{A3,A1} =
+68.276
+/
+68.277
+。→ P3 成立。
+两处差异互相独立且效应可加
+：68.276（B0）→ 仅切换 aux（A4/A0）= 68.922（
++0.646
+）；仅切换 RoPE（A1 vs A3）差
++0.001
+。
+step3/4/11 的 loss 按 aux 因子聚类，而不按 RoPE 聚类
+：
+step3：{A3,A1} = 10.2173/10.2162（相对 B0 仅 1e-6/1.0e-4）；{A4,A0} = 10.1089/10.1083（
+−1.1%
+）
+step4：{A3,A1} = 14.0413/14.0490；{A4,A0} = 14.6950/14.6977（
++4.7%
+）
+step11：{A3,A1} = 6.6366/6.6399；{A4,A0} = 6.8872/6.8967（
++3.7%~+3.9%
+）
+→
+主因是 aux 的 CP 缩放（根因一）；只关 RoPE 不足以对齐
+。
+P5 的诚实修正
+：logged
+load_balancing_loss
+的高低次序
+不能由代数推出
+（取决于训练动力学）。实测第 3~7 步 {A4,A0}（×cp）反而
+更高
+（step4：2.2077/2.2082 vs 2.0069/2.0071；step5：2.3162/2.3166 vs 2.0627/2.0639），第 8 步起反转，之后 {A4,A0} 持续
+更低
+（step11：2.4334/2.4725 vs 2.9234/2.9262）。故 P5 只作为"中期经验趋势"，不能当判据。
+A4（回退后）相对 B0 的 loss 偏差
+：step1
+0
+、step2
+−2.0e-4
+、
+step3
+−1.06%
+、step4
++4.65%
+、step5
+−0.36%
+、step7
+−1.32%
+、step10
++3.0%
+、step11
++3.7%
+、
+step12
++22.1%
+、step14
++6.9%
+、
+step16
++60.0%
+（该步 grad norm 217.8，属难 batch 尖峰）、step17
++9.8%
+；第 10~50 步共 41 步中
+40 步为正
+（典型 +2%~+3.5%）；
+val loss 4.952467（+1.68%）
+。
+→ 印证：回退 aux 因子后，
+step3 的系统性偏差立即回归
+（从 A3 的 1e-6 回到 −1.06%），而 step1 仍完全一致（因 RoPE 已关、前向等价）。这是根因一独立性的最强证据。
+3.5.2 等价性验证（新增 run A5）：
+×cp
+精确等于"有效系数 × cp"
+脚本
+exp3_018_cp_coeff001.sh
+：
+schedules.py
+保持
+回退
+（aux ×cp）不动，只把
+--moe-aux-loss-coeff
+由
+0.02
+改为
+0.01
+，其余与 A3 完全相同（含
+--no-rope-fusion
+）；脚本内置守卫，若
+schedules.py
+不是回退状态则直接报错退出。按 §3.3 的等价关系，它应与 A3（无 cp 因子 + coeff 0.02）算术等价。
+对照
+step1 loss / lb / grad
+step3 loss
+step11 loss
+step50 loss
+val loss
+A3（无 cp，coeff 0.02）
+1.049094E+01 / 1.646665 / 68.276
+1.021727E+01
+6.636606E+00
+4.780195E+00
+4.895675
+A5（×cp，coeff 0.01）
+1.049094E+01 / 1.646665 / 68.276
+1.021727E+01
+6.636606E+00
+4.780195E+00
+4.895675
+A4（×cp，coeff 0.02）
+1.049094E+01 / 1.646665 / 68.922
+1.010893E+01
+6.887161E+00
+4.818234E+00
+4.952467
+结果：
+A5 与 A3 在
+lm loss
+、
+grad norm
+（已比对第 1~14 步与第 20~50 步，共 45 步；其余 5 步未单独比对）、
+load_balancing_loss
+（第 1~14 步）以及验证集 loss 上全部逐位一致。
+结论（根因一机制闭环）：
+×cp
+因子
+精确地
+等价于"把 aux 有效系数乘以 cp"——不含任何非线性，不缺不余；因此 A4（×cp，0.02）与 A5（×cp，0.01）的差异是整整 2 倍有效权重（step1 grad 68.922 vs 68.276；step3 10.1089 vs 10.2173）。
+故 0.12（无 cp 因子、coeff=0.02）在 cp=2 下的有效 aux 权重 =
+0.01
+，即"系数被 CP 稀释一半"。
+事前担心的 1-ulp 结合律偏差
+并未出现
+：
+fl(0.01)×2 = fl(0.02)
+是精确 2 倍（乘 2 只改指数），且
+2/12 = 2×(1/12)
+同样精确，因此两条算术路径逐位相同——这也解释了为何能连续 50 步完全重合。
+3.6 定性：这是"语义不一致"，不是单向缺陷
+从"aux 值 = 全局定义 +
+--moe-aux-loss-coeff
+应等于实际权重"这条一致性要求看，0.18（含
+×cp
+）更自洽
+；0.12 存在"aux 权重随 CP 稀释 1/cp"的历史行为。
+但 0.18 内部也不完全统一
+：同一份
+schedules.py
+里，MTP loss 的 scale（
+/N_mb
+，无 cp）与
+calculate_per_token_loss=True
+分支（
+loss_scale
+，无 cp）都没有配套的 cp 因子。说明 A6 更像
+只针对
+else
+分支的局部补丁
+，而非系统性归一化修正。
+因此准确表述是：
+两版在 CP 下的 aux 归一化语义不一致，0.18 的写法消除了 CP 依赖、0.12 保留了它
+。用户以 0.12.1 为基准的"对齐"目标成立，但需知道这是"回到旧语义"，而非"修正新版本"。
+3.7 为何它解释得了"step3 与 step11 两个观测点"
+aux 梯度只作用在 router 上，误差按以下链条累积（可推导）：
+step1：权重相同 → 前向完全一致；只有反向的 aux 分量差 2×；
+step2~3：参数开始分叉，前向误差从 ~1e-6 累积到超过打印精度（1e-4）→
+第一个可见点 step3
+；
+step3~10：router 权重轨迹持续偏离，MoE 的 top-k 是
+离散操作
+，部分 token 的专家选择被翻转 → loss 偏差从 1e-4 抬升到 1e-2；
+step10~12：累积到 grad norm 尖峰步（step12 grad norm 36→52.7），偏差被尖峰放大到 4.5% →
+第二个可见点 step11/12
+。
+4. 根因二：RoPE 融合路径（实现层）
+4.1 路径对照（由代码直接得出，无需试错）
+0.12：MindSpeed-26.1 patch 了
+rope_utils.apply_rotary_pos_emb
+，其中检测
+not HAVE_APPLY_ROPE_FUSION
+（无 apex）→ 把
+config.apply_rope_fusion
+置 False 并打 warning（这就是 0.12 日志里那条
+Setting apply_rope_fusion to false because its implementation is not included in Apex
+），随后走
+rope_utils._apply_rotary_pos_emb_bshd
+（被 MindSpeed 替换）→ 因
+args.use_fused_rotary_pos_emb=False
+走
+手写非融合
+(t*cos)+(_rotate_half(t)*sin)
+。
+0.18：MindSpeed-core_r0.18.0 只替换
+_apply_rotary_pos_emb_bshd
+；mcore 0.18 的
+apply_rotary_pos_emb
+在
+config.apply_rope_fusion=True
+时直接调用
+TE 的
+fused_apply_rotary_pos_emb
+（NPU 融合算子），根本不进入 MindSpeed 的实现。
+关键对照：把 0.18 的
+apply_rope_fusion
+关掉后，其实际执行路径（MindSpeed 0.18 的
+apply_rotary_pos_emb_bshd
+else 分支）与 0.12 的非融合公式
+逐行相同
+（含
+cos_/sin_
+先转 bf16 这一点）。
+4.2 预言
+编号
+预言
+理由
+Q1
+关闭 0.18 融合 RoPE 后，step1 的
+lm loss
+与
+grad norm
+应与 0.12
+逐位一致
+前向算子一致（回到 L1 等价）
+Q2
+step3~5 的相对误差应从 1e-4~1e-3 掉到 1e-6 级
+系统性差异被消除，只剩种子级舍入
+Q3
+该开关会改变 step1 的
+load_balancing_loss
+末位（与根因一相反）
+RoPE 属于前向
+4.3 观测核验
+step
+0.12 基线
+0.18 修 aux（0920）
+0.18 修 aux**+关 RoPE 融合**
+Q
+1 loss
+1.049094E+01
+1.049095E+01
+1.049094E+01
+Q1 ✅ 逐位一致
+1 grad
+68.276
+68.277
+68.276
+Q1 ✅ 逐位一致
+1 load_balancing_loss
+—
+1.646663E+00
+1.646665E+00
+（末位变了）
+Q3 ✅
+3 loss
+1.021726E+01
+1.021624E+01（1.0e-4）
+1.021727E+01
+（1.0e-6）
+Q2 ✅ 提升 100×
+4 loss
+1.404144E+01
+1.404898E+01（5.4e-4）
+1.404134E+01
+（7e-7）
+Q2 ✅ 提升 750×
+5 loss
+1.476064E+01
+1.476043E+01
+1.476064E+01
+（逐位）
+Q2 ✅
+两处差异的判别特征由此闭合
+：改 aux 缩放（L2）→ 前向 loss/lb 逐位不动、只有 grad norm 动；改 RoPE（L1）→ 前向 loss 与 lb 的末位一起动。
+5. 排除项（不是根因，附排除依据）
+项
+排除依据
+lm loss 的归一化（0.12 在 loss_func 内做 CP all_reduce + schedules
+*=cp
+；0.18 都不做）
+表 A 的 A2/A3 是
+成对
+差异，代数恒等（§2.1），且 step1~5 的 loss 逐位一致为证
+DDP/优化器规约口径
+两侧均为
+1/dp_cp_size
+预乘 + SUM（0.12 有 assert 校验），步进一致
+MoE permute/unpermute/routing map 实现
+0.18 的
+moe_npu_fast_ops
+与 0.12 的对应函数
+逐行等价
+（同
+masked_select
+/
+scatter
+/
+zeros+scatter_add_
+）
+数据管线
+step1~5 逐位一致；两侧
+GPTDataset-*-sample_index.npy
+hash 不同只是 config 字段差异；
+--cache-get-batch-config
+只是 host 侧
+TransformerConfig
+缓存，且 0.12 侧无该开关
+运行期随机性
+exp2a_012_repeat
+与 0.12 基线
+50 步 loss/grad norm/验证集 loss 全部逐位一致
+grad norm 计算逻辑
+见
+grad_norm_diff_analysis_report.md
+（同 MindSpeed patch 接管，逻辑相同）
+6. 残余差异的定量边界（做到什么程度算完）
+6.1 机制
+残余差异量级由两步决定，可推导：
+种子
+：两侧算子栈不同（TE-NPU vs
+mindspeed.te
+、CP attention 实现、DDP 分片、RoPE 之外的融合算子），必然产生 1e-6~1e-5 的相对舍入差异。参考量级：step1~5 修好两处根因后仍有 1e-6 级差异（如 step3 的 1.0e-6）。
+放大器
+：MoE top-k 是离散操作（少量 token 的路由翻转即可造成 O(1) 输出变化），叠加
+clip_grad=1.0
+下"梯度方向决定落点"，使参数轨迹在
+某个难 batch 的分歧步
+后长期分叉。
+6.2 两个同版本受控实验（本轮的"证伪"手段，而非反推依据）
+实验
+配置
+与基线关系
+结果
+exp2a_012_repeat
+0.12 基线原样重跑
+同版本、零改动
+50 步 loss/grad norm/val loss 逐位一致
+→ 确定性成立
+exp2b_012_fused_rope
+0.12 +
+--use-fused-rotary-pos-emb
+同版本、
+仅一个舍入级开关
+step1 差 1e-6；
+step12
+grad norm 尖峰处分岔（36.1→23.4）；
+step19~50 连续 32 步单边 +2.4%~+4.8%
+；val loss
++2.4%
+对照另一侧的同类受控实验：0.18 的 0920 vs
+exp1
+（仅差
+--no-rope-fusion
+）在
+step26
+分岔（grad norm 6.7 → 38.9），其后
+step26~50 连续 25 步单边 +1.3%~+5.8%
+。
+结论
+：一个纯舍入级的开关，就能造成"中后段 2~6% 的 per-step 单边偏移 + 1~2.4% 的验证集 loss 偏移"。因此 0.18 与 0.12 之间残余的 2~6% 逐步偏差，其量级
+完全落在一个舍入开关可造成的范围内
+，无法归因于实现缺陷。
+6.3 判据不可达性（重要）
+run
+与 0.12 基线相对误差 >2% 的步数（共 50 步）
+0.18 修 aux（0920）
+3 步
+（step12、14、16）
+0.18 修 aux + 关 RoPE 融合（exp1）
+16 步
+0.12 + 一个舍入级开关（exp2b）
+30 步
+同一个基线，只因"换了一个数学等价的算子"，就有 30/50 步超 2%。所以
+"每步 <2%"在非 bit 一致前提下不可达
+；而且"谁在中段更贴近基线"是 realization lottery（0920 只有 3 步超标但 val 偏 −0.60%；exp1 有 16 步超标但 val 偏 +0.52%；exp2b 偏 +2.4%）。
+7. 结论 · 归责 · 建议
+7.1 归责
+根因一（aux 的 CP 缩放）属 Megatron（mcore）侧
+：本配置生效的是
+megatron/core/pipeline_parallel/schedules.py
+；MindSpeed 自带同名副本只在特定 feature 下替换
+forward_step
+，且其写法与 0.12 一致（无 cp 因子），即 MindSpeed 侧并未认同该因子。
+根因二（RoPE）属两侧"环境+实现栈"差异
+（0.12 无 apex/TE → 被强制关闭融合）。
+MindSpeed 需要适配吗？
+若目标是"新版对齐旧版数值行为"，最合适的位置是
+在 Megatron 侧提供可配开关
+（改动小、可追溯）；若必须在 MindSpeed 落地，也应走 MindSpeed 的 patch 框架并写明原因与开关，而不是直接改 Megatron 的源文件。
+7.2 对
+cp_size_for_scaling
+的处理建议
+不要硬编码
+cp_size_for_scaling = 1
+。硬编码会让 0.18 在 CP 下的 aux 权重语义与上游不一致，且 cp=1↔cp=2 切换时有效权重静默变化，本次的"对齐经验"无法外推。
+建议改为显式开关（如
+--moe-aux-loss-cp-scaling
+），
+默认保持上游 0.18 语义
+；需要复现 0.12.1 时切到 1，并在注释里写清：该值等价于"aux 有效权重 × cp"。
+同步注意：本次未启用的 MTP loss 与
+calculate_per_token_loss=True
+分支在 0.18 里没有 cp 因子；若将来启用，需要把同一问题重新评估（否则会出现与 aux 不一致的权重口径）。
+7.3 验收判据建议（替换"每步 <2%"）
+step1~5
+：loss 与 grad norm 逐位一致，或相对差 ≤1e-6（这是"实现保真度"的有效区间）；
+验证集 loss
+：落在"同配置多次运行"的散布内（当前观测散布：−0.60%~+2.4%）；
+曲线趋势
+：同区间 loss 的相关系数（如 Pearson）与最终收敛水平一致；
+与
+grad_norm_diff_analysis_report.md
+的判据（val loss 相对差 ≤0.05%、前 10 步 loss ≤1e-3、前 5 步 grad norm ≤0.05%）保持一致口径，注意后者是 CP=1 配置下的结论，在 CP=2 下会放宽。
+7.4 若还要继续收敛（性价比判断）
+需要把表 B 的 B3/B4/B5 逐一对齐（即让两侧跑
+同一份
+TE/attention/分片实现），目标是让 step1 达到 bit 一致；只要还剩 1e-6 种子，某个 spike 步仍会分叉（本轮 exp2b 已证明）。
+在当前基线与判据下不建议继续投入。
+8. 附录
+8.1 运行清单
+run
+版本/环境
+关键差异
+日志
+A0
+0.18（fanlu_py312）
+基线（aux ×cp、RoPE 融合）
+Megatron-LM/logs/train_deepseek_moe_single_0918_195918.log
+A1
+0.18
++
+schedules.py
+去掉 cp 因子
+Megatron-LM/logs/train_deepseek_moe_single_0920_101546.log
+A2
+0.18
+A1 +
+--no-rope-fusion
+（15 步）
+Megatron-LM/logs/exp1_no_rope_fusion_0920_111507.log
+A3
+0.18
+同 A2，跑满 50 步
+Megatron-LM/logs/exp1_no_rope_fusion_0920_112343.log
+A4
+0.18
+回退
+schedules.py
+（恢复 aux ×cp）+
+--no-rope-fusion
+，跑满 50 步
+Megatron-LM/logs/exp1_no_rope_fusion_0920_144730.log
+A5
+0.18
+回退
+schedules.py
+（aux ×cp）+
+--no-rope-fusion
++
+--moe-aux-loss-coeff 0.01
+（等价性验证，见 §3.5.2）
+Megatron-LM/logs/exp3_018_cp_coeff001_0920_170503.log
+B0
+0.12（fanlu_py312_2）
+基线
+Megatron-LM-core_r0.12.0/logs/train_deepseek_moe_single_0918_201243.log
+B1
+0.12
+原样重跑（确定性验证）
+Megatron-LM-core_r0.12.0/logs/exp2a_012_repeat_0920_140627.log
+B2
+0.12
++
+--use-fused-rotary-pos-emb
+（舍入级扰动）
+Megatron-LM-core_r0.12.0/logs/exp2b_012_fused_rope_0920_141318.log
+实验脚本：
+Megatron-LM/exp1_no_rope_fusion.sh
+、
+Megatron-LM/exp3_018_cp_coeff001.sh
+、
+Megatron-LM-core_r0.12.0/exp2a_012_repeat.sh
+、
+Megatron-LM-core_r0.12.0/exp2b_012_fused_rope.sh
+。
+关键结果速查：step1 grad norm：A0 68.922 / A4 68.922 / A1 68.277 / A2 68.276 / A3 68.276 /
+A5 68.276
+/ B0 68.276；val loss（iter50）：A0 4.858736 / A1 4.841352 / A3 4.895675 /
+A5 4.895675（与 A3 全 50 步逐位一致，见 §3.5.2）
+/ A4 4.952467（+1.68%） / B0 4.870522 / B1 4.870522（与 B0 逐位）/ B2 4.988173。
+8.2 代码位置索引
+0.18 侧（
+/home/f00628066/workspace/Megatron-LM/
+）
+位置
+内容
+megatron/core/pipeline_parallel/schedules.py:267-279
+loss 3 元组分支：
+/= clamp(num_tokens)
+、
+/= num_microbatches
+（无 ×cp）
+同文件
+:300-306
+A6
+：
+cp_size_for_scaling = cp_group_size
+→
+set_loss_scale(loss_scale * cp / num_microbatches)
+（当前被改为 1）
+同文件
+:317-320
+MTP loss scale（无 cp）
+megatron/core/transformer/moe/router.py:298-323
+_apply_aux_loss
+：
+reduce_group=self.tp_cp_group
+、
+total_num_tokens
+同文件
+:481-493
+attach_and_log_load_balancing_loss
+→
+MoEAuxLossAutoScaler.apply
+megatron/core/transformer/moe/moe_utils.py:224-243
+get_tokens_per_expert_and_token_count
+（
+total_num_tokens = local*reduce_group.size()
+）
+同文件
+:82-143
+switch_load_balancing_loss_func
+的全局分解 docstring 与公式
+同文件
+:246-283
+MoEAuxLossAutoScaler
+（
+set_loss_scale
+/ backward 返回
+ones_like(aux)*S
+）
+megatron/core/distributed/distributed_data_parallel.py:201-204
+A4
+：
+gradient_scaling_factor = 1/dp_cp_group.size()
+megatron/core/distributed/finalize_model_grads.py:492,497-498
+梯度规约组
+dp_cp_group
+、
+finish_grad_sync
+pretrain_gpt.py:142-147
+loss_func
+返回局部
+(Σloss, num_tokens, report)
+（不做 CP reduce）
+megatron/core/models/common/embeddings/rope_utils.py:268-297
+B1
+：
+apply_rope_fusion=True
+→ TE
+fused_apply_rotary_pos_emb
+0.12 侧（
+/home/f00628066/workspace/Megatron-LM-core_r0.12.0/
+）
+位置
+内容
+megatron/core/pipeline_parallel/schedules.py:287-292
+loss 3 元组分支：
+/= num_tokens
+、
+*= cp
+、
+/= num_microbatches
+同文件
+:317-321
+A6
+：
+set_loss_scale(loss_scale / num_microbatches)
+（无 cp）
+pretrain_gpt.py:174-180,219-224
+A2
+：
+loss_func
+内对
+(Σloss, num_tokens)
+做 CP
+all_reduce
+megatron/core/transformer/moe/moe_utils.py:49-69
+switch_load_balancing_loss_func
+（
+num_tokens = probs.shape[0]*num_sub_sequence
+）
+megatron/core/distributed/distributed_data_parallel.py:151-176,271-276
+A4
+：
+gradient_scaling_factor = 1/dp_cp_size
++ assert
+megatron/core/models/common/embeddings/rope_utils.py:119-123
+B1
+：非融合
+(t*cos_)+(_rotate_half(t)*sin_)
+MindSpeed 侧
+位置
+内容
+MindSpeed/mindspeed/features_manager/fusions/fused_rope.py
+0.18 侧只替换
+_apply_rotary_pos_emb_bshd
+，融合与否由
+args.apply_rope_fusion
+决定
+MindSpeed-26.1/mindspeed/features_manager/fusions/fused_rope.py
+0.12 侧额外替换
+apply_rotary_pos_emb
+（含 apex 缺失检查与 warning）
+MindSpeed/mindspeed/core/transformer/moe/moe_npu_fast_ops.py
+B2
+：将 permute/unpermute/routing map 还原为 0.12 的算子选择（与 0.12 逐行等价）
+MindSpeed/mindspeed/features_manager/functional/cache_get_batch_config.py
+host 侧
+TransformerConfig
+缓存（0.18 默认 False；0.12 无此开关）
+MindSpeed*/mindspeed/core/pipeline_parallel/schedules.py
+两份副本的 aux scale 均为
+loss_scale / num_microbatches
+（无 cp）
+8.3 本轮对话中修正过的判断（自我复盘）
+#
+曾经的判断
+修正
+1
+一度把"中后段 2~3% 单边偏移"解释为混沌噪声
+符号统计证明是
+系统性信号
+（exp1 第 26~50 步、exp2b 第 19~50 步连续同号），后由受控实验定界为"种子放大"
+2
+一度预期"关 RoPE 融合后验证集会更贴近基线"
+数据否定：A3 +0.52% vs A1 −0.60%，两者都在同一散布内；说明中后段 per-step 不可作为保真度判据
+3
+读取日志时一度混用 A1 与 A2 的行（step26 数值）
+已逐行重新核对，本文档数据以重新核对结果为准
+4
+一度忽略
+--cache-get-batch-config
+在 A1/B… 间的存在性差异
+已查明为 host 侧 config 缓存（数值无关），但仍属非单变量因素，已在 §5 与 §8.1 标注
+5
+早期曾以"改完对齐"作为 aux 因子的主要依据
+本文档改为
+先建表 A 找唯一不等价项 → 代数推导 S=cp/N_mb → 给 P1~P4 预言 → 再核验
+6
+一度把 P5（"带 ×cp 一侧 lb 更低"）当成可推导预言列出
+降级为非推导项
+：它只是 step≥8 的经验趋势，第 3~7 步方向相反（§3.5.1 读数 5）
+7
+早期对话中引用过的 A0 中后段数值（如 step4 曾写成 14.04134、step14/15 曾写成 6.794637/6.693566）
+系转录错误
+；A0 的 val loss 当时也未复核
+本文档数值一律以重新 grep 日志为准（A0 step4 = 1.469767E+01、step14 = 6.715582E+00、step15 = 6.560436E+00、step11 lb = 2.472486、val = 4.858736，均已复核）；新增四格因子表见 §3.5.1
+8.4 方法论要点（可复用到其它跨版本精度问题）
+先建两张表
+：会缩放 loss/梯度的归一化项（表 A）+ 前向算子实现路径（表 B），再找
+唯一/少数不等价项
+；成对出现的差异通常是自洽设计，孤立出现的差异最可疑。
+先给可证伪预言再看数据
+：本轮的 P1/P2（前向值逐位不变）与 Q1/Q3（前向值末位改变）能在不跑实验的情况下判出"梯度缩放问题"还是"前向实现问题"。
+多步 loss 曲线不能用来判定实现保真度
+：必须补一个"同版本 + 单变量舍入级扰动"的受控实验来定界噪声地板；否则会把 realization lottery 误判成 bug（反之亦然）。
+一切结论都要标出"实现等价性"与"数值等价性"的层次
+：语义不等价（本轮的 aux ×cp）必须改代码；算子栈不等价（TE vs mindspeed.te、attention、分片）只能换实现，且不可能归零。
+Save
+Cancel
+F
+Fanlu
+Collaborators
+Sep 20
+Added label:
+rfc
+Sep 20
+Added label:
+rfc
+F
+Fanlu
+Collaborators
+Sep 20
+Modify description of issue
+Sep 20
+Modify description of issue
+F
+Fanlu
+Collaborators
+Sep 20
+Modify description of issue
+Sep 20
+Modify description of issue
+dao_qian
+Collaborators
+Sep 28
+Associated milestone: MindSpeed 26.3.0
+Sep 28
+Associated milestone: MindSpeed 26.3.0
+Assignees
+Not assigned
+Label
+rfc
+Kanban
+No board linked yet
+Milestones
+MindSpeed 26.3.0
+Link PR
+No related PR
+Branch
+No branches linked yet

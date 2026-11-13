@@ -1,0 +1,345 @@
+[Bug-Report|缺陷反馈]: aclnnAddRmsNorm epsilon 被 double→float 截断：极小正值下溢致全零行输出 NaN，极小负值绕过 ≥0 校验被静默接受-ops-nn-AtomGit
+Star
+1418
+Fork
+2158
+Code
+Introduction
+Code
+Issues
+935
+Pull Requests
+733
+Pipeline
+Actions
+Discussion
+Wiki
+Members
+474
+Analysis
+Settings
+Star
+1418
+Fork
+2158
+Open
+[Bug-Report|缺陷反馈]: aclnnAddRmsNorm epsilon 被 double→float 截断：极小正值下溢致全零行输出 NaN，极小负值绕过 ≥0 校验被静默接受
+#8745
+majinglan
+Add on
+5 hours ago
+majinglan
+5 hours ago
+Create
+5 hours ago
+Create
+关联：#8694 —— 同为「epsilon 声明 double 却按 float 截断」，#8694 在 aclnnAddRmsNormDynamicQuant 上 eps=1e-50 被执行段 561103 拒绝；本条 aclnnAddRmsNorm 放行执行并输出 NaN/绕过负值校验，下游表现更隐蔽。
+现象
+资料约束「epsilon的值需要大于等于零。建议值为1e-6。」（docs/aclnnAddRmsNorm.md:122），函数原型中 epsilon 为 double。Atlas A2（910B3）实测（x1 含全零行与非零行）：
+eps=1e-50（合法正值）：两段 rc=0/0，全零行 yOut 全 NaN（4096/4096）、rstdOut=inf；正确结果 y=0、rstd=1e25（float32 可表示）。输出与 eps=0.0
+逐字节一致
+（位级 diff=0 字节），证明 1e-50 被截断为 0.0f；
+eps=1e-45：rstdOut=2.671e+22（舍入到最小次正规数 1.4e-45，rstd 偏 15.5%）；eps=1e-46 起下溢为 0.0f，行为与 eps=0 完全一致；
+eps=-1e-50（负值，资料要求拒绝）：两段 rc=0/0
+被静默接受
+并执行；eps=-1.0 被拒但返回 561103 而非资料错误码表的 161002。
+期望
+极小正值 eps 不应下溢为 0.0f（本例 1e-46 起，正确 rstd=1e23）；负值（含极小负值）应在第一段按资料约束拒绝（161002）。根因链：
+add_rms_norm_def.cpp:58
+Attr("epsilon").AttrType(OPTIONAL).Float(1e-6)
+——proto attr 以
+float
+承载，API 的 double 在进入执行前被截断；
+tiling 侧 GetEpsilonParameter（add_rms_norm_tiling.cpp:382-392）以 GetFloat 读出 float：|eps|<7.0e-46 下溢为 ±0.0f；
+epsilon < 0
+对 -0.0f 判假，-1e-50 由此绕过（-1.0 同在此被拒，报 561103）；
+第一段 CheckAttr（op_api/aclnn_add_rms_norm.cpp:195-199）含 epsilon<0 校验，但同样仅在 IsRegbase() 分支调用（:208），非 regbase 平台（910B3）第一段无 epsilon 校验——同族 #8304 在 regbase 平台（A5）实测 AddRmsNorm 对 eps=-1 返回 161002，与本条 A2 实测 561103 的差异与该门控一致。
+环境
+Atlas A2（910B3），CANN 9.2.0（商用安装），ops-nn master 50bdfe72（2026-11-13 fetch 后核验，上述代码仍在）
+纯 aclnn C 两段式直调（libascendcl/libnnopbase/libopapi），无 torch 依赖
+复现步骤
+将下方脚本存为
+repro_arn_eps_truncate.py
+source CANN 环境（set_env.sh）后执行
+python3 repro_arn_eps_truncate.py <device_id>
+对照实测输出：eps=1e-50 与 0.0 两行一致且位级 diff=0；eps=-1e-50 两段 rc=0 放行；eps=-1.0 被拒
+复现脚本
+#!/usr/bin/env python3
+# aclnnAddRmsNorm epsilon double->float 截断复现（A2/910B3, CANN 9.2.0）
+import
+ctypes, sys
+import
+numpy
+as
+np
+F16, F32, ND, H2D, D2H =
+1
+,
+0
+,
+2
+,
+1
+,
+2
+DEV =
+int
+(sys.argv[
+1
+])
+if
+len
+(sys.argv) >
+1
+else
+0
+la, nn, op = (ctypes.CDLL(n)
+for
+n
+in
+(
+"libascendcl.so"
+,
+"libnnopbase.so"
+,
+"libopapi.so"
+))
+la.aclInit.argtypes = [ctypes.c_char_p]; la.aclInit(
+None
+)
+la.aclrtSetDevice.argtypes = [ctypes.c_int32]; la.aclrtSetDevice(DEV)
+la.aclrtMalloc.argtypes = [ctypes.POINTER(ctypes.c_void_p), ctypes.c_size_t, ctypes.c_int32]
+la.aclrtMemcpy.argtypes = [ctypes.c_void_p, ctypes.c_size_t, ctypes.c_void_p, ctypes.c_size_t, ctypes.c_int32]
+la.aclrtCreateStream.argtypes = [ctypes.POINTER(ctypes.c_void_p)]; la.aclrtSynchronizeStream.argtypes = [ctypes.c_void_p]
+gws, run = op.aclnnAddRmsNormGetWorkspaceSize, op.aclnnAddRmsNorm
+gws.argtypes = [ctypes.c_void_p] *
+3
++ [ctypes.c_double] + [ctypes.c_void_p] *
+3
+\
+    + [ctypes.POINTER(ctypes.c_uint64), ctypes.POINTER(ctypes.c_void_p)]
+gws.restype = run.restype = ctypes.c_int32
+run.argtypes = [ctypes.c_void_p, ctypes.c_uint64, ctypes.c_void_p, ctypes.c_void_p]
+def
+mk_t
+(
+ptr, dims, dt
+):
+    ad = (ctypes.c_int64 *
+len
+(dims))(*dims)
+    st, acc = [],
+1
+for
+d
+in
+reversed
+(dims):
+        st.insert(
+0
+, acc); acc *= d
+    f = nn.aclCreateTensor
+    f.argtypes = [ctypes.POINTER(ctypes.c_int64), ctypes.c_uint64, ctypes.c_int32,
+                  ctypes.POINTER(ctypes.c_int64), ctypes.c_int64, ctypes.c_int32, ctypes.POINTER(ctypes.c_int64), ctypes.c_uint64, ctypes.c_void_p]
+    f.restype = ctypes.c_void_p
+return
+int
+(f(ad,
+len
+(dims), dt, (ctypes.c_int64 *
+len
+(dims))(*st),
+0
+, ND,
+                 ad,
+len
+(dims), ptr)
+or
+0
+)
+def
+push
+(
+arr
+):
+    p = ctypes.c_void_p(); la.aclrtMalloc(ctypes.byref(p), arr.nbytes,
+0
+)
+    la.aclrtMemcpy(p.value, arr.nbytes, arr.ctypes.data, arr.nbytes, H2D)
+return
+p.value
+P = ctypes.c_void_p
+R, C =
+8
+,
+4096
+x1 = np.zeros((R, C)); x1[
+1
+:] = (
+1.0
++ (np.arange(C) %
+16
+) *
+0.125
+)
+tx1 = mk_t(push(x1.astype(np.float16)), [R, C], F16)
+tx2 = mk_t(push(np.zeros((R, C), np.float16)), [R, C], F16)
+tg = mk_t(push(np.ones(C, np.float16)), [C], F16)
+yp = push(np.full((R, C), -
+91.0
+, np.float16)); ty = mk_t(yp, [R, C], F16)
+rp = push(np.full((R,
+1
+), -
+91.0
+, np.float32)); tr = mk_t(rp, [R,
+1
+], F32)
+xp = push(np.full((R, C), -
+91.0
+, np.float16)); tx = mk_t(xp, [R, C], F16)
+
+legs = {}
+for
+tag, eps
+in
+((
+"1e-6"
+,
+1e-6
+), (
+"1e-45"
+,
+1e-45
+), (
+"1e-46"
+,
+1e-46
+), (
+"1e-50"
+,
+1e-50
+),
+                 (
+"0.0"
+,
+0.0
+), (
+"-1e-50"
+, -
+1e-50
+), (
+"-1.0"
+, -
+1.0
+)):
+    ws, ex = ctypes.c_uint64(
+0
+), ctypes.c_void_p()
+    rc1 = gws(P(tx1), P(tx2), P(tg), ctypes.c_double(eps), P(ty), P(tr), P(tx),
+              ctypes.byref(ws), ctypes.byref(ex))
+    rc2, y, rstd = -
+1
+,
+None
+,
+None
+if
+rc1 ==
+0
+:
+        wsb = ctypes.c_void_p(); la.aclrtMalloc(ctypes.byref(wsb), ws.value,
+0
+)
+        st = ctypes.c_void_p(); la.aclrtCreateStream(ctypes.byref(st))
+        rc2 = run(wsb, ws.value, ex, st)
+        la.aclrtSynchronizeStream(st)
+        y = np.zeros((R, C), np.float16); la.aclrtMemcpy(y.ctypes.data, y.nbytes, yp, y.nbytes, D2H)
+        rstd = np.zeros((R,
+1
+), np.float32); la.aclrtMemcpy(rstd.ctypes.data, rstd.nbytes, rp, rstd.nbytes, D2H)
+        legs[tag] = y.tobytes()
+if
+y
+is
+not
+None
+:
+print
+(
+"eps=%-7s GWS rc=0, exec rc=%d | 全零行 NaN %d/4096 | rstdOut[0]=%-9.4g"
+% (tag, rc2,
+int
+(np.isnan(y[
+0
+]).
+sum
+()), rstd[
+0
+,
+0
+]))
+else
+:
+print
+(
+"eps=%-7s GWS rc=%d, exec rc=-1 | 第一段拒绝"
+% (tag, rc1))
+if
+"0.0"
+in
+legs
+and
+"1e-50"
+in
+legs:
+print
+(
+"位级 diff(eps=0.0, eps=1e-50) = %d 字节（0 表示 1e-50 被截断为 0.0f）"
+%
+sum
+(a != b
+for
+a, b
+in
+zip
+(legs[
+"0.0"
+], legs[
+"1e-50"
+])))
+实测输出（910B3，device 5）：
+eps=1e-6    GWS rc=0, exec rc=0 | 全零行 NaN 0/4096 | rstdOut[0]=1000
+eps=1e-45   GWS rc=0, exec rc=0 | 全零行 NaN 0/4096 | rstdOut[0]=2.671e+22
+eps=1e-46   GWS rc=0, exec rc=0 | 全零行 NaN 4096/4096 | rstdOut[0]=inf
+eps=1e-50   GWS rc=0, exec rc=0 | 全零行 NaN 4096/4096 | rstdOut[0]=inf
+eps=0.0     GWS rc=0, exec rc=0 | 全零行 NaN 4096/4096 | rstdOut[0]=inf
+eps=-1e-50  GWS rc=0, exec rc=0 | 全零行 NaN 4096/4096 | rstdOut[0]=inf
+eps=-1.0    GWS rc=561103, exec rc=-1 | 第一段拒绝
+位级 diff(eps=0.0, eps=1e-50) = 0 字节（0 表示 1e-50 被截断为 0.0f）
+影响
+epsilon 语义在极小值域失效：正值下限保护场景输出 NaN 而非 0；负值校验被绕过，资料声明的取值约束对极小负值形同虚设。触发值域极端，但一旦触发，NaN 从算子深处冒出、归因成本高。
+建议
+epsilon 全链路以 double 承载（proto attr 改 Double，tiling 校验后再按需转 float），或对下溢边界显式处理；
+epsilon<0 校验移出 IsRegbase() 门，使负值在第一段按资料错误码（161002）拒绝。
+Save
+Cancel
+majinglan
+5 hours ago
+Added label:
+bug-report
+5 hours ago
+Added label:
+bug-report
+Assignees
+Not assigned
+Label
+bug-report
+Kanban
+No board linked yet
+Milestones
+No related milestones
+Link PR
+No related PR
+Branch
+No branches linked yet

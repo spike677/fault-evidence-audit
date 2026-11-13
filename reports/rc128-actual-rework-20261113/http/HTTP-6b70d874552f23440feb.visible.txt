@@ -1,0 +1,230 @@
+fix name spelling error-ascend-transformer-boost-AtomGit
+Star
+617
+Fork
+182
+Code
+Introduction
+Code
+Issues
+73
+Pull Requests
+53
+Pipeline
+Actions
+Discussion
+Wiki
+Members
+108
+Analysis
+Settings
+Star
+617
+Fork
+182
+Merged
+fix name spelling error
+#2207
+wwwlyy
+Add on
+Aug 20
+Merged from
+gcw_CfilvwB1/ascend-transformer-boost_4395：
+pr_rename
+into
+cann/ascend-transformer-boost：
+br_release_cann_9.1.0_20261223
+fix name spelling error
+#2207
+Merged
+wwwlyy
+Add on
+Aug 20
+Merged from
+gcw_CfilvwB1/ascend-transformer-boost_4395
+pr_rename
+into
+cann/ascend-transformer-boost
+br_release_cann_9.1.0_20261223
+Merge checks
+Discussion
+0
+Commits
+0
+Checks
+0
+Files changed
+0
+Clone/Download
+0
+W
+wwwlyy
+Collaborators
+Aug 20
+Aug 20
+描述
+修改ring_mla中的函数名拼写错误
+checklist
+是否通过本地IDE对代码进行静态检查
+是否通过本地IDE对代码进行格式化处理
+是否进行空指针校验
+是否进行返回值校验
+是否正确释放new/malloc申请的内存
+是否充分考虑接口的异常场景
+是否正确记录错误日志
+Save
+Cancel
+Pull Request has been successfully merged by CANN-robot.
+（Thank you for wwwlyy's contribution.）
+W
+wwwlyy
+Collaborators
+Aug 20
+Created pull request, commit
+b1379faa
+Aug 20
+Created pull request, commit
+b1379faa
+CANN-robot
+Collaborators
+Aug 20
+Comments：
+Aug 20
+Comments：
+libing-pipeline创建中，请等待……
+Save
+Cancel
+atomgit-bot
+Aug 20
+Comments：
+Aug 20
+Comments：
+变更摘要
+本 PR 修复
+ring_mla
+模块中枚举值
+CALC_TYPE_FISRT_RING
+（拼写错误）的问题，将其更正为
+CALC_TYPE_FIRST_RING
+，并同步更新了各处的引用与错误日志文案。为保证兼容性，原错误拼写名称被保留为别名继续可用，因此该改动属于纯命名修正，不改变
+RingMLAParam
+的使用方式与行为。
+主要改动
+更正枚举定义并保留兼容别名
+：在
+include/atb/infer_op_params.h
+的
+RingMLAParam::CalcType
+中，将
+CALC_TYPE_FISRT_RING
+更正为
+CALC_TYPE_FIRST_RING
+，并新增
+CALC_TYPE_FISRT_RING = CALC_TYPE_FIRST_RING
+旧名称别名以保持向后兼容。
+更新参数校验逻辑与错误信息
+：在
+src/ops/ops_infer/ring_mla/ring_mla_operation.cpp
+的
+ParamCheck
+中，将校验条件改用新枚举名
+CALC_TYPE_FIRST_RING
+，并同步修正错误描述文案中的拼写。
+更新示例代码引用
+：在
+example/op_demo/ring_mla/ring_mla_demo.cpp
+中，将首卡场景的
+calcType
+赋值由旧枚举名改为
+CALC_TYPE_FIRST_RING
+。
+更新测试注释
+：在
+tests/cinterface/ring_mla_c_interface_test.cpp
+中，将注释中的旧名称
+CALC_TYPE_FISRT_RING
+更正为
+CALC_TYPE_FIRST_RING
+。
+Save
+Cancel
+Incorrect?
+atomgit-bot
+Aug 20
+Comments：
+Aug 20
+Comments：
+代码审查
+✅ 未发现问题
+Save
+Cancel
+Incorrect?
+CANN-robot
+Collaborators
+Aug 20
+Added label:
+cann-cla/yes
+Aug 20
+Added label:
+cann-cla/yes
+101 messages are collapsed here。
+See more
+CANN-robot
+Collaborators
+Aug 21
+Added label:
+lgtm
+Aug 21
+Added label:
+lgtm
+G
+goodpeople233
+Collaborators
+Aug 21
+Comments：
+Aug 21
+Comments：
+/approve
+Save
+Cancel
+CANN-robot
+Collaborators
+Aug 21
+Added label:
+approved
+Aug 21
+Added label:
+approved
+CANN-robot
+Collaborators
+Aug 21
+Closed associated issue
+Aug 21
+Closed associated issue
+CANN-robot
+Collaborators
+Aug 21
+Merged pull request
+Aug 21
+Merged pull request
+Merger
+Not assigned
+Approver
+Not assigned
+Tester
+Not assigned
+Reviewer
+Not assigned
+Label
+stat/needs-squash
+cann-cla/yes
+SC-SUCC
+ci-pipeline-passed
+lgtm
+approved
+Milestones
+No related milestones
+Kanban
+No related boards
+Link Issue
+No related Issues

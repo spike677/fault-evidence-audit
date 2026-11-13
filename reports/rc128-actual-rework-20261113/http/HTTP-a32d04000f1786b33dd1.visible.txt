@@ -1,0 +1,281 @@
+CANN开发者共建计划-修复 CSV 精度汇总对不匹配 NaN/Inf 的误通过-ascend-transformer-boost-AtomGit
+Star
+617
+Fork
+182
+Code
+Introduction
+Code
+Issues
+73
+Pull Requests
+53
+Pipeline
+Actions
+Discussion
+Wiki
+Members
+108
+Analysis
+Settings
+Star
+617
+Fork
+182
+Open
+CANN开发者共建计划-修复 CSV 精度汇总对不匹配 NaN/Inf 的误通过
+#2371
+花@开富贵
+Add on
+6 days ago
+Merged from
+balckwell/ascend-transformer-boost：
+fix/csv-nonfinite-mismatch
+into
+cann/ascend-transformer-boost：
+master
+CANN开发者共建计划-修复 CSV 精度汇总对不匹配 NaN/Inf 的误通过
+#2371
+Open
+花@开富贵
+Add on
+6 days ago
+Merged from
+balckwell/ascend-transformer-boost
+fix/csv-nonfinite-mismatch
+into
+cann/ascend-transformer-boost
+master
+Merge checks
+Discussion
+0
+Commits
+0
+Checks
+0
+Files changed
+0
+Clone/Download
+0
+花@开富贵
+6 days ago
+6 days ago
+描述
+1、变更概述
+CSV 校验器会把 NaN/Inf 清零后比较，导致
+[NaN]
+对
+[0]
+、
+[+Inf]
+对
+[-Inf]
+等错误输出最终通过。修复在清零前检查 ordinary dtype 输出的非有限值模式，失败时设置
+Result=fail
+和包含输出下标的
+ActualError
+，由现有结果汇总稳定判为失败。
+Fixes
+https://atomgit.com/cann/ascend-transformer-boost/issues/509
+2、变更类型
+Bug 修复。
+3、修改内容
+仅修改
+tests/framework/python/CsvOpsTestTool/atb_csv_ops_test.py
+，增加私有静态检查方法及比较入口保护，并按仓库 Ruff 规则对新增赋值换行。NaN mask、Inf mask、Inf 符号必须一致；匹配的特殊值继续沿用原有处理。FP8/HiFloat8 专用路径保留。
+校验入口直接记录失败，避免旧标准将一次 0 精度与大量成功执行平均后重新判为通过。已有
+CsvOpsResult.add_result/compute_result
+负责累计失败，不新增 CSV 列或改变有限值阈值。
+4、自测验证
+CPU：真实 PyTorch 2.5.1+cpu、NumPy 2.2.6、Pandas 2.2.3；Windows AMD64 / Python 3.10.0rc1。
+同一完整类回归：原版 82/142 最终状态断言失败（错误地通过），修复后 142/142 通过。
+覆盖 old/new、四种普通浮点 dtype、NaN/Inf 类型/位置/符号、多输出和标量、匹配特殊值及有限误差、int/bool 控制、一次不匹配加 299 次匹配的最终汇总。
+复现脚本及使用方法见关联 Issue；完整类通过 AST 原样编译，仅跳过顶层 NPU 初始化。没有执行算子或 NPU。
+git diff --check
+、两个 Python 文件
+py_compile
+均通过。
+补做 Ruff 0.14.14 检查与格式检查（使用仓库
+pre-commit/pyproject.toml
+），均通过；仅新增赋值换行，AST 不变，修正后 CPU 回归仍为 142/142。最新社区 precommit 与 CodeCheck 已通过；完整编译/UT 以 CI 页面为准。未在本地运行完整 pre-commit 调度器。
+NPU、CV_FUSION GPU golden、RAND 统计路径及 FP8/HiFloat8 未验证，待 CI/维护者环境验证。
+后续完整 UT 定位到 Nonzero 计数标量和 Unpad 行向量与实际输出形状不同、但原有 torch.subtract 支持广播。现于非有限值 helper 内先 torch.broadcast_tensors，再检查 mask 及 Inf 符号，保持原数值比较的广播契约。相同完整类 CPU 形状回归从60/130恢复到130/130，既有142/142保留，独立新增556项有限值/混合dtype/非有限值/不兼容形状检查通过。没有放宽阈值、flatten或跳过检查，完整NPU UT仍以当前head的新CI为准。
+5、合规检查
+CLA 已由提交者本人签署，平台标签为
+cann-cla/yes
+。
+无新增源码文件或第三方依赖；未调整协议和构建。
+6、评审重点 & 备注
+请重点核对：匹配位置 NaN/NaN 继续允许的原有约定、
+Result=fail
+到最终
+CasePassed
+的传播，以及普通浮点与特殊低精度分支边界。本 PR 与同仓库 AllReduce Python 绑定修复涉及不同文件，可独立审查。
+checklist
+是否通过本地IDE对代码进行静态检查（未使用 IDE；已运行 py_compile 和 diff check，完整门禁待 CI）
+是否通过本地IDE对代码进行格式化处理（未使用 IDE）
+是否进行空指针校验（不适用）
+是否进行返回值校验（真实最终 CasePassed 回归）
+是否正确释放new/malloc申请的内存（不适用）
+是否充分考虑接口的异常场景（非有限值及多次汇总）
+是否正确记录错误日志（ActualError 保留输出下标，现有汇总日志负责输出）
+Save
+Cancel
+Merge blocked
+花@开富贵
+6 days ago
+Created pull request, commit
+7630c2f6
+6 days ago
+Created pull request, commit
+7630c2f6
+花@开富贵
+6 days ago
+Associated issue: CANN开发者共建计划--[Bug-Report|缺陷反馈] CSV 精度检查将不匹配的 NaN/Inf 判为通过
+6 days ago
+Associated issue: CANN开发者共建计划--[Bug-Report|缺陷反馈] CSV 精度检查将不匹配的 NaN/Inf 判为通过
+atomgit-bot
+6 days ago
+Comments：
+6 days ago
+Comments：
+变更摘要
+本 PR 修复
+tests/framework/python/CsvOpsTestTool/atb_csv_ops_test.py
+中 CSV 精度校验器对非有限值不匹配的误通过问题：原逻辑在比较前将 NaN/Inf 清零，导致
+[NaN]
+与
+[0]
+、
+[+Inf]
+与
+[-Inf]
+等错误输出仍被判为通过。改动新增私有静态方法
+__nonfinite_patterns_match
+，在
+precision_performance_analysis
+比较入口清零前先校验 NaN 位置、Inf 位置与 Inf 符号是否完全一致；不一致时直接写入
+Result=fail
+与包含输出下标的
+ActualError
+并返回，由既有
+CsvOpsResult.add_result
+/
+compute_result
+汇总稳定判为失败。FP8/HiFloat8 等专用低精度分支保持原有处理。
+主要改动
+新增非有限值模式一致性检查
+: 新增静态方法
+__nonfinite_patterns_match
+，通过
+torch.isnan
+、
+torch.isinf
+及对 Inf 元素取值的比较，要求实际输出与 golden 输出的 NaN mask、Inf mask 和 Inf 符号三者全部一致。
+比较入口增加前置保护
+: 在
+precision_performance_analysis
+的逐输出循环中，于精度标准分支之前调用上述检查，不再依赖清零后的数值比较。
+校验失败直接标记并短路返回
+: 不匹配时写入
+Result=fail
+与
+ActualError
+（含
+output index
+），并立即
+return
+，避免单次失败被后续大量成功执行平均后重新判为通过。
+保留低精度与既有阈值逻辑
+: 通过 dtype 判断排除
+torch.float8_e5m2
+、
+torch.float8_e4m3fn
+、
+torch.bits8
+，FP8/HiFloat8 专用路径及原有有限值误差阈值、CSV 列结构均不变。
+Save
+Cancel
+Incorrect?
+atomgit-bot
+6 days ago
+Comments：
+6 days ago
+Comments：
+代码审查
+✅ 未发现问题
+Save
+Cancel
+Incorrect?
+CANN-robot
+Collaborators
+6 days ago
+Added label:
+cann-cla/yes
+6 days ago
+Added label:
+cann-cla/yes
+58 messages are collapsed here。
+See more
+CANN-robot
+Collaborators
+2 days ago
+Comments：
+2 days ago
+Comments：
+🚀 CI 流水线已启动
+📋 执行详情:
+点击查看流水线
+Save
+Cancel
+CANN-robot
+Collaborators
+2 days ago
+Removed label:
+ci-pipeline-passed
+2 days ago
+Removed label:
+ci-pipeline-passed
+CANN-robot
+Collaborators
+2 days ago
+Added label:
+ci-pipeline-running
+2 days ago
+Added label:
+ci-pipeline-running
+CANN-robot
+Collaborators
+2 days ago
+Removed label:
+ci-pipeline-running
+2 days ago
+Removed label:
+ci-pipeline-running
+CANN-robot
+Collaborators
+2 days ago
+Added label:
+ci-pipeline-passed
+2 days ago
+Added label:
+ci-pipeline-passed
+Merger
+Not assigned
+Approver
+Not assigned
+Tester
+Not assigned
+Reviewer
+Not assigned
+Label
+stat/needs-squash
+cann-cla/yes
+SC-SUCC
+ci-pipeline-passed
+Milestones
+No related milestones
+Kanban
+No related boards
+Link Issue
+No related Issues

@@ -1,0 +1,122 @@
+[Bug-Report|缺陷反馈]: index/embedding_dense_grad_v2/op_kernel/embedding_dense_grad_v2.h  229行，不符合“ atomic累加指令需将src(ub)与dst(gm)做清零处理”的编码风格，建议修改-ops-nn-AtomGit
+Star
+1418
+Fork
+2160
+Code
+Introduction
+Code
+Issues
+934
+Pull Requests
+735
+Pipeline
+Actions
+Discussion
+Wiki
+Members
+474
+Analysis
+Settings
+Star
+1418
+Fork
+2160
+Closed
+[Bug-Report|缺陷反馈]: index/embedding_dense_grad_v2/op_kernel/embedding_dense_grad_v2.h  229行，不符合“ atomic累加指令需将src(ub)与dst(gm)做清零处理”的编码风格，建议修改
+#90
+duanhaomiao
+Add on
+Nov 4, 2025
+Closed at
+Nov 20, 2025
+duanhaomiao
+Nov 4, 2025
+Create
+Nov 4, 2025
+Create
+Thanks for sending an issue! Please fill in the following template to help quickly solve your problem.
+Describe the current behavior / 问题描述 (Mandatory / 必填)
+代码检视过程中，发现算子源码中可能存在性能问题。
+index/embedding_dense_grad_v2/op_kernel/embedding_dense_grad_v2.h  229行
+SetAtomicAdd<float>();
+规则描述：
+atomic特性遇到溢出会产生0x800000的错误。由于芯片对齐限制，搬运时往往会带有尾部脏数据。进行atomic累加时，需要对src与dst同时进行清零，避免脏数据累加溢出。
+Environment / 环境信息 (Mandatory / 必填)
+https://gitcode.com/cann/ops-nn/blob/master/index/embedding_dense_grad_v2/op_kernel/embedding_dense_grad_v2.h
+Steps to reproduce the issue / 重现步骤 (Mandatory / 必填)
+检视代码即可
+Describe the expected behavior / 预期结果 (Mandatory / 必填)
+index/embedding_dense_grad_v2/op_kernel/embedding_dense_grad_v2.h 230
+对idxNumGm_进行初始化
+Related log / screenshot / 日志 / 截图 (Mandatory / 必填)
+无
+Special notes for this issue/备注 (Optional / 选填)
+Save
+Cancel
+胡
+胡一航
+Collaborators
+Nov 4, 2025
+Comments：
+Nov 4, 2025
+Comments：
+感谢反馈，正在安排人评估修改。
+Save
+Cancel
+张喻翔
+Nov 5, 2025
+Assign FelixTang7 as responsible person
+Nov 5, 2025
+Assign FelixTang7 as responsible person
+F
+FelixTang7
+Collaborators
+Nov 5, 2025
+Comments：
+Nov 5, 2025
+Comments：
+你好，由于该算子涉及到多核累加场景，因此清零操作在算子执行前已完成，可以参考embedding_dense_grad_v2.cpp的内容实现
+Save
+Cancel
+duanhaomiao
+Nov 12, 2025
+Modify description of issue
+Nov 12, 2025
+Modify description of issue
+duanhaomiao
+Nov 18, 2025
+changed custom category from 任务 to 缺陷
+Nov 18, 2025
+changed custom category from 任务 to 缺陷
+duanhaomiao
+Nov 20, 2025
+changed custom state from 待办的 to 已完成
+Nov 20, 2025
+changed custom state from 待办的 to 已完成
+duanhaomiao
+Nov 20, 2025
+Close issue
+Nov 20, 2025
+Close issue
+hqhuangae
+Collaborators
+Nov 28, 2025
+Added label:
+Accepted
+Nov 28, 2025
+Added label:
+Accepted
+Assignees
+F
+FelixTang7
+Label
+Accepted
+Kanban
+No board linked yet
+Milestones
+No related milestones
+Link PR
+No related PR
+Branch
+No branches linked yet

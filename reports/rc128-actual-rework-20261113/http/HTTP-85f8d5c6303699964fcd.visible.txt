@@ -1,0 +1,319 @@
+stride校验/golden优化/vscale bugfix-ops-transformer-AtomGit
+Star
+1681
+Fork
+3393
+Code
+Introduction
+Code
+Issues
+430
+Pull Requests
+724
+Pipeline
+Actions
+Discussion
+Wiki
+Members
+620
+Analysis
+Settings
+Star
+1681
+Fork
+3393
+Merged
+stride校验/golden优化/vscale bugfix
+#8005
+wangke293
+Add on
+Jul 1
+Merged from
+wangke293/ops-transformer_stride：
+master
+into
+cann/ops-transformer：
+master
+stride校验/golden优化/vscale bugfix
+#8005
+Merged
+wangke293
+Add on
+Jul 1
+Merged from
+wangke293/ops-transformer_stride
+master
+into
+cann/ops-transformer
+master
+Merge checks
+Discussion
+0
+Commits
+0
+Checks
+0
+Files changed
+0
+Clone/Download
+0
+W
+wangke293
+Collaborators
+Jul 1
+Jul 1
+描述
+关联的Issue
+测试
+文档更新
+类型标签
+🐛 Bug修复
+✨ 新特性
+⚡ 性能优化
+♻️ 重构
+🧪 测试
+📦 构建/CI
+🔧 配置变更
+📝 文档更新
+⬆️ 依赖升级
+🔒 安全修复
+🧹 代码清理
+❓ 其他，请描述：
+Save
+Cancel
+Pull Request has been successfully merged by CANN-robot.
+（Thank you for wangke293's contribution.）
+W
+wangke293
+Collaborators
+Jul 1
+Created pull request, commit
+c75f44ba
+Jul 1
+Created pull request, commit
+c75f44ba
+CANN-robot
+Collaborators
+Jul 1
+Added label:
+cann-cla/yes
+Jul 1
+Added label:
+cann-cla/yes
+CANN-robot
+Collaborators
+Jul 1
+Comments：
+Jul 1
+Comments：
+Thanks for your pull-request.
+The full list of commands accepted by me can be found at
+here
+。
+You can get sig-info at
+here
+PR Approval Progress
+✅
+Congratulations! All modules have met the lgtm and approve requirements.
+Module Approval Details
+module
+lgtm status
+approve status
+attention
+✅
+shen_weiling
+,
+yang-binrong
+(2/2)
+✅
+shen_weiling
+(1/1)
+💡 Tip:
+Committer
+can comment
+/approve
+or
+/lgtm
+Commenting
+/approve
+implies both code review (lgtm) and intent to merge (approve)
+CLA Signature Pass
+wangke293, thanks for your pull request. All authors of the commits have signed the CLA. 👍
+Save
+Cancel
+atomgit-bot
+Jul 1
+Comments：
+Jul 1
+Comments：
+变更摘要
+此 PR 主要聚焦于 FP8 GQA Fullquant 场景下的 stride 校验增强与 golden 测试脚本优化。在算子 Host 端新增了
+CheckStrideFP8GQAFullquant
+方法，对
+key_antiquant_scale
+、
+key
+和
+value
+三个张量的 stride 进行严格校验；同时大幅度改造了 golden 测试脚本，改善数据生成策略、支持外部 NPU 排布数据加载，并修复了
+dequant_scale_k
+在非连续场景下的提取方式。
+主要改动
+新增
+CheckStrideFP8GQAFullquant
+stride 校验
+: 在
+dequant_checker.cpp
+中新增方法，校验 FP8 GQA fullquant 场景下
+kScaleStrides
+（3 维）、
+keyStrides
+（4 维）和
+valueStrides
+（4 维）的 stride 值是否与预期的 cache block 排布一致，并在
+CheckCrossFeature
+中调用该方法。
+Golden 测试数据生成策略改进
+:
+fia_fullquant_gqa_golden.py
+中 query/key 数据生成从简单均匀分布改为指数幅度分布（
+np.power(10.0, log-uniform)
+），value 数据生成改为按 head 幅度缩放，以覆盖更大动态范围的测试场景。
+Golden 测试支持外部 NPU 排布输入
+: 新增
+load_external_data.py
+模块（
+ExternalData
+类 +
+load_data_from_dir
+函数），可从指定目录加载 rank0 的 pt 文件作为 NPU 排布输入；golden 脚本中新增
+external_to_bnsd
+及配套的
+_ntd_to_bnsd
+、
+_bnbd_to_bnsd
+等排布转换函数，并新增
+npu_fp8_full_quant_external
+路径支持外部数据直接调用 NPU 算子。
+修复
+dequant_scale_k
+提取逻辑
+:
+fa_run_npu
+和
+npu_fp8_full_quant
+中改为通过
+view(torch.uint8).view(float32)
+从 k cache 末尾的 scale 区域提取
+dequant_scale_k
+，避免
+.float()
+调用破坏原始 stride 导致非连续校验失效。
+Save
+Cancel
+Incorrect?
+W
+wangke293
+Collaborators
+Jul 1
+Pre merge succeeded (commit_id: 4462ec17c33f0f9d3168448c287146a52a5a6155)
+Jul 1
+Pre merge succeeded (commit_id: 4462ec17c33f0f9d3168448c287146a52a5a6155)
+50 messages are collapsed here。
+See more
+Y
+yang-binrong
+Collaborators
+Jul 2
+Start code review
+1
+attention/fused_infer_attention_score/op_host/checkers/dequant_checker.cpp
+Resolved
+@@ -1649,0 +1690,4 @@
+1690
++
+return
+ge::GRAPH_FAILED);
+1691
++
+uint64_t
+keyStride1 = kCacheBlockRows *
+static_cast
+<
+uint64_t
+>(fiaInfo.qkHeadDim);
+1692
++
+uint64_t
+keyStride0 =
+static_cast
+<
+uint64_t
+>(fiaInfo.n2Size) * keyStride1;
+1693
++
+if
+(fiaInfo.keyStrides->
+GetDimNum
+() !=
+4
+||
+Y
+yang-binrong
+Jul 2
+Comments：
+【一般】需要解释多个维度的物理含义
+Save
+Cancel
+Y
+yang-binrong
+Collaborators
+Jul 2
+Resolved final issue
+Jul 2
+Resolved final issue
+Y
+yang-binrong
+Collaborators
+Jul 2
+Comments：
+Jul 2
+Comments：
+/lgtm
+Save
+Cancel
+CANN-robot
+Collaborators
+Jul 2
+Added label:
+lgtm
+Jul 2
+Added label:
+lgtm
+CANN-robot
+Collaborators
+Jul 2
+Merged pull request
+Jul 2
+Merged pull request
+Merger
+Not assigned
+Approver
+Not assigned
+Tester
+Not assigned
+Reviewer
+Not assigned
+Label
+cann-cla/yes
+stat/needs-squash
+api-check-pass
+ci-pipeline-passed
+approved
+lgtm
+Milestones
+No related milestones
+Kanban
+No related boards
+Link Issue
+No related Issues

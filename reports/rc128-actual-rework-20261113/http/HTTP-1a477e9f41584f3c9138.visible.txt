@@ -1,0 +1,360 @@
+test(flash_attn): 默认 NPU / GPU FA3 / CPU FP32 的 L2 三方校验-ops-transformer-AtomGit
+Star
+1681
+Fork
+3393
+Code
+Introduction
+Code
+Issues
+429
+Pull Requests
+726
+Pipeline
+Actions
+Discussion
+Wiki
+Members
+620
+Analysis
+Settings
+Star
+1681
+Fork
+3393
+Open
+test(flash_attn): 默认 NPU / GPU FA3 / CPU FP32 的 L2 三方校验
+#15805
+linengyao
+Add on
+19 hours ago
+Merged from
+linengyao/ops-transformer：
+feat/flash-attn-cross-check-l2-20261112
+into
+cann/ops-transformer：
+master
+test(flash_attn): 默认 NPU / GPU FA3 / CPU FP32 的 L2 三方校验
+#15805
+Open
+linengyao
+Add on
+19 hours ago
+Merged from
+linengyao/ops-transformer
+feat/flash-attn-cross-check-l2-20261112
+into
+cann/ops-transformer
+master
+Merge checks
+Discussion
+0
+Commits
+0
+Checks
+0
+Files changed
+0
+Clone/Download
+0
+linengyao
+Collaborators
+19 hours ago
+19 hours ago
+描述
+FlashAttn 原三方精度判据为 L0。本 PR 升级为 L2，并整合 GPU FA3 sinks 适配。默认三方路径为：
+NPU FlashAttn 算子输出、GPU FA3 标杆、CPU FP32 golden
+。
+默认 CPU golden 沿用 FA3 分支的独立 dense FP32 实现：完整 QK、softmax、PV 和 LSE 使用 FP32，不因
+--compare cross_check
+自动升为 FP64。
+默认通过 TTK 原生三方比较器及 GPU XPU 服务执行 FA3，支持布局/分页转换、sinks 后处理和 LSE。缺少 GPU 服务时明确失败，不回退到 NPU 小算子。
+三方采用 TTK L2 预设：mare/mere/rmse 比值上限 2/1.2/1.2；移除旧 L0 数字覆盖，小值域与 NaN/Inf 规则由 TTK 处理。
+显式设置
+FLASH_ATTN_CROSS_CHECK_BACKEND=npu
+可使用本地 NPU 小算子备选方案，该独立路径保留原有 CPU FP64 参考。
+reference_mode=mixed/fp64
+仅为显式选项，默认 FA3 路径使用
+fp32
+。
+测试资产可在没有 TTK/NPU 包的环境导入，兼容 GPU 远程服务和离线工具加载。
+新增
+offline_compare.py
+：读取完整输入 PT 和已有 NPU/GPU 输出 PT，在 CPU 上生成 FP32 golden 并离线比较；不执行 NPU/GPU 算子。当前支持非分页布局、mask_mode 0/3/4 和 sinks。报告包含两侧原始 MARE/MERE/RMSE、比值、分母下限及特殊分支，便于定位
+mare=1.0
+。
+FA3 代码、工具、用例和运行文档来自
+PerrySkywalker/feat/flash_attn_ttk_fa3_sinks
+，整合截至
+84a5235da
+，保留其原提交历史。FA3 计算模块位于
+impl/fa3.py
+。
+关联的Issue
+无。
+测试
+既有三方实现 1,266 项回归全部通过：覆盖 FA3 CPU stand-in 数值/布局/sinks/分页/维度转换、默认与显式标杆选择、默认 CPU FP32、备选参考模式和统一 L2 参数解析。
+新增离线工具 55 项测试通过，其中 36 项与 TTK 比较器直接核对。命令行测试禁止导入 TTK、torch_npu、FA3 和算子包，验证纯 CPU 运行；同时覆盖完整输入包、mask/sinks、输出选择、CPU golden 保存和回放。
+不设置标杆选择变量的实际 TTK 调用，日志确认 attention golden 和 LSE golden 均为
+float32
+；缺少 GPU 服务时返回预期的
+GOLDEN_FAILURE
+，未调用 NPU 小算子回退。
+NPU 小算子备选方案在整合阶段完成 Ascend950DT 实卡 E2E 4/4 PASS，覆盖 FP16/BF16 × 无掩码/因果掩码，每例 attention 输出和 LSE 均通过 L2。
+重新生成 40 条 GPU smoke 和 474 条 FA3 scope CSV，与入库资产逐字节一致。
+Ruff 检查、格式检查及
+git diff --check
+通过。
+验证边界：当前无可用 CUDA/FA3 环境，真实 GPU FA3 及跨机 GPU/NPU 精度尚未验证，CPU stand-in 测试不代表真实 CUDA 执行通过。NPU 备选路径的实卡验证复用了服务器 20261107 现有算子包，未从当前 master 重新编译内核；该备选路径要求 PyTorch/torch_npu 支持
+torch.mm(..., out_dtype=torch.float32)
+。
+文档更新
+更新 README.md 和 README_FA3.md，明确默认 NPU/GPU FA3/CPU FP32 路径、L2 判据、依赖、两端部署及验证边界。带入 FA3、TND 16K/batch 13、scope、未来维度及 GPU smoke 用例和生成工具。
+补充离线比较工具的 PT 格式、命令行、原始误差解释、非分页范围和退出码说明。
+类型标签
+🧪 测试
+📝 文档更新
+Save
+Cancel
+Merge blocked
+linengyao
+Collaborators
+19 hours ago
+Created pull request, commit
+e0a56d88
+19 hours ago
+Created pull request, commit
+e0a56d88
+atomgit-bot
+19 hours ago
+Comments：
+19 hours ago
+Comments：
+变更摘要
+本 PR 将 FlashAttn 的
+--compare cross_check
+三方比较链路从 L0 阈值 + CPU FP32 基准，完整切换为 TTK L2 判据：CPU 侧新增 FP64 真值参考，NPU 侧新增小算子标杆，并移除对进程内 golden 缓存与
+customize_inputs
+的依赖，改为在比较进程中从
+compare_context
+原始输入重建标杆。
+主要改动
+精度判据切换为 L2 预设
+：
+cross_check.py
+中的
+TOLERANCE
+简化为每个 dtype 仅声明
+{"standard": "cross_check", "level": "L2"}
+，删除原有
+mare_ratio
+/
+mere_ratio
+/
+rmse_ratio
+/
+small_value
+等 L0 显式覆盖，小值域与 NaN/Inf 规则交由 TTK L2 比较器处理；
+pre_compare
+在
+enabled()
+为真时直接透传输出。
+标杆计算改为比较进程内重建
+：删除
+prepare()
+/
+get_case()
+缓存机制，新增
+arguments_from_context()
+，通过
+inspect.signature(cpu_flash_attn)
+从
+compare_context.input_tensors
+与
+attributes
+还原参数并保留原始输入 dtype；输入缺失或标杆执行失败时显式抛错，不再回退为两方比较。
+inputs.py
+中对应的
+prepare
+调用一并移除。
+新增 FP64 真值与 NPU 小算子两个参考实现
+：新文件
+reference.py
+定义
+FP64Reference
+（
+COMPUTE_DTYPE = torch.float64
+，
+forward_golden
+先将 Q/K/V 提升为
+double
+）与
+NpuSmallOpReference
+（
+_matmul
+在 NPU 上以原输入精度执行并用
+out_dtype=torch.float32
+输出），两者均不调用待测 FlashAttn 算子。
+golden.py
+计算精度参数化
+：引入
+COMPUTE_DTYPE = torch.float32
+类属性，替换各处硬编码的
+torch.float32
+（输出/LSE/分页 K/V 缓冲、online softmax 的
+maximum
+/
+total
+/
+acc
+等），并抽出
+_matmul()
+作为矩阵乘钩子；
+cpu_flash_attn
+在 cross_check 模式下改为调用
+FP64Reference
+实时计算；
+_to_cpu
+增加 numpy
+bfloat16
+等输入到张量的转换；
+max(q_lens, default=0)
+处理空序列。
+新增回归测试覆盖
+：
+tests/ut/python/test_flash_attn_cross_check.py
+以 FP16/BF16、BSND/BNSD/TND、
+PA_BBND
+/
+PA_BNBD
+/
+PA_NZ
+、因果与窗口掩码、GQA、sinks、空 KV、LSE 开关等组合校验 FP64 真值与独立公式一致，并覆盖 L2 阈值解析、扰动失败、小值域统计、NaN/Inf 透传、缺少上下文报错、标杆失败不回退及 NPU 实机路径。
+🧩 本次 Review 已使用自定义 Skill：
+ascendc-code-review
+Save
+Cancel
+Incorrect?
+CANN-robot
+Collaborators
+19 hours ago
+Added label:
+cann-cla/yes
+19 hours ago
+Added label:
+cann-cla/yes
+CANN-robot
+Collaborators
+19 hours ago
+Comments：
+19 hours ago
+Comments：
+Thanks for your pull-request.
+The full list of commands accepted by me can be found at
+here
+.
+You can get sig-info at
+here
+.
+You can self-configure the PR merge rules for this repository. For more details, please refer to
+Here
+.
+For more, you also can visit
+HICANN
+.
+PR Approval Progress
+⚠️ This PR does not yet meet the following requirements:lgtm (requires ≥ 2 person(s) per module)、approve (requires ≥ 1 person(s) per module)
+Module Approval Details
+module
+lgtm status
+approve status
+attention
+❌ (0/2)(You can also ask:
+lining_210
+,
+huangwei791
+,
+zhangshuoleiokok
+,
+於欣洁
+,
+马兵
+)
+❌ (0/1)(You can also ask:
+马兵
+,
+juyangokok
+,
+yuhao_
+,
+gaoxiang618
+,
+俞郑中
+)
+tests
+❌ (0/2)(You can also ask:
+刘丹
+,
+gaoxiang618
+,
+xtqh
+,
+zzzzzzyf_
+,
+wang-minbo
+)
+❌ (0/1)(You can also ask:
+马兵
+,
+黄俊健
+,
+zzzzzzyf_
+,
+俞郑中
+,
+蒋礼锐
+)
+💡 Tip:
+Committer
+can comment
+/approve
+or
+/lgtm
+Commenting
+/approve
+implies both code review (lgtm) and intent to merge (approve)
+CLA Signature Pass
+linengyao, thanks for your pull request. All authors of the commits have signed the CLA. 👍
+Save
+Cancel
+CANN-robot
+Collaborators
+19 hours ago
+Set guijianwei,hz36amy_00,yangziqi_007,coder_linx,cheng_zhiwei,juyangokok,monologue815,xuanyuandy,crystalhu,yu-xinjie62,huangwei791,jiang-lirui,yang-binrong,Allan_Yu,wang-minbo,huang-wei-chen,xtqh,liudan12,shasha_an,wangzhe123456789,Wei_NaChuan,zhangshuoleiokok,luwei_1104,cc-z,kdy18482276080,xuchengyang,shen_weiling,gaoxiang618,songjionghui,lining_210,wenxin_fight,miaofangzheng,mabing1118,tang-hao-hw-gitcode,haijie_699874,zzy__,Julius47,yuhao_,L_Euler,wangxun21,zzzzzzyf_ as approver
+19 hours ago
+Set guijianwei,hz36amy_00,yangziqi_007,coder_linx,cheng_zhiwei,juyangokok,monologue815,xuanyuandy,crystalhu,yu-xinjie62,huangwei791,jiang-lirui,yang-binrong,Allan_Yu,wang-minbo,huang-wei-chen,xtqh,liudan12,shasha_an,wangzhe123456789,Wei_NaChuan,zhangshuoleiokok,luwei_1104,cc-z,kdy18482276080,xuchengyang,shen_weiling,gaoxiang618,songjionghui,lining_210,wenxin_fight,miaofangzheng,mabing1118,tang-hao-hw-gitcode,haijie_699874,zzy__,Julius47,yuhao_,L_Euler,wangxun21,zzzzzzyf_ as approver
+33 event messages are collapsed here。
+See more
+linengyao
+Collaborators
+16 hours ago
+Modify description of pull request
+16 hours ago
+Modify description of pull request
+Merger
+Not assigned
+Approver
+Not assigned
+Tester
+Not assigned
+Reviewer
+Not assigned
+Label
+stat/needs-squash
+cann-cla/yes
+Milestones
+No related milestones
+Kanban
+No related boards
+Link Issue
+No related Issues

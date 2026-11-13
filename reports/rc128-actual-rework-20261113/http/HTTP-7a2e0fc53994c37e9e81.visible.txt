@@ -1,0 +1,2432 @@
+diff --git a/mindspeed/arguments.py b/mindspeed/arguments.py
+index ba643a83a667c791101b099045102850adbd7679..7615dee25b6f0fa34be52e1c922c864a34d944da 100644
+--- a/mindspeed/arguments.py
++++ b/mindspeed/arguments.py
+@@ -227,6 +227,12 @@ def _add_training_args(parser):
+     group.add_argument('--pipe-experts-multi-stream', action='store_true', default=False,
+                        help='Use multi stream to avoid link collision in collective communication when --use-pipe-experts. '
+                             'The default is False.')
++    group.add_argument("--additional-config", help="additional model config file path")
++    group.add_argument('--use-ema', action='store_true', default=False,
++                       help='use ema when training')
++    group.add_argument('--use-multiparameter-pipeline-model-parallel', action='store_true', default=False,
++                       help='can transfer multi parameters from stage to stage in pipeline model parallel')
++
+     return parser
+ 
+ 
+@@ -313,6 +319,8 @@ def core_transformer_config_from_args_wrapper(fn):
+         config = fn(args)
+         config.context_parallel_algo = args.context_parallel_algo
+         config.batch_p2p_comm = False
++        if args.use_multiparameter_pipeline_model_parallel:
++            config.deallocate_pipeline_outputs = False
+         return config
+ 
+     return wrapper
+@@ -443,8 +451,7 @@ def validate_args_wrapper(validate_args):
+ 
+             assert args.seq_length % (2 * args.context_parallel_size) == 0, f"sequence length must be divisible by 2 * context_parallel_size in hybrid cp"
+             args.use_flash_attn = True
+-            
+-            
++
+         # Mandatory modification to SBH, subsequent abandonment of other formats such as BSH,BSND
+         if args.shape_order != 'SBH':
+             args.shape_order = 'SBH'
+diff --git a/mindspeed/checkpointing.py b/mindspeed/checkpointing.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..000c5a79242ca94058708dfe99439829abf80b70
+--- /dev/null
++++ b/mindspeed/checkpointing.py
+@@ -0,0 +1,314 @@
++# coding=utf-8
++# Copyright (c) 2024, Huawei Technologies Co., Ltd. All rights reserved.
++# Copyright (c) 2024, NVIDIA CORPORATION. All rights reserved.
++#
++# Licensed under the Apache License, Version 2.0 (the "License");
++# you may not use this file except in compliance with the License.
++# You may obtain a copy of the License at
++#
++#     http://www.apache.org/licenses/LICENSE-2.0
++#
++# Unless required by applicable law or agreed to in writing, software
++# distributed under the License is distributed on an "AS IS" BASIS,
++# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++# See the License for the specific language governing permissions and
++# limitations under the License.
++"""Input/output checkpointing."""
++
++import os
++import sys
++
++import torch
++
++from megatron.core import mpu, tensor_parallel, dist_checkpointing
++from megatron.training import get_args
++from megatron.training.utils import (unwrap_model, print_rank_0)
++
++from megatron.training.checkpointing import (
++    get_rng_state,
++    get_checkpoint_name,
++    get_distributed_optimizer_checkpoint_name,
++    ensure_directory_exists,
++    get_checkpoint_tracker_filename,
++    read_metadata,
++    find_checkpoint_rank_0
++)
++
++
++def save_checkpoint(iteration, model, optimizer, opt_param_scheduler,
++                    num_floating_point_operations_so_far, checkpointing_context=None):
++    args = get_args()
++
++    # Only rank zero of the data parallel writes to the disk.
++    model = unwrap_model(model)
++
++    ckpt_format = args.dist_ckpt_format if args.use_dist_ckpt else 'torch'
++    print_rank_0('saving checkpoint at iteration {:7d} to {} in {} format'.format(
++        iteration, args.save, ckpt_format))
++
++    # Collect rng state across data parallel ranks.
++    rng_state = get_rng_state(args.use_dist_ckpt)
++
++    # Checkpoint name.
++    checkpoint_name = get_checkpoint_name(args.save, iteration, return_base_dir=args.use_dist_ckpt)
++
++    # Save distributed optimizer's custom parameter state.
++    if args.use_distributed_optimizer and not args.no_save_optim and optimizer is not None and not args.use_dist_ckpt:
++        optim_checkpoint_name = \
++            get_distributed_optimizer_checkpoint_name(checkpoint_name)
++        ensure_directory_exists(optim_checkpoint_name)
++        optimizer.save_parameter_state(optim_checkpoint_name)
++
++    async_save_request = None
++    if args.async_save:
++        if not args.use_dist_ckpt:
++            raise NotImplementedError('Async checkpoint save not implemented for legacy checkpoints')
++        elif args.dist_ckpt_format != 'torch_dist':
++            raise NotImplementedError(f'Async checkpoint save not implemented for {args.dist_ckpt_format} distributed checkpoint format')
++
++    # Collect args, model, RNG.
++    if not torch.distributed.is_initialized() \
++            or mpu.get_data_modulo_expert_parallel_rank() == 0 \
++            or args.use_dist_ckpt:
++
++        optim_sd_kwargs = {}
++        if args.use_dist_ckpt and args.use_distributed_optimizer:
++            optim_sd_kwargs['sharding_type'] = ('fully_sharded_bucket_space'
++                                                if args.ckpt_fully_parallel_save
++                                                else 'dp_zero_gather_scatter')
++            print_rank_0(f'Storing distributed optimizer sharded state of type {optim_sd_kwargs["sharding_type"]}')
++        state_dict = generate_state_dict(args, model, optimizer, opt_param_scheduler, rng_state,
++                                         args.use_dist_ckpt, iteration, optim_sd_kwargs=optim_sd_kwargs)
++
++        state_dict['num_floating_point_operations_so_far'] = num_floating_point_operations_so_far
++        if args.use_dist_ckpt:
++            if not torch.distributed.is_initialized() or torch.distributed.get_rank() == 0:
++                ensure_directory_exists(checkpoint_name, check_parent=False)
++            validate_sharding_integrity = True
++            save_strategy = (checkpointing_context or {}).get('save_strategy',
++                                                              get_default_save_sharded_strategy(args.dist_ckpt_format))
++            if args.ckpt_fully_parallel_save:
++                if checkpointing_context is not None and 'save_strategy' in checkpointing_context:
++                    # Already saved once before - don't need to rerun sharding validation
++                    validate_sharding_integrity = not args.ckpt_assume_constant_structure
++                else:
++                    save_strategy = FullyParallelSaveStrategyWrapper(save_strategy, mpu.get_data_parallel_group(with_context_parallel=True),
++                                                                     args.ckpt_assume_constant_structure)
++            # Store save strategy for future checkpoint saves
++            if checkpointing_context is not None:
++                checkpointing_context['save_strategy'] = save_strategy
++            async_save_request = dist_checkpointing.save(state_dict, checkpoint_name, save_strategy,
++                                                         async_sharded_save=args.async_save)
++        else:
++            # Save.
++            if args.use_ema:
++                ema_state_dict = {k: v for k, v in state_dict.items() if k.startswith('ema')}
++                state_dict = {k: v for k, v in state_dict.items() if not k.startswith('ema')}
++
++            ensure_directory_exists(checkpoint_name)
++            torch.save(state_dict, checkpoint_name)
++
++            if args.use_ema:
++                ema_state_dict = {k.replace('ema', 'model'): v for k, v in ema_state_dict.items()}
++                torch.save(ema_state_dict, checkpoint_name + ".ema")
++
++    if not args.async_save:
++        assert async_save_request is None
++        # Wait so everyone is done (necessary)
++        if torch.distributed.is_initialized():
++            torch.distributed.barrier()
++
++    # And update the latest iteration
++    if not torch.distributed.is_initialized() \
++       or torch.distributed.get_rank() == 0:
++        tracker_filename = get_checkpoint_tracker_filename(args.save)
++
++        def iter_finalize_fn():
++            with open(tracker_filename, 'w') as f:
++                f.write(str(iteration))
++            print_rank_0('  successfully saved checkpoint from iteration {:7d} to {}'
++                         .format(iteration, args.save))
++            if args.log_progress and args.async_save:
++                append_to_progress_log(f'Saved async checkpoint\tIteration: {iteration}',
++                                       barrier=False)
++
++        if args.async_save:
++            assert async_save_request is not None
++            async_save_request.add_finalize_fn(iter_finalize_fn)
++        else:
++            iter_finalize_fn()
++
++    if args.async_save:
++        schedule_async_save(async_save_request)
++        print_rank_0('  scheduled an async checkpoint save at iteration {:7d} to {}' \
++                     .format(iteration, args.save))
++
++    # Wait so everyone is done (not necessary)
++    if torch.distributed.is_initialized():
++        torch.distributed.barrier()
++
++
++def generate_state_dict(args, model, optimizer, opt_param_scheduler,
++                        rng_state, use_dist_ckpt=False, iteration=None,
++                        optim_sd_kwargs=None):
++    # Arguments, iteration, and model.
++    state_dict = {}
++    ema_state_dict = {}
++    state_dict['args'] = args
++    state_dict['checkpoint_version'] = 3.0
++    if iteration is not None:
++        state_dict['iteration'] = iteration
++
++    if len(model) == 1:
++        state_dict['model'] = (model[0].sharded_state_dict()
++                               if use_dist_ckpt else
++                               model[0].state_dict_for_save_checkpoint())
++    else:
++        for i in range(len(model)):
++            mpu.set_virtual_pipeline_model_parallel_rank(i)
++            state_dict['model%d' % i] = (
++                model[i].sharded_state_dict()
++                if use_dist_ckpt else
++                model[i].state_dict_for_save_checkpoint())
++
++    if args.use_ema:
++        if len(model) == 1:
++            state_dict['ema'] = {k: v for k, v in state_dict['model'].items() if k.startswith('ema')}
++            state_dict['model'] = {k: v for k, v in state_dict['model'].items() if not k.startswith('ema')}
++        else:
++            for i in range(len(model)):
++                mpu.set_virtual_pipeline_model_parallel_rank(i)
++                state_dict['ema%d' % i] = {k.replace('ema.', ''): v for k, v in state_dict['model%d' % i].items() if k.startswith('ema')}
++                state_dict['model%d' % i] = {k: v for k, v in state_dict['model%d' % i].items() if not k.startswith('ema')}
++
++    # Optimizer stuff.
++    if not args.no_save_optim:
++        if optimizer is not None:
++            state_dict['optimizer'] = (optimizer.sharded_state_dict(state_dict, **(optim_sd_kwargs or {}))
++                                       if use_dist_ckpt else
++                                       optimizer.state_dict())
++        if opt_param_scheduler is not None:
++            state_dict['opt_param_scheduler'] = \
++                opt_param_scheduler.state_dict()
++    # RNG states.
++    if not args.no_save_rng:
++        state_dict["rng_state"] = rng_state
++    return state_dict
++
++
++def _load_base_checkpoint(load_dir, rank0=False, sharded_state_dict=None,
++                          exit_on_missing_checkpoint=False, checkpoint_step=None):
++    """ Load the base state_dict from the given directory
++
++    If rank0 is true, just loads rank 0 checkpoint, ignoring arguments.
++    """
++    args = get_args()
++
++    # Read the tracker file and set the iteration.
++    tracker_filename = get_checkpoint_tracker_filename(load_dir)
++
++    # If no tracker file, return nothing
++    if not os.path.isfile(tracker_filename):
++        if not rank0:
++            print_rank_0('WARNING: could not find the metadata file {} '.format(
++                tracker_filename))
++            print_rank_0('    will not load any checkpoints and will start from '
++                         'random')
++
++        # Conditionally exit if checkpoint not found.
++        if exit_on_missing_checkpoint:
++            print_rank_0(">> '--exit-on-missing-checkpoint' set ... exiting. <<")
++            if torch.distributed.is_initialized():
++                torch.distributed.barrier()
++            sys.exit()
++
++        return None, "", False
++
++    # Otherwise, read the tracker file and either set the iteration or
++    # mark it as a release checkpoint.
++    if checkpoint_step is not None:
++        iteration = checkpoint_step
++        release = False
++    else:
++        iteration, release = read_metadata(tracker_filename)
++
++    # Checkpoint.
++    if rank0:
++        checkpoint_name = find_checkpoint_rank_0(load_dir, iteration, release)
++        is_dist_ckpt = checkpoint_name is not None and dist_checkpointing.check_is_distributed_checkpoint(checkpoint_name)
++    else:
++        checkpoint_name = get_checkpoint_name(load_dir, iteration, release,
++                                              return_base_dir=True)
++        is_dist_ckpt = dist_checkpointing.check_is_distributed_checkpoint(checkpoint_name)
++        if not is_dist_ckpt:
++            checkpoint_name = get_checkpoint_name(load_dir, iteration, release,
++                                                  return_base_dir=False)
++        dist_infix = "distributed " if is_dist_ckpt else ""
++        if release:
++            print_rank_0(f' loading release {dist_infix}checkpoint from {load_dir}')
++        else:
++            print_rank_0(f' loading {dist_infix}checkpoint from {load_dir} at iteration {iteration}')
++
++    # Load the checkpoint.
++    if is_dist_ckpt:
++        if rank0:
++            state_dict = dist_checkpointing.load_common_state_dict(checkpoint_name)
++            return state_dict, checkpoint_name, release
++
++        # at this point args are available
++        args = get_args()
++        if sharded_state_dict is None:
++            assert not args.auto_detect_ckpt_format and not args.use_dist_ckpt, (args.auto_detect_ckpt_format, args.use_dist_ckpt)
++            raise RuntimeError('Detected load from a distributed checkpoint, but neither --use-dist-ckpt nor --auto-detect-ckpt-format is set.')
++
++        load_strategy = get_default_load_sharded_strategy(checkpoint_name)
++        if args.ckpt_fully_parallel_load:
++            load_strategy = FullyParallelLoadStrategyWrapper(load_strategy,
++                                                             mpu.get_data_parallel_group(with_context_parallel=True))
++        state_dict = dist_checkpointing.load(sharded_state_dict, checkpoint_name, load_strategy)
++        return state_dict, checkpoint_name, release
++
++    try:
++        state_dict = torch.load(checkpoint_name, map_location='cpu')
++        try:
++            args = get_args()
++            if not args.use_ema:
++                return state_dict, checkpoint_name, release
++
++            len_model = sum(1 for key in state_dict if key.startswith('model'))
++            ema_state_dict = torch.load(checkpoint_name + ".ema", map_location='cpu')
++
++            if len(ema_state_dict) == 0 :
++                return state_dict, checkpoint_name, release
++
++            if len_model == 1:
++                ema_state_dict['model'] = {f'ema.{k}': v for k, v in ema_state_dict['model'].items()}
++                state_dict['model'].update(ema_state_dict['ema'])
++            else:
++                for i in range(len_model):
++                    ema_state_dict['model%d' % i] = {f'ema.{k}': v for k, v in ema_state_dict['model%d' % i].items()}
++                    state_dict['model%d' % i].update(ema_state_dict['model%d' % i])
++        except BaseException as e:
++            print_rank_0('could not load the ema checkpoint, continue without ema checkpoint')
++            print_rank_0(e)
++            ema_state_dict = {}
++    except ModuleNotFoundError:
++        from megatron.legacy.fp16_deprecated import loss_scaler
++        # For backward compatibility.
++        if not rank0:
++            print_rank_0(' > deserializing using the old code structure ...')
++        sys.modules['fp16.loss_scaler'] = sys.modules[
++            'megatron.legacy.fp16_deprecated.loss_scaler']
++        sys.modules['megatron.fp16.loss_scaler'] = sys.modules[
++            'megatron.legacy.fp16_deprecated.loss_scaler']
++        sys.modules['megatron.model'] = sys.modules['megatron.legacy.model']
++        state_dict = torch.load(checkpoint_name, map_location='cpu')
++        sys.modules.pop('fp16.loss_scaler', None)
++        sys.modules.pop('megatron.fp16.loss_scaler', None)
++        sys.modules.pop('megatron.model', None)
++    except BaseException as e:
++        print_rank_0('could not load the checkpoint')
++        print_rank_0(e)
++        sys.exit()
++
++    return state_dict, checkpoint_name, release
+diff --git a/mindspeed/core/parallel_state.py b/mindspeed/core/parallel_state.py
+index 40e06f49d4e5509c094969c0ef6ce4787a4e7c78..37df7aecfe9a25751d09feefd8b43a759396f20f 100644
+--- a/mindspeed/core/parallel_state.py
++++ b/mindspeed/core/parallel_state.py
+@@ -14,7 +14,7 @@
+ # See the License for the specific language governing permissions and
+ # limitations under the License.
+ """Expert parallel groups."""
+-
++import os
+ from functools import wraps
+ from typing import Optional
+ from datetime import timedelta
+@@ -39,6 +39,9 @@ _TENSOR_MODEL_PARALLEL_WORLD_SIZE_FOR_ND1_DIM2 = None
+ _TENSOR_MODEL_PARALLEL_WORLD_SIZE_FOR_ND2_DIM1 = None
+ _TENSOR_MODEL_PARALLEL_WORLD_SIZE_FOR_ND2_DIM2 = None
+ 
++_TENSOR_AND_CONTEXT_PARALLEL_GROUP = None
++_TENSOR_AND_CONTEXT_PARALLEL_GLOBAL_RANKS = None
++
+ 
+ def initialize_model_parallel_wrapper(initialize_model_parallel):
+     @wraps(initialize_model_parallel)
+@@ -80,7 +83,8 @@ def initialize_model_parallel_wrapper(initialize_model_parallel):
+ 
+         if data_parallel_size * context_parallel_size % expert_model_parallel_size != 0:
+             raise RuntimeError(
+-                f"data_parallel_size * context_parallel_size ({data_parallel_size * context_parallel_size}) is not divisible by expert_model_parallel_size "
++                f"data_parallel_size * context_parallel_size ({data_parallel_size * context_parallel_size}) is not "
++                f"divisible by expert_model_parallel_size "
+             )
+ 
+         nccl_comm_cfgs = {}
+@@ -109,7 +113,8 @@ def initialize_model_parallel_wrapper(initialize_model_parallel):
+         timeout = timedelta(minutes=distributed_timeout_minutes)
+ 
+         # Regenerate ep related groups because ep is set to 1 in initialize_model_parallel func
+-        tensor_and_data_group_size_with_cp: int = tensor_model_parallel_size * data_parallel_size * context_parallel_size
++        tensor_and_data_group_size_with_cp: int = (tensor_model_parallel_size * data_parallel_size
++                                                   * context_parallel_size)
+         num_tensor_and_data_groups_with_cp: int = world_size // tensor_and_data_group_size_with_cp
+         tensor_and_expert_group_size: int = tensor_model_parallel_size * expert_model_parallel_size
+         num_expert_groups: int = data_parallel_size * context_parallel_size // expert_model_parallel_size
+@@ -206,6 +211,385 @@ def initialize_model_parallel_wrapper(initialize_model_parallel):
+     return wrapper
+ 
+ 
++def initialize_model_parallel(
++    tensor_model_parallel_size: int = 1,
++    pipeline_model_parallel_size: int = 1,
++    virtual_pipeline_model_parallel_size: Optional[int] = None,
++    pipeline_model_parallel_split_rank: Optional[int] = None,
++    use_sharp: bool = False,
++    context_parallel_size: int = 1,
++    expert_model_parallel_size: int = 1,
++    nccl_communicator_config_path: Optional[str] = None,
++    distributed_timeout_minutes: int = 30,
++    order: str = "tp-cp-ep-dp-pp",
++) -> None:
++    """Initialize model data parallel groups.
++
++    Args:
++        tensor_model_parallel_size (int, default = 1):
++            The number of GPUs to split individual tensors across.
++
++        pipeline_model_parallel_size (int, default = 1):
++            The number of tensor parallel GPU groups to split the
++            Transformer layers across. For example, if
++            tensor_model_parallel_size is 4 and
++            pipeline_model_parallel_size is 2, the model will be split
++            into 2 groups of 4 GPUs.
++
++        virtual_pipeline_model_parallel_size (int, optional):
++            The number of stages that each pipeline group will have,
++            interleaving as necessary. If None, no interleaving is
++            performed. For example, if tensor_model_parallel_size is 1,
++            pipeline_model_parallel_size is 4,
++            virtual_pipeline_model_parallel_size is 2, and there are
++            16 transformer layers in the model, the model will be
++            split into 8 stages with two layers each and each GPU
++            would get 2 stages as such (layer number starting with 1):
++
++            GPU 0: [1, 2] [9, 10]
++            GPU 1: [3, 4] [11, 12]
++            GPU 2: [5, 6] [13, 14]
++            GPU 3: [7, 8] [15, 16]
++
++        pipeline_model_parallel_split_rank (int, optional):
++            For models with both an encoder and decoder, the rank in
++            pipeline to switch between encoder and decoder (i.e. the
++            first rank of the decoder). This allows the user to set
++            the pipeline parallel size of the encoder and decoder
++            independently. For example, if
++            pipeline_model_parallel_size is 8 and
++            pipeline_model_parallel_split_rank is 3, then ranks 0-2
++            will be the encoder and ranks 3-7 will be the decoder.
++
++        use_sharp (bool, default = False):
++            Set the use of SHARP for the collective communications of
++            data-parallel process groups. When `True`, run barrier
++            within each data-parallel process group, which specifies
++            the SHARP application target groups.
++
++        context_parallel_size (int, default = 1):
++            The number of tensor parallel GPU groups to split the
++            network input sequence length across. Compute of attention
++            module requires tokens of full sequence length, so GPUs
++            in a context parallel group need to communicate with each
++            other to exchange information of other sequence chunks.
++            Each GPU and its counterparts in other tensor parallel
++            groups compose a context parallel group.
++
++            For example, assume we have 8 GPUs, if tensor model parallel
++            size is 4 and context parallel size is 2, the network input
++            will be split into two sequence chunks, which are processed
++            by 2 different groups of 4 GPUs. One chunk is processed by
++            GPU0-3, the other chunk is processed by GPU4-7. Four groups
++            are build to do context parallel communications: [GPU0, GPU4],
++            [GPU1, GPU5], [GPU2, GPU6], and [GPU3, GPU7].
++
++            Context parallelism partitions sequence length, so it has no
++            impact on weights, which means weights are duplicated among
++            GPUs in a context parallel group. Hence, weight gradients
++            all-reduce is required in backward. For simplicity, we piggyback
++            GPUs of context parallelism on data parallel group for
++            weight gradient all-reduce.
++
++        expert_model_parallel_size (int, default = 1):
++            The number of Mixture of Experts parallel GPUs in each expert
++            parallel group.
++
++        nccl_communicator_config_path (str, default = None):
++            Path to the yaml file of NCCL communicator configurations.
++            `min_ctas`, `max_ctas`, and `cga_cluster_size` can be set
++            for each communicator.
++
++        distributed_timeout_minutes (int, default = 30): Timeout, in
++            minutes,for operations executed against distributed
++            process groups. See PyTorch documentation at
++            https://pytorch.org/docs/stable/distributed.html for
++            caveats.
++
++        order (str, default=tp-dp-pp):
++            The rank initialization order of parallelism. Now we support
++            tp-dp-pp and tp-pp-dp orders.
++
++    Let's say we have a total of 16 GPUs denoted by g0 ... g15 and we
++    use 2 GPUs to parallelize the model tensor, and 4 GPUs to parallelize
++    the model pipeline. The present function will
++    create 8 tensor model-parallel groups, 4 pipeline model-parallel groups
++    and 8 data-parallel groups as:
++        8 data_parallel groups:
++            [g0, g2], [g1, g3], [g4, g6], [g5, g7], [g8, g10], [g9, g11], [g12, g14], [g13, g15]
++        8 tensor model-parallel groups:
++            [g0, g1], [g2, g3], [g4, g5], [g6, g7], [g8, g9], [g10, g11], [g12, g13], [g14, g15]
++        4 pipeline model-parallel groups:
++            [g0, g4, g8, g12], [g1, g5, g9, g13], [g2, g6, g10, g14], [g3, g7, g11, g15]
++    Note that for efficiency, the caller should make sure adjacent ranks
++    are on the same DGX box. For example if we are using 2 DGX-1 boxes
++    with a total of 16 GPUs, rank 0 to 7 belong to the first box and
++    ranks 8 to 15 belong to the second box.
++
++    """
++    from datetime import timedelta
++    import megatron.core.parallel_state as ps
++
++    # Get world size and rank. Ensure some consistencies.
++    assert torch.distributed.is_initialized()
++    world_size: int = torch.distributed.get_world_size()
++
++    if (
++        world_size
++        % (tensor_model_parallel_size * pipeline_model_parallel_size * context_parallel_size)
++        != 0
++    ):
++        raise RuntimeError(
++            f"world_size ({world_size}) is not divisible by tensor_model_parallel_size "
++            f"({tensor_model_parallel_size}) x pipeline_model_parallel_size ({pipeline_model_parallel_size}) "
++            f"x context_parallel_size ({context_parallel_size})"
++        )
++
++    data_parallel_size: int = world_size // (
++        tensor_model_parallel_size * pipeline_model_parallel_size * context_parallel_size
++    )
++
++    if data_parallel_size % expert_model_parallel_size != 0:
++        raise RuntimeError(
++            f"data_parallel_size ({data_parallel_size}) is not divisible by expert_model_parallel_size "
++        )
++
++    if expert_model_parallel_size > 1 and context_parallel_size > 1:
++        raise RuntimeError(
++            f"combination of expert model prallellism and context parallelism is not supported"
++        )
++
++    num_tensor_model_parallel_groups: int = world_size // tensor_model_parallel_size
++    num_pipeline_model_parallel_groups: int = world_size // pipeline_model_parallel_size
++
++    if virtual_pipeline_model_parallel_size is not None:
++        if not pipeline_model_parallel_size > 2:
++            raise RuntimeError(
++                "pipeline-model-parallel size should be greater than 2 with interleaved schedule"
++            )
++        ps._VIRTUAL_PIPELINE_MODEL_PARALLEL_RANK = 0
++        ps._VIRTUAL_PIPELINE_MODEL_PARALLEL_WORLD_SIZE = virtual_pipeline_model_parallel_size
++
++    if pipeline_model_parallel_split_rank is not None:
++        ps._PIPELINE_MODEL_PARALLEL_SPLIT_RANK = pipeline_model_parallel_split_rank
++
++    rank = torch.distributed.get_rank()
++
++    nccl_comm_cfgs = {}
++    if nccl_communicator_config_path is not None:
++        try:
++            import yaml
++        except ImportError:
++            raise RuntimeError(
++                "Cannot import `yaml`. Setting custom nccl communicator configs "
++                "requires the yaml package."
++            )
++
++        with open(nccl_communicator_config_path, "r") as stream:
++            nccl_comm_cfgs = yaml.safe_load(stream)
++
++    rank_generator = ps.RankGenerator(
++        tp=tensor_model_parallel_size,
++        ep=expert_model_parallel_size,
++        dp=data_parallel_size,
++        pp=pipeline_model_parallel_size,
++        cp=context_parallel_size,
++        order=order,
++    )
++    timeout = timedelta(minutes=distributed_timeout_minutes)
++
++    # Build the data-parallel groups.
++    assert ps._DATA_PARALLEL_GROUP is None, 'data parallel group is already initialized'
++
++    for ranks in rank_generator.get_ranks('dp'):
++        group = torch.distributed.new_group(
++            ranks, timeout=timeout, pg_options=ps.get_nccl_options('dp', nccl_comm_cfgs)
++        )
++        group_gloo = torch.distributed.new_group(ranks, timeout=timeout, backend="gloo")
++        if rank in ranks:
++            ps._DATA_PARALLEL_GROUP = group
++            ps._DATA_PARALLEL_GROUP_GLOO = group_gloo
++            ps._DATA_PARALLEL_GLOBAL_RANKS = ranks
++    for ranks_with_cp in rank_generator.get_ranks('dp-cp'):
++        group_with_cp = torch.distributed.new_group(
++            ranks_with_cp, timeout=timeout, pg_options=ps.get_nccl_options('dp_cp', nccl_comm_cfgs)
++        )
++        group_with_cp_gloo = torch.distributed.new_group(
++            ranks_with_cp, timeout=timeout, backend="gloo"
++        )
++        if rank in ranks_with_cp:
++            ps._DATA_PARALLEL_GROUP_WITH_CP = group_with_cp
++            ps._DATA_PARALLEL_GROUP_WITH_CP_GLOO = group_with_cp_gloo
++            ps._DATA_PARALLEL_GLOBAL_RANKS_WITH_CP = ranks_with_cp
++
++    # Apply SHARP to DP process groups
++    if use_sharp:
++        if rank == 0:
++            print(
++                "The number of process groups to use SHARP with depends on the type "
++                "of the network switch. Nvidia QM1 switch supports SAHRP up to 8 "
++                "process groups and QM2 supports up to 256 process groups. We apply "
++                "SHARP to the communications of the data-parallel domain. If the "
++                "number of data-parallel process groups is larger than the max "
++                "process groups that the network switch supports, the communication "
++                "will fall back to non-SHARP operators. To enable SHARP, "
++                "`#SBATCH_NETWORK=sharp` should be set in the sbatch script."
++            )
++        torch.distributed.barrier(
++            group=ps.get_data_parallel_group(with_context_parallel=True),
++            device_ids=[torch.cuda.current_device()],
++        )
++        # Set `NCCL_COLLNET_ENABLE=0` to restrict SHARP application to DP process groups
++        os.environ["NCCL_COLLNET_ENABLE"] = "0"
++
++    # Build the context-parallel groups.
++    global _TENSOR_AND_CONTEXT_PARALLEL_GROUP
++    global _TENSOR_AND_CONTEXT_PARALLEL_GLOBAL_RANKS
++    assert ps._CONTEXT_PARALLEL_GROUP is None, 'context parallel group is already initialized'
++    assert _TENSOR_AND_CONTEXT_PARALLEL_GROUP is None, 'tensor and context parallel group is already initialized'
++    for ranks in rank_generator.get_ranks('cp'):
++        group = torch.distributed.new_group(
++            ranks, timeout=timeout, pg_options=ps.get_nccl_options('cp', nccl_comm_cfgs)
++        )
++        if rank in ranks:
++            ps._CONTEXT_PARALLEL_GROUP = group
++            ps._CONTEXT_PARALLEL_GLOBAL_RANKS = ranks
++
++    for ranks in rank_generator.get_ranks('tp-cp'):
++        group = torch.distributed.new_group(
++            ranks, timeout=timeout, pg_options=ps.get_nccl_options('tp_cp', nccl_comm_cfgs)
++        )
++        if rank in ranks:
++            _TENSOR_AND_CONTEXT_PARALLEL_GROUP = group
++            _TENSOR_AND_CONTEXT_PARALLEL_GLOBAL_RANKS = ranks
++
++
++    # Build the model-parallel groups.
++    assert ps._MODEL_PARALLEL_GROUP is None, 'model parallel group is already initialized'
++    for ranks in rank_generator.get_ranks('tp-pp'):
++        group = torch.distributed.new_group(
++            ranks, timeout=timeout, pg_options=ps.get_nccl_options('mp', nccl_comm_cfgs)
++        )
++        if rank in ranks:
++            ps._MODEL_PARALLEL_GROUP = group
++
++    # Build the tensor model-parallel groups.
++    assert (
++        ps._TENSOR_MODEL_PARALLEL_GROUP is None
++    ), 'tensor model parallel group is already initialized'
++    for ranks in rank_generator.get_ranks('tp'):
++        group = torch.distributed.new_group(
++            ranks, timeout=timeout, pg_options=ps.get_nccl_options('tp', nccl_comm_cfgs)
++        )
++        if rank in ranks:
++            ps._TENSOR_MODEL_PARALLEL_GROUP = group
++            ps._TENSOR_MODEL_PARALLEL_GLOBAL_RANKS = ranks
++
++    # Build the pipeline model-parallel groups and embedding groups
++    # (first and last rank in each pipeline model-parallel group).
++    assert (
++        ps._PIPELINE_MODEL_PARALLEL_GROUP is None
++    ), 'pipeline model parallel group is already initialized'
++    assert ps._EMBEDDING_GROUP is None, 'embedding group is already initialized'
++    assert ps._POSITION_EMBEDDING_GROUP is None, 'position embedding group is already initialized'
++    for ranks in rank_generator.get_ranks('pp'):
++        group = torch.distributed.new_group(
++            ranks, timeout=timeout, pg_options=ps.get_nccl_options('pp', nccl_comm_cfgs)
++        )
++        if rank in ranks:
++            ps._PIPELINE_MODEL_PARALLEL_GROUP = group
++            ps._PIPELINE_GLOBAL_RANKS = ranks
++        # Setup embedding group (to exchange gradients between
++        # first and last stages).
++        if len(ranks) > 1:
++            embedding_ranks = [ranks[0], ranks[-1]]
++            position_embedding_ranks = [ranks[0]]
++            if pipeline_model_parallel_split_rank is not None:
++                if ranks[pipeline_model_parallel_split_rank] not in embedding_ranks:
++                    embedding_ranks = [
++                        ranks[0],
++                        ranks[pipeline_model_parallel_split_rank],
++                        ranks[-1],
++                    ]
++                if ranks[pipeline_model_parallel_split_rank] not in position_embedding_ranks:
++                    position_embedding_ranks = [ranks[0], ranks[pipeline_model_parallel_split_rank]]
++        else:
++            embedding_ranks = ranks
++            position_embedding_ranks = ranks
++
++        group = torch.distributed.new_group(
++            embedding_ranks, timeout=timeout, pg_options=ps.get_nccl_options('embd', nccl_comm_cfgs)
++        )
++        if rank in embedding_ranks:
++            ps._EMBEDDING_GROUP = group
++        if rank in ranks:
++            ps._EMBEDDING_GLOBAL_RANKS = embedding_ranks
++
++        group = torch.distributed.new_group(
++            position_embedding_ranks,
++            timeout=timeout,
++            pg_options=ps.get_nccl_options('embd', nccl_comm_cfgs),
++        )
++        if rank in position_embedding_ranks:
++            ps._POSITION_EMBEDDING_GROUP = group
++        if rank in ranks:
++            ps._POSITION_EMBEDDING_GLOBAL_RANKS = position_embedding_ranks
++
++    # Build the tensor + data parallel groups.
++    assert (
++        ps._TENSOR_AND_DATA_PARALLEL_GROUP is None
++    ), 'Tensor + data parallel group is already initialized'
++    for ranks in rank_generator.get_ranks('tp-dp-cp'):
++        group = torch.distributed.new_group(
++            ranks, timeout=timeout, pg_options=ps.get_nccl_options('tp_dp_cp', nccl_comm_cfgs)
++        )
++        if rank in ranks:
++            ps._TENSOR_AND_DATA_PARALLEL_GROUP_WITH_CP = group
++    for ranks in rank_generator.get_ranks('tp-dp'):
++        group = torch.distributed.new_group(
++            ranks, timeout=timeout, pg_options=ps.get_nccl_options('tp_dp', nccl_comm_cfgs)
++        )
++        if rank in ranks:
++            ps._TENSOR_AND_DATA_PARALLEL_GROUP = group
++
++    # Build the tensor + expert parallel groups
++    assert ps._EXPERT_MODEL_PARALLEL_GROUP is None, 'Expert parallel group is already initialized'
++    assert (
++        ps._TENSOR_AND_EXPERT_PARALLEL_GROUP is None
++    ), 'Tensor + expert parallel group is already initialized'
++    assert (
++        ps._DATA_MODULO_EXPERT_PARALLEL_GROUP is None
++    ), 'Data modulo expert group is already initialized'
++    for ranks in rank_generator.get_ranks('tp-ep', independent_ep=True):
++        group = torch.distributed.new_group(
++            ranks, timeout=timeout, pg_options=ps.get_nccl_options('tp_exp', nccl_comm_cfgs)
++        )
++        if rank in ranks:
++            ps._TENSOR_AND_EXPERT_PARALLEL_GROUP = group
++
++    for ranks in rank_generator.get_ranks('ep', independent_ep=True):
++        group = torch.distributed.new_group(
++            ranks, pg_options=ps.get_nccl_options('exp', nccl_comm_cfgs)
++        )
++        if rank in ranks:
++            ps._EXPERT_MODEL_PARALLEL_GROUP = group
++
++    for ranks in rank_generator.get_ranks('dp', independent_ep=True):
++        group = torch.distributed.new_group(
++            ranks, timeout=timeout, pg_options=ps.get_nccl_options('dp_modulo_exp', nccl_comm_cfgs)
++        )
++        group_gloo = torch.distributed.new_group(ranks, backend="gloo")
++        if rank in ranks:
++            ps._DATA_MODULO_EXPERT_PARALLEL_GROUP = group
++            ps._DATA_MODULO_EXPERT_PARALLEL_GROUP_GLOO = group_gloo
++
++    # Initialize global memory buffer
++    # This isn't really "parallel state" but there isn't another good place to
++    # put this. If we end up with a more generic initialization of megatron-core
++    # we could stick it there
++    ps._set_global_memory_buffer()
++
++
+ def initialize_context_parallel_group_for_send_recv_overlap(
+         tensor_model_parallel_size,
+         pipeline_model_parallel_size,
+@@ -378,6 +762,10 @@ def destroy_model_parallel_wrapper(destroy_model_parallel):
+         _CONTEXT_PARALLEL_GROUP_FOR_HYBRID_ULYSSES = None
+         _CONTEXT_PARALLEL_RANKS_FOR_HYBRID_RING = None
+         _CONTEXT_PARALLEL_RANKS_FOR_HYBRID_ULYSSES = None
++        global _TENSOR_AND_CONTEXT_PARALLEL_GROUP
++        global _TENSOR_AND_CONTEXT_PARALLEL_GLOBAL_RANKS
++        _TENSOR_AND_CONTEXT_PARALLEL_GROUP = None
++        _TENSOR_AND_CONTEXT_PARALLEL_GLOBAL_RANKS = None
+ 
+     return wrapper
+ 
+@@ -539,3 +927,25 @@ def initialize_ndmm_parallel_group(
+             if rank in ranks:
+                 _TENSOR_MODEL_PARALLEL_GROUP_FOR_ND2_DIM2 = group
+ 
++
++def get_tensor_and_context_parallel_group(check_initialized=True):
++    """Get the context parallel group the caller rank belongs to."""
++    if check_initialized:
++        assert _TENSOR_AND_CONTEXT_PARALLEL_GROUP is not None, 'tensor model and context parallel group is not initialized'
++    return _TENSOR_AND_CONTEXT_PARALLEL_GROUP
++
++
++def get_tensor_and_context_parallel_world_size():
++    """Return world size for the context parallel group."""
++    if torch.distributed.is_available() and torch.distributed.is_initialized():
++        return torch.distributed.get_world_size(group=get_tensor_and_context_parallel_group())
++    else:
++        return 0
++
++
++def get_tensor_and_context_parallel_rank():
++    """Return my rank for the tensor and context parallel group."""
++    if torch.distributed.is_available() and torch.distributed.is_initialized():
++        return torch.distributed.get_rank(group=get_tensor_and_context_parallel_group())
++    else:
++        return 0
+diff --git a/mindspeed/core/pipeline_parallel/multiparameter_schedules.py b/mindspeed/core/pipeline_parallel/multiparameter_schedules.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..c1d1f5edd4dc426152000272e9c59b8057a99ffd
+--- /dev/null
++++ b/mindspeed/core/pipeline_parallel/multiparameter_schedules.py
+@@ -0,0 +1,965 @@
++# coding=utf-8
++# Copyright (c) 2024, Huawei Technologies Co., Ltd. All rights reserved.
++# Copyright (c) 2024, NVIDIA CORPORATION. All rights reserved.
++#
++# Licensed under the Apache License, Version 2.0 (the "License");
++# you may not use this file except in compliance with the License.
++# You may obtain a copy of the License at
++#
++#     http://www.apache.org/licenses/LICENSE-2.0
++#
++# Unless required by applicable law or agreed to in writing, software
++# distributed under the License is distributed on an "AS IS" BASIS,
++# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++# See the License for the specific language governing permissions and
++
++import contextlib
++from functools import wraps
++from typing import Iterator, List, Union
++
++import torch
++
++from megatron.training import get_args
++from megatron.core import parallel_state
++from megatron.core.enums import ModelType
++from megatron.core.pipeline_parallel import p2p_communication
++from megatron.core.utils import get_attr_wrapped_model, get_model_config, get_model_type
++
++from megatron.core.pipeline_parallel.schedules import (
++    forward_step,
++    deallocate_output_tensor,
++    check_first_val_step
++)
++
++
++def forward_step_wrapper(fn):
++    @wraps(fn)
++    def wrapper(*arg, **kwargs):
++        output_tensor, num_tokens = fn(*arg, **kwargs)
++        if len(output_tensor) > 0 and isinstance(output_tensor[0], list):
++            return output_tensor[0], num_tokens
++        else:
++            return output_tensor, num_tokens
++    return wrapper
++
++
++def backward_step(input_tensor, output_tensor, output_tensor_grad, model_type, config):
++    if config.timers is not None:
++        config.timers('backward-compute', log_level=2).start()
++
++    # Retain the grad on the input_tensor.
++    unwrap_input_tensor_grad = False
++    if not isinstance(input_tensor, list):
++        input_tensor = [input_tensor]
++        unwrap_input_tensor_grad = True
++    for x in input_tensor:
++        if x is not None and x.requires_grad:
++            x.retain_grad()
++
++    if not isinstance(output_tensor, list):
++        output_tensor = [output_tensor]
++    if not isinstance(output_tensor_grad, list):
++        output_tensor_grad = [output_tensor_grad]
++
++    # Backward pass.
++    if output_tensor_grad[0] is None and config.grad_scale_func is not None:
++        output_tensor[0] = config.grad_scale_func(output_tensor[0])
++
++    output_tensors = []
++    output_grad_tensors = []
++    if output_tensor_grad[0] is None:
++        # The last stage have no input gradients and only one loss is used to backward
++        torch.autograd.backward(output_tensor[0], grad_tensors=output_tensor_grad[0])
++    else:
++        for output, grad in zip(output_tensor, output_tensor_grad):
++            if output.requires_grad:
++                output_tensors.append(output)
++                output_grad_tensors.append(grad)
++        torch.autograd.backward(output_tensors, grad_tensors=output_grad_tensors)
++
++    # Collect the grad of the input_tensor.
++    input_tensor_grad = [None]
++    if input_tensor is not None:
++        input_tensor_grad = []
++        for x in input_tensor:
++            if x is None:
++                input_tensor_grad.append(None)
++            else:
++                if x.grad is None:
++                    input_tensor_grad.append(torch.zeros_like(x, device=torch.cuda.current_device()))
++                else:
++                    input_tensor_grad.append(x.grad)
++
++    # Handle single skip connection if it exists (encoder_hidden_state in
++    # model with encoder and decoder).
++    if (
++        parallel_state.get_pipeline_model_parallel_world_size() > 1
++        and parallel_state.is_pipeline_stage_after_split()
++        and model_type == ModelType.encoder_and_decoder
++    ):
++        if output_tensor_grad[1] is not None:
++            input_tensor_grad[-1].add_(output_tensor_grad[1])
++    if unwrap_input_tensor_grad:
++        input_tensor_grad = input_tensor_grad[0]
++
++    if config.timers is not None:
++        config.timers('backward-compute').stop()
++
++    return input_tensor_grad
++
++
++def backward_step_wrapper(fn):
++    @wraps(fn)
++    def wrapper(*arg, **kwargs):
++        return backward_step(*arg, **kwargs)
++    return wrapper
++
++
++def get_tensor_shapes_wrapper(fn):
++    @wraps(fn)
++    def wrapper(*arg, **kwargs):
++        args = get_args()
++        return args.pipeline_tensor_shapes
++    return wrapper
++
++
++def forward_backward_pipelining_with_interleaving(
++    *,
++    forward_step_func,
++    data_iterator: Union[Iterator, List[Iterator]],
++    model: Union[torch.nn.Module, List[torch.nn.Module]],
++    num_microbatches: int,
++    seq_length: int,
++    micro_batch_size: int,
++    decoder_seq_length: int = None,
++    forward_only: bool = False,
++    collect_non_loss_data: bool = False,
++    first_val_step: bool = None,
++):
++    assert isinstance(model, list), "interleaved pipeline parallelism expected model chunking"
++    assert all(isinstance(chunk, torch.nn.Module) for chunk in model), "invalid model chunking"
++    assert isinstance(
++        data_iterator, list
++    ), "interleaved pipeline parallelism expected each model chunk to have a data iterator"
++
++    config = get_model_config(model[0])
++    if config.overlap_p2p_comm and config.batch_p2p_comm:
++        raise ValueError("Can not use both overlap_p2p_comm and batch_p2p_comm")
++
++    if config.timers is not None:
++        config.timers('forward-backward', log_level=1).start(barrier=config.barrier_with_L1_time)
++
++    # Disable async grad reductions
++    no_sync_func = config.no_sync_func
++    if isinstance(no_sync_func, list):
++
++        def multi_no_sync():
++            stack = contextlib.ExitStack()
++            for model_chunk_no_sync_func in config.no_sync_func:
++                stack.enter_context(model_chunk_no_sync_func())
++            return stack
++
++        no_sync_func = multi_no_sync
++    if no_sync_func is None:
++        no_sync_func = contextlib.nullcontext
++    no_sync_context = None
++
++    if config.grad_sync_func is not None and not isinstance(config.grad_sync_func, list):
++        config.grad_sync_func = [config.grad_sync_func for _ in model]
++
++    if config.param_sync_func is not None and not isinstance(config.param_sync_func, list):
++        config.param_sync_func = [config.param_sync_func for _ in model]
++
++    def disable_grad_sync():
++        """Disable asynchronous grad reductions"""
++        nonlocal no_sync_context
++        if no_sync_context is None:
++            no_sync_context = no_sync_func()
++            no_sync_context.__enter__()
++
++    def enable_grad_sync():
++        """Enable asynchronous grad reductions"""
++        nonlocal no_sync_context
++        if no_sync_context is not None:
++            no_sync_context.__exit__(None, None, None)
++            no_sync_context = None
++
++    disable_grad_sync()
++
++    # Model chunk IDs with synchronized grads
++    synchronized_model_chunks = set()
++
++    input_tensors = [[] for _ in range(len(model))]
++    output_tensors = [[] for _ in range(len(model))]
++    total_num_tokens = torch.tensor(0, dtype=torch.int).cuda()
++
++    forward_data_store = []
++    if not forward_only:
++        output_tensor_grads = [[] for _ in range(len(model))]
++
++    pipeline_parallel_size = parallel_state.get_pipeline_model_parallel_world_size()
++    pipeline_parallel_rank = parallel_state.get_pipeline_model_parallel_rank()
++
++    if num_microbatches % pipeline_parallel_size != 0:
++        msg = f'number of microbatches ({num_microbatches}) is not divisible by '
++        msg += f'pipeline-model-parallel-size ({pipeline_parallel_size}) '
++        msg += 'when using interleaved schedule'
++        raise RuntimeError(msg)
++
++    model_type = get_model_type(model[0])
++    if model_type == ModelType.encoder_and_decoder:
++        raise RuntimeError("Interleaving is not supported with an encoder and decoder model.")
++
++    if decoder_seq_length is not None and decoder_seq_length != seq_length:
++        raise RuntimeError(
++            "Interleaving is not supported with a different decoder sequence length."
++        )
++
++    tensor_shape = get_args().pipeline_tensor_shapes
++
++    # Compute number of warmup and remaining microbatches.
++    num_model_chunks = len(model)
++    total_num_microbatches = num_microbatches * num_model_chunks
++    all_warmup_microbatches = False
++    if forward_only:
++        num_warmup_microbatches = total_num_microbatches
++    else:
++        # Run all forward passes and then all backward passes if number of
++        # microbatches is just the number of pipeline stages.
++        # Otherwise, perform (num_model_chunks-1)*pipeline_parallel_size on
++        # all workers, followed by more microbatches after depending on
++        # stage ID (more forward passes for earlier stages, later stages can
++        # immediately start with 1F1B).
++        if num_microbatches == pipeline_parallel_size:
++            num_warmup_microbatches = total_num_microbatches
++            all_warmup_microbatches = True
++        else:
++            num_warmup_microbatches = (pipeline_parallel_size - pipeline_parallel_rank - 1) * 2
++            num_warmup_microbatches += (num_model_chunks - 1) * pipeline_parallel_size
++            num_warmup_microbatches = min(num_warmup_microbatches, total_num_microbatches)
++    num_microbatches_remaining = total_num_microbatches - num_warmup_microbatches
++
++    # Checkpoint the activations of partial Transformer layers in a number of micro-batches
++    # within the maximum outstanding micro-batch backpropagations.
++    # Micro-batches with the ids less than 'num_microbatches_with_partial_activation_checkpoints'
++    # checkpoint partial Transformer layers (or skip checkpointing) and
++    # the rest of micro-batches within a window of micro-batches checkpoint
++    # all Transformer layers. The window of micro-batches is set by the maximum
++    # outstanding backpropagations and becomes smaller at later pipeline stages.
++    # Please refer the appendix C in https://arxiv.org/pdf/2205.05198.pdf
++    max_outstanding_backprops = None
++    if config.num_microbatches_with_partial_activation_checkpoints is not None:
++        max_outstanding_backprops = num_warmup_microbatches + 1
++
++    # Synchronize params for first two model chunks
++    if config.param_sync_func is not None:
++        config.param_sync_func[0](model[0].parameters())
++        config.param_sync_func[1](model[1].parameters())
++
++    def get_model_chunk_id(microbatch_id, forward):
++        """Helper method to get the model chunk ID given the iteration number."""
++        microbatch_id_in_group = microbatch_id % (pipeline_parallel_size * num_model_chunks)
++        model_chunk_id = microbatch_id_in_group // pipeline_parallel_size
++        if not forward:
++            model_chunk_id = num_model_chunks - model_chunk_id - 1
++        return model_chunk_id
++
++    def get_microbatch_id_in_model_chunk(iteration_id, forward):
++        """Helper method to get the microbatch_id within model chunk given the iteration number."""
++        assert forward
++        iteration_group_id = iteration_id // (pipeline_parallel_size * num_model_chunks)
++        microbatch_id_in_model_chunk = (iteration_group_id * pipeline_parallel_size) + (
++            iteration_id % pipeline_parallel_size
++        )
++        return microbatch_id_in_model_chunk
++
++    def is_first_microbatch_for_model_chunk(microbatch_id: int) -> bool:
++        """Check if an iteration is the first for a model chunk."""
++        microbatch_group_size = pipeline_parallel_size * num_model_chunks
++        num_microbatch_groups = total_num_microbatches // microbatch_group_size
++        microbatch_group_id = microbatch_id // microbatch_group_size
++        microbatch_id_in_group = microbatch_id % microbatch_group_size
++        if microbatch_group_id == 0:
++            return microbatch_id_in_group % pipeline_parallel_size == 0
++        else:
++            return False
++
++    def is_last_microbatch_for_model_chunk(microbatch_id: int) -> bool:
++        """Check if an iteration is the last for a model chunk."""
++        microbatch_group_size = pipeline_parallel_size * num_model_chunks
++        num_microbatch_groups = total_num_microbatches // microbatch_group_size
++        microbatch_group_id = microbatch_id // microbatch_group_size
++        microbatch_id_in_group = microbatch_id % microbatch_group_size
++        if microbatch_group_id == num_microbatch_groups - 1:
++            return microbatch_id_in_group % pipeline_parallel_size == pipeline_parallel_size - 1
++        else:
++            return False
++
++    def forward_step_helper(microbatch_id, current_microbatch, checkpoint_activations_microbatch):
++        """Helper method to run forward step with model split into chunks
++        (run set_virtual_pipeline_model_parallel_rank() before calling
++        forward_step())."""
++        model_chunk_id = get_model_chunk_id(microbatch_id, forward=True)
++        parallel_state.set_virtual_pipeline_model_parallel_rank(model_chunk_id)
++
++        # launch param synchronization for next model chunk
++        # Note: Asynchronous communication tends to slow down compute.
++        # To reduce idling from mismatched microbatch times, we launch
++        # asynchronous communication at the same time across the
++        # pipeline-parallel group.
++        if config.param_sync_func is not None:
++            param_sync_microbatch_id = microbatch_id + pipeline_parallel_rank
++            if (
++                param_sync_microbatch_id < total_num_microbatches
++                and is_first_microbatch_for_model_chunk(param_sync_microbatch_id)
++            ):
++                param_sync_chunk_id = get_model_chunk_id(param_sync_microbatch_id, forward=True) + 1
++                if 1 < param_sync_chunk_id < num_model_chunks:
++                    config.param_sync_func[param_sync_chunk_id](
++                        model[param_sync_chunk_id].parameters()
++                    )
++
++        # forward step
++        if parallel_state.is_pipeline_first_stage():
++            if len(input_tensors[model_chunk_id]) == len(output_tensors[model_chunk_id]):
++                input_tensors[model_chunk_id].append(None)
++        input_tensor = input_tensors[model_chunk_id][-1]
++
++        output_tensor, num_tokens = forward_step(
++            forward_step_func,
++            data_iterator[model_chunk_id],
++            model[model_chunk_id],
++            num_microbatches,
++            input_tensor,
++            forward_data_store,
++            config,
++            collect_non_loss_data,
++            checkpoint_activations_microbatch,
++            check_first_val_step(
++                first_val_step, forward_only, is_first_microbatch_for_model_chunk(microbatch_id),
++            ),
++            current_microbatch=current_microbatch,
++        )
++        output_tensors[model_chunk_id].append(output_tensor)
++
++        nonlocal total_num_tokens
++        total_num_tokens += num_tokens.item()
++
++        # if forward-only, no need to save tensors for a backward pass
++        if forward_only:
++            input_tensors[model_chunk_id].pop()
++            output_tensors[model_chunk_id].pop()
++
++        return output_tensor
++
++    def backward_step_helper(microbatch_id):
++        """Helper method to run backward step with model split into chunks
++        (run set_virtual_pipeline_model_parallel_rank() before calling
++        backward_step())."""
++        model_chunk_id = get_model_chunk_id(microbatch_id, forward=False)
++        parallel_state.set_virtual_pipeline_model_parallel_rank(model_chunk_id)
++
++        # launch grad synchronization (default)
++        if config.grad_sync_func is None and is_last_microbatch_for_model_chunk(microbatch_id):
++            enable_grad_sync()
++            synchronized_model_chunks.add(model_chunk_id)
++
++        if parallel_state.is_pipeline_last_stage():
++            if len(output_tensor_grads[model_chunk_id]) == 0:
++                output_tensor_grads[model_chunk_id].append(None)
++        input_tensor = input_tensors[model_chunk_id].pop(0)
++        output_tensor = output_tensors[model_chunk_id].pop(0)
++        output_tensor_grad = output_tensor_grads[model_chunk_id].pop(0)
++        input_tensor_grad = backward_step(
++            input_tensor, output_tensor, output_tensor_grad, model_type, config
++        )
++
++        # launch grad synchronization (custom grad sync)
++        # Note: Asynchronous communication tends to slow down compute.
++        # To reduce idling from mismatched microbatch times, we launch
++        # asynchronous communication at the same time across the
++        # pipeline-parallel group.
++        if config.grad_sync_func is not None:
++            grad_sync_microbatch_id = microbatch_id - pipeline_parallel_rank
++            if grad_sync_microbatch_id >= 0 and is_last_microbatch_for_model_chunk(
++                grad_sync_microbatch_id
++            ):
++                grad_sync_chunk_id = get_model_chunk_id(grad_sync_microbatch_id, forward=False)
++                enable_grad_sync()
++                config.grad_sync_func[grad_sync_chunk_id](model[grad_sync_chunk_id].parameters())
++                synchronized_model_chunks.add(grad_sync_chunk_id)
++        disable_grad_sync()
++
++        return input_tensor_grad
++
++    # Run warmup forward passes.
++    parallel_state.set_virtual_pipeline_model_parallel_rank(0)
++    input_tensors[0].append(recv_forward(tensor_shape, config))
++
++    fwd_wait_handles = None
++    bwd_wait_handles = None
++
++    for k in range(num_warmup_microbatches):
++
++        if fwd_wait_handles is not None:
++            for req in fwd_wait_handles:
++                req.wait()
++
++        cur_model_chunk_id = get_model_chunk_id(k, forward=True)
++        # Decide to checkpoint all layers' activations of the current micro-batch
++        if max_outstanding_backprops is not None:
++            checkpoint_activations_microbatch = (
++                k % max_outstanding_backprops
++                >= config.num_microbatches_with_partial_activation_checkpoints
++            )
++        else:
++            checkpoint_activations_microbatch = None
++
++        current_microbatch = get_microbatch_id_in_model_chunk(k, forward=True)
++        output_tensor = forward_step_helper(
++            k, current_microbatch, checkpoint_activations_microbatch
++        )
++
++        # Determine if tensor should be received from previous stage.
++        next_forward_model_chunk_id = get_model_chunk_id(k + 1, forward=True)
++        recv_prev = True
++        if parallel_state.is_pipeline_first_stage(ignore_virtual=True):
++            if next_forward_model_chunk_id == 0:
++                recv_prev = False
++        if k == (total_num_microbatches - 1):
++            recv_prev = False
++
++        # Don't send tensor downstream if on last stage.
++        if parallel_state.is_pipeline_last_stage():
++            output_tensor = None
++
++        # Send and receive tensors as appropriate (send tensors computed
++        # in this iteration; receive tensors for next iteration).
++        if not config.overlap_p2p_comm:
++            if (
++                k == (num_warmup_microbatches - 1)
++                and not forward_only
++                and not all_warmup_microbatches
++            ):
++                input_tensor_grad = None
++                recv_next = True
++                if parallel_state.is_pipeline_last_stage(ignore_virtual=True):
++                    recv_next = False
++                (
++                    input_tensor,
++                    output_tensor_grad,
++                ) = send_forward_backward_recv_forward_backward(
++                    output_tensor,
++                    input_tensor_grad,
++                    tensor_shape,
++                    recv_prev=recv_prev,
++                    recv_next=recv_next,
++                    config=config,
++                )
++                output_tensor_grads[num_model_chunks - 1].append(output_tensor_grad)
++            else:
++                input_tensor = send_forward_recv_forward(
++                    output_tensor, tensor_shape, recv_prev=recv_prev, config=config
++                )
++            input_tensors[next_forward_model_chunk_id].append(input_tensor)
++        else:
++            input_tensor, fwd_wait_handles = send_forward_recv_forward(
++                output_tensor,
++                tensor_shape,
++                recv_prev=recv_prev,
++                config=config,
++                overlap_p2p_comm=True,
++            )
++
++            if (
++                k == (num_warmup_microbatches - 1)
++                and not forward_only
++                and not all_warmup_microbatches
++            ):
++                input_tensor_grad = None
++                recv_next = True
++                if parallel_state.is_pipeline_last_stage(ignore_virtual=True):
++                    recv_next = False
++
++                (
++                    output_tensor_grad,
++                    bwd_wait_handles,
++                ) = send_backward_recv_backward(
++                    input_tensor_grad,
++                    tensor_shape,
++                    recv_next=recv_next,
++                    config=config,
++                    overlap_p2p_comm=True,
++                )
++
++                output_tensor_grads[num_model_chunks - 1].append(output_tensor_grad)
++            input_tensors[next_forward_model_chunk_id].append(input_tensor)
++
++        deallocate_output_tensor(output_tensor, config.deallocate_pipeline_outputs)
++
++    # Run 1F1B in steady state.
++    for k in range(num_microbatches_remaining):
++        # Forward pass.
++        forward_k = k + num_warmup_microbatches
++
++        # Decide to checkpoint all layers' activations of the current micro-batch
++        if max_outstanding_backprops is not None:
++            checkpoint_activations_microbatch = (
++                forward_k % max_outstanding_backprops
++                >= config.num_microbatches_with_partial_activation_checkpoints
++            )
++        else:
++            checkpoint_activations_microbatch = None
++
++        cur_model_chunk_id = get_model_chunk_id(forward_k, forward=True)
++        current_microbatch = get_microbatch_id_in_model_chunk(forward_k, forward=True)
++        if config.overlap_p2p_comm:
++            if fwd_wait_handles is not None:
++                for req in fwd_wait_handles:
++                    req.wait()
++
++            deallocate_output_tensor(output_tensor, config.deallocate_pipeline_outputs)
++
++            output_tensor = forward_step_helper(
++                forward_k, current_microbatch, checkpoint_activations_microbatch
++            )
++
++            # Determine if current stage has anything to send in either direction,
++            # otherwise set tensor to None.
++            forward_model_chunk_id = get_model_chunk_id(forward_k, forward=True)
++            parallel_state.set_virtual_pipeline_model_parallel_rank(forward_model_chunk_id)
++
++            # Last virtual stage no activation tensor to send
++            if parallel_state.is_pipeline_last_stage():
++                output_tensor = None
++
++            # Determine if peers are sending, and where in data structure to put
++            # received tensors.
++            recv_prev = True
++            if parallel_state.is_pipeline_first_stage(ignore_virtual=True):
++                # First stage is ahead of last stage by (pipeline_parallel_size - 1).
++                next_forward_model_chunk_id = get_model_chunk_id(
++                    forward_k - (pipeline_parallel_size - 1), forward=True
++                )
++                if next_forward_model_chunk_id == (num_model_chunks - 1):
++                    recv_prev = False
++                next_forward_model_chunk_id += 1
++            else:
++                next_forward_model_chunk_id = get_model_chunk_id(forward_k + 1, forward=True)
++
++            # If last iteration, don't receive; we already received one extra
++            # before the start of the for loop.
++            if k == (num_microbatches_remaining - 1):
++                recv_prev = False
++
++            # Send activation tensor to the next stage and receive activation tensor from the
++            # previous stage
++            input_tensor, fwd_wait_handles = send_forward_recv_forward(
++                output_tensor,
++                tensor_shape,
++                recv_prev=recv_prev,
++                config=config,
++                overlap_p2p_comm=True,
++            )
++            # assert fwd_wait_handles is not None
++
++            if bwd_wait_handles is not None:
++                for req in bwd_wait_handles:
++                    req.wait()
++
++            # Backward pass.
++            backward_k = k
++            input_tensor_grad = backward_step_helper(backward_k)
++
++            backward_model_chunk_id = get_model_chunk_id(backward_k, forward=False)
++            parallel_state.set_virtual_pipeline_model_parallel_rank(backward_model_chunk_id)
++
++            # First virtual stage no activation gradient tensor to send
++            if parallel_state.is_pipeline_first_stage():
++                input_tensor_grad = None
++
++            # Determine if the current virtual stage has an activation gradient tensor to receive
++            recv_next = True
++            if parallel_state.is_pipeline_last_stage(ignore_virtual=True):
++                # Last stage is ahead of first stage by (pipeline_parallel_size - 1).
++                next_backward_model_chunk_id = get_model_chunk_id(
++                    backward_k - (pipeline_parallel_size - 1), forward=False
++                )
++                if next_backward_model_chunk_id == 0:
++                    recv_next = False
++                next_backward_model_chunk_id -= 1
++            else:
++                next_backward_model_chunk_id = get_model_chunk_id(backward_k + 1, forward=False)
++
++            output_tensor_grad, bwd_wait_handles = send_backward_recv_backward(
++                input_tensor_grad,
++                tensor_shape,
++                recv_next=recv_next,
++                config=config,
++                overlap_p2p_comm=True,
++            )
++
++        else:  # no p2p overlap
++            output_tensor = forward_step_helper(
++                forward_k, current_microbatch, checkpoint_activations_microbatch
++            )
++
++            # Backward pass.
++            backward_k = k
++            input_tensor_grad = backward_step_helper(backward_k)
++
++            # Send output_tensor and input_tensor_grad, receive input_tensor
++            # and output_tensor_grad.
++
++            # Determine if current stage has anything to send in either direction,
++            # otherwise set tensor to None.
++            forward_model_chunk_id = get_model_chunk_id(forward_k, forward=True)
++            parallel_state.set_virtual_pipeline_model_parallel_rank(forward_model_chunk_id)
++            if parallel_state.is_pipeline_last_stage():
++                output_tensor = None
++
++            backward_model_chunk_id = get_model_chunk_id(backward_k, forward=False)
++            parallel_state.set_virtual_pipeline_model_parallel_rank(backward_model_chunk_id)
++            if parallel_state.is_pipeline_first_stage():
++                input_tensor_grad = None
++
++            # Determine if peers are sending, and where in data structure to put
++            # received tensors.
++            recv_prev = True
++            if parallel_state.is_pipeline_first_stage(ignore_virtual=True):
++                # First stage is ahead of last stage by (pipeline_parallel_size - 1).
++                next_forward_model_chunk_id = get_model_chunk_id(
++                    forward_k - (pipeline_parallel_size - 1), forward=True
++                )
++                if next_forward_model_chunk_id == (num_model_chunks - 1):
++                    recv_prev = False
++                next_forward_model_chunk_id += 1
++            else:
++                next_forward_model_chunk_id = get_model_chunk_id(forward_k + 1, forward=True)
++
++            recv_next = True
++            if parallel_state.is_pipeline_last_stage(ignore_virtual=True):
++                # Last stage is ahead of first stage by (pipeline_parallel_size - 1).
++                next_backward_model_chunk_id = get_model_chunk_id(
++                    backward_k - (pipeline_parallel_size - 1), forward=False
++                )
++                if next_backward_model_chunk_id == 0:
++                    recv_next = False
++                next_backward_model_chunk_id -= 1
++            else:
++                next_backward_model_chunk_id = get_model_chunk_id(backward_k + 1, forward=False)
++
++            # If last iteration, don't receive; we already received one extra
++            # before the start of the for loop.
++            if k == (num_microbatches_remaining - 1):
++                recv_prev = False
++
++            # Communicate tensors.
++            (
++                input_tensor,
++                output_tensor_grad,
++            ) = send_forward_backward_recv_forward_backward(
++                output_tensor,
++                input_tensor_grad,
++                tensor_shape,
++                recv_prev=recv_prev,
++                recv_next=recv_next,
++                config=config,
++            )
++            deallocate_output_tensor(output_tensor, config.deallocate_pipeline_outputs)
++
++        # Put input_tensor and output_tensor_grad in data structures in the
++        # right location.
++        if recv_prev:
++            input_tensors[next_forward_model_chunk_id].append(input_tensor)
++        if recv_next:
++            output_tensor_grads[next_backward_model_chunk_id].append(output_tensor_grad)
++
++    deallocate_output_tensor(output_tensor, config.deallocate_pipeline_outputs)
++
++    # Run cooldown backward passes (flush out pipeline).
++    if not forward_only:
++        if config.overlap_p2p_comm and bwd_wait_handles is not None:
++            for wait_handle in bwd_wait_handles:
++                wait_handle.wait()
++
++        if all_warmup_microbatches:
++            output_tensor_grads[num_model_chunks - 1].append(
++                recv_backward(tensor_shape, config=config)
++            )
++        for k in range(num_microbatches_remaining, total_num_microbatches):
++            input_tensor_grad = backward_step_helper(k)
++            next_backward_model_chunk_id = get_model_chunk_id(k + 1, forward=False)
++            recv_next = True
++            if parallel_state.is_pipeline_last_stage(ignore_virtual=True):
++                if next_backward_model_chunk_id == (num_model_chunks - 1):
++                    recv_next = False
++            if k == (total_num_microbatches - 1):
++                recv_next = False
++            output_tensor_grads[next_backward_model_chunk_id].append(
++                send_backward_recv_backward(
++                    input_tensor_grad, tensor_shape, recv_next=recv_next, config=config
++                )
++            )
++
++        # Launch any remaining grad reductions.
++        enable_grad_sync()
++        if config.grad_sync_func is not None:
++            for model_chunk_id in range(num_model_chunks):
++                if model_chunk_id not in synchronized_model_chunks:
++                    config.grad_sync_func[model_chunk_id](model[model_chunk_id].parameters())
++                    synchronized_model_chunks.add(model_chunk_id)
++
++    if config.finalize_model_grads_func is not None and not forward_only:
++        # Finalize model grads (perform full grad all-reduce / reduce-scatter for
++        # data parallelism, layernorm all-reduce for sequence parallelism, and
++        # embedding all-reduce for pipeline parallelism).
++        config.finalize_model_grads_func(
++            model, total_num_tokens if config.calculate_per_token_loss else None
++        )
++
++    if config.timers is not None:
++        config.timers('forward-backward').stop()
++
++    return forward_data_store
++
++
++def recv_forward(tensor_shapes, config):
++    input_tensors = []
++    for tensor_shape in tensor_shapes:
++        if tensor_shape is None:
++            input_tensors.append(None)
++        else:
++            config.pipeline_dtype = tensor_shape['dtype']
++            input_tensors.append(p2p_communication.recv_forward(tensor_shape['shape'], config))
++    return input_tensors
++
++
++def recv_forward_wrapper(fn):
++    @wraps(fn)
++    def wrapper(*arg, **kwargs):
++        return recv_forward(*arg, **kwargs)
++    return wrapper
++
++
++def recv_backward(tensor_shapes, config):
++    output_tensor_grads = []
++    for tensor_shape in tensor_shapes:
++        if tensor_shape is None:
++            output_tensor_grads.append(None)
++        else:
++            config.pipeline_dtype = tensor_shape['dtype']
++            output_tensor_grads.append(p2p_communication.recv_backward(tensor_shape['shape'], config))
++    return output_tensor_grads
++
++
++def recv_backward_wrapper(fn):
++    @wraps(fn)
++    def wrapper(*arg, **kwargs):
++        return recv_backward(*arg, **kwargs)
++    return wrapper
++
++
++def send_forward(output_tensors, tensor_shapes, config):
++    if output_tensors is None:
++        output_tensors = [None] * len(tensor_shapes)
++    if not isinstance(output_tensors, list):
++        output_tensors = [output_tensors]
++    for (output_tensor, tensor_shape) in zip(output_tensors, tensor_shapes):
++        if tensor_shape is None:
++            continue
++        config.pipeline_dtype = tensor_shape['dtype']
++        p2p_communication.send_forward(output_tensor, config)
++
++
++def send_forward_wrapper(fn):
++    @wraps(fn)
++    def wrapper(*arg, **kwargs):
++        return send_forward(*arg, **kwargs)
++    return wrapper
++
++
++def send_backward(input_tensor_grads, tensor_shapes, config):
++    if input_tensor_grads is None:
++        input_tensor_grads = [None] * len(tensor_shapes)
++    if not isinstance(input_tensor_grads, list):
++        input_tensor_grads = [input_tensor_grads]
++    for (input_tensor_grad, tensor_shape) in zip(input_tensor_grads, tensor_shapes):
++        if tensor_shape is None:
++            continue
++        config.pipeline_dtype = tensor_shape['dtype']
++        p2p_communication.send_backward(input_tensor_grad, config)
++
++
++def send_backward_wrapper(fn):
++    @wraps(fn)
++    def wrapper(*arg, **kwargs):
++        return send_backward(*arg, **kwargs)
++    return wrapper
++
++
++def send_forward_recv_backward(output_tensors, tensor_shapes, config):
++    if not isinstance(output_tensors, list):
++        output_tensors = [None] * len(tensor_shapes)
++    output_tensor_grads = []
++    for (output_tensor, tensor_shape) in zip(output_tensors, tensor_shapes):
++        if tensor_shape is None:
++            output_tensor_grads.append(None)
++            continue
++        config.pipeline_dtype = tensor_shape['dtype']
++        output_tensor_grad = p2p_communication.send_forward_recv_backward(
++            output_tensor, tensor_shape['shape'], config
++        )
++        output_tensor_grads.append(output_tensor_grad)
++    return output_tensor_grads
++
++
++def send_forward_recv_backward_wrapper(fn):
++    @wraps(fn)
++    def wrapper(*arg, **kwargs):
++        return send_forward_recv_backward(*arg, **kwargs)
++    return wrapper
++
++
++def send_backward_recv_forward(input_tensor_grads, tensor_shapes, config):
++    if not isinstance(input_tensor_grads, list):
++        input_tensor_grads = [input_tensor_grads]
++    input_tensors = []
++    for (input_tensor_grad, tensor_shape) in zip(input_tensor_grads, tensor_shapes):
++        if tensor_shape is None:
++            input_tensors.append(None)
++            continue
++        config.pipeline_dtype = tensor_shape['dtype']
++        input_tensor = p2p_communication.send_backward_recv_forward(
++            input_tensor_grad, tensor_shape['shape'], config
++        )
++        input_tensors.append(input_tensor)
++    return input_tensors
++
++
++def send_backward_recv_forward_wrapper(fn):
++    @wraps(fn)
++    def wrapper(*arg, **kwargs):
++        return send_backward_recv_forward(*arg, **kwargs)
++    return wrapper
++
++
++def send_forward_recv_forward(output_tensors, tensor_shapes, recv_prev, config, overlap_p2p_comm=False):
++    # overlap_p2p_comm
++    if output_tensors is None:
++        output_tensors = [None] * len(tensor_shapes)
++
++    if not isinstance(output_tensors, list):
++        output_tensors = [output_tensors]
++    input_tensors = []
++    all_fwd_wait_handles = []
++
++    if overlap_p2p_comm:
++        for (output_tensor, tensor_shape) in zip(output_tensors, tensor_shapes):
++            if tensor_shape is None:
++                input_tensors.append(None)
++                continue
++            config.pipeline_dtype = tensor_shape['dtype']
++            input_tensor, wait_handles = p2p_communication.send_forward_recv_forward(
++                output_tensor,
++                recv_prev=recv_prev,
++                tensor_shape=tensor_shape['shape'],
++                config=config,
++                overlap_p2p_comm=overlap_p2p_comm,
++            )
++            input_tensors.append(input_tensor)
++            all_fwd_wait_handles.extend(wait_handles)
++        return input_tensors, all_fwd_wait_handles
++
++    else:
++        for (output_tensor, tensor_shape) in zip(output_tensors, tensor_shapes):
++            if tensor_shape is None:
++                input_tensors.append(None)
++                continue
++            config.pipeline_dtype = tensor_shape['dtype']
++            input_tensor = p2p_communication.send_forward_recv_forward(
++                output_tensor,
++                recv_prev=recv_prev,
++                tensor_shape=tensor_shape['shape'],
++                config=config,
++                overlap_p2p_comm=overlap_p2p_comm,
++            )
++            input_tensors.append(input_tensor)
++        return input_tensors
++
++
++def send_backward_recv_backward(input_tensor_grads, tensor_shapes, recv_next, config, overlap_p2p_comm=False):
++    if input_tensor_grads is None:
++        input_tensor_grads = [None] * len(tensor_shapes)
++
++    if not isinstance(input_tensor_grads, list):
++        input_tensor_grads = [input_tensor_grads]
++    output_tensor_grads = []
++    all_fwd_wait_handles = []
++
++    if overlap_p2p_comm:
++        for (input_tensor_grad, tensor_shape) in zip(input_tensor_grads, tensor_shapes):
++            if tensor_shape is None:
++                output_tensor_grads.append(None)
++                continue
++            config.pipeline_dtype = tensor_shape['dtype']
++            output_tensor_grad, bwd_wait_handles = p2p_communication.send_backward_recv_backward(
++                input_tensor_grad,
++                recv_next=recv_next,
++                tensor_shape=tensor_shape['shape'],
++                config=config,
++                overlap_p2p_comm=overlap_p2p_comm,
++            )
++            output_tensor_grads.append(output_tensor_grad)
++            all_fwd_wait_handles.extend(bwd_wait_handles)
++        return output_tensor_grads, all_fwd_wait_handles
++
++    else:
++        for (input_tensor_grad, tensor_shape) in zip(input_tensor_grads, tensor_shapes):
++            if tensor_shape is None:
++                output_tensor_grads.append(None)
++                continue
++            config.pipeline_dtype = tensor_shape['dtype']
++            output_tensor_grad = p2p_communication.send_backward_recv_backward(
++                input_tensor_grad,
++                recv_next=recv_next,
++                tensor_shape=tensor_shape['shape'],
++                config=config,
++                overlap_p2p_comm=overlap_p2p_comm,
++            )
++            output_tensor_grads.append(output_tensor_grad)
++        return output_tensor_grads
++
++
++def send_forward_backward_recv_forward_backward(output_tensors, input_tensor_grads, tensor_shapes, recv_prev, recv_next,
++                                                config):
++    if output_tensors is None:
++        output_tensors = [None] * len(tensor_shapes)
++    if input_tensor_grads is None:
++        input_tensor_grads = [None] * len(tensor_shapes)
++
++    if not isinstance(input_tensor_grads, list):
++        input_tensor_grads = [input_tensor_grads]
++    input_tensors = []
++    output_tensor_grads = []
++
++    for (output_tensor, input_tensor_grad, tensor_shape) in zip(output_tensors, input_tensor_grads, tensor_shapes):
++        config.pipeline_dtype = tensor_shape['dtype']
++        if tensor_shape is None:
++            input_tensors.append(None)
++            output_tensor_grads.append(None)
++            continue
++        (
++            input_tensor,
++            output_tensor_grad,
++        ) = p2p_communication.send_forward_backward_recv_forward_backward(
++            output_tensor,
++            input_tensor_grad,
++            recv_prev=recv_prev,
++            recv_next=recv_next,
++            tensor_shape=tensor_shape['shape'],
++            config=config,
++        )
++        input_tensors.append(input_tensor)
++        output_tensor_grads.append(output_tensor_grad)
++    return input_tensors, output_tensor_grads
+diff --git a/mindspeed/core/pipeline_parallel/schedules.py b/mindspeed/core/pipeline_parallel/schedules.py
+index 157863bb1472351815ea475e1e6e5689e3c7ba5b..ae4e9170e5b5c45ff844e2132d7be2b67b82c216 100644
+--- a/mindspeed/core/pipeline_parallel/schedules.py
++++ b/mindspeed/core/pipeline_parallel/schedules.py
+@@ -21,6 +21,7 @@ from megatron.training import get_args
+ from megatron.core import parallel_state
+ from mindspeed.core.pipeline_parallel import flexible_schedules
+ from mindspeed.core.pipeline_parallel.ripipe_schedules import forward_backward_ripipe_pipelining
++from mindspeed.core.pipeline_parallel import multiparameter_schedules
+ 
+ 
+ def get_forward_backward_func_wrapper(get_forward_backward_func):
+@@ -40,5 +41,12 @@ def get_forward_backward_func_wrapper(get_forward_backward_func):
+             and parallel_state.get_virtual_pipeline_model_parallel_world_size() is not None \
+             and arguments.use_nanopipe:
+             return flexible_schedules.forward_backward_pipelining_with_interleaving_nano_pipe
++
++        if arguments.use_multiparameter_pipeline_model_parallel:
++            pipeline_model_parallel_size = parallel_state.get_pipeline_model_parallel_world_size()
++            if pipeline_model_parallel_size > 1 \
++            and parallel_state.get_virtual_pipeline_model_parallel_world_size() is not None:
++                return multiparameter_schedules.forward_backward_pipelining_with_interleaving
++
+         return get_forward_backward_func(*args, **kwargs)
+     return wrapper
+diff --git a/mindspeed/megatron_adaptor.py b/mindspeed/megatron_adaptor.py
+index b51a0e2bc27b965b4d170c4a3dc4f2b79a1aeeef..70d03d5e6f2d320781bcabfef0b4fbe252b1512f 100644
+--- a/mindspeed/megatron_adaptor.py
++++ b/mindspeed/megatron_adaptor.py
+@@ -267,6 +267,32 @@ def mcore_pipeline_parallel_adaptation(aspm):
+                         _communicate_shapes)
+ 
+ 
++def mcore_multiparam_pipeline_parallel_adaptation(aspm, mindspeed_args):
++    if mindspeed_args.use_multiparameter_pipeline_model_parallel:
++        from .core.pipeline_parallel.multiparameter_schedules import get_tensor_shapes_wrapper, forward_step_wrapper, \
++            recv_forward_wrapper, recv_backward_wrapper, send_forward_wrapper, send_backward_wrapper, \
++            send_forward_recv_backward_wrapper, send_backward_recv_forward_wrapper, backward_step_wrapper
++
++        aspm.register_patch('megatron.core.pipeline_parallel.schedules.get_tensor_shapes',
++                            get_tensor_shapes_wrapper)
++        aspm.register_patch('megatron.core.pipeline_parallel.schedules.forward_step',
++                            forward_step_wrapper)
++        aspm.register_patch('megatron.core.pipeline_parallel.schedules.backward_step',
++                            backward_step_wrapper)
++        aspm.register_patch('megatron.core.pipeline_parallel.schedules.recv_forward',
++                            recv_forward_wrapper)
++        aspm.register_patch('megatron.core.pipeline_parallel.schedules.recv_backward',
++                            recv_backward_wrapper)
++        aspm.register_patch('megatron.core.pipeline_parallel.schedules.send_forward',
++                            send_forward_wrapper)
++        aspm.register_patch('megatron.core.pipeline_parallel.schedules.send_backward',
++                            send_backward_wrapper)
++        aspm.register_patch('megatron.core.pipeline_parallel.schedules.send_forward_recv_backward',
++                            send_forward_recv_backward_wrapper)
++        aspm.register_patch('megatron.core.pipeline_parallel.schedules.send_backward_recv_forward',
++                            send_backward_recv_forward_wrapper)
++
++
+ def mcore_tensor_parallel_adaptation(aspm):
+     from .core.tensor_parallel.random import checkpoint_wrapper
+     from .core.tensor_parallel.random import _set_cuda_rng_state, checkpoint_function_backward
+@@ -372,8 +398,9 @@ def megatron_training_adaptation(aspm):
+     from .arguments import parse_args_wrapper, validate_args_wrapper, core_transformer_config_from_args_wrapper
+     from .tokenizer import build_tokenizer_wrapper
+     from .yaml_arguments import core_transformer_config_from_yaml_wrapper, print_args_wrapper
++
+     from .core.training import pretrain_decorator, train_decorator, train_step_decorator, \
+-                               setup_model_and_optimizer_decorator, save_checkpoint_and_time_decorator
++        setup_model_and_optimizer_decorator, save_checkpoint_and_time_decorator
+     aspm.register_patch('megatron.training.global_vars.get_num_microbatches', get_num_microbatches_wrapper)
+     aspm.register_patch('megatron.training.training.pretrain', pretrain_decorator)
+     aspm.register_patch('megatron.training.training.train', train_decorator)
+@@ -396,6 +423,15 @@ def megatron_training_adaptation(aspm):
+     aspm.register_patch('megatron.training.tokenizer.tokenizer.build_tokenizer', build_tokenizer_wrapper)
+ 
+ 
++def megatron_training_ema_adaptation(aspm, mindspeed_args):
++    if mindspeed_args.use_ema:
++        from .training import pretrain, train_step
++        from .checkpointing import save_checkpoint, _load_base_checkpoint
++        aspm.register_patch('megatron.training.training.train_step', train_step)
++        aspm.register_patch('megatron.training.checkpointing.save_checkpoint', save_checkpoint)
++        aspm.register_patch('megatron.training.checkpointing._load_base_checkpoint', _load_base_checkpoint)
++
++
+ def memory_fragmentation_adaptation(aspm, args):
+     from megatron.legacy.model.transformer import ParallelTransformerLayer
+     if args.memory_fragmentation:
+@@ -451,14 +487,16 @@ def mcore_moe_adaptation(pm, args):
+             from .core.transformer.moe.token_dispatcher import preprocess, alltoall_token_permutation
+             from .core.transformer.moe.experts import sequential_mlp_forward
+             from .core.transformer.moe.moe_utils import permute, unpermute
+-            pm.register_patch('megatron.core.transformer.moe.token_dispatcher.MoEAlltoAllTokenDispatcher.preprocess', preprocess)
+-            pm.register_patch('megatron.core.transformer.moe.token_dispatcher.MoEAlltoAllTokenDispatcher.token_permutation',
+-                              alltoall_token_permutation)
++            pm.register_patch('megatron.core.transformer.moe.token_dispatcher.MoEAlltoAllTokenDispatcher.preprocess',
++                              preprocess)
++            pm.register_patch(
++                'megatron.core.transformer.moe.token_dispatcher.MoEAlltoAllTokenDispatcher.token_permutation',
++                alltoall_token_permutation)
+             pm.register_patch('megatron.core.transformer.moe.experts.SequentialMLP.forward', sequential_mlp_forward)
+             pm.register_patch('megatron.core.transformer.moe.moe_utils.permute', permute)
+             pm.register_patch('megatron.core.transformer.moe.moe_utils.unpermute', unpermute)
+ 
+-    if args.use_ascend_mc2 and not hasattr(args, 'moe_grouped_gemm'):
++    if args.use_ascend_mc2:
+         # MoE MLP not use mc2 linear
+         from .core.models.gpt.gpt_layer_specs import build_layers_wrapper
+         from megatron.core.tensor_parallel import ColumnParallelLinear, RowParallelLinear
+@@ -564,6 +602,7 @@ def exe_adaptation():
+     mcore_fusions_adaptation(aspm)
+     mcore_optimizer_adapation(aspm)
+     mcore_pipeline_parallel_adaptation(aspm)
++    mcore_multiparam_pipeline_parallel_adaptation(aspm, mindspeed_args)
+     mcore_tensor_parallel_adaptation(aspm)
+     mcore_transformer_adaptation(aspm)
+ 
+@@ -573,6 +612,7 @@ def exe_adaptation():
+     legacy_model_rms_norm_adaptation(aspm)
+ 
+     megatron_training_adaptation(aspm)
++    megatron_training_ema_adaptation(aspm, mindspeed_args)
+     memory_fragmentation_adaptation(aspm, mindspeed_args)
+     coc_adaptation(aspm, mindspeed_args)
+     mcore_moe_adaptation(aspm, mindspeed_args)
+diff --git a/mindspeed/training.py b/mindspeed/training.py
+index 8e9cca4826a637f69a2e547463a593da219d61b8..0497ffc33148c37f45902b6f38da2655d64b8ecd 100644
+--- a/mindspeed/training.py
++++ b/mindspeed/training.py
+@@ -4,6 +4,7 @@ import time
+ import torch
+ 
+ from megatron.core import mpu
++from megatron.core.pipeline_parallel import get_forward_backward_func
+ from megatron.core.utils import get_model_config
+ 
+ from megatron.training.checkpointing import save_checkpoint
+@@ -18,6 +19,7 @@ from megatron.training.training import train
+ from megatron.training.training import evaluate_and_print_results
+ from megatron.training.training import print_datetime
+ 
++
+ from megatron.training.utils import (
+     calc_params_l2_norm,
+     check_adlr_autoresume_termination,
+@@ -39,6 +41,111 @@ from megatron.training.global_vars import (
+ _TRAIN_START_TIME = time.time()
+ 
+ 
++@torch.no_grad()
++def update_ema(
++    ema_model: torch.nn.Module, model: torch.nn.Module, optimizer=None, decay: float = 0.9999
++) -> None:
++    """
++    Step the EMA model towards the current model.
++    """
++    from collections import OrderedDict
++    ema_params = OrderedDict(ema_model.named_parameters())
++    model_params = OrderedDict(model.named_parameters())
++
++    for name, param in model_params.items():
++        if name == "pos_embed":
++            continue
++        if param.requires_grad == False:
++            continue
++        param_data = param.data
++        ema_params[name].mul_(decay).add_(param_data, alpha=1 - decay)
++
++
++def train_step(forward_step_func, data_iterator,
++               model, optimizer, opt_param_scheduler, config):
++    """Single training step."""
++    args = get_args()
++    timers = get_timers()
++
++    # Set grad to zero.
++    for model_chunk in model:
++        model_chunk.zero_grad_buffer()
++    optimizer.zero_grad()
++
++    # Forward pass.
++    forward_backward_func = get_forward_backward_func()
++    losses_reduced = forward_backward_func(
++        forward_step_func=forward_step_func,
++        data_iterator=data_iterator,
++        model=model,
++        num_microbatches=get_num_microbatches(),
++        seq_length=args.seq_length,
++        micro_batch_size=args.micro_batch_size,
++        decoder_seq_length=args.decoder_seq_length,
++        forward_only=False)
++
++    # Empty unused memory.
++    if args.empty_unused_memory_level >= 1:
++        torch.cuda.empty_cache()
++
++    # Vision gradients.
++    if getattr(args, 'vision_pretraining', False) and args.vision_pretraining_type == "dino":
++        unwrapped_model = unwrap_model(model[0])
++        unwrapped_model.cancel_gradients_last_layer(args.curr_iteration)
++
++    # Update parameters.
++    timers('optimizer', log_level=1).start(barrier=args.barrier_with_L1_time)
++    update_successful, grad_norm, num_zeros_in_grad = optimizer.step()
++    timers('optimizer').stop()
++
++    if args.use_ema:
++        unwrapped_model = unwrap_model(model)
++        for model_chunk in unwrapped_model:
++            update_ema(model_chunk.ema, model_chunk, optimizer=optimizer)
++
++
++    # Vision momentum.
++    if getattr(args, 'vision_pretraining', False) and args.vision_pretraining_type == "dino":
++        unwrapped_model = unwrap_model(model[0])
++        unwrapped_model.update_momentum(args.curr_iteration)
++
++    # Update learning rate.
++    if update_successful:
++        increment = get_num_microbatches() * \
++                    args.micro_batch_size * \
++                    args.data_parallel_size
++        opt_param_scheduler.step(increment=increment)
++        skipped_iter = 0
++    else:
++        skipped_iter = 1
++
++    # Empty unused memory.
++    if args.empty_unused_memory_level >= 2:
++        torch.cuda.empty_cache()
++
++    if mpu.is_pipeline_last_stage(ignore_virtual=True):
++        # Average loss across microbatches.
++        loss_reduced = {}
++        for key in losses_reduced[0].keys():
++            numerator = 0
++            denominator = 0
++            for x in losses_reduced:
++                val = x[key]
++                # there is one dict per microbatch. in new reporting, we average
++                # over the total number of tokens across the global batch.
++                if isinstance(val, tuple) or isinstance(val, list):
++                    numerator += val[0]
++                    denominator += val[1]
++                else:
++                    # legacy behavior. we average over the number of microbatches,
++                    # and so the denominator is 1.
++                    numerator += val
++                    denominator += 1
++            loss_reduced[key] = numerator / denominator
++        return loss_reduced, skipped_iter, grad_norm, num_zeros_in_grad
++    return {}, skipped_iter, grad_norm, num_zeros_in_grad
++
++
+ def pretrain(train_valid_test_dataset_provider,
+              model_provider,
+              model_type,
+@@ -51,6 +158,10 @@ def pretrain(train_valid_test_dataset_provider,
+     initialize_megatron(extra_args_provider=extra_args_provider,
+                         args_defaults=args_defaults)
+ 
++    if 'init_func' in args_defaults:
++        init_func = args_defaults['init_func']
++        init_func()
++
+     args = get_args()
+     timers = get_timers()
+ 
+diff --git a/tests_extend/system_tests/opensora1.0/16x256x256.py b/tests_extend/system_tests/opensora1.0/16x256x256.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..24ddf2eb64373d530c3d87e15d9387a6b2001a60
+--- /dev/null
++++ b/tests_extend/system_tests/opensora1.0/16x256x256.py
+@@ -0,0 +1,31 @@
++num_frames = 16
++frame_interval = 3
++image_size = (256, 256)
++
++# Define dataset
++root = None
++use_image_transform = False
++num_workers = 1
++
++# Define model
++model = dict(
++    type="STDiT-XL/2/mindspeed",
++    space_scale=0.5,
++    time_scale=1.0,
++    enable_layernorm_kernel=True,
++)
++vae = dict(
++    type="VideoAutoencoderKL_mindspeed",
++    from_pretrained="sd-vae-ft-ema",
++    enable_sequence_parallelism=True,
++)
++text_encoder = dict(
++    type="t5",
++    from_pretrained="DeepFloyd/t5-v1_1-xxl",
++    model_max_length=120,
++    shardformer=False,
++)
++scheduler = dict(
++    type="iddpm_mindspeed",
++    timestep_respacing="",
++)
+\ No newline at end of file
+diff --git a/tests_extend/system_tests/opensora1.0/pretrain_opensora.py b/tests_extend/system_tests/opensora1.0/pretrain_opensora.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..1c0048124b5754afd59fb6653c40d78647f78dff
+--- /dev/null
++++ b/tests_extend/system_tests/opensora1.0/pretrain_opensora.py
+@@ -0,0 +1,232 @@
++# Copyright (c) 2024, Huawei Technologies Co., Ltd. All rights reserved.
++
++from functools import partial
++
++from mmengine.config import Config
++import torch
++
++import mindspeed.megatron_adaptor
++from mindspeed.utils import get_batch_on_this_cp_rank
++
++from megatron.core import mpu
++from megatron.core.enums import ModelType
++from megatron.training import get_args, get_timers, print_rank_0, pretrain
++from megatron.training.utils import average_losses_across_data_parallel_group
++from megatron.training.arguments import core_transformer_config_from_args
++
++from opensora.utils.train_utils import update_ema
++from opensora.utils.misc import requires_grad
++from opensora.datasets import DatasetFromCSV, get_transforms_video, get_transforms_image, prepare_dataloader
++from opensora.registry import MODELS, SCHEDULERS, build_module
++
++scheduler = None
++vae = None
++text_encoder = None
++cfg = None
++
++
++def initialize():
++    args = get_args()
++    dtype = args.params_dtype
++
++    def initialize_models():
++        global cfg
++        global vae
++        global text_encoder
++
++        vae_cfg = cfg.vae
++        text_encoder_cfg = cfg.text_encoder
++        vae = build_module(vae_cfg, MODELS)
++        text_encoder = build_module(text_encoder_cfg, MODELS, device=torch.cuda.current_device())
++
++        vae = vae.to(torch.cuda.current_device(), dtype)
++
++    def initialize_scheduler():
++        global scheduler
++        scheduler = build_module(cfg.scheduler, SCHEDULERS)
++
++    def initialize_config():
++        args = get_args()
++        global cfg
++        cfg = Config.fromfile(args.additional_config)
++
++    initialize_config()
++    initialize_scheduler()
++    initialize_models()
++
++
++def initialize_pipeline_tensor_shapes(hidden_size):
++    args = get_args()
++    micro_batch_size = args.micro_batch_size
++    dtype = args.params_dtype
++    latent_size = vae.get_latent_size((cfg.num_frames, *cfg.image_size))
++    text_encoder_maxlen = text_encoder.model_max_length
++    args.pipeline_tensor_shapes = [
++                {'shape': (micro_batch_size, text_encoder.output_dim, hidden_size), 'dtype': dtype},
++                {'shape': (micro_batch_size, vae.out_channels, *latent_size), 'dtype': dtype},
++                {'shape': (micro_batch_size, 1, text_encoder_maxlen, hidden_size), 'dtype': dtype},
++                {'shape': (micro_batch_size,), 'dtype': torch.float32},
++                {'shape': (micro_batch_size, hidden_size * 6), 'dtype': dtype},
++                {'shape': (micro_batch_size, text_encoder_maxlen), 'dtype': torch.float32},
++                {'shape': (micro_batch_size, vae.out_channels, *latent_size), 'dtype': dtype},
++                {'shape': (micro_batch_size, vae.out_channels, *latent_size), 'dtype': dtype},
++                {'shape': (micro_batch_size, hidden_size), 'dtype': dtype}
++            ]
++    setattr(forward_step, 'pipeline_tensor_shapes', args.pipeline_tensor_shapes)
++
++
++def model_provider(pre_process=True, post_process=True):
++    """Build the model."""
++    args = get_args()
++    dtype = args.params_dtype
++    latent_size = vae.get_latent_size((cfg.num_frames, *cfg.image_size))
++    stdit = build_module(
++        cfg.model,
++        MODELS,
++        input_size=latent_size,
++        in_channels=vae.out_channels,
++        caption_channels=text_encoder.output_dim,
++        model_max_length=text_encoder.model_max_length,
++        dtype=dtype,
++    )
++
++    ema = build_module(
++        cfg.model,
++        MODELS,
++        input_size=latent_size,
++        in_channels=vae.out_channels,
++        caption_channels=text_encoder.output_dim,
++        model_max_length=text_encoder.model_max_length,
++        dtype=dtype,
++    )
++
++    requires_grad(ema, False)
++    stdit.ema = ema
++    update_ema(ema, stdit, decay=0, sharded=False)
++    ema.eval()
++
++    initialize_pipeline_tensor_shapes(stdit.hidden_size)
++    stdit.config = core_transformer_config_from_args(get_args())
++    return stdit
++
++
++def get_batch_on_this_tp_rank(data_iterator):
++    global vae
++    global text_encoder
++    args = get_args()
++    dtype = args.params_dtype
++
++    if data_iterator is not None:
++        batch = next(data_iterator)
++    else:
++        batch = None
++    # x.shape: [B, C, T, H/P, W/P]
++    x = batch['video'].to(torch.cuda.current_device(), dtype)
++    y = batch['text']
++
++    with torch.no_grad():
++        # Prepare visual inputs
++        # x.shape: [B, C, T, H/P, W/P]
++        x = vae.encode(x).contiguous()
++        # Prepare text inputs
++        encoded_text = text_encoder.encode(y)
++    y = encoded_text['y'].contiguous()
++    mask = encoded_text['mask'].contiguous()
++
++    batch = {
++        'x': x,
++        'y': y,
++        'mask': mask
++    }
++    return batch
++
++
++def get_batch(data_iterator):
++    """Build the batch."""
++
++    if mpu.is_pipeline_first_stage():
++        batch = get_batch_on_this_tp_rank(data_iterator)
++        return batch['x'], batch['y'], batch['mask']
++    else:
++        return None, None, None
++
++
++def loss_func(x_t, x_0, t, noise, output_tensor):
++    loss_dict = scheduler.training_losses(output_tensor[0], x_t, x_0, t, noise=noise)
++    loss = loss_dict["loss"].mean()
++    averaged_loss = average_losses_across_data_parallel_group([loss])
++    loss = loss.unsqueeze(0)
++    return loss, {"loss": averaged_loss[0]}
++
++
++def forward_step(data_iterator, model):
++    """Forward step."""
++    args = get_args()
++    dtype = args.params_dtype
++
++    # Get the batch.
++    x, y, mask = get_batch(data_iterator)
++
++    num_timesteps = 1000
++    micro_bs = args.micro_batch_size
++    timestep = None
++    x_0 = None
++    noise = None
++
++    if mpu.is_pipeline_first_stage():
++        x_0 = x.clone()
++        timestep = torch.randint(0, num_timesteps, (micro_bs,), device=torch.cuda.current_device(), dtype=torch.int64)
++        noise = torch.randn_like(x)
++        noise = noise.to(device=torch.cuda.current_device(), dtype=dtype)
++        x = scheduler.q_sample(x, timestep, noise=noise)
++        x_t = x.clone()
++
++    if mpu.get_pipeline_model_parallel_world_size() > 1:
++        x, x_t, y, timestep, t0, mask, x_0, noise, t = model(x, timestep, y, x_0, noise, mask)
++        output_tensor_wrap = [x, x_t, y, timestep, t0, mask, x_0, noise, t]
++    else:
++        x = model(x, timestep, y, x_0, noise, mask)
++        output_tensor_wrap = [x]
++
++    return output_tensor_wrap, partial(loss_func, x_t, x_0, timestep, noise)
++
++
++def train_valid_test_datasets_provider(train_val_test_num_samples):
++    """Build train, valid, and test datasets."""
++    args = get_args()
++
++    dataset = DatasetFromCSV(
++        args.data_path[0],
++        transform=(
++            get_transforms_video(cfg.image_size[0])
++            if not cfg.use_image_transform
++            else get_transforms_image(cfg.image_size[0])
++        ),
++        num_frames=cfg.num_frames,
++        frame_interval=cfg.frame_interval,
++        root=cfg.root,
++    )
++
++    dataloader = prepare_dataloader(
++        dataset,
++        batch_size=args.micro_batch_size,
++        num_workers=cfg.num_workers,
++        shuffle=True,
++        drop_last=True,
++        pin_memory=True,
++        process_group=mpu.get_data_parallel_group(),
++    )
++
++    return iter(dataloader), None, None
++
++
++if __name__ == "__main__":
++    train_valid_test_datasets_provider.is_distributed = True
++    pretrain(
++        train_valid_test_datasets_provider,
++        model_provider,
++        ModelType.encoder_or_decoder,
++        forward_step,
++        args_defaults={'dataloader_type': 'external',
++                       'init_func': initialize}
++    )
+diff --git a/tests_extend/system_tests/opensora1.0/pretrain_opensora.sh b/tests_extend/system_tests/opensora1.0/pretrain_opensora.sh
+new file mode 100644
+index 0000000000000000000000000000000000000000..cba40e44ce054de171857565522633e9cb310327
+--- /dev/null
++++ b/tests_extend/system_tests/opensora1.0/pretrain_opensora.sh
+@@ -0,0 +1,88 @@
++source "tests_extend/system_tests/env_npu.sh"
++
++export CUDA_DEVICE_MAX_CONNECTIONS=1
++
++GPUS_PER_NODE=8
++MASTER_ADDR=localhost
++MASTER_PORT=6900
++NNODES=1
++NODE_RANK=0
++WORLD_SIZE=$(($GPUS_PER_NODE*$NNODES))
++
++CKPT_SAVE_DIR="your model save ckpt path"
++CKPT_LOAD_DIR="your model load ckpt path"
++DATA_PATH="your data path"
++SCRIPT_CONFIG="tests_extend/system_tests/opensora1.0/16x256x256.py"
++
++TP=2
++PP=2
++CP=2
++
++DISTRIBUTED_ARGS="
++    --nproc_per_node $GPUS_PER_NODE \
++    --nnodes $NNODES \
++    --node_rank $NODE_RANK \
++    --master_addr $MASTER_ADDR \
++    --master_port $MASTER_PORT
++"
++
++GPT_ARGS="
++    --tensor-model-parallel-size ${TP} \
++    --use-multiparameter-pipeline-model-parallel \
++    --pipeline-model-parallel-size ${PP} \
++    --context-parallel-size ${CP} \
++    --context-parallel-algo ulysses_cp_algo \
++    --micro-batch-size 4 \
++    --global-batch-size 4 \
++    --num-layers 28 \
++    --hidden-size 1152 \
++    --num-attention-heads 16 \
++    --seq-length 1024\
++    --max-position-embeddings 1024 \
++    --attention-dropout 0.0 \
++    --hidden-dropout 0.0 \
++    --tokenizer-type NullTokenizer \
++    --vocab-size 0 \
++    --position-embedding-type rope \
++    --rotary-base 500000 \
++    --swiglu \
++    --no-masked-softmax-fusion \
++    --lr 2e-5 \
++    --min-lr 2e-5 \
++    --train-iters 2500 \
++    --weight-decay 0 \
++    --weight-decay 0.0 \
++    --clip-grad 0.0 \
++    --adam-beta1 0.9 \
++    --adam-beta2 0.95 \
++    --initial-loss-scale 4096 \
++    --no-gradient-accumulation-fusion \
++    --no-load-optim \
++    --no-load-rng \
++    --bf16 \
++    --use-ema
++"
++
++DATA_ARGS="
++    --data-path $DATA_PATH \
++"
++
++MODEL_ARGS="
++    --additional-config $SCRIPT_CONFIG \
++"
++
++OUTPUT_ARGS="
++    --log-interval 1 \
++    --save-interval 10000 \
++    --eval-interval 10000 \
++    --eval-iters 10 \
++"
++torchrun $DISTRIBUTED_ARGS pretrain_opensora.py \
++    $GPT_ARGS \
++    $DATA_ARGS \
++    $MODEL_ARGS \
++    $OUTPUT_ARGS \
++    --distributed-backend nccl \
++    --save ${CKPT_SAVE_DIR} \
++
++set +x

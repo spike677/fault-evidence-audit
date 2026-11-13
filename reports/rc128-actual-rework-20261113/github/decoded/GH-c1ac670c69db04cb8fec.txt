@@ -1,0 +1,8 @@
+fix #7188 
+I found that when using DeepSpeed Zero2 for my training task, the loss becomes 0 at the third step with a grad_norm of 1.414. This issue doesn't occur when using Zero3. I found the same issue #7188. After conducting a series of experiments, I identified the cause: there's a synchronization problem when using double ipg_buffer swapping. The issue was resolved after making modifications.
+
+before 
+![image](https://github.com/user-attachments/assets/981d0829-e15f-4899-ae2c-4eca16ef138d)
+
+after
+![image](https://github.com/user-attachments/assets/8b6b8403-d5df-4aa8-b573-195b9ee1fdfb)

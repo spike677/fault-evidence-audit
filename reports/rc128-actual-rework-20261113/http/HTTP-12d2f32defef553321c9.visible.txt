@@ -1,0 +1,306 @@
+[Bug]: [Inductor] NPU 模板 GEMM 融合 epilogue 时缺少 fp32 累加器截断 cast，与 unfused 路径数值不一致-pytorch-AtomGit
+Star
+937
+Fork
+1522
+Code
+Introduction
+Code
+Issues
+1955
+Pull Requests
+1854
+Pipeline
+Actions
+Discussion
+Wiki
+Members
+392
+Analysis
+Settings
+Star
+937
+Fork
+1522
+Open
+[Bug]: [Inductor] NPU 模板 GEMM 融合 epilogue 时缺少 fp32 累加器截断 cast，与 unfused 路径数值不一致
+#5960
+PXTang
+Add on
+3 days ago
+P
+PXTang
+3 days ago
+Create
+3 days ago
+Create
+环境信息
+操作系统：Ubuntu 22.04.5 LTS（Linux 5.15.152.ve.10-amd64，x86_64，容器环境）
+昇腾硬件信息：Ascend950PR_9579
+PyTorch：2.13.0+cpu
+torch_npu：2.13.0.dev20261105
+triton-ascend：3.6.0
+Python：3.11.13
+🐛 问题描述
+现象
+在 NPU 上使用 Inductor max_autotune 生成 Triton 模板 GEMM（mm / addmm + relu/sub 等）时，
+若开启了 epilogue 融合且输出 dtype 为 fp16 / bf16，生成的 Triton kernel 中
+缺少从 fp32
+累加器到输出 dtype 的截断 cast
+（
+acc.to(tl.float16)
+/
+.to(tl.bfloat16)
+，再
+.to(tl.float32)
+），
+epilogue 直接在 fp32 精度下计算并写回，与未融合 epilogue 的路径（eager / unfused）在数值上不一致。
+最小复现示例
+import
+torch
+import
+torch_npu
+# noqa: F401
+from
+torch._inductor
+import
+config
+from
+torch._inductor.utils
+import
+run_and_get_code
+
+torch.manual_seed(
+0
+)
+dtype = torch.float16
+def
+fn
+(
+x
+):
+return
+(x @ x).relu() -
+1.0
+x = torch.randn(
+128
+,
+128
+, dtype=dtype, device=
+"npu"
+)
+with
+config.patch(
+    {
+"max_autotune"
+:
+True
+,
+"max_autotune_gemm_backends"
+:
+"Triton"
+,
+"epilogue_fusion"
+:
+True
+,
+"benchmark_epilogue_fusion"
+:
+False
+,
+    }
+):
+    out, code = run_and_get_code(torch.
+compile
+(fn), x)
+print
+(code[
+0
+])
+# 观察生成的 triton_tem_fused_* kernel
+expected = fn(x)
+# 或与 epilogue_fusion=False 的编译结果对比
+torch.testing.assert_close(out, expected, atol=
+1e-2
+, rtol=
+1e-2
+)
+addmm（bias 加在 epilogue 中）命中同样问题：
+def
+fn
+(
+x, bias
+):
+return
+torch.addmm(bias, x, x).relu() -
+1.0
+bias = torch.randn(
+128
+, dtype=dtype, device=
+"npu"
+)
+期望结果
+生成的 kernel 中应出现截断后再转回 fp32 的模式：
+非 addmm：
+acc.to(tl.float16)
+紧接
+.to(tl.float32)
+；
+addmm：bias 加法在 fp32 下完成，之后才出现
+.to(tl.float16)
+/
+.to(tl.float32)
+，
+即截断不能直接加在
+acc
+上。
+结果应与 epilogue 未融合路径一致。
+实际结果
+生成的 kernel（NPU 上为
+triton_tem_fused_matmul_relu_sub
+等）中不存在上述 cast 模式，
+epilogue 全程在 fp32 下计算，融合与未融合两条路径的数值存在偏差。
+根因
+torch_npu 的
+NPUTritonScheduling.codegen_template
+（
+torch_npu/_inductor/codegen/scheduling.py
+）复刻了上游的模板 codegen 流程，
+但漏掉了上游
+TritonTemplateKernel.codegen_template_body
+在
+render()
+之前的那一步
+_compute_fusion_metadata(...)
+调用。
+结果
+TritonTemplateKernel.store_output
+里
+_epilogue_nodes_by_subgraph
+不存在，
+has_epilogue_fusion
+恒为
+False
+，
+跳过了
+acc_dtype != output_dtype
+时的两次
+to_dtype
+（fp32 -> fp16/bf16 -> fp32）cast。
+上游（PyTorch v2.13.0）对应位置：
+torch/_inductor/select_algorithm.py:1564-1571
+：读取
+_epilogue_nodes_by_subgraph
+判定
+has_epilogue_fusion
+torch/_inductor/select_algorithm.py:1591-1601
+：按判定结果插入截断 cast
+torch/_inductor/select_algorithm.py:1841
+：
+_compute_fusion_metadata
+定义
+torch/_inductor/select_algorithm.py:1870
+：
+codegen_template_body
+在
+render()
+前调用它
+影响版本
+PyTorch 2.12.0 起上游引入
+_compute_fusion_metadata
+，torch_npu 对应分支未同步该调用；
+受影响：Ascend/pytorch master / dev（配套 PyTorch 2.13.0 ~ 2.16.0）。
+修复
+已提交 MR：
+https://gitcode.com/Ascend/pytorch/pull/49099
+在
+codegen_template
+中
+render()
+之前补调
+_compute_fusion_metadata
+，
+同时把
+prologue_nodes
+对齐到上游参数顺序并显式拒绝 NPU 尚不支持的 prologue 融合。
+Save
+Cancel
+P
+PXTang
+3 days ago
+Added label: bug
+3 days ago
+Added label: bug
+TorchNPU-Bot
+Collaborators
+3 days ago
+Assign daifu1234567 as responsible person
+3 days ago
+Assign daifu1234567 as responsible person
+TorchNPU-Bot
+Collaborators
+3 days ago
+Added label:
+triage-review
+module: graph-mode
+3 days ago
+Added label:
+triage-review
+module: graph-mode
+TorchNPU-Bot
+Collaborators
+3 days ago
+Comments：
+3 days ago
+Comments：
+问题核心是 Inductor/Triton 模板 GEMM 融合 epilogue 时缺少 fp32 累加器截断 cast，属图模式/编译问题
+添加分类标签：
+module: graph-mode
+。当前分类由社区bot提供，如分类有误请在评论中回复。
+已自动分配负责人，提出者可自行处理或指定其他负责人。
+Save
+Cancel
+TorchNPU-Bot
+Collaborators
+3 days ago
+Assign PXTang as responsible person, remove original responsible person: daifu1234567
+3 days ago
+Assign PXTang as responsible person, remove original responsible person: daifu1234567
+TorchNPU-Bot
+Collaborators
+3 days ago
+Added label:
+bot-triaged
+; Removed label:
+triage-review
+3 days ago
+Added label:
+bot-triaged
+; Removed label:
+triage-review
+TorchNPU-Bot
+Collaborators
+3 days ago
+Comments：
+3 days ago
+Comments：
+检测到当前 issue 已关联 PR，自动添加标签：
+bot-triaged
+自动设置issue责任人为PR提出人
+Save
+Cancel
+Assignees
+P
+PXTang
+Label
+bug
+module: graph-mode
+bot-triaged
+Kanban
+No board linked yet
+Milestones
+No related milestones
+Link PR
+No related PR
+Branch
+No branches linked yet

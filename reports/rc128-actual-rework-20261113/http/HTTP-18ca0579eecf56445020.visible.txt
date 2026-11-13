@@ -1,0 +1,512 @@
+fix: 移除 TransData 非等价 RT2 InferShape 注册-ops-math-AtomGit
+Star
+1754
+Fork
+1658
+Code
+Introduction
+Code
+Issues
+495
+Pull Requests
+578
+Pipeline
+Actions
+Discussion
+Wiki
+Members
+299
+Analysis
+Settings
+Star
+1754
+Fork
+1658
+Open
+fix: 移除 TransData 非等价 RT2 InferShape 注册
+#7380
+Ding_Jing
+Add on
+13 hours ago
+Merged from
+Ding_Jing/ops-math：
+fix/transdata-remove-rt2-infershape
+into
+cann/ops-math：
+master
+fix: 移除 TransData 非等价 RT2 InferShape 注册
+#7380
+Open
+Ding_Jing
+Add on
+13 hours ago
+Merged from
+Ding_Jing/ops-math
+fix/transdata-remove-rt2-infershape
+into
+cann/ops-math
+master
+Merge checks
+Discussion
+0
+Commits
+0
+Checks
+0
+Files changed
+0
+Clone/Download
+0
+Ding_Jing
+Collaborators
+13 hours ago
+13 hours ago
+描述
+TransData 的 RT2 Elewise InferShape 不等价于 RT1：跨 origin format 时把构图方预置目标改为输入 shape；改为空回调同样不能保留目标。仅按属性补正向公式也无法完整承接旧图中必要的目标约束。
+删除
+conversion/trans_data/op_host/trans_data_infershape.cpp
+及只绑定该 shape 注册的 6 个 UT，保留
+op_graph/trans_data_graph_infer.cpp
+的独立 InferDataType。
+关联的Issue
+关联 #4650；
+测试
+从删除后保留的生产 dtype 源码编译并用真实
+OpImplSpaceRegistryV2
+加载，确认 TransData
+infer_shape=null
+、
+infer_datatype
+保留。
+两份完整 proto 的修改前后四个源文件均通过真实 CANN/GE 头语法编译；回调使用 -O2 -Wall -Wextra -Werror -ftrapv 严格编译。
+六组实际回调注册/契约测试各 4704 个描述组合、9408 次重复调用通过，并含两种目标的歧义反例；注册负向控制有效。该矩阵验证回调语义，不代表全部组合为合法设备格式。
+910B3 / CANN 9.2.0：主 proto 与 AICPU proto 的等价原始 GE Session 用例各 3 次通过；输入 [32,32,1,1] INT8、groups=2，输出 [2,1,16,32]、1024 字节、1024 个值正确，确认 GE V1 与 AICPU kernel 路由。
+ops-math 原生
+bash build.sh -u --opkernel_aicpu --ops=trans_data --soc=ascend910b
+：22/22 通过，另有 1 个存量禁用用例。
+同进程 ABBA/BAAB 最终 A/A、A/B 各 120 张图、3720 次 RunGraph，每路径 1800 个稳态样本；speedup=old/new 的 bootstrap95 区间 A/A [0.9778,1.0026]、A/B [0.9755,1.0197]，通过 >=0.97 门槛。结论限给定用例的 host RunGraph。
+完整
+--pkg
+已执行，因未修改 opbase 调用当前 SDK 缺失的
+GetPcieThroughFlag
+中止，未生成并安装完整 .run。设备验证使用隔离 OPP 镜像加载本次生产回调原文编译的模块，不能替代完整包集成验收。
+git diff --check
+、新增范围格式与本地 CodeCheck 自查通过；服务端 CodeCheck/CI 待流水线确认。
+仓内 pre-commit 已执行，删除文件均按 hook 规则跳过；未夹带其他格式变更。
+文档更新
+不涉及
+类型标签
+Bug修复
+新特性
+性能优化
+文档更新
+其他，请描述：
+Save
+Cancel
+Merge blocked
+Ding_Jing
+Collaborators
+13 hours ago
+Created pull request, commit
+11049abd
+13 hours ago
+Created pull request, commit
+11049abd
+Ding_Jing
+Collaborators
+13 hours ago
+Associated issue: [Bug-Report|缺陷反馈]: TransData RT1/RT2 目标输出契约不兼容，[Bug-Report|缺陷反馈]: 恢复 TransData RT1 推理以兼容已有目标输出描述
+13 hours ago
+Associated issue: [Bug-Report|缺陷反馈]: TransData RT1/RT2 目标输出契约不兼容，[Bug-Report|缺陷反馈]: 恢复 TransData RT1 推理以兼容已有目标输出描述
+atomgit-bot
+13 hours ago
+Comments：
+13 hours ago
+Comments：
+变更摘要
+本 PR 回退
+TransData
+在 RT2 的 Elewise
+InferShape
+注册：跨 origin format 场景下该注册与 RT1 语义不等价，会将构图方预置的目标 shape 覆盖为输入 shape，改为空回调也无法保留目标约束，因此直接移除该 shape 注册及其配套单测，改由 canndev 侧恢复 RT1 shape 注册与 AICPU proto 实现来承接。
+op_graph/trans_data_graph_infer.cpp
+中独立的
+InferDataType
+注册不变。
+主要改动
+删除 RT2 Elewise shape 注册
+：移除
+conversion/trans_data/op_host/trans_data_infershape.cpp
+，其中
+IMPL_OP_INFERSHAPE(TransData).InferShape(Ops::Base::InferShape4Elewise)
+的绑定不再生效，
+TransData
+的
+infer_shape
+注册随之为空。
+同步删除绑定该注册的 UT
+：移除
+conversion/trans_data/tests/ut/op_host/test_trans_data_infershape.cpp
+，其中的 6 个用例（覆盖 2D/4D/5D、
+ND
+/
+NCHW
+/
+NCDHW
+/
+FRACTAL_NZ
+格式、未知 rank 与标量）均以“输出 shape 等于输入 shape”为期望，随注册删除一并废弃。
+保留数据类型推导能力
+：shape 注册被移除后，
+op_graph/trans_data_graph_infer.cpp
+的
+InferDataType
+仍独立保留，输出 dtype 推导链路不受影响。
+🧩 本次 Review 已使用自定义 Skill：
+ascendc-code-review
+Save
+Cancel
+Incorrect?
+atomgit-bot
+13 hours ago
+Comments：
+13 hours ago
+Comments：
+代码审查
+审查结论
+发现清单（2 项）
+优先级
+置信度
+位置
+问题
+P2
+0.55
+conversion/trans_data/op_host/trans_data_infershape.cpp:15-18
+（已删除行）
+删除后 TransData 在本仓无任何 InferShape 注册，但同模块
+op_api/transdata.cpp
+的 4 处
+INFER_SHAPE(TransData, ...)
+仍以失败为致命错误、输出 tensor 分配时未带 shape，形状完全依赖被删回调；且
+conversion/
+下 98 个算子均有
+op_host/*_infershape.cpp
+，TransData 成为唯一例外
+P3
+0.40
+conversion/trans_data/tests/ut/op_host/test_trans_data_infershape.cpp:26-38
+（已删除行）
+删掉 6 个用例后该目录为空，
+add_modules_ut_sources
+的 glob 为空会静默 return，本仓 TransData host 侧（含保留的 InferDataType）零用例守护，PR 声明的注册状态无 CI 可复现
+已核实不构成问题的点
+：
+op_host/CMakeLists.txt
+、
+tests/ut/op_host/CMakeLists.txt
+与
+CMakeLists.txt
+均按 glob 收集源文件，不显式列举被删文件，
+cmake/ut.cmake
+对空 glob 有
+return()
+与
+empty.cpp
+兜底，未引入构建/链接断裂；
+scripts/util/build_opp_kernel_static.py
+的
+_extract_register_symbol
+对空注册返回
+nullptr
+，静态资源生成不会失败；
+op_host/config/*
+的 binary json / simplified_key.ini 未声明 infer shape 子类型，与删除不冲突。
+总体风险判断
+：删除本身的实现方向（避免把不等价的 RT2 elewise shape 注册强加于跨格式转换）合理，代码层面没有编译/配置级破坏；主要风险在于跨仓发布耦合——本仓删除后 TransData 变成“零 shape 注册”状态，而仓内仍有强依赖该回调的 aclnn 路径，该组合需要 canndev 侧 RT1 注册同步生效才能成立，且缺乏任何本仓内的守护手段。建议合并前补齐注册契约级用例或明确版本闸门。
+类型
+数量
+🔴 阻塞
+0
+🟡 建议
+1
+💬 仅评论
+🧩 本次 Review 已使用自定义 Skill：
+ascendc-code-review
+Save
+Cancel
+Incorrect?
+CANN-robot
+Collaborators
+13 hours ago
+Added label:
+cann-cla/yes
+13 hours ago
+Added label:
+cann-cla/yes
+CANN-robot
+Collaborators
+13 hours ago
+Comments：
+13 hours ago
+Comments：
+Thanks for your pull-request.
+The full list of commands accepted by me can be found at
+here
+.
+You can get sig-info at
+here
+.
+You can self-configure the PR merge rules for this repository. For more details, please refer to
+Here
+.
+For more, you also can visit
+HICANN
+.
+PR Approval Progress
+⚠️ This PR does not yet meet the following requirements:lgtm (requires ≥ 2 person(s) per module)、approve (requires ≥ 1 person(s) per module)
+Module Approval Details
+module
+lgtm status
+approve status
+conversion/trans_data
+❌ (0/2)(You can also ask:
+王瑞
+,
+zhanw_coding
+,
+jia0liang
+,
+FelixTang7
+,
+andong_hw
+)
+❌ (0/1)(You can also ask:
+顾宝成
+,
+onanfield
+,
+冯彤
+,
+FelixTang7
+,
+zhangyuxiang0119
+)
+💡 Tip:
+Committer
+can comment
+/approve
+or
+/lgtm
+Commenting
+/approve
+implies both code review (lgtm) and intent to merge (approve)
+CLA Signature Pass
+Ding_Jing, thanks for your pull request. All authors of the commits have signed the CLA. 👍
+Save
+Cancel
+CANN-robot
+Collaborators
+13 hours ago
+Set FelixTang7,yue-ma,zhou-qilong,wangrui_,rxtfeng,loov1,zhangzijie,jia0liang,zl_hw,songkai111,chenxingyu18,pingchuantang,llimwang,gubaocheng,andong_hw,xuejinghui,onanfield,zhanw_coding,jiangjiawei,clinglai0517 as approver
+13 hours ago
+Set FelixTang7,yue-ma,zhou-qilong,wangrui_,rxtfeng,loov1,zhangzijie,jia0liang,zl_hw,songkai111,chenxingyu18,pingchuantang,llimwang,gubaocheng,andong_hw,xuejinghui,onanfield,zhanw_coding,jiangjiawei,clinglai0517 as approver
+CANN-robot
+Collaborators
+13 hours ago
+Set FelixTang7,yue-ma,zhou-qilong,wangrui_,rxtfeng,loov1,zhangzijie,zl_hw,songkai111,chenxingyu18,pingchuantang,llimwang,gubaocheng,andong_hw,xuejinghui,onanfield,zhanw_coding,jiangjiawei,clinglai0517 as approver
+13 hours ago
+Set FelixTang7,yue-ma,zhou-qilong,wangrui_,rxtfeng,loov1,zhangzijie,zl_hw,songkai111,chenxingyu18,pingchuantang,llimwang,gubaocheng,andong_hw,xuejinghui,onanfield,zhanw_coding,jiangjiawei,clinglai0517 as approver
+Ding_Jing
+Collaborators
+13 hours ago
+Modify description of pull request
+13 hours ago
+Modify description of pull request
+Ding_Jing
+Collaborators
+12 hours ago
+Comments：
+12 hours ago
+Comments：
+compile
+Save
+Cancel
+Ding_Jing
+Collaborators
+12 hours ago
+Pre merge succeeded (commit_id: 4980a7fa7b3b98f2e9587eb7686f14a1f5e7e705)
+12 hours ago
+Pre merge succeeded (commit_id: 4980a7fa7b3b98f2e9587eb7686f14a1f5e7e705)
+CANN-robot
+Collaborators
+12 hours ago
+Comments：
+12 hours ago
+Comments：
+🚀 CI 流水线已启动
+📋 执行详情:
+点击查看流水线
+Save
+Cancel
+CANN-robot
+Collaborators
+12 hours ago
+Added label:
+ci-pipeline-running
+12 hours ago
+Added label:
+ci-pipeline-running
+Ding_Jing
+Collaborators
+12 hours ago
+Modify description of pull request
+12 hours ago
+Modify description of pull request
+CANN-robot
+Collaborators
+12 hours ago
+Removed label:
+ci-pipeline-running
+12 hours ago
+Removed label:
+ci-pipeline-running
+CANN-robot
+Collaborators
+12 hours ago
+Added label:
+ci-pipeline-failed
+12 hours ago
+Added label:
+ci-pipeline-failed
+CANN-robot
+Collaborators
+12 hours ago
+Comments：
+12 hours ago
+Comments：
+流水线分析报告 — ops-math run#7481
+流水线:
+https://gitcode.com/cann/ops-math/actions/runs/0dcc5067cf3d4d25aa4ced422d7cee63
+| PR#7380 | 2026-11-12 21:21:50 ~ 21:29:09 | 失败 Job 3 个
+定界结论: 代码问题 / 编译错误（兼容性看护） — Ops::Base::DAV_5162 未定义
+失败类型
+: 代码问题（兼容性问题）
+根因
+: 3 个
+Compile_X86_monitor_*
+兼容性看护 Job 均在同两处源文件报
+'DAV_5162' is not a member of 'Ops::Base'
+，即 op_common host 侧代码引用了看护基线（旧版 CANN/opbase 头文件）中不存在的架构枚举
+DAV_5162
+。
+处置建议
+: 通知仓库维护者在
+src/op_common/op_host/tiling_util.cpp
+/
+util/op_arch_helper.cpp
+对
+DAV_5162
+引用增加版本兼容处理（版本宏守卫 + 旧版本降级分支），使 910b/910c/950 看护基线可编译；
+严禁通过升级看护镜像解决
+（会丧失兼容性看护意义）。
+排除项
+: 本 PR 仅删除
+conversion/trans_data
+的 infershape 实现与 UT（2 个文件），与报错文件无关联；同一错误在其他 PR（如 #6976 run fb019dc7 的 monitor 910b Job）上同样复现，属仓库级存量兼容性缺陷，非本 PR 引入。其余 31 个 Job（含编译、codecheck、SCA、staticcheck）均通过，UT/冒烟/API_Check 为前置失败未启动，无独立失败。
+失败根因分析
+根因 #1: 代码问题 / 编译错误 — op_common host 代码引用看护基线不存在的 DAV_5162
+判据
+: 源文件编译报错（
+'DAV_5162' is not a member of 'Ops::Base'
+，随后 initializer-list 转换失败）
+定位步骤
+:
+3_compile_acc.log
+影响文件
+:
+src/op_common/op_host/tiling_util.cpp:27
+、
+src/op_common/op_host/util/op_arch_helper.cpp:36
+影响 Job
+: Compile_X86_monitor_910b、Compile_X86_monitor_910c、Compile_X86_monitor_950（3 个 Job 同因，仅报一次）
+根因证据（日志原文）
+:
+/home/jenkins/opensource/opbase/src/op_common/op_host/tiling_util.cpp:27:104: error: 'DAV_5162' is not a member of 'Ops::Base'
+/home/jenkins/opensource/opbase/src/op_common/op_host/tiling_util.cpp:28:70: error: could not convert '{Ops::Base::DAV_3510, Ops::Base::DAV_5102, <expression error>, Ops::Base::DAV_9201}' from '<brace-enclosed initializer list>' to 'const std::set<NpuArch>'
+/home/jenkins/opensource/opbase/src/op_common/op_host/util/op_arch_helper.cpp:36:17: error: 'DAV_5162' is not a member of 'Ops::Base'
+佐证
+:
+同一 run 的常规编译 Job（
+Compile_Ascend_X86_ubuntu24
+、
+mobile_station
+、
+9030
+、
+ARM
+、
+A5
+、
+single
+等）全部通过，仅使用旧版基线的
+X86_monitor_*
+看护 Job 失败 → 新老版本头文件能力差异导致，符合兼容性看护失败特征。
+同仓库其他 PR（#6976 / run fb019dc7…、#6553、#6120-#6131 等 17 个 PR 的最近 24h 记录）的 monitor Job 报完全相同的
+DAV_5162
+错误 → 存量问题，非本 PR 变更触发。
+结构化定界摘要
+[
+{
+"repo"
+:
+"ops-math"
+,
+"run_number"
+:
+7481
+,
+"Failed_Type"
+:
+"代码问题"
+,
+"Failed_Sub_Type"
+:
+"编译错误"
+,
+"Failed_Reason"
+:
+"3个X86_monitor兼容性看护Job(910b/910c/950)在op_common host编译时报'DAV_5162' is not a member of 'Ops::Base'：代码引用了看护基线旧版CANN/opbase头文件中不存在的架构枚举DAV_5162，需要版本兼容守卫；PR#7380仅删除trans_data infershape文件，与本错误无关，属仓库存量兼容性问题。"
+,
+"evidence"
+:
+"/home/jenkins/opensource/opbase/src/op_common/op_host/tiling_util.cpp:27:104: error: 'DAV_5162' is not a member of 'Ops::Base'"
+,
+"suggestion"
+:
+"维护者在tiling_util.cpp/op_arch_helper.cpp对DAV_5162加版本宏守卫与旧版本降级分支，勿升级看护镜像"
+,
+"jobs"
+:
+"Compile_X86_monitor_910b, Compile_X86_monitor_910c, Compile_X86_monitor_950"
+}
+]
+由门禁失败定界分析自动生成 | repo: ops-math | run: 0dcc5067cf3d4d25aa4ced422d7cee63 | PR#7380
+Save
+Cancel
+Merger
+Not assigned
+Approver
+Not assigned
+Tester
+Not assigned
+Reviewer
+Not assigned
+Label
+cann-cla/yes
+ci-pipeline-failed
+Milestones
+No related milestones
+Kanban
+No related boards
+Link Issue
+No related Issues

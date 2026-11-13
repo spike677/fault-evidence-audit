@@ -1,0 +1,113 @@
+diff --git a/mc2/all_gather_matmul/README.md b/mc2/all_gather_matmul/README.md
+index f76650731a9adcfe98717129c173f68c23e03cfd..4496eedfa8563dce97a9cb874d3924de1006d0ab 100644
+--- a/mc2/all_gather_matmul/README.md
++++ b/mc2/all_gather_matmul/README.md
+@@ -139,7 +139,7 @@
+ * gather_index当前版本仅支持输入0。
+ * commTurn当前版本仅支持输入0。
+ * <term>Atlas A2系列产品</term>：
+-    * 支持2、4、8卡，并且仅支持HCCS链路all mesh组网。
++    * 支持2、4、8卡，并且仅支持HCCS链路Full Mesh（全互连）组网。
+     * 一个模型中的通算融合MC2算子，仅支持相同通信域。
+ * <term>Atlas A3系列产品</term>  ：
+     * 支持2、4、8、16、32卡，并且仅支持HCCS链路double ring组网。
+diff --git a/mc2/all_gather_matmul/docs/aclnnAllGatherMatmul.md b/mc2/all_gather_matmul/docs/aclnnAllGatherMatmul.md
+index 04da94bff110e505032201690a9345665030a925..50d87bf4f7932217bcf94ec8480261505d87d1c9 100644
+--- a/mc2/all_gather_matmul/docs/aclnnAllGatherMatmul.md
++++ b/mc2/all_gather_matmul/docs/aclnnAllGatherMatmul.md
+@@ -242,6 +242,9 @@ aclnnStatus aclnnAllGatherMatmul(
+     <tr>
+         <td>streamMode不在合法范围内。</td>
+     </tr>
++    <tr>
++        <td>x1的k轴为0。</td>
++    </tr>
+     </tbody></table>
+ 
+ ## aclnnAllGatherMatmul
+@@ -299,14 +302,14 @@ aclnnStatus aclnnAllGatherMatmul(
+ - 输出为2维，其shape为(m*rank_size, n)，rank_size为卡数。
+ 
+ <!-- npu="910b" id9 -->
+-- <term>Atlas A2系列产品</term>：支持2、4、8卡，并且仅支持HCCS链路all mesh组网。
++- <term>Atlas A2系列产品</term>：支持2、4、8卡，并且仅支持HCCS链路Full Mesh（全互连）组网。
+ <!-- end id9 -->
+ <!-- npu="A3" id10 -->
+ - <term>Atlas A3系列产品</term>  ：支持2、4、8、16、32卡，并且仅支持HCCS链路double ring组网。
+ <!-- end id10 -->
+ <!-- npu="950" id11 -->
+ - <term>Ascend 950PR&950DT系列产品</term>:
+-  - 支持2、4、8、16、32、64卡，并且仅支持HCCS链路all mesh组网。
++  - 支持2、4、8、16、32、64卡，并且仅支持HCCS链路Full Mesh（全互连）组网。
+ <!-- end id11 -->
+ <!-- npu="910b" id12 -->
+ - <term>Atlas A2系列产品</term>:一个模型中的通算融合MC2算子，仅支持相同通信域。
+diff --git a/mc2/all_gather_matmul/docs/aclnnAllGatherMatmul_en.md b/mc2/all_gather_matmul/docs/aclnnAllGatherMatmul_en.md
+index 7b75716bcb2ab8520c42f338c31520f8eab9afb1..caace90dda960ea21717b0f6086171b3c3a06c39 100644
+--- a/mc2/all_gather_matmul/docs/aclnnAllGatherMatmul_en.md
++++ b/mc2/all_gather_matmul/docs/aclnnAllGatherMatmul_en.md
+@@ -244,6 +244,9 @@ aclnnStatus aclnnAllGatherMatmul(
+     <tr>
+         <td>streamMode is not in the valid range.</td>
+     </tr>
++    <tr>
++        <td>The k-axis of x1 is 0.</td>
++    </tr>
+     </tbody></table>
+ 
+ ## aclnnAllGatherMatmul
+@@ -301,14 +304,14 @@ aclnnStatus aclnnAllGatherMatmul(
+ - The output is 2-dimensional, with a shape of (m*rank_size, n), where rank_size is the number of cards.
+ 
+ <!-- npu="910b" id9 -->
+-- <term>Atlas A2 products</term>: Supports 2, 4, and 8 cards, and only supports HCCS link all mesh networking.
++- <term>Atlas A2 products</term>: Supports 2, 4, and 8 cards, and only supports HCCS link full mesh networking.
+ <!-- end id9 -->
+ <!-- npu="A3" id10 -->
+ - <term>Atlas A3 products</term>: supports 2, 4, 8, 16, and 32 devices, and only supports double ring networking over HCCS links.
+ <!-- end id10 -->
+ <!-- npu="950" id11 -->
+ - <term>Ascend 950PR&950DT products</term>:
+-  - Supports 2, 4, 8, 16, 32, and 64 cards, and only supports HCCS link all mesh networking.
++  - Supports 2, 4, 8, 16, 32, and 64 cards, and only supports HCCS link full mesh networking.
+ <!-- end id11 -->
+ <!-- npu="910b" id12 -->
+ - <term>Atlas A2 products</term>: The communication-computation fusion MC2 operators in a model only support the same communication domain.
+diff --git a/mc2/all_gather_matmul_v2/docs/aclnnAllGatherMatmulV2.md b/mc2/all_gather_matmul_v2/docs/aclnnAllGatherMatmulV2.md
+index 5283e2d453904fe8b58154977d22d3802fa55418..c7eb82f207b3c71955f95995133e61751d106c8a 100644
+--- a/mc2/all_gather_matmul_v2/docs/aclnnAllGatherMatmulV2.md
++++ b/mc2/all_gather_matmul_v2/docs/aclnnAllGatherMatmulV2.md
+@@ -380,7 +380,13 @@ aclnnStatus aclnnAllGatherMatmulV2(
+     <tr>
+         <td rowspan="3">ACLNN_ERR_PARAM_INVALID</td>
+         <td rowspan="3">161002</td>
+-        <td>传入的x1、x2、x1Scale、x2Scale、bias、quantScale、output、gatherOut或amaxOut的数据类型和维度不在支持的范围内。</td>
++        <td>传入的x1、x2、x1Scale、x2Scale、bias、quantScale、output、gatherOut或amaxOut的数据类型和shape（维度/尺寸）不在支持的范围内。</td>
++    </tr>
++    <tr>
++        <td>streamMode、commMode取值不在合法范围内。</td>
++    </tr>
++    <tr>
++        <td>传入的x1、x2、output、bias、gatherOut或amaxOut的format不为ND，x1Scale、x2Scale的format不为ND/NCL（x2为INT4时format不支持FRACTAL_NZ），或量化场景下x1Scale、x2Scale为空指针，fp16/bf16场景下amaxOut不为空指针。</td>
+     </tr>
+     </tbody></table>
+ 
+diff --git a/mc2/all_gather_matmul_v2/docs/aclnnAllGatherMatmulV2_en.md b/mc2/all_gather_matmul_v2/docs/aclnnAllGatherMatmulV2_en.md
+index 06df2dd86e62bcdc0b847384799808e0dc0be36f..d810d4fefff4783b9f5be4deed892fcc5e78e5eb 100644
+--- a/mc2/all_gather_matmul_v2/docs/aclnnAllGatherMatmulV2_en.md
++++ b/mc2/all_gather_matmul_v2/docs/aclnnAllGatherMatmulV2_en.md
+@@ -381,7 +381,13 @@ aclnnStatus aclnnAllGatherMatmulV2(
+     <tr>
+         <td rowspan="3">ACLNN_ERR_PARAM_INVALID</td>
+         <td rowspan="3">161002</td>
+-        <td>The data types and dimensions of the input x1, x2, x1Scale, x2Scale, bias, quantScale, output, gatherOut, or amaxOut are out of the supported range.</td>
++        <td>The data types and shapes (dimensions/sizes) of the input x1, x2, x1Scale, x2Scale, bias, quantScale, output, gatherOut, or amaxOut are out of the supported range.</td>
++    </tr>
++    <tr>
++        <td>streamMode or commMode is not in the valid range.</td>
++    </tr>
++    <tr>
++        <td>The format of the input x1, x2, output, bias, gatherOut, or amaxOut is not ND, the format of x1Scale or x2Scale is not ND/NCL (the FRACTAL_NZ format is not supported when x2 is INT4), or x1Scale and x2Scale are null pointers in quantization scenarios, or amaxOut is not a null pointer in fp16/bf16 scenarios.</td>
+     </tr>
+     </tbody></table>
+ 

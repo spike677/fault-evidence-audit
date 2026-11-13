@@ -1,0 +1,176 @@
+From 351e0f8a622cc24d6e4f545b47597c1c1bdb9663 Mon Sep 17 00:00:00 2001
+From: ranczhw <ranchenzhi@huawei.com>
+Date: Wed, 15 Jul 2026 11:35:49 +0800
+Subject: [PATCH] modify a2 a8w4 workspace k<n/2
+
+---
+ mc2/mega_moe/op_kernel/arch22/mega_moe_a2.h   |  6 ++-
+ .../arch22/mega_moe_kernel_a2_bf16_w4a8.hpp   | 51 ++++++++++---------
+ 2 files changed, 33 insertions(+), 24 deletions(-)
+
+diff --git a/mc2/mega_moe/op_kernel/arch22/mega_moe_a2.h b/mc2/mega_moe/op_kernel/arch22/mega_moe_a2.h
+index c5396e13bbd..f00188f6cfd 100644
+--- a/mc2/mega_moe/op_kernel/arch22/mega_moe_a2.h
++++ b/mc2/mega_moe/op_kernel/arch22/mega_moe_a2.h
+@@ -297,7 +297,11 @@ __aicore__ inline void MegaMoeA2<MegaMoeFuncA2>::Process()
+ 
+     using BlockScheduler = typename Gemm::Block::GemmIdentityBlockSwizzle<9, 1>;
+     using ElementGroupList = int64_t;
+-    LayoutA layoutA1{static_cast<uint32_t>(m_), static_cast<uint32_t>(k_)};
++    // W4A8 reuses this workspace for GMM1 input and SwiGLU/GMM2 input. Pad only
++    // the GMM1 token slot; SwiGLU/GMM2 keeps its native packed k2 layout.
++    uint32_t layoutA1RowStride =
++        isW4A8 ? static_cast<uint32_t>(k_ > k2 ? k_ : k2) : static_cast<uint32_t>(k_);
++    LayoutA layoutA1{static_cast<uint32_t>(m_), static_cast<uint32_t>(k_), layoutA1RowStride};
+     LayoutA layoutA2{static_cast<uint32_t>(m_), static_cast<uint32_t>(k2)};
+     layout::VectorLayout layoutScale1{static_cast<uint32_t>(n_)};
+     layout::VectorLayout layoutScale2{static_cast<uint32_t>(n2)};
+diff --git a/mc2/mega_moe/op_kernel/arch22/mega_moe_kernel_a2_bf16_w4a8.hpp b/mc2/mega_moe/op_kernel/arch22/mega_moe_kernel_a2_bf16_w4a8.hpp
+index 695723e6f5e..9cebc388775 100644
+--- a/mc2/mega_moe/op_kernel/arch22/mega_moe_kernel_a2_bf16_w4a8.hpp
++++ b/mc2/mega_moe/op_kernel/arch22/mega_moe_kernel_a2_bf16_w4a8.hpp
+@@ -103,6 +103,9 @@ public:
+         uint64_t maxOutputSize;
+         // for reuse workspace, gmm1 out preRow Stride use max(n,k)
+         uint32_t gmmOutPreRowStride;
++        // Padded token-slot stride for GMM1 input. It prevents packed SwiGLU
++        // output from overwriting unread GMM1 rows when k < n/2.
++        uint32_t gmmA1PreRowStride = 0;
+         //--------------
+         GM_ADDR expertIdx;
+         GM_ADDR moeInitRoutingQuantV2Scale;
+@@ -173,6 +176,7 @@ public:
+             moeInitRoutingQuantV2TilingData.gatherOutComputeParamsOp =
+                 moeInitRoutingQuantV2TilingData_.gatherOutComputeParamsOp;
+             gmmOutPreRowStride = problemShape.n() > problemShape.k() ? problemShape.n() : problemShape.k();
++            gmmA1PreRowStride = static_cast<uint32_t>(layoutA.stride(0));
+         }
+     };
+ 
+@@ -310,9 +314,9 @@ private:
+         AscendC::WaitFlag<AscendC::HardEvent::MTE3_MTE2>(EVENT_ID1);
+     }
+ 
+-    CATLASS_DEVICE void FetchAndPreprocessInt8ToInt4(uint64_t gmOffsetA, AscendC::GlobalTensor<float> dstScale,
+-                                                     AscendC::GlobalTensor<int8_t> src, int32_t rows,
+-                                                     int32_t hiddenSize)
++    CATLASS_DEVICE void FetchAndPreprocessInt8ToInt4(uint64_t gmOffsetA, AscendC::GlobalTensor<float> dstScale,
++                                                     AscendC::GlobalTensor<int8_t> src, int32_t rows,
++                                                     int32_t hiddenSize, uint32_t aStride)
+     {
+         uint32_t tmpBufferOffset = 0;
+ 
+@@ -382,7 +386,7 @@ private:
+ 
+         int pingpongId = 0;
+         for (uint32_t processIndex = 0; processIndex < rows; ++processIndex) {
+-            uint64_t relStartAddr = processIndex * hiddenSize;
++            const uint64_t relStartAddr = processIndex * aStride;
+             uint64_t absStartAddr = gmOffsetA + relStartAddr;
+             AscendC::TEventID EVENT_ID = pingpongId == 0 ? EVENT_ID6 : EVENT_ID7;
+             AscendC::LocalTensor<int8_t> buf = pingpongId == 0 ? tmpBuffer0 : tmpBuffer1;
+@@ -434,7 +438,7 @@ private:
+             Cast(xLowI4Tensor, xHighHalfTensor.ReinterpretCast<half>(), AscendC::RoundMode::CAST_NONE, hiddenSize);
+             SetFlag<HardEvent::V_MTE3>(EVENT_ID7);
+             WaitFlag<HardEvent::V_MTE3>(EVENT_ID7);
+-            DataCopy(gmA1I4_I8[absStartAddr + hiddenSize / 2], xLowI4Tensor.ReinterpretCast<int8_t>(), hiddenSize / 2);
++            DataCopy(gmA1I4_I8[absStartAddr + aStride / 2], xLowI4Tensor.ReinterpretCast<int8_t>(), hiddenSize / 2);
+             SetFlag<HardEvent::MTE3_V>(EVENT_ID6);
+             // 低四位处理结束
+             pingpongId = (pingpongId + 1) % BufferNum;
+@@ -574,11 +578,11 @@ private:
+             }
+             preCurrentmSum += currentM / 2;
+ 
+-            gmGroupOffsetA += inGroupProblemShape.m() * inGroupProblemShape.k();
+-            if (params.listLen == 1) {
+-                gmGroupOffsetB += inGroupProblemShape.k() * inGroupProblemShape.n();
+-            }
+-            gmGroupOffsetC += inGroupProblemShape.m() * params.gmmOutPreRowStride;
++            gmGroupOffsetA += static_cast<int64_t>(inGroupProblemShape.m()) * params.gmmA1PreRowStride;
++            if (params.listLen == 1) {
++                gmGroupOffsetB += inGroupProblemShape.k() * inGroupProblemShape.n();
++            }
++            gmGroupOffsetC += inGroupProblemShape.m() * params.gmmOutPreRowStride;
+             startCoreIdx = (startCoreIdx + coreLoops) % coreNum;
+         }
+ 
+@@ -674,11 +678,11 @@ private:
+                 }
+             }
+             preCurrentmSum += currentM / 2;
+-            gmGroupOffsetA += inGroupProblemShape.m() * inGroupProblemShape.k();
+-            if (params.listLen == 1) {
+-                gmGroupOffsetB += inGroupProblemShape.k() * inGroupProblemShape.n();
+-            }
+-            gmGroupOffsetC += inGroupProblemShape.m() * inGroupProblemShape.n();
++            gmGroupOffsetA += inGroupProblemShape.m() * inGroupProblemShape.k();
++            if (params.listLen == 1) {
++                gmGroupOffsetB += inGroupProblemShape.k() * inGroupProblemShape.n();
++            }
++            gmGroupOffsetC += inGroupProblemShape.m() * inGroupProblemShape.n();
+ 
+             startCoreIdx = (startCoreIdx + coreLoops) % coreNum;
+         }
+@@ -892,7 +896,8 @@ private:
+ 
+         // -- Path A: self-rank --
+         if (static_cast<int32_t>(RuntimeRank(params)) == dstEpIdx) {
+-            FetchAndPreprocessInt8ToInt4(gmOffsetA, gmPerTokenScale1[rowStart], src, rows, hiddenSize);
++            FetchAndPreprocessInt8ToInt4(gmOffsetA, gmPerTokenScale1[rowStart], src, rows, hiddenSize,
++                                         params.gmmA1PreRowStride);
+             return;
+         }
+ 
+@@ -985,8 +990,8 @@ private:
+         AscendC::GlobalTensor<T> gmDstA;
+         gmDstA.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(shmem() + peermemInfo.offsetA));
+         AscendC::PipeBarrier<PIPE_ALL>();
+-        FetchAndPreprocessInt8ToInt4(gmOffsetA, gmPerTokenScale1[rowStart2], gmDstA[rowStart2 * copyInNum], rows2,
+-                                     hiddenSize);
++        FetchAndPreprocessInt8ToInt4(gmOffsetA, gmPerTokenScale1[rowStart2], gmDstA[rowStart2 * copyInNum], rows2,
++                                     hiddenSize, params.gmmA1PreRowStride);
+         return;
+     }
+ 
+@@ -1126,7 +1131,7 @@ private:
+                     SendTokensV3<ElementABefore>(gmRemoteDstA[gmDstOffset], gmSrcA[gmSrcOffset],
+                                                  static_cast<int32_t>(rows), params.problemShape.k(), dstEpIdx,
+                                                  groupIdx, static_cast<int32_t>(rowStart), params,
+-                                                 static_cast<uint64_t>(rowStart) * params.problemShape.k());
++                                                 static_cast<uint64_t>(rowStart) * params.gmmA1PreRowStride);
+                 }
+                 prevGroupSum1Arr[arrIdx] += currentMSend;
+             }
+@@ -1148,7 +1153,7 @@ private:
+                     }
+                     RecvTokensV3<ElementABefore>(static_cast<int32_t>(rows2), static_cast<int32_t>(rowStart2),
+                                                  params.problemShape.k(), srcEpIdx, groupIdx, params,
+-                                                 static_cast<uint64_t>(rowStart2) * params.problemShape.k());
++                                                 static_cast<uint64_t>(rowStart2) * params.gmmA1PreRowStride);
+                 }
+             }
+             AscendC::SyncAll<true>();
+@@ -1205,8 +1210,8 @@ private:
+                                cumsumMM[tokenPerExpertLayout(params.EP - 1, RuntimeRank(params), 0) -
+                                         tokenPerExpertLayout(0, params.EP - 1, 0)],
+                                rowStartThisCore, gmPerTokenScale2[rowStartThisCore], params.expertPerRank, params.EP,
+-                               RuntimeRank(params), params.listLen, resource, params.epilogueCoreNum,
+-                               params.swigluLimit, params.gmmOutPreRowStride);
++                               RuntimeRank(params), params.listLen, resource, params.epilogueCoreNum,
++                               params.swigluLimit, params.gmmOutPreRowStride);
+             }
+             AscendC::SyncAll<true>();
+             AscendC::CrossCoreSetFlag<0x2, PIPE_MTE3>(SYNCFLAGV2C);
+@@ -1420,7 +1425,7 @@ private:
+ 
+             ptrA1Int4 = params.ptrWorkspace + workspaceOffset;
+             ptrA2Int4 = params.ptrWorkspace + workspaceOffset;
+-            workspaceOffset += params.maxOutputSize * (params.problemShape.k() > k2 ? params.problemShape.k() : k2);
++            workspaceOffset += params.maxOutputSize * (params.problemShape.k() > k2 ? params.problemShape.k() : k2);
+ 
+             ptrSumBeforeRankForDispatch = params.ptrWorkspace + workspaceOffset;
+             workspaceOffset += paddedExpertNumAligned * sizeof(int32_t);
+-- 
+GitCode
+

@@ -1,0 +1,481 @@
+修复dsv32 splitfuse+dp+异步调度的精度问题-MindIE-LLM-AtomGit
+Star
+142
+Fork
+244
+Code
+Introduction
+Code
+Issues
+89
+Pull Requests
+179
+Pipeline
+Actions
+Discussion
+Wiki
+Members
+76
+Analysis
+Settings
+Star
+142
+Fork
+244
+Merged
+修复dsv32 splitfuse+dp+异步调度的精度问题
+#855
+lijiaqi139
+Add on
+Apr 13
+Merged from
+lijiaqi139/MindIE-LLM：
+fix_splitfuse_async_accuracy
+into
+Ascend/MindIE-LLM：
+dev
+修复dsv32 splitfuse+dp+异步调度的精度问题
+#855
+Merged
+lijiaqi139
+Add on
+Apr 13
+Merged from
+lijiaqi139/MindIE-LLM
+fix_splitfuse_async_accuracy
+into
+Ascend/MindIE-LLM
+dev
+Merge checks
+Discussion
+0
+Commits
+0
+Checks
+0
+Files changed
+0
+Clone/Download
+0
+L
+lijiaqi139
+Apr 13
+Apr 13
+合入背景
+请描述为什么要做这个PR内的改动。
+如涉及，请关联前序PR或同特性/需求下的其他PR。
+如果是修复之前PR引入的问题，请关联引入问题的PR。
+注意：
+Fixes #ISSUE ID
+会自动关闭issue，如问题部分解决请不要使用
+Fixes
+，可以用
+Fix part of #ISSUE ID
+替代.
+修改内容
+（1）dsv32用了aclgraph model_runner_exp，走了_fill_in_model_result_exp的异步分支，需要把_fill_in_model_result中hit_mask_per_token命中来更新model_input.input_ids的逻辑再实现下
+（2）再_fill_in_model_result_exp中的actual_seq_lengths_kv计算错误，需要用qlens来做累加，原始代码错误
+资料变更
+不涉及
+接口变更
+不涉及
+测试结果
+请说明测试场景，测试方法以及测试结果。
+测试用例设计时需考虑硬件、部署方式、功能、性能、精度、显存等维度。
+CheckList
+PR提交人对以下CheckList自检项进行全量自检，自检通过或不涉及，均修改 [ ] 为 [x]。
+代码注释完备
+正确记录错误日志
+进行了返回值校验 (禁止使用void屏蔽安全函数、自研函数返回值；考虑接口的异常场景；调用底层组件接口时，需要进行返回值校验)
+进行了空指针校验
+若存在资源申请，使用后资源被正确的释放了
+若涉及多线程场景，考虑了并发场景，不存在死锁问题
+按照
+代码仓中提供的格式模板
+，使用clang-format工具格式化代码
+符合Ascend社区的编码规范。
+C++ 语言编程指导
+|
+C++ 语言安全编程指导
+Save
+Cancel
+Pull Request has been successfully merged by ascend-robot.
+（Thank you for lijiaqi139's contribution.）
+ascend-robot
+Collaborators
+Apr 13
+Comments：
+Apr 13
+Comments：
+Thanks for your pull-request.
+The full list of commands accepted by me can be found at
+here
+。
+You can get sig-info at
+here
+PR Approval Progress
+✅
+Congratulations! All modules have met the lgtm and approve requirements.
+Module Approval Details
+module
+lgtm status
+approve status
+repo-Ascend/MindIE-LLM
+✅
+纪涛
+,
+吴铭泾
+(2/2)
+✅
+纪涛
+,
+吴铭泾
+(2/1)
+💡 Tip:
+Committer
+can comment
+/approve
+or
+/lgtm
+Commenting
+/approve
+implies both code review (lgtm) and intent to merge (approve)
+CLA Signature Pass
+lijiaqi139, thanks for your pull request. All authors of the commits have signed the CLA. 👍
+Save
+Cancel
+ascend-robot
+Collaborators
+Apr 13
+Added label:
+ascend-cla/yes
+Apr 13
+Added label:
+ascend-cla/yes
+ascend-robot
+Collaborators
+Apr 13
+Added label:
+needs-issue
+Apr 13
+Added label:
+needs-issue
+ascend-robot
+Collaborators
+Apr 13
+Comments：
+Apr 13
+Comments：
+Linking Issue Notice
+@lijiaqi139
+, the pull request must be linked to at least one issue.
+If an issue has already been linked, but the
+needs-issue
+label remains, you can remove the label by commenting
+/check-issue
+.
+Save
+Cancel
+L
+lijiaqi139
+Apr 13
+Change title to "修复dsv32 splitfuse+dp+异步调度的精度问题", originally titled "修复splitfuse+dp+异步调度的精度问题".
+Apr 13
+Change title to "修复dsv32 splitfuse+dp+异步调度的精度问题", originally titled "修复splitfuse+dp+异步调度的精度问题".
+L
+lijiaqi139
+Apr 13
+Comments：
+Apr 13
+Comments：
+compile
+Save
+Cancel
+ascend-robot
+Collaborators
+Apr 13
+Comments：
+Apr 13
+Comments：
+Ascend docs pipeline is running...
+Save
+Cancel
+ascend-robot
+Collaborators
+Apr 13
+Added label:
+docs-ci-pipeline-running
+Apr 13
+Added label:
+docs-ci-pipeline-running
+ascend-robot
+Collaborators
+Apr 13
+Comments：
+Apr 13
+Comments：
+✅ 流水线任务触发成功(流水线编号: 4770)，正在执行， 请稍候。 任务链接
+点此跳转
+...
+Save
+Cancel
+ascend-robot
+Collaborators
+Apr 13
+Added label:
+ci-pipeline-running
+Apr 13
+Added label:
+ci-pipeline-running
+ascend-robot
+Collaborators
+Apr 13
+Comments：
+Apr 13
+Comments：
+Ascend docs pipeline is running...
+Save
+Cancel
+ascend-robot
+Collaborators
+Apr 13
+Comments：
+Apr 13
+Comments：
+✅ 跳过 docs ci 检查，没有需要检查的文档文件
+Save
+Cancel
+ascend-robot
+Collaborators
+Apr 13
+Removed label:
+docs-ci-pipeline-running
+Apr 13
+Removed label:
+docs-ci-pipeline-running
+ascend-robot
+Collaborators
+Apr 13
+Added label:
+docs-ci-pipeline-success
+Apr 13
+Added label:
+docs-ci-pipeline-success
+ascend-robot
+Collaborators
+Apr 13
+Comments：
+Apr 13
+Comments：
+✅ 跳过 docs ci 检查，没有需要检查的文档文件
+Save
+Cancel
+ascend-robot
+Collaborators
+Apr 13
+Removed label:
+ci-pipeline-running
+Apr 13
+Removed label:
+ci-pipeline-running
+ascend-robot
+Collaborators
+Apr 13
+Added label:
+ci-pipeline-passed
+Apr 13
+Added label:
+ci-pipeline-passed
+ascend-robot
+Collaborators
+Apr 13
+Comments：
+Apr 13
+Comments：
+流水线
+PR-pipeline_MindIE-LLM_gitcode#4770
+已完成
+阶段
+任务名
+状态
+详情
+编译构建
+Build_ops_x86_A3
+✅
+>>>
+Build_ops_arm_A3
+✅
+>>>
+Build_ops_x86_A2
+✅
+>>>
+Build_ops_arm_A2
+✅
+>>>
+Build_linux_x86_abi1_atb
+✅
+>>>
+Build_linux_x86_abi1_llm
+✅
+>>>
+Build_linux_arm_abi1_atb
+✅
+>>>
+Build_linux_arm_abi1_llm
+✅
+>>>
+Build_linux_arm_abi0_atb
+✅
+>>>
+Build_linux_arm_abi0_llm
+✅
+>>>
+恶意代码检查
+Antipoison
+✅
+>>>
+编码安全与规范检查
+pre-commit
+✅
+>>>
+开源片段检查
+SCA
+✅
+>>>
+开发者测试
+UT_linux_arm_mindie-llm
+✅
+>>>
+UT_linux_arm_atb-models
+✅
+>>>
+流水线
+PR-pipeline_MindIE-LLM_gitcode
+✅
+>>>
+Save
+Cancel
+L
+lijiaqi139
+Apr 13
+Modify description of pull request
+Apr 13
+Modify description of pull request
+纪涛
+Collaborators
+Apr 14
+Comments：
+Apr 14
+Comments：
+/approve
+Save
+Cancel
+ascend-robot
+Collaborators
+Apr 14
+Added label:
+approved
+Apr 14
+Added label:
+approved
+吴铭泾
+Collaborators
+Apr 14
+Comments：
+Apr 14
+Comments：
+/approve
+Save
+Cancel
+ascend-robot
+Collaborators
+Apr 14
+Added label:
+lgtm
+Apr 14
+Added label:
+lgtm
+纪涛
+Collaborators
+Apr 14
+Comments：
+Apr 14
+Comments：
+/merge
+Save
+Cancel
+ascend-robot
+Collaborators
+Apr 14
+Added label:
+keeper_approved
+Apr 14
+Added label:
+keeper_approved
+纪涛
+Collaborators
+Apr 14
+Associated issue: [Bug]: 修复dsv32 splitfuse+dp+异步调度的精度问题
+Apr 14
+Associated issue: [Bug]: 修复dsv32 splitfuse+dp+异步调度的精度问题
+ascend-robot
+Collaborators
+Apr 14
+Removed label:
+needs-issue
+Apr 14
+Removed label:
+needs-issue
+ascend-robot
+Collaborators
+Apr 14
+Comments：
+Apr 14
+Comments：
+Review Guide
+This pull-request
+passes review
+.
+Committers who wrote a comment of
+/approve
+are:
+纪涛
+,
+吴铭泾
+.
+Reviewers who wrote a comment of
+/lgtm
+are:
+纪涛
+,
+吴铭泾
+.
+Save
+Cancel
+ascend-robot
+Collaborators
+Apr 14
+Merged pull request
+Apr 14
+Merged pull request
+Merger
+Not assigned
+Approver
+Not assigned
+Tester
+Not assigned
+Reviewer
+Not assigned
+Label
+ascend-cla/yes
+docs-ci-pipeline-success
+ci-pipeline-passed
+approved
+lgtm
+keeper_approved
+Milestones
+No related milestones
+Kanban
+No related boards
+Link Issue
+No related Issues

@@ -1,0 +1,581 @@
+fix(instance_norm): 空归约兜底模板 mean 填充值 NaN 改 0，对齐 CUDA welford 与仓内空模板约定-ops-nn-AtomGit
+Star
+1418
+Fork
+2158
+Code
+Introduction
+Code
+Issues
+935
+Pull Requests
+733
+Pipeline
+Actions
+Discussion
+Wiki
+Members
+474
+Analysis
+Settings
+Star
+1418
+Fork
+2158
+Open
+fix(instance_norm): 空归约兜底模板 mean 填充值 NaN 改 0，对齐 CUDA welford 与仓内空模板约定
+#14321
+HelloWord-LuXin
+Add on
+17 hours ago
+Merged from
+HelloWord-LuXin/ops-nn：
+fix/instancenorm-empty-mean-zero
+into
+cann/ops-nn：
+master
+fix(instance_norm): 空归约兜底模板 mean 填充值 NaN 改 0，对齐 CUDA welford 与仓内空模板约定
+#14321
+Open
+HelloWord-LuXin
+Add on
+17 hours ago
+Merged from
+HelloWord-LuXin/ops-nn
+fix/instancenorm-empty-mean-zero
+into
+cann/ops-nn
+master
+Merge checks
+Discussion
+0
+Commits
+0
+Checks
+0
+Files changed
+0
+Clone/Download
+0
+HelloWord-LuXin
+Collaborators
+17 hours ago
+17 hours ago
+描述
+InstanceNorm（Ascend950 arch35）空归约兜底模板
+InstanceNormReduceEmpty
+（R==0 且 N*C>0 时进入，tilingKey=50000）原先将 mean/variance 双双填 NaN。该填充值与以下三方均不一致：
+参照
+空归约填充约定
+PyTorch CUDA welford（torch 2.7.0+cu126 / 2.14.1+cu130 双版本实测，A100）
+save_mean=
+0
+/ save_invstd=NaN
+仓内同语义空模板
+add_layer_norm_regbase_reduce_empty.h
+（其文件注释即写明"mean=[A,1] 填 0、rstd=[A,1] 填 NaN"）
+mean=
+0
+/ rstd=NaN
+aclnnBatchNorm L2 空进填充（
+ProcessEmptyTensorWithValue(saveMean, 0)
+/
+saveInvstd, NaN)
+）
+saveMean=
+0
+/ saveInvstd=NaN
+本改动将空归约时 mean 填充值改为
+0
+（variance 保持 NaN），并把实现方式对齐
+add_layer_norm_regbase_reduce_empty
+：同一 buffer 分两段填充 0 和 NaN 后循环搬出（原先共用一个 NaN tensor 拷给两路输出）。
+实际影响面有限（torch 对外不暴露 instance_norm 统计量、InstanceNormGrad 空模板自身填 0 不消费统计量输出），但以 torch 逐实例统计量为 golden 的精度对比会出现 NaN vs 0 的假红；且本改动消除 CANN 生态内同一"空归约"语义下两种填充约定的分叉。
+验证
+环境：Ascend950PR + CANN 9.3.0，master (63513a9e2) 构建
+--ops=instance_norm --soc=ascend950 --pkg
+，以自定义算子包（ASCEND_CUSTOM_OPP_PATH）覆盖内置二进制
+空进非空出用例
+x=(2,4,0,3) fp32/NCHW：mean=0、variance=NaN，与更新后 golden 精确匹配（ttk kernel 模式 PASS）
+正常 shape 对照
+用例无回归（PASS）
+反汇编 diff 确认语义变化完全限定在
+InstanceNorm_..._50000
+（ReduceEmpty）符号内（新增第二组 Duplicate 填充与 NaN 常量构造、buffer 移位 #2→#3）
+依赖检查：InstanceNormGrad 空模板
+instance_norm_grad_empty_load.h
+自身填 0、不读取 mean/variance 统计量，无下游影响
+无测试锁定旧行为（UT 仅校验 tiling 数据切分，无填充值断言）
+Save
+Cancel
+Merge blocked
+HelloWord-LuXin
+Collaborators
+17 hours ago
+Created pull request, commit
+6fb268aa
+17 hours ago
+Created pull request, commit
+6fb268aa
+atomgit-bot
+17 hours ago
+Comments：
+17 hours ago
+Comments：
+变更摘要
+本改动修复
+InstanceNorm
+（arch35）空归约兜底模板
+InstanceNormReduceEmpty
+（
+R==0
+且
+N*C>0
+，tilingKey=50000）的填充约定：原先
+mean
+与
+variance
+均填 NaN，现改为
+mean
+填
+0
+、
+variance
+保持 NaN，与 PyTorch CUDA welford 空归约结果（save_mean=0 / save_invstd=NaN）、仓内
+add_layer_norm_regbase_reduce_empty.h
+以及 aclnnBatchNorm 空进填充约定对齐，消除 CANN 生态内同一“空归约”语义下的填充值分叉。
+主要改动
+mean
+填充值改为 0
+：
+Process()
+中先以
+Duplicate
+将整段 buffer 前半填
+static_cast<T_MEAN>(0)
+，后半填
+QuietNaN()
+，使空归约输出的
+mean
+为 0、
+variance
+为 NaN。
+单 buffer 双段填充替代共用 NaN tensor
+：队列由
+outNanQueue_
+重命名并改为
+outQueue_
+，
+InitBuffer
+容量由
+perCorePerLoopElements_
+扩为
+NUM_TWO * perCorePerLoopElements_ * sizeof(T_MEAN)
+，新增常量
+NUM_TWO = 2
+。
+搬出逻辑按段索引取地址
+：
+CopyOut
+参数由
+runningMeanTypeNanLocal
+改为
+fillLocal
+，
+meanGm_
+搬出
+fillLocal
+，
+varianceGm_
+搬出
+fillLocal[perCorePerLoopElements_]
+，实现同一个 buffer 分两段循环搬出。
+文件头注释更新
+：
+instance_norm_reduce_empty.h
+的
+\brief
+补充说明空张量兜底 kernel 的填充约定及其与
+add_layer_norm_regbase_reduce_empty
+、PyTorch CUDA welford 的一致性依据。
+🧩 本次 Review 已使用自定义 Skill：
+ascendc-code-review
+Save
+Cancel
+Incorrect?
+atomgit-bot
+17 hours ago
+Comments：
+17 hours ago
+Comments：
+代码审查
+审查结论
+变更文件复核
+norm/instance_norm/op_kernel/arch35/instance_norm_reduce_empty.h
+：已完整审查（含 Init/Process/CopyOut 全流程，并交叉核对
+instance_norm_tiling_reduce_empty_arch35.cpp
+的 UB 预算与对齐粒度、
+instance_norm_tiling_data.h
+、
+instance_norm_apt.cpp
+调用点、UT 中锁定的 per-loop 切分）。语义本身正确（mean 段填 0、variance 段填 NaN，
+CopyOut
+的 mean/variance 与两段数据一一对应，末次循环长度不越界），主要风险集中在 UB 预算与地址对齐两处。
+问题统计
+P0：0
+P1：0
+P2：2（① 2 倍 UB buffer 超出 tiling 单 buffer 预算；② 第二段偏移未 32B 对齐，fallback 形状触发）
+P3：0
+整体风险判断
+：填充值语义改动方向正确、与 PR 描述一致，但实现方式从「单 buffer 共用」改为「同一 buffer 两段」后，新增了两处与 host tiling 现有约束不一致的隐患：一是把 UB 占用放大到 2 倍而 tiling 仍按 1 个 buffer 计算上限，大 N
+C 空归约形状可能触发 UB 分配越界；二是第二段起始偏移直接取未对齐的
+perCorePerLoopElements_
+，小 N
+C fallback 路径（fp32 N*C=1..7、fp16 1..15）下
+Duplicate
+/
+DataCopyPad
+起点非 32B 对齐。两处都建议在合并前修掉（可复用单 buffer 两次填充，或段步长向上对齐并同步 tiling 上限），否则空归约用例在大/小两端都可能出现不回退的异常。
+类型
+数量
+🔴 阻塞
+0
+🟡 建议
+2
+💬 仅评论
+🧩 本次 Review 已使用自定义 Skill：
+ascendc-code-review
+Save
+Cancel
+Incorrect?
+CANN-robot
+Collaborators
+17 hours ago
+Added label:
+cann-cla/yes
+17 hours ago
+Added label:
+cann-cla/yes
+CANN-robot
+Collaborators
+17 hours ago
+Comments：
+17 hours ago
+Comments：
+Thanks for your pull-request.
+The full list of commands accepted by me can be found at
+here
+.
+You can get sig-info at
+here
+.
+You can self-configure the PR merge rules for this repository. For more details, please refer to
+Here
+.
+For more, you also can visit
+HICANN
+.
+PR Approval Progress
+⚠️ This PR does not yet meet the following requirements:lgtm (requires ≥ 2 person(s) per module)、approve (requires ≥ 1 person(s) per module)
+Module Approval Details
+module
+lgtm status
+approve status
+norm
+❌ (0/2)(You can also ask:
+陈琦
+,
+胡碧霞
+,
+刘波
+,
+陈兴宇
+,
+唐超
+)
+❌ (0/1)(You can also ask:
+上官秦南
+,
+汤平川
+,
+王星
+,
+任如海
+,
+杨东
+)
+💡 Tip:
+Committer
+can comment
+/approve
+or
+/lgtm
+Commenting
+/approve
+implies both code review (lgtm) and intent to merge (approve)
+CLA Signature Pass
+HelloWord-LuXin, thanks for your pull request. All authors of the commits have signed the CLA. 👍
+Save
+Cancel
+CANN-robot
+Collaborators
+17 hours ago
+Set zengjuan,u010470851,chaotang233,kevin_huang1234,crystalhu,yangyang016,fanqirui,wangrui_,renruhai,su-yueming,zhajianqing123,yourealize,chenqi317,wang-xing001,liubo75,tangweiwei2,chenxingyu18,liujie12345678,east_yang,pingchuantang,Chen_HaoWen,qianzehong as approver
+17 hours ago
+Set zengjuan,u010470851,chaotang233,kevin_huang1234,crystalhu,yangyang016,fanqirui,wangrui_,renruhai,su-yueming,zhajianqing123,yourealize,chenqi317,wang-xing001,liubo75,tangweiwei2,chenxingyu18,liujie12345678,east_yang,pingchuantang,Chen_HaoWen,qianzehong as approver
+CANN-robot
+Collaborators
+17 hours ago
+Set u010470851,kevin_huang1234,wangrui_,renruhai,su-yueming,zhajianqing123,yourealize,wang-xing001,chenxingyu18,liujie12345678,east_yang,pingchuantang,Chen_HaoWen,qianzehong as approver
+17 hours ago
+Set u010470851,kevin_huang1234,wangrui_,renruhai,su-yueming,zhajianqing123,yourealize,wang-xing001,chenxingyu18,liujie12345678,east_yang,pingchuantang,Chen_HaoWen,qianzehong as approver
+atomgit-bot
+17 hours ago
+Start code review
+2
+norm/instance_norm/op_kernel/arch35/instance_norm_reduce_empty.h
+Outdated
+Unresolved
+@@ -59,2 +61,2 @@
+59
+-
+// init local memory
+60
+-
+pipe_.InitBuffer(
+outNanQueue_
+, BUFFER_NUM, perCorePerLoopElements_ * sizeof(T_MEAN));
+61
++
+// init local memory
+: 前半段填 mean(0), 后半段填 variance(NaN)
+62
++
+pipe_.InitBuffer(
+outQueue_
+, BUFFER_NUM,
+NUM_TWO *
+perCorePerLoopElements_ * sizeof(T_MEAN));
+atomgit-bot
+17 hours ago
+Comments：
+🟡
+Medium Priority
+变更行：
+instance_norm_reduce_empty.h:62
+由
+pipe_.InitBuffer(outQueue_, BUFFER_NUM, perCorePerLoopElements_ * sizeof(T_MEAN))
+改为
+NUM_TWO * perCorePerLoopElements_ * sizeof(T_MEAN)
+。
+受影响契约：host 侧 tiling（未在本 diff 中修改）是唯一决定
+perCorePerLoopElements_
+上界的地方，其预算是「1 个 buffer」：
+即 tiling 只保证「一个 tile 占 perCorePerLoopElements_ * sizeof(T_MEAN) ≤ ubSize」，而 kernel 现在申请 2 倍。
+失效模式：当每核元素字节数落在 (ubSize/2, ubSize] 区间时，
+InitBuffer
+申请量 > ubSize，触发 UB 分配失败（UB overflow / TPipe 申请越界），或在无断言版本中分配到越界区域导致后续 Duplicate/DataCopyPad 踩坏其它 buffer。触发条件是可构造的：
+blockNum_
+被 AIV 核数封顶后（
+:66-69
+，仅当
+totalBytes ≤ aivNum*32KB
+时每核才被限制在 32KB 以内），每核字节数会随 N
+C 线性增长，只要
+N*C*elemSize > aivNum*ubSize/2
+（例如 ubSize≈192KB、aivNum≈40 时约 3.8MB，即 fp32 下 N
+C 超过约 96 万元素，如 x=(8,131072,0,4)）即会进入该区间。
+建议
+：不要同时放大 UB 申请量：保持 buffer 长度为 perCorePerLoopElements_，用两次「填 NaN → 搬出 variance」「填 0 → 搬出 mean」（各自 EnQue/DeQue）复用同一块 UB；若坚持一 buffer 两段方案，则必须在 host tiling（instance_norm_tiling_reduce_empty_arch35.cpp 的 perLoopMaxIndicesElements）同步把每 loop 上限改为 ubSize/(2*elemSize)，并把两段长度按 32B 向上对齐。
+Save
+Cancel
+Incorrect?
+System Message
+System
+13 hours ago
+Comments：
+13 hours ago
+Comments：
+changed this line on
+00be69b0
+view
+diff detail
+Save
+Cancel
+atomgit-bot
+17 hours ago
+Start code review
+2
+norm/instance_norm/op_kernel/arch35/instance_norm_reduce_empty.h
+Outdated
+Unresolved
+@@ -72,2 +74,3 @@
+72
+74
+T_MEAN t_nan = AscendC::NumericLimits<T_MEAN>::QuietNaN();
+73
+-
+Duplicate(
+meanTypeNanLocal
+,
+t_nan
+, perCorePerLoopElements_);
+75
++
+Duplicate(
+fillLocal
+,
+static_cast<T_MEAN>(0)
+, perCorePerLoopElements_);
+76
++
+Duplicate(fillLocal[perCorePerLoopElements_], t_nan, perCorePerLoopElements_);
+atomgit-bot
+17 hours ago
+Comments：
+🟡
+Medium Priority
+变更行：
+instance_norm_reduce_empty.h:76
+新增
+Duplicate(fillLocal[perCorePerLoopElements_], t_nan, perCorePerLoopElements_)
+，以及
+:98-99
+新增
+DataCopyPad(varianceGm_[...], fillLocal[perCorePerLoopElements_], copyInParams)
+。第二段的起始地址由
+perCorePerLoopElements_
+决定，而该值在 fallback 路径上并不保证 32B 对齐。
+证据链：host tiling
+instance_norm_tiling_reduce_empty_arch35.cpp:83-86
+中
+perCorePerLoopElements = (perCoreAligned == 0) ? perCoreElements : perCoreAligned;
+，即当
+perCoreElements < ubBlockSize/elemSize
+（fp32 为 8 元素、fp16 为 16 元素）时回退为未对齐的
+perCoreElements
+（同文件
+:102
+的
+lastCorePerLoopElements
+同理，UT
+test_instance_norm_tiling.cpp:1119
+明确锁定该路径结果为 7、
+:1171
+为 8）。原实现始终从 offset 0 取数，32B 对齐天然成立；改后第二段的 UB 地址为
+perCorePerLoopElements_ * sizeof(T_MEAN)
+字节（如 7
+4=28B、8
+2=16B），并非 32B 对齐。
+失效模式：AscendC 的
+Duplicate
+（向量写 UB）与
+DataCopyPad
+（UB→GM 的 MTE3 搬运）都要求起始地址 32B 对齐；未对齐时表现为 address-not-aligned 类硬件/运行时错误，或搬出错位结果，使 variance 输出错值（mean 段不受影响）。触发条件是确定性的形状：R==0 且 N
+C 小于对齐粒度（fp32 下 N
+C=1..7，fp16 下 1..15，此时
+blockNum_=1
+必然走 fallback 分支）。
+建议
+：第二段起始偏移必须 32B 对齐：用 CeilAlign(perCorePerLoopElements_, BLOCK_SIZE/sizeof(T_MEAN)) 作为段步长，InitBuffer 按 2
+alignElems
+sizeof(T_MEAN) 申请，Duplicate 与 DataCopyPad 的第二段统一用 fillLocal[alignElems]（或由 tiling 保证 perLoop 元素数恒对齐）。
+Save
+Cancel
+Incorrect?
+System Message
+System
+13 hours ago
+Comments：
+13 hours ago
+Comments：
+changed this line on
+00be69b0
+view
+diff detail
+Save
+Cancel
+HelloWord-LuXin
+Collaborators
+13 hours ago
+Pre merge succeeded (commit_id: 15964fd25e7333f529ab65e5d05cf06c78a7243b)
+13 hours ago
+Pre merge succeeded (commit_id: 15964fd25e7333f529ab65e5d05cf06c78a7243b)
+HelloWord-LuXin
+Collaborators
+13 hours ago
+Force-pushed 1 commits:
+00be69b0
+-fix(instance_norm): 空归约兜底模板 mean 填充值 NaN 改 0，对齐 CUDA welford 与仓内空模板约定
+13 hours ago
+Force-pushed 1 commits:
+00be69b0
+-fix(instance_norm): 空归约兜底模板 mean 填充值 NaN 改 0，对齐 CUDA welford 与仓内空模板约定
+HelloWord-LuXin
+Collaborators
+13 hours ago
+Pre merge succeeded (commit_id: 2b432c9041d219424544caaa085933458e551628)
+13 hours ago
+Pre merge succeeded (commit_id: 2b432c9041d219424544caaa085933458e551628)
+HelloWord-LuXin
+Collaborators
+13 hours ago
+Comments：
+13 hours ago
+Comments：
+自检补充（self-review 发现并已修复两处问题，commit 已更新）
+：
+初版只改了 kernel 的填充值（单 buffer 分两段填 0/NaN），自检时对照 add_layer_norm 空 tiling（
+perLoopMax = ubSize_ / (OUTPUT_NUM * sizeof(float))
+）发现两处遗漏：
+UB 溢出（已修）
+：原 tiling 的
+perLoopMaxIndicesElements = ubSize/elemSize/BUFFER_NUM(=1)
+允许单循环元素数占满整个 UB；kernel 改双值填充后 buffer 需求翻倍，大 N
+C 场景（单核负载超过 perLoopMax）会 UB 溢出。实测对照：真机 UB=253952B，修复前 perCorePerLoopElements=63488 恰占满整 UB。修法与 add_layer_norm 同款：tiling 侧
+perLoopMaxIndicesElements
+除以 OUTPUT_NUM(=2)，并新增 UT 用例
+instance_norm_reduce_empty_fp32_large_nc_perloop_capped
+（N
+C=2000000，锁定 perCorePerLoopElements 封顶 30720=UB/2/4）。
+非对齐 offset 风险（已修）
+：单 buffer 分两段方案中，第二段起始偏移依赖 perCorePerLoopElements 32B 对齐；而既有 fallback 语义（N*C=1/7 时单拷非对齐，UT 已锁定）会破坏该假设。改为
+mean/variance 各占一个独立 buffer
+（BUFFER_NUM=2，各自起始对齐），不再依赖 offset 对齐，同时保留既有 fallback 行为不变（UT 6 个 reduce-empty 用例原样通过）。
+验证更新：UT 17/17（含新增约束用例）；kernel 模式实测 4 用例全 PASS——x=(2,4,0,3) 常规空进、x=(16384,512,0,2) 大 N
+C=8.4M（封顶路径，修复前该场景双 buffer 必溢出）、x=(1,3,0,2) 小 N
+C 非对齐 fallback、正常 shape 对照。
+Save
+Cancel
+CANN-robot
+Collaborators
+13 hours ago
+Removed label:
+cann-cla/yes
+13 hours ago
+Removed label:
+cann-cla/yes
+CANN-robot
+Collaborators
+13 hours ago
+Added label:
+cann-cla/yes
+13 hours ago
+Added label:
+cann-cla/yes
+Merger
+Not assigned
+Approver
+Not assigned
+Tester
+Not assigned
+Reviewer
+Not assigned
+Label
+cann-cla/yes
+Milestones
+No related milestones
+Kanban
+No related boards
+Link Issue
+No related Issues

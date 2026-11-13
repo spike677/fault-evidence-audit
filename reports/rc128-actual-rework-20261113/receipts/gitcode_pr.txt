@@ -1,0 +1,479 @@
+elewise极致头开销模板设置ctrl寄存器-opbase-AtomGit
+Star
+927
+Fork
+292
+Code
+Introduction
+Code
+Issues
+34
+Pull Requests
+134
+Pipeline
+Actions
+Discussion
+Wiki
+Members
+120
+Analysis
+Settings
+Star
+927
+Fork
+292
+Merged
+elewise极致头开销模板设置ctrl寄存器
+#279
+ligen75
+Add on
+Apr 7
+Merged from
+Deleted :
+master
+into
+cann/opbase：
+master
+elewise极致头开销模板设置ctrl寄存器
+#279
+Merged
+ligen75
+Add on
+Apr 7
+Merged from
+Deleted :
+master
+into
+cann/opbase
+master
+Merge checks
+Discussion
+0
+Commits
+0
+Checks
+0
+Files changed
+0
+Clone/Download
+0
+L
+ligen75
+Apr 7
+Apr 7
+描述
+极致头开销模板取消TPipe，导致TPipe的构造函数中设置ctrl寄存器操作缺失，从而造成精度问题。将设置ctrl寄存器操作恢复至极致头开销模板。
+关联的Issue
+测试
+执行极致头开销模板算子比如torch.relu，精度正确
+文档更新
+不涉及文档更新
+类型标签
+Bug修复
+新特性
+性能优化
+文档更新
+其他，请描述：
+Save
+Cancel
+Pull Request has been successfully merged by CANN-robot.
+（Thank you for ligen75's contribution.）
+L
+ligen75
+Apr 7
+Created pull request, commit
+57fe4c47
+Apr 7
+Created pull request, commit
+57fe4c47
+CANN-robot
+Collaborators
+Apr 7
+Comments：
+Apr 7
+Comments：
+Thanks for your pull-request.
+The full list of commands accepted by me can be found at
+here
+。
+You can get sig-info at
+here
+PR Approval Progress
+✅
+Congratulations! All modules have met the lgtm and approve requirements.
+Module Approval Details
+module
+lgtm status
+approve status
+pkg_inc
+✅
+wangyongguang
+,
+wangrui_
+,
+songkai111
+(3/2)
+✅
+wangyongguang
+(1/1)
+💡 Tip:
+Committer
+can comment
+/approve
+or
+/lgtm
+Commenting
+/approve
+implies both code review (lgtm) and intent to merge (approve)
+CLA Signature Pass
+ligen75, thanks for your pull request. All authors of the commits have signed the CLA. 👍
+Save
+Cancel
+CANN-robot
+Collaborators
+Apr 7
+Set zhou-qilong,wangrui_,rxtfeng,loov1,jia0liang,songkai111,llimwang,gubaocheng as approver
+Apr 7
+Set zhou-qilong,wangrui_,rxtfeng,loov1,jia0liang,songkai111,llimwang,gubaocheng as approver
+CANN-robot
+Collaborators
+Apr 7
+Added label:
+cann-cla/yes
+Apr 7
+Added label:
+cann-cla/yes
+CANN-robot
+Collaborators
+Apr 7
+Comments：
+Apr 7
+Comments：
+🔵 source code change are detected, tasks labels is removed in this pull request!
+Save
+Cancel
+CANN-robot
+Collaborators
+Apr 7
+Comments：
+Apr 7
+Comments：
+问题/功能描述
+本次PR修改旨在解决因硬件控制寄存器状态未初始化，可能导致向量计算单元工作异常或性能下降的问题。通过在
+ElementwiseSchWithScalar
+类的构造函数中增加对特定硬件控制位的初始化操作，确保后续的向量化元素级计算能在正确的硬件环境下执行。
+修改方案描述
+修改了
+ElementwiseSchWithScalar
+模板类的构造函数，在初始化成员变量前新增了三行代码。具体操作为：读取当前控制寄存器值，保留特定比特位（0x1000000000000），然后与新的控制位（0x1000000000000008）进行按位或操作，最后将结果写回寄存器。此修改通过原子操作（
+get_ctrl
+/
+set_ctrl
+）安全地配置了硬件功能，为后续计算提供了必要的硬件支持。
+Save
+Cancel
+L
+ligen75
+Apr 7
+Pre merge succeeded (commit_id: 2169fa40b411a681527146a11d4100f66cc0474c)
+Apr 7
+Pre merge succeeded (commit_id: 2169fa40b411a681527146a11d4100f66cc0474c)
+L
+ligen75
+Apr 7
+Force-pushed 1 commits:
+a764af87
+-elewise极致头开销模板设置ctrl寄存器
+Apr 7
+Force-pushed 1 commits:
+a764af87
+-elewise极致头开销模板设置ctrl寄存器
+L
+ligen75
+Apr 7
+Pre merge succeeded (commit_id: 2dfa933964e09c5e41bf1b537e8eb526d9fa3e87)
+Apr 7
+Pre merge succeeded (commit_id: 2dfa933964e09c5e41bf1b537e8eb526d9fa3e87)
+CANN-robot
+Collaborators
+Apr 7
+Comments：
+Apr 7
+Comments：
+🔵 source code change are detected, tasks labels is removed in this pull request!
+Save
+Cancel
+L
+ligen75
+Apr 7
+Pre merge succeeded (commit_id: b84b2b528911573a5805e7bff7f0c313c8517682)
+Apr 7
+Pre merge succeeded (commit_id: b84b2b528911573a5805e7bff7f0c313c8517682)
+L
+ligen75
+Apr 7
+Force-pushed 1 commits:
+75333096
+-elewise极致头开销模板设置ctrl寄存器
+Apr 7
+Force-pushed 1 commits:
+75333096
+-elewise极致头开销模板设置ctrl寄存器
+L
+ligen75
+Apr 7
+Pre merge succeeded (commit_id: 3bf114fec9edc562605bcaba58c54290ad8ca5c9)
+Apr 7
+Pre merge succeeded (commit_id: 3bf114fec9edc562605bcaba58c54290ad8ca5c9)
+CANN-robot
+Collaborators
+Apr 7
+Comments：
+Apr 7
+Comments：
+🔵 source code change are detected, tasks labels is removed in this pull request!
+Save
+Cancel
+L
+ligen75
+Apr 7
+Pre merge succeeded (commit_id: d40673579b8afdfa3a0f4006792f7a839372fe60)
+Apr 7
+Pre merge succeeded (commit_id: d40673579b8afdfa3a0f4006792f7a839372fe60)
+L
+ligen75
+Apr 7
+Force-pushed 1 commits:
+3d67b1d6
+-elewise极致头开销模板设置ctrl寄存器
+Apr 7
+Force-pushed 1 commits:
+3d67b1d6
+-elewise极致头开销模板设置ctrl寄存器
+L
+ligen75
+Apr 7
+Pre merge succeeded (commit_id: 300e0c71ba3afc484d49f7281ddc063f863fcde9)
+Apr 7
+Pre merge succeeded (commit_id: 300e0c71ba3afc484d49f7281ddc063f863fcde9)
+CANN-robot
+Collaborators
+Apr 7
+Comments：
+Apr 7
+Comments：
+🔵 source code change are detected, tasks labels is removed in this pull request!
+Save
+Cancel
+L
+ligen75
+Apr 8
+Comments：
+Apr 8
+Comments：
+compile
+Save
+Cancel
+CANN-robot
+Collaborators
+Apr 8
+Added label:
+ci-pipeline-running
+Apr 8
+Added label:
+ci-pipeline-running
+CANN-robot
+Collaborators
+Apr 8
+Comments：
+Apr 8
+Comments：
+流水线任务触发成功
+任务链接 [
+1128fcc5549e4a69b5047e6e7f0da8e8
+][
+流水线指导
+]
+任务名称
+状态
+日志
+下载链接
+codecheck
+✅ SUCCESS
+>>>>>
+SCA
+✅ SUCCESS
+>>>>>
+anti_virus
+✅ SUCCESS
+>>>>>
+Check_Pr
+✅ SUCCESS
+>>>>>
+Compile_Ascend_X86
+✅ SUCCESS
+>>>>>
+>>>>>
+Compile_Ascend_ARM
+✅ SUCCESS
+>>>>>
+>>>>>
+Compile_Ascend_X86_ubuntu24
+✅ SUCCESS
+>>>>>
+UT_Test
+✅ SUCCESS
+Compile_Ascend_ARM_ubuntu24
+✅ SUCCESS
+>>>>>
+pre_comment
+✅ SUCCESS
+>>>>>
+StaticCheck_codespell_check
+✅ SUCCESS
+StaticCheck_link_validity_check
+✅ SUCCESS
+StaticCheck_resource_existence_check
+✅ SUCCESS
+StaticCheck_tag_closed_check
+✅ SUCCESS
+StaticCheck_markdownlint
+✅ SUCCESS
+codecheck_style
+✅ SUCCESS
+API_Check
+⚠️ WARNING
+>>>>>
+[2026-04-08 09:19:20]    CI执行结束
+Save
+Cancel
+CANN-robot
+Collaborators
+Apr 8
+Added label:
+api-check-failed
+Apr 8
+Added label:
+api-check-failed
+CANN-robot
+Collaborators
+Apr 8
+Removed label:
+ci-pipeline-running
+Apr 8
+Removed label:
+ci-pipeline-running
+CANN-robot
+Collaborators
+Apr 8
+Added label:
+ci-pipeline-passed
+Apr 8
+Added label:
+ci-pipeline-passed
+L
+ligen75
+Apr 8
+Modify description of pull request
+Apr 8
+Modify description of pull request
+S
+songkai111
+Collaborators
+Apr 8
+Comments：
+Apr 8
+Comments：
+/lgtm
+/approve
+Save
+Cancel
+R
+RuiWang_
+Collaborators
+Apr 8
+Comments：
+Apr 8
+Comments：
+/lgtm
+/approve
+Save
+Cancel
+CANN-robot
+Collaborators
+Apr 8
+Added label:
+lgtm
+Apr 8
+Added label:
+lgtm
+W
+wangyongguang
+Collaborators
+Apr 8
+Comments：
+Apr 8
+Comments：
+/approve
+Save
+Cancel
+CANN-robot
+Collaborators
+Apr 8
+Added label:
+approved
+Apr 8
+Added label:
+approved
+CANN-robot
+Collaborators
+Apr 8
+Comments：
+Apr 8
+Comments：
+Review Guide
+This pull-request
+passes review
+.
+Committers who wrote a comment of
+/approve
+are:
+wangyongguang
+.
+Reviewers who wrote a comment of
+/lgtm
+are:
+wangyongguang
+,
+songkai111
+,
+wangrui_
+.
+Save
+Cancel
+CANN-robot
+Collaborators
+Apr 8
+Merged pull request
+Apr 8
+Merged pull request
+Merger
+Not assigned
+Approver
+Not assigned
+Tester
+Not assigned
+Reviewer
+Not assigned
+Label
+cann-cla/yes
+api-check-failed
+ci-pipeline-passed
+lgtm
+approved
+Milestones
+No related milestones
+Kanban
+No related boards
+Link Issue
+No related Issues

@@ -1,0 +1,39 @@
+From a759e5c78969652203175a93fb1d2443bc882689 Mon Sep 17 00:00:00 2001
+From: libaokui <libaokui@huawei.com>
+Date: Mon, 22 Dec 2025 11:05:30 +0800
+Subject: [PATCH] =?UTF-8?q?=E3=80=90fix=20bug=E3=80=91=20fix=20bug=20for?=
+ =?UTF-8?q?=20bias=20of=20MindSpeedTELayerNormColumnParallelLinear?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Signed-off-by: libaokui <libaokui@huawei.com>
+---
+ .../te/pytorch/module/layernorm_column_parallel_linear.py     | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/mindspeed/te/pytorch/module/layernorm_column_parallel_linear.py b/mindspeed/te/pytorch/module/layernorm_column_parallel_linear.py
+index 7228c85a8c..0ff298a9fd 100644
+--- a/mindspeed/te/pytorch/module/layernorm_column_parallel_linear.py
++++ b/mindspeed/te/pytorch/module/layernorm_column_parallel_linear.py
+@@ -250,7 +250,7 @@ class MindSpeedTELayerNormColumnParallelLinear(torch.nn.Module):
+             else:
+                 norm_output = self._rmsnorm(inp)
+ 
+-        bias = self.bias if self.te_return_bias else None
++        bias = self.bias if not self.skip_bias_add else None
+ 
+         if (
+             self.allreduce_dgrad
+@@ -294,6 +294,8 @@ class MindSpeedTELayerNormColumnParallelLinear(torch.nn.Module):
+                     else None
+                 )
+             )
++
++        bias = self.bias if self.te_return_bias else None
+         return output_parallel, bias
+ 
+     def sharded_state_dict(self, prefix='', sharded_offsets=(), metadata=None):
+-- 
+GitCode
+

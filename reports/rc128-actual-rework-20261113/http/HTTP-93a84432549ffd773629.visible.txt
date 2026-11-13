@@ -1,0 +1,109 @@
+[Bug] KvRmsNormRopeCache InferShape缺少rank前置校验及动态尾维推导错误-ops-transformer-AtomGit
+Star
+1681
+Fork
+3393
+Code
+Introduction
+Code
+Issues
+430
+Pull Requests
+726
+Pipeline
+Actions
+Discussion
+Wiki
+Members
+620
+Analysis
+Settings
+Star
+1681
+Fork
+3393
+Open
+[Bug] KvRmsNormRopeCache InferShape缺少rank前置校验及动态尾维推导错误
+#7482
+pipiman
+Add on
+13 hours ago
+P
+pipiman
+13 hours ago
+Create
+13 hours ago
+Create
+问题与关联PR
+修复PR：
+https://gitcode.com/cann/ops-transformer/pull/15749
+责任田工作项：kv_rms_norm_rope_cache/K03。
+本issue跟踪InferShape的rank依赖访问与未知维传播问题，不把同根因的两份看板记录计作两个独立缺陷。
+基线复现（源码推导）
+文件：posembedding/kv_rms_norm_rope_cache/op_host/kv_rms_norm_rope_cache_infershape.cpp。
+基线：8011a1cd18390e9bad9567cdb6f51d1c38f40b0a。
+gamma为已知rank0标量shape {}，其余kv/cos/cache为合法4D。旧代码在校验前读取GetDim(gammaDimSize-1)，即GetDim(-1)。当前gert::Shape有下标保护，返回INT64_MIN而非已证实内存越界；旧代码仍可能进入V1并将该哨兵写成c_kv尾维，返回成功。
+gamma=[-1]或未知rank[-2]时，模式尚无法确定，旧实现仍可能提前选择V1，错误确定输出尾维或保留kv总尾维。
+共享V2 InferShape单元场景：kv=[-2]、gamma=[192]、ckv_cache=[64,288,1,128]。旧逻辑使用kvDimSize-1=0索引ckv_cache，得到batch维64；c_kv尾维应读取cache第3维128。此例不代表950支持V2或证明整组跨输入关系合法。
+预期行为
+相关GetDim前，确认已知rank符合输入契约：kv/cos/k_cache/ckv_cache为4D，gamma为1D；未知rank保留安全推导路径。
+未知gamma长度不能据此选定V1/V2，两输出尾维保守传播未知。
+cache尾维从cache自身约定位置读取，不用另一个输入的rank作为索引依据。
+非法已知rank明确返回失败，不能把INT64_MIN作为正常输出维度继续传播。
+PR覆盖范围与验收边界
+对应看板005、008（infershape-2两种历史sourceId写法）的同根因维度访问／推导问题。
+看板004、007（infershape-1）还包含更广的跨输入shape关系；本PR仅覆盖rank及推导前提，仍为部分覆盖，不能整体关闭K03。
+不覆盖K02 dtype校验，不修改tiling、Kernel数学算法或精度标准。
+已有验证回执记录：定向旧／新对照15/33→33/33，全量Host UT 84/84；A5 TTK 17/20，3项精度失败在基线包对照中复现。不能写成20/20全通过。
+上述验证回执绑定2f676eb0524c930680267390835ea442118e5771。PR当前head如有变化，应核对树／工件身份后再认定验证覆盖，不能直接移记结果。PR合入与看板回填应另行确认。
+没有端到端证据证明上述GetDim(-1)必然导致进程崩溃；问题口径为非法维度访问及错误shape推导。
+Save
+Cancel
+周云飞
+Collaborators
+13 hours ago
+Comments：
+13 hours ago
+Comments：
+报告指出的主要风险是：已知非法 rank 可能导致错误的维度读取；gamma 长度未知时提前选择模式，也可能推导出错误的输出尾维。目前这些现象来自基线源码推导，尚不能据此认定会发生进程崩溃。
+处理方向是在读取维度前校验已知 rank；gamma 长度未知时保守传播未知尾维；读取 cache 尾维时使用 cache 自身的维度位置。关联的
+PR
+及其合入状态仍需确认。
+按报告中的范围，K03 的跨输入 shape 关系尚未完整覆盖，不宜据此整体关闭。报告中的验证回执绑定特定提交，PR head 变化后需先核对工件身份；其中 A5 TTK 为 17/20，不能视为全部通过。
+Save
+Cancel
+P
+pipiman
+54 minutes ago
+Associated pull request
+54 minutes ago
+Associated pull request
+周云飞
+Collaborators
+52 minutes ago
+Comments：
+52 minutes ago
+Comments：
+/assign
+@gcw_QAn8CO53
+Save
+Cancel
+CANN-robot
+Collaborators
+52 minutes ago
+Assign gcw_QAn8CO53 as responsible person
+52 minutes ago
+Assign gcw_QAn8CO53 as responsible person
+Assignees
+P
+pipiman
+Label
+Label not set yet
+Kanban
+No board linked yet
+Milestones
+No related milestones
+Link PR
+No related PR
+Branch
+No branches linked yet

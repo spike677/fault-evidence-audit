@@ -1,0 +1,661 @@
+fix(dataloader): BaseRandomBatchSampler 采样忽略 seed 导致不同 seed 产生相同顺序-MindSpeed-MM-AtomGit
+Star
+192
+Fork
+432
+Code
+Introduction
+Code
+Issues
+107
+Pull Requests
+175
+Pipeline
+Actions
+Discussion
+Wiki
+Members
+118
+Analysis
+Settings
+Star
+192
+Fork
+432
+Closed
+fix(dataloader): BaseRandomBatchSampler 采样忽略 seed 导致不同 seed 产生相同顺序
+#3136
+不喜欢雨天ༀ
+Add on
+Sep 13
+Closed at
+Sep 22
+Merged from
+2403_87936996/MindSpeed-MM：
+fix/sampler-seed
+into
+Ascend/MindSpeed-MM：
+master
+fix(dataloader): BaseRandomBatchSampler 采样忽略 seed 导致不同 seed 产生相同顺序
+#3136
+Closed
+不喜欢雨天ༀ
+Add on
+Sep 13
+Closed at
+Sep 22
+Merged from
+2403_87936996/MindSpeed-MM
+fix/sampler-seed
+into
+Ascend/MindSpeed-MM
+master
+Merge checks
+Discussion
+0
+Commits
+0
+Checks
+0
+Files changed
+0
+Clone/Download
+0
+不喜欢雨天ༀ
+Sep 13
+Sep 13
+关联 Issue
+修复 #686
+问题
+FSDP2 训练使用
+BaseRandomBatchSampler
+且
+shuffle=True
+时，
+training.seed
+已正确传入 sampler（trainer.py 中
+seed=args.training.seed
+），但 sampler 内部
+g.manual_seed(self.epoch)
+只用 epoch 初始化，完全忽略
+self.seed
+，导致不同 seed 产生完全相同的采样顺序（
+data_sharding
+两种路径均如此）。
+修复
+两处
+g.manual_seed(self.epoch)
+改为
+g.manual_seed(self.seed + self.epoch)
+，与本文件既有约定一致（
+VariableVideoBatchSampler
+:729、
+AESampler
+:939/
+get_bucket
+:835、
+LuminaMetaLenDistSampler
+:1022 均用
+self.seed + self.epoch
+）。
+同一缺陷也存在于非 FSDP 版的
+BaseRandomBatchSampler.__iter__
+（sampler.py :455/:466）及其子类
+BucketBatchSampler
+（:644/:655）——同一文件、同样的手写 generator 模式，一并对齐修复，避免同类 issue 重复上报。
+验证
+运行 issue 最小复现脚本，修复前两条路径
+same_order=True
+，修复后
+same_order=False
+；
+epoch
+递增仍会改变顺序（保留原 epoch 相关性）。
+兼容性
+种子语义从“仅 epoch”变为“seed+epoch”，顺序本身会变化（这正是 issue 期望的行为）；state_dict 格式不变。
+Save
+Cancel
+The current Pull Request has been closed by 不喜欢雨天ༀ.
+不喜欢雨天ༀ
+Sep 13
+Created pull request, commit
+3933709e
+Sep 13
+Created pull request, commit
+3933709e
+不喜欢雨天ༀ
+Sep 13
+Associated issue: [Bug]: FSDP2 BaseRandomBatchSampler 忽略训练 seed，导致不同 seed 的样本顺序相同
+Sep 13
+Associated issue: [Bug]: FSDP2 BaseRandomBatchSampler 忽略训练 seed，导致不同 seed 的样本顺序相同
+ascend-robot
+Collaborators
+Sep 13
+Comments：
+Sep 13
+Comments：
+openLiBing可接管PR, PR详情链接:
+https://www.openlibing.com/apps/transitionPrDetail?owner=Ascend&repo=MindSpeed-MM&number=3136&platform=gitcode&codeHostingPlatformFlag=gitcode
+Save
+Cancel
+atomgit-bot
+Sep 13
+Comments：
+Sep 13
+Comments：
+变更摘要
+本 PR 修复
+BaseRandomBatchSampler
+采样时忽略
+seed
+、导致不同 seed 产生完全相同采样顺序的问题（关联 issue #686）。问题根源在于 sampler 内部
+g.manual_seed(self.epoch)
+仅用 epoch 初始化随机生成器，完全忽略已传入的
+self.seed
+。修复方式是将两处文件中的
+g.manual_seed(self.epoch)
+统一改为
+g.manual_seed(self.seed + self.epoch)
+，与本文件既有约定（
+VariableVideoBatchSampler
+、
+AESampler
+、
+LuminaMetaLenDistSampler
+均使用
+self.seed + self.epoch
+）保持一致，同时保留 epoch 递增仍会改变采样顺序的原相关性；种子语义从「仅 epoch」变为「seed + epoch」，采样顺序本身会随之变化，
+state_dict
+格式不变。
+主要改动
+FSDP 版
+BaseRandomBatchSampler
+修复
+：在
+mindspeed_mm/fsdp/data/dataloader/sampler.py
+的
+__iter__
+中，
+data_sharding
+两条路径的
+g.manual_seed(self.epoch)
+均改为
+g.manual_seed(self.seed + self.epoch)
+（:71/:82），使不同 seed 产生不同采样顺序。
+非 FSDP 版
+BaseRandomBatchSampler.__iter__
+修复
+：在
+mindspeed_mm/data/dataloader/sampler.py
+中，bucket 与 full-bucket 两条 shuffle 路径的
+g.manual_seed(self.epoch)
+均改为
+g.manual_seed(self.seed + self.epoch)
+（:452/:463），修复同类缺陷避免重复上报。
+BucketBatchSampler
+同步修复
+：其子类
+BucketBatchSampler
+中同样两处手写 generator 模式（:641/:652）一并改为
+g.manual_seed(self.seed + self.epoch)
+，保证同一文件内行为一致。
+Save
+Cancel
+Incorrect?
+atomgit-bot
+Sep 13
+Comments：
+Sep 13
+Comments：
+代码审查
+✅ 未发现问题
+Save
+Cancel
+Incorrect?
+ascend-robot
+Collaborators
+Sep 13
+Added label:
+ascend-cla/no
+Sep 13
+Added label:
+ascend-cla/no
+ascend-robot
+Collaborators
+Sep 13
+Comments：
+Sep 13
+Comments：
+Thanks for your pull-request.
+The full list of commands accepted by me can be found at
+here
+.
+You can get sig-info at
+here
+.
+You can self-configure the PR merge rules for this repository. For more details, please refer to
+Here
+.
+PR Approval Progress
+⚠️ This PR does not yet meet the following requirements:lgtm (requires ≥ 2 person(s) per module)、approve (requires ≥ 1 person(s) per module)
+Module Approval Details
+module
+lgtm status
+approve status
+repo-Ascend/MindSpeed-MM
+❌ (0/2)(You can also ask:
+feng0w0
+,
+peng-hengduo
+,
+楚浩田
+,
+chenpeizhe
+,
+刘启元
+)
+❌ (0/1)(You can also ask:
+王海涛
+,
+朱彦儒
+,
+cxiaolong
+,
+bigdog1206
+,
+陈志国
+)
+💡 Tip:
+Committer
+can comment
+/approve
+or
+/lgtm
+Commenting
+/approve
+implies both code review (lgtm) and intent to merge (approve)
+CLA Signature Guide
+@2403_87936996 , thanks for your pull request.
+The following commit(s) have not signed
+Contributor License Agreement (CLA)
+.
+Commit
+Reason
+823e3be3  fix(dataloader): honor seed in B...
+the email is not signed for CLA! please check if it is correct and the same as your signed email.
+If you need to sign CLA,
+you can click here to sign the CLA
+.
+If you need to check if the email is set up correctly,
+you can click here to do it in the
+FAQs
+.
+After signing the CLA or updating the email, you must comment
+/check-cla
+to check the CLA status again.
+Save
+Cancel
+不喜欢雨天ༀ
+Sep 13
+Comments：
+Sep 13
+Comments：
+compile
+Save
+Cancel
+不喜欢雨天ༀ
+Sep 13
+Pre merge succeeded (commit_id: df4fdb84ce31820240c87061b73ccd3e21bd30ed)
+Sep 13
+Pre merge succeeded (commit_id: df4fdb84ce31820240c87061b73ccd3e21bd30ed)
+ascend-robot
+Collaborators
+Sep 13
+Added label:
+ci-pipeline-running
+Sep 13
+Added label:
+ci-pipeline-running
+ascend-robot
+Collaborators
+Sep 13
+Comments：
+Sep 13
+Comments：
+ascend docs pipeline is running...
+Save
+Cancel
+ascend-robot
+Collaborators
+Sep 13
+Added label:
+docs-ci-pipeline-running
+Sep 13
+Added label:
+docs-ci-pipeline-running
+ascend-robot
+Collaborators
+Sep 13
+Comments：
+Sep 13
+Comments：
+ascend docs pipeline is running...
+Save
+Cancel
+ascend-robot
+Collaborators
+Sep 13
+Comments：
+Sep 13
+Comments：
+✅ 跳过 docs ci 检查，没有需要检查的文档文件
+Save
+Cancel
+ascend-robot
+Collaborators
+Sep 13
+Removed label:
+docs-ci-pipeline-running
+Sep 13
+Removed label:
+docs-ci-pipeline-running
+ascend-robot
+Collaborators
+Sep 13
+Added label:
+docs-ci-pipeline-success
+Sep 13
+Added label:
+docs-ci-pipeline-success
+ascend-robot
+Collaborators
+Sep 13
+Comments：
+Sep 13
+Comments：
+✅ 跳过 docs ci 检查，没有需要检查的文档文件
+Save
+Cancel
+ascend-robot
+Collaborators
+Sep 13
+Removed label:
+ci-pipeline-running
+Sep 13
+Removed label:
+ci-pipeline-running
+ascend-robot
+Collaborators
+Sep 13
+Added label:
+ci-pipeline-failed
+Sep 13
+Added label:
+ci-pipeline-failed
+ascend-robot
+Collaborators
+Sep 13
+Comments：
+Sep 13
+Comments：
+流水线
+PR-pipeline_MindSpeed-MM#4819
+[ commitID：823e3be3 ] 运行失败
+>>>
+代码风格自动修复执行成功（无修复内容）
+阶段
+任务名
+状态
+详情
+编译构建
+Build
+✅ COMPLETED
+>>>
+恶意代码检查
+Antipoison
+✅ COMPLETED
+>>>
+编码安全与规范检查
+Only_doc_commit
+✅ COMPLETED
+>>>
+codeCheck_pre-commit
+✅ COMPLETED
+>>>
+pre-commit
+✅ COMPLETED
+>>>
+Compatibility_Interface
+✅ COMPLETED
+>>>
+开源片段检查
+SCA
+✅ COMPLETED
+>>>
+开发者测试
+UT
+⚪ IGNORED
+>>>
+ST
+⚪ IGNORED
+>>>
+UT-pool
+✅ COMPLETED
+>>>
+ST_pool
+❌ FAILED
+>>>
+流水线
+PR-pipeline_MindSpeed-MM
+❌ FAILED
+>>>
+此流水线已支持下列评论快捷指令，仅PR创建者和白名单成员[wujinyuan1, htwang, hhhzhuyizhi, cxiaolong, bigdog1206, ghoshaw, yaoyaoxu]评论有效
+compile
+:
+运行流水线
+retry
+:
+重试流水线所有失败子任务
+retry <任务名>
+:
+仅重试指定失败子任务
+stop
+:
+停止流水线
+Save
+Cancel
+不喜欢雨天ༀ
+Sep 13
+Comments：
+Sep 13
+Comments：
+compile
+Save
+Cancel
+ascend-robot
+Collaborators
+Sep 13
+Removed label:
+ci-pipeline-failed
+Sep 13
+Removed label:
+ci-pipeline-failed
+ascend-robot
+Collaborators
+Sep 13
+Added label:
+ci-pipeline-running
+Sep 13
+Added label:
+ci-pipeline-running
+ascend-robot
+Collaborators
+Sep 13
+Comments：
+Sep 13
+Comments：
+ascend docs pipeline is running...
+Save
+Cancel
+ascend-robot
+Collaborators
+Sep 13
+Removed label:
+docs-ci-pipeline-success
+Sep 13
+Removed label:
+docs-ci-pipeline-success
+ascend-robot
+Collaborators
+Sep 13
+Added label:
+docs-ci-pipeline-running
+Sep 13
+Added label:
+docs-ci-pipeline-running
+ascend-robot
+Collaborators
+Sep 13
+Comments：
+Sep 13
+Comments：
+✅ 跳过 docs ci 检查，没有需要检查的文档文件
+Save
+Cancel
+ascend-robot
+Collaborators
+Sep 13
+Removed label:
+docs-ci-pipeline-running
+Sep 13
+Removed label:
+docs-ci-pipeline-running
+ascend-robot
+Collaborators
+Sep 13
+Added label:
+docs-ci-pipeline-success
+Sep 13
+Added label:
+docs-ci-pipeline-success
+ascend-robot
+Collaborators
+Sep 13
+Removed label:
+ci-pipeline-running
+Sep 13
+Removed label:
+ci-pipeline-running
+ascend-robot
+Collaborators
+Sep 13
+Added label:
+ci-pipeline-failed
+Sep 13
+Added label:
+ci-pipeline-failed
+ascend-robot
+Collaborators
+Sep 13
+Comments：
+Sep 13
+Comments：
+流水线
+PR-pipeline_MindSpeed-MM#4822
+[ commitID：823e3be3 ] 运行失败
+>>>
+代码风格自动修复执行成功（无修复内容）
+阶段
+任务名
+状态
+详情
+编译构建
+Build
+✅ COMPLETED
+>>>
+恶意代码检查
+Antipoison
+✅ COMPLETED
+>>>
+编码安全与规范检查
+Only_doc_commit
+✅ COMPLETED
+>>>
+codeCheck_pre-commit
+✅ COMPLETED
+>>>
+pre-commit
+✅ COMPLETED
+>>>
+Compatibility_Interface
+✅ COMPLETED
+>>>
+开源片段检查
+SCA
+✅ COMPLETED
+>>>
+开发者测试
+UT
+⚪ IGNORED
+>>>
+ST
+⚪ IGNORED
+>>>
+UT-pool
+✅ COMPLETED
+>>>
+ST_pool
+❌ FAILED
+>>>
+流水线
+PR-pipeline_MindSpeed-MM
+❌ FAILED
+>>>
+此流水线已支持下列评论快捷指令，仅PR创建者和白名单成员[wujinyuan1, htwang, hhhzhuyizhi, cxiaolong, bigdog1206, ghoshaw, yaoyaoxu]评论有效
+compile
+:
+运行流水线
+retry
+:
+重试流水线所有失败子任务
+retry <任务名>
+:
+仅重试指定失败子任务
+stop
+:
+停止流水线
+Save
+Cancel
+不喜欢雨天ༀ
+Sep 13
+Comments：
+Sep 13
+Comments：
+ST 失败原因分析（@maintainer 请确认）：该用例（tests/st/run_configs/finetune_qwen3_5_35B）
+sampler_type: BaseRandomBatchSampler
++ 可变长 llava 多模态数据——本 MR 修复了 sampler 忽略 training.seed 的问题，shuffle 顺序随之改变，每步 batch 组成不同导致 step 耗时与基线对不齐（基线是按带 bug 的旧顺序录的）。交叉验证：!3138（lora 修复，不碰数据路径）同流水线 ST_pool 全绿。属预期内连锁变化而非性能回退，建议确认后更新 finetune_qwen3_5_35B 基线耗时。
+Save
+Cancel
+不喜欢雨天ༀ
+Sep 22
+Close pull request
+Sep 22
+Close pull request
+Merger
+Not assigned
+Approver
+Not assigned
+Tester
+Not assigned
+Reviewer
+Not assigned
+Label
+ascend-cla/no
+docs-ci-pipeline-success
+ci-pipeline-failed
+Milestones
+No related milestones
+Kanban
+No related boards
+Link Issue
+No related Issues

@@ -1,0 +1,321 @@
+[L2] fix: get_device_properties() 里 Ascend950 的 elif 写了三遍，后两个分支永不执行-ascend-transformer-boost-AtomGit
+Star
+617
+Fork
+182
+Code
+Introduction
+Code
+Issues
+73
+Pull Requests
+53
+Pipeline
+Actions
+Discussion
+Wiki
+Members
+108
+Analysis
+Settings
+Star
+617
+Fork
+182
+Merged
+[L2] fix: get_device_properties() 里 Ascend950 的 elif 写了三遍，后两个分支永不执行
+#2312
+eieiei
+Add on
+Oct 7
+Merged from
+wsnidie1/ascend-transformer-boost：
+drop-duplicated-ascend950-branches
+into
+cann/ascend-transformer-boost：
+master
+[L2] fix: get_device_properties() 里 Ascend950 的 elif 写了三遍，后两个分支永不执行
+#2312
+Merged
+eieiei
+Add on
+Oct 7
+Merged from
+wsnidie1/ascend-transformer-boost
+drop-duplicated-ascend950-branches
+into
+cann/ascend-transformer-boost
+master
+Merge checks
+Discussion
+0
+Commits
+0
+Checks
+0
+Files changed
+0
+Clone/Download
+0
+eieiei
+Oct 7
+Oct 7
+问题
+tests/framework/python/CsvOpsTestTool/atb_csv_ops_test.py
+的
+get_device_properties()
+用一条 if/elif 链把
+torch.npu.get_device_name()
+映射到
+soc_version
+。同一个条件
+re.search("Ascend950", device_name, re.I)
+在这条链里出现了
+3 次
+（L1041、L1045、L1053），三处分支体都只有
+soc_version = "Ascend950"
+：
+elif
+re.search(
+"Ascend910_93"
+, device_name, re.I):
+# L1038
+...
+elif
+re.search(
+"Ascend950"
+, device_name, re.I):
+# L1041  真正生效
+soc_version =
+"Ascend950"
+elif
+re.search(
+"Ascend310P"
+, device_name, re.I):
+# L1043
+soc_version =
+"Ascend310P"
+elif
+re.search(
+"Ascend950"
+, device_name, re.I):
+# L1045  ← 永不执行
+soc_version =
+"Ascend950"
+...
+elif
+re.search(
+"Ascend310B"
+, device_name, re.I):
+# L1051
+soc_version =
+"Ascend310B"
+elif
+re.search(
+"Ascend950"
+, device_name, re.I):
+# L1053  ← 永不执行
+soc_version =
+"Ascend950"
+elif 自上而下取第一个成立分支，
+device_name
+在 L1035 赋值后到该链结束前没有任何重新绑定，
+re.search
+是确定性的，所以 L1045、L1053 两处条件命中时必然已经在 L1041 被取走 —— 是彻底不可达的死分支。风险在于：后来的人给 Ascend950 加处理逻辑时，很容易改到 L1045/L1053 那两份上而完全无效。
+判据：可运行的分支选择模拟（不依赖 torch/NPU）
+用 AST 取出这条链的 8 个条件（按源码顺序），然后对一批设备名分别模拟"原样"与"删掉两个死分支"两种情况下的分支选择：
+'Ascend950PR_958b'  改前 -> L1041 (soc_version='Ascend950')   改后 -> L1041   一致
+'Ascend950'         改前 -> L1041                              改后 -> L1041   一致
+'ascend950dt_9999'  改前 -> L1041                              改后 -> L1041   一致
+'Ascend910B284'     改前 -> L1036 (soc_version='Ascend910B')   改后 -> L1036   一致
+'Ascend910_9380E'   改前 -> L1038 (allow_internal_format=True)  改后 -> L1038   一致
+'Ascend310P3'       改前 -> L1043                              改后 -> L1043   一致
+'Ascend910ProB'     改前 -> L1047 (soc_version='Ascend910A')   改后 -> L1047   一致
+'Ascend310B'        改前 -> L1051                              改后 -> L1051   一致
+'Huawei Ascend910'  改前 -> else (quit(1) 未支持)               改后 -> else    一致
+...
+14 个设备名，删除死分支后分支选择不一致数 = 0
+并且三个重复分支的分支体逐字相同（
+ast.unparse
+比对结果为单一值），所以删除它们不会丢掉任何"本来想做但写错位置"的处理逻辑 —— 这也是我敢直接删而不是改成别的条件的原因。
+修改
+删掉 L1045-1046、L1053-1054 这两个死分支（各 2 行），保留 L1041 那个生效的；其余分支、顺序、
+else: quit(1)
+一律不动：
+elif re.search("Ascend310P", device_name, re.I):
+         soc_version = "Ascend310P"
+-    elif re.search("Ascend950", device_name, re.I):
+-        soc_version = "Ascend950"
+elif (re.search("Ascend910ProB", device_name, re.I) or re.search("Ascend910B", device_name, re.I) or
+...
+     elif re.search("Ascend310B", device_name, re.I):
+         soc_version = "Ascend310B"
+-    elif re.search("Ascend950", device_name, re.I):
+-        soc_version = "Ascend950"
+else:
+改完
+ast.parse
+通过，文件 1120 -> 1116 行；
+re.search("Ascend950"...)
+在该函数内出现次数 3 -> 1。
+fixes #450
+Save
+Cancel
+Pull Request has been successfully merged by CANN-robot.
+（Thank you for eieiei's contribution.）
+eieiei
+Oct 7
+Created pull request, commit
+223d09df
+Oct 7
+Created pull request, commit
+223d09df
+atomgit-bot
+Oct 7
+Comments：
+Oct 7
+Comments：
+变更摘要
+本 PR 修复
+tests/framework/python/CsvOpsTestTool/atb_csv_ops_test.py
+中
+get_device_properties()
+的
+if/elif
+设备名映射链里重复出现的
+Ascend950
+分支。原链中
+re.search("Ascend950", device_name, re.I)
+条件出现三次且分支体均为
+soc_version = "Ascend950"
+，由于
+elif
+自上而下取首个成立分支且条件确定，后两处永远不可达。本次改动仅删除这两处死分支，保留最先命中的那一处，分支顺序、其余条件以及
+else
+中的未支持处理均不变，因此不影响任何设备名到
+soc_version
+的映射结果。
+主要改动
+删除
+Ascend310P
+分支之后的重复
+Ascend950
+分支
+: 移除紧跟
+elif re.search("Ascend310P", device_name, re.I)
+之后的
+elif re.search("Ascend950", device_name, re.I): soc_version = "Ascend950"
+两行，该分支在链中永不执行。
+删除
+Ascend310B
+分支之后的重复
+Ascend950
+分支
+: 移除位于
+elif re.search("Ascend310B", device_name, re.I)
+与
+else
+之间的同一组
+Ascend950
+判断与赋值两行，该分支同样不可达。
+收敛
+Ascend950
+判断为单处生效分支
+: 删除后该函数内
+Ascend950
+的判断只保留最先命中的那一处，避免后续为
+Ascend950
+增加处理逻辑时误改到已被移除的无效分支。
+Save
+Cancel
+Incorrect?
+atomgit-bot
+Oct 7
+Comments：
+Oct 7
+Comments：
+代码审查
+✅ 未发现问题
+Save
+Cancel
+Incorrect?
+eieiei
+Oct 7
+Comments：
+Oct 7
+Comments：
+/compile
+Save
+Cancel
+eieiei
+Oct 7
+Pre merge succeeded (commit_id: 68f05638854f5772d56c94bf60c56627964a8af1)
+Oct 7
+Pre merge succeeded (commit_id: 68f05638854f5772d56c94bf60c56627964a8af1)
+109 messages are collapsed here。
+See more
+CANN-robot
+Collaborators
+16 days ago
+Added label:
+ci-pipeline-passed
+16 days ago
+Added label:
+ci-pipeline-passed
+Z
+zhuzhiming
+Collaborators
+13 days ago
+Comments：
+13 days ago
+Comments：
+/lgtm
+Save
+Cancel
+CANN-robot
+Collaborators
+13 days ago
+Added label:
+lgtm
+13 days ago
+Added label:
+lgtm
+CANN-robot
+Collaborators
+13 days ago
+Merged pull request
+13 days ago
+Merged pull request
+CANN-robot
+Collaborators
+13 days ago
+Comments：
+13 days ago
+Comments：
+Pull Request 已合并或已关闭。
+If you want to solve this problem,
+you can click here to do it in the
+FAQs
+.
+Save
+Cancel
+Merger
+Not assigned
+Approver
+Not assigned
+Tester
+Not assigned
+Reviewer
+Not assigned
+Label
+cann-cla/yes
+approved
+SC-SUCC
+ci-pipeline-passed
+lgtm
+Milestones
+No related milestones
+Kanban
+No related boards
+Link Issue
+No related Issues

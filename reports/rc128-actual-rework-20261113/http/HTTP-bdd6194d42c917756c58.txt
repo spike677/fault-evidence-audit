@@ -1,0 +1,251 @@
+/**
+ * Copyright (c) 2025 Huawei Technologies Co., Ltd.
+ * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
+ * CANN Open Software License Agreement Version 2.0 (the "License").
+ * Please refer to the License for details. You may not use this file except in compliance with the License.
+ * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
+ * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE.
+ * See LICENSE in the root of the software repository for the full text of the License.
+ */
+
+#include "register/op_impl_registry.h"
+#include "log/log.h"
+#include "op_common/op_host/util/shape_util.h"
+
+#include <string>
+#include <vector>
+
+using namespace ge;
+namespace ops {
+constexpr size_t INDEX_CONCAT_DIM_FOR_CONCAT_V2 = 1;
+constexpr size_t INPUT_IDX_FOR_CONCAT_V2 = 0;
+constexpr int64_t UNKNOWN_DIM_FOR_CONCAT_V2 = -1;
+
+static void ReportInferShapeExecutionError(const char* opName, const char* reason)
+{
+    const std::string opNameStr(opName == nullptr ? "" : opName);
+    const std::string reasonStr(reason == nullptr ? "" : reason);
+    const std::string msg = "Failed to execute operator " + opNameStr + ". Reason: " + reasonStr + ".";
+    const std::vector<const char*> msgKey = {"opName", "reason"};
+    const std::vector<const char*> msgValue = {opNameStr.c_str(), reasonStr.c_str()};
+    OP_LOGE_WITHOUT_REPORT(opNameStr.c_str(), "%s", msg.c_str());
+    REPORT_PREDEFINED_ERR_MSG("EZ1014", msgKey, msgValue);
+}
+
+template <typename T>
+static inline bool GetAxisValue(gert::InferShapeContext* context, int64_t dimIdx, int64_t& axisValue)
+{
+    // 注意: 此处必须按 IR anchor 索引取 tensor(GetRequiredInputTensor), 不能用扁平索引(GetInputTensor),
+    // 因为 x 为动态输入, concat_dim 的扁平位置随实例数变化
+    auto tensor = context->GetRequiredInputTensor(dimIdx);
+    if (tensor == nullptr) {
+        return false;
+    }
+    auto ptr = tensor->GetData<T>();
+    if (ptr == nullptr) {
+        // 编译期轴值不可得(Data-feed): 由调用方兜底, 不在此处报错
+        return false;
+    }
+    axisValue = static_cast<int64_t>(ptr[0]);
+    return true;
+}
+
+// 对等 V1 ConcatV2Verify/ConcatInputsVerify/CheckInputDtypeSame: 动态输入 x 的 dtype 必须一致
+static bool CheckInputsDtypeSame(gert::InferShapeContext* context, int64_t numInputs)
+{
+    auto firstDesc = context->GetDynamicInputDesc(INPUT_IDX_FOR_CONCAT_V2, 0);
+    if (firstDesc == nullptr) {
+        return true;
+    }
+    const DataType firstDtype = firstDesc->GetDataType();
+    for (int64_t i = 1; i < numInputs; ++i) {
+        auto desc = context->GetDynamicInputDesc(INPUT_IDX_FOR_CONCAT_V2, static_cast<size_t>(i));
+        if (desc == nullptr) {
+            continue;
+        }
+        if (desc->GetDataType() != firstDtype) {
+            OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
+                context->GetNodeName(), "x", Ops::Base::ToString(desc->GetDataType()).c_str(),
+                ("all input tensors must have the same dtype, but the first input dtype is " +
+                 Ops::Base::ToString(firstDtype))
+                    .c_str());
+            return false;
+        }
+    }
+    return true;
+}
+
+static ge::graphStatus InferShape4ConcatV2(gert::InferShapeContext* context)
+{
+    OP_LOGI(context, "Begin to do InferShape4ConcatV2 Func");
+    auto computeNodeInfo = context->GetComputeNodeInfo();
+    if (computeNodeInfo == nullptr) {
+        ReportInferShapeExecutionError(context->GetNodeName(),
+                                       "InferShape4ConcatV2 failed because compute node info is null");
+        return ge::GRAPH_FAILED;
+    }
+
+    auto xInfo = computeNodeInfo->GetInputInstanceInfo(INPUT_IDX_FOR_CONCAT_V2);
+    OP_CHECK_NULL_WITH_CONTEXT(context, xInfo);
+
+    int64_t numInputs = static_cast<int64_t>(xInfo->GetInstanceNum());
+    OP_LOGW(context, "ConcatV2 Dynamic input count = %ld", numInputs);
+    if (numInputs <= 1) {
+        OP_LOGE_FOR_INVALID_TENSORNUM(context->GetNodeName(), "x", numInputs, "at least 2");
+        return ge::GRAPH_FAILED;
+    }
+
+    if (!CheckInputsDtypeSame(context, numInputs)) {
+        return ge::GRAPH_FAILED;
+    }
+
+    auto concatDimPtr = context->GetRequiredInputDesc(INDEX_CONCAT_DIM_FOR_CONCAT_V2);
+    OP_CHECK_IF(concatDimPtr == nullptr, OP_LOGE_WITH_INVALID_INPUT(context->GetNodeName(), "concat_dim"),
+                return ge::GRAPH_FAILED);
+
+    auto dtype = concatDimPtr->GetDataType();
+    int64_t axis = 0;
+    bool axisAvailable = false;
+    if (dtype == ge::DT_INT32) {
+        axisAvailable = GetAxisValue<int32_t>(context, INDEX_CONCAT_DIM_FOR_CONCAT_V2, axis);
+    } else if (dtype == ge::DT_INT64) {
+        axisAvailable = GetAxisValue<int64_t>(context, INDEX_CONCAT_DIM_FOR_CONCAT_V2, axis);
+    } else {
+        OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(context->GetNodeName(), "concat_dim", Ops::Base::ToString(dtype).c_str(),
+                                              "supported dtypes are DT_INT32 and DT_INT64");
+        return ge::GRAPH_FAILED;
+    }
+    if (!axisAvailable) {
+        // 轴值编译期不可得(Data-feed): 与V1一致, 秩已知时输出保秩全-1, 否则输出未知秩, 交由运行期携带真实数据重推
+        OP_LOGW(context, "concat_dim value unavailable at compile time, set output to unknown shape.");
+        auto outShape = context->GetOutputShape(0);
+        OP_CHECK_NULL_WITH_CONTEXT(context, outShape);
+        int64_t knownRank = -1;
+        for (int64_t i = 0; i < numInputs; ++i) {
+            auto shapeI = context->GetDynamicInputShape(INPUT_IDX_FOR_CONCAT_V2, static_cast<size_t>(i));
+            OP_CHECK_NULL_WITH_CONTEXT(context, shapeI);
+            if (!Ops::Base::IsUnknownRank(*shapeI)) {
+                const int64_t dimNum = static_cast<int64_t>(shapeI->GetDimNum());
+                if (dimNum > knownRank) {
+                    knownRank = dimNum;
+                }
+            }
+        }
+        if (knownRank < 0) {
+            // 所有输入均为未知秩, 输出只能为未知秩
+            Ops::Base::SetUnknownRank(*outShape);
+        } else {
+            Ops::Base::SetUnknownShape(knownRank, *outShape);
+        }
+        return ge::GRAPH_SUCCESS;
+    }
+
+    auto outShape = context->GetOutputShape(0);
+    OP_CHECK_NULL_WITH_CONTEXT(context, outShape);
+
+    // 以索引标识基底(首个已知秩输入), 不做实例指针相等比较:
+    // 运行时可能对相同形状的多个实例返回同一个 Shape 对象(如输入desc同源共享),
+    // 指针比较会把后续同形输入误判为基底而跳过求和, 导致输出 axis 维漏加
+    std::vector<const gert::Shape*> inShapes;
+    inShapes.reserve(static_cast<size_t>(numInputs));
+    int64_t baseIdx = -1;
+    bool hasUnknownRankInput = false;
+    for (int64_t i = 0; i < numInputs; ++i) {
+        auto shapeI = context->GetDynamicInputShape(INPUT_IDX_FOR_CONCAT_V2, static_cast<size_t>(i));
+        OP_CHECK_NULL_WITH_CONTEXT(context, shapeI);
+        inShapes.push_back(shapeI);
+        if (Ops::Base::IsUnknownRank(*shapeI)) {
+            hasUnknownRankInput = true;
+        } else if (baseIdx < 0) {
+            baseIdx = i;
+        }
+    }
+
+    // 对等 V1 all_unknown_rank_shape: 全部输入未知秩时, 输出未知秩
+    if (baseIdx < 0) {
+        Ops::Base::SetUnknownRank(*outShape);
+        return ge::GRAPH_SUCCESS;
+    }
+
+    // 对等 V1 JoinShapes: 输出以首个已知秩输入为基底, 未知秩输入不参与形状合并;
+    // 对等 V1 ConcatInferShapeCommonStatic: 标量基底升为 [1]
+    const gert::Shape* baseShape = inShapes[static_cast<size_t>(baseIdx)];
+    *outShape = *baseShape;
+    if (outShape->IsScalar()) {
+        outShape->AppendDim(1);
+    }
+
+    const int64_t rank = static_cast<int64_t>(outShape->GetDimNum());
+    if (axis < 0)
+        axis += rank;
+    if (axis < 0 || axis >= rank) {
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+            context->GetNodeName(), "concat_dim", std::to_string(axis).c_str(),
+            ("concat_dim must be in [-rank, rank), rank=" + std::to_string(rank)).c_str());
+        return ge::GRAPH_FAILED;
+    }
+
+    // 对等 V1: 任一输入未知秩或任一输入在 axis 维为 -1 时, 输出 axis 维未知
+    bool dimUnknown = hasUnknownRankInput;
+    int64_t newDim = 0;
+    if (!dimUnknown) {
+        if (outShape->GetDim(axis) == UNKNOWN_DIM_FOR_CONCAT_V2) {
+            dimUnknown = true;
+        } else {
+            newDim = outShape->GetDim(axis);
+        }
+    }
+
+    for (int64_t i = 0; i < numInputs; ++i) {
+        if (i == baseIdx) {
+            continue; // 基底自身已计入 newDim
+        }
+        const gert::Shape* shapeI = inShapes[static_cast<size_t>(i)];
+        if (Ops::Base::IsUnknownRank(*shapeI)) {
+            dimUnknown = true;
+            continue;
+        }
+        if (shapeI->IsScalar() && rank == 1) {
+            // 对等 V1 静态路径: 标量输入拼接到秩1输出, axis 维 +1
+            if (!dimUnknown) {
+                newDim += 1;
+            }
+            continue;
+        }
+        if (static_cast<int64_t>(shapeI->GetDimNum()) != rank) {
+            OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(context->GetNodeName(), "x", Ops::Base::ToString(inShapes).c_str(),
+                                                   "all input shapes must have the same rank");
+            return ge::GRAPH_FAILED;
+        }
+        for (int64_t d = 0; d < rank; ++d) {
+            const int64_t dimValue = shapeI->GetDim(d);
+            if (d == axis) {
+                if (dimValue == UNKNOWN_DIM_FOR_CONCAT_V2) {
+                    dimUnknown = true;
+                } else if (!dimUnknown) {
+                    newDim += dimValue;
+                }
+                continue;
+            }
+            const int64_t baseDim = outShape->GetDim(d);
+            if (dimValue == UNKNOWN_DIM_FOR_CONCAT_V2 || baseDim == dimValue) {
+                continue;
+            }
+            if (baseDim == UNKNOWN_DIM_FOR_CONCAT_V2) {
+                // 对等 V1 JoinShapes: -1 与已知值合并取已知
+                outShape->SetDim(d, dimValue);
+                continue;
+            }
+            OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(context->GetNodeName(), "x", Ops::Base::ToString(inShapes).c_str(),
+                                                   "input shapes must be identical except the concat dim");
+            return ge::GRAPH_FAILED;
+        }
+    }
+
+    outShape->SetDim(axis, dimUnknown ? UNKNOWN_DIM_FOR_CONCAT_V2 : newDim);
+    return ge::GRAPH_SUCCESS;
+}
+
+// 输出 dtype 推导由 op_graph/concat_v2_graph_infer.cpp 的 InferDataTypeForConcatV2 承接(仓内主流布局)
+IMPL_OP_INFERSHAPE(ConcatV2).InferShape(InferShape4ConcatV2).InputsDataDependency({INDEX_CONCAT_DIM_FOR_CONCAT_V2});
+} // namespace ops

@@ -1,0 +1,73 @@
+diff --git a/math/reduce_prod/op_api/aclnn_prod.cpp b/math/reduce_prod/op_api/aclnn_prod.cpp
+index 4d51365d6920701b2597cec792f1ae3d56ed09e5..8a3a638c316f26d0804ba91bc207524e216e63d5 100644
+--- a/math/reduce_prod/op_api/aclnn_prod.cpp
++++ b/math/reduce_prod/op_api/aclnn_prod.cpp
+@@ -10,6 +10,7 @@
+ 
+ #include "aclnn_prod.h"
+ #include "reduce_prod.h"
++#include "math/reduce_all/op_api/reduce_all.h"
+ #include "aclnn_kernels/contiguous.h"
+ #include "aclnn_kernels/cast.h"
+ #include "aclnn_kernels/common/op_error_check.h"
+@@ -145,8 +146,8 @@ static aclnnStatus FillScalar(aclTensor* out, float val, aclOpExecutor* executor
+     return ACLNN_SUCCESS;
+ }
+ 
+-static aclnnStatus ExecuteProd(const aclTensor* self, const aclTensor* axes, bool keepDim, const aclDataType dtype,
+-                               aclTensor* out, aclOpExecutor* executor)
++static aclnnStatus ExecuteProd(const aclTensor* self, const aclTensor* axes, const aclIntArray* dimList, bool keepDim,
++                               const aclDataType dtype, aclTensor* out, aclOpExecutor* executor)
+ {
+     // 将输入tensor转换成连续的tensor
+     auto selfContiguous = l0op::Contiguous(self, executor);
+@@ -183,8 +184,13 @@ static aclnnStatus ExecuteProd(const aclTensor* self, const aclTensor* axes, boo
+     }();
+     CHECK_RET(selfCast != nullptr, ACLNN_ERR_INNER_NULLPTR);
+ 
+-    // 调用ReduceProd算子kernel，完成计算
+-    auto output = l0op::ReduceProd(selfCast, axes, keepDim, executor);
++    // bool输出场景（910B/910_93）走ReduceAll，对齐GPU torch.prod(dtype=bool)语义，其余走原ReduceProd路径
++    const aclTensor* output = nullptr;
++    if (dimList != nullptr) {
++        output = l0op::ReduceAll(selfCast, dimList, keepDim, executor);
++    } else {
++        output = l0op::ReduceProd(selfCast, axes, keepDim, executor);
++    }
+     CHECK_RET(output != nullptr, ACLNN_ERR_INNER_NULLPTR);
+     CHECK_RET(CheckShapeAndScalarSame(output, out), ACLNN_ERR_PARAM_INVALID);
+ 
+@@ -223,10 +229,17 @@ aclnnStatus aclnnProdDimGetWorkspaceSize(const aclTensor* self, int64_t dim, boo
+         return ret;
+     }
+ 
++    bool useReduceAll = (out->GetDataType() == op::DataType::DT_BOOL &&
++                         (GetCurrentPlatformInfo().GetSocVersion() == SocVersion::ASCEND910B ||
++                          GetCurrentPlatformInfo().GetSocVersion() == SocVersion::ASCEND910_93));
++    int64_t dimListArr[1] = {dim};
++    auto dimList = uniqueExecutor.get()->AllocIntArray(dimListArr, 1);
++    CHECK_RET(dimList != nullptr, ACLNN_ERR_INNER_NULLPTR);
++
+     auto axes = uniqueExecutor.get()->ConvertToTensor(&dim, 1, op::DataType::DT_INT64);
+     CHECK_RET(axes != nullptr, ACLNN_ERR_INNER_NULLPTR);
+ 
+-    ret = ExecuteProd(self, axes, keepDim, dtype, out, uniqueExecutor.get());
++    ret = ExecuteProd(self, axes, useReduceAll ? dimList : nullptr, keepDim, dtype, out, uniqueExecutor.get());
+     CHECK_RET(ret == ACLNN_SUCCESS, ret);
+ 
+     // 获取计算过程中需要使用的workspace大小
+@@ -272,8 +285,13 @@ aclnnStatus aclnnProdGetWorkspaceSize(const aclTensor* self, const aclDataType d
+     auto axes = uniqueExecutor.get()->ConvertToTensor(dimList, op::DataType::DT_INT64);
+     CHECK_RET(axes != nullptr, ACLNN_ERR_INNER_NULLPTR);
+ 
++    // bool输出场景（910B/910_93）走ReduceAll，对齐GPU torch.prod(dtype=bool)语义，其余走原ReduceProd路径
++    bool useReduceAll = (out->GetDataType() == op::DataType::DT_BOOL &&
++                         (GetCurrentPlatformInfo().GetSocVersion() == SocVersion::ASCEND910B ||
++                          GetCurrentPlatformInfo().GetSocVersion() == SocVersion::ASCEND910_93));
++
+     // 执行计算图逻辑
+-    ret = ExecuteProd(self, axes, false, dtype, out, uniqueExecutor.get());
++    ret = ExecuteProd(self, axes, useReduceAll ? dimList : nullptr, false, dtype, out, uniqueExecutor.get());
+     CHECK_RET(ret == ACLNN_SUCCESS, ret);
+ 
+     // 获取计算过程中需要使用的workspace大小

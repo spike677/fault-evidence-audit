@@ -1,0 +1,26 @@
+            group_list_type=group_list_type,
+            combine_metadata=MoEAllGatherCombineMetadata(
+                topk_weights=topk_weights,
+                expanded_row_idx=expanded_row_idx,
+                restore_shape=restore_shape,
+            ),
+        )
+
+    def token_combine(self, hidden_states, combine_metadata, bias=None):
+        final_hidden_states = torch_npu.npu_moe_token_unpermute(
+            permuted_tokens=hidden_states,
+            sorted_indices=torch.abs(combine_metadata.expanded_row_idx),
+            probs=combine_metadata.topk_weights,
+        )
+        if len(combine_metadata.restore_shape) == 3:
+            final_hidden_states = final_hidden_states.view(combine_metadata.restore_shape)
+
+        # these values are no longer used, so they need to be set to None for memory release.
+        return final_hidden_states
+
+
+class TokenDispatcherWithAll2AllV(MoETokenDispatcher[MoEAllToAllCombineMetadata]):
+    """
+    The implementation of the AlltoAll-based token dispatcher, which handles token
+    dispatching on the sequence level instead of token level. The core of this implementation
+    lies in each device dispatching on the entire sequence, with the hidden state being partitioned.

@@ -1,0 +1,78 @@
+diff --git a/matmul/mat_mul_v3/op_host/op_tiling/arch35/matmul_v3_tiling_helper.cpp b/matmul/mat_mul_v3/op_host/op_tiling/arch35/matmul_v3_tiling_helper.cpp
+index f3e7ec9882f8a769aab5ed59176022ea428bd619..cfaa90b5757ea3c4c1be0a3a9769a4a71e228374 100644
+--- a/matmul/mat_mul_v3/op_host/op_tiling/arch35/matmul_v3_tiling_helper.cpp
++++ b/matmul/mat_mul_v3/op_host/op_tiling/arch35/matmul_v3_tiling_helper.cpp
+@@ -180,13 +180,14 @@ MatMulV3L0C2Out GetL0C2OutDav3510(const MatmulV3CompileInfo& compileInfo, const
+     if (!fixpipeBound || (compileInfo.aivNum != (compileInfo.aicNum * NUM_TWO)) || isSplitK) {
+         return MatMulV3L0C2Out::ON_THE_FLY;
+     }
++    if (args.cType == ge::DT_FLOAT) {
++        runInfo.splitM = true;
++        return MatMulV3L0C2Out::ND_FIXPIPE_1_2;
++    }
+     if (args.aType == ge::DT_FLOAT16 || args.aType == ge::DT_BF16) {
+         return MatMulV3L0C2Out::ND_FIXPIPE_1_1;
+     }
+-    if (args.aType == ge::DT_FLOAT) {
+-        runInfo.splitM = true;
+-    }
+-    return MatMulV3L0C2Out::ND_FIXPIPE_1_2;
++    return MatMulV3L0C2Out::ON_THE_FLY;
+ }
+ 
+ // 全 dtype 统一走 ND_FIXPIPE_1_1
+diff --git a/matmul/mat_mul_v3/tests/ut/op_host/arch35/test_matmul_v3_tiling.cpp b/matmul/mat_mul_v3/tests/ut/op_host/arch35/test_matmul_v3_tiling.cpp
+index 474edf6507700bc52e00a6e80d5f13e6a399f8f2..63a957eaebfb94bda31bb3712dd0753fceb469f1 100644
+--- a/matmul/mat_mul_v3/tests/ut/op_host/arch35/test_matmul_v3_tiling.cpp
++++ b/matmul/mat_mul_v3/tests/ut/op_host/arch35/test_matmul_v3_tiling.cpp
+@@ -4721,6 +4721,50 @@ TEST_F(MatMulV3StreamKTilingDirectTest, GetL0C2Out_Non3510Arch_DefaultOnTheFly)
+         MatMulV3L0C2Out::ON_THE_FLY);
+ }
+ 
++// GetL0C2OutDav3510：fixpipe Bound 场景按输出 dtype 选择 1V1/1V2，splitM 仅在 FP32 输出时置位
++TEST_F(MatMulV3StreamKTilingDirectTest, GetL0C2Out_Dav3510_Fp32Out_Fixpipe1V2WithSplitM)
++{
++    compileInfo_.npuArch = Ops::Base::DAV_3510;
++    SetShape(256UL, 300UL, 256UL);
++    args_.aType = ge::DT_FLOAT;
++    args_.bType = ge::DT_FLOAT;
++    args_.cType = ge::DT_FLOAT;
++    optiling::matmul_v3_advanced::MatMulV3RunInfo runInfo{};
++    runInfo.singleCoreM = 128UL;
++    runInfo.singleCoreN = 64UL;
++    EXPECT_EQ(
++        optiling::matmul_v3_advanced::MatMulV3TilingHelper::GetL0C2Out(compileInfo_, args_, runInfo, false, nullptr),
++        MatMulV3L0C2Out::ND_FIXPIPE_1_2);
++    EXPECT_TRUE(runInfo.splitM);
++}
++
++TEST_F(MatMulV3StreamKTilingDirectTest, GetL0C2Out_Dav3510_Fp16InFp32Out_Fixpipe1V2WithSplitM)
++{
++    compileInfo_.npuArch = Ops::Base::DAV_3510;
++    SetShape(256UL, 300UL, 256UL);
++    args_.cType = ge::DT_FLOAT;
++    optiling::matmul_v3_advanced::MatMulV3RunInfo runInfo{};
++    runInfo.singleCoreM = 128UL;
++    runInfo.singleCoreN = 64UL;
++    EXPECT_EQ(
++        optiling::matmul_v3_advanced::MatMulV3TilingHelper::GetL0C2Out(compileInfo_, args_, runInfo, false, nullptr),
++        MatMulV3L0C2Out::ND_FIXPIPE_1_2);
++    EXPECT_TRUE(runInfo.splitM);
++}
++
++TEST_F(MatMulV3StreamKTilingDirectTest, GetL0C2Out_Dav3510_Fp16Out_Fixpipe1V1WithoutSplitM)
++{
++    compileInfo_.npuArch = Ops::Base::DAV_3510;
++    SetShape(256UL, 300UL, 256UL);
++    optiling::matmul_v3_advanced::MatMulV3RunInfo runInfo{};
++    runInfo.singleCoreM = 128UL;
++    runInfo.singleCoreN = 64UL;
++    EXPECT_EQ(
++        optiling::matmul_v3_advanced::MatMulV3TilingHelper::GetL0C2Out(compileInfo_, args_, runInfo, false, nullptr),
++        MatMulV3L0C2Out::ND_FIXPIPE_1_1);
++    EXPECT_FALSE(runInfo.splitM);
++}
++
+ TEST_F(MatMulV3TilingAdvancedDirectTest, GetFormat_NdFormats)
+ {
+     gert::StorageShape a = {{2, 32}, {2, 32}};

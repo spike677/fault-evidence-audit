@@ -1,0 +1,279 @@
+fix: initialize broadcast workspace to zero-opbase-AtomGit
+Star
+927
+Fork
+292
+Code
+Introduction
+Code
+Issues
+34
+Pull Requests
+134
+Pipeline
+Actions
+Discussion
+Wiki
+Members
+120
+Analysis
+Settings
+Star
+927
+Fork
+292
+Merged
+fix: initialize broadcast workspace to zero
+#1007
+zhang-song-rui
+Add on
+Oct 12
+Merged from
+zhang-song-rui/opbase-workspace：
+fix/ascend950-vector-workspace
+into
+cann/opbase：
+master
+fix: initialize broadcast workspace to zero
+#1007
+Merged
+zhang-song-rui
+Add on
+Oct 12
+Merged from
+zhang-song-rui/opbase-workspace
+fix/ascend950-vector-workspace
+into
+cann/opbase
+master
+Merge checks
+Discussion
+0
+Commits
+0
+Checks
+0
+Files changed
+0
+Clone/Download
+0
+zhang-song-rui
+Oct 12
+Oct 12
+描述
+Broadcast 公共 tiling 路径为不使用 GM workspace 的 Vector 算子预留了冗余系统空间。本次在
+BroadcastBaseTiling::DoTiling
+的成功出口调用
+GetWorkspaceSizes(1)
+、检查返回指针并显式写入 0，替换默认系统 workspace 预留。
+修改集中于一个公共头文件，一维、广播和非连续调度共用该出口；不在各算子重复覆盖 workspace，不改变 tiling key、分块计算或 kernel 数值逻辑。本 PR 不修改 CMake。
+关联的Issue
+未关联独立 Issue。
+相关 PR（不是 Issue）
+联动 PR：
+ops-math PR 6242
+ops-nn PR 11789
+ops-transformer PR 13661
+依赖接入顺序：本 PR 合入后，依赖方固定到包含该补丁的上游 commit ID。无需新增本地源码覆盖、缓存切换或远程仓库选择逻辑。现有联调通过本地工作副本接入补丁，不代表依赖方默认远程固定版本已更新。
+测试
+环境：Ascend950PR_9579，CANN 9.2.0（20260909 工具链）。
+公共依赖同版本正反对照：未修改公共代码时 Math Host UT 171/333 通过，162 个 workspace 断言失败；恢复补丁后 333/333 通过。
+新增 Add 非连续 stride 与已初始化 workspace 覆盖测试后，Math Host UT 334/334 通过。
+Math 39 算子 430 项固定输入设备回放，以及新增 78 项大规模候选，binary 比较与独立输出原始字节比较均通过；workspace 为 0，越界检查通过，tiling key/data/blockDim 不变。
+小 shape 按基线 <20 us、允许 1 us 波动；大 shape 允许 <5% 波动。Math 大规模初轮 AxpyV2 广播 +5.39%，修改前 → 修改后 → 修改后 → 修改前、每轮 100 次启动复测为 +1.1165%，落入容差。
+文档更新
+本 PR 未增加仓内文档。
+类型标签
+Bug修复
+新特性
+性能优化
+文档更新
+其他，请描述：减少冗余系统 workspace 内存申请
+分类验证结果（2026-10-13）
+验证环境：Ascend950PR_9579，CANN 9.2.0（20260909）。这里的“二进制一致”指相同输入下
+输出张量的原始字节一致
+，不是编译产物文件一致。基线输入固定回放，独立检查输出元数据和原始字节。
+范围限制：全量结果来自变基前联调版本（原依赖对照、opbase 6dc960b 加公共补丁）；不能替代 opbase PR 1007 合入、更新远程固定 commit 后的默认构建复测。当前该依赖接入仍待完成。最新 AddRmsNormCast 空归约专项使用当前 NN 提交 884dc23ad，单独标明。
+【输出】二进制一致
+公共 broadcast 修改经 Math 消费方固定输入回放验证：430/430 项输出字节一致；Math 新增大规模候选 78/78 一致，其中 74 项实际耗时 ≥20 μs。该结果属于消费方联调证据，不将 NN/Transformer 的全部独立算子结果归功于本公共补丁。
+【精度标准】与修改前一致
+上述固定输入在输出原始字节层面一致，已测范围内精度保持不变。公共 Host UT 同版本控制实验：未加公共补丁为 171/333 通过，162 项 workspace 断言失败；加补丁后 333/333 通过。后续包含非连续 stride 的 Math Host UT 为 334/334。UT 验证 workspace 语义，不能替代设备精度证据。
+【性能标准】与修改前一致
+消费方按照小 shape（<20 μs）1 μs、大 shape <5% 的约定验证。Math AxpyV2 大广播首轮 +5.39%，修改前 → 修改后 → 修改后 → 修改前 每轮 100 次复测 +1.1165%，满足阈值。详细逐用例输出和耗时已附在
+Math PR PR 6242
+。
+结果分类导航及限制
+Math：输出、精度、性能明细
+NN：输出、精度、性能及两项基线差异控制实验
+Transformer：输出、精度、性能明细
+本 PR 尚未合入；后续依赖 commit 更新和默认构建复测仍待完成。历史公共消费者静态审查不等同于所有清单外消费者已上板验证。
+性能复测方法：按“修改前 → 修改后 → 修改后 → 修改前”的顺序执行四轮，每轮启动 100 次。每轮使用硬件任务耗时，丢弃首次样本后取中位数；分别对两轮修改前、两轮修改后的中位数取平均，作为最终对照耗时。变化率 =（修改后耗时 − 修改前耗时）÷ 修改前耗时 × 100%。该顺序用于减轻温度、频率等随时间变化带来的测量偏差，不能完全消除干扰。
+Save
+Cancel
+Pull Request has been successfully merged by CANN-robot.
+（Thank you for zhang-song-rui's contribution.）
+zhang-song-rui
+Oct 12
+Created pull request, commit
+8c4f98b0
+Oct 12
+Created pull request, commit
+8c4f98b0
+atomgit-bot
+Oct 12
+Comments：
+Oct 12
+Comments：
+变更摘要
+本 PR 针对
+pkg_inc/op_common/atvoss/broadcast/broadcast_tiling.h
+中广播算子的 workspace 初始化逻辑进行修复，将 tiling 阶段设置的 workspace 大小由
+DEFAULT_TILING_WORKSPACE_SIZE
+调整为
+0
+，使广播调度不再申请 KFC workspace。
+主要改动
+workspace 取值调整
+: 将
+workspaces[0]
+的赋值由
+DEFAULT_TILING_WORKSPACE_SIZE
+改为
+0
+，使广播算子不再预留 KFC workspace 空间。
+补充说明注释
+: 新增注释说明广播调度仅使用 UB 存储、不需要 KFC workspace，并强调需要显式初始化 workspace 槽位（包含零大小的情形）。
+保留空指针校验
+: 保持对
+context_->GetWorkspaceSizes(1)
+返回值的
+OP_CHECK_NULL_WITH_CONTEXT
+校验逻辑不变，仅调整实际写入的 workspace 大小。
+Save
+Cancel
+Incorrect?
+CANN-robot
+Collaborators
+Oct 12
+Comments：
+Oct 12
+Comments：
+Hi
+@zhang-song-rui
+, welcome to submitting your first PR to opbase!
+PR Merge Steps
+1. CLA Signing
+If the current PR label includes
+cann-cla/yes
+, it means you have signed the CLA and can proceed to the next step. If the label includes
+cann-cla/no
+, please sign the
+CLA
+first. If you have any questions, please refer to the
+FAQ
+.
+2. CI Check
+Please comment
+/compile
+to trigger the CI pipeline check. If the CI run is successful, the PR will be tagged with
+ci-pipeline-passed
+and you can proceed to the next step. If the CI run fails, the PR will be tagged with
+ci-pipeline-failed
+, please check the CI logs to fix the issues in the PR. If you have any questions, please refer to the
+FAQ
+.
+3. Code Review
+After CI passes, please refer to the
+PR Approval Progress
+and proactively @ the committers in the table to review the code. After approval, committers will comment
+/lgtm
+and
+/approve
+. Once the
+lgtm
+and
+approved
+labels are successfully added, the PR will be merged automatically.
+Save
+Cancel
+atomgit-bot
+Oct 12
+Comments：
+Oct 12
+Comments：
+代码审查
+✅ 未发现问题
+Save
+Cancel
+Incorrect?
+CANN-robot
+Collaborators
+Oct 12
+Added label:
+cann-cla/yes
+Oct 12
+Added label:
+cann-cla/yes
+48 messages are collapsed here。
+See more
+W
+wangyongguang
+Collaborators
+17 days ago
+Comments：
+17 days ago
+Comments：
+/approve
+Save
+Cancel
+CANN-robot
+Collaborators
+17 days ago
+Added label:
+approved
+17 days ago
+Added label:
+approved
+S
+songkai111
+Collaborators
+17 days ago
+Comments：
+17 days ago
+Comments：
+/lgtm
+Save
+Cancel
+CANN-robot
+Collaborators
+17 days ago
+Added label:
+lgtm
+17 days ago
+Added label:
+lgtm
+CANN-robot
+Collaborators
+17 days ago
+Merged pull request
+17 days ago
+Merged pull request
+Merger
+Not assigned
+Approver
+Not assigned
+Tester
+Not assigned
+Reviewer
+Not assigned
+Label
+cann-cla/yes
+ci-pipeline-passed
+approved
+lgtm
+Milestones
+No related milestones
+Kanban
+No related boards
+Link Issue
+No related Issues

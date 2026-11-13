@@ -1,0 +1,297 @@
+fix(unpad_flash_attention_mla_bf16): 修复 alibi 压缩 mask delta 的 uint32 下溢（9.2 分支）-ascend-transformer-boost-AtomGit
+Star
+617
+Fork
+182
+Code
+Introduction
+Code
+Issues
+73
+Pull Requests
+53
+Pipeline
+Actions
+Discussion
+Wiki
+Members
+108
+Analysis
+Settings
+Star
+617
+Fork
+182
+Merged
+fix(unpad_flash_attention_mla_bf16): 修复 alibi 压缩 mask delta 的 uint32 下溢（9.2 分支）
+#2344
+zouyanlong
+Add on
+21 days ago
+Merged from
+ninihihi/ascend-transformer-boost：
+fix/fa-alibi-920-release
+into
+cann/ascend-transformer-boost：
+br_release_cann_9.2.0_20270309
+fix(unpad_flash_attention_mla_bf16): 修复 alibi 压缩 mask delta 的 uint32 下溢（9.2 分支）
+#2344
+Merged
+zouyanlong
+Add on
+21 days ago
+Merged from
+ninihihi/ascend-transformer-boost
+fix/fa-alibi-920-release
+into
+cann/ascend-transformer-boost
+br_release_cann_9.2.0_20270309
+Merge checks
+Discussion
+0
+Commits
+0
+Checks
+0
+Files changed
+0
+Clone/Download
+0
+Z
+zouyanlong
+Collaborators
+21 days ago
+21 days ago
+关联 Issue：#474
+变更说明
+核心修复
+：
+br_release_cann_9.2.0_20270309
+上 MLA BF16 重建 alibi 压缩 mask 时仍使用
+delta = base_y * (n_idx + 1 - m_idx);
+，其中
+m_idx
+/
+n_idx
+为
+uint32_t
+，三角掩码下结果恒为负，发生无符号回绕，乘
+base_y = -128
+后得到错误的大负偏置，长序列（> 512）远端 K 块 softmax 权重被压为 0。改为有符号运算，与 master 上的 !2343 一致，也与 !2205 在
+unpad_flashattention_bf16_mix.cce
+、
+unpad_flashattention_bf16_prefix_cache.cce
+的处理方式一致。仅表达式内提升类型，不改变
+m_idx
+/
+n_idx
+的声明与用途。
+构成配套
+：本分支的
+scripts/build.sh
+中
+testframework
+目标与 master 不同——只带
+-DBUILD_TEST_FRAMEWORK=ON
+，不编 UT 二进制（UT 由
+unittest
+/
+kernelunittest
+目标单独编译）。而当前 CI 的
+.gitcode/scripts/compile_test_framework.sh
++
+atb_scheduler.py
+按 master 的新模型工作：只要
+output/atb/set_env.sh
+存在就跳过重建 testframework，随后直接执行
+$ATB_HOME_PATH/bin/atb_unittest
+。两者组合导致 9.2 分支上 UT job 必然报
+unit-test failed with return code 127
+（命令不存在）。故将
+testframework
+目标与 master 对齐（补
+-DUSE_UNIT_TEST=ON -DUSE_KERNEL_UNIT_TEST=ON
+与
+fn_build_3rdparty_for_test
+），使其能编出 UT 二进制。
+影响范围
+核心代码 1 行（MLA BF16 alibi 压缩 mask 路径）
+构建脚本 1 处（
+testframework
+目标补齐 UT 编译开关，不改变
+default
+/
+unittest
+等其它目标）
+静态检查/格式化/空指针/返回值/new释放/异常场景/错误日志
+验证
+同款代码修复在 master（!2343）上用 CANN 9.2.0 官方封装路径编译出包成功
+alibi 压缩 mask 功能用例 seq=512 / 1024 / 1500：maxDiff=0.003906、bad_ratio=0.0000，全部 pass
+修复前同环境 seq=1024 在 512 行之后整体超差
+本 PR 的 UT 失败（run #732/#731）已定界为上述
+testframework
+目标差异，与核心修复无关；本次补齐后重跑验证
+Save
+Cancel
+Pull Request has been successfully merged by CANN-robot.
+（Thank you for zouyanlong's contribution.）
+Z
+zouyanlong
+Collaborators
+21 days ago
+Created pull request, commit
+0d228dbc
+21 days ago
+Created pull request, commit
+0d228dbc
+Z
+zouyanlong
+Collaborators
+21 days ago
+Associated issue: [Bug-Report|缺陷反馈] MLA BF16 长序列 alibi 压缩 mask 的 delta 计算发生 uint32 下溢导致输出错误
+21 days ago
+Associated issue: [Bug-Report|缺陷反馈] MLA BF16 长序列 alibi 压缩 mask 的 delta 计算发生 uint32 下溢导致输出错误
+atomgit-bot
+21 days ago
+Comments：
+21 days ago
+Comments：
+变更摘要
+本 PR 针对
+br_release_cann_9.2.0_20270309
+分支上 MLA BF16 场景重建 alibi 压缩 mask 的无符号回绕问题，在
+unpad_flash_attention_mla_bf16_mix.cce
+中将
+delta
+的计算改为有符号运算。核心实质改动仅一行：
+m_idx
+、
+n_idx
+参与减法时显式提升为
+int32_t
+，避免三角掩码下
+uint32_t
+相减产生大负偏置导致长序列远端 K 块 softmax 权重被压为 0；其余均为行尾空白清理与文件末尾换行修正。
+主要改动
+alibi
+压缩 mask 的
+delta
+改为有符号计算
+: 在
+alibi_left_align == 0
+分支将
+delta = base_y * (n_idx + 1 - m_idx)
+改为
+base_y * (static_cast<int32_t>(n_idx) + 1 - static_cast<int32_t>(m_idx))
+，消除
+uint32_t
+减法回绕产生的错误偏置。
+m_idx
+/
+n_idx
+声明与用途保持不变
+: 仅在表达式内做类型提升，索引变量类型及其余使用位置不受影响，改动范围限定在 mask 偏移量计算。
+base_y
+分支逻辑保持原状
+:
+alibi_left_align == 1
+时的
+delta = -base_y * n_idx
+以及后续
+adds_v
+按
+alibi_left_align
+区分的偏置叠加路径均未改变。
+非功能性清理
+: 该文件内的行尾空格删除与文件结尾补充换行属于格式调整，不影响运行行为。
+Save
+Cancel
+Incorrect?
+atomgit-bot
+21 days ago
+Comments：
+21 days ago
+Comments：
+代码审查
+✅ 未发现问题
+Save
+Cancel
+Incorrect?
+CANN-robot
+Collaborators
+21 days ago
+Added label:
+cann-cla/yes
+21 days ago
+Added label:
+cann-cla/yes
+79 messages are collapsed here。
+See more
+CANN-robot
+Collaborators
+17 days ago
+Added label:
+ci-pipeline-passed
+17 days ago
+Added label:
+ci-pipeline-passed
+CANN-robot
+Collaborators
+17 days ago
+Comments：
+17 days ago
+Comments：
+The MR can not be merged, because of CodeReview discussion not resolved
+If you want to solve this problem,
+you can click here to do it in the
+FAQs
+.
+Save
+Cancel
+Z
+zouyanlong
+Collaborators
+17 days ago
+Resolved final issue
+17 days ago
+Resolved final issue
+CANN-robot
+Collaborators
+17 days ago
+Merged pull request
+17 days ago
+Merged pull request
+CANN-robot
+Collaborators
+17 days ago
+Comments：
+17 days ago
+Comments：
+Pull Request 已合并或已关闭。
+If you want to solve this problem,
+you can click here to do it in the
+FAQs
+.
+Save
+Cancel
+Merger
+Not assigned
+Approver
+Not assigned
+Tester
+Not assigned
+Reviewer
+Not assigned
+Label
+stat/needs-squash
+cann-cla/yes
+lgtm
+approved
+SC-SUCC
+ci-pipeline-passed
+Milestones
+No related milestones
+Kanban
+No related boards
+Link Issue
+No related Issues

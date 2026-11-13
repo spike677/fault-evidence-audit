@@ -1,0 +1,127 @@
+[Bug-Report|缺陷反馈]: ConcatV2 infershape 同形多输入指针比较误判基底导致输出 axis 维漏加-ops-math-AtomGit
+Star
+1754
+Fork
+1658
+Code
+Introduction
+Code
+Issues
+495
+Pull Requests
+578
+Pipeline
+Actions
+Discussion
+Wiki
+Members
+299
+Analysis
+Settings
+Star
+1754
+Fork
+1658
+Open
+[Bug-Report|缺陷反馈]: ConcatV2 infershape 同形多输入指针比较误判基底导致输出 axis 维漏加
+#4685
+hw-zhangpanpan
+Add on
+1 day ago
+H
+hw-zhangpanpan
+1 day ago
+Create
+1 day ago
+Create
+一、问题描述 （必填）
+conversion/concat_v2/op_host/concat_v2_infershape.cpp
+中
+InferShape4ConcatV2
+在推导 concat 维大小时，基底（首个已知秩输入）的识别使用了
+实例指针相等比较
+：
+收集阶段以
+baseShape
+（指针）记录首个已知秩输入；
+求和阶段用
+if (shapeI == baseShape) continue;
+跳过基底自身。
+但运行时多个 shape 相同的输入实例可能返回
+同一个
+ge::Shape
+对象
+（输入 desc 同源共享）。此时，后续同形输入会被指针比较误判为"基底"而跳过求和，导致输出 concat（axis）维的尺寸
+漏加
+，推导结果偏小。
+二、环境信息 （可选）
+• 昇腾硬件型号：不涉及（GEIR 图编译 infershape 路径）
+• CANN版本：不涉及
+• 操作系统：不涉及
+• 其他相关软件版本：gert::InferShapeContext / op_host inferShape
+三、重现步骤 （可选）
+构造 ConcatV2 图，两个 x 输入 shape 相同（如
+{16,4,8}
+、
+{16,4,8}
+），axis 沿第 3 维（axis=2）拼接。
+运行时若两个输入的 desc 同源共享同一个 Shape 对象（相同形状、共享指针），基底识别按指针比较。
+观察输出 axis 维被漏加：正确应为 16，实际推导为 8。
+四、预期结果 （可选）
+基底识别改为按
+索引
+标识首个已知秩输入（
+baseIdx = i
+），求和循环按
+if (i == baseIdx) continue;
+跳过基底，不做实例指针比较。
+对同形共享 Shape 对象的输入，输出 concat 维尺寸正确求和（如
+{16,4,16}
+）。
+💡 备注（选填）
+Save
+Cancel
+H
+hw-zhangpanpan
+1 day ago
+Associated pull request
+1 day ago
+Associated pull request
+jiyg
+1 day ago
+Associated pull request
+1 day ago
+Associated pull request
+陈思
+Collaborators
+1 day ago
+Assign hw-zhangpanpan as responsible person
+1 day ago
+Assign hw-zhangpanpan as responsible person
+jiyg
+1 day ago
+Comments：
+1 day ago
+Comments：
+核对发现 #4685 已由
+MR !7301
+修复并合入 master，主线提交
+454733904ae6a350a64deb33df720eebcc52da99
+明确写明修复同形输入导致 ConcatV2 axis 维漏加，并包含回归 UT。我们的
+!7333
+与该主线改动重复、无独立剩余贡献，已关闭以避免重复合入。请维护者据主线核对后关闭本 Issue。
+Save
+Cancel
+Assignees
+H
+hw-zhangpanpan
+Label
+Label not set yet
+Kanban
+No board linked yet
+Milestones
+No related milestones
+Link PR
+No related PR
+Branch
+No branches linked yet

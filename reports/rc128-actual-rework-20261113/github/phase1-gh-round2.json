@@ -1,0 +1,638 @@
+[
+  {
+    "task_ids": [
+      "RC-004"
+    ],
+    "kind": "SEARCH",
+    "round": 2,
+    "tool": "github_search_issues",
+    "args": {
+      "repository_full_name": "vllm-project/vllm-ascend",
+      "query": "\"Ring-1T\" is:issue",
+      "topn": 3
+    },
+    "checked_at": "2026-11-13T02:27:22.762Z",
+    "response": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Action completed."
+        }
+      ],
+      "structuredContent": {
+        "issues": []
+      },
+      "isError": false
+    }
+  },
+  {
+    "task_ids": [
+      "RC-004"
+    ],
+    "kind": "SEARCH",
+    "round": 2,
+    "tool": "github_search_prs",
+    "args": {
+      "repository_full_name": "vllm-project/vllm-ascend",
+      "query": "\"Ring-1T\"",
+      "topn": 3
+    },
+    "checked_at": "2026-11-13T02:27:23.411Z",
+    "response": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Action completed."
+        }
+      ],
+      "structuredContent": {
+        "issues": []
+      },
+      "isError": false
+    }
+  },
+  {
+    "task_ids": [
+      "RC-042"
+    ],
+    "kind": "SEARCH",
+    "round": 2,
+    "tool": "github_search_issues",
+    "args": {
+      "repository_full_name": "pytorch/pytorch",
+      "query": "\"segment_reduce\" empty is:issue",
+      "topn": 3
+    },
+    "checked_at": "2026-11-13T02:27:23.473Z",
+    "response": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Action completed."
+        }
+      ],
+      "structuredContent": {
+        "issues": [
+          {
+            "url": "https://github.com/pytorch/pytorch/issues/196192",
+            "title": "[MPS] Tracking issue: sparse compressed (CSR/CSC/BSR/BSC) tensor support",
+            "issue_number": 196192,
+            "body": "### 🚀 The feature, motivation and pitch\n\nTracking issue for bringing sparse compressed tensors (CSR, CSC, BSR, BSC) to the\nMPS backend, and for the MPS defects found while doing it.\n\n**Motivation.** `torch.sparse_csr_tensor(..., device=\"mps\")` currently fails with\n`Could not run 'new_compressed_tensor' from the 'mps:0' device`, which is\n#129842 (closed as completed while the reproducer in its body still fails) and\n#166426 (closed as a duplicate of it).\n\nConcretely, scvi-tools loads single-cell count matrices as CSR and offers\n`load_sparse_tensor=True`, whose purpose is to move the compressed representation\nto the accelerator and densify only after the transfer, in\n`on_after_batch_transfer`. Because the transfer fails on MPS the library probes\nfor support and densifies on the host instead, sending a dense count matrix over\nthe bus where the data is typically more than 90% zeros. That is the exact cost\nthe option exists to avoid.\n\n**State of the backend.** Most of the plumbing already exists: `SparseCsrMPS` is\ngenerated from the MPS backend component and the `SparseCsr` functionality key,\nand `Backend.h`, `Layout.h` and `DispatchKey.cpp` handle it. What was missing was\nthe constructor case, the key-set/device invariant in `SparseCsrTensorImpl`, and\na hard-coded device allowlist in `_validate_sparse_compressed_tensor_args`.\n\n### Plan\n\nA stack of four changes, the first three independent of the sparse work and\nuseful on their own:\n\n1. **Metal shader header dependencies.** On a host where `CAN_COMPILE_METAL` is\n   `NO`, the embedded shader sources are not regenerated when a header under\n   `c10/metal/` changes, so an edit silently does not reach the binary.\n2. **GPU hang in `scatter_reduce`/`index_reduce` with NaN.** The CAS loop behind\n   `amax`/`amin`/`prod` compares floats, so once a NaN is stored the exchange\n   never succeeds and the loop spins forever. Separately, `index_reduce_`\n   `amin`/`amax` dropped NaN where CPU propagates it.\n3. **`binary_cross_entropy` on zero-element tensors**, which trips\n   `Placeholder tensor is empty!` for want of a `numel() == 0` guard.\n4. **Sparse compressed tensors on MPS**: construction, transfer, the layout\n   conversions, the device-agnostic structural and elementwise operations, and\n   two Metal kernels for `_convert_indices_from_coo_to_csr` and\n   `_convert_indices_from_csr_to_coo`, which every layout conversion is built on.\n\n### Not covered by the first stack\n\nThese need real Metal kernels rather than dispatch registrations, because their\n`.out` variants resolve to `sparse::impl::cpu::add_out_sparse_csr` or to cuSPARSE\nand MKL, so there is no shared implementation to reuse:\n\n- [ ] `addmm`, `mm` (SpMM)\n- [ ] `addmv` (SpMV)\n- [ ] `add` (sparse + sparse)\n- [ ] `sampled_addmm`\n- [ ] `sum` and `prod` over a dimension (`_sparse_csr_sum`, `_sparse_csr_prod`)\n- [ ] `bmm`, `baddbmm`\n- [ ] `_sparse_mm_reduce_impl`\n- [ ] `triangular_solve`\n- [ ] `segment_reduce`, which `torch.masked` reductions over a compressed tensor\n      need and which has no MPS kernel either\n\n### Known issues\n\n- #196190: `mul` on an integer CSR tensor intermittently produces an invalid\n  compressed tensor.\n\nThis issue was authored with the help of an AI assistant (Claude).\n\n\ncc @nikitaved @pearu @cpuhrsch @amjames @bhosmer @jcaip @kulinseth @malfet @DenisVieriu97 @jhavukainen @aditvenk @Isalia20",
+            "state": null,
+            "user": null,
+            "assignees": null,
+            "labels": null,
+            "milestone": null,
+            "state_reason": null,
+            "comments": null,
+            "created_at": null,
+            "updated_at": null,
+            "closed_at": null,
+            "display_url": "https://github.com/pytorch/pytorch/issues/196192",
+            "display_title": "[MPS] Tracking issue: sparse compressed (CSR/CSC/BSR/BSC) tensor support"
+          },
+          {
+            "url": "https://github.com/pytorch/pytorch/issues/77764",
+            "title": "General MPS op coverage tracking issue",
+            "issue_number": 77764,
+            "body": "### This issue is to have a centralized place to list and track work on adding support to new ops for the MPS backend.\n\n[**Most requested ops**](https://github.com/pytorch/pytorch/issues/154052) (extracted from comments to this issue and #141287)\n\n[**PyTorch MPS Ops Project**](https://github.com/users/kulinseth/projects/1/views/1) : Project to track all the ops for MPS backend. There are a very large number of operators in pytorch and so they are not all yet implemented. We will be prioritizing adding new operators based on user feedback. If possible, please also provide link to the network or use-case where this op is getting used.\n\nAs Ops are requested we will add \" *To Triage*\" pool. If we have 3+ requests for an operation and given its complexity/need the operation will be moved \"*To be implemented*\" pool. If you want to work on adding support for such op, feel free to comment below to get assigned one. Please avoid pickup up an op that is already being worked on tracked in \"*In progress*\" pool. \n\n[Link to the wiki for details](https://github.com/pytorch/pytorch/wiki/MPS-Backend) on how to add these ops and example PRs.\n\n[**MPS operators coverage matrix**](https://qqaatw.github.io/pytorch-mps-ops-coverage/) - The matrix covers most of the supported operators but is not exhaustive. **Please look at the `In vx.x.x` column, if the box is green, it means that the op implementation is included in the latest release; on the other hand, if the box is yellow, it means the op implementation is in the nightly and has not yet included in the latest release.** Before you comment below, please take a look at this matrix to make sure the operator you're requesting has not been implemented in nightly.  More details can be found on the [readme](https://github.com/qqaatw/pytorch-mps-ops-coverage).\n\ncc @kulinseth @malfet @DenisVieriu97 @jhavukainen",
+            "state": null,
+            "user": null,
+            "assignees": null,
+            "labels": null,
+            "milestone": null,
+            "state_reason": null,
+            "comments": null,
+            "created_at": null,
+            "updated_at": null,
+            "closed_at": null,
+            "display_url": "https://github.com/pytorch/pytorch/issues/77764",
+            "display_title": "General MPS op coverage tracking issue"
+          },
+          {
+            "url": "https://github.com/pytorch/pytorch/issues/105655",
+            "title": "Pytorch -  cpu only & caffe2 build failing",
+            "issue_number": 105655,
+            "body": "## Pytorch build failing always\r\n\r\n[Pytorch cpu-only build from source failing with caffe2 on]\r\n\r\nI was trying to build caffe2 within Pytorch directory but couldn't find a way to build it. The build seems to fail always. Can somebody tell what & how to do?\r\n\r\nBelow are the set of commands I was using:\r\n\r\n- How you installed PyTorch (conda, pip, source):\r\n```\r\ngit clone --recursive https://github.com/pytorch/pytorch\r\ncd pytorch\r\ngit checkout tags/v2.0.1\r\n```\r\n\r\n- Build command used :\r\n```\r\nexport USE_CAFFE2=1\r\nexport USE_CUDA=0\r\nexport USE_MKLDNN=1\r\nexport BUILD_CAFFE2_OPS=1\r\nexport BUILD_CAFFE2=1\r\nexport USE_OPENMP=1\r\nexport CMAKE_PREFIX_PATH=${CONDA_PREFIX:-\"$(dirname $(which conda))/../\"}\r\nexport _GLIBCXX_USE_CXX11_ABI=1\r\nBUILD_CAFFE2=ON BUILD_CAFFE2_OPS=ON USE_MKLDNN=ON python setup.py install\r\n```\r\n\r\n## System Info\r\n\r\n```\r\nPyTorch version: 2.0.1\r\nIs debug build: False\r\nCUDA used to build PyTorch: None\r\nROCM used to build PyTorch: N/A\r\n\r\nOS: Ubuntu 20.04.6 LTS (x86_64)\r\nGCC version: (Ubuntu 9.4.0-1ubuntu1~20.04.1) 9.4.0\r\nClang version: 3.8.0-2ubuntu1 (tags/RELEASE_380/final)\r\nCMake version: version 3.26.4\r\nLibc version: glibc-2.31\r\n\r\nPython version: 3.10.12 (main, Jul  5 2023, 18:54:27) [GCC 11.2.0] (64-bit runtime)\r\nPython platform: Linux-5.4.0-148-generic-x86_64-with-glibc2.31\r\nIs CUDA available: False\r\nCUDA runtime version: No CUDA\r\nCUDA_MODULE_LOADING set to: N/A\r\nGPU models and configuration: No CUDA\r\nNvidia driver version: No CUDA\r\ncuDNN version: No CUDA\r\nHIP runtime version: N/A\r\nMIOpen runtime version: N/A\r\nIs XNNPACK available: True\r\n\r\nCPU:\r\nArchitecture:                    x86_64\r\nCPU op-mode(s):                  32-bit, 64-bit\r\nByte Order:                      Little Endian\r\nAddress sizes:                   46 bits physical, 48 bits virtual\r\nCPU(s):                          40\r\nOn-line CPU(s) list:             0-39\r\nThread(s) per core:              2\r\nCore(s) per socket:              10\r\nSocket(s):                       2\r\nNUMA node(s):                    1\r\nVendor ID:                       GenuineIntel\r\nCPU family:                      6\r\nModel:                           63\r\nModel name:                      Intel(R) Xeon(R) CPU E5-2650 v3 @ 2.30GHz\r\nStepping:                        2\r\nCPU MHz:                         1227.239\r\nCPU max MHz:                     2300.0000\r\nCPU min MHz:                     1200.0000\r\nBogoMIPS:                        4589.03\r\nVirtualization:                  VT-x\r\nL1d cache:                       640 KiB\r\nL1i cache:                       640 KiB\r\nL2 cache:                        5 MiB\r\nL3 cache:                        50 MiB\r\nNUMA node0 CPU(s):               0-39\r\nVulnerability Itlb multihit:     KVM: Mitigation: Split huge pages\r\nVulnerability L1tf:              Mitigation; PTE Inversion; VMX conditional cache flushes, SMT vulnerable\r\nVulnerability Mds:               Mitigation; Clear CPU buffers; SMT vulnerable\r\nVulnerability Meltdown:          Mitigation; PTI\r\nVulnerability Mmio stale data:   Mitigation; Clear CPU buffers; SMT vulnerable\r\nVulnerability Retbleed:          Not affected\r\nVulnerability Spec store bypass: Mitigation; Speculative Store Bypass disabled via prctl and seccomp\r\nVulnerability Spectre v1:        Mitigation; usercopy/swapgs barriers and __user pointer sanitization\r\nVulnerability Spectre v2:        Mitigation; Retpolines, IBPB conditional, IBRS_FW, STIBP conditional, RSB filling, PBRSB-eIBRS Not affected\r\nVulnerability Srbds:             Not affected\r\nVulnerability Tsx async abort:   Not affected\r\nFlags:                           fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush dts acpi mmx fxsr sse sse2 ss ht tm pbe syscall nx pdpe1gb rdtscp lm constant_tsc arch_perfmon pebs bts rep_good nopl xtopology nonstop_tsc cpuid aperfmperf pni pclmulqdq dtes64 monitor ds_cpl vmx smx est tm2 ssse3 sdbg fma cx16 xtpr pdcm pcid dca sse4_1 sse4_2 x2apic movbe popcnt tsc_deadline_timer aes xsave avx f16c rdrand lahf_lm abm cpuid_fault epb invpcid_single pti ssbd ibrs ibpb stibp tpr_shadow vnmi flexpriority ept vpid ept_ad fsgsbase tsc_adjust bmi1 avx2 smep bmi2 erms invpcid cqm xsaveopt cqm_llc cqm_occup_llc dtherm arat pln pts md_clear flush_l1d\r\n\r\nVersions of relevant libraries:\r\n[pip3] numpy==1.25.0\r\n[pip3] torch==2.0.1\r\n[pip3] torchaudio==2.0.2\r\n[pip3] torchvision==0.15.2\r\n[conda] blas                      1.0                         mkl  \r\n[conda] cpuonly                   2.0                           0    pytorch\r\n[conda] mkl                       2023.2.0                 pypi_0    pypi\r\n[conda] mkl-include               2023.2.0                 pypi_0    pypi\r\n[conda] mkl-service               2.4.0           py310h5eee18b_1  \r\n[conda] mkl_fft                   1.3.6           py310h1128e8f_1  \r\n[conda] mkl_random                1.2.2           py310h1128e8f_1  \r\n[conda] numpy                     1.25.0          py310h5f9d8c6_0  \r\n[conda] numpy-base                1.25.0          py310hb5e798b_0  \r\n[conda] pytorch                   2.0.1              py3.10_cpu_0    pytorch\r\n[conda] pytorch-mutex             1.0                         cpu    pytorch\r\n[conda] torchaudio                2.0.2                 py310_cpu    pytorch\r\n[conda] torchvision               0.15.2                py310_cpu    pytorch\r\n```\r\n\n\ncc @malfet @seemethere",
+            "state": null,
+            "user": null,
+            "assignees": null,
+            "labels": null,
+            "milestone": null,
+            "state_reason": null,
+            "comments": null,
+            "created_at": null,
+            "updated_at": null,
+            "closed_at": null,
+            "display_url": "https://github.com/pytorch/pytorch/issues/105655",
+            "display_title": "Pytorch -  cpu only & caffe2 build failing"
+          }
+        ]
+      },
+      "isError": false
+    }
+  },
+  {
+    "task_ids": [
+      "RC-042"
+    ],
+    "kind": "SEARCH",
+    "round": 2,
+    "tool": "github_search_prs",
+    "args": {
+      "repository_full_name": "pytorch/pytorch",
+      "query": "\"segment_reduce\" empty",
+      "topn": 3
+    },
+    "checked_at": "2026-11-13T02:27:23.396Z",
+    "response": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Action completed."
+        }
+      ],
+      "structuredContent": {
+        "issues": [
+          {
+            "url": "https://github.com/pytorch/pytorch/pull/203994",
+            "title": "[Inductor] Add segment_reduce backward lowering",
+            "issue_number": 203994,
+            "body": "Stack from [ghstack](https://github.com/ezyang/ghstack/tree/0.15.0) (oldest at bottom):\n* __->__ #203994\n* #203486\n* #203455\n* #203423\n* #203415\n\n## Linked issue or supporting maintainer\n\nTODO(nullplay)\n\n## BC-breaking?\n\nNo\n\n## Summary (human written only)\n\nAdd `segment_reduce` backward lowering.\n\n## Agent details\n\n> Authored with an AI assistant (Metamate). The human author reviews it before it leaves draft.\n\nThis is the fifth PR in the jagged IR stack. `aten._segment_reduce_backward` was a `make_fallback`, so a compiled training step ran the ATen backward kernel even though the forward lowers to a jagged reduction. This PR replaces the fallback with a decomposition into ops that Inductor already lowers.\n\nEach element p of segment s gets the gradient that the ATen kernels give it:\n\n| reduce | gradient of data[p] |\n|---|---|\n| sum | grad[s] |\n| mean | grad[s] / length[s] |\n| max, min | 0 unless data[p] is nan or equals out[s] (a tie); then grad[s], divided by the number of ties in s if grad[s] > 0 |\n| prod | grad[s] * out[s] / data[p]; where data[p] is 0 or nan, grad[s] * initial * (product of the other elements of s) |\n\nThe segment of each element is `searchsorted(offsets, p, right=True) - 1`, one pointwise kernel with `bucketize_binary_search`, and `grad[s]` is then an indirect load: the sum backward is two pointwise kernels. The tie counts for max and min, and for prod the product of the elements that are neither 0 nor nan and the counts of 0 and nan elements, are `segment_reduce` calls, which lower to jagged reductions. Eager computes the prod gradient of a 0 or nan element with a loop over the rest of the segment; these counts give the same value without the loop. Eager divides only positive gradients among ties (#201633), and the decomposition does the same so that compiled and eager agree. Elements that the offsets do not cover get 0, as in eager. On CPU, the `segment_reduce` calls fall back to ATen and the compiled backward still matches eager.\n\nA dedicated lowering would generate the same code, because Inductor already lowers `searchsorted` to a binary search, `gather` to an indirect load and `segment_reduce` to the jagged loop. The decomposition is shorter and keeps working wherever the forward falls back.\n\n### Performance\n\nBackward of `segment_reduce` with default `torch.compile` vs eager on one H100, with the inputs of the forward table in #203455: `offsets` input, average segment length 128 (uniform in [0, 256], or lognormal with sigma 1.5). prod uses data near 1 so that the products stay finite. The backward alone and forward + backward are each captured in a CUDA graph, and the replay is timed with `triton.testing.do_bench`, so the times exclude CPU overhead. Times are in microseconds. Every compiled gradient matches an fp64 reference.\n\nEager's CUDA backward kernel runs one thread per output element, and that thread loops over its segment, so a long segment dominates the time. The compiled sum backward is a gather whose cost does not depend on the segment lengths, and the counts and products that max and prod need are jagged reductions, which read a segment R0_BLOCK elements at a time. For max and min, the partitioner computes the tie mask in the forward and saves it, so the compiled forward is slower than eager for large inputs (521 to 1138 us for B = 8192, uniform lengths, D = 256, fp32), and the forward + backward speedup is lower than the backward speedup.\n\n#### sum\n\n| B | lengths (max) | D | dtype | backward eager | backward compiled | speedup | forward + backward speedup |\n|---|---|---|---|---|---|---|---|\n| 256 | uniform (256) | 1 | bfloat16 | 44.1 | 6.7 | 6.60x | 5.19x |\n| 256 | uniform (256) | 1 | float32 | 44.2 | 6.7 | 6.61x | 5.31x |\n| 256 | uniform (256) | 32 | bfloat16 | 15.5 | 9.2 | 1.68x | 3.08x |\n| 256 | uniform (256) | 32 | float32 | 16.5 | 9.8 | 1.69x | 2.82x |\n| 256 | uniform (256) | 256 | bfloat16 | 23.7 | 15.3 | 1.54x | 2.05x |\n| 256 | uniform (256) | 256 | float32 | 35.1 | 23.9 | 1.47x | 1.68x |\n| 256 | lognormal (2335) | 1 | bfloat16 | 76.9 | 6.8 | 11.23x | 8.66x |\n| 256 | lognormal (2335) | 1 | float32 | 76.4 | 7.0 | 10.90x | 8.56x |\n| 256 | lognormal (2335) | 32 | bfloat16 | 59.4 | 9.0 | 6.63x | 17.48x |\n| 256 | lognormal (2335) | 32 | float32 | 60.1 | 9.7 | 6.22x | 14.86x |\n| 256 | lognormal (2335) | 256 | bfloat16 | 70.9 | 15.1 | 4.70x | 7.95x |\n| 256 | lognormal (2335) | 256 | float32 | 78.2 | 22.9 | 3.41x | 5.84x |\n| 8192 | uniform (256) | 1 | bfloat16 | 55.7 | 18.4 | 3.03x | 3.26x |\n| 8192 | uniform (256) | 1 | float32 | 51.5 | 18.2 | 2.83x | 2.72x |\n| 8192 | uniform (256) | 32 | bfloat16 | 66.9 | 51.3 | 1.30x | 1.29x |\n| 8192 | uniform (256) | 32 | float32 | 125.1 | 79.4 | 1.58x | 1.36x |\n| 8192 | uniform (256) | 256 | bfloat16 | 470.7 | 253.7 | 1.86x | 1.35x |\n| 8192 | uniform (256) | 256 | float32 | 924.9 | 497.9 | 1.86x | 1.41x |\n| 8192 | lognormal (13938) | 1 | bfloat16 | 319.0 | 18.3 | 17.40x | 7.98x |\n| 8192 | lognormal (13938) | 1 | float32 | 319.6 | 18.1 | 17.61x | 7.91x |\n| 8192 | lognormal (13938) | 32 | bfloat16 | 343.1 | 51.3 | 6.69x | 8.72x |\n| 8192 | lognormal (13938) | 32 | float32 | 391.0 | 79.4 | 4.93x | 7.65x |\n| 8192 | lognormal (13938) | 256 | bfloat16 | 744.1 | 253.8 | 2.93x | 3.86x |\n| 8192 | lognormal (13938) | 256 | float32 | 1181.7 | 495.6 | 2.38x | 2.79x |\n\n#### max\n\n| B | lengths (max) | D | dtype | backward eager | backward compiled | speedup | forward + backward speedup |\n|---|---|---|---|---|---|---|---|\n| 256 | uniform (256) | 1 | bfloat16 | 84.4 | 9.3 | 9.06x | 4.66x |\n| 256 | uniform (256) | 1 | float32 | 97.8 | 9.2 | 10.65x | 4.74x |\n| 256 | uniform (256) | 32 | bfloat16 | 175.1 | 15.4 | 11.40x | 5.75x |\n| 256 | uniform (256) | 32 | float32 | 123.0 | 15.7 | 7.81x | 3.62x |\n| 256 | uniform (256) | 256 | bfloat16 | 189.6 | 34.2 | 5.54x | 3.00x |\n| 256 | uniform (256) | 256 | float32 | 153.1 | 42.8 | 3.57x | 2.25x |\n| 256 | lognormal (2335) | 1 | bfloat16 | 246.2 | 9.2 | 26.72x | 15.88x |\n| 256 | lognormal (2335) | 1 | float32 | 285.4 | 9.2 | 30.87x | 17.23x |\n| 256 | lognormal (2335) | 32 | bfloat16 | 993.0 | 19.1 | 51.89x | 20.66x |\n| 256 | lognormal (2335) | 32 | float32 | 998.2 | 19.6 | 51.05x | 18.03x |\n| 256 | lognormal (2335) | 256 | bfloat16 | 1481.7 | 48.1 | 30.81x | 15.46x |\n| 256 | lognormal (2335) | 256 | float32 | 1025.8 | 55.6 | 18.44x | 11.72x |\n| 8192 | uniform (256) | 1 | bfloat16 | 92.9 | 24.0 | 3.87x | 2.23x |\n| 8192 | uniform (256) | 1 | float32 | 107.3 | 24.0 | 4.47x | 2.03x |\n| 8192 | uniform (256) | 32 | bfloat16 | 453.4 | 106.7 | 4.25x | 2.40x |\n| 8192 | uniform (256) | 32 | float32 | 319.8 | 137.9 | 2.32x | 1.31x |\n| 8192 | uniform (256) | 256 | bfloat16 | 2140.7 | 673.8 | 3.18x | 1.79x |\n| 8192 | uniform (256) | 256 | float32 | 1686.2 | 936.5 | 1.80x | 1.06x |\n| 8192 | lognormal (13938) | 1 | bfloat16 | 1334.0 | 43.8 | 30.45x | 14.90x |\n| 8192 | lognormal (13938) | 1 | float32 | 1463.7 | 43.6 | 33.56x | 15.50x |\n| 8192 | lognormal (13938) | 32 | bfloat16 | 11339.5 | 238.7 | 47.51x | 29.70x |\n| 8192 | lognormal (13938) | 32 | float32 | 6047.1 | 268.8 | 22.50x | 13.98x |\n| 8192 | lognormal (13938) | 256 | bfloat16 | 12753.3 | 790.5 | 16.13x | 8.97x |\n| 8192 | lognormal (13938) | 256 | float32 | 7104.3 | 1050.6 | 6.76x | 3.68x |\n\n#### prod\n\n| B | lengths (max) | D | dtype | backward eager | backward compiled | speedup | forward + backward speedup |\n|---|---|---|---|---|---|---|---|\n| 256 | uniform (256) | 1 | bfloat16 | 91.7 | 9.9 | 9.24x | 6.12x |\n| 256 | uniform (256) | 1 | float32 | 107.8 | 9.8 | 11.05x | 6.81x |\n| 256 | uniform (256) | 32 | bfloat16 | 130.5 | 18.6 | 7.03x | 7.84x |\n| 256 | uniform (256) | 32 | float32 | 131.2 | 20.4 | 6.43x | 7.42x |\n| 256 | uniform (256) | 256 | bfloat16 | 144.4 | 51.7 | 2.79x | 3.50x |\n| 256 | uniform (256) | 256 | float32 | 163.8 | 70.2 | 2.33x | 3.06x |\n| 256 | lognormal (2335) | 1 | bfloat16 | 346.1 | 10.0 | 34.56x | 25.13x |\n| 256 | lognormal (2335) | 1 | float32 | 388.4 | 9.9 | 39.41x | 27.23x |\n| 256 | lognormal (2335) | 32 | bfloat16 | 1083.6 | 26.6 | 40.70x | 43.13x |\n| 256 | lognormal (2335) | 32 | float32 | 1076.1 | 27.5 | 39.19x | 40.19x |\n| 256 | lognormal (2335) | 256 | bfloat16 | 1114.7 | 72.6 | 15.35x | 16.02x |\n| 256 | lognormal (2335) | 256 | float32 | 1127.8 | 91.1 | 12.38x | 16.30x |\n| 8192 | uniform (256) | 1 | bfloat16 | 94.5 | 26.0 | 3.64x | 3.07x |\n| 8192 | uniform (256) | 1 | float32 | 118.1 | 25.7 | 4.59x | 3.17x |\n| 8192 | uniform (256) | 32 | bfloat16 | 306.5 | 150.5 | 2.04x | 2.22x |\n| 8192 | uniform (256) | 32 | float32 | 359.1 | 225.7 | 1.59x | 1.65x |\n| 8192 | uniform (256) | 256 | bfloat16 | 1472.9 | 945.7 | 1.56x | 1.61x |\n| 8192 | uniform (256) | 256 | float32 | 1948.8 | 1569.7 | 1.24x | 1.25x |\n| 8192 | lognormal (13938) | 1 | bfloat16 | 1892.3 | 52.1 | 36.35x | 23.90x |\n| 8192 | lognormal (13938) | 1 | float32 | 2068.3 | 51.2 | 40.42x | 25.09x |\n| 8192 | lognormal (13938) | 32 | bfloat16 | 6533.8 | 352.0 | 18.56x | 23.42x |\n| 8192 | lognormal (13938) | 32 | float32 | 6610.6 | 375.1 | 17.62x | 22.70x |\n| 8192 | lognormal (13938) | 256 | bfloat16 | 7531.9 | 1439.0 | 5.23x | 7.26x |\n| 8192 | lognormal (13938) | 256 | float32 | 8005.8 | 1850.6 | 4.33x | 5.68x |\n\n## Test plan\n\nThe new test compiles the backward of `torch.segment_reduce` for each reduction and compares it with eager on CUDA. Its inputs extend those of `test_simple_1d` in `test/test_segment_reductions.py` (a nan, an empty segment, tied maxima) with tied minima, two zeros for prod and a negative gradient for the tied segment, and it checks that the wrapper does not call `aten._segment_reduce_backward`. The OpInfo tests in `test_torchinductor_opinfo.py` compare the compiled backward with eager for `lengths` and `offsets`, along `axis=1` of 2-D and 3-D inputs, with lengths that do not cover every row, and with `initial`.\n\n```\npython test/inductor/test_jagged_ir.py -v\npython -m pytest -q test/inductor/test_torchinductor_opinfo.py -k segment_reduce\npython test/inductor/test_op_completeness.py\nlintrunner -a torch/_inductor/decomposition.py torch/_inductor/lowering.py test/inductor/test_jagged_ir.py\n```\n\ncc @voznesenskym @penguinwu @EikanWang @jgong5 @Guobing-Chen @XiaobingSuper @zhuhaozhe @blzheng @wenzhe-nrv @jiayisunx @ipiszy @kadeng @muchulee8 @amjames @chauhang @aakhundov @coconutruben @jataylo",
+            "state": null,
+            "user": null,
+            "assignees": null,
+            "labels": null,
+            "milestone": null,
+            "state_reason": null,
+            "comments": null,
+            "created_at": null,
+            "updated_at": null,
+            "closed_at": null,
+            "display_url": "https://github.com/pytorch/pytorch/pull/203994",
+            "display_title": "[Inductor] Add segment_reduce backward lowering"
+          },
+          {
+            "url": "https://github.com/pytorch/pytorch/pull/203455",
+            "title": "[Inductor] Lower segment_reduce forward to a jagged reduction",
+            "issue_number": 203455,
+            "body": "Stack from [ghstack](https://github.com/ezyang/ghstack/tree/0.15.0) (oldest at bottom):\n* #203994\n* #203486\n* __->__ #203455\n* #203423\n* #203415\n\n## Linked issue or supporting maintainer\n\nTODO(nullplay)\n\n## BC-breaking?\n\nNo\n\n## Summary (human written only)\n\nAdd `segment_reduce` forward lowering with the jagged IR.\n\n## Agent details\n\n> Authored with an AI assistant (Metamate). The human author reviews it before it leaves draft.\n\nThis is the third PR in the jagged IR stack. It lowers the forward of `aten.segment_reduce` to a jagged reduction instead of the ATen fallback:\n\n```\nout[*o, s, *i] = reduce(data[*o, p, *i] for p in range(start[*o, s], end[*o, s]))\n```\n\nThere is a single path, based on offsets: the bound is `offsets[s + 1] - offsets[s]` and the start is `offsets[s]`. When only `lengths` is given, the offsets are `cumsum` of the lengths with a leading 0 padded in first. The scan inlines the pad, so the lengths path runs as two kernels: one scan for the offsets and one jagged reduction. The offsets are realized, and the bound reads them with a load even when they are computed only from constants; otherwise Inductor would inline them into the bound. Calls that pass the same offsets or lengths buffer reuse the same offsets and `JaggedRange`. `GraphLowering.jagged_offsets` records them, keyed by kind and buffer name; views get a fresh range. As a result, `sum` and `max` over the same offsets fuse into one kernel, and the lengths scan runs once. `mean` divides the sum by the length in a pointwise epilogue. Empty segments give the same values as eager: 0 for sum, -inf for max, inf for min, 1 for prod, and nan for mean.\n\n`initial` is lowered for `max` and `min` with any value: a pointwise epilogue computes `max(x, initial)` (or `min`), which equals eager seeding the accumulator with `initial`, and an empty segment gives `initial`. `sum`, `mean` and `prod` lower only their identity (0, 0 and 1). With `initial=0`, `mean` gives 0 for an empty segment instead of nan, so the epilogue divides by `max(length, 1)`. Eager adds any other `initial` to the accumulator first, in the data dtype, so those calls fall back.\n\n`lengths` without `unsafe=True` is lowered too. Eager checks on the host that no length is negative and that each row of lengths sums to `data.size(axis)`. The lowering reduces each check to one flag on the device with `any` and asserts on it with `tl.device_assert` and eager's message, so there is no sync. Like `torch._assert_async`, the assert fires asynchronously. This path runs as four kernels: scan, two checks and the reduction. `amax` and `amin`, which PyG passes, lower as `max` and `min`, as in eager.\n\nThe lowering keeps the ATen fallback for:\n- `lengths` and `offsets` together, because meta and eager disagree on which one wins.\n- `indices`, and an `initial` other than the identity for `sum`, `mean` and `prod`.\n- Non-Triton devices and the C++/FX wrappers, which cannot pass the jagged numel argument.\n\nfp16 and bf16 data accumulate in fp32, like other Inductor reductions. Eager accumulates in the data dtype, so for long segments the compiled result is closer to an fp64 reference than eager is. `_segment_reduce_backward` stays a fallback. `meta_segment_reduce` now canonicalizes `axis`. Before, a negative `axis` gave the wrong output shape, and the compiled result was silently wrong. Integer data still falls back, because eager supports only floating types.\n\n### Performance\n\n`sum` with default `torch.compile` vs eager on one H100, `offsets` input, average segment length 128 (uniform in [0, 256], or lognormal with sigma 1.5), measured with `triton.testing.do_bench`. Every compiled result matches an fp64 reference. Times are in microseconds; this includes the flat tiling from the previous PR.\n\n| B | lengths (max) | D | dtype | eager | compiled | speedup |\n|---|---|---|---|---|---|---|\n| 256 | uniform (256) | 1 | bfloat16 | 7.4 | 5.6 | 1.34x |\n| 256 | uniform (256) | 1 | float32 | 7.3 | 5.1 | 1.44x |\n| 256 | uniform (256) | 32 | bfloat16 | 37.0 | 9.0 | 4.10x |\n| 256 | uniform (256) | 32 | float32 | 36.4 | 10.5 | 3.48x |\n| 256 | uniform (256) | 256 | bfloat16 | 45.2 | 18.6 | 2.42x |\n| 256 | uniform (256) | 256 | float32 | 50.7 | 25.3 | 2.01x |\n| 256 | lognormal (2335) | 1 | bfloat16 | 8.1 | 5.6 | 1.45x |\n| 256 | lognormal (2335) | 1 | float32 | 8.0 | 5.6 | 1.43x |\n| 256 | lognormal (2335) | 32 | bfloat16 | 264.1 | 12.8 | 20.69x |\n| 256 | lognormal (2335) | 32 | float32 | 240.0 | 13.5 | 17.83x |\n| 256 | lognormal (2335) | 256 | bfloat16 | 286.9 | 32.7 | 8.76x |\n| 256 | lognormal (2335) | 256 | float32 | 280.5 | 39.4 | 7.11x |\n| 8192 | uniform (256) | 1 | bfloat16 | 21.4 | 8.0 | 2.66x |\n| 8192 | uniform (256) | 1 | float32 | 14.9 | 7.7 | 1.95x |\n| 8192 | uniform (256) | 32 | bfloat16 | 69.2 | 50.9 | 1.36x |\n| 8192 | uniform (256) | 32 | float32 | 93.2 | 76.3 | 1.22x |\n| 8192 | uniform (256) | 256 | bfloat16 | 298.2 | 308.3 | 0.97x |\n| 8192 | uniform (256) | 256 | float32 | 515.9 | 509.9 | 1.01x |\n| 8192 | lognormal (13938) | 1 | bfloat16 | 22.6 | 27.9 | 0.81x |\n| 8192 | lognormal (13938) | 1 | float32 | 15.7 | 27.4 | 0.57x |\n| 8192 | lognormal (13938) | 32 | bfloat16 | 1526.7 | 166.9 | 9.15x |\n| 8192 | lognormal (13938) | 32 | float32 | 1425.0 | 161.1 | 8.84x |\n| 8192 | lognormal (13938) | 256 | bfloat16 | 1785.4 | 403.5 | 4.42x |\n| 8192 | lognormal (13938) | 256 | float32 | 1871.4 | 602.5 | 3.11x |\n\nCompiled is slower for D = 1 with very long segments (B = 8192, lognormal): eager uses CUB's segmented reduce, and the jagged loop has no split reduction yet.\n\n## Test plan\n\nThe new tests compile `torch.segment_reduce` and compare it with eager on CUDA. They cover all five reductions with offsets on 1-D and 2-D data, an inner `axis` with int32 offsets, `lengths` with `unsafe=True` and `unsafe=False` (both lowered; `unsafe=False` emits the device asserts), `amax` and `amin`, and `axis=-2` with offsets, lengths and unsafe lengths. For `initial`, they cover `lengths` with `unsafe=True` and each reduction: `max` with 0 and -inf and `min` with 0.5 are lowered, as are `sum` and `mean` with 0 and `prod` with 1, while `sum` with 1.0 and `prod` with 2.0 fall back. Offsets computed only from constants inside the graph are also lowered. fp16 and bf16 sums are compared with an fp64 reference. The tests also check kernel launch counts: 1 for two reductions on the same offsets, 2 for the same lengths (scan + reduction), and 2 for different offsets. For vertical fusion, a pointwise prologue or epilogue fuses into the jagged reduction (1 launch). A stored prologue, or an epilogue that reduces across segments, stays separate (2 launches). The inputs include an empty segment and a segment longer than one reduction block.\n\n```\npython test/inductor/test_jagged_ir.py -v\npython -m pytest -q test/inductor/test_torchinductor_opinfo.py -k segment_reduce\npython -m pytest -q test/test_meta.py -k segment_reduce\npython -m pytest -q test/inductor/test_fxir_backend.py -k extern_kernel_irnode_kwargs\npython test/inductor/test_op_completeness.py\nlintrunner -a torch/_inductor/lowering.py torch/_inductor/graph.py torch/_meta_registrations.py test/inductor/test_jagged_ir.py\n```\n\ncc @voznesenskym @penguinwu @EikanWang @jgong5 @Guobing-Chen @XiaobingSuper @zhuhaozhe @blzheng @wenzhe-nrv @jiayisunx @ipiszy @kadeng @muchulee8 @amjames @chauhang @aakhundov @coconutruben @jataylo\n",
+            "state": null,
+            "user": null,
+            "assignees": null,
+            "labels": null,
+            "milestone": null,
+            "state_reason": null,
+            "comments": null,
+            "created_at": null,
+            "updated_at": null,
+            "closed_at": null,
+            "display_url": "https://github.com/pytorch/pytorch/pull/203455",
+            "display_title": "[Inductor] Lower segment_reduce forward to a jagged reduction"
+          },
+          {
+            "url": "https://github.com/pytorch/pytorch/pull/197014",
+            "title": "[MPS] Add native segment_reduce forward pass ",
+            "issue_number": 197014,
+            "body": " ## Summary\r\n \r\nAdds native Metal forward implementations of `segment_reduce` for `sum`, `mean`, `min`, `max` and `prod`, using FP32/FP16/BF16 data and INT32/INT64 lengths or offsets. It reuses the existing ATen frontend and **two forward dispatch stubs**. \r\nBackward and indices-based reduction remain unsupported. No MPS-only offsets validation is added.\r\n\r\n\r\n\r\nTracking Issue : https://github.com/pytorch/pytorch/issues/141287\r\n\r\n## Implementation\r\n\r\nThe general path assigns one thread per output; long contiguous segments use a threadgroup reduction. Sum/product policies share identity, combine, SIMD and threadgroup operations with ordinary Metal reductions while preserving their load/finalize behavior. Existing min/max policies are reused, and reduction-name conversion is shared in `ReductionType.h`.\r\n\r\nThe 256-thread launch and scratch capacity derive from shared constants with compile-time constraints. Checked host-side initial-value conversion preserves dtype rounding and scalar overflow errors; redundant shader casts were removed.\r\n\r\nForward OpInfo coverage remains enabled. Missing backward behavior is marked expected-failure, including gradient checks, eager variant consistency, noncontiguous samples and dtype checks. Both lengths and offsets have the additional expectations published in `d512c19305f`. The focused BF16 test has ten cases: five reductions across parallel-contiguous and serial-strided layouts, including noncontiguous inputs, a skipped prefix, empty and long segments.\r\n\r\n## Preliminary performance\r\n\r\nOn an Apple M4 Pro, an FP32 sum over 65,536 values in 16 equal segments took approximately 323 us with the serial shader and 9.7 us with the parallel shader. \r\n\r\n ## Benchmark\r\n\r\nNative product `segment_reduce` on **Apple M4 Pro**, macOS 26.7, with **10 configured CPU threads**.\r\n\r\n ### Queued throughput across shapes and segment counts\r\n\r\n\r\n| Input shape | Segments | Dtype | Queued CPU | Queued MPS | Speedup | Synchronized CPU | Synchronized MPS | Speedup |\r\n|---|---:|---|---:|---:|---:|---:|---:|---:|\r\n| 262,144 | 64 | FP32 | 197.92 | 46.32 | 4.27x | 202.06 | 161.15 | 1.25x |\r\n| 262,144 | 64 | FP16 | 200.17 | 46.32 | 4.32x | 197.13 | 174.02 | 1.13x |\r\n| 262,144 | 64 | BF16 | 1,121.06 | 48.41 | 23.16x | 1,125.25 | 231.52 | 4.86x |\r\n| 1,048,576 | 16 | FP32 | 810.03 | 195.25 | 4.15x | 800.88 | 360.92 | 2.22x |\r\n| 1,048,576 | 16 | FP16 | 804.55 | 193.47 | 4.16x | 801.86 | 359.45 | 2.23x |\r\n| 1,048,576 | 16 | BF16 | 4,511.18 | 202.47 | 22.28x | 4,479.74 | 383.40 | 11.68x |\r\n| 1,048,576 | 256 | FP32 | 790.69 | 94.49 | 8.37x | 789.48 | 217.05 | 3.64x |\r\n| 1,048,576 | 256 | FP16 | 788.61 | 90.05 | 8.76x | 788.61 | 228.25 | 3.46x |\r\n| 1,048,576 | 256 | BF16 | 4,507.81 | 114.73 | 39.29x | 4,482.26 | 241.94 | 18.53x |\r\n| 4,194,304 | 1,024 | FP32 | 3,181.23 | 250.82 | 12.68x | 3,163.23 | 419.89 | 7.53x |\r\n| 4,194,304 | 1,024 | FP16 | 3,154.13 | 246.90 | 12.77x | 3,152.25 | 426.73 | 7.39x |\r\n| 4,194,304 | 1,024 | BF16 | 17,963.24 | 77.17 | 232.78x | 17,916.33 | 459.62 | 38.98x |\r\n| 8,192 x 128 | 32 | FP32 | 545.95 | 136.92 | 3.99x | 545.64 | 254.28 | 2.15x |\r\n| 8,192 x 128 | 32 | FP16 | 533.61 | 274.62 | 1.94x | 528.25 | 230.58 | 2.29x |\r\n| 8,192 x 128 | 32 | BF16 | 4,105.75 | 277.30 | 14.81x | 4,122.99 | 361.03 | 11.42x |\r\n\r\nSegments are equal-length along axis 0. For the 2D input, each segment spans 256 rows with 128 inner values, exercising the serial strided path rather than the contiguous 1D parallel path. Product inputs use adjacent `(0.5, 2)` pairs in randomized order to avoid overflow and underflow. CPU and MPS outputs were exact against the FP64 reference for these controlled product inputs.\r\n\r\n### All forward reductions and data types\r\n\r\nEach speedup below is the median of the five per-configuration CPU/MPS ratios for the shapes and segment counts above, not a ratio of aggregate times.\r\n\r\n| Dtype | Reduction | Queued speedup | Synchronized speedup | MPS wins, synchronized |\r\n|---|---|---:|---:|---:|\r\n| FP32 | sum | 2.78x | 1.76x | 4/5 |\r\n| FP32 | mean | 3.83x | 2.20x | 4/5 |\r\n| FP32 | min | 7.03x | 3.67x | 5/5 |\r\n| FP32 | max | 7.34x | 3.77x | 5/5 |\r\n| FP32 | prod | 4.27x | 2.22x | 5/5 |\r\n| FP16 | sum | 5.62x | 1.88x | 4/5 |\r\n| FP16 | mean | 6.27x | 1.36x | 4/5 |\r\n| FP16 | min | 32.46x | 8.34x | 5/5 |\r\n| FP16 | max | 18.33x | 8.77x | 5/5 |\r\n| FP16 | prod | 4.32x | 2.29x | 5/5 |\r\n| BF16 | sum | 38.94x | 10.57x | 5/5 |\r\n| BF16 | mean | 42.22x | 9.76x | 5/5 |\r\n| BF16 | min | 18.41x | 11.01x | 5/5 |\r\n| BF16 | max | 19.92x | 8.87x | 5/5 |\r\n| BF16 | prod | 23.16x | 11.68x | 5/5 |\r\n\r\nAcross all reductions and dtypes, MPS was faster in 75/75 queued comparisons and 71/75 synchronized comparisons. All four slower cases used 262,144 elements and 64 segments:\r\n\r\n| Reduction | Dtype | Synchronized CPU (us) | Synchronized MPS (us) |\r\n|---|---|---:|---:|\r\n| sum | FP32 | 123.03 | 159.00 |\r\n| sum | FP16 | 127.70 | 203.14 |\r\n| mean | FP32 | 122.60 | 165.40 |\r\n| mean | FP16 | 124.40 | 169.55 |\r\n\r\n**Numerical limitations:** sum/mean/min/max use seeded uniform inputs in `[-0.5, 0.5]`. CPU and MPS are checked independently against FP64, with `(rtol, atol)` of FP32 `(1.3e-6, 1e-5)`, FP16 `(1e-3, 1e-5)`, and BF16 `(1.6e-2, 1e-5)`. One MPS FP32 sum case, with 1,048,576 elements and 16 segments, exceeded tolerance: the mismatching output was `16.02954102` versus reference `16.02950263`; CPU produced `16.02973175`. All other MPS configurations passed. CPU sum exceeded tolerance in 14/15 configurations and CPU mean in 10/15. These discrepancies are retained, not hidden by relaxed tolerances.\r\n",
+            "state": null,
+            "user": null,
+            "assignees": null,
+            "labels": null,
+            "milestone": null,
+            "state_reason": null,
+            "comments": null,
+            "created_at": null,
+            "updated_at": null,
+            "closed_at": null,
+            "display_url": "https://github.com/pytorch/pytorch/pull/197014",
+            "display_title": "[MPS] Add native segment_reduce forward pass "
+          }
+        ]
+      },
+      "isError": false
+    }
+  },
+  {
+    "task_ids": [
+      "RC-091"
+    ],
+    "kind": "SEARCH",
+    "round": 2,
+    "tool": "github_search_issues",
+    "args": {
+      "repository_full_name": "mindspore-ai/mindspore",
+      "query": "AIR precision is:issue",
+      "topn": 3
+    },
+    "checked_at": "2026-11-13T02:27:23.439Z",
+    "response": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Action completed."
+        }
+      ],
+      "structuredContent": {
+        "issues": []
+      },
+      "isError": false
+    }
+  },
+  {
+    "task_ids": [
+      "RC-091"
+    ],
+    "kind": "SEARCH",
+    "round": 2,
+    "tool": "github_search_prs",
+    "args": {
+      "repository_full_name": "mindspore-ai/mindspore",
+      "query": "AIR precision",
+      "topn": 3
+    },
+    "checked_at": "2026-11-13T02:27:22.899Z",
+    "response": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Action completed."
+        }
+      ],
+      "structuredContent": {
+        "issues": []
+      },
+      "isError": false
+    }
+  },
+  {
+    "task_ids": [
+      "RC-114"
+    ],
+    "kind": "SEARCH",
+    "round": 2,
+    "tool": "github_search_issues",
+    "args": {
+      "repository_full_name": "Ascend/pytorch",
+      "query": "\"mm349\" is:issue",
+      "topn": 3
+    },
+    "checked_at": "2026-11-13T02:27:23.171Z",
+    "response": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Action completed."
+        }
+      ],
+      "structuredContent": {
+        "issues": []
+      },
+      "isError": false
+    }
+  },
+  {
+    "task_ids": [
+      "RC-114"
+    ],
+    "kind": "SEARCH",
+    "round": 2,
+    "tool": "github_search_prs",
+    "args": {
+      "repository_full_name": "Ascend/pytorch",
+      "query": "\"mm349\"",
+      "topn": 3
+    },
+    "checked_at": "2026-11-13T02:27:22.746Z",
+    "response": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Action completed."
+        }
+      ],
+      "structuredContent": {
+        "issues": []
+      },
+      "isError": false
+    }
+  },
+  {
+    "task_ids": [
+      "RC-119"
+    ],
+    "kind": "SEARCH",
+    "round": 2,
+    "tool": "github_search_issues",
+    "args": {
+      "repository_full_name": "Ascend/pytorch",
+      "query": "\"FastGatherSyncBatchNorm\" is:issue",
+      "topn": 3
+    },
+    "checked_at": "2026-11-13T02:27:22.808Z",
+    "response": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Action completed."
+        }
+      ],
+      "structuredContent": {
+        "issues": []
+      },
+      "isError": false
+    }
+  },
+  {
+    "task_ids": [
+      "RC-119"
+    ],
+    "kind": "SEARCH",
+    "round": 2,
+    "tool": "github_search_prs",
+    "args": {
+      "repository_full_name": "Ascend/pytorch",
+      "query": "\"FastGatherSyncBatchNorm\"",
+      "topn": 3
+    },
+    "checked_at": "2026-11-13T02:27:22.946Z",
+    "response": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Action completed."
+        }
+      ],
+      "structuredContent": {
+        "issues": []
+      },
+      "isError": false
+    }
+  },
+  {
+    "task_ids": [
+      "RC-035"
+    ],
+    "kind": "SEARCH",
+    "round": 2,
+    "tool": "github_search_issues",
+    "args": {
+      "repository_full_name": "triton-lang/triton",
+      "query": "stream synchronization is:issue",
+      "topn": 3
+    },
+    "checked_at": "2026-11-13T02:27:22.929Z",
+    "response": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Action completed."
+        }
+      ],
+      "structuredContent": {
+        "issues": [
+          {
+            "url": "https://github.com/triton-lang/triton/issues/8953",
+            "title": "RuntimeError: Failed to execute cuptiSubscribe with error 2",
+            "issue_number": 8953,
+            "body": "### Describe the bug\n\nSeeing  error  on running the following. \n\n`python triton/python/tutorials/10-block-scaled-matmul.py --format mxfp8`\n\nerror:\n```\n✅ (pass mxfp8)\nTraceback (most recent call last):\n  File \".../triton/python/tutorials/10-block-scaled-matmul.py\", line 642, in <module>\n    proton.start(\"block_scaled_matmul\", hook=\"triton\")\n  File \".../triton/python/triton/profiler/profile.py\", line 110, in start\n    session = libproton.start(name, context, data, backend, mode_str)\nRuntimeError: Failed to execute cuptiSubscribe with error 2\n```\n\n\n### Environment details\n\nTriton: master'ish\nGPU: DGX Spark",
+            "state": null,
+            "user": null,
+            "assignees": null,
+            "labels": null,
+            "milestone": null,
+            "state_reason": null,
+            "comments": null,
+            "created_at": null,
+            "updated_at": null,
+            "closed_at": null,
+            "display_url": "https://github.com/triton-lang/triton/issues/8953",
+            "display_title": "RuntimeError: Failed to execute cuptiSubscribe with error 2"
+          },
+          {
+            "url": "https://github.com/triton-lang/triton/issues/11905",
+            "title": "Pipelined dot-input load appears before gdc_wait and produces incorrect results with PDL",
+            "issue_number": 11905,
+            "body": "### Describe the bug\n\nWith Triton 3.7.1 on an H20 (SM90), a consumer kernel using `num_stages=2` produces incorrect results when `tl.extra.cuda.gdc_wait()` is inside its K loop, immediately before the dependent input load.\n\nThe generated TTGIR contains an asynchronous copy of the dependent input in the loop prologue, before the GDC wait inside the loop. Disabling PDL, using `num_stages=1`, or adding a GDC wait before the loop makes this standalone reproducer pass.\n\nIs a GDC wait inside a software-pipelined loop expected to prevent this load from being scheduled before the wait? If this placement is unsupported, could you clarify the required pattern? Based on the documented semantics, I expected the dependent load to remain after the wait.\n\n### Environment details\n\n- GPU: NVIDIA H20-3e, compute capability 9.0\n- NVIDIA driver: 580.105.08\n- Triton: 3.7.1\n- PyTorch: 2.13.0+cu132\n- `torch.version.cuda`: 13.2\n- Python: 3.12.14\n- OS: Linux 5.10.134-16.3.al8.x86_64, x86_64\n- Tested with the installed versions above; not yet tested against Triton main/nightly.\n\n## Reproducer\n\nBoth kernels launch one CTA. The producer signals its dependent, briefly sleeps, and writes ones to X. The store depends on the inline-assembly result to keep it after the delay. The delay widens the overlap window; reproducibility on other devices is not guaranteed by the sleep duration.\n\nBefore each pair, X is reset to zero. The producer is launched with `launch_pdl=False` so this reset keeps its normal stream dependency. Only the consumer enables PDL. W is always one, so all output values must be exactly 64.\n\nK is a runtime parameter so the K loop remains available for software pipelining. The source order inside that loop is:\n\n```python\nw = tl.load(wp)               # independent weights\ntl.extra.cuda.gdc_wait()\nx = tl.load(xp).to(tl.bfloat16)  # dependent producer output\nacc += tl.dot(x, w)\n```\n\nSave the following as `repro_gdc_pipeline.py` and run:\n\n```bash\npython repro_gdc_pipeline.py\n```\n\nOn the affected setup it prints all four controls, then exits with an AssertionError. It also writes TTGIR and PTX for every variant into `repro_gdc_asm/`.\n\n```python\n\"\"\"Standalone reproducer for GDC wait + software-pipelined dot input loads.\n\nRequires an NVIDIA SM90+ GPU, PyTorch and Triton. No vLLM dependency.\nRun: python repro_gdc_pipeline.py\n\"\"\"\nfrom pathlib import Path\n\nimport torch\nimport triton\nimport triton.language as tl\n\n\n@triton.jit\ndef producer(X, SIZE: tl.constexpr):\n    tl.extra.cuda.gdc_launch_dependents()\n    # Keep the producer alive after signaling. The store depends on the asm\n    # result, so it cannot move before the delay.\n    value = tl.inline_asm_elementwise(\n        \"nanosleep.u32 1000000; mov.u32 $0, 1;\",\n        constraints=\"=r\", args=[], dtype=tl.int32, is_pure=False, pack=1,\n    )\n    i = tl.arange(0, SIZE)\n    tl.store(X + i, value.to(tl.float32))\n\n\n@triton.jit\ndef consumer(X, W, Y, K, N: tl.constexpr, WAIT_OUTSIDE: tl.constexpr):\n    m = tl.arange(0, 64)\n    n = tl.program_id(0) * 128 + tl.arange(0, 128)\n    k = tl.arange(0, 32)\n    xp = X + m[:, None] * K + k[None, :]\n    wp = W + k[:, None] * N + n[None, :]\n    acc = tl.zeros((64, 128), tl.float32)\n    if WAIT_OUTSIDE:\n        tl.extra.cuda.gdc_wait()\n    for _ in range(tl.cdiv(K, 32)):\n        w = tl.load(wp)\n        tl.extra.cuda.gdc_wait()\n        x = tl.load(xp).to(tl.bfloat16)\n        acc += tl.dot(x, w)\n        xp += 32\n        wp += 32 * N\n    tl.store(Y + m[:, None] * N + n[None, :], acc)\n\n\ndef run_case(pdl, stages, outside=False):\n    M, N, K = 64, 128, 64\n    x = torch.zeros((M, K), device=\"cuda\", dtype=torch.float32)\n    w = torch.ones((K, N), device=\"cuda\", dtype=torch.bfloat16)\n    y = torch.empty((M, N), device=\"cuda\", dtype=torch.float32)\n\n    def launch():\n        x.zero_()\n        # Normal producer launch preserves the dependency on x.zero_().\n        producer[(1,)](x, M * K, num_warps=4, launch_pdl=False)\n        return consumer[(N // 128,)](\n            x, w, y, K, N, outside,\n            num_warps=4, num_stages=stages, launch_pdl=pdl,\n        )\n\n    kernel = launch()\n    torch.cuda.synchronize()\n    stem = f\"pdl{int(pdl)}_stages{stages}_outside{int(outside)}\"\n    output = Path(__file__).with_name(\"repro_gdc_asm\")\n    output.mkdir(exist_ok=True)\n    for ext in (\"ttgir\", \"ptx\"):\n        (output / f\"{stem}.{ext}\").write_text(kernel.asm[ext])\n\n    graph = torch.cuda.CUDAGraph()\n    with torch.cuda.graph(graph):\n        launch()\n    failures = 0\n    worst = 0.0\n    for _ in range(20):\n        graph.replay()\n        torch.cuda.synchronize()\n        # All inputs are one after the producer: every output must equal K.\n        error = (y - K).abs().max().item()\n        failures += int(not torch.equal(y, torch.full_like(y, K)))\n        worst = max(worst, error)\n    print(f\"{stem}: failed_replays={failures}/20 max_abs_error={worst}\", flush=True)\n    return failures\n\n\ndef main():\n    print(f\"torch={torch.__version__}, CUDA={torch.version.cuda}, \"\n          f\"triton={triton.__version__}\", flush=True)\n    print(f\"GPU={torch.cuda.get_device_name()}, \"\n          f\"capability={torch.cuda.get_device_capability()}\", flush=True)\n    assert torch.cuda.get_device_capability()[0] >= 9, \"Requires SM90+\"\n    assert run_case(False, 2) == 0, \"Non-PDL control failed\"\n    assert run_case(True, 1) == 0, \"Single-stage control failed\"\n    failures = run_case(True, 2)\n    assert run_case(True, 2, outside=True) == 0, \"Outside-wait control failed\"\n    assert failures == 0, (\n        \"Dependent loads appear to cross gdc_wait with num_stages=2: \"\n        f\"{failures}/20 graph replays produced incorrect results\"\n    )\n\n\nif __name__ == \"__main__\":\n    main()\n```\n\n## Actual result\n\n```text\ntorch=2.13.0+cu132, CUDA=13.2, triton=3.7.1\nGPU=NVIDIA H20-3e, capability=(9, 0)\npdl0_stages2_outside0: failed_replays=0/20 max_abs_error=0.0\npdl1_stages1_outside0: failed_replays=0/20 max_abs_error=0.0\npdl1_stages2_outside0: failed_replays=20/20 max_abs_error=32.0\npdl1_stages2_outside1: failed_replays=0/20 max_abs_error=0.0\nTraceback (most recent call last):\n  File \"/home/linitra24/vllm_my/tmp/lora_pdl/repro_gdc_pipeline.py\", line 102, in <module>\n    main()\n  File \"/home/linitra24/vllm_my/tmp/lora_pdl/repro_gdc_pipeline.py\", line 95, in main\n    assert failures == 0, (\n           ^^^^^^^^^^^^^\nAssertionError: Dependent loads appear to cross gdc_wait with num_stages=2: 20/20 graph replays produced incorrect results\n```\n\nThe outside-wait control adds one wait before the loop and leaves the original in-loop wait in place.\n\nExpected: all four variants produce exactly 64 in every output element.\n\n## Generated-code evidence\n\nIn `pdl1_stages2_outside0.ttgir`, `%xp_22` is derived from the producer output pointer `%X`. Its asynchronous copy appears at line 72, before the `scf.for` at line 74. The GDC wait is inside the loop at line 85.\n\nAbbreviated for readability:\n\n```text\n%xp_16 = tt.splat %X ...\n...\n%x_38 = ttg.async_copy_global_to_local %xp_22, %x_36 ...\n...\n%acc_40:8 = scf.for ... {\n    ...\n    %9 = tt.elementwise_inline_asm \"griddepcontrol.wait; // dummy $0\"\n         {constraints = \"=r\", packed_element = 1 : i32, pure = false} -> i32\n    ...\n}\n```\n\nThe PTX likewise contains dependent-input `cp.async.cg.shared.global` instructions at lines 123–135, before the `griddepcontrol.wait` at line 323. Full TTGIR, PTX and the execution log are attached.\n\nThis suggests the asynchronous input copy is moved ahead of the synchronization during software pipelining. I have not identified the responsible compiler pass or verified a compiler fix.\n\nFor this reproducer, both `num_stages=1` and an additional wait before the loop avoid the incorrect results.\n\nReference: [Triton GDC wait documentation](https://triton-lang.org/main/python-api/generated/triton.language.extra.cuda.gdc_wait.html).",
+            "state": null,
+            "user": null,
+            "assignees": null,
+            "labels": null,
+            "milestone": null,
+            "state_reason": null,
+            "comments": null,
+            "created_at": null,
+            "updated_at": null,
+            "closed_at": null,
+            "display_url": "https://github.com/triton-lang/triton/issues/11905",
+            "display_title": "Pipelined dot-input load appears before gdc_wait and produces incorrect results with PDL"
+          },
+          {
+            "url": "https://github.com/triton-lang/triton/issues/4",
+            "title": "Regression for caffe opencl branch.",
+            "issue_number": 4,
+            "body": "The latest isaac code triggers many test failures with caffe's opencl branch. The good commit is:\nTemplates/Reduce1D: now properly loading 2D scalars  commit 6ac5e1f55b1cae5\n\nSince that commit, both \"General: Internal code generator overhaul\" and \"JIT: No longer using fallbacks for stride[0] > 1\" introduce some regressions.\n\nIt's easy to build the Caffe's opencl branch as below:\n\n  # mkdir build\n  # cmake -DUSE_GREENTEA=ON -DUSE_ISAAC=ON ..\n  # cd build\n  # make -j8\n  # make runtest\n\nThen you will see many new failures with the above two commit.\n\nBTW It's better to use latest beignet driver as the OCL compiler. The good commit works great with beignet.\n\n@ptillet  Could you look at this issue? Thanks.\n",
+            "state": null,
+            "user": null,
+            "assignees": null,
+            "labels": null,
+            "milestone": null,
+            "state_reason": null,
+            "comments": null,
+            "created_at": null,
+            "updated_at": null,
+            "closed_at": null,
+            "display_url": "https://github.com/triton-lang/triton/issues/4",
+            "display_title": "Regression for caffe opencl branch."
+          }
+        ]
+      },
+      "isError": false
+    }
+  },
+  {
+    "task_ids": [
+      "RC-035"
+    ],
+    "kind": "SEARCH",
+    "round": 2,
+    "tool": "github_search_prs",
+    "args": {
+      "repository_full_name": "triton-lang/triton",
+      "query": "stream synchronization",
+      "topn": 3
+    },
+    "checked_at": "2026-11-13T02:27:23.310Z",
+    "response": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Action completed."
+        }
+      ],
+      "structuredContent": {
+        "issues": [
+          {
+            "url": "https://github.com/triton-lang/triton/pull/12030",
+            "title": "[Gluon] Prototype CTA specialization",
+            "issue_number": 12030,
+            "body": "## Summary\n\nPrototype `gl.cta_specialize(functions_and_args, partition_num_ctas)` so a Gluon program can divide its current CTAs into independently programmed subgroups. Each subgroup has its own `num_ctas()`, layouts, CTA ranks, and barriers. Splits can nest, and the parent CTAs synchronize before the split and after all regions finish.\n\nParent shared-memory allocations can be passed into regions using ordinary `smem.slice(...)` views. The compiler checks that a view belongs to exactly the receiving CTA range and rebases its layout while preserving the allocation, strides, and local offsets. Writes are visible through the parent descriptor after the join.\n\n```python\n# With four CTAs and a shared layout that places these halves on CTAs 0–1 and 2–3:\ngl.cta_specialize([\n    (worker_a, (smem.slice(0, 16),)),\n    (worker_b, (smem.slice(16, 16),)),\n], [2, 2])\n```\n\n## Prototype limits\n\n- NVIDIA Hopper or newer; partition counts are positive powers of two and sum to the current CTA count.\n- Inline functions and synchronous operations only. Warp specialization, asynchronous cluster operations, and sanitizer instrumentation are not supported within CTA-specialized regions.\n- Regions return no runtime values. Distributed tensors and tensor-memory descriptors cannot be captured; shared-memory captures require statically provable CTA ownership and an unpartitioned shared layout.\n\n## Validation\n\nBuilt on an isolated GB300 devbox and verified matching source hashes. Only formatting changed afterward; Python ASTs and normalized C++ token streams were checked unchanged:\n\n- 14 compiler/frontend tests passed, including invalid partition counts, nested contexts, unsupported operations, and invalid shared-memory captures.\n- 16 GPU tests passed: 8 shared-memory capture cases and 8 existing CTA specialization cases. Coverage includes nested and uneven splits, nonzero slice offsets, padded/swizzled/linear shared layouts, runtime buffer indices, parent reads after joining, and subgroup synchronization.\n- 5 focused lit tests passed for IR validation, NVIDIA lowering, cluster-barrier allocation, and warp-group allocation/lowering.\n- Local Python syntax, diff-whitespace, and pre-commit checks passed.\n",
+            "state": null,
+            "user": null,
+            "assignees": null,
+            "labels": null,
+            "milestone": null,
+            "state_reason": null,
+            "comments": null,
+            "created_at": null,
+            "updated_at": null,
+            "closed_at": null,
+            "display_url": "https://github.com/triton-lang/triton/pull/12030",
+            "display_title": "[Gluon] Prototype CTA specialization"
+          },
+          {
+            "url": "https://github.com/triton-lang/triton/pull/11720",
+            "title": "[TUTORIALS] Avoid per-case streams in fused-softmax benchmark",
+            "issue_number": 11720,
+            "body": "Fixes #11661\n\nThe fused-softmax tutorial created and selected a new PyTorch device stream in every `benchmark()` call. This made each case use a different stream while the caching allocator retained memory from earlier cases, causing reserved memory to grow through the sweep.\n\nRemove the two per-case stream calls so the benchmark uses the current stream. On an 8 GiB RTX 2000 Ada running Windows, the full 294-case sweep completed with this change alone. Reserved memory still grew (to 23,016 MiB under WDDM), so this does not establish that the original 6 GiB OOM is fixed on that card.\n",
+            "state": null,
+            "user": null,
+            "assignees": null,
+            "labels": null,
+            "milestone": null,
+            "state_reason": null,
+            "comments": null,
+            "created_at": null,
+            "updated_at": null,
+            "closed_at": null,
+            "display_url": "https://github.com/triton-lang/triton/pull/11720",
+            "display_title": "[TUTORIALS] Avoid per-case streams in fused-softmax benchmark"
+          },
+          {
+            "url": "https://github.com/triton-lang/triton/pull/11020",
+            "title": "[GSan][IR] Make GDC ops IR nodes, and support PDL in GSan",
+            "issue_number": 11020,
+            "body": "This changes how GSan models stream synchronization. Each stream maintains a ring buffer of three vector clocks, and each kernel receives a monotonically increasing `kernel_id`.\r\n\r\n- At kernel completion, each CTA publishes its vector clock using an atomic max on `stream_clock[kernel_id % 3]`.\r\n- For a normal launch, the kernel initializes its clock from `stream_clock[(kernel_id - 1) % 3]`, acquiring the previous kernel’s aggregated clock.\r\n- For a PDL launch, the kernel initializes from `stream_clock[(kernel_id - 2) % 3]`, acquiring the kernel from two launches ago.\r\n- When a PDL kernel executes `gdc_wait`, it acquires `stream_clock[(kernel_id - 1) % 3]`, synchronizing with its immediate predecessor.\r\n\r\nThis also completely removes the need for the separate `synchronize_launch_stream` function.",
+            "state": null,
+            "user": null,
+            "assignees": null,
+            "labels": null,
+            "milestone": null,
+            "state_reason": null,
+            "comments": null,
+            "created_at": null,
+            "updated_at": null,
+            "closed_at": null,
+            "display_url": "https://github.com/triton-lang/triton/pull/11020",
+            "display_title": "[GSan][IR] Make GDC ops IR nodes, and support PDL in GSan"
+          }
+        ]
+      },
+      "isError": false
+    }
+  },
+  {
+    "task_ids": [
+      "RC-006"
+    ],
+    "kind": "SEARCH",
+    "round": 2,
+    "tool": "github_search_issues",
+    "args": {
+      "repository_full_name": "Ascend/pytorch",
+      "query": "\"npu_rms_norm\" dtype is:issue",
+      "topn": 3
+    },
+    "checked_at": "2026-11-13T02:27:22.698Z",
+    "response": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Action completed."
+        }
+      ],
+      "structuredContent": {
+        "issues": []
+      },
+      "isError": false
+    }
+  },
+  {
+    "task_ids": [
+      "RC-006"
+    ],
+    "kind": "SEARCH",
+    "round": 2,
+    "tool": "github_search_prs",
+    "args": {
+      "repository_full_name": "Ascend/pytorch",
+      "query": "\"npu_rms_norm\" dtype",
+      "topn": 3
+    },
+    "checked_at": "2026-11-13T02:27:23.411Z",
+    "response": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Action completed."
+        }
+      ],
+      "structuredContent": {
+        "issues": []
+      },
+      "isError": false
+    }
+  },
+  {
+    "task_ids": [
+      "RC-121"
+    ],
+    "kind": "SEARCH",
+    "round": 2,
+    "tool": "github_search_issues",
+    "args": {
+      "repository_full_name": "vllm-project/vllm-ascend",
+      "query": "\"useBufferType\" is:issue",
+      "topn": 3
+    },
+    "checked_at": "2026-11-13T02:27:23.315Z",
+    "response": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Action completed."
+        }
+      ],
+      "structuredContent": {
+        "issues": []
+      },
+      "isError": false
+    }
+  },
+  {
+    "task_ids": [
+      "RC-121"
+    ],
+    "kind": "SEARCH",
+    "round": 2,
+    "tool": "github_search_prs",
+    "args": {
+      "repository_full_name": "vllm-project/vllm-ascend",
+      "query": "\"useBufferType\"",
+      "topn": 3
+    },
+    "checked_at": "2026-11-13T02:27:23.076Z",
+    "response": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Action completed."
+        }
+      ],
+      "structuredContent": {
+        "issues": []
+      },
+      "isError": false
+    }
+  }
+]

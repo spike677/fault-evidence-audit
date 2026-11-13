@@ -1,0 +1,40 @@
+From f0ce645b0b22037d3c3003794039bf31b44bbb93 Mon Sep 17 00:00:00 2001
+From: sakya_gyq <geyunqi@huawei.com>
+Date: Mon, 25 May 2026 15:53:07 +0800
+Subject: [PATCH]  fix 950 rmsnorm golden
+
+---
+ .../python/CsvOpsTestTool/data_generation.py    | 17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
+
+diff --git a/tests/framework/python/CsvOpsTestTool/data_generation.py b/tests/framework/python/CsvOpsTestTool/data_generation.py
+index 22371d8a0..d08a5f6be 100644
+--- a/tests/framework/python/CsvOpsTestTool/data_generation.py
++++ b/tests/framework/python/CsvOpsTestTool/data_generation.py
+@@ -3035,6 +3035,23 @@ class RmsNormOperation(DataGen):
+         elif json_param['layerType'] == RmsNormOperation.RMS_NORM_POSTNORM:
+             json_data = json_param["postNormParam"]
+         eps = json_data['epsilon'] if 'epsilon' in json_data.keys() else 0.00001
++
++        if get_soc_version() == "Ascend950":
++            if json_param['layerType'] == RmsNormOperation.RMS_NORM_NORM:
++                if json_data['quantType'] == 0:
++                    x = in_tensors[0]
++                    gamma = in_tensors[1]
++                    gamma_shape = gamma.shape
++                    idx = 0
++                    while idx < len(gamma_shape) and gamma_shape[idx] == 1:
++                        idx += 1
++                    gamma_shape = gamma_shape[idx:] if idx < len(gamma_shape) else [1]
++                    gamma_new = gamma.reshape(gamma_shape)
++                    rms_norm = torch.nn.RMSNorm(gamma_new.size(), eps=eps)
++                    rms_norm.weight = torch.nn.Parameter(gamma_new)
++                    golden_result = rms_norm(x)
++                    return [golden_result]
++
+         x = in_tensors[0].float()
+         gamma_origin = in_tensors[1]
+         gamma_flatten_fp16 = gamma_origin.view(1, -1)
+-- 
+GitCode
+

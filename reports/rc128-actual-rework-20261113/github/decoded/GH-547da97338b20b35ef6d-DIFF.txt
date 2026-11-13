@@ -1,0 +1,202 @@
+FILE: csrc/moe/dequant_swiglu_quant/op_host/dequant_swiglu_quant_tiling.cpp
+@@ -625,7 +625,8 @@ ge::graphStatus DequantSwigluQuantDskTiling::CountMaxDim(int64_t& ubFactorDimx)
+   int64_t quantOffsetSpace = quantMode_ == QUANT_MODE_DYNAMIC ? 0 : static_cast<int64_t>(sizeof(float));
+ 
+   // UbFactorDimx is 1,compute maxOutDimy
+-  int64_t numerator = static_cast<int64_t>(ubSize_) - UB_RESERVE - BLOCK_SIZE - db * BLOCK_SIZE - static_cast<int64_t>(sizeof(float));
++  int64_t numerator = static_cast<int64_t>(ubSize_) - UB_RESERVE - BLOCK_SIZE - db * BLOCK_SIZE - static_cast<int64_t>(sizeof(float)) -
++                       BLOCK_ELEM * BLOCK_ELEM * static_cast<int64_t>(sizeof(float));
+   int64_t denominator =
+       5 * static_cast<int64_t>(sizeof(float)) + db * SWI_FACTOR * static_cast<int64_t>(sizeof(float)) + static_cast<int64_t>(sizeof(int8_t)) + biasBufferY + SweiGLUBufferY + quantOffsetSpace;
+   maxOutDimy = static_cast<int64_t>(numerator / denominator);
+@@ -643,7 +644,8 @@ ge::graphStatus DequantSwigluQuantDskTiling::CountMaxDim(int64_t& ubFactorDimx)
+   numerator = static_cast<int64_t>(ubSize_) - UB_RESERVE - outDimy_ * static_cast<int64_t>(sizeof(float)) - BLOCK_SIZE - SWI_FACTOR * outDimy_ * static_cast<int64_t>(sizeof(float)) - biasBufferX - quantOffsetSpace;
+ 
+   denominator = db * (outDimy_ * SWI_FACTOR + BLOCK_ELEM) * static_cast<int64_t>(sizeof(float)) + outDimy_ * static_cast<int64_t>(sizeof(int8_t)) + static_cast<int64_t>(sizeof(float)) +
+-                outDimy_ * SWI_FACTOR * static_cast<int64_t>(sizeof(float)) + SweiGLUBufferX;
++                outDimy_ * SWI_FACTOR * static_cast<int64_t>(sizeof(float)) + SweiGLUBufferX +
++                BLOCK_ELEM * static_cast<int64_t>(sizeof(float));
+   ubFactorDimx  = static_cast<int64_t>(numerator / denominator);
+   ubFactorDimx = std::min(ubFactorDimx, inDimx_);
+   OP_LOGI(context_->GetNodeName(), "Get ubFactorDimx[%ld]", ubFactorDimx);
+
+FILE: csrc/moe/dequant_swiglu_quant/op_kernel/dequant_swiglu_quant.h
+@@ -132,6 +132,7 @@ class DequantSwigluQuantBase
+ 
+     TBuf<TPosition::VECCALC> tmpBuf1_;
+     TBuf<TPosition::VECCALC> tmpBuf2_; // only use in swigluMode == 1
++    TBuf<TPosition::VECCALC> scaleBuf_;
+ 
+     uint32_t blockIdx_ = GetBlockIdx();
+     int64_t realDimx_ = 0;
+@@ -198,6 +199,8 @@ __aicore__ inline void DequantSwigluQuantBase<TEMPLATE_DSQ_ARGS>::Init(
+     pipe_->InitBuffer(outQueue_, 1, UbSingleOutSize_ * sizeof(int8_t) + tl_->UbFactorDimx * sizeof(float) + BLOCK_SIZE);
+ 
+     pipe_->InitBuffer(tmpBuf1_, UbSingleOutSize_ * SWI_FACTOR * sizeof(float));
++    pipe_->InitBuffer(scaleBuf_,
++        ((tl_->UbFactorDimx + BLOCK_ELEM - 1) / BLOCK_ELEM) * BLOCK_ELEM * BLOCK_ELEM * sizeof(float));
+     if (tl_->swigluMode == 1) {
+         pipe_->InitBuffer(
+             tmpBuf2_,
+@@ -704,25 +707,27 @@ __aicore__ inline void DequantSwigluQuantBase<TEMPLATE_DSQ_ARGS>::DynamicQuant(
+     // Calc quant: proDimsx * 64 -> proDimsx
+     // repeatTimes:proDimsx, dstRepStride:1(dtype), srcBlkStride:1, srcRepStride:tl_->UbFactorDimy / 64 * 8
+     WholeReduceMax(
+-        tmpUbF32Gate, tmpUbF32Gate, MASK_NUM_T32, proDimsx, 1, 1, tl_->UbFactorDimy / MASK_NUM_T32 * MASK_BLK_STRIDE,
+-        ReduceOrder::ORDER_ONLY_VALUE);
++        tmpUbF32Gate, tmpUbF32Gate, MASK_NUM_T32, proDimsx, 1, 1, tl_->UbFactorDimy / BLOCK_ELEM,
++         ReduceOrder::ORDER_ONLY_VALUE);
+     PipeBarrier<PIPE_V>();
+     // Calc quant: scaleOut / 127.0
+     Muls(scaleOut, tmpUbF32Gate, DYNAMIC_QUANT_FACTOR, proDimsx);
+     PipeBarrier<PIPE_V>();
+     // Calc Broadcast: proDimsx -> proDimsx,8
+     int64_t blockCount = (proDimsx + BLOCK_ELEM - 1) / BLOCK_ELEM;
+-    Brcb(outLocal, scaleOut, blockCount, {1, MASK_BLK_STRIDE});
++    LocalTensor<float> brcbTmp = scaleBuf_.AllocTensor<float>();
++    Brcb(brcbTmp, scaleOut, blockCount, {1, MASK_BLK_STRIDE});
+     PipeBarrier<PIPE_V>();
+     // Copy scale: [proDimsx,8] -> [proDimsx,H]
+     SetMaskCount();
+     SetVectorMask<float, MaskMode::COUNTER>(tl_->UbFactorDimy);
+     Copy<float, false>(
+-        tmpUbF32Gate, outLocal, AscendC::MASK_PLACEHOLDER, proDimsx,
++        tmpUbF32Gate, brcbTmp, AscendC::MASK_PLACEHOLDER, proDimsx,
+         {1, 0, static_cast<uint16_t>(tl_->UbFactorDimy / BLOCK_ELEM), 1});
+     SetMaskNorm();
+     ResetMask();
+     PipeBarrier<PIPE_V>();
++    scaleBuf_.FreeTensor(brcbTmp);
+     // Calc y: tmpUbF32Act = tmpUbF32Act / scaleOut
+     Div(tmpUbF32Act, tmpUbF32Act, tmpUbF32Gate, tl_->UbFactorDimy * proDimsx);
+     PipeBarrier<PIPE_V>();
+
+FILE: tests/e2e/nightly/single_node/ops/singlecard_ops/test_dequant_swiglu_quant.py
+@@ -1,6 +1,6 @@
+ import gc
+-import math
+ 
++import pytest
+ import torch
+ import torch.nn.functional as F
+ import torch_npu
+@@ -13,33 +13,13 @@
+ enable_custom_op()
+ 
+ 
+-def _has_effective_swiglu_limit(swiglu_limit: int | float) -> bool:
+-    limit = float(swiglu_limit)
+-    return math.isfinite(limit) and 0.0 < limit < 1_000_000.0
+-
+-
+ def _shared_dequant_swiglu_quant(
+     hidden_states: torch.Tensor,
+     weight_scale: torch.Tensor,
+     activation_scale: torch.Tensor,
+     swiglu_limit: int | float,
+     output_dtype: torch.dtype,
+ ) -> tuple[torch.Tensor, torch.Tensor]:
+-    if not _has_effective_swiglu_limit(swiglu_limit):
+-        return torch.ops._C_ascend.npu_dequant_swiglu_quant(
+-            x=hidden_states,
+-            weight_scale=weight_scale,
+-            activation_scale=activation_scale,
+-            bias=None,
+-            quant_scale=None,
+-            quant_offset=None,
+-            group_index=None,
+-            activate_left=True,
+-            quant_mode=1,
+-            swiglu_mode=1,
+-            clamp_limit=swiglu_limit,
+-        )
+-
+     if hidden_states.shape[0] == 0:
+         output_shape = hidden_states.shape[:-1] + (hidden_states.shape[-1] // 2,)
+         return (
+@@ -53,35 +33,49 @@ def _shared_dequant_swiglu_quant(
+ 
+     half = gate_up.shape[-1] // 2
+     limit = float(swiglu_limit)
+-    gate = torch.clamp(gate_up[..., :half], max=limit)
+-    up = torch.clamp(gate_up[..., half:], min=-limit, max=limit)
++    gate = gate_up[..., :half]
++    up = gate_up[..., half:]
++    # Skip clamp when limit == 0 (treated as "no clamp")
++    if limit > 0.0:
++        gate = torch.clamp(gate, max=limit)
++        up = torch.clamp(up, min=-limit, max=limit)
+     swiglu = F.silu(gate) * up
+     if swiglu.dtype not in (torch.float16, torch.bfloat16):
+         swiglu = swiglu.to(output_dtype if output_dtype in (torch.float16, torch.bfloat16) else torch.bfloat16)
+     return torch_npu.npu_dynamic_quant(swiglu)
+ 
+ 
++_REPRO_CASES = [
++    ([4608, 2048], 0.0, "large_2048_aligned"),
++    ([2, 192], 0.0, "small_192_misaligned"),
++    ([4, 192], 0.0, "small_192_misaligned_4rows"),
++    ([8, 384], 0.0, "small_384_aligned"),
++    ([1, 256], 0.0, "single_row_256_aligned"),
++]
++
++
+ @torch.inference_mode()
+-def test_npu_dequant_swiglu_quant_with_limit():
+-    swiglu_mode = 1
+-    x_shape = [4608, 2048]
+-    x = torch.randint(-10, 10, x_shape, dtype=torch.int32)
+-    weight_scale = torch.randn(x_shape[1], dtype=torch.float32)
+-    activate_scale = torch.randn((x_shape[0], 1), dtype=torch.float32)
+-    clamp_limit = 2.0
+-    quant_mode = 1
++@pytest.mark.parametrize("x_shape,clamp_limit,desc", _REPRO_CASES, ids=[c[2] for c in _REPRO_CASES])
++def test_npu_dequant_swiglu_quant_with_limit(x_shape, clamp_limit, desc):
++    # Use values with non-trivial abs() so reduce-max is meaningful
++    x = torch.randint(-100, 100, x_shape, dtype=torch.int32)
++    weight_scale = torch.randn(x_shape[1], dtype=torch.float32) * 0.1
++    activate_scale = torch.randn((x_shape[0], 1), dtype=torch.float32) * 0.5
++
++    x = x.npu()
++    weight_scale = weight_scale.npu()
++    activate_scale = activate_scale.npu()
+ 
++    # 1. Golden reference (pure PyTorch + npu_dynamic_quant)
+     output_golden, output_scale_golden = _shared_dequant_swiglu_quant(
+-        x.npu(),
+-        weight_scale.npu(),
+-        activate_scale.npu(),
++        x,
++        weight_scale,
++        activate_scale,
+         clamp_limit,
+         torch.bfloat16,
+     )
+ 
+-    x = x.npu()
+-    weight_scale = weight_scale.npu()
+-    activate_scale = activate_scale.npu()
++    # 2. Fused op (NPUGraph, same as production code)
+     graph = torch.npu.NPUGraph()
+     with torch.npu.graph(graph, capture_error_mode="thread_local", auto_dispatch_capture=True):
+         output, output_scale = torch.ops._C_ascend.npu_dequant_swiglu_quant(
+@@ -93,15 +87,17 @@ def test_npu_dequant_swiglu_quant_with_limit():
+             quant_offset=None,
+             group_index=None,
+             activate_left=True,
+-            quant_mode=quant_mode,
+-            swiglu_mode=swiglu_mode,
++            quant_mode=1,
++            swiglu_mode=1,
+             clamp_limit=clamp_limit,
+             glu_alpha=1.0,
+             glu_bias=0.0,
+         )
+     graph.replay()
+ 
++    # int8 quantization output: atol=1 covers the rounding error (max_abs=1 in all cases)
+     torch.testing.assert_close(output.cpu(), output_golden.cpu(), atol=1, rtol=0.1)
++    # Dynamic quant scale: relax tolerance to cover both aligned and non-64-aligned outDimy
+     torch.testing.assert_close(output_scale.cpu(), output_scale_golden.cpu(), atol=1e-4, rtol=5e-3)
+ 
+     gc.collect()

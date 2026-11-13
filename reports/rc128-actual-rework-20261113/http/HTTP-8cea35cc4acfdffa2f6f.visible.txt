@@ -1,0 +1,73 @@
+diff --git a/index/gather_v2/docs/aclnnIndexSelect.md b/index/gather_v2/docs/aclnnIndexSelect.md
+index 9549d1fc5b431a776455f12ce03f479527e0505e..1e6612aab5eac5587f24d2099ddb067e2d168f48 100644
+--- a/index/gather_v2/docs/aclnnIndexSelect.md
++++ b/index/gather_v2/docs/aclnnIndexSelect.md
+@@ -141,7 +141,7 @@ aclnnStatus aclnnIndexSelect(
+       </tr>
+     </tbody></table>
+ 
+-    - <term>Atlas 推理系列产品</term>、<term>Atlas 训练系列产品</term>：数据类型不支持BFLOAT。
++    - <term>Atlas 推理系列产品</term>、<term>Atlas 训练系列产品</term>：数据类型不支持BFLOAT16。
+ 
+ - **返回值**
+ 
+@@ -226,6 +226,8 @@ aclnnStatus aclnnIndexSelect(
+ 
+ ## 约束说明
+ 
++- 当self的shape为[]时，index的shape只能为[1]。
++
+ - 确定性计算：
+   - aclnnIndexSelect默认确定性实现。
+ 
+diff --git a/index/gather_v2/op_api/aclnn_gather_v3.cpp b/index/gather_v2/op_api/aclnn_gather_v3.cpp
+index 6b24b746996a22c8c85ea7071556c20b35740d04..ea1eb37c8f884e610e2f2ae7104a3e49f6899eb8 100644
+--- a/index/gather_v2/op_api/aclnn_gather_v3.cpp
++++ b/index/gather_v2/op_api/aclnn_gather_v3.cpp
+@@ -201,7 +201,7 @@ static aclnnStatus CheckParams(const aclTensor *self, int64_t dim, const aclTens
+     xsize *= self->GetViewShape().GetDim(i);
+   }
+ 
+-  auto indexSize = ge::GetSizeByDataType(index->GetDataType());
++  auto indexSize = 1;
+   auto indexDimNum = index->GetViewShape().GetDimNum();
+   for (int i = 0; i < indexDimNum ; i++) {
+     indexSize *= index->GetViewShape().GetDim(i);
+diff --git a/index/index_fill/op_host/config/ascend910b/index_fill_simplified_key.ini b/index/index_fill/op_host/config/ascend910b/index_fill_simplified_key.ini
+index 38e5eb22d0cb6b5ed3e4a0e33114bff9f5fba4d0..9f3c60ff9bad49a1fc76e8fa7af28f13ad13d68f 100644
+--- a/index/index_fill/op_host/config/ascend910b/index_fill_simplified_key.ini
++++ b/index/index_fill/op_host/config/ascend910b/index_fill_simplified_key.ini
+@@ -9,5 +9,5 @@
+ ; 4)如果default配置和平台配置都有：对应平台的使用平台的配置，非对应的平台的以default值配置。
+ ; 5)对于自定义simplified key的情况，需要在binary_simplified_key_mode.ini 文件中显式配置为None，不传入 --simplified_key_mode 选项，由opc工具和FE框架自行判断使用何种模式
+ ; 6)是否是AscendC算子，由 ops/build-in/tbe/op_info_cfg/parser/ascendc_config.json 中配置的算子名字和对于的平台决定
+-[FusedCrossEntropyLossWithMaxSum]
++[IndexFill]
+ default=0
+\ No newline at end of file
+diff --git a/loss/fused_cross_entropy_loss_with_max_sum/op_host/config/ascend910_93/fused_cross_entropy_loss_with_max_sum_binary.json b/loss/fused_cross_entropy_loss_with_max_sum/op_host/config/ascend910_93/fused_cross_entropy_loss_with_max_sum_binary.json
+index abeaf02b539c29112444e26a672a1376f21ec4fc..dfd290e70b84f9cd202e64790ac872d55e82e2b9 100644
+--- a/loss/fused_cross_entropy_loss_with_max_sum/op_host/config/ascend910_93/fused_cross_entropy_loss_with_max_sum_binary.json
++++ b/loss/fused_cross_entropy_loss_with_max_sum/op_host/config/ascend910_93/fused_cross_entropy_loss_with_max_sum_binary.json
+@@ -81,7 +81,7 @@
+                     "index": 1,
+                     "dtype": "float32",
+                     "format": "ND",
+-                    "paramType": "required",
++                    "paramType": "optional",
+                     "shape": [
+                         -2
+                     ]
+diff --git a/loss/fused_cross_entropy_loss_with_max_sum/op_host/config/ascend910b/fused_cross_entropy_loss_with_max_sum_binary.json b/loss/fused_cross_entropy_loss_with_max_sum/op_host/config/ascend910b/fused_cross_entropy_loss_with_max_sum_binary.json
+index abeaf02b539c29112444e26a672a1376f21ec4fc..dfd290e70b84f9cd202e64790ac872d55e82e2b9 100644
+--- a/loss/fused_cross_entropy_loss_with_max_sum/op_host/config/ascend910b/fused_cross_entropy_loss_with_max_sum_binary.json
++++ b/loss/fused_cross_entropy_loss_with_max_sum/op_host/config/ascend910b/fused_cross_entropy_loss_with_max_sum_binary.json
+@@ -81,7 +81,7 @@
+                     "index": 1,
+                     "dtype": "float32",
+                     "format": "ND",
+-                    "paramType": "required",
++                    "paramType": "optional",
+                     "shape": [
+                         -2
+                     ]

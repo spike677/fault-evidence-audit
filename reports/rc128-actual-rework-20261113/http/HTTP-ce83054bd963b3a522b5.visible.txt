@@ -1,0 +1,185 @@
+[RFC]: A5代际随机数API对齐pytorch-pytorch-AtomGit
+Star
+937
+Fork
+1522
+Code
+Introduction
+Code
+Issues
+1955
+Pull Requests
+1855
+Pipeline
+Actions
+Discussion
+Wiki
+Members
+392
+Analysis
+Settings
+Star
+937
+Fork
+1522
+Closed
+[RFC]: A5代际随机数API对齐pytorch
+#1921
+chengpeng25
+Add on
+May 13
+Closed at
+Jul 10
+C
+chengpeng25
+Collaborators
+May 13
+Create
+May 13
+Create
+状态（Status）：
+Draft
+作者（Authors）：
+@Your_community
+创建日期（Created）：
+2026-05-13
+更新日期（Updated）：
+2026-05-13
+相关 Issue/PR：
+#123（关联 Issue/PR 以便追踪背景）
+1. 概述
+1.1 简介
+本提案目标是将torch_npu上的随机数生成 API（Dropout、均匀分布 uniform 、指数分布 exponential ）在A5代际与 PyTorch 原生行为对齐。使 NPU 随机数 API 在语义和数值行为上与 PyTorch CPU/CUDA 实现一致，从而消除跨平台迁移的随机性差异。
+1.2 动机
+从模型训练的跨平台可复现性，生态兼容提升方面考虑，同Pytorch对齐随机数API具有必要性。
+1.3 目标
+通过底层算子和框架侧的一致性实现，使得随机数API在A5代际上同Pytorch CUDA数值对齐。
+2. 用例分析
+针对本提案的各场景用例，描述其主要包含哪些功能点、要实现的关键性能指标、安全隐私以及DFX（兼容性、可维护性、可测试性、可靠性...）要求等。若涉及，还可以包括使用限制、约束和要求等信息。
+3. 方案设计
+3.1 总体方案
+根据本提案的场景用例及功能特点，阐述整体设计思路、技术方案、核心逻辑，可包括选择什么软/硬件平台、操作系统、编程模型、使用什么算法，系统架构如何布局，UI如何呈现等。并给出相应的限制和约束说明，如在什么场景或前置条件下，可以达成xx性能指标。
+根据实现方案的复杂度，可选择采用自然语言，并结合架构图、时序图、活动图或状态机（算法）等适合的方式来辅助设计。
+3.2 技术选型
+列出考虑过但放弃的其他方案，给出优劣对比，说明不选择的理由。
+3.3 功能与性能设计
+结合场景用例分析的结果，对本提案的相关功能及性能指标影响展开设计，如功能的实现方案、运行的核心流程（文字描述或流程图）、数据模型定义或变更（若涉及）、影响范围等。
+3.4 安全隐私与DFX设计
+结合场景用例，对本提案所涉及的安全隐私及DFX（兼容性、可维护性、可测试性、可靠性...）等属性影响进行设计。
+3.5 编程与调用设计
+若本提案相关特性/功能组件/模块等支持被开发者集成调用（二次开发），则需要提供便捷易用的编程与调用能力。要站在开发者如何进行编程开发、接口调用及系统集成的使用方式上，给出相应的编程模型定义和设计，包括各要素的可获取方式和途径。
+3.5.1 编程模型基本设计
+开发环境设计：​明确好开发者使用的软​/硬件环境、开发​&调试工具链、编程框架、要提供的加速库或算子等。
+开发约束：开发者使用过程中的约束和限制说明，如硬件平台、编程语言限制等。
+可验收设计：提供相应功能、性能指标等的验收环境、标准或用例设计，保证最终的实现可达成既定目标。
+3.5.2 接口定义与设计
+给出相关组件/模块被集成调用的API定义或变更、对接上下游主流生态技术栈的适配方案、提供功能被使用或集成的参考代码或方法等。
+3.5.2.1 xxx（API1 Name）
+接口描述：xxx
+接口原型：xxx
+输入/输出参数：
+参数名称
+输入/输出
+类型
+描述
+取值范围
+返回参数：
+参数名称
+类型
+描述
+取值范围
+异常处理：xxx
+约束说明：xxx
+变更说明：xxx
+调用参考代码：xxx
+3.5.2.2 xxx（API2 Name）
+...
+3.5.3 编程手册设计
+为了帮助开发者能快速上手开发，要设计好本提案相关特性/功能的《编程手册》，要包含哪些内容和章节，单独输出还是共用，在已有的手册中更新还是输出等。确保最后输出的《编程手册》中有相关变更内容。
+4. 测试设计
+介绍该功能的测试方法以及测试用例设计，包括单元测试（unit test），集成测试（integration test），端到端测试（e2e test）等。
+5. 缺点和风险
+说明潜在风险（Breaking Change、性能回退、复杂度提升、引入的安全问题）、负面影响（对现有功能/用户的冲击）、实现成本（代码量/维护成本/人力投入）、是否有API或版本兼容性、旧版本迁移方案问题等，给出应对措施。
+6. 现有技术
+参考其他项目/社区的类似设计，说明借鉴与差异。
+7. 未解决问题
+待社区讨论/决策的开放问题，如硬件适配范围、参数默认值等（需在RFC通过前解决）。
+附录
+参考资料链接
+术语表
+文档更新计划
+欢迎加入社区，感谢您对社区的贡献 🎉!
+Save
+Cancel
+ascend-robot
+Collaborators
+May 13
+Added label:
+rfc
+May 13
+Added label:
+rfc
+C
+chengpeng25
+Collaborators
+May 13
+Modify description of issue
+May 13
+Modify description of issue
+chenrayray
+Collaborators
+Jul 4
+changed custom category from Bug-Report to RFC
+Jul 4
+changed custom category from Bug-Report to RFC
+ascend-robot
+Collaborators
+Jul 8
+associated Kanban: MindStudio ISSUE管理
+Jul 8
+associated Kanban: MindStudio ISSUE管理
+C
+chengpeng25
+Collaborators
+Jul 10
+Comments：
+Jul 10
+Comments：
+Dropout反向对齐依赖底层实现，计划放在下个版本完成
+Save
+Cancel
+C
+chengpeng25
+Collaborators
+Jul 10
+changed custom state from TODO to DONE
+Jul 10
+changed custom state from TODO to DONE
+C
+chengpeng25
+Collaborators
+Jul 10
+Close issue
+Jul 10
+Close issue
+ascend-robot
+Collaborators
+Jul 10
+Added label:
+resolved
+Jul 10
+Added label:
+resolved
+Assignees
+Not assigned
+Label
+rfc
+resolved
+Kanban
+No board linked yet
+Milestones
+No related milestones
+Link PR
+No related PR
+Branch
+No branches linked yet

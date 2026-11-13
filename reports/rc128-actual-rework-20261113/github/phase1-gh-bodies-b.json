@@ -1,0 +1,268 @@
+[
+  {
+    "url": "https://github.com/vllm-project/vllm-ascend/issues/14686",
+    "task_ids": [
+      "RC-054"
+    ],
+    "kind": "BODY",
+    "round": 1,
+    "tool": "mcp__codex_apps__github_fetch_issue",
+    "args": {
+      "repository_full_name": "vllm-project/vllm-ascend",
+      "issue_number": 14686
+    },
+    "checked_at": "2026-11-13T02:20:36.216Z",
+    "response": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Action completed."
+        }
+      ],
+      "structuredContent": {
+        "issue": {
+          "url": "https://github.com/vllm-project/vllm-ascend/issues/14686",
+          "title": "[Bug][GLM-5.2-W4A8C8][co-located] Stochastic async MTP enters a parser-before periodic raw-token loop",
+          "issue_number": 14686,
+          "body": "## Why this is a separate report\n\nThis is an independent **two-node co-located** reproduction, not P/D disaggregation. It is related to #14463 and #14656, but adds two isolation results that those issue bodies do not contain:\n\n1. the failure reproduces through the vLLM OpenAI-compatible endpoint directly, bypassing the agent harness, LiteLLM, and the API gateway;\n2. `return_token_ids=true` proves that the periodic loop already exists in the engine's raw output token IDs before GLM tool parsing.\n\nThe symptom eventually becomes repeated or unterminated `tool_calls[].function.arguments`, but the parser is downstream of the first observed corruption in this case.\n\n## Impact\n\nIn a production-style agent request, approximately 0.9%-1.0% of default-sampling requests entered a long-running periodic token loop. They continued returning HTTP 200 SSE chunks until a 300-second client protection timeout, with no terminal `finish_reason`, usage chunk, or `[DONE]`. If the incomplete tool call is persisted and sent back in a later turn, downstream JSON parsing reports `Unterminated string` and returns HTTP 400.\n\n## Reproduction statistics\n\nAll runs used the same request shape and called the serving endpoint directly:\n\n| Arm | Result |\n|---|---:|\n| default model sampling, concurrency 4 | 991/1000 completed; 9/1000 timed out at 300 s |\n| independent default-sampling repeat, concurrency 4 | 297/300 completed; 3/300 timed out at 300 s |\n| `temperature=0`, concurrency 4 | 300/300 completed; 0/300 observed timeouts |\n\nThe zero failures in 300 greedy requests are evidence that stochastic sampling is a trigger/risk factor; they are not claimed as proof of a complete fix.\n\nThe request did **not** set `tool_choice`, `strict`, or `temperature`. It therefore used auto tool choice and the model's default generation configuration (`temperature=1.0`, `top_p=0.95`).\n\nNon-sensitive request shape:\n\n```text\nOpenAI Chat Completions\nstream=true\nabout 50,190 prompt tokens after template application\n36 messages\n85 function tool schemas\nmax_completion_tokens=128,000 (an upper bound, not a fixed requested output length)\nstream_options.include_usage=true\nreturn_token_ids=true for the evidence run\nconcurrency=4\nper-request protection timeout=300 seconds\n```\n\n## Parser-before raw-token evidence\n\nAll three failures in the 300-request evidence run had low-diversity periodic repetition in raw `output.token_ids` before parser processing. The three token-stream hashes and best periods were different, so this is not one SSE response duplicated by the client or proxy.\n\n| Request | Raw engine token evidence | Token-stream SHA-256 |\n|---|---|---|\n| 44 | best period 13 over the last 8192 tokens; 74.61% agreement | `a5f86d630332741d00746281a50594bd4d07f4496f63f08cd5201c45419a096b` |\n| 82 | exact period 768 over a 6144-token tail; 5376/5376 comparable tokens match | `e1df762935c36e64f1383e0bfba62c9f86683e3d27a45d0b8c3a69bd3fee754d` |\n| 142 | exact period 8 over the last 8192 tokens; 8184/8184 comparable tokens match | `eb9cd9c12bffa1ebe41dba9c4294bf1c9749082c67494a045314cb9d5cd13b5b` |\n\nAfter those raw-token loops begin, the parser converts the repeated GLM tool markup into repeated/unclosed arguments. For request 82, the parsed argument tail also repeats exactly (period 1248 characters) and ends with `Unterminated string`. Request 142 independently produces a different repeated argument period and the same incomplete-JSON class.\n\n## Environment\n\n```text\nHardware: two Atlas 800 A3 hosts, 16 Ascend910 devices visible per host\nDeployment: co-located serving, not P/D disaggregation\nParallelism: DP4 / TP8 / DCP8 / PCP1 / PP1, EP enabled\nModel: GLM-5.2-W4A8C8, GlmMoeDsaForCausalLM\nSpeculative decode: deepseek_mtp, num_speculative_tokens=3\nKV connector: AscendStoreConnector, kv_role=kv_both, MemCache backend\nContext: max-model-len=1,024,000\nTool parser: glm47\nReasoning parser: glm45\nCANN: 9.1.0, innerversion V100R001C11SPC001B243\nPyTorch: 2.10.0+cpu\ntorch-npu: 2.10.0.post4\nvLLM: 0.23.0, commit 0fc695fc6d1d82e9a5ac6835ac8e4e1c83703665\nvLLM-Ascend: 0.23.0, commit 5cb98caaadeff42b5b62b996e34bb2aaa29d20fd\ntransformers: 5.5.4\n```\n\nImmutable official base image:\n\n```text\nquay.io/ascend/vllm-ascend@sha256:382b012420854ba2d8b3b78897d9216742f27948345e503a01644ebbdd706ce6\n```\n\nThe derivative image, Dockerfile, and applied parser backports are documented here:\n\nhttps://gist.github.com/ZhengDeL/0b63136e32a5e573109aa4e1afb18d57\n\nComplete sanitized host commands, image provenance, package versions, model fingerprints, and source hashes were already posted here:\n\nhttps://github.com/vllm-project/vllm-ascend/issues/14463#issuecomment-5345634154\n\n## Fix/version audit already performed\n\n- vLLM #45915 and #46351 are present in the tested image. They improve GLM streaming parsing, but the parser-before token loop still reproduces.\n- vLLM-Ascend #13865 is present byte-for-byte in both serving images. The issue still reproduces, so the async accepted-token snapshot fix is insufficient by itself.\n- vLLM #47512 / issue #47504 cover `tool_choice=required`; this request uses auto tool choice and does not set `tool_choice`.\n- vLLM #52805 covers speculative grammar advancement after structural-tag termination. This request has neither `strict` nor required/named tool choice, so it does not build that constrained structural-tag path.\n- vLLM-Ascend #13766 fixes an always-accepting rejection sampler in ModelRunner V2 on v0.26+. The tested v0.23 path is ModelRunner V1 and uses generated uniform probabilities, not the hardcoded `u=0.0` code fixed there.\n- vLLM-Ascend #14536 is specific to P/D decode nodes with `enable_sparse_sfa_c8`; this reproduction is co-located and uses `enable_sparse_li_c8` without `enable_sparse_sfa_c8`.\n- vLLM-Ascend #14451 may be relevant to GLM-5.2 MTP shared-index handling on the v0.26rc line, but it is still a draft with no end-to-end validation for this failure mode.\n- As of 2026-08-20, the latest published vLLM-Ascend release is v0.23.0. Main/v0.26rc contains additional candidate fixes, but no released or merged change claims to fix this parser-before periodic raw-token loop.\n\n## Questions for maintainers\n\n1. Which component should own the next isolation step: GLM hybrid/MTP state, DCP/distributed decode state, W4A8C8 numerical behavior, or KV reuse?\n2. Is there an exact main/release-branch commit that is expected to fix this raw-token loop, rather than only malformed parser output?\n3. Is #14451 applicable to in-model `deepseek_mtp` under this DP4/TP8/DCP8 topology, and if so, which commit should be tested?\n4. Could the diagnostic facilities in #12209 (MTP acceptance/token-repeat/logprob/tensor dump) be provided as a testable branch or minimal patch for this case?\n5. We can run controlled A/B tests on isolated validation instances with raw token capture: MTP on/off, DCP on/off, async path on/off, MemCache on/off, and W4A8C8 versus W8A8C8/BF16. Please advise the preferred order and any additional tensors/counters to capture.\n\nThis is affecting a production tool-calling workload. We would appreciate an owner and priority triage. The customer payload cannot be posted publicly, but a complete evidence archive can be shared privately with maintainers if needed.\n",
+          "state": "open",
+          "user": {
+            "login": "ZhengDeL",
+            "name": "ZhengDeL",
+            "email": null,
+            "avatar_url": "https://avatars.githubusercontent.com/u/245653240?v=4",
+            "id": 245653240
+          },
+          "assignees": null,
+          "labels": [
+            {
+              "name": "bug",
+              "color": "d73a4a",
+              "description": "Something isn't working"
+            },
+            {
+              "name": "triaged",
+              "color": "8022f7",
+              "description": ""
+            }
+          ],
+          "milestone": null,
+          "state_reason": null,
+          "comments": 1,
+          "created_at": "2026-08-20T13:31:54Z",
+          "updated_at": "2026-08-24T12:16:42Z",
+          "closed_at": null,
+          "display_url": "https://github.com/vllm-project/vllm-ascend/issues/14686",
+          "display_title": "[Bug][GLM-5.2-W4A8C8][co-located] Stochastic async MTP enters a parser-before periodic raw-token loop"
+        },
+        "url": "https://github.com/vllm-project/vllm-ascend/issues/14686",
+        "title": "[Bug][GLM-5.2-W4A8C8][co-located] Stochastic async MTP enters a parser-before periodic raw-token loop",
+        "display_url": "https://github.com/vllm-project/vllm-ascend/issues/14686",
+        "display_title": "[Bug][GLM-5.2-W4A8C8][co-located] Stochastic async MTP enters a parser-before periodic raw-token loop"
+      },
+      "isError": false
+    }
+  },
+  {
+    "url": "https://github.com/vllm-project/vllm-ascend/issues/15903",
+    "task_ids": [
+      "RC-084"
+    ],
+    "kind": "BODY",
+    "round": 1,
+    "tool": "mcp__codex_apps__github_fetch_issue",
+    "args": {
+      "repository_full_name": "vllm-project/vllm-ascend",
+      "issue_number": 15903
+    },
+    "checked_at": "2026-11-13T02:20:36.118Z",
+    "response": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Action completed."
+        }
+      ],
+      "structuredContent": {
+        "issue": {
+          "url": "https://github.com/vllm-project/vllm-ascend/issues/15903",
+          "title": "[Bug]: Vector core exception (errcode 507035) in MoE routing TopK crashes all 16 ranks on Atlas A3 running GLM-5.3-Flash under concurrent long-prompt load",
+          "issue_number": 15903,
+          "body": "### Your current environment\n\n[vllm-a3-crash_20260907_170631.log](https://github.com/user-attachments/files/31910401/vllm-a3-crash_20260907_170631.log)\n\n- vllm-ascend: quay.io/ascend/vllm-ascend:glm-5.3-flash-a3\n- torch / torch_npu: 2.10.0+cpu / 2.10.0.post2\n- CANN: 9.1.0 + a vendor custom-opp package (custom_transformer) providing a high-performance TopKV2 kernel\n- Driver / firmware: 25.5.1 (V100R001C23SPC006B220)\n- Platform: Atlas A3 super pod node, 16 x Ascend910 (8 chips x 2 dies), TP=16 with EP\n- Model: GLM-5.3-Flash-w8a8 (public MIT release)\n\nLaunch command (paths sanitized):\n\n```bash\nexport PYTORCH_NPU_ALLOC_CONF=expandable_segments:True\nexport HCCL_OP_EXPANSION_MODE=AIV\nexport HCCL_BUFFSIZE=400\n# sources a vendor custom-opp package:\n#   /usr/local/Ascend/cann-9.1.0/opp/vendors/custom_transformer/bin/set_env.bash\n\nvllm serve /path/to/GLM-5.3-Flash-w8a8 \\\n  --tensor-parallel-size 16 \\\n  --enable-expert-parallel \\\n  --max-model-len 133120 \\\n  --max-num-seqs 32 \\\n  --max-num-batched-tokens 8192 \\\n  --quantization ascend \\\n  --safetensors-load-strategy prefetch \\\n  --gpu-memory-utilization 0.85 \\\n  --limit-mm-per-prompt '{\"image\":1,\"video\":0}' \\\n  --compilation-config '{\"cudagraph_mode\":\"FULL_DECODE_ONLY\",\"cudagraph_capture_sizes\":[1,2,4,8,16,32,64,96,128]}'\n```\n\n### 🐛 Describe the bug\n\nThe service crashed twice with an identical signature — once after ~16h of uptime and once after\n~1.7h after restart — so the failure is uptime-independent and deterministic.\n\nPython-side error (identical in both crashes, in MoE token dispatch preprocess):\n\n```text\nFile \"vllm_ascend/ops/fused_moe/token_dispatcher.py\", line 623, in _preprocess\n    global_input_tokens_local_experts_indices = torch.repeat_interleave(\nRuntimeError: operator():../torch_npu/csrc/aten/common/LocalScalarDenseNpu.cpp:23 NPU function error:\nc10_npu::acl::AclrtSynchronizeStreamWithTimeout(copy_stream), error code is 507035\n[ERROR] ERR00100 PTA call acl api failed\n[Error]: The vector core execution is abnormal.\n```\n\nDevice-side error:\n\n```text\nThe error from device(chipId:x, dieId:y), serial number is 1, there is an exception of fftsplus\naivector error, vec error info: 0x470000020d, subErrType:4, errorStr: The VEC instruction parameter is invalid.\nAn error occurred in the kernel task, retCode=0x31, [vector core exception]\nrtStreamSynchronizeWithTimeout execution failed, reason=vector core exception\n```\n\nKey observations:\n\n1. All 16 devices failed in the same second with bit-identical vec error info (0x470000020d).\n   npu-smi reports Health OK for every device before and after, and the failing task serial number\n   is 1/2 on every device. This looks like a deterministic kernel/tiling bug, not a hardware fault.\n2. The device exception dump identifies the failing kernel: the dump directory next to each\n   exception_info.* file contains only TopKV2_<hash>_high_performance_*_host.o — i.e. the crashing\n   kernel is the custom high-performance TopKV2 from the vendor opp package (MoE routing top-k),\n   not repeat_interleave itself; repeat_interleave is only where the stream synchronize surfaced\n   the error. The dumps also contain full tiling data (64B) and input tensors.\n3. The trigger pattern is reproducible: right before both crashes, a burst of 4 concurrent requests\n   with ~32K-token prompts arrived (identical traffic replayed both times: Avg prompt throughput\n   3276.7 tokens/s, then Running: 2 reqs, Waiting: 2 reqs), and the crash happened during the first\n   mixed chunked-prefill + decode forward passes (max_num_batched_tokens=8192).\n4. The crash occurred while the acl-graph wrapper executed the step via its eager fallback\n   (acl_graph.py fx_run_eagerly), since the mixed-batch shape is not covered by decode-only graphs.\n   Additionally, at startup every worker recorded\n   \"EE1016: Synchronous memory copy failed ... capture mode GLOBAL(0) ... supported only in\n   RELAXED mode\" during graph capture — pointing at the same op family (synchronous scalar copy\n   inside repeat_interleave) being incompatible with GLOBAL capture.\n\nCurrent workaround / status:\n\n- Temporarily ran with --enforce-eager and reduced limits (--max-model-len 8192 --max-num-seqs 1):\n  service was up, no 507035/EE1016 during that run. However, the original crash happened on the\n  eager fallback path, so enforce-eager alone may not fully avoid it.\n- Next step we plan to try: drop the custom_transformer vendor opp package from the env so TopK\n  falls back to the native implementation, and re-run the trigger traffic.\n- npu-smi health is OK; we have per-device exception_info dumps (incl. tiling data) and plog\n  available if needed.\n\nQuestions:\n\n1. Is this a known issue with the custom high-performance TopKV2 kernel under mixed\n   chunked-prefill batches?\n2. Is there a supported way to force native TopK for this model (instead of removing the whole\n   vendor opp package), e.g. an op-priority config?\n3. Any fixed version you can point us to?",
+          "state": "open",
+          "user": {
+            "login": "zkfopen",
+            "name": "zkfopen",
+            "email": null,
+            "avatar_url": "https://avatars.githubusercontent.com/u/29174476?v=4",
+            "id": 29174476
+          },
+          "assignees": null,
+          "labels": [
+            {
+              "name": "bug",
+              "color": "d73a4a",
+              "description": "Something isn't working"
+            },
+            {
+              "name": "glm5",
+              "color": "fef2c0",
+              "description": ""
+            },
+            {
+              "name": "triaged",
+              "color": "8022f7",
+              "description": ""
+            },
+            {
+              "name": "llm-model",
+              "color": "51f988",
+              "description": ""
+            }
+          ],
+          "milestone": null,
+          "state_reason": null,
+          "comments": 4,
+          "created_at": "2026-09-07T03:38:15Z",
+          "updated_at": "2026-09-08T08:51:48Z",
+          "closed_at": null,
+          "display_url": "https://github.com/vllm-project/vllm-ascend/issues/15903",
+          "display_title": "[Bug]: Vector core exception (errcode 507035) in MoE routing TopK crashes all 16 ranks on Atlas A3 running GLM-5.3-Flash under concurrent long-prompt load"
+        },
+        "url": "https://github.com/vllm-project/vllm-ascend/issues/15903",
+        "title": "[Bug]: Vector core exception (errcode 507035) in MoE routing TopK crashes all 16 ranks on Atlas A3 running GLM-5.3-Flash under concurrent long-prompt load",
+        "display_url": "https://github.com/vllm-project/vllm-ascend/issues/15903",
+        "display_title": "[Bug]: Vector core exception (errcode 507035) in MoE routing TopK crashes all 16 ranks on Atlas A3 running GLM-5.3-Flash under concurrent long-prompt load"
+      },
+      "isError": false
+    }
+  },
+  {
+    "url": "https://github.com/vllm-project/vllm-ascend/issues/14464",
+    "task_ids": [
+      "RC-093"
+    ],
+    "kind": "BODY",
+    "round": 1,
+    "tool": "mcp__codex_apps__github_fetch_issue",
+    "args": {
+      "repository_full_name": "vllm-project/vllm-ascend",
+      "issue_number": 14464
+    },
+    "checked_at": "2026-11-13T02:20:36.182Z",
+    "response": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Action completed."
+        }
+      ],
+      "structuredContent": {
+        "issue": {
+          "url": "https://github.com/vllm-project/vllm-ascend/issues/14464",
+          "title": "[Bug]: Long Chinese-context (≈8k+ chars) generation is corrupted for a DeepSeek-V2 model on vLLM-Ascend (works <5k, works on SGLang)",
+          "issue_number": 14464,
+          "body": "### Your current environment\n\n<details>\n<summary>The output of `python collect_env.py`</summary>\n\n```text\n- Python   : 3.11.15\n- torch    : 2.10.0 (torch_npu 2.10.0)\n- vLLM     : v0.20.2 (V1 engine)\n- vLLM-Ascend : 0.20.2rc1 (register: ascend -> vllm_ascend)\n- transformers : 5.5.3\n- CANN     : 9.0   (npu-smi 25.5.0)\n- NPU      : Ascend 910C (16x, 64GB), TP=2 (逻辑卡 10,11)\n- OS       : Linux (manas-npu-node1)\n```\n\n</details>\n\n\n### 🐛 Describe the bug\n\n## 1. Issue summary\n\nFor a **DeepSeek-V2** architecture model (custom fine-tuned 32B MoE), chat-completions generation is **corrupted (garbled Chinese, `�` replacement chars, repetition loop, `finish_reason=length`)** whenever the user prompt is **longer than roughly 5k–8k characters** (~2k–8k tokens). Short prompts (<5k chars) generate normally. The corruption is **independent of configuration** (verified below) and **does NOT reproduce on SGLang with the same weights** → it points to a vLLM-Ascend implementation/long-context issue for this model family.\n\n- vLLM-Ascend log maps the `DeepseekV2ForCausalLM` model to `vllm_ascend.models.deepseek_v4:AscendDeepseekV4ForCausalLM` (see log line below). The model's own config says `model_type: deepseek_v2`, `architectures: [\"DeepseekV2ForCausalLM\"]`.\n\n## 2. Model\n\n- Path: a local `DeepseekV2ForCausalLM` 32B MoE (021-32b fine-tune).\n- `config.json`: `model_type` = `deepseek_v2`, `architectures` = `[\"DeepseekV2ForCausalLM\"]`,\n  `max_position_embeddings=32768`, `rope_theta=1e6`,\n  `rope_scaling={\"type\":\"yarn\",\"factor\":1.0,\"original_max_position_embeddings\":32768,\"beta_fast\":32,\"beta_slow\":1,\"mscale\":1,\"mscale_all_dim\":1}`.\n- Tokenizer: `trust_remote_code` with a custom `MixedTokenizer` (per-base DNA tokens `<d_>_X`, byte-level). Chinese/English encode correctly after tokenizer fixes (prompt token counts are correct: 15.5k chars → 11116 tokens).\n\n## 3. Reproduction\n\n### 3.1 Startup command\n\n```bash\npython -m vllm.entrypoints.openai.api_server \\\n  --model /path/to/model \\\n  --served-model-name 021-32b-best --port 30001 \\\n  --tensor-parallel-size 2 --enable-expert-parallel \\\n  --distributed_executor_backend mp --trust-remote-code \\\n  --reasoning-parser deepseek_r1 \\\n  --block-size 128 --gpu-memory-utilization 0.9 --async-scheduling \\\n  --max-num-seqs 64 --max-num-batched-tokens 2048 \\\n  --compilation_config '{\"cudagraph_mode\":\"FULL_DECODE_ONLY\",\"cudagraph_capture_sizes\":[1,2,4,8,16,24,32]}' \\\n  --hf-overrides '{\"max_position_embeddings\":131072,\"rope_parameters\":{\"rope_type\":\"yarn\",\"factor\":1.0,\"original_max_position_embeddings\":131072,\"beta_fast\":32.0,\"beta_slow\":1.0,\"mscale\":1.0,\"mscale_all_dim\":1.0}}'\n```\n\nStartup log shows the architecture mapping:\n\n```\nWARNING registry.py:945 Model architecture DeepseekV4ForCausalLM is already registered,\nand will be overwritten by the new model class vllm_ascend.models.deepseek_v4:AscendDeepseekV4ForCausalLM.\n```\n\n### 3.2 Request\n\n```bash\ncurl http://127.0.0.1:30001/v1/chat/completions \\\n  -H \"Content-Type: application/json\" -d '{\n    \"model\": \"021-32b-best\",\n    \"messages\": [{\"role\": \"user\", \"content\": \"<long Chinese prompt ~14k–20k chars; e.g. a structured clinical-analysis instruction with patient data>\"}],\n    \"max_tokens\": 8192, \"temperature\": 0.0\n  }'\n```\n\n> The full prompt is a Chinese-language structured task (~14k chars). \n\n### 3.3 Actual (broken)\n\n```text\nfinish_reason = length\ncontent       = null (empty)\nreasoning     = ~13k chars, from the very first token it is garbled Chinese/ASCII mix\n                with many U+FFFD replacement chars and repeated fragments, e.g.:\n  '###（HAG-PS：.\\n（A-1”。\\n-    1，\"（Hun-1”（B- 该（S-    1”：\\n\" ... � ... \\n###\\n###\\n###...'\nNo usable JSON/answer is produced.\n```\n\n> **Byte-level clarification:** this is genuine garbage **produced by the model's byte stream**, not a display/decoder issue.\n> The `U+FFFD` replacement chars can only arise from invalid UTF-8 byte sequences reaching the detokenizer; short Chinese outputs on the same server decode cleanly (0 `U+FFFD`), so the ByteLevel decoder itself is fine — the corruption is specifically in the long-context generated token/byte stream.\n\n### 3.4 Expected\n\n```text\nModel should produce a coherent Chinese chain-of-thought and a final answer (JSON).\nSame weights + same prompt on SGLang 0.5.17.dev386 (deepseek-r1 parser) → works: coherent Chinese reasoning, JSON answer, finish_reason=stop.\n```\n\n## 4. Length threshold (the key signal)\n\nSame prompt truncated to different lengths (`max_tokens=4096–8192`, temp=0):\n\n| Input length (chars) | Output |\n| --- | --- |\n| ~2,000 | OK (finish=stop, no U+FFFD) |\n| ~5,000 | OK (finish=stop, no U+FFFD) |\n| ~8,000 | **BROKEN** (finish=length, reasoning ~9.8k chars, U+FFFD, repetition) |\n| ~14,000+ | **BROKEN** (finish=length, reasoning ~13k chars, U+FFFD from first token) |\n\nShort tasks on the same server are fine (e.g., Chinese arithmetic answers correctly), so it is specifically a **long-context** problem, not a general/Chinese/tokenizer problem.\n\n## 5. A/B already tested (all still reproduce ⇒ config-independent)\n\n| Attempt | Result |\n| --- | --- |\n| `--max-num-batched-tokens 8192` (chunked prefill) | still BROKEN |\n| MC2 off (`VLLM_ASCEND_ENABLE_FUSED_MC2=0`) + no `--enable-expert-parallel` | still BROKEN |\n| `--enforce-eager` (no OOT compile / no CUDAGraph) | still BROKEN |\n| RoPE `--hf-overrides factor=4.0` vs `1.0` | both BROKEN |\n| `/no_think` (system msg) or `enable_thinking=false` | still BROKEN (long); helps only short tasks |\n| `repetition_penalty=1.05 / 1.1` | still BROKEN (so not a plain repetition that sampling can fix) |\n| SGLang (same weights, `--reasoning-parser deepseek-r1`) | **works** (coherent, JSON, stop) |\n\n## 6. Supporting observations\n\n- The corrupted output starts garbled at the **first generated token** for long prompts → the encoded context itself appears corrupted before/at prefill-decode transition, not a mid-roll divergence.\n- `enable_chunked_prefill=True`, `compile_ranges_endpoints=[2048]` (from log).\n- Possible related upstream issues (same family, DeepSeek + long-context/repeat on vLLM-Ascend):\n  - #13661 `dsv4f0731 will repeat and repeat hungup`\n  - #14118 `Prompt corruption/leak under high concurrency with prefix caching enabled for DeepSeek-...`\n  - #9983 `Disable fused MC2 ... to prevent logit corruption`\n  - #5823 (closed) `mla_v1.py ... strongly bound to deepseek_yarn rope_type` — DeepSeek MLA rope is custom on Ascend\n  - #12723 / #12820 — examples of Ascend rope silently corrupting positions / QK\n\n## 7. Ask\n\n1. Why does the model register as `AscendDeepseekV4ForCausalLM` although `config.architectures` is `DeepseekV2ForCausalLM`? Could the DeepSeek-V2 → DeepSeek-V4 code path mishandle long-context MLA/rope for this model?\n2. Any fix/workaround for long-context (>8k chars) correctness on vLLM-Ascend for DeepSeek-V2 models?\n",
+          "state": "open",
+          "user": {
+            "login": "Mr-qiji",
+            "name": "Mr-qiji",
+            "email": null,
+            "avatar_url": "https://avatars.githubusercontent.com/u/28950742?v=4",
+            "id": 28950742
+          },
+          "assignees": null,
+          "labels": [
+            {
+              "name": "bug",
+              "color": "d73a4a",
+              "description": "Something isn't working"
+            },
+            {
+              "name": "llm-model",
+              "color": "51f988",
+              "description": ""
+            },
+            {
+              "name": "deepseek",
+              "color": "ededed",
+              "description": null
+            }
+          ],
+          "milestone": null,
+          "state_reason": null,
+          "comments": 3,
+          "created_at": "2026-08-18T02:47:33Z",
+          "updated_at": "2026-08-24T11:45:08Z",
+          "closed_at": null,
+          "display_url": "https://github.com/vllm-project/vllm-ascend/issues/14464",
+          "display_title": "[Bug]: Long Chinese-context (≈8k+ chars) generation is corrupted for a DeepSeek-V2 model on vLLM-Ascend (works <5k, works on SGLang)"
+        },
+        "url": "https://github.com/vllm-project/vllm-ascend/issues/14464",
+        "title": "[Bug]: Long Chinese-context (≈8k+ chars) generation is corrupted for a DeepSeek-V2 model on vLLM-Ascend (works <5k, works on SGLang)",
+        "display_url": "https://github.com/vllm-project/vllm-ascend/issues/14464",
+        "display_title": "[Bug]: Long Chinese-context (≈8k+ chars) generation is corrupted for a DeepSeek-V2 model on vLLM-Ascend (works <5k, works on SGLang)"
+      },
+      "isError": false
+    }
+  },
+  {
+    "url": "https://github.com/vllm-project/vllm-ascend/issues/15296",
+    "task_ids": [
+      "RC-096"
+    ],
+    "kind": "BODY",
+    "round": 1,
+    "tool": "mcp__codex_apps__github_fetch_issue",
+    "args": {
+      "repository_full_name": "vllm-project/vllm-ascend",
+      "issue_number": 15296
+    },
+    "checked_at": "2026-11-13T02:20:36.203Z",
+    "response": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Action completed."
+        }
+      ],
+      "structuredContent": {
+        "issue": {
+          "url": "https://github.com/vllm-project/vllm-ascend/issues/15296",
+          "title": "[Performance]: Qwen3-235B accuracy and performance issues on releases/v0.26.0rc",
+          "issue_number": 15296,
+          "body": "## Model\nQwen3-235B-A22B-w8a8-rot and Qwen3-235B W4A8 (800IA3)\n\n## Issue\nOn `releases/v0.26.0rc`, some PD separation and PD disaggregation tests show lower accuracy or performance than the baseline.\n\nFor the A3 single-machine aclgraph case (`32768_4096_TPOT50ms`), the measured TPOT values are `258.2517, 260.6926, 263.8598, 255.5208`, compared with the baseline `273.432`.\n\nThis issue will be tracked in the follow-up sunset plan.\n",
+          "state": "open",
+          "user": {
+            "login": "underfituu",
+            "name": "underfituu",
+            "email": null,
+            "avatar_url": "https://avatars.githubusercontent.com/u/33891520?v=4",
+            "id": 33891520
+          },
+          "assignees": null,
+          "labels": [
+            {
+              "name": "triaged",
+              "color": "8022f7",
+              "description": ""
+            }
+          ],
+          "milestone": null,
+          "state_reason": null,
+          "comments": 0,
+          "created_at": "2026-08-29T07:41:24Z",
+          "updated_at": "2026-09-04T07:35:29Z",
+          "closed_at": null,
+          "display_url": "https://github.com/vllm-project/vllm-ascend/issues/15296",
+          "display_title": "[Performance]: Qwen3-235B accuracy and performance issues on releases/v0.26.0rc"
+        },
+        "url": "https://github.com/vllm-project/vllm-ascend/issues/15296",
+        "title": "[Performance]: Qwen3-235B accuracy and performance issues on releases/v0.26.0rc",
+        "display_url": "https://github.com/vllm-project/vllm-ascend/issues/15296",
+        "display_title": "[Performance]: Qwen3-235B accuracy and performance issues on releases/v0.26.0rc"
+      },
+      "isError": false
+    }
+  }
+]

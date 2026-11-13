@@ -1,0 +1,279 @@
+fix: preserve MTP sequence boundaries in packed SFT-MindSpeed-LLM-AtomGit
+Star
+225
+Fork
+357
+Code
+Introduction
+Code
+Issues
+32
+Pull Requests
+103
+Pipeline
+Actions
+Discussion
+Wiki
+Members
+102
+Analysis
+Settings
+Star
+225
+Fork
+357
+Merged
+fix: preserve MTP sequence boundaries in packed SFT
+#5182
+simon_jia
+Add on
+17 days ago
+Merged from
+gcw_m1ionjwU/MindSpeed-LLM：
+fix/mtp-packed-sft-sequence-boundaries
+into
+Ascend/MindSpeed-LLM：
+master
+fix: preserve MTP sequence boundaries in packed SFT
+#5182
+Merged
+simon_jia
+Add on
+17 days ago
+Merged from
+gcw_m1ionjwU/MindSpeed-LLM
+fix/mtp-packed-sft-sequence-boundaries
+into
+Ascend/MindSpeed-LLM
+master
+Merge checks
+Discussion
+0
+Commits
+0
+Checks
+0
+Files changed
+0
+Clone/Download
+0
+S
+simon_jia
+17 days ago
+17 days ago
+What this PR does / why we need it?
+Related issue:
+https://gitcode.com/Ascend/MindSpeed-LLM/issues/1934
+Packed SFT with
+--mtp-num-layers 1 --reset-attention-mask
+encounters two consecutive errors:
+DecoderPackedMTFDataset.__getitem__()
+converts
+actual_seq_len
+to a list when constructing MTP boundaries, then passes that list to
+F.pad
+, causing
+TypeError: pad(): argument input must be Tensor, not list
+. Only pad the non-MTP result; the MTP path already constructs its own tensor.
+With micro batch size 1,
+SFTTrainer.get_batch()
+flattens the per-layer boundaries, causing
+TypeError: int object is not subscriptable
+in the DeepSeek4 forward path. Use
+squeeze(0)
+to remove only the batch dimension and retain
+[mtp_num_layers + 1, num_boundaries]
+in both intermediate and first/last pipeline stage branches.
+Does this PR introduce any user-facing change?
+No new arguments or data format changes. This fixes the existing MTP packed-SFT data path. Existing non-MTP and micro batch size > 1 processing is retained.
+How was this patch tested?
+Local: Python AST syntax checks for both modified files and
+git diff --check
+passed. No local PyTorch/NPU training environment is available.
+Reported remote run: DeepSeek-V4-Flash packed SFT, 4 nodes / 64 NPUs, TP1 / PP4 / EP16 / CP4,
+kvallgather_cp_algo
+, BF16, MTP1, micro batch size 1, global batch size 32, reset attention/position IDs. At sequence length 8192, three consecutive training steps completed with finite LM/MTP losses, zero skipped updates and zero NaN iterations.
+A sequence-length-20480 run also completed one training step after these fixes; subsequent runs had separate device/HCCL memory failures. This PR does not claim to resolve the 20k OOM or the device-kernel error.
+Multi-layer MTP, micro batch size > 1, other CP algorithms and checkpoint save/restore are not covered by the remote validation.
+Save
+Cancel
+Pull Request has been successfully merged by ascend-robot.
+（Thank you for simon_jia's contribution.）
+S
+simon_jia
+17 days ago
+Added label:
+fix
+17 days ago
+Added label:
+fix
+S
+simon_jia
+17 days ago
+Created pull request, commit
+74e35d5e
+17 days ago
+Created pull request, commit
+74e35d5e
+S
+simon_jia
+17 days ago
+Associated issue: [Bug]: MTP + reset_attention_mask causes F.pad TypeError in DecoderPackedMTFDataset
+17 days ago
+Associated issue: [Bug]: MTP + reset_attention_mask causes F.pad TypeError in DecoderPackedMTFDataset
+atomgit-bot
+17 days ago
+Comments：
+17 days ago
+Comments：
+变更摘要
+本 PR 修复 packed SFT 在开启 MTP（
+--mtp-num-layers 1 --reset-attention-mask
+）时的两条数据路径错误。在数据侧，
+DecoderPackedMTFDataset.__getitem__()
+中只有在非 MTP 分支才把
+actual_seq_len
+送入
+F.pad
+补齐，避免把列表传给
+pad()
+的
+TypeError
+；在训练侧，
+SFTTrainer.get_batch()
+在
+mtp_num_layers
+开启且
+micro_batch_size == 1
+时改用
+squeeze(0)
+仅去掉 batch 维，保留
+[mtp_num_layers + 1, num_boundaries]
+的每层边界结构，避免被当成扁平列表后在 DeepSeek4 前向路径中出现
+int object is not subscriptable
+。非 MTP 与 micro batch size 大于 1 的原有处理逻辑保持不变，无新增用户参数或数据格式变更。
+主要改动
+MTP 边界不再走
+F.pad
+补齐
+：
+DecoderPackedMTFDataset.__getitem__()
+中为
+padded_actual_seq_len
+的补齐逻辑加上
+if mtp_res is None:
+条件，MTP 路径直接使用自身构造的边界张量，消除
+pad(): argument input must be Tensor, not list
+报错。
+单样本 MTP 边界保留层维度（中间 pipeline stage）
+：
+SFTTrainer.get_batch()
+的中间分支新增
+args.mtp_num_layers and args.micro_batch_size == 1
+判断，对
+data_b['actual_seq_len']
+执行
+squeeze(0)
+，仅移除 batch 维并保留每 MTP 层的行。
+单样本 MTP 边界保留层维度（首/尾 pipeline stage）
+：首/尾 stage 分支同步加入相同的
+mtp_num_layers
++
+micro_batch_size == 1
+判断与
+squeeze(0)
+处理，使两条分支的
+actual_seq_len
+形状一致。
+原有分支顺序调整
+：
+micro_batch_size > 1
+的
+compute_actual_seq_len_form_list
+合并逻辑改为
+elif
+，其余情况继续沿用原始
+actual_seq_len
+，保证非 MTP 与多样本场景行为不变。
+Save
+Cancel
+Incorrect?
+ascend-robot
+Collaborators
+17 days ago
+Comments：
+17 days ago
+Comments：
+openLiBing可接管PR, PR详情链接:
+https://www.openlibing.com/apps/transitionPrDetail?owner=Ascend&repo=MindSpeed-LLM&number=5182&platform=gitcode&codeHostingPlatformFlag=gitcode
+Save
+Cancel
+168 messages are collapsed here。
+See more
+ascend-robot
+Collaborators
+10 days ago
+Added label:
+lgtm
+10 days ago
+Added label:
+lgtm
+I
+iansheng
+Collaborators
+10 days ago
+Comments：
+10 days ago
+Comments：
+/approve
+Save
+Cancel
+ascend-robot
+Collaborators
+10 days ago
+Added label:
+approved
+10 days ago
+Added label:
+approved
+ascend-robot
+Collaborators
+10 days ago
+Merged pull request
+10 days ago
+Merged pull request
+ascend-robot
+Collaborators
+10 days ago
+Comments：
+10 days ago
+Comments：
+Pull Request 已合并或已关闭。
+If you want to solve this problem,
+you can click here to do it in the
+FAQs
+.
+Save
+Cancel
+Merger
+Not assigned
+Approver
+Not assigned
+Tester
+Not assigned
+Reviewer
+Not assigned
+Label
+fix
+stat/needs-squash
+ascend-cla/yes
+docs-ci-pipeline-success
+ci-pipeline-passed
+lgtm
+approved
+Milestones
+No related milestones
+Kanban
+No related boards
+Link Issue
+No related Issues

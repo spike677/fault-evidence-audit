@@ -1,0 +1,763 @@
+LI UB duplicate fix-ops-transformer-AtomGit
+Star
+1681
+Fork
+3393
+Code
+Introduction
+Code
+Issues
+430
+Pull Requests
+724
+Pipeline
+Actions
+Discussion
+Wiki
+Members
+620
+Analysis
+Settings
+Star
+1681
+Fork
+3393
+Merged
+LI UB duplicate fix
+#9834
+lh
+Add on
+Aug 10
+Merged from
+lhlll/ops-transformer_pangucase：
+9.1.0
+into
+cann/ops-transformer：
+9.1.0
+LI UB duplicate fix
+#9834
+Merged
+lh
+Add on
+Aug 10
+Merged from
+lhlll/ops-transformer_pangucase
+9.1.0
+into
+cann/ops-transformer
+9.1.0
+Merge checks
+Discussion
+0
+Commits
+0
+Checks
+0
+Files changed
+0
+Clone/Download
+0
+lh
+Collaborators
+Aug 10
+Aug 10
+描述
+修复LIub不足引起的地址踩踏问题
+关联的Issue
+https://gitcode.com/cann/ops-transformer/issues/4290
+测试
+文档更新
+类型标签
+🐛 Bug修复
+✨ 新特性
+⚡ 性能优化
+♻️ 重构
+🧪 测试
+📦 构建/CI
+🔧 配置变更
+📝 文档更新
+⬆️ 依赖升级
+🔒 安全修复
+🧹 代码清理
+❓ 其他，请描述：
+Save
+Cancel
+Pull Request has been successfully merged by CANN-robot.
+（Thank you for lh's contribution.）
+lh
+Collaborators
+Aug 10
+Created pull request, commit
+87cc1d27
+Aug 10
+Created pull request, commit
+87cc1d27
+atomgit-bot
+Aug 10
+Comments：
+Aug 10
+Comments：
+变更摘要
+此 PR 修复了
+LightningIndexerServiceVector
+中 TopK 结果无效值填充（duplicate）的缓冲区大小不足和掩码越界问题。主要将
+valueOutBuf_
+和
+scoreOutBuf_
+的初始化大小各增加了安全余量，同时将
+ProcessTopK
+函数中无效值填充的覆盖范围从 64 个元素扩展到 128 个元素，并修正了
+mask
+数组大小以匹配新的覆盖范围。
+主要改动
+InitBuffers
+中缓冲区大小扩展
+：
+valueOutBuf_
+的初始化大小从
+topkCountAlign256_ * sizeof(K_T)
+改为
+(topkCountAlign256_ + 128) * sizeof(K_T)
+，
+scoreOutBuf_
+从
+topkCountAlign256_ * sizeof(SCORE_T)
+改为
+(topkCountAlign256_ + 64) * sizeof(SCORE_T)
+，为无效值填充提供额外空间，防止越界写入。
+mask
+数组大小修正
+：在
+ProcessTopK
+中将
+uint64_t mask[1]
+改为
+uint64_t mask[2]
+，并新增
+mask[1] = ~0
+初始化，支持对 128 个元素范围的位掩码控制，修复了原单元素掩码数组无法覆盖完整填充区域的问题。
+无效值填充偏移量调整
+：将第二个
+Duplicate
+调用的起始偏移从
+validS2Len / 16 * 16 + 64
+改为
+validS2Len / 16 * 16 + 128
+，对应的条件检查也同步修改，确保带掩码的
+Duplicate
+负责前 128 个元素的精确填充，无掩码的
+Duplicate
+从第 128 个元素之后批量填充。
+Save
+Cancel
+Incorrect?
+CANN-robot
+Collaborators
+Aug 10
+Added label:
+cann-cla/yes
+Aug 10
+Added label:
+cann-cla/yes
+CANN-robot
+Collaborators
+Aug 10
+Comments：
+Aug 10
+Comments：
+CLA Signature Pass
+lhlll, thanks for your pull request. All authors of the commits have signed the CLA. 👍
+Save
+Cancel
+CANN-robot
+Collaborators
+Aug 10
+Comments：
+Aug 10
+Comments：
+Thanks for your pull-request.
+The full list of commands accepted by me can be found at
+here
+。
+You can get sig-info at
+here
+PR Approval Progress
+✅
+Congratulations! All modules have met the lgtm and approve requirements.
+Module Approval Details
+module
+lgtm status
+approve status
+9.1.0
+✅
+Andy-lb
+,
+coder_linx
+(2/2)
+✅
+Andy-lb
+(1/1)
+💡 Tip:
+Committer
+can comment
+/approve
+or
+/lgtm
+Commenting
+/approve
+implies both code review (lgtm) and intent to merge (approve)
+CLA Signature Pass
+lhlll, thanks for your pull request. All authors of the commits have signed the CLA. 👍
+Save
+Cancel
+CANN-robot
+Collaborators
+Aug 10
+Set hz36amy_00,coder_linx,juyangokok,monologue815,xuanyuandy,crystalhu,yu-xinjie62,huangwei791,jiang-lirui,yang-binrong,Allan_Yu,TianXL,liudan12,shasha_an,jiangtao_rts,wangzhe123456789,gitcode-chenjiao,cc-z,shen_weiling,hanxiaolong,gaoxiang618,songjionghui,wenxin_fight,miaofangzheng,mabing1118,tang-hao-hw-gitcode,haijie_699874,zzy__,gcw_kUomxQ2l,Andy-lb,yuhao_,L_Euler as approver
+Aug 10
+Set hz36amy_00,coder_linx,juyangokok,monologue815,xuanyuandy,crystalhu,yu-xinjie62,huangwei791,jiang-lirui,yang-binrong,Allan_Yu,TianXL,liudan12,shasha_an,jiangtao_rts,wangzhe123456789,gitcode-chenjiao,cc-z,shen_weiling,hanxiaolong,gaoxiang618,songjionghui,wenxin_fight,miaofangzheng,mabing1118,tang-hao-hw-gitcode,haijie_699874,zzy__,gcw_kUomxQ2l,Andy-lb,yuhao_,L_Euler as approver
+lh
+Collaborators
+Aug 10
+Comments：
+Aug 10
+Comments：
+compile
+Save
+Cancel
+CANN-robot
+Collaborators
+Aug 10
+Set TianXL,jiangtao_rts,gitcode-chenjiao,hanxiaolong,gcw_kUomxQ2l,Andy-lb as approver
+Aug 10
+Set TianXL,jiangtao_rts,gitcode-chenjiao,hanxiaolong,gcw_kUomxQ2l,Andy-lb as approver
+lh
+Collaborators
+Aug 10
+Pre merge succeeded (commit_id: 67349f89cd776a831c5dc7283a608c628871c03b)
+Aug 10
+Pre merge succeeded (commit_id: 67349f89cd776a831c5dc7283a608c628871c03b)
+CANN-robot
+Collaborators
+Aug 10
+Added label:
+ci-pipeline-running
+Aug 10
+Added label:
+ci-pipeline-running
+CANN-robot
+Collaborators
+Aug 10
+Comments：
+Aug 10
+Comments：
+流水线任务触发成功
+任务链接 [
+a8e9e98ae64f49b1bd90d68290017725
+][
+流水线指导
+]
+任务名称
+状态
+日志
+下载链接
+Compile_Ascend_X86
+✅ SUCCESS
+>>>>>
+>>>>>
+Compile_Ascend_ARM
+✅ SUCCESS
+>>>>>
+>>>>>
+Compile_Ascend_X86_experimental
+✅ SUCCESS
+>>>>>
+>>>>>
+Compile_Ascend_ARM_experimental
+✅ SUCCESS
+>>>>>
+>>>>>
+Compile_Pre
+✅ SUCCESS
+>>>>>
+pre_comment
+✅ SUCCESS
+>>>>>
+Compile_X86_monitor_910b
+✅ SUCCESS
+>>>>>
+>>>>>
+Compile_X86_monitor_910c
+✅ SUCCESS
+>>>>>
+>>>>>
+Compile_X86_monitor_950
+✅ SUCCESS
+>>>>>
+>>>>>
+Compile_Ascend_X86_experimental_950
+✅ SUCCESS
+>>>>>
+>>>>>
+Compile_Ascend_ARM_experimental_950
+✅ SUCCESS
+>>>>>
+>>>>>
+Compile_Ascend_X86_mobile_station
+✅ SUCCESS
+>>>>>
+>>>>>
+UT_Test
+✅ SUCCESS
+PreSmoke_A900
+✅ SUCCESS
+>>>>>
+PreSmoke_ATK_Test_A2
+✅ SUCCESS
+>>>>>
+[2026-08-10 17:24:45]    CI执行结束
+Save
+Cancel
+CANN-robot
+Collaborators
+Aug 10
+Comments：
+Aug 10
+Comments：
+流水线任务触发成功
+任务链接 [
+34ca9971fdfd4da085ff49de4202dc80
+][
+流水线指导
+]
+任务名称
+状态
+日志
+下载链接
+codecheck
+✅ SUCCESS
+>>>>>
+SCA
+✅ SUCCESS
+>>>>>
+antipoison
+✅ SUCCESS
+>>>>>
+codecheck_style
+✅ SUCCESS
+>>>>>
+StaticCheck_codespell_check
+✅ SUCCESS
+StaticCheck_link_validity_check
+✅ SUCCESS
+StaticCheck_resource_existence_check
+✅ SUCCESS
+StaticCheck_tag_closed_check
+✅ SUCCESS
+StaticCheck_markdownlint
+✅ SUCCESS
+codecheck_checkpr
+✅ SUCCESS
+codecheck_precommit
+⚠️ WARNING
+>>>>>
+>>>>>
+[2026-08-10 17:21:04]    CI执行结束
+Save
+Cancel
+CANN-robot
+Collaborators
+Aug 10
+Removed label:
+ci-pipeline-running
+Aug 10
+Removed label:
+ci-pipeline-running
+CANN-robot
+Collaborators
+Aug 10
+Added label:
+ci-pipeline-passed
+Aug 10
+Added label:
+ci-pipeline-passed
+lh
+Collaborators
+Aug 13
+Change title to "LI UB duplicate fix", originally titled "duplicate fix".
+Aug 13
+Change title to "LI UB duplicate fix", originally titled "duplicate fix".
+lh
+Collaborators
+Aug 13
+Modify description of pull request
+Aug 13
+Modify description of pull request
+lh
+Collaborators
+Aug 13
+Modify description of pull request
+Aug 13
+Modify description of pull request
+lh
+Collaborators
+Aug 13
+Modify description of pull request
+Aug 13
+Modify description of pull request
+W
+wzwen1
+Collaborators
+Aug 13
+Start code review
+3
+attention/lightning_indexer/op_kernel/arch35/lightning_indexer_service_vector.h
+Outdated
+Resolved
+@@ -163,3 +163,3 @@
+163
+163
+// returnvalue
+164
+164
+if
+(topkCount_ <=
+2048
+) {
+165
+-
+pipe->InitBuffer(valueOutBuf_, topkCountAlign256_ * sizeof(K_T));
+165
++
+pipe->InitBuffer(valueOutBuf_,
+(
+topkCountAlign256_
++ 128)
+* sizeof(K_T));
+W
+wzwen1
+Aug 13
+Comments：
+【一般】统一写成加256B
+Save
+Cancel
+System Message
+System
+Aug 13
+Comments：
+Aug 13
+Comments：
+changed this line on
+48bcf8a9
+view
+diff detail
+Save
+Cancel
+lh
+Collaborators
+Aug 13
+Comments：
+Aug 13
+Comments：
+已修改
+Save
+Cancel
+lh
+Collaborators
+Aug 13
+Pre merge succeeded (commit_id: 7b8da13ee89bdf230d2ca298f1fc9342d41f169c)
+Aug 13
+Pre merge succeeded (commit_id: 7b8da13ee89bdf230d2ca298f1fc9342d41f169c)
+lh
+Collaborators
+Aug 13
+Force-pushed 1 commits:
+48bcf8a9
+-duplicate fix
+Aug 13
+Force-pushed 1 commits:
+48bcf8a9
+-duplicate fix
+lh
+Collaborators
+Aug 13
+Pre merge succeeded (commit_id: 2491b71efe3940b56fd90ebe2e337188c6b08812)
+Aug 13
+Pre merge succeeded (commit_id: 2491b71efe3940b56fd90ebe2e337188c6b08812)
+CANN-robot
+Collaborators
+Aug 13
+Removed label:
+cann-cla/yes
+Aug 13
+Removed label:
+cann-cla/yes
+CANN-robot
+Collaborators
+Aug 13
+Removed label:
+ci-pipeline-passed
+Aug 13
+Removed label:
+ci-pipeline-passed
+CANN-robot
+Collaborators
+Aug 13
+Added label:
+cann-cla/yes
+Aug 13
+Added label:
+cann-cla/yes
+CANN-robot
+Collaborators
+Aug 13
+Comments：
+Aug 13
+Comments：
+Notification
+This pull request has been changed(code update) or closed, so removes the following label(s): ci-pipeline-passed.
+Save
+Cancel
+CANN-robot
+Collaborators
+Aug 13
+Set guijianwei as approver
+Aug 13
+Set guijianwei as approver
+lh
+Collaborators
+Aug 13
+Comments：
+Aug 13
+Comments：
+compile
+Save
+Cancel
+lh
+Collaborators
+Aug 13
+Pre merge succeeded (commit_id: c74b13413d8fda6d63fe1c008615ed29b84eba06)
+Aug 13
+Pre merge succeeded (commit_id: c74b13413d8fda6d63fe1c008615ed29b84eba06)
+CANN-robot
+Collaborators
+Aug 13
+Added label:
+ci-pipeline-running
+Aug 13
+Added label:
+ci-pipeline-running
+CANN-robot
+Collaborators
+Aug 13
+Comments：
+Aug 13
+Comments：
+流水线任务触发成功
+任务链接 [
+20f29e89fa504cc0b88e2f5fa2649375
+][
+流水线指导
+]
+任务名称
+状态
+日志
+下载链接
+Compile_Ascend_X86
+✅ SUCCESS
+>>>>>
+>>>>>
+Compile_Ascend_ARM
+✅ SUCCESS
+>>>>>
+>>>>>
+Compile_Ascend_X86_experimental
+✅ SUCCESS
+>>>>>
+>>>>>
+Compile_Ascend_ARM_experimental
+✅ SUCCESS
+>>>>>
+>>>>>
+Compile_Pre
+✅ SUCCESS
+>>>>>
+pre_comment
+✅ SUCCESS
+>>>>>
+Compile_X86_monitor_910b
+✅ SUCCESS
+>>>>>
+>>>>>
+Compile_X86_monitor_910c
+✅ SUCCESS
+>>>>>
+>>>>>
+Compile_X86_monitor_950
+✅ SUCCESS
+>>>>>
+>>>>>
+Compile_Ascend_X86_experimental_950
+✅ SUCCESS
+>>>>>
+>>>>>
+Compile_Ascend_ARM_experimental_950
+✅ SUCCESS
+>>>>>
+>>>>>
+Compile_Ascend_X86_mobile_station
+✅ SUCCESS
+>>>>>
+>>>>>
+UT_Test
+✅ SUCCESS
+PreSmoke_A900
+✅ SUCCESS
+>>>>>
+PreSmoke_ATK_Test_A2
+✅ SUCCESS
+>>>>>
+[2026-08-13 10:33:11]    CI执行结束
+Save
+Cancel
+lh
+Collaborators
+Aug 13
+Modify description of pull request
+Aug 13
+Modify description of pull request
+CANN-robot
+Collaborators
+Aug 13
+Comments：
+Aug 13
+Comments：
+流水线任务触发成功
+任务链接 [
+3e1b988e10e040748cf6002a5a2ead74
+][
+流水线指导
+]
+任务名称
+状态
+日志
+下载链接
+codecheck
+✅ SUCCESS
+>>>>>
+SCA
+✅ SUCCESS
+>>>>>
+antipoison
+✅ SUCCESS
+>>>>>
+codecheck_style
+✅ SUCCESS
+>>>>>
+StaticCheck_codespell_check
+✅ SUCCESS
+StaticCheck_link_validity_check
+✅ SUCCESS
+StaticCheck_resource_existence_check
+✅ SUCCESS
+StaticCheck_tag_closed_check
+✅ SUCCESS
+StaticCheck_markdownlint
+✅ SUCCESS
+codecheck_checkpr
+✅ SUCCESS
+codecheck_precommit
+⚠️ WARNING
+>>>>>
+>>>>>
+[2026-08-13 10:21:23]    CI执行结束
+Save
+Cancel
+CANN-robot
+Collaborators
+Aug 13
+Removed label:
+ci-pipeline-running
+Aug 13
+Removed label:
+ci-pipeline-running
+CANN-robot
+Collaborators
+Aug 13
+Added label:
+ci-pipeline-passed
+Aug 13
+Added label:
+ci-pipeline-passed
+lh
+Collaborators
+Aug 13
+Resolved final issue
+Aug 13
+Resolved final issue
+A
+Andy-lb
+Collaborators
+Aug 13
+Comments：
+Aug 13
+Comments：
+/approve
+Save
+Cancel
+CANN-robot
+Collaborators
+Aug 13
+Added label:
+approved
+Aug 13
+Added label:
+approved
+林竹
+Collaborators
+Aug 13
+Comments：
+Aug 13
+Comments：
+/lgtm
+Save
+Cancel
+CANN-robot
+Collaborators
+Aug 13
+Added label:
+lgtm
+Aug 13
+Added label:
+lgtm
+CANN-robot
+Collaborators
+Aug 13
+Closed associated issue
+Aug 13
+Closed associated issue
+CANN-robot
+Collaborators
+Aug 13
+Merged pull request
+Aug 13
+Merged pull request
+Merger
+Not assigned
+Approver
+Not assigned
+Tester
+Not assigned
+Reviewer
+Not assigned
+Label
+cann-cla/yes
+ci-pipeline-passed
+approved
+lgtm
+Milestones
+No related milestones
+Kanban
+No related boards
+Link Issue
+No related Issues

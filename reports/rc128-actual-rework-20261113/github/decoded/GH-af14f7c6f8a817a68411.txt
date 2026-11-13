@@ -1,0 +1,16 @@
+[Ops][Misc] Optimize split_qkv_rmsnorm_rope op
+### What this PR does / why we need it?
+
+This PR optimizes the `split_qkv_rmsnorm_rope` operator by introducing a new Triton kernel, `split_qkv_rmsnorm_rope_prefill_kernel`, for the prefill stage (i.e., large batch sizes). The implementation now dynamically selects between the existing decode kernel and the new prefill kernel based on the batch size, which improves performance for large batch scenarios.
+
+Additionally, the RoPE implementation is updated to support partial rotation dimensions (`rope_dim`), making the operator more flexible.
+
+### Does this PR introduce _any_ user-facing change?
+
+No. This is a performance optimization and is not expected to introduce any user-facing changes.
+
+### How was this patch tested?
+
+CI should pass with existing tests. The new prefill path is triggered when the batch size is larger than the number of available vector cores. The partial RoPE feature can be tested by passing the `rope_dim` argument.
+- vLLM version: v0.15.0
+- vLLM main: https://github.com/vllm-project/vllm/commit/83b47f67b1dfad505606070ae4d9f83e50ad4ebd

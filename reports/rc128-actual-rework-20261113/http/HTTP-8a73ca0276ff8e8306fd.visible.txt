@@ -1,0 +1,237 @@
+[Feature]: MindIE支持Aclgraph后端-MindIE-LLM-AtomGit
+Star
+142
+Fork
+244
+Code
+Introduction
+Code
+Issues
+89
+Pull Requests
+179
+Pipeline
+Actions
+Discussion
+Wiki
+Members
+76
+Analysis
+Settings
+Star
+142
+Fork
+244
+Closed
+[Feature]: MindIE支持Aclgraph后端
+#160
+XhgAtHuawei
+Add on
+Jan 22
+Closed at
+May 25
+XhgAtHuawei
+Jan 22
+Create
+Jan 22
+Create
+提交提案之前，请先检索仓库内是否已有相同的提案，如已有请在同一提案中进行讨论。
+💻 需求背景、当前现状、期望实现的功能内容、具体的设计方案、以及测试方案
+【需求背景】
+为了达成0day模型迁移的目标，以及拥有更高效易用的模型深度优化手段，拥抱torch生态是必然的选择。
+【当前现状】
+当前MindIE仅支持ATB后端，存在如下问题：
+1、其CPP组图模式，上手门槛较高，调试效率不如pytorch。
+2、torch生态相比ATB更完善。
+3、torch结合aclgraph技术，也能解决算子下发问题。
+4、未来能结合compile技术，将长尾小算子自动融合，ATB缺乏compile能力。
+【功能内容】
+mindie基于torch组图，加aclgraph后端，支持deepseek v3.1/v3.2, qwen3-32B，qwen3-next模型推理，精度满足性能工厂验收标准。
+整体形成一个runtime模块，包含如下子功能模块：
+1、Custom layers：models依赖的公共子模块，包含auto quant, auto transpose, auto parallel能力，提升模型适配高阶特性的效率，沉淀稠密和稀疏模型通用能力，具备UT能力
+2、Utils：loader, env, log , prof, cpu binding等atb-models已有能力，建议和Custom layers一起交付
+3、modelRunner：向上对接batch调度，持有model，使用Compilation编译图，下发forwardContext给model
+4、Models：qwen3-32B, deepseek v3.1/v3.2, qwen3-next，要考虑和modelRunner的接口可扩展性，满足精度工厂要求，性能按照项目要求
+5、ops：放triton,tile等Python算子，具备UT能力
+6、csrc：存放torch.ops.xxx等cpp算子，具备UT能力
+7、提供整体模型迁移指导手册
+【设计方案】
+新增配置
+框架与流程
+Model初始化：
+1、TG之上的初始化流程保持不变
+2、TG直接调用model_runner，用上层给下来的model_config初始化（如果开启MTP，model_runner会被劫持为SpecWorker，其本质也是ModelRunner，持有main model_runner以及draft model_runner）
+3、model_runner将基于router机制，router到具体的model初始化
+4、model将递归遍历初始化其子layers
+5、layers调用Utils的weights loader加载权重（可逐tensor加载），
+6、layer层级的auto quant：将依据quant config，进行auto quant（加载量化权重）
+7、layer层级的auto parallel：将依据 paarallel_info（TP/DP/EP/CP/SP）以及flashcomm，依据固定模式，自动初始化通信域（如allreduce、reduceScatter、allGather、dispatch、combine）
+ModelCachePool初始化（在warmup流程中，与atb-models流程有差异，原则上依然是满足权重、激活值、输入buffer，hccl buffer、等这些模型forward过程中必要的空间之后，剩余的按照显存比例因子分配给kvcache）：
+1、model初始化之后，权重已经在device上了，torch的显存池中
+2、确定全量的graph capture size，可以用户指定capture size，也可以按照固定step和max_capture_size自动生成档位（以num_tokens维度衡量，需要考虑MTP）
+3、根据max_capture_size来prepare_padding_inputs buffer
+2、将model以eager mode按照最大规格forward一次，如果存在多图（多特性），则所有model都要按最大规格跑一遍，此时激活值、input_buffer、hccl_buffer都在torch显存池
+3、剩余的显存在aclrt的显存池中，按照显存比例因子分配作为kvcache总的大小
+4、遍历model.layers.attn，获取所有层的CacheSpec（每层都独立描述其cache info，包括shape，format，dtype，ratio）
+5、遍历model.layers.attn，bind cache
+图捕获（在warmup流程中）（只做decode阶段入图）：
+1、ModelCachePool初始化完成之后，kvcache的地址固定了，可以开始图捕获
+2、根据max_capture_size来prepare_padding_inputs buffer，所有graph的不同档位共享这些固定的buffer（一个aclgraph捕获之后，shape和tensor的地址不可变化）
+3、从大档位到小档位，将torch model依次捕获aclgraph，缓存起来（key为num_tokens，value为aclgraph）
+kvConnector初始化（PD分离场景）（Q1依然基于llm_datadist已有能力，Mooncake作为穿刺）：
+1、从ModelCachePool中获取全量cache，注册到kvTransforEngine
+2、发起link（如果是mooncake，则为初始化ZMQ）
+Forward：
+1、TG之上调度逻辑不变（kv压缩场景，scheduler需要引入多BlockManager）
+2、ModelRunner将ModelInputs转换为forward Context，在prepare_padding_inputs中完成，遍历model.layer.attn的attn_metadata构造方法构造，model_runner不负责具体的attn相关输入构造
+3、输入构造可以做tensor转换，H2D、D2D操作，异步调度需要掩盖这些耗时
+4、graph replay前，需要D2D copy到graph input buffer中（满足aclgraph要求固定地址不变）
+5、所有DP之间交换本轮的DP_num_tokens，以最大的值去选出最近的graph档位
+6、replay触发图执行
+Pull_kv：
+保持现有流程不变
+DS v3.2
+1、DP+TP+EP（D节点分布式）
+2、CP+TP+EP（P节点集中式，长序列）(由于sfa算子仅支持q_len<kv_len，不支持输出lse，所以kv只能切分存储，无法切分计算)
+qwen3-32
+【测试方案】
+DS v3.2：
+硬件：A3
+精度验收达标（CEval、MMLU、Math500、AIME24）
+部署形态：PD分离 2+2(P: CP 32, EP 32;     D: DP 16, TP 2, EP 32)需要达成全部性能目标；PD混部保证DP+TP+EP+MTP3功能即可
+性能目标：3K+0.5K/23K+1K/75K+2K，TTFT＜2s/5s/10s，TPOT＜20ms
+A3 560T：2.3x H20，折算8卡115QPM/19QPM/9QPM
+Qwen-32B
+硬件类型：A3 560T
+性能要求：TP4 3.5K 1.5K 不低于616TPS/卡，不低于atb-models
+精度要求：精度满足性能工厂验收标准（使用GPQA数据集进行验收）
+Qwen3-next
+硬件：A2、A3
+精度数据集：MMLU、Math500、GSM8K、GPQA，达成论文精度
+序列长度：至少支持到128K
+性能：不做要求
+功能：支持浮点、PD分离、PD混部、DP/EP
+替代方案
+补充说明
+欢迎加入社区，感谢您对社区的贡献 🎉!
+Save
+Cancel
+ascend-robot
+Collaborators
+Jan 22
+Added label: feature
+Jan 22
+Added label: feature
+XhgAtHuawei
+Jan 23
+Modify description of issue
+Jan 23
+Modify description of issue
+zeshengzong
+Collaborators
+Jan 29
+associated Kanban: @zeshengzong的看板 20260129
+Jan 29
+associated Kanban: @zeshengzong的看板 20260129
+吴铭泾
+Collaborators
+Mar 9
+Comments：
+Mar 9
+Comments：
+收到反馈，感谢！我会尽快查看并回复进展。
+Save
+Cancel
+吴铭泾
+Collaborators
+Mar 9
+Assign wumingjing as responsible person
+Mar 9
+Assign wumingjing as responsible person
+吴铭泾
+Collaborators
+Mar 9
+Removed responsible person wumingjing
+Mar 9
+Removed responsible person wumingjing
+吴铭泾
+Collaborators
+Mar 9
+Assign Katrina-CXY as responsible person
+Mar 9
+Assign Katrina-CXY as responsible person
+吴铭泾
+Collaborators
+Mar 9
+changed custom state from TODO to ACCEPTED
+Mar 9
+changed custom state from TODO to ACCEPTED
+吴铭泾
+Collaborators
+Mar 22
+Comments：
+Mar 22
+Comments：
+您好，当前DeepSeek V3.2已支持aclgraph后端推理功能，PR已合入～该ISSUE建议关闭，感谢您的关注！
+Save
+Cancel
+吴铭泾
+Collaborators
+Mar 22
+changed custom state from ACCEPTED to DONE
+Mar 22
+changed custom state from ACCEPTED to DONE
+吴铭泾
+Collaborators
+Mar 22
+Close issue
+Mar 22
+Close issue
+CXY-Katrina
+Collaborators
+May 20
+changed custom state from DONE to TODO
+May 20
+changed custom state from DONE to TODO
+CXY-Katrina
+Collaborators
+May 20
+Reopen issue
+May 20
+Reopen issue
+吴铭泾
+Collaborators
+May 25
+Close issue
+May 25
+Close issue
+吴铭泾
+Collaborators
+May 25
+Reopen issue
+May 25
+Reopen issue
+吴铭泾
+Collaborators
+May 25
+changed custom state from TODO to DONE
+May 25
+changed custom state from TODO to DONE
+吴铭泾
+Collaborators
+May 25
+Close issue
+May 25
+Close issue
+Assignees
+CXY-Katrina
+Label
+feature
+Kanban
+No board linked yet
+Milestones
+No related milestones
+Link PR
+No related PR
+Branch
+No branches linked yet

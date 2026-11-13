@@ -1,0 +1,176 @@
+[Bug-Report|缺陷反馈]: Cumsum 整数 tiling 未处理空 Tensor——rightAxisLen=0 除零（SIGFPE）、midAxisLen=0 非法分核、leftAxisLen=0 非法 tiling-ops-math-AtomGit
+Star
+1754
+Fork
+1658
+Code
+Introduction
+Code
+Issues
+495
+Pull Requests
+578
+Pipeline
+Actions
+Discussion
+Wiki
+Members
+299
+Analysis
+Settings
+Star
+1754
+Fork
+1658
+Closed
+[Bug-Report|缺陷反馈]: Cumsum 整数 tiling 未处理空 Tensor——rightAxisLen=0 除零（SIGFPE）、midAxisLen=0 非法分核、leftAxisLen=0 非法 tiling
+#4634
+wangweidong
+Add on
+3 days ago
+Closed at
+3 days ago
+W
+wangweidong
+Collaborators
+3 days ago
+Create
+3 days ago
+Create
+Describe the current behavior / 问题描述
+math/cumsum/op_host/arch35/cumsum_tiling_ascendc_int_arch35.cpp
+（master 基线 84f3256f）整数 tiling 未处理空 Tensor。输入任一维度为 0 时，按 0 维位于 axis 的前/中/后位置，
+leftAxisLen
+/
+midAxisLen
+/
+rightAxisLen
+相应变 0，进入三条坏路径：
+rightAxisLen=0（除零）
+：
+GetAxisLpUnit
+:200 取
+raLpUnit_ = rightAxisLen = 0
+，后续 :217
+comLeftA = vlSize_ / (raLpUnit_ * dtypeSize)
+触发
+除零（SIGFPE）
+，tiling 进程崩溃；
+midAxisLen=0（非法分核）
+：
+rLpUnit_=0
+传导产生非法分核；
+leftAxisLen=0（非法 tiling）
+：
+laLpCnt=0
+，
+CeilDiv(0, CeilDiv(0, coreNum))
+产生非法 tiling。
+ACLNN 通路已有
+self->IsEmpty()
+早返回兜底，但 TTK kernel/GE direct 直接进入整数 tiling，算子侧无兜底。
+Environment / 环境信息
+昇腾硬件型号：Ascend950（arch35）
+代码基线：cann/ops-math master（merge-base 84f3256f）
+触发路径：TTK kernel/GE direct 整数 tiling（ACLNN 通路已有 IsEmpty 早返回）
+Steps to reproduce the issue / 重现步骤
+构造整数 dtype（int32/int64/uint8 等）空 Tensor 输入（任一维度为 0）。
+经 TTK kernel/GE direct 通路触发整数 tiling。
+按 0 维相对 axis 的位置观察三种结果：axis 后（rightAxisLen=0）→ SIGFPE 除零崩溃；axis 中（midAxisLen=0）→ 非法分核；axis 前（leftAxisLen=0）→ 非法 tiling。
+Describe the expected behavior / 预期结果
+GetInputDims()
+后检测
+leftAxisLen/midAxisLen/rightAxisLen == 0
+，下发安全 empty tiling（
+blockDim=1
+/新 tilingKey
+11003
+/
+workspace=0
+），跳过 kernel 计算。
+kernel 侧 empty 分支（tilingKey 11003）经
+GET_TILING_DATA_WITH_STRUCT
+注册 tiling struct size 后立即返回，不访问 GM（opc 可推导该 key 的 tiling 数据大小）。
+整数 tiling 成员默认初始化（0），保证 empty 分支序列化数据确定。
+Related log / screenshot / 日志 / 截图
+代码证据（master 84f3256f）：tiling_int :200（
+raLpUnit_ = rightAxisLen
+）、:217（
+vlSize_ / (raLpUnit_ * dtypeSize)
+除零点）、:268（
+laLpCnt
+）；ACLNN 通路
+IsEmpty
+早返回与 TTK kernel/GE direct 无兜底的通路差异。
+修复验证（关联 PR）：tiling UT 3/3 PASS；empty UT int32/int64/uint8 × axis 0/3/5 均 key=11003、blockDim=1、workspace=0；Ascend950 kernel 二进制编译成功，opc 接受 11003；TTK direct 空 Tensor 均
+perf_status=PASS
+；非空回归
+[105,2239]
+：axis0 key=11000/blockDim=35、axis1 key=11001/blockDim=53，precision 2/2 PASS；
+git diff --check
+通过。
+Special notes for this issue/备注
+关联 PR：
+https://gitcode.com/cann/ops-math/pull/7177
+Save
+Cancel
+W
+wangweidong
+Collaborators
+3 days ago
+Added label:
+bug-report
+3 days ago
+Added label:
+bug-report
+CANN-robot
+Collaborators
+3 days ago
+Close issue
+3 days ago
+Close issue
+CANN-robot
+Collaborators
+3 days ago
+changed custom state from 待办的 to 已完成
+3 days ago
+changed custom state from 待办的 to 已完成
+W
+wangweidong
+Collaborators
+3 days ago
+Comments：
+3 days ago
+Comments：
+/assign
+@gcw_YBIAEfqJ
+Save
+Cancel
+CANN-robot
+Collaborators
+3 days ago
+Assign gcw_YBIAEfqJ as responsible person
+3 days ago
+Assign gcw_YBIAEfqJ as responsible person
+CANN-robot
+Collaborators
+3 days ago
+Added label:
+resolved
+3 days ago
+Added label:
+resolved
+Assignees
+W
+wangweidong
+Label
+bug-report
+resolved
+Kanban
+No board linked yet
+Milestones
+No related milestones
+Link PR
+No related PR
+Branch
+No branches linked yet

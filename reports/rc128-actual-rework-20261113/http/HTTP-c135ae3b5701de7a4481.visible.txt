@@ -1,0 +1,148 @@
+[Bug] Qwen35Converter hf_to_dcp 仅合并 mtp 专家权重，主模型 MoE 专家 per-expert 权重未生成 fused 键，训练加载时被静默跳过-MindSpeed-MM-AtomGit
+Star
+192
+Fork
+432
+Code
+Introduction
+Code
+Issues
+107
+Pull Requests
+175
+Pipeline
+Actions
+Discussion
+Wiki
+Members
+118
+Analysis
+Settings
+Star
+192
+Fork
+432
+Open
+[Bug] Qwen35Converter hf_to_dcp 仅合并 mtp 专家权重，主模型 MoE 专家 per-expert 权重未生成 fused 键，训练加载时被静默跳过
+#833
+iceflysnow
+Add on
+9 days ago
+I
+iceflysnow
+9 days ago
+Create
+9 days ago
+Create
+环境信息
+MindSpeed-MM：master 分支 commit 1bf29812
+Python 3.11 / torch 2.7.1
+复现所用模型：Qwen3.5 架构 MoE 大模型（约 397B，60 层主模型 MoE × 512 专家，含 mtp 层）
+问题描述
+checkpoint/vlm_model/converters/qwen3_5.py
+的
+hf_to_dcp
+中，专家权重收集器只收 mtp 层的专家键：
+if
+mtp_num_hidden_layers >
+0
+and
+self
+.is_mtp_expert_key(ori_key):
+    mtp_expert_collector[ori_key] = value
+continue
+主模型各层
+…mlp.experts.{expert}.{gate_proj|up_proj|down_proj}
+的 per-expert 键走不到收集器，仅在循环里做 permute 与前缀替换后按原 per-expert 键名写入 DCP；随后只有
+mtp_expert_collector
+被
+merge_moe_expert_weights
+合并成 fused 键（
+…mlp.experts.gate_up_proj
+/
+…mlp.experts.down_proj
+）后追加写回。
+而训练侧（fsdp）模型权重的 FQN 是 fused 形态。转换出的 DCP 中主模型专家权重全部是 per-expert 键名、缺少 fused 键，加载时这部分权重全部 unmatched 被静默跳过，对应参数保持随机初始化，无任何报错或警告。以 60 层 × 512 专家 × 3 个 per-expert 权重张量计，共约 9.2 万个键未落位；实际训练从第 1 个 iter 起 loss 即为 NaN，排查成本很高。
+mtp 层因走了收集器路径而被正确合并，这也使得问题更隐蔽：转换"看起来成功"，仅主模型专家权重缺失。
+复现步骤
+用
+Qwen35Converter
+对一个含主模型 MoE 专家层的 Qwen3.5 架构模型执行
+hf_to_dcp
+；
+检查产物
+release/.metadata
+：搜索主模型层的
+mlp.experts
+fused 键（形如
+…layers.{N}.mlp.experts.gate_up_proj
+），确认不存在；存在的仅是 per-expert 键；
+用该 DCP 权重启动训练，观察首个 iter 的 loss。
+期望与实际
+期望：转换产物中主模型专家权重以训练侧可加载的 fused 键形态存在，per-expert 与 fused 不应同时缺失 fused 侧。
+实际：仅 mtp 层专家被合并为 fused 键，主模型全部专家权重以 per-expert 键写入、fused 键缺失，训练加载时被静默跳过，参数保持随机初始化，训练从首个 iter 起 loss=NaN 且无报错。
+修复建议
+将既有合并逻辑从"仅 mtp"扩展到主模型专家键：
+收集器除 mtp 外同时收集匹配主模型
+expert_weight_name_patterns
+的专家键（该 pattern 列表本身已覆盖主模型）；
+按层分组调用现成的
+checkpoint/vlm_model/converters/moe_expert.py::merge_moe_expert_weights
+（
+weight_path
+用
+model.layers.{layer}.mlp.experts.{expert}
+对应模板），生成 fused 键后与其它权重一并写出；
+Save
+Cancel
+ascend-robot
+Collaborators
+9 days ago
+Added label: bug
+9 days ago
+Added label: bug
+I
+iceflysnow
+9 days ago
+Associated pull request
+9 days ago
+Associated pull request
+I
+iceflysnow
+9 days ago
+Comments：
+9 days ago
+Comments：
+已提交针对该问题的修复PR，
+https://gitcode.com/Ascend/MindSpeed-MM/pulls/3369
+Save
+Cancel
+Z
+zhaoyuhang22
+Collaborators
+9 days ago
+Comments：
+9 days ago
+Comments：
+您好，感谢您提交 Issue。我们已收到关于「[Bug] Qwen35Converter hf_to_dcp 仅合并 mtp 专家权重，主模型 MoE 专家 per-expert 权重未生成 fused 键」的信息，将结合仓库代码和当前版本进一步核查；有进展会在本 Issue 中同步。
+Save
+Cancel
+Z
+zhaoyuhang22
+Collaborators
+3 days ago
+Assign wanglikai1019 as responsible person
+3 days ago
+Assign wanglikai1019 as responsible person
+Assignees
+LKONE
+Label
+bug
+Kanban
+No board linked yet
+Milestones
+No related milestones
+Link PR
+No related PR
+Branch
+No branches linked yet

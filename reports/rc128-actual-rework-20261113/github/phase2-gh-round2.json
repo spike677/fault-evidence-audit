@@ -1,0 +1,345 @@
+[
+  {
+    "task_ids": [
+      "RC-023"
+    ],
+    "kind": "SEARCH",
+    "round": 2,
+    "args": {
+      "repository_full_name": "vllm-project/vllm-ascend",
+      "query": "\"sorted_indices\" abs is:issue",
+      "topn": 3
+    },
+    "response": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Action completed."
+        }
+      ],
+      "structuredContent": {
+        "issues": []
+      },
+      "isError": false
+    },
+    "checked_at": "2026-11-13T02:45:11.681Z"
+  },
+  {
+    "task_ids": [
+      "RC-023"
+    ],
+    "kind": "SEARCH",
+    "round": 2,
+    "args": {
+      "repository_full_name": "vllm-project/vllm-ascend",
+      "query": "\"sorted_indices\" abs",
+      "topn": 3
+    },
+    "response": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Action completed."
+        }
+      ],
+      "structuredContent": {
+        "issues": [
+          {
+            "url": "https://github.com/vllm-project/vllm-ascend/pull/12530",
+            "title": "[Test] Restore custom MoE init routing for A2 accuracy validation",
+            "issue_number": 12530,
+            "body": "### What this PR does / why we need it?\n\nThis PR temporarily reverts #12305 and restores the previous `npu_moe_init_routing_custom` implementation for an A/B validation of the A2 Gemma4 MoE accuracy regression.\n\nThe preceding experiment that only removed `torch.abs` from `npu_moe_token_unpermute` scored 45.45 on GPQA-D, which is consistent with the regressed baseline (~46.97) and disproves that hypothesis. This branch therefore restores the complete pre-#12305 routing path so the same A2 Nightly configuration can determine whether the operator replacement is responsible for the regression.\n\nThis is a validation PR, not the proposed final production fix.\n\n### Does this PR introduce _any_ user-facing change?\n\nNo. The branch is intended only for controlled regression validation.\n\n### How was this patch tested?\n\n- `ruff check`: passed\n- `ruff format`: passed\n- `codespell`: passed\n- `typos`: passed\n- `clang-format`: passed\n- Previous A2 Nightly with the `torch.abs` experiment: Gemma4 MoE GPQA-D 45.45; Gemma4 31B Dense passed\n- Pending: rerun A2 Nightly `gemma4` and `gemma4-31b-dense` on this restored custom-routing branch\n\nSigned-off-by: xuetongyao <xuetongyao2001@gmail.com>\n- vLLM version: v0.25.1\n- vLLM main: https://github.com/vllm-project/vllm/commit/54503ecec0f3ac31e5ecfc5f28652e4cc42307b5\n",
+            "state": null,
+            "user": null,
+            "assignees": null,
+            "labels": null,
+            "milestone": null,
+            "state_reason": null,
+            "comments": null,
+            "created_at": null,
+            "updated_at": null,
+            "closed_at": null,
+            "display_url": "https://github.com/vllm-project/vllm-ascend/pull/12530",
+            "display_title": "[Test] Restore custom MoE init routing for A2 accuracy validation"
+          },
+          {
+            "url": "https://github.com/vllm-project/vllm-ascend/pull/12069",
+            "title": "[Refactor]update permute/unpermute to init_routing/finalize_routing",
+            "issue_number": 12069,
+            "body": "### What this PR does / why we need it?\r\n\r\n### Does this PR introduce _any_ user-facing change?\r\n\r\n### How was this patch tested?\r\n\n- vLLM version: v0.23.0\n- vLLM main: https://github.com/vllm-project/vllm/commit/85c09e9885e346ea1612da30ebff5a75f67d2350\n",
+            "state": null,
+            "user": null,
+            "assignees": null,
+            "labels": null,
+            "milestone": null,
+            "state_reason": null,
+            "comments": null,
+            "created_at": null,
+            "updated_at": null,
+            "closed_at": null,
+            "display_url": "https://github.com/vllm-project/vllm-ascend/pull/12069",
+            "display_title": "[Refactor]update permute/unpermute to init_routing/finalize_routing"
+          },
+          {
+            "url": "https://github.com/vllm-project/vllm-ascend/pull/10579",
+            "title": "[BugFix]Fix moe allgather NaN issue",
+            "issue_number": 10579,
+            "body": "### What this PR does / why we need it?\r\nThis pull request removes the `torch.abs` operation on `combine_metadata.expanded_row_idx` before passing it as `sorted_indices` to `torch_npu.npu_moe_token_unpermute` within the `token_combine` method.\r\n\r\n### Does this PR introduce _any_ user-facing change?\r\nNo.\r\n\r\n### How was this patch tested?\r\nNo tests were included in this pull request.\r\n\r\n\n- vLLM version: v0.22.1\n- vLLM main: https://github.com/vllm-project/vllm/commit/967c5c3bc38891f4465d3f4e99917ed837bb3833\n",
+            "state": null,
+            "user": null,
+            "assignees": null,
+            "labels": null,
+            "milestone": null,
+            "state_reason": null,
+            "comments": null,
+            "created_at": null,
+            "updated_at": null,
+            "closed_at": null,
+            "display_url": "https://github.com/vllm-project/vllm-ascend/pull/10579",
+            "display_title": "[BugFix]Fix moe allgather NaN issue"
+          }
+        ]
+      },
+      "isError": false
+    },
+    "checked_at": "2026-11-13T02:45:11.573Z"
+  },
+  {
+    "task_ids": [
+      "RC-062"
+    ],
+    "kind": "SEARCH",
+    "round": 2,
+    "args": {
+      "repository_full_name": "verl-project/verl",
+      "query": "\"cos\" \"sleep\" is:issue",
+      "topn": 3
+    },
+    "response": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Action completed."
+        }
+      ],
+      "structuredContent": {
+        "issues": []
+      },
+      "isError": false
+    },
+    "checked_at": "2026-11-13T02:45:11.930Z"
+  },
+  {
+    "task_ids": [
+      "RC-062"
+    ],
+    "kind": "SEARCH",
+    "round": 2,
+    "args": {
+      "repository_full_name": "verl-project/verl",
+      "query": "\"cos\" \"sleep\"",
+      "topn": 3
+    },
+    "response": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Action completed."
+        }
+      ],
+      "structuredContent": {
+        "issues": []
+      },
+      "isError": false
+    },
+    "checked_at": "2026-11-13T02:45:11.685Z"
+  },
+  {
+    "task_ids": [
+      "RC-074"
+    ],
+    "kind": "SEARCH",
+    "round": 2,
+    "args": {
+      "repository_full_name": "microsoft/onnxruntime",
+      "query": "CANN precision_mode is:issue",
+      "topn": 3
+    },
+    "response": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Action completed."
+        }
+      ],
+      "structuredContent": {
+        "issues": [
+          {
+            "url": "https://github.com/microsoft/onnxruntime/issues/26778",
+            "title": "[Build] NPU Multi-Card Concurrent Compilation Causes OM File Race Condition (Read-While-Write Error)",
+            "issue_number": 26778,
+            "body": "### Describe the issue\n\nWhen compiling an ONNX model to OM on multiple NPUs concurrently, we observed a reproducible race conditon: the faster card finished OM generation first and starts writing the file, while slower cards detect that the OM file has appeared and immediately attempt to load it. \n\nWe also created a script where card 0 compiles first and all other cards continuously poll the directory; as soon as the OM file shows up, the other cards start inference, and the error reproduces reliably. Because the file is still being written by the fast card, the slower cards read an incomplete OM, leading to model-load failures or accuracy issues. \n\n### Urgency\n\n_No response_\n\n### Target platform\n\nLinux x86_64\nCANN:8.3.RC1\ntorch:2.5.1+cpu\ntorch_npu:2.5.1\nonnxruntime-cann:1.24.0 (This requires building ONNX Runtime from source)\n\n### Build script\ninswapper onnx :https://huggingface.co/Devia/G/blob/main/inswapper_128.onnx\n\npython script:\n```\nimport os\nimport time\nimport glob\nimport numpy as np\nimport torch\nimport torch_npu\nimport onnxruntime as ort\n\nRESWAPPER_PATH = \"./insightface/inswapper_128.onnx\"\nOM_DIR = \"./\"\nPOLL_INTERVAL = 0.2\nMAX_WAIT = 300\n\ndef list_om():\n    return set(glob.glob(os.path.join(OM_DIR, \"*.om\")))\n\ndef main():\n    local_rank = int(os.environ.get(\"LOCAL_RANK\", \"0\"))\n    torch.npu.set_device(local_rank)\n    \n    sess = ort.InferenceSession(\n        RESWAPPER_PATH,\n        providers=[\n            (\n                \"CANNExecutionProvider\",\n                {\n                    \"device_id\":local_rank ,\n                    \"arena_extend_strategy\": \"kNextPowerOfTwo\",\n                    \"enable_cann_graph\": True,\n                    \"precision_mode\": \"must_keep_orgin_dtype\",\n                    \"op_select_impl_mode\": \"high_precision\",\n                },\n            ),\n        ],\n    )\n    \n    target = np.random.randn(1, 3, 128, 128).astype(np.float32)\n    source = np.random.randn(1, 512).astype(np.float32)\n    feed = {sess.get_inputs()[0].name: target, sess.get_inputs()[0].name: source}\n    \n    init = list_om()\n    \n    if local_rank == 0:\n        sess.run(None, feed)\n    else:\n        start = time.time()\n        while True:\n            now = list_om()\n            if now - init:\n                break\n            if time.time() - start > MAX_WAIT:\n                break\n        time.sleep(POLL_INTERVAL)\n    \n    out = sess.run(None, feed)\n    \n    \nif __name__ == \"__main__\":\n    main()\n```\n\nshell script:\n``` torchrun --nproc_per_node=8 xxx.py```\n\n### Error / output\n\nStatus Message: CANN error executing aclmdLoadFromFile()\n\n### Visual Studio Version\n\n_No response_\n\n### GCC / Compiler Version\n\n_No response_",
+            "state": null,
+            "user": null,
+            "assignees": null,
+            "labels": null,
+            "milestone": null,
+            "state_reason": null,
+            "comments": null,
+            "created_at": null,
+            "updated_at": null,
+            "closed_at": null,
+            "display_url": "https://github.com/microsoft/onnxruntime/issues/26778",
+            "display_title": "[Build] NPU Multi-Card Concurrent Compilation Causes OM File Race Condition (Read-While-Write Error)"
+          }
+        ]
+      },
+      "isError": false
+    },
+    "checked_at": "2026-11-13T02:45:11.645Z"
+  },
+  {
+    "task_ids": [
+      "RC-074"
+    ],
+    "kind": "SEARCH",
+    "round": 2,
+    "args": {
+      "repository_full_name": "microsoft/onnxruntime",
+      "query": "CANN precision_mode",
+      "topn": 3
+    },
+    "response": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Action completed."
+        }
+      ],
+      "structuredContent": {
+        "issues": [
+          {
+            "url": "https://github.com/microsoft/onnxruntime/pull/27970",
+            "title": "[CANN]: add dynamic shape support for CANN EP",
+            "issue_number": 27970,
+            "body": "Add support for CANN's three dynamic shape modes in the execution\r\nprovider: dynamic_batch_size, dynamic_image_size, and dynamic_dims.\r\n\r\nChanges:\r\n- Add provider options: dynamic_batch_size, dynamic_image_size,\r\n  dynamic_dims, and input_format for configuring dynamic shape behavior\r\n- Upgrade precision_mode to precision_mode_v2 aligning with latest\r\n  CANN API\r\n- Pass DYNAMIC_BATCH_SIZE, DYNAMIC_IMAGE_SIZE, DYNAMIC_DIMS, and\r\n  INPUT_FORMAT to aclgrphBuildModel for OM model compilation\r\n- Extract original shapes (with -1 for dynamic dims) from model\r\n  definition at Compile() time to ensure consistent INPUT_SHAPE\r\n  strings across inference runs, enabling proper OM model caching\r\n- Handle CANN's hidden dynamic tensor input (ACL_DYNAMIC_TENSOR_NAME)\r\n  during inference, including device memory allocation and cleanup\r\n- Set runtime dynamic dimensions via aclmdlSetDynamicBatchSize,\r\n  aclmdlSetDynamicHWSize, or aclmdlSetInputDynamicDims before\r\n  model execution based on the configured dynamic mode\r\n- Maintain backward compatibility: existing static shape and\r\n  is_dynamic_shape (output dynamic shape from operators like Slice)\r\n  logic remains unchanged and independent from the new dynamic\r\n  input shape support\r\n\r\nSupported formats: NCHW, NHWC, ND (ND format should use dynamic_dims)\r\n\r\n",
+            "state": null,
+            "user": null,
+            "assignees": null,
+            "labels": null,
+            "milestone": null,
+            "state_reason": null,
+            "comments": null,
+            "created_at": null,
+            "updated_at": null,
+            "closed_at": null,
+            "display_url": "https://github.com/microsoft/onnxruntime/pull/27970",
+            "display_title": "[CANN]: add dynamic shape support for CANN EP"
+          }
+        ]
+      },
+      "isError": false
+    },
+    "checked_at": "2026-11-13T02:45:11.816Z"
+  },
+  {
+    "task_ids": [
+      "RC-075"
+    ],
+    "kind": "SEARCH",
+    "round": 2,
+    "args": {
+      "repository_full_name": "microsoft/onnxruntime",
+      "query": "CANN force_fp16 is:issue",
+      "topn": 3
+    },
+    "response": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Action completed."
+        }
+      ],
+      "structuredContent": {
+        "issues": []
+      },
+      "isError": false
+    },
+    "checked_at": "2026-11-13T02:45:11.427Z"
+  },
+  {
+    "task_ids": [
+      "RC-075"
+    ],
+    "kind": "SEARCH",
+    "round": 2,
+    "args": {
+      "repository_full_name": "microsoft/onnxruntime",
+      "query": "CANN force_fp16",
+      "topn": 3
+    },
+    "response": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Action completed."
+        }
+      ],
+      "structuredContent": {
+        "issues": []
+      },
+      "isError": false
+    },
+    "checked_at": "2026-11-13T02:45:11.487Z"
+  },
+  {
+    "task_ids": [
+      "RC-117"
+    ],
+    "kind": "SEARCH",
+    "round": 2,
+    "args": {
+      "repository_full_name": "mindspore-ai/mindspore",
+      "query": "\"npu_apply_adam_w\" is:issue",
+      "topn": 3
+    },
+    "response": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Action completed."
+        }
+      ],
+      "structuredContent": {
+        "issues": []
+      },
+      "isError": false
+    },
+    "checked_at": "2026-11-13T02:45:11.453Z"
+  },
+  {
+    "task_ids": [
+      "RC-117"
+    ],
+    "kind": "SEARCH",
+    "round": 2,
+    "args": {
+      "repository_full_name": "mindspore-ai/mindspore",
+      "query": "\"npu_apply_adam_w\"",
+      "topn": 3
+    },
+    "response": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Action completed."
+        }
+      ],
+      "structuredContent": {
+        "issues": []
+      },
+      "isError": false
+    },
+    "checked_at": "2026-11-13T02:45:11.391Z"
+  }
+]

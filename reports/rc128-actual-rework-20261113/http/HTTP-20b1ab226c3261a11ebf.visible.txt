@@ -1,0 +1,667 @@
+【fix bug】 fix bug for bias of MindSpeedTELayerNormColumnParallelLinear-MindSpeed-AtomGit
+Star
+92
+Fork
+416
+Code
+Introduction
+Code
+Issues
+33
+Pull Requests
+163
+Pipeline
+Actions
+Discussion
+Wiki
+Members
+87
+Analysis
+Settings
+Star
+92
+Fork
+416
+Merged
+【fix bug】 fix bug for bias of MindSpeedTELayerNormColumnParallelLinear
+#3128
+libaokui
+Add on
+Dec 22, 2025
+Merged from
+libaokui/MindSpeed：
+014_wtd
+into
+Ascend/MindSpeed：
+core_r0.14.0
+【fix bug】 fix bug for bias of MindSpeedTELayerNormColumnParallelLinear
+#3128
+Merged
+libaokui
+Add on
+Dec 22, 2025
+Merged from
+libaokui/MindSpeed
+014_wtd
+into
+Ascend/MindSpeed
+core_r0.14.0
+Merge checks
+Discussion
+0
+Commits
+0
+Checks
+0
+Files changed
+0
+Clone/Download
+0
+L
+libaokui
+Dec 22, 2025
+Dec 22, 2025
+【fix bug】 fix bug for bias of MindSpeedTELayerNormColumnParallelLinear
+Save
+Cancel
+Pull Request has been successfully merged by ascend-robot.
+（Thank you for libaokui's contribution.）
+L
+libaokui
+Dec 22, 2025
+Created pull request, commit
+a285e25b
+Dec 22, 2025
+Created pull request, commit
+a285e25b
+ascend-robot
+Collaborators
+Dec 22, 2025
+Comments：
+Dec 22, 2025
+Comments：
+Thank your for your pull-request.
+The full list of commands accepted by me can be found at
+here
+.
+You can get sig-info at
+here
+Save
+Cancel
+AtlasAccount
+Collaborators
+Dec 22, 2025
+Comments：
+Dec 22, 2025
+Comments：
+openLiBing可接管PR, PR详情链接:
+https://www.openlibing.com/apps/transitionPrDetail?owner=Ascend&repo=MindSpeed&number=3128&platform=gitcode&codeHostingPlatformFlag=gitcode
+Save
+Cancel
+ascend-robot
+Collaborators
+Dec 22, 2025
+Comments：
+Dec 22, 2025
+Comments：
+以下是根据您提交的修改文件推荐的Reviewer和Committer序列，需各模块评审通过后方可合入
+Module List
+Reviewers
+Committers
+repo-Ascend/MindSpeed
+qingfenxiaochong1, RyanWang1022, zhao-yifan27, adrian07110, wangmin0104
+JialiZheng1, gp513, qingfenxiaochong1, bingobb
+Save
+Cancel
+ascend-robot
+Collaborators
+Dec 22, 2025
+Added label:
+ascend-cla/yes
+Dec 22, 2025
+Added label:
+ascend-cla/yes
+ascend-robot
+Collaborators
+Dec 22, 2025
+Comments：
+Dec 22, 2025
+Comments：
+CLA Signature Pass
+@libaokui
+, thanks for your pull request. All authors of the commits have signed the CLA. 👍
+Save
+Cancel
+AtlasAccount
+Collaborators
+Dec 22, 2025
+Start code review
+1
+mindspeed/te/pytorch/module/layernorm_column_parallel_linear.py
+Unresolved
+@@ -251,3 +251,3 @@
+251
+251
+norm_output =
+self
+._rmsnorm(inp)
+252
+252
+253
+-
+bias = self.bias if self.
+te_return_bias
+else None
+253
++
+bias = self.bias if
+not
+self.
+skip_bias_add
+else None
+AtlasAccount
+Dec 22, 2025
+Comments：
+代码逻辑和结构: 第253行将'bias = self.bias if self.te_return_bias else None'修改为'bias = self.bias if not self.skip_bias_add else None'，这个改动改变了bias变量的语义和用途。在原始代码中，te_return_bias是在__init__方法中定义的（第218行：self.te_return_bias = self.skip_bias_add and bias），表示当skip_bias_add为True且bias存在时才返回bias。而新代码直接使用not self.skip_bias_add，这会导致逻辑不一致。具体来说：当skip_bias_add=True时，原始逻辑中te_return_bias=True（如果bias存在），forward方法最后会返回bias；而新逻辑中第253行的bias会设为None，但第298行又根据te_return_bias重新设置bias。这造成了中间变量bias的用途混乱。
+问题类型
+: 代码逻辑和结构
+文件路径
+:
+mindspeed/te/pytorch/module/layernorm_column_parallel_linear.py
+行号
+: 253
+问题代码
+:
+bias =
+self
+.bias
+if
+not
+self
+.skip_bias_add
+else
+None
+修改建议
+:
+建议保持原始逻辑的一致性。如果确实需要修改，应该明确说明修改的目的。可能的解决方案：1) 恢复原始代码'bias = self.bias if self.te_return_bias else None'；2) 如果修改是为了修复某个bug，需要在注释中说明；3) 考虑将第253行和第298行的逻辑统一，避免中间变量bias的语义变化。
+此评论由代码审查工具自动生成
+Save
+Cancel
+AtlasAccount
+Collaborators
+Dec 22, 2025
+Start code review
+1
+mindspeed/te/pytorch/module/layernorm_column_parallel_linear.py
+Unresolved
+@@ -295,2 +295,4 @@
+295
+295
+)
+296
+296
+)
+297
++
+298
++
+bias =
+self
+.bias
+if
+self
+.te_return_bias
+else
+None
+AtlasAccount
+Dec 22, 2025
+Comments：
+代码逻辑和结构: 第298行新增了'bias = self.bias if self.te_return_bias else None'，这与第253行的修改形成了逻辑上的冗余和潜在的混淆。现在bias变量被设置了两次：第一次在第253行（根据not self.skip_bias_add），第二次在第298行（根据te_return_bias）。这种重复设置不仅增加了代码复杂度，还可能导致理解困难。特别是当skip_bias_add=True且bias存在时，第253行会将bias设为None，而第298行又会将其设为self.bias，这种来回切换缺乏明确的设计意图。
+问题类型
+: 代码逻辑和结构
+文件路径
+:
+mindspeed/te/pytorch/module/layernorm_column_parallel_linear.py
+行号
+: 298
+问题代码
+:
+bias =
+self
+.bias
+if
+self
+.te_return_bias
+else
+None
+修改建议
+:
+建议重新审视整个forward方法中bias的处理逻辑。如果目的是在计算过程中使用bias（当skip_bias_add=False时），而在返回时根据te_return_bias决定是否返回bias，那么应该：1) 使用不同的变量名区分计算用的bias和返回用的bias；2) 添加注释说明这种设计；3) 考虑简化逻辑，避免多次赋值。例如：计算时使用'use_bias = self.bias if not self.skip_bias_add else None'，返回时使用'return_bias = self.bias if self.te_return_bias else None'。
+此评论由代码审查工具自动生成
+Save
+Cancel
+AtlasAccount
+Collaborators
+Dec 22, 2025
+Comments：
+Dec 22, 2025
+Comments：
+问题/功能描述
+修复了并行线性层中偏置（bias）返回逻辑的错误。原代码在
+skip_bias_add
+标志为
+True
+时，错误地将偏置在线性计算中直接添加，导致在需要延迟偏置添加的场景下，计算逻辑与预期不符，可能影响模型训练的正确性。
+修改方案描述
+调整了
+MindSpeedTELayerNormColumnParallelLinear
+类
+forward
+方法中偏置的处理逻辑。核心修改是：在调用线性计算函数时，根据
+skip_bias_add
+标志决定是否传入偏置；在函数返回前，根据
+te_return_bias
+标志决定是否返回偏置。这确保了当
+skip_bias_add
+为
+True
+时，偏置不会在线性计算中被添加，而是作为第二个返回值返回，供后续处理，从而与模块的设计意图保持一致。
+Save
+Cancel
+L
+libaokui
+Dec 22, 2025
+Comments：
+Dec 22, 2025
+Comments：
+compile
+Save
+Cancel
+AtlasAccount
+Collaborators
+Dec 22, 2025
+Comments：
+Dec 22, 2025
+Comments：
+已进入队列，请勿重复触发
+Save
+Cancel
+ascend-robot
+Collaborators
+Dec 22, 2025
+Comments：
+Dec 22, 2025
+Comments：
+✅
+流水线任务触发成功，正在执行，请稍候。
+任务链接[2e674104c36643fb9a8f5434db9ab54e]
+Save
+Cancel
+ascend-robot
+Collaborators
+Dec 22, 2025
+Added label:
+ci-pipeline-running
+Dec 22, 2025
+Added label:
+ci-pipeline-running
+ascend-robot
+Collaborators
+Dec 22, 2025
+Comments：
+Dec 22, 2025
+Comments：
+get-log
+Save
+Cancel
+ascend-robot
+Collaborators
+Dec 22, 2025
+Removed label:
+ci-pipeline-running
+Dec 22, 2025
+Removed label:
+ci-pipeline-running
+ascend-robot
+Collaborators
+Dec 22, 2025
+Added label:
+ci-pipeline-running
+Dec 22, 2025
+Added label:
+ci-pipeline-running
+ascend-robot
+Collaborators
+Dec 22, 2025
+Removed label:
+ci-pipeline-running
+Dec 22, 2025
+Removed label:
+ci-pipeline-running
+ascend-robot
+Collaborators
+Dec 22, 2025
+Added label:
+ci-pipeline-failed
+Dec 22, 2025
+Added label:
+ci-pipeline-failed
+L
+libaokui
+Dec 22, 2025
+Comments：
+Dec 22, 2025
+Comments：
+compile
+Save
+Cancel
+AtlasAccount
+Collaborators
+Dec 22, 2025
+Comments：
+Dec 22, 2025
+Comments：
+已进入队列，请勿重复触发
+Save
+Cancel
+L
+libaokui
+Dec 22, 2025
+Start code review
+1
+mindspeed/te/pytorch/module/layernorm_column_parallel_linear.py
+Unresolved
+@@ -295,2 +295,4 @@
+295
+295
+)
+296
+296
+)
+297
++
+298
++
+bias =
+self
+.bias
+if
+self
+.te_return_bias
+else
+None
+L
+libaokui
+Dec 22, 2025
+Comments：
+在多数情况下te_return_bias 为False, 语言模型都是False。mm中 verl 场景 vit 模型的配置会不同，在mlp阶段会需要bias计算
+Save
+Cancel
+L
+libaokui
+Dec 22, 2025
+Start code review
+1
+mindspeed/te/pytorch/module/layernorm_column_parallel_linear.py
+Unresolved
+@@ -251,3 +251,3 @@
+251
+251
+norm_output =
+self
+._rmsnorm(inp)
+252
+252
+253
+-
+bias = self.bias if self.
+te_return_bias
+else None
+253
++
+bias = self.bias if
+not
+self.
+skip_bias_add
+else None
+L
+libaokui
+Dec 22, 2025
+Comments：
+开启skip_bias_add， 在layer内部拒绝进行bias相加， 避免和外部bias相加冲突。
+改代码引入的主要原因， te和megatron基本能力的参数不对， te中可以控制bias是否在内部相加， megatron基本能力只要传入bias就进行相加
+Save
+Cancel
+L
+libaokui
+Dec 23, 2025
+Comments：
+Dec 23, 2025
+Comments：
+compile
+Save
+Cancel
+AtlasAccount
+Collaborators
+Dec 23, 2025
+Comments：
+Dec 23, 2025
+Comments：
+已进入队列，请勿重复触发
+Save
+Cancel
+ascend-robot
+Collaborators
+Dec 23, 2025
+Removed label:
+ci-pipeline-failed
+Dec 23, 2025
+Removed label:
+ci-pipeline-failed
+ascend-robot
+Collaborators
+Dec 23, 2025
+Comments：
+Dec 23, 2025
+Comments：
+✅
+流水线任务触发成功，正在执行，请稍候。
+任务链接[22fd8db81e0f490598eeca603a7e19d3]
+Save
+Cancel
+ascend-robot
+Collaborators
+Dec 23, 2025
+Added label:
+ci-pipeline-running
+Dec 23, 2025
+Added label:
+ci-pipeline-running
+ascend-robot
+Collaborators
+Dec 23, 2025
+Comments：
+Dec 23, 2025
+Comments：
+get-log
+Save
+Cancel
+ascend-robot
+Collaborators
+Dec 23, 2025
+Removed label:
+ci-pipeline-running
+Dec 23, 2025
+Removed label:
+ci-pipeline-running
+ascend-robot
+Collaborators
+Dec 23, 2025
+Added label:
+ci-pipeline-running
+Dec 23, 2025
+Added label:
+ci-pipeline-running
+AtlasAccount
+Collaborators
+Dec 23, 2025
+Comments：
+Dec 23, 2025
+Comments：
+正在运行中,预计 2025-12-23 19:32:35 运行结束,具体时间已实际情况为准,请勿重复compile
+Save
+Cancel
+ascend-robot
+Collaborators
+Dec 23, 2025
+Removed label:
+ci-pipeline-running
+Dec 23, 2025
+Removed label:
+ci-pipeline-running
+ascend-robot
+Collaborators
+Dec 23, 2025
+Added label:
+ci-pipeline-passed
+Dec 23, 2025
+Added label:
+ci-pipeline-passed
+ascend-robot
+Collaborators
+Dec 23, 2025
+Comments：
+Dec 23, 2025
+Comments：
+检查项
+状态
+日志
+code_check
+✅
+>>>
+sca
+✅
+>>>
+anti_poison
+✅
+>>>
+Build
+✅
+>>>
+UT_MindSpeed
+✅
+>>>
+openlibing链接
+点此跳转
+Save
+Cancel
+ascend-robot
+Collaborators
+Dec 23, 2025
+Removed label:
+ci-pipeline-passed
+Dec 23, 2025
+Removed label:
+ci-pipeline-passed
+ascend-robot
+Collaborators
+Dec 23, 2025
+Added label:
+ci-pipeline-passed
+Dec 23, 2025
+Added label:
+ci-pipeline-passed
+E
+EX_mitsuX
+Dec 24, 2025
+Comments：
+Dec 24, 2025
+Comments：
+/lgtm
+Save
+Cancel
+G
+gp513
+Collaborators
+Dec 24, 2025
+Comments：
+Dec 24, 2025
+Comments：
+/lgtm
+Save
+Cancel
+ascend-robot
+Collaborators
+Dec 24, 2025
+Added label:
+lgtm
+Dec 24, 2025
+Added label:
+lgtm
+G
+gp513
+Collaborators
+Dec 24, 2025
+Comments：
+Dec 24, 2025
+Comments：
+/approve
+Save
+Cancel
+ascend-robot
+Collaborators
+Dec 24, 2025
+Added label:
+approved
+Dec 24, 2025
+Added label:
+approved
+ascend-robot
+Collaborators
+Dec 24, 2025
+Comments：
+Dec 24, 2025
+Comments：
+Review Guide
+This Pull-Request
+Passes Review
+.
+Committers who writed a comment of
+/approve
+are:
+gp513
+.
+Reviewers who writed a comment of
+/lgtm
+are:
+gp513
+,
+EX_mitsuX
+.
+Save
+Cancel
+ascend-robot
+Collaborators
+Dec 24, 2025
+Merged pull request
+Dec 24, 2025
+Merged pull request
+Merger
+Not assigned
+Approver
+Not assigned
+Tester
+Not assigned
+Reviewer
+Not assigned
+Label
+ascend-cla/yes
+ci-pipeline-passed
+lgtm
+approved
+Milestones
+No related milestones
+Kanban
+No related boards
+Link Issue
+No related Issues

@@ -1,0 +1,635 @@
+修复NsaCompAtten内存检测问题【商分】-ops-transformer-AtomGit
+Star
+1681
+Fork
+3393
+Code
+Introduction
+Code
+Issues
+430
+Pull Requests
+724
+Pipeline
+Actions
+Discussion
+Wiki
+Members
+620
+Analysis
+Settings
+Star
+1681
+Fork
+3393
+Merged
+修复NsaCompAtten内存检测问题【商分】
+#8365
+yf_zhou
+Add on
+Jul 7
+Merged from
+hz36amy_00/ops-transformer：
+nsaCmpAttn-9.1
+into
+cann/ops-transformer：
+9.1.0
+修复NsaCompAtten内存检测问题【商分】
+#8365
+Merged
+yf_zhou
+Add on
+Jul 7
+Merged from
+hz36amy_00/ops-transformer
+nsaCmpAttn-9.1
+into
+cann/ops-transformer
+9.1.0
+Merge checks
+Discussion
+0
+Commits
+0
+Checks
+0
+Files changed
+0
+Clone/Download
+0
+yf_zhou
+Collaborators
+Jul 7
+Jul 7
+描述
+修复topk API使用tempUb大小超出分配大小导致的内存检测问题
+关联的Issue
+测试
+文档更新
+类型标签
+🐛 Bug修复
+✨ 新特性
+⚡ 性能优化
+♻️ 重构
+🧪 测试
+📦 构建/CI
+🔧 配置变更
+📝 文档更新
+⬆️ 依赖升级
+🔒 安全修复
+🧹 代码清理
+❓ 其他，请描述：
+Save
+Cancel
+Pull Request has been successfully merged by CANN-robot.
+（Thank you for yf_zhou's contribution.）
+yf_zhou
+Collaborators
+Jul 7
+Created pull request, commit
+65c89282
+Jul 7
+Created pull request, commit
+65c89282
+atomgit-bot
+Jul 7
+Comments：
+Jul 7
+Comments：
+变更摘要
+该 PR 修复了
+NsaCompressAttention
+中 TopK 操作临时缓冲区大小硬编码导致的内存检测问题。原先使用固定值
+20 * S2sizeAlign32
+估算临时 UB 空间，不同配置下可能分配不足或浪费。本次改动引入 AscendC 运行时 API
+GetTopKMaxMinTmpSize
+动态计算实际所需的临时内存大小，并通过新增的 tiling 字段
+tmpUbSize
+传递给 kernel 层使用，确保内存分配与实际需求一致。
+主要改动
+新增 tiling 字段
+tmpUbSize
+：在
+nsa_compress_attention_tiling.h
+的 TILING_DATA 中新增
+tmpUbSize
+字段，用于记录 TopK 操作所需的临时 UB 缓冲区大小。
+TopKTiling()
+中动态计算临时缓冲区大小
+：在
+nsa_compress_attention_tiling_general.cpp
+的
+TopKTiling()
+函数中，调用
+AscendC::GetTopKMaxMinTmpSize
+获取
+maxsize
+，并通过
+importanceScoreParams.set_tmpUbSize()
+写入 tiling 数据。
+Kernel 层使用动态
+tmpUbSize
+替代硬编码值
+：在
+nsa_compress_attention_s1s2_bn2gs1_sab.h
+中，
+maxTopkBase
+的计算由
+190 * 1024 - 20 * S2sizeAlign32
+改为
+190 * 1024 - tmpUbSize
+，
+topKTmpLocal
+的偏移量由
+20 * S2sizeTopK
+改为
+tmpUbSize
+，消除硬编码假定的缓冲区大小。
+Save
+Cancel
+Incorrect?
+CANN-robot
+Collaborators
+Jul 7
+Added label:
+cann-cla/yes
+Jul 7
+Added label:
+cann-cla/yes
+CANN-robot
+Collaborators
+Jul 7
+Comments：
+Jul 7
+Comments：
+Thanks for your pull-request.
+The full list of commands accepted by me can be found at
+here
+。
+You can get sig-info at
+here
+PR Approval Progress
+✅
+Congratulations! All modules have met the lgtm and approve requirements.
+Module Approval Details
+module
+lgtm status
+approve status
+**
+✅
+gcw_kUomxQ2l
+,
+黄俊健
+(2/2)
+✅
+gcw_kUomxQ2l
+(1/1)
+💡 Tip:
+Committer
+can comment
+/approve
+or
+/lgtm
+Commenting
+/approve
+implies both code review (lgtm) and intent to merge (approve)
+CLA Signature Pass
+hz36amy_00, thanks for your pull request. All authors of the commits have signed the CLA. 👍
+Save
+Cancel
+CANN-robot
+Collaborators
+Jul 7
+Set monologue815,jiang-lirui,Allan_Yu,liudan12,mabing1118,gcw_kUomxQ2l,Andy-lb as approver
+Jul 7
+Set monologue815,jiang-lirui,Allan_Yu,liudan12,mabing1118,gcw_kUomxQ2l,Andy-lb as approver
+CANN-robot
+Collaborators
+Jul 7
+Set gcw_kUomxQ2l,Andy-lb as approver
+Jul 7
+Set gcw_kUomxQ2l,Andy-lb as approver
+yf_zhou
+Collaborators
+Jul 7
+Comments：
+Jul 7
+Comments：
+compile
+Save
+Cancel
+yf_zhou
+Collaborators
+Jul 7
+Pre merge succeeded (commit_id: c06bd5940ae37ee32edc76d369692438179460ac)
+Jul 7
+Pre merge succeeded (commit_id: c06bd5940ae37ee32edc76d369692438179460ac)
+yf_zhou
+Collaborators
+Jul 7
+Modify description of pull request
+Jul 7
+Modify description of pull request
+CANN-robot
+Collaborators
+Jul 7
+Added label:
+ci-pipeline-running
+Jul 7
+Added label:
+ci-pipeline-running
+CANN-robot
+Collaborators
+Jul 7
+Comments：
+Jul 7
+Comments：
+流水线任务触发成功
+任务链接 [
+7e63749e364b4ce391383b42d55568ea
+][
+流水线指导
+]
+任务名称
+状态
+日志
+下载链接
+Compile_Ascend_X86
+✅ SUCCESS
+>>>>>
+>>>>>
+Compile_Ascend_ARM
+✅ SUCCESS
+>>>>>
+>>>>>
+Compile_Ascend_X86_mobile_station
+✅ SUCCESS
+>>>>>
+>>>>>
+Compile_Ascend_X86_experimental
+✅ SUCCESS
+>>>>>
+>>>>>
+Compile_Ascend_ARM_experimental
+✅ SUCCESS
+>>>>>
+>>>>>
+Compile_Pre
+✅ SUCCESS
+>>>>>
+pre_comment
+✅ SUCCESS
+>>>>>
+Compile_X86_monitor_910b
+✅ SUCCESS
+>>>>>
+>>>>>
+Compile_X86_monitor_910c
+✅ SUCCESS
+>>>>>
+>>>>>
+Compile_X86_monitor_950
+✅ SUCCESS
+>>>>>
+>>>>>
+Compile_Ascend_X86_experimental_950
+✅ SUCCESS
+>>>>>
+>>>>>
+Compile_Ascend_ARM_experimental_950
+✅ SUCCESS
+>>>>>
+>>>>>
+Compile_harmony-infer-chs-transformer
+✅ SUCCESS
+>>>>>
+[2026-07-07 11:43:34]    CI执行结束
+Save
+Cancel
+CANN-robot
+Collaborators
+Jul 7
+Comments：
+Jul 7
+Comments：
+流水线任务触发成功
+任务链接 [
+ec94a40ddfcb40a1979261250813456c
+][
+流水线指导
+]
+任务名称
+状态
+日志
+下载链接
+codecheck
+❌ FAILED
+>>>>>
+SCA
+✅ SUCCESS
+>>>>>
+antipoison
+✅ SUCCESS
+>>>>>
+codecheck_style
+✅ SUCCESS
+>>>>>
+StaticCheck_codespell_check
+✅ SUCCESS
+StaticCheck_link_validity_check
+✅ SUCCESS
+StaticCheck_resource_existence_check
+✅ SUCCESS
+StaticCheck_tag_closed_check
+✅ SUCCESS
+StaticCheck_markdownlint
+✅ SUCCESS
+codecheck_checkpr
+✅ SUCCESS
+codecheck_precommit
+⚠️ WARNING
+>>>>>
+>>>>>
+Save
+Cancel
+yf_zhou
+Collaborators
+Jul 7
+Associated issue: [Bug-Report|缺陷反馈]: NsaCompAtten内存检测问题
+Jul 7
+Associated issue: [Bug-Report|缺陷反馈]: NsaCompAtten内存检测问题
+yf_zhou
+Collaborators
+Jul 7
+Pre merge succeeded (commit_id: 29f5812b67cd05e8c4d3ea05f97aefcb887d38e0)
+Jul 7
+Pre merge succeeded (commit_id: 29f5812b67cd05e8c4d3ea05f97aefcb887d38e0)
+yf_zhou
+Collaborators
+Jul 7
+Force-pushed 1 commits:
+45600336
+-fix NsaCompAtten topk tempUBSize
+Jul 7
+Force-pushed 1 commits:
+45600336
+-fix NsaCompAtten topk tempUBSize
+yf_zhou
+Collaborators
+Jul 7
+Pre merge succeeded (commit_id: 1f7486ddc0696b548f49f25f29c32914bbd8b169)
+Jul 7
+Pre merge succeeded (commit_id: 1f7486ddc0696b548f49f25f29c32914bbd8b169)
+yf_zhou
+Collaborators
+Jul 7
+Comments：
+Jul 7
+Comments：
+compile
+Save
+Cancel
+yf_zhou
+Collaborators
+Jul 7
+Pre merge succeeded (commit_id: ae4e00c2391a3f6d0e9efa265b8eb985a3fb3911)
+Jul 7
+Pre merge succeeded (commit_id: ae4e00c2391a3f6d0e9efa265b8eb985a3fb3911)
+CANN-robot
+Collaborators
+Jul 7
+Removed label:
+ci-pipeline-running
+Jul 7
+Removed label:
+ci-pipeline-running
+CANN-robot
+Collaborators
+Jul 7
+Added label:
+ci-pipeline-failed
+Jul 7
+Added label:
+ci-pipeline-failed
+CANN-robot
+Collaborators
+Jul 7
+Removed label:
+ci-pipeline-failed
+Jul 7
+Removed label:
+ci-pipeline-failed
+CANN-robot
+Collaborators
+Jul 7
+Added label:
+ci-pipeline-running
+Jul 7
+Added label:
+ci-pipeline-running
+CANN-robot
+Collaborators
+Jul 7
+Comments：
+Jul 7
+Comments：
+流水线任务触发成功
+任务链接 [
+6f35a6dfbc83406bbfa97d27ca84c4cc
+][
+流水线指导
+]
+任务名称
+状态
+日志
+下载链接
+Compile_Ascend_X86
+✅ SUCCESS
+>>>>>
+>>>>>
+Compile_Ascend_ARM
+✅ SUCCESS
+>>>>>
+>>>>>
+Compile_Ascend_X86_mobile_station
+✅ SUCCESS
+>>>>>
+>>>>>
+Compile_Ascend_X86_experimental
+✅ SUCCESS
+>>>>>
+>>>>>
+Compile_Ascend_ARM_experimental
+✅ SUCCESS
+>>>>>
+>>>>>
+Compile_Pre
+✅ SUCCESS
+>>>>>
+pre_comment
+✅ SUCCESS
+>>>>>
+Compile_X86_monitor_910b
+✅ SUCCESS
+>>>>>
+>>>>>
+Compile_X86_monitor_910c
+✅ SUCCESS
+>>>>>
+>>>>>
+Compile_X86_monitor_950
+✅ SUCCESS
+>>>>>
+>>>>>
+Compile_Ascend_X86_experimental_950
+✅ SUCCESS
+>>>>>
+>>>>>
+Compile_Ascend_ARM_experimental_950
+✅ SUCCESS
+>>>>>
+>>>>>
+Compile_harmony-infer-chs-transformer
+✅ SUCCESS
+>>>>>
+UT_Test
+✅ SUCCESS
+PreSmoke_A900
+✅ SUCCESS
+>>>>>
+PreSmoke_ATK_Test_A2
+✅ SUCCESS
+>>>>>
+[2026-07-07 11:54:52]    CI执行结束
+Save
+Cancel
+CANN-robot
+Collaborators
+Jul 7
+Comments：
+Jul 7
+Comments：
+流水线任务触发成功
+任务链接 [
+4ef8ccb3ba4245b89809a4d6e09a2711
+][
+流水线指导
+]
+任务名称
+状态
+日志
+下载链接
+codecheck
+✅ SUCCESS
+>>>>>
+SCA
+✅ SUCCESS
+>>>>>
+antipoison
+✅ SUCCESS
+>>>>>
+codecheck_style
+✅ SUCCESS
+>>>>>
+StaticCheck_codespell_check
+✅ SUCCESS
+StaticCheck_link_validity_check
+✅ SUCCESS
+StaticCheck_resource_existence_check
+✅ SUCCESS
+StaticCheck_tag_closed_check
+✅ SUCCESS
+StaticCheck_markdownlint
+✅ SUCCESS
+codecheck_checkpr
+✅ SUCCESS
+codecheck_precommit
+⚠️ WARNING
+>>>>>
+>>>>>
+[2026-07-07 11:47:01]    CI执行结束
+Save
+Cancel
+CANN-robot
+Collaborators
+Jul 7
+Removed label:
+ci-pipeline-running
+Jul 7
+Removed label:
+ci-pipeline-running
+CANN-robot
+Collaborators
+Jul 7
+Added label:
+ci-pipeline-passed
+Jul 7
+Added label:
+ci-pipeline-passed
+L
+liulun0308
+Collaborators
+Jul 7
+Comments：
+Jul 7
+Comments：
+/approve
+Save
+Cancel
+CANN-robot
+Collaborators
+Jul 7
+Added label:
+approved
+Jul 7
+Added label:
+approved
+M
+monologue815
+Collaborators
+Jul 7
+Comments：
+Jul 7
+Comments：
+/lgtm
+Save
+Cancel
+CANN-robot
+Collaborators
+Jul 7
+Added label:
+lgtm
+Jul 7
+Added label:
+lgtm
+CANN-robot
+Collaborators
+Jul 7
+Closed associated issue
+Jul 7
+Closed associated issue
+CANN-robot
+Collaborators
+Jul 7
+Merged pull request
+Jul 7
+Merged pull request
+Merger
+Not assigned
+Approver
+Not assigned
+Tester
+Not assigned
+Reviewer
+Not assigned
+Label
+cann-cla/yes
+ci-pipeline-passed
+approved
+lgtm
+Milestones
+No related milestones
+Kanban
+No related boards
+Link Issue
+No related Issues

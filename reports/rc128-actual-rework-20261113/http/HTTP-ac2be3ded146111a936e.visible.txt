@@ -1,0 +1,434 @@
+fix(inductor): exclude NPU dropout ops from fx_graph_cse-pytorch-AtomGit
+Star
+937
+Fork
+1522
+Code
+Introduction
+Code
+Issues
+1955
+Pull Requests
+1854
+Pipeline
+Actions
+Discussion
+Wiki
+Members
+392
+Analysis
+Settings
+Star
+937
+Fork
+1522
+Merged
+fix(inductor): exclude NPU dropout ops from fx_graph_cse
+#49092
+关龙锋
+Add on
+7 days ago
+Merged from
+glf2016/pytorch_9325：
+fix_cse_npu_dropout
+into
+Ascend/pytorch：
+master
+fix(inductor): exclude NPU dropout ops from fx_graph_cse
+#49092
+Merged
+关龙锋
+Add on
+7 days ago
+Merged from
+glf2016/pytorch_9325
+fix_cse_npu_dropout
+into
+Ascend/pytorch
+master
+Merge checks
+Discussion
+0
+Commits
+0
+Checks
+0
+Files changed
+0
+Clone/Download
+0
+关
+关龙锋
+7 days ago
+7 days ago
+PR功能描述 / 为什么需要这个合入:
+npu._npu_dropout
+没有 seed 入参、内部使用 RNG，不是确定性算子。但
+torch._functorch.compile_utils.fx_graph_cse
+只跳过
+rand_ops
+名单中的算子：
+aten.native_dropout
+在名单内，
+npu._npu_dropout
+不在。
+当
+torch._inductor.config.fallback_random=True
+时，
+native_dropout
+会下沉为
+npu._npu_dropout
+。训练路径会经过 AOTAutograd min-cut 分区并调用
+fx_graph_cse
+，此时两个结构完全相同的 dropout 调用会被合并成一个，导致：
+两次 dropout 共用同一 mask/output，随机性丢失、分支强相关；
+RNG 只消费一次，后续随机序列错位。
+本 PR 在 torch_npu 侧把 NPU 随机 dropout 系列算子补充进
+rand_ops
+，让 CSE 不再合并它们。
+def
+_patch_cse_rand_ops
+():
+import
+torch
+as
+_torch
+from
+torch._functorch
+import
+compile_utils
+as
+_compile_utils
+for
+_name
+in
+(
+"_npu_dropout"
+,
+"npu_dropout_gen_mask"
+,
+"npu_dropout_do_mask"
+,
+"npu_dropout_with_add_softmax"
+):
+        _op =
+getattr
+(_torch.ops.npu, _name,
+None
+)
+if
+_op
+is
+not
+None
+and
+_op
+not
+in
+_compile_utils.rand_ops:
+            _compile_utils.rand_ops.append(_op)
+复现与验证:
+复现条件：
+fallback_random=True
++ 训练，模型内两个相同的
+F.dropout(x, 0.5, training=True)
+。
+打补丁前：
+torch.equal(a, b) == True
+（两个 dropout 被 CSE 合并）。
+打补丁后：
+torch.equal(a, b) == False
+（两次独立采样）。
+后端覆盖：npu-triton 与 npu-ascendc 均验证通过；纯推理路径和
+fallback_random=False
+默认路径行为不变。
+说明：验证时需关闭 Inductor/AOT 磁盘缓存（
+torch._inductor.config.fx_graph_cache=False
++ 新的
+TORCHINDUCTOR_CACHE_DIR
+），否则会复用打补丁前的编译图导致误判。
+该PR关联的issue
+fixes #5880
+Save
+Cancel
+Pull Request has been successfully merged by ascend-robot.
+（Thank you for 关龙锋's contribution.）
+关
+关龙锋
+7 days ago
+Created pull request, commit
+10ba0743
+7 days ago
+Created pull request, commit
+10ba0743
+atomgit-bot
+7 days ago
+Comments：
+7 days ago
+Comments：
+变更摘要
+本 PR 针对
+torch_npu/_inductor/__init__.py
+中 Inductor 初始化流程的补充：新增
+_patch_cse_rand_ops
+函数并在模块加载时立即调用，将 NPU 侧非确定性的随机 dropout 系列算子注册进
+torch._functorch.compile_utils.rand_ops
+。原因是
+npu._npu_dropout
+无 seed 入参、依赖内部 RNG，却未被
+fx_graph_cse
+的随机算子名单覆盖；在
+fallback_random=True
+的训练路径中，结构相同的两次 dropout 会被 CSE 合并为一次，导致 mask 共用、随机性丢失及后续 RNG 序列错位。该改动使 CSE 跳过这些算子，恢复独立采样。
+主要改动
+新增
+_patch_cse_rand_ops
+补丁函数
+: 在
+torch_npu/_inductor/__init__.py
+中导入
+torch._functorch.compile_utils
+，向
+rand_ops
+追加 NPU 随机算子，从源头阻止 CSE 合并。
+扩充随机算子名单
+: 依次处理
+_npu_dropout
+、
+npu_dropout_gen_mask
+、
+npu_dropout_do_mask
+、
+npu_dropout_with_add_softmax
+四个
+torch.ops.npu
+算子，覆盖 NPU dropout 及掩码生成/应用等关联形态。
+注册的幂等与兼容处理
+: 通过
+getattr
+判断算子是否存在，并检查
+_op not in _compile_utils.rand_ops
+后才追加，避免算子缺失报错与重复注册。
+模块导入时自动生效
+: 在
+npu_patch_meta()
+、
+_dynamo_register_interface_for_device()
+、
+register_device_op_overrides_npu()
+之后直接调用
+_patch_cse_rand_ops()
+，使补丁先于
+_apply_common_patches()
+的 triton/mlir 后端补丁执行。
+Save
+Cancel
+Incorrect?
+atomgit-bot
+7 days ago
+Comments：
+7 days ago
+Comments：
+代码审查
+审查总结
+改动文件覆盖情况
+torch_npu/_inductor/__init__.py
+：已审查（改动为新增
+_patch_cse_rand_ops()
+及模块顶层调用，+21 行）。核对点：
+npu_patch_meta
+等既有顶层 patch 的执行顺序与
+torch.ops.npu
+命名空间可用性（第 43-45 行先执行，故 op 命名空间已存在，此处无问题）、
+_apply_common_patches
+的
+@run_once
+约定、文件内既有的私有 API 防御式写法（第 97-106 行、第 256 行）、以及仓库内按 FX node.target 匹配的既有清单（
+triton_experimental/lowering_fallback_list.py:59
+使用
+.default
+重载形式）。
+发现清单（3 项）
+优先级
+置信度
+位置
+问题
+P2
+0.50
+__init__.py:53-63
+导入期无保护访问私有
+torch._functorch.compile_utils.rand_ops
+（或非 list 时
+.append
+），AttributeError 会中断
+torch_npu._inductor
+整体导入，故障面从"CSE 修复失效"扩大为整个 NPU backend 不可用
+P3
+0.30
+__init__.py:61-63
+追加的是
+OpOverloadPacket
+，而
+fx_graph_cse
+比较的
+node.target
+是
+OpOverload
+；若 torch 侧
+rand_ops
+存重载则永不命中、修复静默失效，建议同时覆盖
+.default
+形式
+P3
+0.35
+__init__.py:61-62
+op 名缺失/改名时静默跳过、无日志与回归测试，修复退化后无任何信号
+整体风险判断
+修复方向正确（把 NPU 无 seed、内部取 RNG 的 dropout 系列补入
+rand_ops
+以避免
+fx_graph_cse
+合并），改动小、幂等（有
+not in
+去重），不改变推理与
+fallback_random=False
+路径。主要风险集中在
+稳健性与生效性
+：一是私有 API 在模块顶层无保护使用，触发时后果为 backend 导入失败（建议降级为 best-effort）；二是 packet/overload 匹配形式与 op 名字面量都缺乏断言或测试兜底，存在"ping 通但补丁完全没生效"的静默退化可能。建议合入前至少补上 try/except 与一条 CSE 回归用例。
+类型
+数量
+🔴 阻塞
+0
+🟡 建议
+1
+💬 仅评论
+Save
+Cancel
+Incorrect?
+ascend-robot
+Collaborators
+7 days ago
+Added label:
+needs-issue
+7 days ago
+Added label:
+needs-issue
+ascend-robot
+Collaborators
+7 days ago
+Comments：
+7 days ago
+Comments：
+Thanks for your pull-request.
+The full list of commands accepted by me can be found at
+here
+.
+You can get sig-info at
+here
+.
+You can self-configure the PR merge rules for this repository. For more details, please refer to
+Here
+.
+PR Approval Progress
+✅
+Congratulations! All modules have met the lgtm and approve requirements.
+Module Approval Details
+module
+lgtm status
+approve status
+torch_npu/_inductor
+✅
+daifu1234567
+,
+HinPeng
+(2/2)
+✅
+daifu1234567
+,
+HinPeng
+(2/1)
+💡 Tip:
+Committer
+can comment
+/approve
+or
+/lgtm
+Commenting
+/approve
+implies both code review (lgtm) and intent to merge (approve)
+CLA Signature Pass
+glf2016, thanks for your pull request. All authors of the commits have signed the CLA. 👍
+Save
+Cancel
+99 messages are collapsed here。
+See more
+ascend-robot
+Collaborators
+1 day ago
+Comments：
+1 day ago
+Comments：
+The MR can not be merged, because of CodeReview discussion not resolved
+If you want to solve this problem,
+you can click here to do it in the
+FAQs
+.
+Save
+Cancel
+D
+daifu1234567
+Collaborators
+1 day ago
+Resolved final issue
+1 day ago
+Resolved final issue
+ascend-robot
+Collaborators
+1 day ago
+Merged pull request
+1 day ago
+Merged pull request
+ascend-robot
+Collaborators
+1 day ago
+Comments：
+1 day ago
+Comments：
+Pull Request 已合并或已关闭。
+If you want to solve this problem,
+you can click here to do it in the
+FAQs
+.
+Save
+Cancel
+AtlasAccount
+Collaborators
+1 day ago
+Comments：
+1 day ago
+Comments：
+流水线
+pytorch_gitcode_PR_multiVersion-onetrack#760
+[ commitID：0c0783e9 ] 运行失败
+Save
+Cancel
+Merger
+Not assigned
+Approver
+Not assigned
+Tester
+Not assigned
+Reviewer
+Not assigned
+Label
+ascend-cla/yes
+docs-ci-pipeline-success
+ci-pipeline-passed
+approved
+lgtm
+Milestones
+No related milestones
+Kanban
+No related boards
+Link Issue
+No related Issues

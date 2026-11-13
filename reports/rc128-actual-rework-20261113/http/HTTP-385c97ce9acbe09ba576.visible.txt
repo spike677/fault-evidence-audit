@@ -1,0 +1,390 @@
+fix(inductor): emit accumulator truncation cast for fused template epilogues-pytorch-AtomGit
+Star
+937
+Fork
+1522
+Code
+Introduction
+Code
+Issues
+1955
+Pull Requests
+1854
+Pipeline
+Actions
+Discussion
+Wiki
+Members
+392
+Analysis
+Settings
+Star
+937
+Fork
+1522
+Merged
+fix(inductor): emit accumulator truncation cast for fused template epilogues
+#49099
+PXTang
+Add on
+7 days ago
+Merged from
+PXTang/PTA：
+dev
+into
+Ascend/pytorch：
+master
+fix(inductor): emit accumulator truncation cast for fused template epilogues
+#49099
+Merged
+PXTang
+Add on
+7 days ago
+Merged from
+PXTang/PTA
+dev
+into
+Ascend/pytorch
+master
+Merge checks
+Discussion
+0
+Commits
+0
+Checks
+0
+Files changed
+0
+Clone/Download
+0
+P
+PXTang
+7 days ago
+7 days ago
+【合入来源】
+https://gitcode.com/Ascend/pytorch/issues/5960
+需求
+问题单
+issue/工单
+重构优化
+资料更新
+【修改方案】
+在
+NPUTritonScheduling.codegen_template
+（
+torch_npu/_inductor/codegen/scheduling.py
+）中，于
+render()
+之前调用：
+kernel._compute_fusion_metadata(self, epilogue_nodes, [], {})
+为 Triton 模板的 epilogue 融合补齐元数据。
+适配的功能：模板 GEMM 融合 epilogue 时，若累加 dtype 与输出 dtype 不同（fp32 累加、fp16/bf16 输出），
+store_output
+会生成
+acc_dtype -> output_dtype -> acc_dtype
+的截断 cast，使融合核与未融合路径在相同位置做舍入。
+prologue 两个参数传空，是因为该 codegen 路径不支持 prologue fusion。
+【资料变更】
+不涉及
+【接口变更】
+不涉及
+【功能验证】
+在 NPU 上运行
+test_triton_gemm_epilogue_fusion_truncates_accumulator
+（fp16/bf16/fp32 × mm/addmm，共 12 条），全部通过；生成的 kernel 代码中包含
+acc.to(tl.float16/bf16)
+及其后的
+.to(tl.float32)
+。
+【CheckList】
+PR提交人对以下CheckList自检项进行全量自检，自检通过或不涉及，均修改 [ ] 为 [x]
+代码注释完备，正确记录错误日志
+代码实现进行了返回值、空指针等校验
+PR标题正确使用类型标签，如：feat、fix、refactor、docs、test等
+PR持续集成流水线（CI）执行通过，代码检查无异常
+Save
+Cancel
+Pull Request has been successfully merged by ascend-robot.
+（Thank you for PXTang's contribution.）
+P
+PXTang
+7 days ago
+Created pull request, commit
+2797fb70
+7 days ago
+Created pull request, commit
+2797fb70
+atomgit-bot
+7 days ago
+Comments：
+7 days ago
+Comments：
+变更摘要
+本 PR 主要修复 NPU Inductor 侧的三个问题：使
+NPUDebugAutotuner
+的构造签名与上游
+DebugAutotuner
+对齐，从而在
+config.profile_bandwidth
+开启时能够正确接收 profiler 相关关键字参数；在
+bmm
+的 batched 配置生成中加入 L0 tile 容量上限约束；并在模板调度的 kernel 生成流程中补充融合元数据计算。
+主要改动
+NPUDebugAutotuner
+兼容 profiler 关键字参数
+：
+__init__
+新增
+with_profiler
+与
+with_bandwidth_info
+形参并保存为实例属性，避免
+cached_autotune
+构造时因 “unexpected keyword argument” 导致 kernel 加载失败。
+bench 调用传递 profiler 开关
+：在
+run
+中调用
+self.bench(...)
+时新增
+with_profiler=self.with_profiler
+参数，使调试调优路径能够按配置启用 profiler 测量。
+bmm 配置增加 L0 tile 上限校验
+：
+_get_npu_bmm_batched_configs
+中引入
+L0B_BYTES
+，当
+a_tile
+超过
+L0A_BYTES
+或
+b_tile
+超过
+L0B_BYTES
+时直接返回空配置列表，从而过滤掉超出 L0 缓冲容量的候选。
+模板 kernel 补充融合元数据计算
+：
+NPUTritonScheduling
+在生成模板 kernel 时，若
+kernel
+具备
+_compute_fusion_metadata
+属性，则调用
+kernel._compute_fusion_metadata(self, epilogue_nodes, [], {})
+，使模板节点与 epilogue 节点的融合元数据在
+mark_run
+之前完成计算。
+Save
+Cancel
+Incorrect?
+atomgit-bot
+7 days ago
+Comments：
+7 days ago
+Comments：
+代码审查
+审查结论
+逐文件核查结果
+torch_npu/_inductor/codegen/scheduling.py
+：1 个问题（P2，见下）。核查了
+NPUTritonScheduling.codegen_template
+的全部调用方（
+generate_kernel_code_from_nodes
+、
+parallel_scheduler_pass
+、
+npu_combined_scheduling
+、
+dvm/mlir_fusion.py
+），确认新增调用位于
+with kernel:
+内、在
+render()
+之前，epilogue 实参形态与调用方一致；风险集中在对上游私有方法的签名假设。
+torch_npu/_inductor/kernel/bmm.py
+：1 个问题（P3，见下）。核查了
+_get_npu_bmm_batched_configs
+的新增剪枝方向、
+_fractal_rows
+/
+BATCHED_N_FRACTAL
+语义及
+mm_common
+的容量常量（L0A/L0B=64KiB、L1=512KiB），确认剪枝为保守方向、不产生错误结果，仅留下冗余条件与文档不同步。
+torch_npu/_inductor/runtime/triton_heuristics.py
+：2 个问题（均 P3，见下）。核查了
+NPUCachingAutotuner
+/
+NPUCostModelAutotuner.__init__
+的签名与属性初始化（无同名属性覆盖）、
+bench
+/
+_bench_with_launch_args
+的
+with_profiler
+消费路径，以及
+cached_autotune
+的唯一构造点（第 3206-3224 行），确认新增关键字消除了
+unexpected keyword argument
+崩溃，但两个新关键字的语义未真正生效。
+问题统计
+P0：0
+P1：0
+P2：1（上游私有
+_compute_fusion_metadata
+以伪造空参数调用，编译期崩溃风险，置信度低）
+P3：3（
+with_bandwidth_info
+未生效；
+with_profiler
+传给 bench 后为 no-op；bmm 新增 L0 检查使 L1 检查不可达且 docstring 未同步）
+总体风险判断
+低。本 PR 主干改动（补齐
+NPUDebugAutotuner
+关键字、为 batched 模板加 L0A/L0B 上界）方向正确：前者修复了
+profile_bandwidth
+下 kernel 加载期的
+TypeError
+，后者是保守剪枝、最坏只是少一个候选模板，不会产生错误结果。唯一需要人工确认的是
+scheduling.py
+中对上游私有
+_compute_fusion_metadata
+的四参调用——其函数签名与
+kernel_args
+语义在本仓库内无任何可交叉验证的引用，若与目标 torch 版本不符会在 template codegen 阶段直接编译失败，建议按版本门控或校验签名后再调用。其余三项均为可选改进，不影响正确性。
+类型
+数量
+🔴 阻塞
+0
+🟡 建议
+1
+💬 仅评论
+Save
+Cancel
+Incorrect?
+ascend-robot
+Collaborators
+7 days ago
+Added label:
+needs-issue
+7 days ago
+Added label:
+needs-issue
+ascend-robot
+Collaborators
+7 days ago
+Comments：
+7 days ago
+Comments：
+Thanks for your pull-request.
+The full list of commands accepted by me can be found at
+here
+.
+You can get sig-info at
+here
+.
+You can self-configure the PR merge rules for this repository. For more details, please refer to
+Here
+.
+PR Approval Progress
+✅
+Congratulations! All modules have met the lgtm and approve requirements.
+Module Approval Details
+module
+lgtm status
+approve status
+torch_npu/_inductor
+✅
+HinPeng
+,
+rain-666
+(2/2)
+✅
+HinPeng
+(1/1)
+💡 Tip:
+Committer
+can comment
+/approve
+or
+/lgtm
+Commenting
+/approve
+implies both code review (lgtm) and intent to merge (approve)
+CLA Signature Pass
+PXTang, thanks for your pull request. All authors of the commits have signed the CLA. 👍
+Save
+Cancel
+139 messages are collapsed here。
+See more
+X
+Xuan Peng
+3 days ago
+Comments：
+3 days ago
+Comments：
+/lgtm
+/approve
+Save
+Cancel
+ascend-robot
+Collaborators
+3 days ago
+Added label:
+approved
+lgtm
+3 days ago
+Added label:
+approved
+lgtm
+ascend-robot
+Collaborators
+3 days ago
+Merged pull request
+3 days ago
+Merged pull request
+ascend-robot
+Collaborators
+3 days ago
+Comments：
+3 days ago
+Comments：
+Pull Request 已合并或已关闭。
+If you want to solve this problem,
+you can click here to do it in the
+FAQs
+.
+Save
+Cancel
+AtlasAccount
+Collaborators
+3 days ago
+Comments：
+3 days ago
+Comments：
+流水线
+pytorch_gitcode_PR_multiVersion-onetrack#722
+[ commitID：661b7f93 ] 运行失败
+Save
+Cancel
+Merger
+Not assigned
+Approver
+Not assigned
+Tester
+Not assigned
+Reviewer
+Not assigned
+Label
+ascend-cla/yes
+docs-ci-pipeline-success
+ci-pipeline-passed
+approved
+lgtm
+Milestones
+No related milestones
+Kanban
+No related boards
+Link Issue
+No related Issues

@@ -1,0 +1,104 @@
+From 34f249b1d39eb5d11165f0334953319e1a213b37 Mon Sep 17 00:00:00 2001
+From: Bernstein <1322434659@qq.com>
+Date: Thu, 5 Nov 2026 16:18:39 +0800
+Subject: [PATCH] =?UTF-8?q?[fix]=20=E7=A7=BB=E9=99=A4AR=20NDA=20inter?=
+ =?UTF-8?q?=E6=A8=A1=E6=9D=BF=E7=9A=84AICPU=5FCOMPILE=E8=A3=81=E5=89=AA?=
+ =?UTF-8?q?=EF=BC=8C=E4=BF=AE=E5=A4=8DAllReduce=20NDA=E7=B2=BE=E5=BA=A6?=
+ =?UTF-8?q?=E9=97=AE=E9=A2=98?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+DpuAllReduceSequenceMeshNHRNDA 的两个 inter 模板（InsTempReduceScatterMesh1dNdaInter /
+InsTempAllGatherNhrNdaInter）的 KernelRun/RunNHR/REGISTER_TEMPLATE_V2 被
+#ifndef AICPU_COMPILE 包裹，在 hccl_aicpu_kernel 编译单元中被剪成 no-op。
+NDA 算法经 STARS(AICPU_TS) 在 kernel 侧执行，step2/step3 空跑：ACK/DATA_SIGNAL/
+FIN_ACK 握手与 HcommWrite 数据写均不执行。由于 notify Record/Wait 对称置空不会
+死锁，表现为流程正常完成但跨 rank 数据未搬运，AllReduce 精度错误；单独
+ReduceScatter/AllGather 的 NDA 模板无该包裹，不受影响。
+
+与 SendRecvWriteForNda 原语的去裁剪处理保持一致（该原语已无包裹，RS/AG 因此正常）。
+移除模板层共 5 处包裹，kernel 侧依赖（SendRecvWriteForNda/LocalCopy/LocalReduce/
+HcommBatchMode*/GetAlgRank）均已存在（RS/AG 无包裹模板已在 kernel 侧使用）。
+---
+ .../template/aicpu/ins_temp_all_gather_nhr_nda_inter.cc     | 6 ------
+ .../aicpu/ins_temp_reduce_scatter_mesh_1D_nda_inter.cc      | 4 ----
+ 2 files changed, 10 deletions(-)
+
+diff --git a/src/ops/all_reduce/algorithm/template/aicpu/ins_temp_all_gather_nhr_nda_inter.cc b/src/ops/all_reduce/algorithm/template/aicpu/ins_temp_all_gather_nhr_nda_inter.cc
+index f3a832dd9e..eb354720c6 100644
+--- a/src/ops/all_reduce/algorithm/template/aicpu/ins_temp_all_gather_nhr_nda_inter.cc
++++ b/src/ops/all_reduce/algorithm/template/aicpu/ins_temp_all_gather_nhr_nda_inter.cc
+@@ -50,7 +50,6 @@ u64 InsTempAllGatherNhrNdaInter::CalcScratchMultiple(BufferType inBufferType, Bu
+ HcclResult InsTempAllGatherNhrNdaInter::KernelRun(
+     const OpParam& param, const TemplateDataParams& tempAlgParams, TemplateResource& templateResource)
+ {
+-#ifndef AICPU_COMPILE
+     if (templateResource.threads.empty()) {
+         HCCL_ERROR("[InsTempAllGatherNhrNdaInter] Rank[%u], required thread error.", myRank_);
+         return HCCL_E_INTERNAL;
+@@ -68,7 +67,6 @@ HcclResult InsTempAllGatherNhrNdaInter::KernelRun(
+         HCCL_ERROR("[InsTempAllGatherNhrNdaInter] failed to start batch mode, tag[%s].", param.algTag),
+         HCCL_E_INTERNAL);
+     CHK_RET(PostLocalCopy(tempAlgParams, templateResource));
+-#endif
+     return HCCL_SUCCESS;
+ }
+ 
+@@ -130,7 +128,6 @@ HcclResult InsTempAllGatherNhrNdaInter::RunNHR(
+     const TemplateDataParams& tempAlgParams, const std::map<u32, std::vector<ChannelInfo>>& channels,
+     const ThreadHandle& thread) const
+ {
+-#ifndef AICPU_COMPILE
+     const u32 stepNum = GetNHRStepNum(templateRankSize_);
+     for (u32 repeatIdx = 0; repeatIdx < tempAlgParams.repeatNum; ++repeatIdx) {
+         for (u32 step = 0; step < stepNum; ++step) {
+@@ -188,7 +185,6 @@ HcclResult InsTempAllGatherNhrNdaInter::RunNHR(
+                 HCCL_E_INTERNAL);
+         }
+     }
+-#endif
+     return HCCL_SUCCESS;
+ }
+ 
+@@ -220,8 +216,6 @@ HcclResult InsTempAllGatherNhrNdaInter::PostLocalCopy(
+     return HCCL_SUCCESS;
+ }
+ 
+-#ifndef AICPU_COMPILE
+ REGISTER_TEMPLATE_V2("InsTempAllGatherNhrNdaInter", InsTempAllGatherNhrNdaInter);
+-#endif
+ 
+ } // namespace ops_hccl
+diff --git a/src/ops/all_reduce/algorithm/template/aicpu/ins_temp_reduce_scatter_mesh_1D_nda_inter.cc b/src/ops/all_reduce/algorithm/template/aicpu/ins_temp_reduce_scatter_mesh_1D_nda_inter.cc
+index 272dfa89b6..77752ad44e 100644
+--- a/src/ops/all_reduce/algorithm/template/aicpu/ins_temp_reduce_scatter_mesh_1D_nda_inter.cc
++++ b/src/ops/all_reduce/algorithm/template/aicpu/ins_temp_reduce_scatter_mesh_1D_nda_inter.cc
+@@ -50,7 +50,6 @@ u64 InsTempReduceScatterMesh1dNdaInter::CalcScratchMultiple(BufferType inBufferT
+ HcclResult InsTempReduceScatterMesh1dNdaInter::KernelRun(
+     const OpParam& param, const TemplateDataParams& tempAlgParams, TemplateResource& templateResource)
+ {
+-#ifndef AICPU_COMPILE
+     dataType_ = param.DataDes.dataType;
+     if (templateResource.threads.empty()) {
+         HCCL_ERROR("[InsTempReduceScatterMesh1dNdaInter] Rank[%u], required thread error.", myRank_);
+@@ -134,7 +133,6 @@ HcclResult InsTempReduceScatterMesh1dNdaInter::KernelRun(
+         HCCL_ERROR("[InsTempReduceScatterMesh1dNdaInter] failed to start batch mode, tag[%s].", param.algTag),
+         HCCL_E_INTERNAL);
+     CHK_RET(PostLocalReduce(param, tempAlgParams, templateResource.threads));
+-#endif
+     return HCCL_SUCCESS;
+ }
+ 
+@@ -198,8 +196,6 @@ HcclResult InsTempReduceScatterMesh1dNdaInter::PostLocalReduce(
+     return HCCL_SUCCESS;
+ }
+ 
+-#ifndef AICPU_COMPILE
+ REGISTER_TEMPLATE_V2("InsTempReduceScatterMesh1dNdaInter", InsTempReduceScatterMesh1dNdaInter);
+-#endif
+ 
+ } // namespace ops_hccl
+-- 
+GitCode
+

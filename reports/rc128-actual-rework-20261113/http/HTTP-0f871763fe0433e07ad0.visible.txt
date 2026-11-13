@@ -1,0 +1,648 @@
+fix：reduce prod bool输出改用ReduceAll，对齐GPU逻辑和语义-ops-math-AtomGit
+Star
+1755
+Fork
+1658
+Code
+Introduction
+Code
+Issues
+494
+Pull Requests
+577
+Pipeline
+Actions
+Discussion
+Wiki
+Members
+299
+Analysis
+Settings
+Star
+1755
+Fork
+1658
+Merged
+fix：reduce prod bool输出改用ReduceAll，对齐GPU逻辑和语义
+#6026
+fitZepHYr
+Add on
+Sep 28
+Merged from
+VoyageZhou/ops-math_fork：
+reduce_prod
+into
+cann/ops-math：
+master
+fix：reduce prod bool输出改用ReduceAll，对齐GPU逻辑和语义
+#6026
+Merged
+fitZepHYr
+Add on
+Sep 28
+Merged from
+VoyageZhou/ops-math_fork
+reduce_prod
+into
+cann/ops-math
+master
+Merge checks
+Discussion
+0
+Commits
+0
+Checks
+0
+Files changed
+0
+Clone/Download
+0
+fitZepHYr
+Collaborators
+Sep 28
+Sep 28
+描述
+reduce prod bool输出改用ReduceAll，对齐GPU逻辑和语义
+关联的Issue
+Issue 3344
+测试
+ST通过
+文档更新
+类型标签
+Bug修复
+新特性
+性能优化
+文档更新
+其他，请描述：
+Save
+Cancel
+Pull Request has been successfully merged by CANN-robot.
+（Thank you for fitZepHYr's contribution.）
+fitZepHYr
+Collaborators
+Sep 28
+Created pull request, commit
+aed56722
+Sep 28
+Created pull request, commit
+aed56722
+atomgit-bot
+Sep 28
+Comments：
+Sep 28
+Comments：
+变更摘要
+本 PR 调整
+math/reduce_prod/op_api/aclnn_prod.cpp
+中
+prod
+算子在布尔输出场景下的实现逻辑。当输出数据类型为
+DT_BOOL
+且运行在
+ASCEND910B
+/
+ASCEND910_93
+平台时，改为对齐 GPU
+torch.prod(dtype=bool)
+语义：先将输入按“非零→True”转换为
+DT_BOOL
+，再通过
+ReduceAll
+（逐维逻辑与）完成归约，最后转换回输出类型；其他场景仍走原有
+ExecuteProd
+路径。
+主要改动
+新增布尔归约执行函数
+: 新增
+ExecuteProdAsLogicalAnd
+，依次执行
+Contiguous
+、
+Cast
+为
+DT_BOOL
+、
+ReduceAll
+、再
+Cast
+回
+out
+的数据类型并
+ViewCopy
+，实现逐维逻辑与语义。
+引入 ReduceAll 依赖
+: 增加头文件
+"math/reduce_all/op_api/reduce_all.h"
+，以支持调用
+l0op::ReduceAll
+。
+aclnnProdDimGetWorkspaceSize
+分支切换
+: 将
+dim
+由
+ConvertToTensor
+改为
+AllocIntArray
+生成
+dimList
+，并在
+DT_BOOL
+且平台为 910B/910_93 时调用
+ExecuteProdAsLogicalAnd
+，否则保留原
+ExecuteProd
+逻辑。
+aclnnProdGetWorkspaceSize
+分支切换
+: 移除原先统一创建
+axesTensor
+的步骤，改为按输出类型与平台条件选择
+ExecuteProdAsLogicalAnd(dimList, ...)
+或原有的
+ConvertToTensor
++
+ExecuteProd
+路径。
+Save
+Cancel
+Incorrect?
+atomgit-bot
+Sep 28
+Comments：
+Sep 28
+Comments：
+代码审查
+✅ 未发现问题
+Save
+Cancel
+Incorrect?
+fitZepHYr
+Collaborators
+Sep 28
+Comments：
+Sep 28
+Comments：
+compile
+Save
+Cancel
+CANN-robot
+Collaborators
+Sep 28
+Added label:
+cann-cla/yes
+Sep 28
+Added label:
+cann-cla/yes
+fitZepHYr
+Collaborators
+Sep 28
+Pre merge succeeded (commit_id: 2d09d651bec6c98f3514abe065868377e759f7a1)
+Sep 28
+Pre merge succeeded (commit_id: 2d09d651bec6c98f3514abe065868377e759f7a1)
+CANN-robot
+Collaborators
+Sep 28
+Comments：
+Sep 28
+Comments：
+Thanks for your pull-request.
+The full list of commands accepted by me can be found at
+here
+.
+You can get sig-info at
+here
+.
+You can self-configure the PR merge rules for this repository. For more details, please refer to
+Here
+.
+For more, you also can visit
+HICANN
+.
+PR Approval Progress
+✅
+Congratulations! All modules have met the lgtm and approve requirements.
+Module Approval Details
+module
+lgtm status
+approve status
+math/reduce_prod
+✅
+yue-ma
+,
+汤平川
+(2/2)
+✅
+汤平川
+,
+yue-ma
+(2/1)
+💡 Tip:
+Committer
+can comment
+/approve
+or
+/lgtm
+Commenting
+/approve
+implies both code review (lgtm) and intent to merge (approve)
+CLA Signature Pass
+VoyageZhou, thanks for your pull request. All authors of the commits have signed the CLA. 👍
+Save
+Cancel
+CANN-robot
+Collaborators
+Sep 28
+Comments：
+Sep 28
+Comments：
+CLA Signature Pass
+VoyageZhou, thanks for your pull request. All authors of the commits have signed the CLA. 👍
+Save
+Cancel
+CANN-robot
+Collaborators
+Sep 28
+Set FelixTang7,yue-ma,zhou-qilong,wangrui_,rxtfeng,loov1,zhangzijie,jia0liang,zl_hw,songkai111,chenxingyu18,pingchuantang,llimwang,gubaocheng,andong_hw,xuejinghui,zhanw_coding,clinglai0517 as approver
+Sep 28
+Set FelixTang7,yue-ma,zhou-qilong,wangrui_,rxtfeng,loov1,zhangzijie,jia0liang,zl_hw,songkai111,chenxingyu18,pingchuantang,llimwang,gubaocheng,andong_hw,xuejinghui,zhanw_coding,clinglai0517 as approver
+CANN-robot
+Collaborators
+Sep 28
+Set FelixTang7,yue-ma,zhou-qilong,wangrui_,rxtfeng,loov1,zhangzijie,zl_hw,songkai111,chenxingyu18,pingchuantang,llimwang,gubaocheng,andong_hw,xuejinghui,zhanw_coding,clinglai0517 as approver
+Sep 28
+Set FelixTang7,yue-ma,zhou-qilong,wangrui_,rxtfeng,loov1,zhangzijie,zl_hw,songkai111,chenxingyu18,pingchuantang,llimwang,gubaocheng,andong_hw,xuejinghui,zhanw_coding,clinglai0517 as approver
+CANN-robot
+Collaborators
+Sep 28
+Comments：
+Sep 28
+Comments：
+🚀 CI 流水线已启动
+📋 执行详情:
+点击查看流水线
+Save
+Cancel
+CANN-robot
+Collaborators
+Sep 28
+Added label:
+ci-pipeline-running
+Sep 28
+Added label:
+ci-pipeline-running
+CANN-robot
+Collaborators
+Sep 28
+Removed label:
+ci-pipeline-running
+Sep 28
+Removed label:
+ci-pipeline-running
+CANN-robot
+Collaborators
+Sep 28
+Added label:
+ci-pipeline-failed
+Sep 28
+Added label:
+ci-pipeline-failed
+CANN-robot
+Collaborators
+Sep 28
+Comments：
+Sep 28
+Comments：
+流水线分析报告 — ops-math run#4315
+流水线:
+https://gitcode.com/CANN/ops-math/actions/runs/d4e2a0789adc497f9b31d075d79fe0ad
+| PR#6026 | 2026-09-28 18:36:59 ~ 2026-09-28 18:48:14 | 失败 Job 1 个
+定界结论: 代码问题 / API_CHECK检查失败 — 包内接口调用
+失败类型
+: 代码问题(PR 变更引入, 由提交者修复)
+根因
+: PR 在
+math/reduce_prod/op_api/aclnn_prod.cpp
+的
+ExecuteProdAsLogicalAnd
+函数中调用了 3 个包内管控接口(
+l0op::Cast
+/
+l0op::ViewCopy
+/
+l0op::Contiguous
+), 触发包内接口调用管控
+处置建议
+: 通知 PR 提交者修复: ① 改用已开放接口实现同等功能; ② 或走接口评审/豁免登记流程后保留调用
+排除项
+: API 兼容性、算子兼容性、接口规范性、包内/包间重复头文件、包间接口调用、废弃接口调用、管控目录文件新增/删除均未检出问题; 其余 Job 无独立失败
+失败根因分析
+根因 #1: 代码问题 / API_CHECK检查失败 — 包内接口调用
+判据
+: 包内接口调用管控(调用方/被调用方见证据; 改用已开放接口或走接口评审/豁免登记)
+定位步骤
+:
+1_api-check.log
+影响 Job
+: API_Check
+根因证据(日志原文)
+:
+***包内接口调用***
+--调用方：ops-math#math/reduce_prod/op_api/aclnn_prod.cpp@ExecuteProdAsLogicalAnd
+--被调用方：ops-math#common/inc/external/aclnn_kernels/cast.h@l0op::Cast(const aclTensor*,op::DataType,aclOpExecutor*)
+
+--调用方：ops-math#math/reduce_prod/op_api/aclnn_prod.cpp@ExecuteProdAsLogicalAnd
+--被调用方：ops-math#common/inc/external/aclnn_kernels/contiguous.h@l0op::ViewCopy(const aclTensor*,const aclTensor*,aclOpExecutor*)
+
+--调用方：ops-math#math/reduce_prod/op_api/aclnn_prod.cpp@ExecuteProdAsLogicalAnd
+--被调用方：ops-math#common/inc/external/aclnn_kernels/contiguous.h@l0op::Contiguous(const aclTensor*,aclOpExecutor*)
+
+error
+::error::脚本异常退出: exit code=1, signal=null
+由门禁失败定界分析自动生成 | repo: ops-math | run: d4e2a0789adc497f9b31d075d79fe0ad | PR#6026
+Save
+Cancel
+fitZepHYr
+Collaborators
+Sep 28
+Pre merge succeeded (commit_id: 5bdb223c5243e73f669b2d3a9af1559c94468ae2)
+Sep 28
+Pre merge succeeded (commit_id: 5bdb223c5243e73f669b2d3a9af1559c94468ae2)
+fitZepHYr
+Collaborators
+Sep 28
+Pushed 1 commits:
+c83b4574
+-fix: reduce_prod bool输出改用ReduceAll，复用ExecuteProd规避API_Check包内接口调用
+Sep 28
+Pushed 1 commits:
+c83b4574
+-fix: reduce_prod bool输出改用ReduceAll，复用ExecuteProd规避API_Check包内接口调用
+fitZepHYr
+Collaborators
+Sep 28
+Pre merge succeeded (commit_id: 6be819467ec8c45285a33f4b14c7ed5421bdea71)
+Sep 28
+Pre merge succeeded (commit_id: 6be819467ec8c45285a33f4b14c7ed5421bdea71)
+CANN-robot
+Collaborators
+Sep 28
+Removed label:
+cann-cla/yes
+Sep 28
+Removed label:
+cann-cla/yes
+CANN-robot
+Collaborators
+Sep 28
+Added label:
+stat/needs-squash
+Sep 28
+Added label:
+stat/needs-squash
+CANN-robot
+Collaborators
+Sep 28
+Added label:
+cann-cla/yes
+Sep 28
+Added label:
+cann-cla/yes
+fitZepHYr
+Collaborators
+Sep 28
+Comments：
+Sep 28
+Comments：
+/compile
+Save
+Cancel
+fitZepHYr
+Collaborators
+Sep 28
+Pre merge succeeded (commit_id: 6275e8d38bd62c25002d99c188d142bb3e6eaa37)
+Sep 28
+Pre merge succeeded (commit_id: 6275e8d38bd62c25002d99c188d142bb3e6eaa37)
+CANN-robot
+Collaborators
+Sep 28
+Comments：
+Sep 28
+Comments：
+🚀 CI 流水线已启动
+📋 执行详情:
+点击查看流水线
+Save
+Cancel
+CANN-robot
+Collaborators
+Sep 28
+Removed label:
+ci-pipeline-failed
+Sep 28
+Removed label:
+ci-pipeline-failed
+5 event messages are collapsed here。
+See more
+fitZepHYr
+Collaborators
+Sep 28
+Pre merge succeeded (commit_id: e51c8aea48a324ab0a25aa3b871f66b50ef163fe)
+Sep 28
+Pre merge succeeded (commit_id: e51c8aea48a324ab0a25aa3b871f66b50ef163fe)
+fitZepHYr
+Collaborators
+Sep 28
+Comments：
+Sep 28
+Comments：
+/compile
+Save
+Cancel
+CANN-robot
+Collaborators
+Sep 28
+Removed label:
+cann-cla/yes
+Sep 28
+Removed label:
+cann-cla/yes
+fitZepHYr
+Collaborators
+Sep 28
+Pre merge succeeded (commit_id: 94a3e0790bbc561d5c5a640a02f849dfe0f83540)
+Sep 28
+Pre merge succeeded (commit_id: 94a3e0790bbc561d5c5a640a02f849dfe0f83540)
+CANN-robot
+Collaborators
+Sep 28
+Added label:
+cann-cla/yes
+Sep 28
+Added label:
+cann-cla/yes
+CANN-robot
+Collaborators
+Sep 28
+Comments：
+Sep 28
+Comments：
+流水线分析报告 — ops-math run#4319
+流水线:
+https://gitcode.com/CANN/ops-math/actions/runs/33e3b1f8fa7b4f94865056218f14b6a6
+| PR#6026 | 2026-09-28 19:26:04 ~ 2026-09-28 19:35:23 | 失败 Job 1 个
+定界结论: 代码问题 / 代码检查错误 — clang-format 格式检查不通过
+失败类型
+: 代码问题
+根因
+: pre-commit 检查项 clang-format 不通过, PR 变更文件
+math/reduce_prod/op_api/aclnn_prod.cpp
+存在格式问题, 被 clang-format 钩子自动修改("files were modified by this hook"), 门禁判定失败
+处置建议
+: 通知 PR 提交者修复——本地对变更文件执行 clang-format 格式化(或在仓库根目录执行
+pre-commit run --files math/reduce_prod/op_api/aclnn_prod.cpp
+), 提交格式化结果后重新推送触发流水线
+参考链接
+:
+本地执行 pre-commit 指导
+排除项
+: 同 Job 内其余检查项均通过(detect private key / codespell / OAT Compliance Check), ruff 无需检查文件; 非 CI 环境或平台问题, 重试无效
+失败根因分析
+根因 #1: 代码问题 / 代码检查错误 — clang-format 格式检查不通过
+判据
+: pre-commit 检查项不通过: clang-format(本地执行 pre-commit run clang-format 修复)
+定位步骤
+:
+3_precommit.log
+影响 Job
+: CodeCheck_precommit
+格式不合规文件
+:
+math/reduce_prod/op_api/aclnn_prod.cpp
+根因证据(日志原文)
+:
+[2026-09-28 19:29:27.459+08:00] clang-format.............................................................Failed
+[2026-09-28 19:29:27.460+08:00] - hook id: clang-format
+[2026-09-28 19:29:27.461+08:00] - files were modified by this hook
+[2026-09-28 19:29:27.463+08:00] Formatting [1/1] math/reduce_prod/op_api/aclnn_prod.cpp
+由门禁失败定界分析自动生成 | repo: ops-math | run: 33e3b1f8fa7b4f94865056218f14b6a6 | PR#6026
+Save
+Cancel
+CANN-robot
+Collaborators
+Sep 28
+Comments：
+Sep 28
+Comments：
+🚀 CI 流水线已启动
+📋 执行详情:
+点击查看流水线
+Save
+Cancel
+CANN-robot
+Collaborators
+Sep 28
+Removed label:
+ci-pipeline-failed
+Sep 28
+Removed label:
+ci-pipeline-failed
+CANN-robot
+Collaborators
+Sep 28
+Added label:
+ci-pipeline-running
+Sep 28
+Added label:
+ci-pipeline-running
+CANN-robot
+Collaborators
+Sep 28
+Removed label:
+ci-pipeline-running
+Sep 28
+Removed label:
+ci-pipeline-running
+CANN-robot
+Collaborators
+Sep 28
+Added label:
+ci-pipeline-passed
+Sep 28
+Added label:
+ci-pipeline-passed
+fitZepHYr
+Collaborators
+Sep 28
+Associated issue: [Bug-Report|缺陷反馈]: reduce prod bool输出时，产生精度问题
+Sep 28
+Associated issue: [Bug-Report|缺陷反馈]: reduce prod bool输出时，产生精度问题
+fitZepHYr
+Collaborators
+Sep 28
+Modify description of pull request
+Sep 28
+Modify description of pull request
+Y
+yue-ma
+Collaborators
+Sep 28
+Comments：
+Sep 28
+Comments：
+/lgtm
+/approve
+Save
+Cancel
+CANN-robot
+Collaborators
+Sep 28
+Added label:
+approved
+Sep 28
+Added label:
+approved
+TangPC
+Collaborators
+Sep 28
+Comments：
+Sep 28
+Comments：
+/lgtm
+/approve
+Save
+Cancel
+CANN-robot
+Collaborators
+Sep 28
+Added label:
+lgtm
+Sep 28
+Added label:
+lgtm
+CANN-robot
+Collaborators
+Sep 28
+Merged pull request
+Sep 28
+Merged pull request
+Merger
+Not assigned
+Approver
+Not assigned
+Tester
+Not assigned
+Reviewer
+Not assigned
+Label
+stat/needs-squash
+cann-cla/yes
+ci-pipeline-passed
+approved
+lgtm
+Milestones
+No related milestones
+Kanban
+No related boards
+Link Issue
+No related Issues

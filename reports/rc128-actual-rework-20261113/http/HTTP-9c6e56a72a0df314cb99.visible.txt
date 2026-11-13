@@ -1,0 +1,126 @@
+[Bug-Report|缺陷反馈]: RadixTopK未预留Ascend C API所需workspace导致精度问题-ops-math-AtomGit
+Star
+1755
+Fork
+1658
+Code
+Introduction
+Code
+Issues
+494
+Pull Requests
+577
+Pipeline
+Actions
+Discussion
+Wiki
+Members
+299
+Analysis
+Settings
+Star
+1755
+Fork
+1658
+Closed
+[Bug-Report|缺陷反馈]: RadixTopK未预留Ascend C API所需workspace导致精度问题
+#3007
+huang-wei-chen
+Add on
+Sep 2
+Closed at
+Sep 3
+H
+huang-wei-chen
+Collaborators
+Sep 2
+Create
+Sep 2
+Create
+Thanks for sending an issue! Please fill in the following template to help quickly solve your problem.
+一、问题描述 （必填）
+二、环境信息 （可选）
+910B，910_93
+三、重现步骤 （可选）
+import
+torch, torch_npu
+x = torch.randn(
+2
+,
+1210809681
+, dtype=torch.float16, device=
+"npu:0"
+)
+K =
+537222
+Dim = -
+1
+value_golden, index_golden = torch.topk(x.cpu(), dim=Dim, k=K,
+sorted
+=
+True
+, largest=
+True
+)
+value, index = torch.topk(x, dim=Dim, k=K,
+sorted
+=
+True
+, largest=
+True
+)
+print
+(
+f"isequal npu-cpu=
+{torch.equal(value.cpu(), velue_golden.cpu())}
+"
+)
+四、预期结果 （可选）
+预期精度正确
+💡 备注（选填）
+Save
+Cancel
+H
+huang-wei-chen
+Collaborators
+Sep 2
+Added label:
+bug-report
+Sep 2
+Added label:
+bug-report
+H
+huang-wei-chen
+Collaborators
+Sep 2
+Assign huang-wei-chen as responsible person
+Sep 2
+Assign huang-wei-chen as responsible person
+CANN-robot
+Collaborators
+Sep 3
+Close issue
+Sep 3
+Close issue
+CANN-robot
+Collaborators
+Sep 3
+Added label:
+resolved
+Sep 3
+Added label:
+resolved
+Assignees
+H
+huang-wei-chen
+Label
+bug-report
+resolved
+Kanban
+No board linked yet
+Milestones
+No related milestones
+Link PR
+No related PR
+Branch
+No branches linked yet

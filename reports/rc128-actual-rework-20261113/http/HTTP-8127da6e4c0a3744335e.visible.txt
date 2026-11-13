@@ -1,0 +1,319 @@
+/**
+ * Copyright (c) 2025 Huawei Technologies Co., Ltd.
+ * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
+ * CANN Open Software License Agreement Version 2.0 (the "License").
+ * Please refer to the License for details. You may not use this file except in compliance with the License.
+ * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
+ * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
+ * See LICENSE in the root of the software repository for the full text of the License.
+ */
+
+#include "aiv_communication_base_v2.h"
+
+using namespace AscendC;
+
+template <typename T>
+class AivAllGatherMesh1D : public AivCommBase {
+public:
+    __aicore__ inline AivAllGatherMesh1D() {}
+
+    // 如果让rankSize个核去写本地，写的时候切成多份去写
+    // 然后剩下的核，切成rankSize份，去读
+    // 需要知道写本地和读远端的时间比例，才可以调节怎么切分
+    __aicore__ inline void InitCoreInfo(uint64_t len) // len is input length
+    {
+        // 每个核处理 len/curStageCoreNum 个数据
+        uint64_t targetRank = blockIdx_;
+        uint64_t dataPerRank = len / rankSize_;
+        uint64_t remainderPerRank = len % rankSize_;
+        // 数据对不齐的情况
+        uint64_t innerDisplsPerRank = 0;
+        uint64_t sendCurCountPerRank = 0;
+        if (targetRank < remainderPerRank) { // 这部分核需要多处理一个数据
+            innerDisplsPerRank = targetRank * dataPerRank + targetRank;
+            sendCurCountPerRank = dataPerRank + 1;
+        } else {
+            innerDisplsPerRank = targetRank * dataPerRank + remainderPerRank;
+            sendCurCountPerRank = dataPerRank;
+        }
+
+        uint64_t dataPerCore = sendCurCountPerRank / cutNum;
+        uint64_t remainder = sendCurCountPerRank % cutNum;
+        // 这里是要切三分，还是直接一份，然后多个flag？
+        for (int64_t coreIndex = 0; coreIndex < cutNum; coreIndex++) {
+            // 数据对不齐的情况
+            uint64_t innerDispls = 0;
+            uint64_t sendCurCount = 0;
+            if (coreIndex < remainder) { // 这部分核需要多处理一个数据
+                innerDispls = coreIndex * dataPerCore + coreIndex;
+                sendCurCount = dataPerCore + 1;
+            } else {
+                innerDispls = coreIndex * dataPerCore + remainder;
+                sendCurCount = dataPerCore;
+            }
+
+            if (sendCurCount > 0) {
+                uint64_t usrInOffset = input_ + (innerDisplsPerRank + innerDispls) * sizeof(T);
+                uint64_t cclInOffset
+                    = reinterpret_cast<uint64_t>(myGmIn_) + (innerDisplsPerRank + innerDispls) * sizeof(T);
+                CpGM2GM((__gm__ T*)cclInOffset, (__gm__ T*)usrInOffset, sendCurCount);
+                AIV_INFO(
+                    "AG1D0020 blockIdx_=%u InitCoreInfo CpGM2GM done flag=%llu count=%llu\n", blockIdx_,
+                    (unsigned long long)(blockIdx_ * cutNum + coreIndex), (unsigned long long)sendCurCount);
+                // 每个核写flag
+                Record(rank_, blockIdx_ * cutNum + coreIndex, curTag_);
+                AIV_INFO(
+                    "AG1D0021 blockIdx_=%u InitCoreInfo Record done flag=%llu curTag_=%u\n", blockIdx_,
+                    (unsigned long long)(blockIdx_ * cutNum + coreIndex), curTag_);
+            }
+        }
+    }
+
+    __aicore__ inline void Run(uint64_t len, uint64_t stride)
+    {
+        uint64_t blockInedx = blockIdx_ - coreNumStage1;
+        // 然后stage2的核分成rankSize份，每一份有cutNum个核，每个核去读对端的rankSize份数据
+        uint32_t coreNumPerRank = coreNumStage2 / rankSize_;
+        uint32_t targetRank = blockInedx / coreNumPerRank;
+        uint32_t coreIndex = (blockInedx - (targetRank * coreNumPerRank)) % coreNumPerRank;
+        for (uint32_t idx = 0; idx < rankSize_; idx++) {
+            // 这里根据写数据时候的编排，去计算每次读数据时候的编排
+            uint64_t innerIndex
+                = (idx + rank_) % rankSize_; // 做一点偏移，不要出现好多张卡读同一块数据的情况，却似有一点点效果
+            uint64_t dataPerRank = len / rankSize_;
+            uint64_t remainderPerRank = len % rankSize_;
+            // 数据对不齐的情况
+            uint64_t innerDisplsPerRank = 0;
+            uint64_t sendCurCountPerRank = 0;
+            if (innerIndex < remainderPerRank) { // 这部分核需要多处理一个数据
+                innerDisplsPerRank = innerIndex * dataPerRank + innerIndex;
+                sendCurCountPerRank = dataPerRank + 1;
+            } else {
+                innerDisplsPerRank = innerIndex * dataPerRank + remainderPerRank;
+                sendCurCountPerRank = dataPerRank;
+            }
+
+            // 然后每个核分数据
+            uint64_t dataPerCore = sendCurCountPerRank / coreNumPerRank;
+            uint64_t remainder = sendCurCountPerRank % coreNumPerRank;
+            // 数据对不齐的情况
+            uint64_t innerDispls = 0;
+            uint64_t sendCurCount = 0;
+            if (coreIndex < remainder) { // 这部分核需要多处理一个数据
+                innerDispls = coreIndex * dataPerCore + coreIndex;
+                sendCurCount = dataPerCore + 1;
+            } else {
+                innerDispls = coreIndex * dataPerCore + remainder;
+                sendCurCount = dataPerCore;
+            }
+
+            if (sendCurCount > 0) {
+                // 先去wait flag，然后把数据拷贝过来
+                WaitFlag(targetRank, innerIndex * coreNumPerRank + coreIndex, curTag_);
+                AIV_INFO(
+                    "AG1D0030 blockIdx_=%u Run WaitFlag done targetRank=%u flag=%llu curTag_=%u\n", blockIdx_,
+                    targetRank, (unsigned long long)(innerIndex * coreNumPerRank + coreIndex), curTag_);
+
+                uint64_t srcCclInOffset
+                    = reinterpret_cast<uint64_t>(GetGmIn(targetRank)) + (innerDisplsPerRank + innerDispls) * sizeof(T);
+                uint64_t usrOutOffset = output_ + targetRank * stride + (innerDisplsPerRank + innerDispls) * sizeof(T);
+                CpGM2GM((__gm__ T*)usrOutOffset, (__gm__ T*)srcCclInOffset, sendCurCount);
+                AIV_INFO(
+                    "AG1D0031 blockIdx_=%u Run CpGM2GM done targetRank=%u innerIndex=%llu count=%llu\n", blockIdx_,
+                    targetRank, (unsigned long long)innerIndex, (unsigned long long)sendCurCount);
+                PipeBarrier<PIPE_ALL>();
+                AIV_INFO("AG1D0032 blockIdx_=%u Run PipeBarrier done targetRank=%u\n", blockIdx_, targetRank);
+            }
+        }
+    }
+
+    __aicore__ inline void Process(uint64_t count, uint64_t sliceId, uint64_t stride)
+    {
+        uint32_t rankMultiple = 2;
+        curTag_ = (static_cast<uint32_t>(tag_) << AIV_TAG_MOVE_RIGHT_BITS) | (sliceId & LOW_16_BITS);
+        if (count * sizeof(T) >= DATA_LIMIT && numBlocks_ >= rankMultiple * rankSize_) {
+            // 核数大于等于2倍ranksize
+            curStageCoreNum = numBlocks_ / rankSize_ * rankSize_; // 总的核数
+            coreNumStage1 = rankSize_;
+            coreNumStage2 = curStageCoreNum - coreNumStage1;
+            cutNum = coreNumStage2 / rankSize_;
+
+            if (blockIdx_ < coreNumStage1) {
+                InitCoreInfo(count);
+            } else if (blockIdx_ < curStageCoreNum) {
+                Run(count, stride);
+            }
+        } else {
+            // 核数小于ranksize
+            RunCtrlCore(count, stride);
+        }
+    }
+
+    __aicore__ inline void RunCtrlCore(uint64_t count, uint64_t stride)
+    {
+        int32_t curNumBlocks = numBlocks_;
+        // 核数小于ranksize
+        if (curNumBlocks > rankSize_) {
+            curNumBlocks = rankSize_;
+        }
+        // SK满核启动时，超出curNumBlocks的核不搬数据，只执行相同次数的SyncAll
+        bool coreIdle = blockIdx_ >= static_cast<uint32_t>(curNumBlocks);
+        // 分核把数据从input搬到gm
+        if (!coreIdle) {
+            auto input = reinterpret_cast<__gm__ T*>(input_);
+            uint64_t dataTypeSize = sizeof(T);
+            uint64_t countPerCore = count / curNumBlocks;
+            uint64_t curCountCore
+                = blockIdx_ == curNumBlocks - 1 ? count - countPerCore * (curNumBlocks - 1) : countPerCore;
+            auto gmIn = reinterpret_cast<__gm__ T*>(
+                reinterpret_cast<uint64_t>(myGmIn_) + blockIdx_ * countPerCore * dataTypeSize);
+            CpGM2GM(gmIn, input + blockIdx_ * countPerCore, curCountCore);
+            AIV_INFO(
+                "AG1D0040 blockIdx_=%u RunCtrlCore CpGM2GM input->gm done count=%llu\n", blockIdx_,
+                (unsigned long long)curCountCore);
+        }
+        SyncAll<true>();
+        AIV_INFO("AG1D0041 blockIdx_=%u RunCtrlCore SyncAll done\n", blockIdx_);
+
+        // 每个核分配多个rank搬运数据从gm到对端output
+        if (!coreIdle) {
+            uint32_t perCoreRankNum = rankSize_ / curNumBlocks;
+            uint32_t remainRankNum = rankSize_ % curNumBlocks;
+            uint32_t curCoreRankNum = blockIdx_ < remainRankNum ? perCoreRankNum + 1 : perCoreRankNum;
+            uint32_t startRank = blockIdx_ < remainRankNum ? (perCoreRankNum + 1) * blockIdx_ :
+                                                             perCoreRankNum * blockIdx_ + remainRankNum;
+            for (uint32_t rank = startRank; rank < startRank + curCoreRankNum; rank++) {
+                Record(rank, rank_, curTag_);
+                AIV_INFO(
+                    "AG1D0042 blockIdx_=%u RunCtrlCore Record ready done rank=%u curTag_=%u\n", blockIdx_, rank,
+                    curTag_);
+            }
+            for (uint32_t rank = startRank; rank < startRank + curCoreRankNum; rank++) {
+                auto gmOthers = reinterpret_cast<__gm__ T*>(reinterpret_cast<uint64_t>(GetGmIn(rank)));
+                auto output = reinterpret_cast<__gm__ T*>(output_ + rank * stride);
+                WaitFlag(rank_, rank, curTag_);
+                AIV_INFO(
+                    "AG1D0043 blockIdx_=%u RunCtrlCore WaitFlag ready done rank=%u curTag_=%u\n", blockIdx_, rank,
+                    curTag_);
+                CpGM2GM(output, gmOthers, count);
+                AIV_INFO(
+                    "AG1D0044 blockIdx_=%u RunCtrlCore CpGM2GM done rank=%u count=%llu\n", blockIdx_, rank,
+                    (unsigned long long)count);
+                PipeBarrier<PIPE_ALL>();
+                AIV_INFO("AG1D0045 blockIdx_=%u RunCtrlCore PipeBarrier done rank=%u\n", blockIdx_, rank);
+                Record(rank, rank_ + rankSize_, curTag_);
+                AIV_INFO(
+                    "AG1D0046 blockIdx_=%u RunCtrlCore Record consumed done rank=%u curTag_=%u\n", blockIdx_, rank,
+                    curTag_);
+            }
+            for (uint32_t rank = startRank; rank < startRank + curCoreRankNum; rank++) {
+                WaitFlag(rank_, rank + rankSize_, curTag_);
+                AIV_INFO(
+                    "AG1D0047 blockIdx_=%u RunCtrlCore WaitFlag consumed done rank=%u curTag_=%u\n", blockIdx_, rank,
+                    curTag_);
+            }
+        }
+    }
+
+    uint64_t coreOffset;
+    uint64_t curCount;
+    uint64_t coreNumStage1;
+    uint64_t coreNumStage2;
+    uint64_t cutNum;
+    uint64_t curStageCoreNum;
+};
+
+template <typename T>
+__aicore__ inline void AivAllGatherV2Mesh1D(KERNEL_ARGS_DEF)
+{
+    AivAllGatherMesh1D<T> op;
+    bool pingpong = false;
+    if (len * sizeof(T) <= DATA_LIMIT && rankSize * len * sizeof(T) <= PINGPONG_TOTAL_DATA_LIMIT) {
+        pingpong = true;
+    }
+    op.Init(KERNEL_CLASS_INIT, true, pingpong);
+    if (op.blockIdx_ == 0) {
+        AIV_INFO(
+            "AG1D0000 entry rank_=%u rankSize_=%u numBlocks_=%d len=%llu tag_=%u sliceId=%u pingpong=%d\n", op.rank_,
+            op.rankSize_, op.numBlocks_, (unsigned long long)len, op.tag_, sliceId, pingpong ? 1 : 0);
+    }
+    if (op.IsFirstOP(sliceId)) {
+        op.BarrierForFirstOP();
+        AIV_INFO("AG1D0001 blockIdx_=%u BarrierForFirstOP done\n", op.blockIdx_);
+    }
+    op.Process(len, sliceId, outputSliceStride);
+    AIV_INFO("AG1D0005 blockIdx_=%u Process done\n", op.blockIdx_);
+    if (!pingpong) {
+        op.BarrierAll();
+        AIV_INFO("AG1D0006 blockIdx_=%u BarrierAll done\n", op.blockIdx_);
+    }
+}
+
+template <typename T>
+__aicore__ inline void AivAllGatherV2Mesh1DSuperKernel(SUPERKERNEL_ARGS_DEF)
+{
+    AivAllGatherMesh1D<T> op;
+    op.Init(SUPERKERNEL_CLASS_INIT, false);
+    uint64_t maxCountPerLoop = op.cclBufferSize_ / UB_ALIGN_SIZE * UB_ALIGN_SIZE / op.rankSize_ / sizeof(T);
+    uint64_t countLeft = op.len_;
+
+    int32_t loopTag = op.tag_;
+
+    if (op.blockIdx_ == 0) {
+        AIV_INFO(
+            "AG1D1000 SK entry rank_=%u rankSize_=%u numBlocks_=%d len_=%llu tag_=%u maxCountPerLoop=%llu\n", op.rank_,
+            op.rankSize_, op.numBlocks_, (unsigned long long)op.len_, op.tag_, (unsigned long long)maxCountPerLoop);
+    }
+
+    while (countLeft > 0) {
+        uint64_t curCount = (countLeft > maxCountPerLoop) ? maxCountPerLoop : countLeft;
+        uint64_t curSize = curCount * sizeof(T);
+
+        if (op.blockIdx_ == 0) {
+            AIV_INFO(
+                "AG1D1010 SK loop curCount=%llu countLeft=%llu loopTag=%d\n", (unsigned long long)curCount,
+                (unsigned long long)countLeft, loopTag);
+        }
+
+        op.Process(curCount, loopTag, op.outputSliceStride_);
+        op.BarrierAll();
+        if (op.blockIdx_ == 0) {
+            AIV_INFO("AG1D1011 SK loop BarrierAll done loopTag=%d\n", loopTag);
+        }
+        countLeft -= curCount;
+        op.input_ += curSize;
+        op.output_ += curSize;
+        loopTag += curSize / UB_DB_DATA_BATCH_SIZE + 1;
+    }
+    if (op.blockIdx_ == 0) {
+        AIV_INFO("AG1D1090 SK exit rank_=%u\n", op.rank_);
+    }
+}
+
+__aicore__ inline void sk_ag_mesh_1d(SUPERKERNEL_ARGS_DEF)
+{
+#ifdef HCCL_DTYPE_INT8
+    AivAllGatherV2Mesh1DSuperKernel<int8_t>(SUPERKERNEL_ARGS_CALL);
+#elif defined HCCL_DTYPE_UINT8
+    AivAllGatherV2Mesh1DSuperKernel<uint8_t>(SUPERKERNEL_ARGS_CALL);
+#elif defined HCCL_DTYPE_INT16
+    AivAllGatherV2Mesh1DSuperKernel<int16_t>(SUPERKERNEL_ARGS_CALL);
+#elif defined HCCL_DTYPE_UINT16
+    AivAllGatherV2Mesh1DSuperKernel<uint16_t>(SUPERKERNEL_ARGS_CALL);
+#elif defined HCCL_DTYPE_INT32
+    AivAllGatherV2Mesh1DSuperKernel<int32_t>(SUPERKERNEL_ARGS_CALL);
+#elif defined HCCL_DTYPE_UINT32
+    AivAllGatherV2Mesh1DSuperKernel<uint32_t>(SUPERKERNEL_ARGS_CALL);
+#elif defined HCCL_DTYPE_FP16
+    AivAllGatherV2Mesh1DSuperKernel<half>(SUPERKERNEL_ARGS_CALL);
+#elif defined HCCL_DTYPE_FP32
+    AivAllGatherV2Mesh1DSuperKernel<float>(SUPERKERNEL_ARGS_CALL);
+#elif defined HCCL_DTYPE_BFP16
+    AivAllGatherV2Mesh1DSuperKernel<bfloat16_t>(SUPERKERNEL_ARGS_CALL);
+#elif defined HCCL_DTYPE_INT64
+    AivAllGatherV2Mesh1DSuperKernel<int64_t>(SUPERKERNEL_ARGS_CALL);
+#elif defined HCCL_DTYPE_UINT64
+    AivAllGatherV2Mesh1DSuperKernel<uint64_t>(SUPERKERNEL_ARGS_CALL);
+#else
+#endif
+}

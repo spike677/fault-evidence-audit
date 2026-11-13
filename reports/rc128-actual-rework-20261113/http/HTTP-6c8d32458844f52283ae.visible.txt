@@ -1,0 +1,902 @@
+修复SFAG同步问题与潜在风险【商分】-ops-transformer-AtomGit
+Star
+1681
+Fork
+3393
+Code
+Introduction
+Code
+Issues
+430
+Pull Requests
+724
+Pipeline
+Actions
+Discussion
+Wiki
+Members
+620
+Analysis
+Settings
+Star
+1681
+Fork
+3393
+Merged
+修复SFAG同步问题与潜在风险【商分】
+#8443
+yf_zhou
+Add on
+Jul 8
+Merged from
+hz36amy_00/ops-transformer：
+sfag-0708-9.1
+into
+cann/ops-transformer：
+9.1.0
+修复SFAG同步问题与潜在风险【商分】
+#8443
+Merged
+yf_zhou
+Add on
+Jul 8
+Merged from
+hz36amy_00/ops-transformer
+sfag-0708-9.1
+into
+cann/ops-transformer
+9.1.0
+Merge checks
+Discussion
+0
+Commits
+0
+Checks
+0
+Files changed
+0
+Clone/Download
+0
+yf_zhou
+Collaborators
+Jul 8
+Jul 8
+描述
+1、修复
+runInfo
+中
+scatterTmpK/VMte2WaitV
+eventId未赋值导致的偶现卡死问题
+2、修复tilingdata字段未对齐潜在风险
+3、修复性能优化分支下
+NzToNd
+MTE3->V的同步，提升性能
+关联的Issue
+测试
+文档更新
+类型标签
+🐛 Bug修复
+✨ 新特性
+⚡ 性能优化
+♻️ 重构
+🧪 测试
+📦 构建/CI
+🔧 配置变更
+📝 文档更新
+⬆️ 依赖升级
+🔒 安全修复
+🧹 代码清理
+❓ 其他，请描述：
+Save
+Cancel
+Pull Request has been successfully merged by CANN-robot.
+（Thank you for yf_zhou's contribution.）
+yf_zhou
+Collaborators
+Jul 8
+Created pull request, commit
+6a1ac0fb
+Jul 8
+Created pull request, commit
+6a1ac0fb
+atomgit-bot
+Jul 8
+Comments：
+Jul 8
+Comments：
+变更摘要
+本次变更主要修复 Sparse Flash Attention 反向算子中的同步问题与潜在整数溢出风险。具体包括：修正
+ScatterAddUnDeter
+中散加操作的同步等待逻辑，将
+NzToNd
+函数内的事件等待控制参数化并移除冗余的外部等待；将多个 tiling 数据字段从
+uint32_t
+拓宽为
+uint64_t
+以防止大维度场景下的溢出；并为
+UpdateGmOffset
+补充缺失的 scatter 临时事件字段赋值，确保 ping-pong 同步机制正确运转。
+主要改动
+NzToNd
+事件同步逻辑修正
+：将函数参数
+isDk
+重命名为
+isBackEvent
+，并在
+ScatterAddUnDeter
+中移除调用
+NzToNd
+之前的
+WaitFlag<HardEvent::MTE3_V>(backEvent)
+，改为通过参数
+!KV_MERGE
+和
+KV_MERGE
+在
+NzToNd
+内部按需等待
+backEvent
+，避免了 dv/dk 两条路径上不恰当的串行等待。
+Tiling 字段宽度扩展
+：将
+qPostBaseNum
+、
+qPostTailNum
+、
+kPostBlockFactor
+、
+kPostBaseNum
+、
+kPostTailNum
+、
+vPostBlockFactor
+、
+vPostBaseNum
+、
+vPostTailNum
+共 8 个字段从
+uint32_t
+改为
+uint64_t
+，消除大维度切分时的整数溢出风险。
+Tiling 数据布局调整
+：新增
+kvMerge
+字段（
+uint32_t
+）并插入到
+castUsedCoreNum
+之后，同时在末尾增加 6 字节的预留数组
+rsv
+（
+bool[6]
+），保证 tiling 结构的内存布局兼容性。
+UpdateGmOffset
+缺失字段补齐
+：在
+sparse_flash_attention_grad_bs1_basic.h
+的
+UpdateGmOffset
+函数中补充
+scatterTmpKMte2WaitV
+、
+scatterTmpVMte2WaitV
+及其 Pong 版本的赋值，确保 scatter 阶段 ping-pong 同步事件信息正确传递至
+RunInfo
+。
+Save
+Cancel
+Incorrect?
+CANN-robot
+Collaborators
+Jul 8
+Added label:
+cann-cla/yes
+Jul 8
+Added label:
+cann-cla/yes
+CANN-robot
+Collaborators
+Jul 8
+Comments：
+Jul 8
+Comments：
+CLA Signature Pass
+hz36amy_00, thanks for your pull request. All authors of the commits have signed the CLA. 👍
+Save
+Cancel
+CANN-robot
+Collaborators
+Jul 8
+Comments：
+Jul 8
+Comments：
+Thanks for your pull-request.
+The full list of commands accepted by me can be found at
+here
+。
+You can get sig-info at
+here
+PR Approval Progress
+✅
+Congratulations! All modules have met the lgtm and approve requirements.
+Module Approval Details
+module
+lgtm status
+approve status
+**
+✅
+gcw_kUomxQ2l
+,
+黄俊健
+(2/2)
+✅
+gcw_kUomxQ2l
+(1/1)
+💡 Tip:
+Committer
+can comment
+/approve
+or
+/lgtm
+Commenting
+/approve
+implies both code review (lgtm) and intent to merge (approve)
+CLA Signature Pass
+hz36amy_00, thanks for your pull request. All authors of the commits have signed the CLA. 👍
+Save
+Cancel
+CANN-robot
+Collaborators
+Jul 8
+Set monologue815,jiang-lirui,Allan_Yu,liudan12,mabing1118,gcw_kUomxQ2l,Andy-lb as approver
+Jul 8
+Set monologue815,jiang-lirui,Allan_Yu,liudan12,mabing1118,gcw_kUomxQ2l,Andy-lb as approver
+CANN-robot
+Collaborators
+Jul 8
+Set gcw_kUomxQ2l,Andy-lb as approver
+Jul 8
+Set gcw_kUomxQ2l,Andy-lb as approver
+yf_zhou
+Collaborators
+Jul 8
+Comments：
+Jul 8
+Comments：
+compile
+Save
+Cancel
+yf_zhou
+Collaborators
+Jul 8
+Pre merge succeeded (commit_id: ebee3ff8077c5f33da9e93348e0d00d911148b70)
+Jul 8
+Pre merge succeeded (commit_id: ebee3ff8077c5f33da9e93348e0d00d911148b70)
+CANN-robot
+Collaborators
+Jul 8
+Added label:
+ci-pipeline-running
+Jul 8
+Added label:
+ci-pipeline-running
+CANN-robot
+Collaborators
+Jul 8
+Comments：
+Jul 8
+Comments：
+流水线任务触发成功
+任务链接 [
+cd5bb16ab3394399a42780bec875837e
+][
+流水线指导
+]
+任务名称
+状态
+日志
+下载链接
+Compile_Ascend_X86
+✅ SUCCESS
+>>>>>
+>>>>>
+Compile_Ascend_ARM
+✅ SUCCESS
+>>>>>
+>>>>>
+Compile_Ascend_X86_mobile_station
+✅ SUCCESS
+>>>>>
+>>>>>
+Compile_Ascend_X86_experimental
+✅ SUCCESS
+>>>>>
+>>>>>
+Compile_Ascend_ARM_experimental
+✅ SUCCESS
+>>>>>
+>>>>>
+Compile_Pre
+✅ SUCCESS
+>>>>>
+pre_comment
+✅ SUCCESS
+>>>>>
+Compile_X86_monitor_910b
+✅ SUCCESS
+>>>>>
+>>>>>
+Compile_X86_monitor_910c
+✅ SUCCESS
+>>>>>
+>>>>>
+Compile_X86_monitor_950
+✅ SUCCESS
+>>>>>
+>>>>>
+Compile_Ascend_X86_experimental_950
+✅ SUCCESS
+>>>>>
+>>>>>
+Compile_Ascend_ARM_experimental_950
+✅ SUCCESS
+>>>>>
+>>>>>
+Compile_harmony-infer-chs-transformer
+✅ SUCCESS
+>>>>>
+Compile_harmony-infer-chs-transformer-1
+✅ SUCCESS
+>>>>>
+UT_Test
+✅ SUCCESS
+PreSmoke_A900
+✅ SUCCESS
+>>>>>
+PreSmoke_ATK_Test_A2
+✅ SUCCESS
+>>>>>
+[2026-07-08 11:11:04]    CI执行结束
+Save
+Cancel
+CANN-robot
+Collaborators
+Jul 8
+Comments：
+Jul 8
+Comments：
+流水线任务触发成功
+任务链接 [
+960ca2a37b2848afa7a8774c2cd7ed6d
+][
+流水线指导
+]
+任务名称
+状态
+日志
+下载链接
+codecheck
+❌ FAILED
+>>>>>
+SCA
+✅ SUCCESS
+>>>>>
+antipoison
+✅ SUCCESS
+>>>>>
+codecheck_style
+✅ SUCCESS
+>>>>>
+StaticCheck_codespell_check
+✅ SUCCESS
+StaticCheck_link_validity_check
+✅ SUCCESS
+StaticCheck_resource_existence_check
+✅ SUCCESS
+StaticCheck_tag_closed_check
+✅ SUCCESS
+StaticCheck_markdownlint
+✅ SUCCESS
+codecheck_checkpr
+✅ SUCCESS
+codecheck_precommit
+⚠️ WARNING
+>>>>>
+>>>>>
+Save
+Cancel
+CANN-robot
+Collaborators
+Jul 8
+Removed label:
+ci-pipeline-running
+Jul 8
+Removed label:
+ci-pipeline-running
+5 event messages are collapsed here。
+See more
+CANN-robot
+Collaborators
+Jul 8
+Set gitcode-chenjiao as approver
+Jul 8
+Set gitcode-chenjiao as approver
+yf_zhou
+Collaborators
+Jul 8
+Comments：
+Jul 8
+Comments：
+compile
+Save
+Cancel
+yf_zhou
+Collaborators
+Jul 8
+Pre merge succeeded (commit_id: bf9c979a5b05b28fbbc573687c64a309014b0f42)
+Jul 8
+Pre merge succeeded (commit_id: bf9c979a5b05b28fbbc573687c64a309014b0f42)
+CANN-robot
+Collaborators
+Jul 8
+Removed label:
+ci-pipeline-failed
+Jul 8
+Removed label:
+ci-pipeline-failed
+CANN-robot
+Collaborators
+Jul 8
+Added label:
+ci-pipeline-running
+Jul 8
+Added label:
+ci-pipeline-running
+CANN-robot
+Collaborators
+Jul 8
+Comments：
+Jul 8
+Comments：
+流水线任务触发成功
+任务链接 [
+7a0f73edc6aa4e26b0e0421034d7d388
+][
+流水线指导
+]
+任务名称
+状态
+日志
+下载链接
+Compile_Ascend_X86
+✅ SUCCESS
+>>>>>
+>>>>>
+Compile_Ascend_ARM
+✅ SUCCESS
+>>>>>
+>>>>>
+Compile_Ascend_X86_mobile_station
+✅ SUCCESS
+>>>>>
+>>>>>
+Compile_Ascend_X86_experimental
+✅ SUCCESS
+>>>>>
+>>>>>
+Compile_Ascend_ARM_experimental
+✅ SUCCESS
+>>>>>
+>>>>>
+Compile_Pre
+✅ SUCCESS
+>>>>>
+pre_comment
+✅ SUCCESS
+>>>>>
+Compile_X86_monitor_910b
+✅ SUCCESS
+>>>>>
+>>>>>
+Compile_X86_monitor_910c
+✅ SUCCESS
+>>>>>
+>>>>>
+Compile_X86_monitor_950
+✅ SUCCESS
+>>>>>
+>>>>>
+Compile_Ascend_X86_experimental_950
+✅ SUCCESS
+>>>>>
+>>>>>
+Compile_Ascend_ARM_experimental_950
+✅ SUCCESS
+>>>>>
+>>>>>
+Compile_harmony-infer-chs-transformer
+✅ SUCCESS
+>>>>>
+Compile_harmony-infer-chs-transformer-1
+✅ SUCCESS
+>>>>>
+UT_Test
+❌ FAILED
+Save
+Cancel
+CANN-robot
+Collaborators
+Jul 8
+Comments：
+Jul 8
+Comments：
+流水线任务触发成功
+任务链接 [
+5b0bc43979284b3187d9532f13acb664
+][
+流水线指导
+]
+任务名称
+状态
+日志
+下载链接
+codecheck
+✅ SUCCESS
+>>>>>
+SCA
+✅ SUCCESS
+>>>>>
+antipoison
+✅ SUCCESS
+>>>>>
+codecheck_style
+✅ SUCCESS
+>>>>>
+StaticCheck_codespell_check
+✅ SUCCESS
+StaticCheck_link_validity_check
+✅ SUCCESS
+StaticCheck_resource_existence_check
+✅ SUCCESS
+StaticCheck_tag_closed_check
+✅ SUCCESS
+StaticCheck_markdownlint
+✅ SUCCESS
+codecheck_checkpr
+✅ SUCCESS
+codecheck_precommit
+⚠️ WARNING
+>>>>>
+>>>>>
+[2026-07-08 14:17:13]    CI执行结束
+Save
+Cancel
+yf_zhou
+Collaborators
+Jul 8
+Pre merge succeeded (commit_id: faddccc60f0542c35cd6b97417af14d96c618f40)
+Jul 8
+Pre merge succeeded (commit_id: faddccc60f0542c35cd6b97417af14d96c618f40)
+yf_zhou
+Collaborators
+Jul 8
+Force-pushed 1 commits:
+8946df02
+-fix SFAG synchronize
+Jul 8
+Force-pushed 1 commits:
+8946df02
+-fix SFAG synchronize
+yf_zhou
+Collaborators
+Jul 8
+Pre merge succeeded (commit_id: f91f8bab0c57815a80c97787ff998c921943d9a5)
+Jul 8
+Pre merge succeeded (commit_id: f91f8bab0c57815a80c97787ff998c921943d9a5)
+yf_zhou
+Collaborators
+Jul 8
+Comments：
+Jul 8
+Comments：
+compile
+Save
+Cancel
+yf_zhou
+Collaborators
+Jul 8
+Pre merge succeeded (commit_id: 43c7f339b652f6d2962a819057d94abd6291ba89)
+Jul 8
+Pre merge succeeded (commit_id: 43c7f339b652f6d2962a819057d94abd6291ba89)
+CANN-robot
+Collaborators
+Jul 8
+Removed label:
+ci-pipeline-running
+Jul 8
+Removed label:
+ci-pipeline-running
+CANN-robot
+Collaborators
+Jul 8
+Added label:
+ci-pipeline-running
+Jul 8
+Added label:
+ci-pipeline-running
+CANN-robot
+Collaborators
+Jul 8
+Comments：
+Jul 8
+Comments：
+流水线任务触发成功
+任务链接 [
+37cac6f3ea2d4328aa0217926055d6bf
+][
+流水线指导
+]
+任务名称
+状态
+日志
+下载链接
+Compile_Ascend_X86
+✅ SUCCESS
+>>>>>
+>>>>>
+Compile_Ascend_ARM
+✅ SUCCESS
+>>>>>
+>>>>>
+Compile_Ascend_X86_mobile_station
+✅ SUCCESS
+>>>>>
+>>>>>
+Compile_Ascend_X86_experimental
+✅ SUCCESS
+>>>>>
+>>>>>
+Compile_Ascend_ARM_experimental
+✅ SUCCESS
+>>>>>
+>>>>>
+Compile_Pre
+✅ SUCCESS
+>>>>>
+pre_comment
+✅ SUCCESS
+>>>>>
+Compile_X86_monitor_910b
+✅ SUCCESS
+>>>>>
+>>>>>
+Compile_X86_monitor_910c
+✅ SUCCESS
+>>>>>
+>>>>>
+Compile_X86_monitor_950
+✅ SUCCESS
+>>>>>
+>>>>>
+Compile_Ascend_X86_experimental_950
+✅ SUCCESS
+>>>>>
+>>>>>
+Compile_Ascend_ARM_experimental_950
+✅ SUCCESS
+>>>>>
+>>>>>
+Compile_harmony-infer-chs-transformer
+✅ SUCCESS
+>>>>>
+Compile_harmony-infer-chs-transformer-1
+✅ SUCCESS
+>>>>>
+UT_Test
+✅ SUCCESS
+PreSmoke_A900
+✅ SUCCESS
+>>>>>
+PreSmoke_ATK_Test_A2
+✅ SUCCESS
+>>>>>
+[2026-07-08 14:35:59]    CI执行结束
+Save
+Cancel
+CANN-robot
+Collaborators
+Jul 8
+Comments：
+Jul 8
+Comments：
+流水线任务触发成功
+任务链接 [
+faa8753a1c4345e9aa1b85e595f96f25
+][
+流水线指导
+]
+任务名称
+状态
+日志
+下载链接
+codecheck
+✅ SUCCESS
+>>>>>
+SCA
+✅ SUCCESS
+>>>>>
+antipoison
+✅ SUCCESS
+>>>>>
+codecheck_style
+✅ SUCCESS
+>>>>>
+StaticCheck_codespell_check
+✅ SUCCESS
+StaticCheck_link_validity_check
+✅ SUCCESS
+StaticCheck_resource_existence_check
+✅ SUCCESS
+StaticCheck_tag_closed_check
+✅ SUCCESS
+StaticCheck_markdownlint
+✅ SUCCESS
+codecheck_checkpr
+✅ SUCCESS
+codecheck_precommit
+⚠️ WARNING
+>>>>>
+>>>>>
+[2026-07-08 14:26:17]    CI执行结束
+Save
+Cancel
+yf_zhou
+Collaborators
+Jul 8
+Modify description of pull request
+Jul 8
+Modify description of pull request
+CANN-robot
+Collaborators
+Jul 8
+Removed label:
+ci-pipeline-running
+Jul 8
+Removed label:
+ci-pipeline-running
+CANN-robot
+Collaborators
+Jul 8
+Added label:
+ci-pipeline-passed
+Jul 8
+Added label:
+ci-pipeline-passed
+yf_zhou
+Collaborators
+Jul 8
+Associated issue: [Bug-Report|缺陷反馈]: SFAG算子偶现卡死问题
+Jul 8
+Associated issue: [Bug-Report|缺陷反馈]: SFAG算子偶现卡死问题
+L
+liulun0308
+Collaborators
+Jul 8
+Comments：
+Jul 8
+Comments：
+/approve
+Save
+Cancel
+CANN-robot
+Collaborators
+Jul 8
+Added label:
+approved
+Jul 8
+Added label:
+approved
+W
+wang-minbo
+Collaborators
+Jul 8
+Comments：
+Jul 8
+Comments：
+/lgtm
+/approve
+Save
+Cancel
+CANN-robot
+Collaborators
+Jul 8
+Comments：
+Jul 8
+Comments：
+The following users do not have permission to comment
+/lgtm
+or
+/approve
+on any module in this PR:
+wang-minbo
+Save
+Cancel
+CANN-robot
+Collaborators
+Jul 8
+Comments：
+Jul 8
+Comments：
+The following users do not have permission to comment
+/lgtm
+or
+/approve
+on any module in this PR:
+wang-minbo
+Save
+Cancel
+M
+monologue815
+Collaborators
+Jul 8
+Comments：
+Jul 8
+Comments：
+/lgtm
+Save
+Cancel
+CANN-robot
+Collaborators
+Jul 8
+Comments：
+Jul 8
+Comments：
+The following users do not have permission to comment
+/lgtm
+or
+/approve
+on any module in this PR:
+wang-minbo
+Save
+Cancel
+CANN-robot
+Collaborators
+Jul 8
+Added label:
+lgtm
+Jul 8
+Added label:
+lgtm
+CANN-robot
+Collaborators
+Jul 8
+Closed associated issue
+Jul 8
+Closed associated issue
+CANN-robot
+Collaborators
+Jul 8
+Merged pull request
+Jul 8
+Merged pull request
+Merger
+Not assigned
+Approver
+Not assigned
+Tester
+Not assigned
+Reviewer
+Not assigned
+Label
+cann-cla/yes
+ci-pipeline-passed
+approved
+lgtm
+Milestones
+No related milestones
+Kanban
+No related boards
+Link Issue
+No related Issues

@@ -1,0 +1,1082 @@
+[
+  {
+    "job_id": "RC-064-GH-ISSUE",
+    "task_ids": [
+      "RC-064"
+    ],
+    "kind": "SEARCH",
+    "resource_type": "ISSUE",
+    "round": 1,
+    "tool": "mcp__codex_apps__github_search_issues",
+    "args": {
+      "repository_full_name": "vllm-project/vllm-ascend",
+      "query": "FLA decode state is:issue",
+      "topn": 3
+    },
+    "checked_at": "2026-11-13T02:33:31.755Z",
+    "response": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Action completed."
+        }
+      ],
+      "structuredContent": {
+        "issues": [
+          {
+            "url": "https://github.com/vllm-project/vllm-ascend/issues/21366",
+            "title": "GDN (Qwen3.5/linear-attention) decode kernels dominate step time at small batch on Ascend 950DT: RecurrentGatedDeltaRule ~180us/layer plus multi-ms stable argsort/cumsum in gdn_attn_builder",
+            "issue_number": 21366,
+            "body": "### Environment\n\n- vLLM-Ascend: v0.30.0-a5 image (CANN 9.2.1, torch_npu 2.10.0.post7)\n- Hardware: Ascend 950DT (8x96GB HBM)\n- Model: Qwen3.8-27B w8a8c8-mxfp8 (hybrid: 48x GDN/linear-attention layers + 16x full attention), MTP spec decode k=3, DP=7 TP=1, max-num-seqs=32, mxfp8 KV cache\n\n### What happens\n\nAt saturation (256 concurrent decode requests, 32 per DP rank), torch_npu profiler (kernel_details.csv) shows the decode step is dominated by GDN-related kernels, far above their arithmetic needs:\n\n| kernel | profiled time per decode step | note |\n|---|---|---|\n| RecurrentGatedDeltaRule | ~8.7 ms | 48 layers, ~181us per layer per step |\n| aclnnCumsum | ~8.4 ms | two tiny cumsums in gdn_attn_builder mixed-branch (prefill+decode batch) |\n| Sort (stable argsort) | ~2.5 ms | same builder branch |\n\nFor comparison, all w8a8 QuantMatmul work (27GB weights read per step) is ~11.9 ms — i.e. the GDN state scan + builder index ops together exceed the entire weight-traffic floor of the model at this batch size.\n\nThe builder sort/cumsum ops run on the update stream and are overlapped with the verify forward, so they are not directly binding, but the RecurrentGatedDeltaRule kernel sits on the critical path.\n\n### Ask\n\n1. Is there a fused or tiled variant of RecurrentGatedDeltaRule planned for small-batch decode (B<=128 tokens/step)? ~180us per layer looks like fixed-launch overhead dominating rather than state-scan arithmetic.\n2. The gdn_attn_builder mixed branch (prefill+decode in one step) does stable argsort + cumsums on device to partition spec/non-spec tokens. Since these tensors are tiny (<=128 rows), a CPU/numpy path with async H2D copy is feasible (we tested a patch: correctness OK, no throughput change because the ops overlap anyway, but it would free update-stream bandwidth).\n3. Any known plan for GDN kernel improvements on 950DT / CANN 9.2.1+?\n\nHappy to share kernel_details.csv excerpts or a repro config.",
+            "state": null,
+            "user": null,
+            "assignees": null,
+            "labels": null,
+            "milestone": null,
+            "state_reason": null,
+            "comments": null,
+            "created_at": null,
+            "updated_at": null,
+            "closed_at": null,
+            "display_url": "https://github.com/vllm-project/vllm-ascend/issues/21366",
+            "display_title": "GDN (Qwen3.5/linear-attention) decode kernels dominate step time at small batch on Ascend 950DT: RecurrentGatedDeltaRule ~180us/layer plus multi-ms stable argsort/cumsum in gdn_attn_builder"
+          },
+          {
+            "url": "https://github.com/vllm-project/vllm-ascend/issues/17837",
+            "title": "[Bug]: Qwen3.5 MTP3 structured output corruption from ragged GDN state indexing",
+            "issue_number": 17837,
+            "body": "### Your current environment\n\nReproduced on Ascend A3 (ascend910_93), with one NPU for the weight-free operator reproducer and TP16 + EP for the Qwen3.5 service investigation.\n\n| Component | Investigated version |\n| --- | --- |\n| vLLM | v0.26.0, 568afb3a13806beb53bb2e6bd518269357b237c0 |\n| vLLM-Ascend release | v0.26.0rc1, f2f74a16c3c50a76f4349d807918e83edec1e35c |\n| PyTorch / torch_npu | 2.10.0+cpu / 2.10.0.post4 |\n| CANN / driver | 9.1.0 B243 / 25.5.0 |\n| XGrammar | 0.2.8 |\n| Service checkpoint | Qwen3.5-397B-A17B-W8A8-MTP |\n| Service configuration | MTP3, TP16 + EP, FULL_DECODE_ONLY, synchronous scheduling, prefix caching; effective Mamba cache mode align |\n\n### Describe the bug\n\nConcurrent Qwen3.5 structured-output requests can produce malformed JSON, incorrect fields, repetitive fragments, or run to max_tokens while MTP3 is enabled. The trigger is a batch with different actual verification lengths, which can occur when grammar validation trims different numbers of draft tokens for different requests.\n\nThe local service investigation observed wrong fruit-list contents, invalid punctuation, unrelated generated text, repetition, and length-limit finishes. The one-NPU reproducer below isolates an exact cross-request state-indexing error without a model, tokenizer, grammar engine, or distributed execution.\n\n### Impact scope\n\n| Scope | Assessment and evidence |\n| --- | --- |\n| Confirmed release defect | Reproduced with an independently rebuilt original v0.26.0rc1 recurrent operator on A3. The affected operator, caller, and metadata-builder code is also unchanged at releases/v0.26.0rc commit d3e4c109bf5c02041ad3c781f38f7f8651012d60. |\n| Current main | The same state-addressing failure is reproduced on A3 using the exact FLA version pinned by main at 875e5654189a2e02c1eed1e550279fb1ded06798; details below. |\n| Models | Qwen3.5-397B is the observed service case. Other GDN models using the same speculative caller/operator contract are potentially affected; this report does not claim model-level reproduction for every GDN model. Ordinary full-attention models do not use this specific recurrent-state path. |\n| Trigger | A fixed [B, K+1] state table is indexed as though rows were packed by current query lengths. Cross-request contamination requires multiple rows and an earlier row shorter than K+1. Independently, previous accepted count greater than current query length can affect a single request. Fully trimmed drafts also require correct history selection. |\n| Structured output and speculative depth | MTP3 plus grammar-trimmed drafts is the observed configuration. The indexing error is not specific to JSON/XGrammar and can be reached by other sources of variable verification lengths. Other speculative depths need their own service validation. |\n| Hardware / execution | The operator defect is reproduced on one A3 NPU, so TP16, EP, and multi-node communication are not necessary. A2/A5/310P are not claimed as hardware-reproduced. The failure occurs in eager operator execution as well as being reachable from graph-based serving. |\n| Dtype / checkpoint | The standalone reproducer uses BF16 Q/K/V and FP32 recurrent state, without quantized weights. It is therefore not dependent on W8A8 quantization. The original BF16 full-model incident has not been replayed because the checkpoint and exact pins were unavailable. |\n\nAn all-full-width batch does not expose the row-offset mismatch; an equal-length [4,4] control passes. This does not establish that every equal-length or no-draft transition is safe, because previous accepted-state selection is a separate condition.\n\n### Does current main have the same problem?\n\nYes, at the operator/caller-contract level checked on September 30, 2026. The checked main commit is 875e5654189a2e02c1eed1e550279fb1ded06798 (commit time 2026-09-30 07:29:39 UTC).\n\nMain has moved recurrent GDN to the external FLA package, so the old in-repository kernel is no longer the active implementation. However:\n\n1. [Main GDN caller](https://github.com/vllm-project/vllm-ascend/blob/875e5654189a2e02c1eed1e550279fb1ded06798/vllm_ascend/ops/gdn.py#L550-L566) still passes spec_state_indices_tensor.flatten(). Its [metadata builder](https://github.com/vllm-project/vllm-ascend/blob/875e5654189a2e02c1eed1e550279fb1ded06798/vllm_ascend/ops/gdn_attn_builder.py#L765-L804) still constructs fixed-width rows from the first K+1 block-table columns.\n2. [Main A3 Dockerfile](https://github.com/vllm-project/vllm-ascend/blob/875e5654189a2e02c1eed1e550279fb1ded06798/Dockerfile.a3#L114-L132) pins flash-linear-attention-npu-a3 26.9.1+deva4a7958, release v26.9.1-beta2. Its aarch64 wheel SHA256 is 6a6f298a23fbc4902e8379a469696bca1cce108db8159d9c5bf6dfe819a22d58.\n3. That package's [recurrent kernel](https://github.com/flashserve/flash-linear-attention-npu/blob/a4a795857868729fbdbb0118c1e06c8655a7b31b/fla/ops/ascendc/gdn/recurrent_gdn/recurrent_gated_delta_rule/op_kernel/recurrent_gated_delta_rule.h#L164-L196) retains both packed-offset state selection and the acceptedTokenNum > seqLen rejection; its [writeback](https://github.com/flashserve/flash-linear-attention-npu/blob/a4a795857868729fbdbb0118c1e06c8655a7b31b/fla/ops/ascendc/gdn/recurrent_gdn/recurrent_gated_delta_rule/op_kernel/recurrent_gated_delta_rule.h#L510-L520) also uses the packed token index.\n4. The same minimal tensors were run on an A3 NPU through fla_npu.ops.ascendc.recurrent_gated_delta_rule from that exact pinned wheel. All 2,921 hash-bearing installed wheel records verified, and loaded libraries resolved to that package. The output was [1,1,3,3,3,3], rather than [1,1,5,5,5,5], reproducing the same state leak.\n\nThis establishes the defect in main's current caller/backend contract. It is not a full Qwen3.5 service replay on the complete main source pair. Upgrading to this main snapshot or switching to its pinned FLA backend alone does not resolve the demonstrated bug.\n\n### Minimal reproducer: one NPU, no model weights\n\nFor the affected 0.26 release, use matching native/custom-op builds. Select the custom OPP before starting Python. If fla_npu is installed, prevent its automatic path injection from redirecting this release-path test.\n\n~~~bash\nexport VLLM_ASCEND_ROOT=/path/to/vllm-ascend\nexport ASCEND_CUSTOM_OPP_PATH=\"$VLLM_ASCEND_ROOT/vllm_ascend/_cann_ops_custom/vendors/custom_transformer\"\nexport LD_LIBRARY_PATH=\"$ASCEND_CUSTOM_OPP_PATH/op_api/lib:$LD_LIBRARY_PATH\"\nexport FLA_NPU_DISABLE_PTH=1\npython repro_gdn_state.py \"$VLLM_ASCEND_ROOT/vllm_ascend\"\n~~~\n\nSave the following as repro_gdn_state.py. actual_seq_lengths takes a leading zero followed by per-request lengths here, so [0,2,4] describes requests containing two and four tokens.\n\n~~~python\nimport sys\nfrom pathlib import Path\n\nimport torch\nimport torch_npu\n\n# argv[1]: package directory containing the matching vllm_ascend_C*.so.\ntorch.ops.load_library(next(Path(sys.argv[1]).glob(\"vllm_ascend_C*.so\")))\ntorch.npu.set_device(0)\ntorch_npu.npu.set_compile_mode(jit_compile=False)\n\ntable = torch.tensor([[1, 2, 3, 4], [5, 6, 7, 8]], dtype=torch.int32, device=\"npu\")\nstate = torch.arange(10, dtype=torch.float32, device=\"npu\")\nstate = state[:, None, None, None].expand(-1, 4, 128, 128).contiguous()\nq = torch.zeros(6, 1, 128, dtype=torch.bfloat16, device=\"npu\")\nq[..., 0] = 1\noutput = torch.ops._C_ascend.npu_recurrent_gated_delta_rule(\n    query=q,\n    key=torch.zeros_like(q),\n    value=torch.zeros(6, 4, 128, dtype=torch.bfloat16, device=\"npu\"),\n    state=state,\n    beta=torch.zeros(6, 4, dtype=torch.bfloat16, device=\"npu\"),\n    g=torch.zeros(6, 4, dtype=torch.float32, device=\"npu\"),\n    scale=1.0,\n    actual_seq_lengths=torch.tensor([0, 2, 4], dtype=torch.int32, device=\"npu\"),\n    ssm_state_indices=table.flatten(),\n    num_accepted_tokens=torch.ones(2, dtype=torch.int32, device=\"npu\"),\n)\nactual = output[:, 0, 0].cpu().float()\nexpected = torch.tensor([1, 1, 5, 5, 5, 5], dtype=torch.float32)\nprint(\"actual:  \", actual.tolist())\nprint(\"expected:\", expected.tolist())\ntorch.testing.assert_close(actual, expected, rtol=0, atol=0)\n~~~\n\nObserved with the independently rebuilt original release operator:\n\n~~~text\nactual:   [1.0, 1.0, 3.0, 3.0, 3.0, 3.0]\nexpected: [1.0, 1.0, 5.0, 5.0, 5.0, 5.0]\nAssertionError: Tensor-likes are not equal!\n~~~\n\nThe second request reads block 3, which belongs to the first request, instead of block 5. beta=0 and g=0 keep the states unchanged numerically, so this is an exact indexing counterexample rather than a floating-point tolerance issue.\n\nTo reproduce against main's pinned FLA package, use the same tensors but replace the native-library loading line with:\n\n~~~python\nfrom fla_npu.ops.ascendc import recurrent_gated_delta_rule\n~~~\n\nReplace torch.ops._C_ascend.npu_recurrent_gated_delta_rule with recurrent_gated_delta_rule. Before launching Python, set ASCEND_CUSTOM_OPP_PATH to the installed fla_npu/opp/vendors/fla_npu_transformer directory and remove the release custom-op path from LD_LIBRARY_PATH. The test must load the pinned FLA libraries; it produces the same incorrect values above.\n\n### Root cause\n\n1. XGrammar validates and returns a legal prefix of each draft. vLLM saves those trimmed drafts in the scheduler. Different verification lengths are legal inputs to the attention backend.\n2. The Ascend GDN metadata builder retains a fixed [B,K+1] recurrent-state table, but the caller flattens it before the recurrent call.\n3. The recurrent kernel indexes the initial state at seq0 + accepted_prev - 1 and writes back using seq_i, both based on packed token offsets. The state-row base must instead be request_index * (K+1).\n\nFor K=3 and rows [1,2,3,4] / [5,6,7,8], query lengths [2,4] require the second state row to start at flattened offset 4. The old kernel starts at offset 2 and consequently reads/writes another request's state.\n\nThe same kernel also returns when accepted_prev > current_query_length. Accepting four tokens in the previous step and verifying two in the current step is valid. The bound must be the state-row width; the existing early return can leave an at::empty output unwritten. Packing only the currently active indices or clamping accepted_prev to the current length is insufficient.\n\nAffected release sources:\n\n- [Ascend GDN caller](https://github.com/vllm-project/vllm-ascend/blob/f2f74a16c3c50a76f4349d807918e83edec1e35c/vllm_ascend/ops/gdn.py#L345-L357)\n- [Ascend recurrent state selection](https://github.com/vllm-project/vllm-ascend/blob/f2f74a16c3c50a76f4349d807918e83edec1e35c/csrc/attention/recurrent_gated_delta_rule/op_kernel/recurrent_gated_delta_rule.h#L157-L198)\n- Upstream vLLM retains state-row stride independently of token offsets: https://github.com/vllm-project/vllm/blob/568afb3a13806beb53bb2e6bd518269357b237c0/vllm/third_party/flash_linear_attention/ops/fused_sigmoid_gating.py#L103-L112\n\nIf every draft is trimmed, the Ascend runner/builder also needs to preserve previous accepted-state selection for single-token decode, including convolution history. Whether the upstream CUDA path has an analogous transition issue requires separate validation. The reproduced cross-request indexing defect belongs to the Ascend caller/operator integration, not to XGrammar's legal-prefix trimming in upstream vLLM.\n\n### Suggested fix\n\n- Retain the per-request two-dimensional state table, pass its row stride explicitly, and use that stride for both reads and writes independently of token offsets.\n- Validate previous accepted counts against the state-row width, preserve history for fully trimmed drafts, and skip zero-length graph-padding rows.\n- Preserve compatibility for genuine one-dimensional packed-state callers. Rebuild and deploy the operator with its corresponding Python caller changes; changing only the caller shape is insufficient.\n- For releases/v0.26.0rc, update the in-repository recurrent operator and GDN metadata/caller. For main, coordinate the equivalent contract change with the external FLA package and update the pinned dependency; a release-only kernel patch does not cover main's external backend.\n- Keep MTP3 enabled. Include ragged batches, prior acceptance greater than current query length, zero-draft transitions, and graph padding in regression coverage, and measure serving throughput/latency under an unchanged workload before merging.\n\nRelated main-branch work: #15207 and #17763 address broader variable-length GDN/operator support.\n\nRelease-branch implementation proposal: #17839. The main-branch external FLA dependency needs a corresponding change.\n",
+            "state": null,
+            "user": null,
+            "assignees": null,
+            "labels": null,
+            "milestone": null,
+            "state_reason": null,
+            "comments": null,
+            "created_at": null,
+            "updated_at": null,
+            "closed_at": null,
+            "display_url": "https://github.com/vllm-project/vllm-ascend/issues/17837",
+            "display_title": "[Bug]: Qwen3.5 MTP3 structured output corruption from ragged GDN state indexing"
+          },
+          {
+            "url": "https://github.com/vllm-project/vllm-ascend/issues/18304",
+            "title": "[Bug][A3] DeepSeek-V4.1: missing causal_conv1d_update_npu -> CausalConv1dBwd ACL-graph crash kills decode EngineCores",
+            "issue_number": 18304,
+            "body": "### What happened?\n\nOn Ascend A3, running **DeepSeek-V4.1-Flash (w8a8) with DSpark MTP (`num_speculative_tokens=5`) + `CUDAGraphMode.FULL_DECODE_ONLY`** on a decode-side DP8×TP2 (EP16) deployment, the decode service dies reproducibly. Two consecutive failures observed on 2026-10-10 and 2026-10-11:\n\n**Phase 1 — first request wedges the engines.** The first request after startup (any size, even `1+1=?`) is accepted by the APIServer (streaming 200) but is never processed:\n\n- `vllm:num_requests_running = 0`, `vllm:prompt_tokens_total = 0` forever; client receives nothing.\n- `py-spy` on `EngineCore_DP0`: MainThread stuck in `step_with_batch_queue → _wait_for_response → get_response → shm_broadcast.dequeue` — waiting for a Worker response that never arrives.\n- `py-spy` on both `Worker_DP0_TP0/TP1`: stuck in `fused_moe token_dispatcher._preprocess` (EP all-to-all participation) inside the first forward (`deepseek_v41 model.py:1725 → acl_graph fx_run_eagerly`).\n- All 8 EngineCores log `shm_broadcast.py:801: No available shared memory broadcast block found in 60 seconds` every minute.\n\n**Phase 2 — idle-rank dummy decode crashes with the GDN conv1d failure, killing all remaining EngineCores.** A few minutes into the wedge, the idle DP ranks' dummy decode (`execute_dummy_batch → _dummy_run(uniform_decode=True, skip_gdn_state_update=True)`) fails on device and every EngineCore except the wedged one exits:\n\n```\n(EngineCore_DP1 pid=2545) ERROR [core.py:1368] RuntimeError: Worker failed with error 'synchronize:...AclrtSynchronizeStreamWithTimeout(stream()), error code is 507011'\n(EngineCore_DP1 pid=2545) ERROR [core.py:1368] [InitOpInfoLib][InitOpKernel] Inconsistent format size [1] and data type size [3]![FUNC:InitUnknownFormatAndDtype][FILE:op_kernel_info_constructor.cc][LINE:960]\n(EngineCore_DP1 pid=2545) ERROR [core.py:1368] [InitOpInfoLib][InitOpKernel] Node[CausalConv1dBwd]: failed to initialize unknown shape dtype and format. The input or output is input6.queryStartLoc.[LINE:556]\n(EngineCore_DP1 pid=2545) ERROR [core.py:1368] [GraphOpt][Init][ConstructOpKernelInfo] OpKernelInfo CausalConv1dBwd initialization failed.\n(EngineCore_DP1 pid=2545) ERROR [core.py:1368] The error from device(chipId:7, dieId:1) ... exception of fftsplus aivector error, core id is 1 ...\n```\n\nIn our two runs, 7 EngineCores died within ~13 s of the first device error; the surviving DP0 EngineCore is stuck forever in the EP all-to-all, so the whole decode service is dead (APIServer `EngineDeadError`).\n\n### Suspected root cause\n\nEvery startup logs this warning, which points at the same GDN/KDA causal-conv1d path:\n\n```\nWARNING [patch_triton.py:332] NPU Triton causal_conv1d_update is unavailable (cannot import name 'causal_conv1d_update_npu' from\n'vllm_ascend.ops.triton.mamba.causal_conv1d' (...)); falling back to the PyTorch implementation, which syncs per request and\ntherefore stalls ACL graph capture at decode-FULL.\n```\n\n`vllm_ascend/patch/worker/patch_triton.py` still tries to bind `causal_conv1d_update_npu` for the KDA layers (its comment notes the PyTorch fallback \"calls .item() per request, which aborts ACL graph capture\"), but that kernel was deleted from `vllm_ascend/ops/triton/mamba/causal_conv1d.py` by **PR #14620** (\"[Refactor][Ops] Remove causal_conv1d_update_npu\", merged 2026-08-25). The binding therefore always fails and the DeepSeek-V4.1 GDN conv1d-update decode path runs the upstream PyTorch fallback under the decode-FULL ACL graph, where the captured `CausalConv1dBwd` op carries a dynamic-shape `input6.queryStartLoc` that fails op-kernel-info initialization at replay (`format size [1]` vs `dtype size [3]`), raising the aivector exception on device.\n\n### Reproduction\n\n- Hardware: 2× Ascend A3 nodes, PD-disaggregated 1P1D. Prefill node DP4×TP4; decode node DP8×TP2 (EP16), `kv_role=kv_consumer` (MooncakeHybridConnector).\n- Model: DeepSeek-V4.1-Flash w8a8 (`quantization=ascend`), `max_model_len=1048576`, `block_size=128`.\n- Decode engine flags (the failure needs this combination):\n  - `speculative_config={'method': 'dspark', 'num_speculative_tokens': 5}`\n  - `cudagraph_mode: FULL_DECODE_ONLY` (+ `enable_npugraph_ex: True`, `async_scheduling`)\n  - `max_num_batched_tokens: 400`, `max_num_seqs: 32`\n- Steps: start the 8 decode engines, wait until all 8 `/health` return 200, then send **one** request directly to a single decode DP rank (e.g. `POST decode_node:7100/v1/chat/completions`, `max_tokens=8`). The engine wedge (Phase 1) starts immediately; the GDN conv1d dummy-decode crash (Phase 2) follows a few minutes later and kills the remaining EngineCores. Reproduced twice (2026-10-10 07:22–07:55 UTC and 2026-10-11 09:16–09:33 UTC).\n\n### Environment\n\n- vllm-ascend: `main` @ `05fa3be5f` (`0.19.1rc2.dev2688+g05fa3be5f`)\n- vllm: 0.30.0\n- torch 2.10.0+cpu, torch_npu 2.10.0.post4, CANN 9.1.0, Ascend910 (A3, 910.93)\n\n### Notes / related PRs\n\n- #14620 removed the Triton `causal_conv1d_update_npu` kernel; the patch site in `patch_triton.py` still references it and always falls back.\n- #17250 (open) enables `aclnnCausalConv1dV2` on A3 — explicitly targets ACL-graph-unfriendly dynamic shapes (host-side `query_start_loc`, DSpark `num_accepted_tokens`) for the same conv1d path.\n- #17629 (open, WIP) would switch GDN/KDA causal-conv1d callers to the fla_npu AscendC operators (incl. `causal_conv1d_update`).\n- #17659 (merged after the affected build) fixes post-capture state corruption for GLM-5.3 KDA — different failure mode, does not fix this.\n\n### Before submitting a new issue...\n\n- [x] Did you search for existing issues? (searched `causal_conv1d`, `GDN`, `CausalConv1dBwd`, `conv1d decode`; no prior report of this failure)\n",
+            "state": null,
+            "user": null,
+            "assignees": null,
+            "labels": null,
+            "milestone": null,
+            "state_reason": null,
+            "comments": null,
+            "created_at": null,
+            "updated_at": null,
+            "closed_at": null,
+            "display_url": "https://github.com/vllm-project/vllm-ascend/issues/18304",
+            "display_title": "[Bug][A3] DeepSeek-V4.1: missing causal_conv1d_update_npu -> CausalConv1dBwd ACL-graph crash kills decode EngineCores"
+          }
+        ]
+      },
+      "isError": false
+    }
+  },
+  {
+    "job_id": "RC-064-GH-PR",
+    "task_ids": [
+      "RC-064"
+    ],
+    "kind": "SEARCH",
+    "resource_type": "PR",
+    "round": 1,
+    "tool": "mcp__codex_apps__github_search_prs",
+    "args": {
+      "repository_full_name": "vllm-project/vllm-ascend",
+      "query": "FLA decode state",
+      "topn": 3
+    },
+    "checked_at": "2026-11-13T02:33:31.447Z",
+    "response": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Action completed."
+        }
+      ],
+      "structuredContent": {
+        "issues": [
+          {
+            "url": "https://github.com/vllm-project/vllm-ascend/pull/21775",
+            "title": "[Feature][releases/v0.32.0rc] Fuse recurrent GDN preprocessing and use 2D State indices",
+            "issue_number": 21775,
+            "body": "### What this PR does / why we need it?\n\nBackport the recurrent GDN integration from #21720 onto releases/v0.32.0rc (base a452c3628).\n\nCompatible fla_npu interfaces use in-kernel Q/K L2 normalization, gate transformation and beta sigmoid, consuming raw a/b projections and request-row State indices [B, Ckpt]. Decode uses [B, 1], retaining metadata rows for zero-length graph padding.\n\nArchitecture:\n- Attention partitions token rows and merges outputs.\n- The dispatch helper selects fused or legacy native interfaces.\n- The fused adapter handles tensor shapes/dtypes and fusion flags; scheduler/metadata continue to own accepted counts and State slots.\n- Capability detection inspects explicitly published parameters once without launching a mutating probe. Native failures are not retried after potential State mutation.\n- Chunk prefill retains external gate processing.\n\nRelease-specific adaptation preserves the existing per-step cached token-to-State mapping for legacy wheels. Main-only upstream recurrent dispatch policies and checkpoint-prefill dependencies are not imported into this release branch.\n\n### Does this PR introduce _any_ user-facing change?\n\nYes. Compatible fla_npu wheels automatically use recurrent fusion and 2D State indices. Older interfaces retain the release branch's packed-index path and cached mapping. Includes a release note fragment.\n\n### How was this patch tested?\n\nBasic CPU tests are included for capability detection, fusion arguments, variable-length checkpoint rows, prior accepted slots beyond current query length, zero-length rows, decode row mapping, invalid row counts, legacy preprocessing, and six full-forward routing cases. Mixed-batch gate mocks size results from each input slice.\n\nPer the requester's instruction, this release backport has not been executed or validated. Python formatting was applied. CPU UT execution, full format.sh ci, NPU numerical/complete-State comparison, MTP acceptance/rollback, graph replay and matched-workload performance validation are pending. Signature detection alone does not establish native-binary compatibility.\n\n### Checklist\n\n- [x] Basic and boundary test cases included.\n- [x] Error-path coverage included.\n- [ ] CPU UT execution.\n- [ ] Full formatting/CI checks.\n- [ ] NPU correctness and graph replay.\n- [ ] Matched-workload performance validation.\n\n- vLLM main: https://github.com/vllm-project/vllm/commit/544f182d9f0c9bfe8bd7645525951d5e3692a542\n",
+            "state": null,
+            "user": null,
+            "assignees": null,
+            "labels": null,
+            "milestone": null,
+            "state_reason": null,
+            "comments": null,
+            "created_at": null,
+            "updated_at": null,
+            "closed_at": null,
+            "display_url": "https://github.com/vllm-project/vllm-ascend/pull/21775",
+            "display_title": "[Feature][releases/v0.32.0rc] Fuse recurrent GDN preprocessing and use 2D State indices"
+          },
+          {
+            "url": "https://github.com/vllm-project/vllm-ascend/pull/19898",
+            "title": "[Ops][Feature] GDN decode fuse gating + recurrent update",
+            "issue_number": 19898,
+            "body": "### What this PR does / why we need it?\r\n\r\nThis PR adds an Ascend A3 Triton kernel that fuses Q/K L2 normalization, softplus decay, sigmoid beta, recurrent state update, and attention output reduction into a single kernel launch. This avoids launching separate operators and reduces intermediate tensor traffic during single-token decoding for Gated DeltaNet (GDN) layers.\r\n\r\n### Does this PR introduce _any_ user-facing change?\r\n\r\nYes, supported GDN models decode faster on Ascend A3 without requiring new user options.\r\n\r\n### How was this patch tested?\r\n\r\nTested using unit tests and nightly regression tests on Ascend NPU:\r\n- `pytest tests/ut/ops/test_fused_gdn_decode.py`\r\n- `pytest tests/ut/ops/test_gdn_mixed_batch.py`\r\n- `pytest tests/e2e/nightly/single_node/ops/singlecard_ops/triton/test_fused_gdn_decode.py`\r\n\r\n#### Complete server command\r\n\r\nRun the following in the first shell, initially with `GDN_VARIANT=baseline`.\r\nAfter the baseline matrix finishes, stop that service and release its worker\r\nprocesses, then restart on the same devices with `GDN_VARIANT=optimized`.\r\n\r\n```bash\r\nset -euo pipefail\r\n# This uses the prepared, shared compatibility environment from the E2E run.\r\nexport GDN_E2E_ROOT=/workspace/gdn-e2e-20261026\r\nexport GDN_VARIANT=${GDN_VARIANT:-baseline}  # baseline or optimized\r\ncd \"${GDN_E2E_ROOT}/${GDN_VARIANT}\"\r\nexport PYTHONPATH=\"${GDN_E2E_ROOT}/runtime-deps:${GDN_E2E_ROOT}/vllm:${GDN_E2E_ROOT}/${GDN_VARIANT}:/workspace/gdn-decode-validation/deps:/usr/local/Ascend/cann-9.1.0/python/site-packages\"\r\nexport ASCEND_RT_VISIBLE_DEVICES=0,1,2,3\r\nexport VLLM_WORKER_MULTIPROC_METHOD=spawn\r\nexport HF_HUB_OFFLINE=1\r\nexport TRANSFORMERS_OFFLINE=1\r\nexport GDN_FLA_VENDOR=/workspace/gdn-decode-validation/deps/fla_npu/opp/vendors/fla_npu_transformer\r\nexport ASCEND_CUSTOM_OPP_PATH=\"${GDN_FLA_VENDOR}:${GDN_FLA_VENDOR}/op_api/lib:${GDN_E2E_ROOT}/${GDN_VARIANT}/vllm_ascend/_cann_ops_custom/vendors/custom_transformer:${ASCEND_CUSTOM_OPP_PATH:-}\"\r\n\r\nvllm serve /models/Qwen3-Next-80B-A3B-Instruct \\\r\n  --served-model-name qwen3-next \\\r\n  --host 127.0.0.1 \\\r\n  --port 18080 \\\r\n  --tensor-parallel-size 4 \\\r\n  --dtype bfloat16 \\\r\n  --seed 42 \\\r\n  --max-model-len 4096 \\\r\n  --max-num-seqs 32 \\\r\n  --max-num-batched-tokens 4096 \\\r\n  --gpu-memory-utilization 0.8 \\\r\n  --kv-cache-memory-bytes 2147483648 \\\r\n  --no-enable-prefix-caching \\\r\n  --compilation-config '{\"cudagraph_mode\":\"FULL_DECODE_ONLY\",\"cudagraph_capture_sizes\":[1,8,16,32]}' \\\r\n  --profiler-config \"{\\\"profiler\\\":\\\"torch\\\",\\\"torch_profiler_dir\\\":\\\"${GDN_E2E_ROOT}/profiles/${GDN_VARIANT}\\\",\\\"torch_profiler_with_stack\\\":false,\\\"ignore_frontend\\\":true}\"\r\n```\r\n\r\nThe captured server launcher used `python -m vllm.entrypoints.cli.main serve`\r\nwith these exact arguments. The displayed `vllm serve` invokes the same entrypoint.\r\n\r\nThe explicit 2 GiB KV-cache budget takes precedence over the utilization-based\r\ncache budget. The profiler is configured only for optional separate captures;\r\nthe benchmark commands below do not enable profiling.\r\n\r\n#### Complete official vLLM benchmark command\r\n\r\nThe attached `prompts.jsonl` contains 128 deterministic text prompts, each verified\r\nto tokenize to exactly 128 tokens. `generate_dataset.py` reproduces that file.\r\nBoth variants use the same file, sample order, seed, and client settings.\r\n\r\nRun in a second shell in the same container, matching `GDN_VARIANT` to the running\r\nserver. Each concurrency has three measured rounds; each round contains four times\r\nconcurrency requests and a separate warmup of concurrency requests. Warmup and the\r\nclient's endpoint readiness request are excluded from the benchmark metrics.\r\n\r\n```bash\r\nset -euo pipefail\r\n# Run in a second shell inside the same NPU container after the server is ready.\r\nexport GDN_E2E_ROOT=/workspace/gdn-e2e-20261026\r\nexport GDN_VARIANT=${GDN_VARIANT:-baseline}  # match the running server\r\nexport PYTHONPATH=\"${GDN_E2E_ROOT}/runtime-deps:${GDN_E2E_ROOT}/vllm:${GDN_E2E_ROOT}/optimized:/workspace/gdn-decode-validation/deps:/usr/local/Ascend/cann-9.1.0/python/site-packages\"\r\nexport HF_HUB_OFFLINE=1\r\nexport TRANSFORMERS_OFFLINE=1\r\n\r\nfor concurrency in 1 8 16 32; do\r\n  for repeat in 0 1 2; do\r\n    vllm bench serve \\\r\n      --backend openai \\\r\n      --base-url http://127.0.0.1:18080 \\\r\n      --endpoint /v1/completions \\\r\n      --model qwen3-next \\\r\n      --tokenizer /models/Qwen3-Next-80B-A3B-Instruct \\\r\n      --dataset-name custom \\\r\n      --dataset-path \"${GDN_E2E_ROOT}/official-bench/prompts.jsonl\" \\\r\n      --skip-chat-template \\\r\n      --disable-shuffle \\\r\n      --custom-output-len 256 \\\r\n      --num-prompts \"$((4 * concurrency))\" \\\r\n      --max-concurrency \"${concurrency}\" \\\r\n      --request-rate inf \\\r\n      --num-warmups \"${concurrency}\" \\\r\n      --temperature 0 \\\r\n      --seed 42 \\\r\n      --extra-body '{\"seed\":42}' \\\r\n      --ignore-eos \\\r\n      --disable-tqdm \\\r\n      --save-result \\\r\n      --save-detailed \\\r\n      --result-dir \"${GDN_E2E_ROOT}/official-bench\" \\\r\n      --result-filename \"${GDN_VARIANT}-c${concurrency}-r${repeat}.json\"\r\n  done\r\ndone\r\n```\r\n\r\n#### Official benchmark results\r\n\r\nInput length is 128 tokens and output length is 256 tokens, with greedy decoding\r\nand EOS ignored. Each table cell is the median of the three corresponding official\r\nCLI round metrics. The TPOT columns use `mean_tpot_ms`; throughput uses\r\n`output_throughput`. A single run's printed metric should be compared with that\r\nrun's JSON, rather than with the three-round aggregate below.\r\n\r\n| Concurrency | Baseline mean TPOT (ms) | Fused mean TPOT (ms) | TPOT reduction | Baseline output tok/s | Fused output tok/s | Throughput gain |\r\n| --- | --- | --- | --- | --- | --- | --- |\r\n| 1 | 14.638 | 14.078 | 3.83% | 65.38 | 67.91 | 3.86% |\r\n| 8 | 18.165 | 17.533 | 3.48% | 412.14 | 425.69 | 3.29% |\r\n| 16 | 19.108 | 18.217 | 4.66% | 784.72 | 819.81 | 4.47% |\r\n| 32 | 21.311 | 20.694 | 2.90% | 1415.18 | 1454.62 | 2.79% |\r\n\r\nBoth variants completed 684 measured requests and 175,104 output tokens, with zero\r\nfailed requests. All measured input/output token totals were checked against the\r\nexpected lengths. This is a short-prompt decode workload; other prompt lengths,\r\nTP sizes, speculative decoding, and larger batches were not measured here.\r\n\r\n### Checklist\r\n\r\n#### Testing\r\n\r\n- [x] **Boundary / edge-case coverage**: I reviewed whether this change involves\r\n  boundary conditions (e.g. empty input, single/zero element, min/max values,\r\n  off-by-one, sequence-length limits, integer overflow). Where applicable, I\r\n  added unit tests covering these edge cases in `tests/ut/` or `tests/e2e/`.\r\n- [x] **Regression test**: If this PR fixes a bug, I added a regression test\r\n  that would fail without the fix.\r\n- [x] **Error / failure path coverage**: I covered abnormal paths (exceptions,\r\n  timeouts, out-of-range, division by zero) in addition to the happy path.\r\n- [x] **Meaningful & reliable tests**: New tests assert real behavior and are\r\n  not written merely to satisfy CI.\r\n- [ ] **Performance impact**: If this PR touches a performance-sensitive path,\r\n  I attached benchmark results and added performance regression tests.\r\n\r\nPerformance results and a reproducible operator benchmark are attached, but an\r\nautomated CI performance-threshold regression test has not been added. That is\r\nwhy the final checkbox remains unchecked. Failure-path coverage above concerns\r\noperator validation and dispatch fallback; no network timeout behavior is changed.\r\n\r\n\n- vLLM main: https://github.com/vllm-project/vllm/commit/544f182d9f0c9bfe8bd7645525951d5e3692a542\n",
+            "state": null,
+            "user": null,
+            "assignees": null,
+            "labels": null,
+            "milestone": null,
+            "state_reason": null,
+            "comments": null,
+            "created_at": null,
+            "updated_at": null,
+            "closed_at": null,
+            "display_url": "https://github.com/vllm-project/vllm-ascend/pull/19898",
+            "display_title": "[Ops][Feature] GDN decode fuse gating + recurrent update"
+          },
+          {
+            "url": "https://github.com/vllm-project/vllm-ascend/pull/17393",
+            "title": "[Feature] Add FLA RecurrentGDN Backend",
+            "issue_number": 17393,
+            "body": "### Overview\r\nThis change introduces a switchable backend for the GDN decode recurrent operator. A new configuration item, `ascend_gdn_decode_backend`, allows selection between `fla_npu` and native custom operators. The mechanism covers all three decode paths:\r\n\r\n| Path | Location |\r\n| :--- | :--- |\r\n| 2.1 MTP spec decode | `AscendGatedDeltaNetAttention.forward` spec branch |\r\n| 2.2 Mixed-batch non-spec decode | `split_non_spec` decode branch |\r\n| 2.3 Prefill chunk / pure decode | non-spec branch |\r\n\r\n### Performance\r\nWe conducted tests across 50 scenarios at the single-operator level, comparing the performance of operators in the fla package against the original recurrent operators. For recurrent_gated_delta_rule, the fla implementation reduced the average latency from 538us to 148us.\r\n\r\n### How to use\r\nAdd extra addtional-config : `vllm serve xxx --additional-config '\"ascend_gdn_decode_backend\": \"fla_npu\"`\r\n\r\n- vLLM main: https://github.com/vllm-project/vllm/commit/ced6857afa0ea7b2e3f0846a62e1394e90f15607\r\n",
+            "state": null,
+            "user": null,
+            "assignees": null,
+            "labels": null,
+            "milestone": null,
+            "state_reason": null,
+            "comments": null,
+            "created_at": null,
+            "updated_at": null,
+            "closed_at": null,
+            "display_url": "https://github.com/vllm-project/vllm-ascend/pull/17393",
+            "display_title": "[Feature] Add FLA RecurrentGDN Backend"
+          }
+        ]
+      },
+      "isError": false
+    }
+  },
+  {
+    "job_id": "RC-065-GH-ISSUE",
+    "task_ids": [
+      "RC-065"
+    ],
+    "kind": "SEARCH",
+    "resource_type": "ISSUE",
+    "round": 1,
+    "tool": "mcp__codex_apps__github_search_issues",
+    "args": {
+      "repository_full_name": "Ascend/MindSpeed-MM",
+      "query": "EMA Qwen Image is:issue",
+      "topn": 3
+    },
+    "checked_at": "2026-11-13T02:33:31.323Z",
+    "response": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Action completed."
+        }
+      ],
+      "structuredContent": {
+        "issues": []
+      },
+      "isError": false
+    }
+  },
+  {
+    "job_id": "RC-065-GH-PR",
+    "task_ids": [
+      "RC-065"
+    ],
+    "kind": "SEARCH",
+    "resource_type": "PR",
+    "round": 1,
+    "tool": "mcp__codex_apps__github_search_prs",
+    "args": {
+      "repository_full_name": "Ascend/MindSpeed-MM",
+      "query": "EMA Qwen Image",
+      "topn": 3
+    },
+    "checked_at": "2026-11-13T02:33:31.322Z",
+    "response": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Action completed."
+        }
+      ],
+      "structuredContent": {
+        "issues": []
+      },
+      "isError": false
+    }
+  },
+  {
+    "job_id": "RC-066-GH-ISSUE",
+    "task_ids": [
+      "RC-066"
+    ],
+    "kind": "SEARCH",
+    "resource_type": "ISSUE",
+    "round": 1,
+    "tool": "mcp__codex_apps__github_search_issues",
+    "args": {
+      "repository_full_name": "Ascend/MindSpeed-LLM",
+      "query": "deterministic dump is:issue",
+      "topn": 3
+    },
+    "checked_at": "2026-11-13T02:33:31.322Z",
+    "response": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Action completed."
+        }
+      ],
+      "structuredContent": {
+        "issues": []
+      },
+      "isError": false
+    }
+  },
+  {
+    "job_id": "RC-066-GH-PR",
+    "task_ids": [
+      "RC-066"
+    ],
+    "kind": "SEARCH",
+    "resource_type": "PR",
+    "round": 1,
+    "tool": "mcp__codex_apps__github_search_prs",
+    "args": {
+      "repository_full_name": "Ascend/MindSpeed-LLM",
+      "query": "deterministic dump",
+      "topn": 3
+    },
+    "checked_at": "2026-11-13T02:33:31.190Z",
+    "response": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Action completed."
+        }
+      ],
+      "structuredContent": {
+        "issues": []
+      },
+      "isError": false
+    }
+  },
+  {
+    "job_id": "RC-067-GH-ISSUE",
+    "task_ids": [
+      "RC-067"
+    ],
+    "kind": "SEARCH",
+    "resource_type": "ISSUE",
+    "round": 1,
+    "tool": "mcp__codex_apps__github_search_issues",
+    "args": {
+      "repository_full_name": "Ascend/MindSpeed-LLM",
+      "query": "MiniMax grad norm is:issue",
+      "topn": 3
+    },
+    "checked_at": "2026-11-13T02:33:31.339Z",
+    "response": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Action completed."
+        }
+      ],
+      "structuredContent": {
+        "issues": []
+      },
+      "isError": false
+    }
+  },
+  {
+    "job_id": "RC-067-GH-PR",
+    "task_ids": [
+      "RC-067"
+    ],
+    "kind": "SEARCH",
+    "resource_type": "PR",
+    "round": 1,
+    "tool": "mcp__codex_apps__github_search_prs",
+    "args": {
+      "repository_full_name": "Ascend/MindSpeed-LLM",
+      "query": "MiniMax grad norm",
+      "topn": 3
+    },
+    "checked_at": "2026-11-13T02:33:31.338Z",
+    "response": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Action completed."
+        }
+      ],
+      "structuredContent": {
+        "issues": []
+      },
+      "isError": false
+    }
+  },
+  {
+    "job_id": "RC-069-GH-ISSUE",
+    "task_ids": [
+      "RC-069"
+    ],
+    "kind": "SEARCH",
+    "resource_type": "ISSUE",
+    "round": 1,
+    "tool": "mcp__codex_apps__github_search_issues",
+    "args": {
+      "repository_full_name": "Ascend/MindSpeed-MM",
+      "query": "image input forward is:issue",
+      "topn": 3
+    },
+    "checked_at": "2026-11-13T02:33:31.583Z",
+    "response": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Action completed."
+        }
+      ],
+      "structuredContent": {
+        "issues": []
+      },
+      "isError": false
+    }
+  },
+  {
+    "job_id": "RC-069-GH-PR",
+    "task_ids": [
+      "RC-069"
+    ],
+    "kind": "SEARCH",
+    "resource_type": "PR",
+    "round": 1,
+    "tool": "mcp__codex_apps__github_search_prs",
+    "args": {
+      "repository_full_name": "Ascend/MindSpeed-MM",
+      "query": "image input forward",
+      "topn": 3
+    },
+    "checked_at": "2026-11-13T02:33:31.425Z",
+    "response": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Action completed."
+        }
+      ],
+      "structuredContent": {
+        "issues": []
+      },
+      "isError": false
+    }
+  },
+  {
+    "job_id": "RC-071-GH-ISSUE",
+    "task_ids": [
+      "RC-071"
+    ],
+    "kind": "SEARCH",
+    "resource_type": "ISSUE",
+    "round": 1,
+    "tool": "mcp__codex_apps__github_search_issues",
+    "args": {
+      "repository_full_name": "Ascend/pytorch",
+      "query": "embedding gradient nan is:issue",
+      "topn": 3
+    },
+    "checked_at": "2026-11-13T02:33:31.323Z",
+    "response": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Action completed."
+        }
+      ],
+      "structuredContent": {
+        "issues": []
+      },
+      "isError": false
+    }
+  },
+  {
+    "job_id": "RC-071-GH-PR",
+    "task_ids": [
+      "RC-071"
+    ],
+    "kind": "SEARCH",
+    "resource_type": "PR",
+    "round": 1,
+    "tool": "mcp__codex_apps__github_search_prs",
+    "args": {
+      "repository_full_name": "Ascend/pytorch",
+      "query": "embedding gradient nan",
+      "topn": 3
+    },
+    "checked_at": "2026-11-13T02:33:31.339Z",
+    "response": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Action completed."
+        }
+      ],
+      "structuredContent": {
+        "issues": []
+      },
+      "isError": false
+    }
+  },
+  {
+    "job_id": "RC-074-GH-ISSUE",
+    "task_ids": [
+      "RC-074"
+    ],
+    "kind": "SEARCH",
+    "resource_type": "ISSUE",
+    "round": 1,
+    "tool": "mcp__codex_apps__github_search_issues",
+    "args": {
+      "repository_full_name": "microsoft/onnxruntime",
+      "query": "CANN precision_mode is:issue",
+      "topn": 3
+    },
+    "checked_at": "2026-11-13T02:33:31.922Z",
+    "response": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Action completed."
+        }
+      ],
+      "structuredContent": {
+        "issues": [
+          {
+            "url": "https://github.com/microsoft/onnxruntime/issues/26778",
+            "title": "[Build] NPU Multi-Card Concurrent Compilation Causes OM File Race Condition (Read-While-Write Error)",
+            "issue_number": 26778,
+            "body": "### Describe the issue\n\nWhen compiling an ONNX model to OM on multiple NPUs concurrently, we observed a reproducible race conditon: the faster card finished OM generation first and starts writing the file, while slower cards detect that the OM file has appeared and immediately attempt to load it. \n\nWe also created a script where card 0 compiles first and all other cards continuously poll the directory; as soon as the OM file shows up, the other cards start inference, and the error reproduces reliably. Because the file is still being written by the fast card, the slower cards read an incomplete OM, leading to model-load failures or accuracy issues. \n\n### Urgency\n\n_No response_\n\n### Target platform\n\nLinux x86_64\nCANN:8.3.RC1\ntorch:2.5.1+cpu\ntorch_npu:2.5.1\nonnxruntime-cann:1.24.0 (This requires building ONNX Runtime from source)\n\n### Build script\ninswapper onnx :https://huggingface.co/Devia/G/blob/main/inswapper_128.onnx\n\npython script:\n```\nimport os\nimport time\nimport glob\nimport numpy as np\nimport torch\nimport torch_npu\nimport onnxruntime as ort\n\nRESWAPPER_PATH = \"./insightface/inswapper_128.onnx\"\nOM_DIR = \"./\"\nPOLL_INTERVAL = 0.2\nMAX_WAIT = 300\n\ndef list_om():\n    return set(glob.glob(os.path.join(OM_DIR, \"*.om\")))\n\ndef main():\n    local_rank = int(os.environ.get(\"LOCAL_RANK\", \"0\"))\n    torch.npu.set_device(local_rank)\n    \n    sess = ort.InferenceSession(\n        RESWAPPER_PATH,\n        providers=[\n            (\n                \"CANNExecutionProvider\",\n                {\n                    \"device_id\":local_rank ,\n                    \"arena_extend_strategy\": \"kNextPowerOfTwo\",\n                    \"enable_cann_graph\": True,\n                    \"precision_mode\": \"must_keep_orgin_dtype\",\n                    \"op_select_impl_mode\": \"high_precision\",\n                },\n            ),\n        ],\n    )\n    \n    target = np.random.randn(1, 3, 128, 128).astype(np.float32)\n    source = np.random.randn(1, 512).astype(np.float32)\n    feed = {sess.get_inputs()[0].name: target, sess.get_inputs()[0].name: source}\n    \n    init = list_om()\n    \n    if local_rank == 0:\n        sess.run(None, feed)\n    else:\n        start = time.time()\n        while True:\n            now = list_om()\n            if now - init:\n                break\n            if time.time() - start > MAX_WAIT:\n                break\n        time.sleep(POLL_INTERVAL)\n    \n    out = sess.run(None, feed)\n    \n    \nif __name__ == \"__main__\":\n    main()\n```\n\nshell script:\n``` torchrun --nproc_per_node=8 xxx.py```\n\n### Error / output\n\nStatus Message: CANN error executing aclmdLoadFromFile()\n\n### Visual Studio Version\n\n_No response_\n\n### GCC / Compiler Version\n\n_No response_",
+            "state": null,
+            "user": null,
+            "assignees": null,
+            "labels": null,
+            "milestone": null,
+            "state_reason": null,
+            "comments": null,
+            "created_at": null,
+            "updated_at": null,
+            "closed_at": null,
+            "display_url": "https://github.com/microsoft/onnxruntime/issues/26778",
+            "display_title": "[Build] NPU Multi-Card Concurrent Compilation Causes OM File Race Condition (Read-While-Write Error)"
+          }
+        ]
+      },
+      "isError": false
+    }
+  },
+  {
+    "job_id": "RC-074-GH-PR",
+    "task_ids": [
+      "RC-074"
+    ],
+    "kind": "SEARCH",
+    "resource_type": "PR",
+    "round": 1,
+    "tool": "mcp__codex_apps__github_search_prs",
+    "args": {
+      "repository_full_name": "microsoft/onnxruntime",
+      "query": "CANN precision_mode",
+      "topn": 3
+    },
+    "checked_at": "2026-11-13T02:33:31.339Z",
+    "response": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Action completed."
+        }
+      ],
+      "structuredContent": {
+        "issues": [
+          {
+            "url": "https://github.com/microsoft/onnxruntime/pull/27970",
+            "title": "[CANN]: add dynamic shape support for CANN EP",
+            "issue_number": 27970,
+            "body": "Add support for CANN's three dynamic shape modes in the execution\r\nprovider: dynamic_batch_size, dynamic_image_size, and dynamic_dims.\r\n\r\nChanges:\r\n- Add provider options: dynamic_batch_size, dynamic_image_size,\r\n  dynamic_dims, and input_format for configuring dynamic shape behavior\r\n- Upgrade precision_mode to precision_mode_v2 aligning with latest\r\n  CANN API\r\n- Pass DYNAMIC_BATCH_SIZE, DYNAMIC_IMAGE_SIZE, DYNAMIC_DIMS, and\r\n  INPUT_FORMAT to aclgrphBuildModel for OM model compilation\r\n- Extract original shapes (with -1 for dynamic dims) from model\r\n  definition at Compile() time to ensure consistent INPUT_SHAPE\r\n  strings across inference runs, enabling proper OM model caching\r\n- Handle CANN's hidden dynamic tensor input (ACL_DYNAMIC_TENSOR_NAME)\r\n  during inference, including device memory allocation and cleanup\r\n- Set runtime dynamic dimensions via aclmdlSetDynamicBatchSize,\r\n  aclmdlSetDynamicHWSize, or aclmdlSetInputDynamicDims before\r\n  model execution based on the configured dynamic mode\r\n- Maintain backward compatibility: existing static shape and\r\n  is_dynamic_shape (output dynamic shape from operators like Slice)\r\n  logic remains unchanged and independent from the new dynamic\r\n  input shape support\r\n\r\nSupported formats: NCHW, NHWC, ND (ND format should use dynamic_dims)\r\n\r\n",
+            "state": null,
+            "user": null,
+            "assignees": null,
+            "labels": null,
+            "milestone": null,
+            "state_reason": null,
+            "comments": null,
+            "created_at": null,
+            "updated_at": null,
+            "closed_at": null,
+            "display_url": "https://github.com/microsoft/onnxruntime/pull/27970",
+            "display_title": "[CANN]: add dynamic shape support for CANN EP"
+          }
+        ]
+      },
+      "isError": false
+    }
+  },
+  {
+    "job_id": "RC-075-GH-ISSUE",
+    "task_ids": [
+      "RC-075"
+    ],
+    "kind": "SEARCH",
+    "resource_type": "ISSUE",
+    "round": 1,
+    "tool": "mcp__codex_apps__github_search_issues",
+    "args": {
+      "repository_full_name": "microsoft/onnxruntime",
+      "query": "CANN fp16 overflow is:issue",
+      "topn": 3
+    },
+    "checked_at": "2026-11-13T02:33:31.417Z",
+    "response": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Action completed."
+        }
+      ],
+      "structuredContent": {
+        "issues": [
+          {
+            "url": "https://github.com/microsoft/onnxruntime/issues/23684",
+            "title": "[Build] CMake Error at onnxruntime_unittests.cmake:1026 (find_path):   Could not find onnx_SOURCE_DIR using the following files:   onnx/onnx-ml.proto3, onnx/onnx-ml.proto Call Stack (most recent call first):   CMakeLists.txt:1789 (include)",
+            "issue_number": 23684,
+            "body": "### Describe the issue\n\nNVCC_ERROR = \nNVCC_OUT = no such file or directory\n-- Performing Test HAS_STRINGOP_OVERFLOW\n-- Performing Test HAS_STRINGOP_OVERFLOW - Failed\n-- Performing Test HAS_TAUTOLOGICAL_POINTER_COMPARE\n-- Performing Test HAS_TAUTOLOGICAL_POINTER_COMPARE - Success\n-- Performing Test HAS_UNDEFINED_VAR_TEMPLATE\n-- Performing Test HAS_UNDEFINED_VAR_TEMPLATE - Success\n-- Performing Test HAS_UNUSED_BUT_SET_PARAMETER\n-- Performing Test HAS_UNUSED_BUT_SET_PARAMETER - Success\n-- Performing Test HAS_UNUSED_BUT_SET_VARIABLE\n-- Performing Test HAS_UNUSED_BUT_SET_VARIABLE - Success\n-- Performing Test HAS_UNUSED_VARIABLE\n-- Performing Test HAS_UNUSED_VARIABLE - Success\n-- Performing Test HAS_USELESS_CAST\n-- Performing Test HAS_USELESS_CAST - Failed\n-- Looking for reallocarray\n-- Looking for reallocarray - not found\n-- Found Git: /opt/homebrew/bin/git (found version \"2.48.1\")\n**CMake Error at onnxruntime_unittests.cmake:1026 (find_path):\n  Could not find onnx_SOURCE_DIR using the following files:\n  onnx/onnx-ml.proto3, onnx/onnx-ml.proto\nCall Stack (most recent call first):\n  CMakeLists.txt:1789 (include)**\n\n\n-- Configuring incomplete, errors occurred!\nTraceback (most recent call last):\n  File \"/Users/bobchenyx/Documents/Work/YZ.Wang/TTS/GPT-SoVITS/TTS-C/cpp/onnxruntime/tools/ci_build/build.py\", line 2998, in <module>\n    sys.exit(main())\n  File \"/Users/bobchenyx/Documents/Work/YZ.Wang/TTS/GPT-SoVITS/TTS-C/cpp/onnxruntime/tools/ci_build/build.py\", line 2853, in main\n    generate_build_tree(\n  File \"/Users/bobchenyx/Documents/Work/YZ.Wang/TTS/GPT-SoVITS/TTS-C/cpp/onnxruntime/tools/ci_build/build.py\", line 1674, in generate_build_tree\n    run_subprocess(\n  File \"/Users/bobchenyx/Documents/Work/YZ.Wang/TTS/GPT-SoVITS/TTS-C/cpp/onnxruntime/tools/ci_build/build.py\", line 867, in run_subprocess\n    return run(*args, cwd=cwd, capture_stdout=capture_stdout, shell=shell, env=my_env)\n  File \"/Users/bobchenyx/Documents/Work/YZ.Wang/TTS/GPT-SoVITS/TTS-C/cpp/onnxruntime/tools/python/util/run.py\", line 49, in run\n    completed_process = subprocess.run(\n  File \"/opt/anaconda3/envs/tts-c/lib/python3.9/subprocess.py\", line 528, in run\n    raise CalledProcessError(retcode, process.args,\nsubprocess.CalledProcessError: Command '['/opt/homebrew/bin/cmake', '/Users/bobchenyx/Documents/Work/YZ.Wang/TTS/GPT-SoVITS/TTS-C/cpp/onnxruntime/cmake', '--compile-no-warning-as-error', '-Donnxruntime_RUN_ONNX_TESTS=OFF', '-Donnxruntime_GENERATE_TEST_REPORTS=ON', '-DPython_EXECUTABLE=/opt/anaconda3/envs/tts-c/bin/python3', '-DPYTHON_EXECUTABLE=/opt/anaconda3/envs/tts-c/bin/python3', '-Donnxruntime_USE_VCPKG=OFF', '-Donnxruntime_USE_MIMALLOC=OFF', '-Donnxruntime_ENABLE_PYTHON=OFF', '-Donnxruntime_BUILD_CSHARP=OFF', '-Donnxruntime_BUILD_JAVA=OFF', '-Donnxruntime_BUILD_NODEJS=OFF', '-Donnxruntime_BUILD_OBJC=OFF', '-Donnxruntime_BUILD_SHARED_LIB=ON', '-Donnxruntime_BUILD_APPLE_FRAMEWORK=OFF', '-Donnxruntime_USE_DNNL=OFF', '-Donnxruntime_USE_NNAPI_BUILTIN=OFF', '-Donnxruntime_USE_VSINPU=OFF', '-Donnxruntime_USE_RKNPU=OFF', '-Donnxruntime_USE_LLVM=OFF', '-Donnxruntime_ENABLE_MICROSOFT_INTERNAL=OFF', '-Donnxruntime_USE_VITISAI=OFF', '-Donnxruntime_USE_TENSORRT=OFF', '-Donnxruntime_USE_TENSORRT_BUILTIN_PARSER=ON', '-Donnxruntime_USE_TVM=OFF', '-Donnxruntime_TVM_CUDA_RUNTIME=OFF', '-Donnxruntime_TVM_USE_HASH=OFF', '-Donnxruntime_USE_MIGRAPHX=OFF', '-Donnxruntime_DISABLE_CONTRIB_OPS=OFF', '-Donnxruntime_DISABLE_ML_OPS=OFF', '-Donnxruntime_DISABLE_RTTI=OFF', '-Donnxruntime_DISABLE_EXCEPTIONS=OFF', '-Donnxruntime_MINIMAL_BUILD=OFF', '-Donnxruntime_EXTENDED_MINIMAL_BUILD=OFF', '-Donnxruntime_MINIMAL_BUILD_CUSTOM_OPS=OFF', '-Donnxruntime_REDUCED_OPS_BUILD=OFF', '-Donnxruntime_USE_DML=OFF', '-Donnxruntime_USE_WINML=OFF', '-Donnxruntime_BUILD_MS_EXPERIMENTAL_OPS=OFF', '-Donnxruntime_USE_TELEMETRY=OFF', '-Donnxruntime_ENABLE_LTO=OFF', '-Donnxruntime_USE_ACL=OFF', '-Donnxruntime_USE_ARMNN=OFF', '-Donnxruntime_ARMNN_RELU_USE_CPU=ON', '-Donnxruntime_ARMNN_BN_USE_CPU=ON', '-Donnxruntime_USE_JSEP=OFF', '-Donnxruntime_USE_WEBGPU=OFF', '-Donnxruntime_ENABLE_NVTX_PROFILE=OFF', '-Donnxruntime_ENABLE_TRAINING=OFF', '-Donnxruntime_ENABLE_TRAINING_OPS=OFF', '-Donnxruntime_ENABLE_TRAINING_APIS=OFF', '-Donnxruntime_ENABLE_CPU_FP16_OPS=OFF', '-Donnxruntime_USE_NCCL=OFF', '-Donnxruntime_BUILD_BENCHMARKS=OFF', '-Donnxruntime_USE_ROCM=OFF', '-Donnxruntime_GCOV_COVERAGE=OFF', '-Donnxruntime_USE_MPI=OFF', '-Donnxruntime_ENABLE_MEMORY_PROFILE=OFF', '-Donnxruntime_ENABLE_CUDA_LINE_NUMBER_INFO=OFF', '-Donnxruntime_USE_CUDA_NHWC_OPS=OFF', '-Donnxruntime_BUILD_WEBASSEMBLY_STATIC_LIB=OFF', '-Donnxruntime_ENABLE_WEBASSEMBLY_EXCEPTION_CATCHING=ON', '-Donnxruntime_ENABLE_WEBASSEMBLY_API_EXCEPTION_CATCHING=OFF', '-Donnxruntime_ENABLE_WEBASSEMBLY_EXCEPTION_THROWING=ON', '-Donnxruntime_WEBASSEMBLY_RUN_TESTS_IN_BROWSER=OFF', '-Donnxruntime_ENABLE_WEBASSEMBLY_THREADS=OFF', '-Donnxruntime_ENABLE_WEBASSEMBLY_DEBUG_INFO=OFF', '-Donnxruntime_ENABLE_WEBASSEMBLY_PROFILING=OFF', '-Donnxruntime_ENABLE_LAZY_TENSOR=OFF', '-Donnxruntime_ENABLE_EXTERNAL_CUSTOM_OP_SCHEMAS=OFF', '-Donnxruntime_ENABLE_CUDA_PROFILING=OFF', '-Donnxruntime_ENABLE_ROCM_PROFILING=OFF', '-Donnxruntime_USE_XNNPACK=OFF', '-Donnxruntime_USE_WEBNN=OFF', '-Donnxruntime_USE_CANN=OFF', '-Donnxruntime_USE_TRITON_KERNEL=OFF', '-Donnxruntime_DISABLE_FLOAT8_TYPES=OFF', '-Donnxruntime_DISABLE_SPARSE_TENSORS=OFF', '-Donnxruntime_DISABLE_OPTIONAL_TYPE=OFF', '-DCMAKE_OSX_ARCHITECTURES=arm64', '-DCMAKE_OSX_ARCHITECTURES=arm64', '-DCMAKE_TLS_VERIFY=ON', '-DFETCHCONTENT_QUIET=OFF', '-DCMAKE_BUILD_TYPE=RelWithDebInfo', '-DCMAKE_PREFIX_PATH=/Users/bobchenyx/Documents/Work/YZ.Wang/TTS/GPT-SoVITS/TTS-C/cpp/onnxruntime/build/MacOS/RelWithDebInfo/installed']' returned non-zero exit status 1.\n(tts-c) bobchenyx@Mac onnxruntime % \n\n\n### Urgency\n\n_No response_\n\n### Target platform\n\nMacOS m3pro\n\n### Build script\n\n(tts-c) bobchenyx@Mac onnxruntime % g++ --version\nApple clang version 16.0.0 (clang-1600.0.26.6)\nTarget: arm64-apple-darwin24.2.0\nThread model: posix\nInstalledDir: /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin\n\n### Error / output\n\nCMake Error at onnxruntime_unittests.cmake:1026 (find_path):\n  Could not find onnx_SOURCE_DIR using the following files:\n  onnx/onnx-ml.proto3, onnx/onnx-ml.proto\nCall Stack (most recent call first):\n  CMakeLists.txt:1789 (include)\n\n### Visual Studio Version\n\n_No response_\n\n### GCC / Compiler Version\n\n_No response_",
+            "state": null,
+            "user": null,
+            "assignees": null,
+            "labels": null,
+            "milestone": null,
+            "state_reason": null,
+            "comments": null,
+            "created_at": null,
+            "updated_at": null,
+            "closed_at": null,
+            "display_url": "https://github.com/microsoft/onnxruntime/issues/23684",
+            "display_title": "[Build] CMake Error at onnxruntime_unittests.cmake:1026 (find_path):   Could not find onnx_SOURCE_DIR using the following files:   onnx/onnx-ml.proto3, onnx/onnx-ml.proto Call Stack (most recent call first):   CMakeLists.txt:1789 (include)"
+          },
+          {
+            "url": "https://github.com/microsoft/onnxruntime/issues/26490",
+            "title": "[Feature Request] need add 16kb page size support for android arm64",
+            "issue_number": 26490,
+            "body": "### Describe the feature request\n\nhttps://developer.android.google.cn/guide/practices/page-sizes\n\n### Describe scenario use case\n\nneed add -Wl,-z,max-page-size=16384 to build for android arm64",
+            "state": null,
+            "user": null,
+            "assignees": null,
+            "labels": null,
+            "milestone": null,
+            "state_reason": null,
+            "comments": null,
+            "created_at": null,
+            "updated_at": null,
+            "closed_at": null,
+            "display_url": "https://github.com/microsoft/onnxruntime/issues/26490",
+            "display_title": "[Feature Request] need add 16kb page size support for android arm64"
+          },
+          {
+            "url": "https://github.com/microsoft/onnxruntime/issues/26362",
+            "title": "[Build] CUDA 13 cuda/std/utility should change",
+            "issue_number": 26362,
+            "body": "### Describe the issue\n\nHi,\n\nThe error onnxruntime/build/Linux/Release/_deps/cutlass-src/include/cutlass/cutlass.h:43:35: fatal error: cuda/std/utility: No such file or directory occurred when I built ONNX Runtime on the DGX Spark.I noticed that in CUDA 13, the folder has been moved to /cuda-13.0/include/cccl/cuda/std/utility.Could you please advise where I should update the path, or consider updating it in the new version?\n\n\n### Urgency\n\n_No response_\n\n### Target platform\n\nUbuntu DGX Spark\n\n### Build script\n\n./build.sh --config Release --use_cuda --cuda_home $CUDA_HOME --cudnn_home $CUDA_HOME --skip_tests --build_wheel --parallel --cmake_extra_defines CMAKE_CUDA_ARCHITECTURES=\"121\" --cmake_extra_defines onnxruntime_BUILD_UNIT_TESTS=OFF\n\n### Error / output\n\n/onnxruntime/build/Linux/Release/_deps/cutlass-src/include/cutlass/cutlass.h:43:35: fatal error: cuda/std/utility: No such file or directory\n   43 |   #define CUDA_STD_HEADER(header) <cuda/std/header>\n\n\n### Visual Studio Version\n\n_No response_\n\n### GCC / Compiler Version\n\n_No response_",
+            "state": null,
+            "user": null,
+            "assignees": null,
+            "labels": null,
+            "milestone": null,
+            "state_reason": null,
+            "comments": null,
+            "created_at": null,
+            "updated_at": null,
+            "closed_at": null,
+            "display_url": "https://github.com/microsoft/onnxruntime/issues/26362",
+            "display_title": "[Build] CUDA 13 cuda/std/utility should change"
+          }
+        ]
+      },
+      "isError": false
+    }
+  },
+  {
+    "job_id": "RC-075-GH-PR",
+    "task_ids": [
+      "RC-075"
+    ],
+    "kind": "SEARCH",
+    "resource_type": "PR",
+    "round": 1,
+    "tool": "mcp__codex_apps__github_search_prs",
+    "args": {
+      "repository_full_name": "microsoft/onnxruntime",
+      "query": "CANN fp16 overflow",
+      "topn": 3
+    },
+    "checked_at": "2026-11-13T02:33:31.894Z",
+    "response": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Action completed."
+        }
+      ],
+      "structuredContent": {
+        "issues": []
+      },
+      "isError": false
+    }
+  },
+  {
+    "job_id": "RC-077-GH-ISSUE",
+    "task_ids": [
+      "RC-077"
+    ],
+    "kind": "SEARCH",
+    "resource_type": "ISSUE",
+    "round": 1,
+    "tool": "mcp__codex_apps__github_search_issues",
+    "args": {
+      "repository_full_name": "vllm-project/vllm-ascend",
+      "query": "graph all_reduce missing is:issue",
+      "topn": 3
+    },
+    "checked_at": "2026-11-13T02:33:31.552Z",
+    "response": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Action completed."
+        }
+      ],
+      "structuredContent": {
+        "issues": [
+          {
+            "url": "https://github.com/vllm-project/vllm-ascend/issues/5158",
+            "title": "[Doc]: Missing installation guide for DeepSeek-V3 custom ops in official docker (v0.12.0rc1)",
+            "issue_number": 5158,
+            "body": "### 📚 The doc issue\n\n### Describe the issue\nI am following the official tutorial to deploy DeepSeek-V3.2 on Ascend:\n[https://docs.vllm.ai/projects/ascend/en/latest/tutorials/DeepSeek-V3.2.html](https://docs.vllm.ai/projects/ascend/en/latest/tutorials/DeepSeek-V3.2.html)\n\n**Context:**\nI have pulled the official docker image mentioned in the docs:\n`quay.io/ascend/vllm-ascend:v0.12.0rc1`\n\n**The Problem:**\nThe documentation states:\n> \"You can using our official docker image and **install extra operator** for supporting DeepSeek-V3.2.\"\n\n<img width=\"1815\" height=\"703\" alt=\"Image\" src=\"https://github.com/user-attachments/assets/83da9cd7-835f-4be0-ad55-673d6abc1227\" />\n\nHowever, I cannot find any script, pip command, or instructions on **how** to install these extra operators inside the docker container.\n\n**Investigation:**\nI noticed Issue #3278 involves the source code for `deepseek_v3_ops`.\n**My question is:** Am I expected to perform a similar **manual compilation or installation** procedure using the resources from that issue?\nThe official tutorial currently does not link to or explain this step.\n\n\n### Suggest a potential alternative/fix\n\n_No response_",
+            "state": null,
+            "user": null,
+            "assignees": null,
+            "labels": null,
+            "milestone": null,
+            "state_reason": null,
+            "comments": null,
+            "created_at": null,
+            "updated_at": null,
+            "closed_at": null,
+            "display_url": "https://github.com/vllm-project/vllm-ascend/issues/5158",
+            "display_title": "[Doc]: Missing installation guide for DeepSeek-V3 custom ops in official docker (v0.12.0rc1)"
+          }
+        ]
+      },
+      "isError": false
+    }
+  },
+  {
+    "job_id": "RC-077-GH-PR",
+    "task_ids": [
+      "RC-077"
+    ],
+    "kind": "SEARCH",
+    "resource_type": "PR",
+    "round": 1,
+    "tool": "mcp__codex_apps__github_search_prs",
+    "args": {
+      "repository_full_name": "vllm-project/vllm-ascend",
+      "query": "graph all_reduce missing",
+      "topn": 3
+    },
+    "checked_at": "2026-11-13T02:33:32.686Z",
+    "response": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Action completed."
+        }
+      ],
+      "structuredContent": {
+        "issues": [
+          {
+            "url": "https://github.com/vllm-project/vllm-ascend/pull/9689",
+            "title": "[BugFix]Fix multi-DP deadlock for extract_hidden_states proposer on MoE targets",
+            "issue_number": 9689,
+            "body": "### What this PR does / why we need it?\r\n\r\n`AscendExtractHiddenStatesProposer` inherits the upstream `ExtractHiddenStatesProposer._determine_batch_execution_and_padding` unchanged, which on Ascend causes failures when running `extract_hidden_states` on a MoE target model with `DP > 1` and sequence parallelism enabled (e.g. MiniMax-M2 with `VLLM_ASCEND_ENABLE_FLASHCOMM1=1`).\r\n\r\n#### Bug 1 — gloo shape mismatch on the DP cpu_group\r\n\r\n```\r\nwhat(): [enforce fail at .../gloo/transport/tcp/pair.cc:456]\r\nop.preamble.length <= op.nbytes. 8 vs 4.\r\nReceived data size doesn't match expected size.\r\nIs there a distributed collective mismatch in your code?\r\n```\r\n\r\nUpstream `coordinate_batch_across_dp` posts a `[4, dp_size]` int32 tensor to the DP cpu_group, while Ascend's main runner uses `_sync_metadata_across_dp` with a `[2, dp_size]` tensor on the same cpu_group. The two shapes collide within one step.\r\n\r\n#### Bug 2 — reduce_scatter shape-not-divisible assertion on the idle DP rank\r\n\r\n```\r\nFile \".../vllm_ascend/ops/linear_op.py\", line 574, in matmul_and_reduce\r\n    output = tensor_model_parallel_reduce_scatter(output_parallel, 0)\r\nFile \".../base_device_communicator.py\", line 234, in reduce_scatter\r\n    assert input_tensor.shape[0] % world_size == 0\r\nAssertionError\r\n```\r\n\r\nThe proposer's own `cudagraph_dispatcher` is initialized as PIECEWISE/NONE only (never FULL), so `dispatch(num_tokens=6)` returns 6 as-is (no SP padding). That 6 enters DP sync, the synced max stays 6, and the idle DP rank's main MoE forward then crashes in SP `reduce_scatter` because `6 % TP=4 != 0`.\r\n\r\nEagle3/MTP do not reproduce this because Ascend's `AscendEagleProposer` uses `runner.cudagraph_dispatcher.dispatch(...)` which dispatches against the runner's FULL-mode capture sizes (always TP-aligned).\r\n\r\n#### Bug 3 / Bug 4 — multi-DP deadlock on MoE targets\r\n\r\nWhen the drafter sync performs a real all_reduce (e.g. hierarchical communication enabled), `MoE target + DP>1 + extract_hidden_states` serving hangs:\r\n\r\n- `is_drafter_moe_model()` misclassified the cache-only extract_hidden_states drafter as MoE because its `hf_config` copies the (MoE) target `hf_config`, so the expert-key scan matched. This made `_sync_metadata_across_dp(is_draft_model=True)` perform a real gloo all_reduce on the DP cpu_group in the drafter path that idle DP ranks never match.\r\n- `AscendExtractHiddenStatesProposer.dummy_run` never issued the drafter DP sync, unlike `llm_base_proposer.dummy_run`. Busy DP ranks (propose path) post one more cpu_group collective per step than idle ranks (dummy path), the collectives pair across different steps, token counts get garbled, and all ranks deadlock in the device-side MoE collectives.\r\n\r\n### Fix\r\n\r\nOverride `AscendExtractHiddenStatesProposer._determine_batch_execution_and_padding`:\r\n\r\n- SP-pad `num_tokens` via `runner._pad_for_sequence_parallelism` before dispatch, so the contribution to DP sync is always TP-aligned. Mirrors what the runner's main path does at `model_runner_v1.py:_determine_batch_execution_and_padding`.\r\n- Use `runner._sync_metadata_across_dp` (packed_tensor shape `[2, dp_size]`) for DP coordination instead of upstream `coordinate_batch_across_dp` (shape `[4, dp_size]`), so all DP collectives in a single step that hit the cpu_group use a consistent tensor shape.\r\n- Fail fast at the entry of the override with a clear `AssertionError` if the proposer was constructed without a runner reference, instead of letting the unguarded `runner._pad_for_sequence_parallelism` call raise a confusing `AttributeError`.\r\n- Document the `is_draft_model=True` semantics: it intentionally makes `should_skip_allreduce_across_dp_group` short-circuit (the cache-only \"draft\" here is not MoE), so the call degenerates to a local broadcast. The actual cross-DP all_reduce has already been done by the main runner earlier in the step; the SP padding above is what keeps the value TP-aligned regardless.\r\n\r\nAdditionally fix the two DP-collective bugs that hang `MoE target + DP>1 + extract_hidden_states` serving:\r\n\r\n- **`is_drafter_moe_model()` misclassification** (`vllm_ascend/utils.py`): the cache-only extract_hidden_states drafter is a single attention layer and never contains MoE layers, but its `hf_config` is built by copying the (possibly MoE) target `hf_config`, so the generic expert-key scan marked it MoE. Special-case `method == \"extract_hidden_states\"` to always return `False` (merged with the existing `Eagle3DeepseekV2ForCausalLM` special-case).\r\n- **Missing drafter DP sync in `dummy_run`** (`extract_hidden_states_proposer.py`): mirror `llm_base_proposer.dummy_run` and issue the same `_sync_metadata_across_dp(num_tokens, is_draft_model=True)` in `dummy_run`, so busy and idle DP ranks always stay collective-balanced.\r\n\r\n### Does this PR introduce _any_ user-facing change?\r\n\r\nNo user-facing API change. Fixes a runtime crash **and a multi-DP hang** for users running `extract_hidden_states` speculative decoding with `--data-parallel-size > 1` on MoE target models on Ascend NPU. Single-DP runs and dense target models (e.g. Qwen3-8B) are unaffected.\r\n\r\n### How was this patch tested?\r\n\r\nReproduced the crash/hang and verified the fix on MiniMax-M2:\r\n\r\n- 2x8 NPU, `--tensor-parallel-size 8 --data-parallel-size 2`\r\n- `--enable-expert-parallel`\r\n- `--compilation-config '{\"cudagraph_mode\": \"FULL_DECODE_ONLY\"}'`\r\n- `--speculative-config '{\"method\": \"extract_hidden_states\", \"num_speculative_tokens\": 1, \"draft_model_config\": {\"hf_config\": {\"eagle_aux_hidden_state_layer_ids\": [2, 18, 34]}}}'`\r\n- `--kv-transfer-config '{\"kv_connector\": \"ExampleHiddenStatesConnector\", \"kv_role\": \"kv_producer\", ...}'`\r\n\r\nSending one `/v1/completions` request with `max_tokens=1`:\r\n\r\n- Before fix: idle DP rank crashes on first `execute_dummy_batch` with the `AssertionError` shown above (and hangs once the drafter sync does a real all_reduce).\r\n- After fix: request returns `200 OK`, hidden_states `.safetensors` file is written with the expected `(prompt_len, len(layer_ids), hidden_size)` shape.\r\n\r\nAlso verified the existing dense Qwen3-8B + extract_hidden_states path still works unchanged.\r\n\r\nMiniMax-M2:\r\n\r\nUnit tests added in `tests/ut/spec_decode/test_extract_hidden_states_proposer.py`:\r\n\r\n- `test_determine_batch_execution_and_padding_asserts_when_runner_is_none`: regression guard for the `AttributeError` that would otherwise be raised on the unguarded `self.runner._pad_for_sequence_parallelism` call at the entry of the override.\r\n- `test_determine_batch_execution_and_padding_dp1_sp_pads_and_skips_sync`: with `DP=1` the runner's `_pad_for_sequence_parallelism` is still consulted (so `cache_only` forward gets an SP-aligned input) but `_sync_metadata_across_dp` is not called.\r\n- `test_determine_batch_execution_and_padding_dp2_uses_runner_sync`: with `DP>1` the override calls `runner._sync_metadata_across_dp` with the SP-padded `num_tokens` and `is_draft_model=True`, and does NOT call the upstream `coordinate_batch_across_dp` (regression guard for the gloo `8 vs 4` shape mismatch).\r\n- `test_determine_batch_execution_and_padding_dp2_keeps_tp_aligned_for_main_forward`: regression guard for the `reduce_scatter` `input.shape[0] % world_size == 0` assertion — the final `num_tokens_padded` returned to the caller is always TP-aligned.\r\n- `test_dummy_run_syncs_metadata_across_dp_as_draft_model`: regression guard for the multi-DP deadlock — `dummy_run` must issue the same `_sync_metadata_across_dp(..., is_draft_model=True)` drafter sync as the busy `propose()` path, and forward the synced tensor to `set_forward_context`.\r\n\r\nUnit tests added in `tests/ut/test_utils.py`:\r\n\r\n- `test_is_drafter_moe_model_extract_hidden_states_is_never_moe`: the extract_hidden_states drafter is never classified as MoE even when its inherited `hf_config` carries MoE keys (`num_local_experts`, `num_experts_per_tok`).\r\n- `test_is_drafter_moe_model_eagle_moe_drafter_detected`: non-extract_hidden_states drafters keep the expert-key MoE detection.\r\n\r\nRelated upstream PR: vllm-project/vllm#39949 (introduced extract_hidden_states speculative method).\r\n\r\n\n- vLLM version: v0.22.1\n- vLLM main: https://github.com/vllm-project/vllm/commit/967c5c3bc38891f4465d3f4e99917ed837bb3833\n",
+            "state": null,
+            "user": null,
+            "assignees": null,
+            "labels": null,
+            "milestone": null,
+            "state_reason": null,
+            "comments": null,
+            "created_at": null,
+            "updated_at": null,
+            "closed_at": null,
+            "display_url": "https://github.com/vllm-project/vllm-ascend/pull/9689",
+            "display_title": "[BugFix]Fix multi-DP deadlock for extract_hidden_states proposer on MoE targets"
+          },
+          {
+            "url": "https://github.com/vllm-project/vllm-ascend/pull/1417",
+            "title": "Br fix multi stream moe",
+            "issue_number": 1417,
+            "body": "### What this PR does / why we need it?\r\nAfter #1229 , multistream moe with **both mc2 and TP** is broken, due to `all_gather` operation in moe layer used to communicate the summation of `router_hidden_states` and `shared_hidden_states`, but only `router_hidden_states` now, causing a shape mismatch.\r\nFix this by adding yet another `all_gather` operation for `shared_hidden_states`. \r\n\r\nBy the way, all these `all_gather` operation exists due to a joint effect of:\r\n1. attn use `all_reduce` instead of `all_gather` + `reduce_scatter` for TP communication and,\r\n2. moe transfer TP to EP, necessitating `split` operations at the entry of moe layer.\r\n\r\nThis problem will be addressed by #1194 -like optimizations, after that is merged, both `split` and `all_gather` here can be removed.\r\n\r\n### Does this PR introduce _any_ user-facing change?\r\nNo.\r\n\r\n### How was this patch tested?\r\nTested both offline, and by graph mode mla e2e testcase.\r\n\r\n",
+            "state": null,
+            "user": null,
+            "assignees": null,
+            "labels": null,
+            "milestone": null,
+            "state_reason": null,
+            "comments": null,
+            "created_at": null,
+            "updated_at": null,
+            "closed_at": null,
+            "display_url": "https://github.com/vllm-project/vllm-ascend/pull/1417",
+            "display_title": "Br fix multi stream moe"
+          },
+          {
+            "url": "https://github.com/vllm-project/vllm-ascend/pull/710",
+            "title": "V1 parallel fix: bug fix to enable DP in V1",
+            "issue_number": 710,
+            "body": "<!--  Thanks for sending a pull request!\r\n\r\nBEFORE SUBMITTING, PLEASE READ https://docs.vllm.ai/en/latest/contributing/overview.html\r\n\r\n-->\r\n### What this PR does / why we need it?\r\n<!--\r\n- Please clarify what changes you are proposing. The purpose of this section is to outline the changes and how this PR fixes the issue.\r\nIf possible, please consider writing useful notes for better and faster reviews in your PR.\r\n\r\n- Please clarify why the changes are needed. For instance, the use case and bug description.\r\n\r\n- Fixes #\r\n-->\r\n\r\nThis PR fixed 2 bugs that disable Data Parallel on V1.\r\n\r\n[BUG 1] All-to-all communication is only used in MC2 mode, which is still not fully supported. Before the backend supports the communication, we closed all-to-all function while not using MC2.\r\n\r\n[BUG 2] When DP ranks have different max_tokens params, the rank finishes forwarding first must wait for others before termination due to all-reduce. Otherwise there will show communication error. This should be supported by execute_dummy_batch() to run a dummy forward. However, the dummy MoE will return immediately before all-reduce. We need to let dummy run the all_reduce func.\r\n\r\n### Does this PR introduce _any_ user-facing change?\r\n<!--\r\nNote that it means *any* user-facing change including all aspects such as API, interface or other behavior changes.\r\nDocumentation-only updates are not considered user-facing changes.\r\n-->\r\n\r\nYes, as a bug-fix PR, it introduces a new method and several branches.\r\n\r\n### How was this patch tested?\r\n<!--\r\nCI passed with new added/existing test.\r\nIf it was tested in a way different from regular unit tests, please clarify how you tested step by step, ideally copy and paste-able, so that other reviewers can test and check, and descendants can verify in the future.\r\nIf tests were not added, please describe why they were not added and/or why it was difficult to add.\r\n-->\r\n This patch can be tested with:\r\n```\r\n# torch version: 2.5.1+cpu\r\n# torch_npu version: 2.5.1\r\nexport VLLM_ENABLE_MC2=0\r\nexport VLLM_USE_V1=1\r\nexport TASK_QUEUE_ENABLE=2\r\nexport PYTORCH_NPU_ALLOC_CONF=expandable_segments:True\r\nexport VLLM_ENABLE_GRAPH_MODE=0\r\nexport USING_LCCL_COM=0\r\nexport VLLM_WORKER_MULTIPROC_METHOD=spawn\r\n\r\n# recommended test model: DeepSeek-V2-Lite\r\npython examples/offline_inference/data_parallel.py  --model=<your-model> --dp-size=2 --tp-size=8\r\n```\r\n\r\nCo-authored-by: HanlinDu ftdl21@pku.edu.cn\r\nCo-authored-by: ZhengWG zwg0606@gmail.com\r\nCo-authored-by: realliujiaxu realliujiaxu@163.com",
+            "state": null,
+            "user": null,
+            "assignees": null,
+            "labels": null,
+            "milestone": null,
+            "state_reason": null,
+            "comments": null,
+            "created_at": null,
+            "updated_at": null,
+            "closed_at": null,
+            "display_url": "https://github.com/vllm-project/vllm-ascend/pull/710",
+            "display_title": "V1 parallel fix: bug fix to enable DP in V1"
+          }
+        ]
+      },
+      "isError": false
+    }
+  },
+  {
+    "job_id": "RC-079-GH-ISSUE",
+    "task_ids": [
+      "RC-079"
+    ],
+    "kind": "SEARCH",
+    "resource_type": "ISSUE",
+    "round": 1,
+    "tool": "mcp__codex_apps__github_search_issues",
+    "args": {
+      "repository_full_name": "verl-project/verl",
+      "query": "qwen3_vl gradient spike is:issue",
+      "topn": 3
+    },
+    "checked_at": "2026-11-13T02:33:31.493Z",
+    "response": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Action completed."
+        }
+      ],
+      "structuredContent": {
+        "issues": []
+      },
+      "isError": false
+    }
+  },
+  {
+    "job_id": "RC-079-GH-PR",
+    "task_ids": [
+      "RC-079"
+    ],
+    "kind": "SEARCH",
+    "resource_type": "PR",
+    "round": 1,
+    "tool": "mcp__codex_apps__github_search_prs",
+    "args": {
+      "repository_full_name": "verl-project/verl",
+      "query": "qwen3_vl gradient spike",
+      "topn": 3
+    },
+    "checked_at": "2026-11-13T02:33:31.724Z",
+    "response": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Action completed."
+        }
+      ],
+      "structuredContent": {
+        "issues": []
+      },
+      "isError": false
+    }
+  },
+  {
+    "job_id": "RC-082-GH-ISSUE",
+    "task_ids": [
+      "RC-082"
+    ],
+    "kind": "SEARCH",
+    "resource_type": "ISSUE",
+    "round": 1,
+    "tool": "mcp__codex_apps__github_search_issues",
+    "args": {
+      "repository_full_name": "Ascend/pytorch",
+      "query": "EmbeddingDenseGrad empty is:issue",
+      "topn": 3
+    },
+    "checked_at": "2026-11-13T02:33:31.853Z",
+    "response": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Action completed."
+        }
+      ],
+      "structuredContent": {
+        "issues": []
+      },
+      "isError": false
+    }
+  },
+  {
+    "job_id": "RC-082-GH-PR",
+    "task_ids": [
+      "RC-082"
+    ],
+    "kind": "SEARCH",
+    "resource_type": "PR",
+    "round": 1,
+    "tool": "mcp__codex_apps__github_search_prs",
+    "args": {
+      "repository_full_name": "Ascend/pytorch",
+      "query": "EmbeddingDenseGrad empty",
+      "topn": 3
+    },
+    "checked_at": "2026-11-13T02:33:31.885Z",
+    "response": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Action completed."
+        }
+      ],
+      "structuredContent": {
+        "issues": []
+      },
+      "isError": false
+    }
+  },
+  {
+    "job_id": "RC-083-GH-ISSUE",
+    "task_ids": [
+      "RC-083"
+    ],
+    "kind": "SEARCH",
+    "resource_type": "ISSUE",
+    "round": 1,
+    "tool": "mcp__codex_apps__github_search_issues",
+    "args": {
+      "repository_full_name": "Ascend/pytorch",
+      "query": "bucketize stream is:issue",
+      "topn": 3
+    },
+    "checked_at": "2026-11-13T02:33:31.724Z",
+    "response": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Action completed."
+        }
+      ],
+      "structuredContent": {
+        "issues": []
+      },
+      "isError": false
+    }
+  },
+  {
+    "job_id": "RC-083-GH-PR",
+    "task_ids": [
+      "RC-083"
+    ],
+    "kind": "SEARCH",
+    "resource_type": "PR",
+    "round": 1,
+    "tool": "mcp__codex_apps__github_search_prs",
+    "args": {
+      "repository_full_name": "Ascend/pytorch",
+      "query": "bucketize stream",
+      "topn": 3
+    },
+    "checked_at": "2026-11-13T02:33:31.893Z",
+    "response": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Action completed."
+        }
+      ],
+      "structuredContent": {
+        "issues": []
+      },
+      "isError": false
+    }
+  },
+  {
+    "job_id": "RC-086-GH-ISSUE",
+    "task_ids": [
+      "RC-086"
+    ],
+    "kind": "SEARCH",
+    "resource_type": "ISSUE",
+    "round": 1,
+    "tool": "mcp__codex_apps__github_search_issues",
+    "args": {
+      "repository_full_name": "Ascend/pytorch",
+      "query": "matmul bias fusion precision is:issue",
+      "topn": 3
+    },
+    "checked_at": "2026-11-13T02:33:31.885Z",
+    "response": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Action completed."
+        }
+      ],
+      "structuredContent": {
+        "issues": []
+      },
+      "isError": false
+    }
+  },
+  {
+    "job_id": "RC-086-GH-PR",
+    "task_ids": [
+      "RC-086"
+    ],
+    "kind": "SEARCH",
+    "resource_type": "PR",
+    "round": 1,
+    "tool": "mcp__codex_apps__github_search_prs",
+    "args": {
+      "repository_full_name": "Ascend/pytorch",
+      "query": "matmul bias fusion precision",
+      "topn": 3
+    },
+    "checked_at": "2026-11-13T02:33:31.852Z",
+    "response": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Action completed."
+        }
+      ],
+      "structuredContent": {
+        "issues": []
+      },
+      "isError": false
+    }
+  },
+  {
+    "job_id": "RC-094-GH-ISSUE",
+    "task_ids": [
+      "RC-094"
+    ],
+    "kind": "SEARCH",
+    "resource_type": "ISSUE",
+    "round": 1,
+    "tool": "mcp__codex_apps__github_search_issues",
+    "args": {
+      "repository_full_name": "vllm-project/vllm-ascend",
+      "query": "scaling_factor seq_len is:issue",
+      "topn": 3
+    },
+    "checked_at": "2026-11-13T02:33:32.281Z",
+    "response": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Action completed."
+        }
+      ],
+      "structuredContent": {
+        "issues": [
+          {
+            "url": "https://github.com/vllm-project/vllm-ascend/issues/1657",
+            "title": "[Bug]: 0.9.1rc1-dev，offline推理下，启动一个自定义类Deepseek模型（只有dense层，有MLA），报错。明显的问题是：切片参数需要时整数，而这里是浮点数",
+            "issue_number": 1657,
+            "body": "### Your current environment\n\n0.9.1rc1-dev镜像，启用VLLM_USE_V1\n\n### 🐛 Describe the bug\n\n推理代码：    \nprompts = [\n        \"Hello, my name is\",\n        \"The future of AI is\",\n    ]\n    sampling_params = SamplingParams(temperature=0.8, top_p=0.95)\n    llm = LLM(\n            model=\"./self_weight_full_32\",\n            gpu_memory_utilization=0.9,\n            tensor_parallel_size=1,\n            max_model_len=1024,\n            additional_config={\"torchair_graph_config\": {\"enabled\": True},\"ascend_scheduler_config\": {\"enabled\": True,}},\n            )\n    outputs = llm.generate(prompts, sampling_params)\n    #llm.stop_profile()\n    for output in outputs:\n        prompt = output.prompt\n        generated_text = output.outputs[0].text\n        print(f\"Prompt: {prompt!r}, Generated text: {generated_text!r}\")\n\n 报错：\n\nINFO 07-07 12:25:26 [default_loader.py:272] Loading weights took 3.32 seconds\nINFO 07-07 12:25:27 [model_runner_v1.py:1746] Loading model weights took 16.7268 GB\nINFO 07-07 12:25:29 [kv_cache_utils.py:715] GPU KV cache size: 1,209,984 tokens\nINFO 07-07 12:25:29 [kv_cache_utils.py:719] Maximum concurrency for 1,024 tokens per request: 1181.62x\nINFO 07-07 12:25:29 [model_runner_v1.py:1963] Capturing torchair graph, this usually takes 1.0~3.0 mins.\n==in\nERROR 07-07 12:25:30 [core.py:515] EngineCore failed to start.\nERROR 07-07 12:25:30 [core.py:515] Traceback (most recent call last):\nERROR 07-07 12:25:30 [core.py:515]   File \"/vllm-workspace/vllm/vllm/v1/engine/core.py\", line 506, in run_engine_core\nERROR 07-07 12:25:30 [core.py:515]     engine_core = EngineCoreProc(*args, **kwargs)\nERROR 07-07 12:25:30 [core.py:515]   File \"/vllm-workspace/vllm/vllm/v1/engine/core.py\", line 390, in __init__\nERROR 07-07 12:25:30 [core.py:515]     super().__init__(vllm_config, executor_class, log_stats,\nERROR 07-07 12:25:30 [core.py:515]   File \"/vllm-workspace/vllm/vllm/v1/engine/core.py\", line 83, in __init__\nERROR 07-07 12:25:30 [core.py:515]     self._initialize_kv_caches(vllm_config)\nERROR 07-07 12:25:30 [core.py:515]   File \"/vllm-workspace/vllm/vllm/v1/engine/core.py\", line 168, in _initialize_kv_caches\nERROR 07-07 12:25:30 [core.py:515]     self.model_executor.initialize_from_config(kv_cache_configs)\nERROR 07-07 12:25:30 [core.py:515]   File \"/vllm-workspace/vllm/vllm/v1/executor/abstract.py\", line 66, in initialize_from_config\nERROR 07-07 12:25:30 [core.py:515]     self.collective_rpc(\"compile_or_warm_up_model\")\nERROR 07-07 12:25:30 [core.py:515]   File \"/vllm-workspace/vllm/vllm/executor/uniproc_executor.py\", line 57, in collective_rpc\nERROR 07-07 12:25:30 [core.py:515]     answer = run_method(self.driver_worker, method, args, kwargs)\nERROR 07-07 12:25:30 [core.py:515]   File \"/vllm-workspace/vllm/vllm/utils.py\", line 2671, in run_method\nERROR 07-07 12:25:30 [core.py:515]     return func(*args, **kwargs)\nERROR 07-07 12:25:30 [core.py:515]   File \"/vllm-workspace/vllm-ascend/vllm_ascend/worker/worker_v1.py\", line 208, in compile_or_warm_up_model\nERROR 07-07 12:25:30 [core.py:515]     self.model_runner.capture_model()\nERROR 07-07 12:25:30 [core.py:515]   File \"/vllm-workspace/vllm-ascend/vllm_ascend/worker/model_runner_v1.py\", line 1976, in capture_model\nERROR 07-07 12:25:30 [core.py:515]     self._dummy_run(num_tokens, is_torchair_compile=True)\nERROR 07-07 12:25:30 [core.py:515]   File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/utils/_contextlib.py\", line 116, in decorate_context\nERROR 07-07 12:25:30 [core.py:515]     return func(*args, **kwargs)\nERROR 07-07 12:25:30 [core.py:515]   File \"/vllm-workspace/vllm-ascend/vllm_ascend/worker/model_runner_v1.py\", line 1662, in _dummy_run\nERROR 07-07 12:25:30 [core.py:515]     hidden_states = compiled_model(\nERROR 07-07 12:25:30 [core.py:515]   File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/nn/modules/module.py\", line 1736, in _wrapped_call_impl\nERROR 07-07 12:25:30 [core.py:515]     return self._call_impl(*args, **kwargs)\nERROR 07-07 12:25:30 [core.py:515]   File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/nn/modules/module.py\", line 1747, in _call_impl\nERROR 07-07 12:25:30 [core.py:515]     return forward_call(*args, **kwargs)\nERROR 07-07 12:25:30 [core.py:515]   File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/eval_frame.py\", line 465, in _fn\nERROR 07-07 12:25:30 [core.py:515]     return fn(*args, **kwargs)\nERROR 07-07 12:25:30 [core.py:515]   File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/nn/modules/module.py\", line 1736, in _wrapped_call_impl\nERROR 07-07 12:25:30 [core.py:515]     return self._call_impl(*args, **kwargs)\nERROR 07-07 12:25:30 [core.py:515]   File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/nn/modules/module.py\", line 1747, in _call_impl\nERROR 07-07 12:25:30 [core.py:515]     return forward_call(*args, **kwargs)\nERROR 07-07 12:25:30 [core.py:515]   File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/convert_frame.py\", line 1269, in __call__\nERROR 07-07 12:25:30 [core.py:515]     return self._torchdynamo_orig_callable(\nERROR 07-07 12:25:30 [core.py:515]   File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/convert_frame.py\", line 526, in __call__\nERROR 07-07 12:25:30 [core.py:515]     return _compile(\nERROR 07-07 12:25:30 [core.py:515]   File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/convert_frame.py\", line 924, in _compile\nERROR 07-07 12:25:30 [core.py:515]     guarded_code = compile_inner(code, one_graph, hooks, transform)\nERROR 07-07 12:25:30 [core.py:515]   File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/convert_frame.py\", line 666, in compile_inner\nERROR 07-07 12:25:30 [core.py:515]     return _compile_inner(code, one_graph, hooks, transform)\nERROR 07-07 12:25:30 [core.py:515]   File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_utils_internal.py\", line 87, in wrapper_function\nERROR 07-07 12:25:30 [core.py:515]     return function(*args, **kwargs)\nERROR 07-07 12:25:30 [core.py:515]   File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/convert_frame.py\", line 699, in _compile_inner\nERROR 07-07 12:25:30 [core.py:515]     out_code = transform_code_object(code, transform)\nERROR 07-07 12:25:30 [core.py:515]   File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/bytecode_transformation.py\", line 1322, in transform_code_object\nERROR 07-07 12:25:30 [core.py:515]     transformations(instructions, code_options)\nERROR 07-07 12:25:30 [core.py:515]   File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/convert_frame.py\", line 219, in _fn\nERROR 07-07 12:25:30 [core.py:515]     return fn(*args, **kwargs)\nERROR 07-07 12:25:30 [core.py:515]   File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/convert_frame.py\", line 634, in transform\nERROR 07-07 12:25:30 [core.py:515]     tracer.run()\nERROR 07-07 12:25:30 [core.py:515]   File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/symbolic_convert.py\", line 2796, in run\nERROR 07-07 12:25:30 [core.py:515]     super().run()\nERROR 07-07 12:25:30 [core.py:515]   File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/symbolic_convert.py\", line 983, in run\nERROR 07-07 12:25:30 [core.py:515]     while self.step():\nERROR 07-07 12:25:30 [core.py:515]   File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/symbolic_convert.py\", line 895, in step\nERROR 07-07 12:25:30 [core.py:515]     self.dispatch_table[inst.opcode](self, inst)\nERROR 07-07 12:25:30 [core.py:515]   File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/symbolic_convert.py\", line 582, in wrapper\nERROR 07-07 12:25:30 [core.py:515]     return inner_fn(self, inst)\nERROR 07-07 12:25:30 [core.py:515]   File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/symbolic_convert.py\", line 1602, in CALL_FUNCTION\nERROR 07-07 12:25:30 [core.py:515]     self.call_function(fn, args, {})\nERROR 07-07 12:25:30 [core.py:515]   File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/symbolic_convert.py\", line 830, in call_function\nERROR 07-07 12:25:30 [core.py:515]     self.push(fn.call_function(self, args, kwargs))  # type: ignore[arg-type]\nERROR 07-07 12:25:30 [core.py:515]   File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/variables/lazy.py\", line 156, in realize_and_forward\nERROR 07-07 12:25:30 [core.py:515]     return getattr(self.realize(), name)(*args, **kwargs)\nERROR 07-07 12:25:30 [core.py:515]   File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/variables/nn_module.py\", line 899, in call_function\nERROR 07-07 12:25:30 [core.py:515]     return variables.UserFunctionVariable(fn, source=source).call_function(\nERROR 07-07 12:25:30 [core.py:515]   File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/variables/functions.py\", line 324, in call_function\nERROR 07-07 12:25:30 [core.py:515]     return super().call_function(tx, args, kwargs)\nERROR 07-07 12:25:30 [core.py:515]   File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/variables/functions.py\", line 111, in call_function\nERROR 07-07 12:25:30 [core.py:515]     return tx.inline_user_function_return(self, [*self.self_args(), *args], kwargs)\nERROR 07-07 12:25:30 [core.py:515]   File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/symbolic_convert.py\", line 836, in inline_user_function_return\nERROR 07-07 12:25:30 [core.py:515]     return InliningInstructionTranslator.inline_call(self, fn, args, kwargs)\nERROR 07-07 12:25:30 [core.py:515]   File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/symbolic_convert.py\", line 3011, in inline_call\nERROR 07-07 12:25:30 [core.py:515]     return cls.inline_call_(parent, func, args, kwargs)\nERROR 07-07 12:25:30 [core.py:515]   File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/symbolic_convert.py\", line 3139, in inline_call_\nERROR 07-07 12:25:30 [core.py:515]     tracer.run()\nERROR 07-07 12:25:30 [core.py:515]   File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/symbolic_convert.py\", line 983, in run\nERROR 07-07 12:25:30 [core.py:515]     while self.step():\nERROR 07-07 12:25:30 [core.py:515]   File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/symbolic_convert.py\", line 895, in step\nERROR 07-07 12:25:30 [core.py:515]     self.dispatch_table[inst.opcode](self, inst)\nERROR 07-07 12:25:30 [core.py:515]   File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/symbolic_convert.py\", line 582, in wrapper\nERROR 07-07 12:25:30 [core.py:515]     return inner_fn(self, inst)\nERROR 07-07 12:25:30 [core.py:515]   File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/symbolic_convert.py\", line 1602, in CALL_FUNCTION\nERROR 07-07 12:25:30 [core.py:515]     self.call_function(fn, args, {})\nERROR 07-07 12:25:30 [core.py:515]   File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/symbolic_convert.py\", line 830, in call_function\nERROR 07-07 12:25:30 [core.py:515]     self.push(fn.call_function(self, args, kwargs))  # type: ignore[arg-type]\nERROR 07-07 12:25:30 [core.py:515]   File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/variables/nn_module.py\", line 899, in call_function\nERROR 07-07 12:25:30 [core.py:515]     return variables.UserFunctionVariable(fn, source=source).call_function(\nERROR 07-07 12:25:30 [core.py:515]   File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/variables/functions.py\", line 324, in call_function\nERROR 07-07 12:25:30 [core.py:515]     return super().call_function(tx, args, kwargs)\nERROR 07-07 12:25:30 [core.py:515]   File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/variables/functions.py\", line 111, in call_function\nERROR 07-07 12:25:30 [core.py:515]     return tx.inline_user_function_return(self, [*self.self_args(), *args], kwargs)\nERROR 07-07 12:25:30 [core.py:515]   File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/symbolic_convert.py\", line 836, in inline_user_function_return\nERROR 07-07 12:25:30 [core.py:515]     return InliningInstructionTranslator.inline_call(self, fn, args, kwargs)\nERROR 07-07 12:25:30 [core.py:515]   File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/symbolic_convert.py\", line 3011, in inline_call\nERROR 07-07 12:25:30 [core.py:515]     return cls.inline_call_(parent, func, args, kwargs)\nERROR 07-07 12:25:30 [core.py:515]   File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/symbolic_convert.py\", line 3139, in inline_call_\nERROR 07-07 12:25:30 [core.py:515]     tracer.run()\nERROR 07-07 12:25:30 [core.py:515]   File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/symbolic_convert.py\", line 983, in run\nERROR 07-07 12:25:30 [core.py:515]     while self.step():\nERROR 07-07 12:25:30 [core.py:515]   File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/symbolic_convert.py\", line 895, in step\nERROR 07-07 12:25:30 [core.py:515]     self.dispatch_table[inst.opcode](self, inst)\nERROR 07-07 12:25:30 [core.py:515]   File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/symbolic_convert.py\", line 582, in wrapper\nERROR 07-07 12:25:30 [core.py:515]     return inner_fn(self, inst)\nERROR 07-07 12:25:30 [core.py:515]   File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/symbolic_convert.py\", line 1692, in CALL_FUNCTION_KW\nERROR 07-07 12:25:30 [core.py:515]     self.call_function(fn, args, kwargs)\nERROR 07-07 12:25:30 [core.py:515]   File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/symbolic_convert.py\", line 830, in call_function\nERROR 07-07 12:25:30 [core.py:515]     self.push(fn.call_function(self, args, kwargs))  # type: ignore[arg-type]\nERROR 07-07 12:25:30 [core.py:515]   File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/variables/lazy.py\", line 156, in realize_and_forward\nERROR 07-07 12:25:30 [core.py:515]     return getattr(self.realize(), name)(*args, **kwargs)\nERROR 07-07 12:25:30 [core.py:515]   File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/variables/nn_module.py\", line 899, in call_function\nERROR 07-07 12:25:30 [core.py:515]     return variables.UserFunctionVariable(fn, source=source).call_function(\nERROR 07-07 12:25:30 [core.py:515]   File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/variables/functions.py\", line 324, in call_function\nERROR 07-07 12:25:30 [core.py:515]     return super().call_function(tx, args, kwargs)\nERROR 07-07 12:25:30 [core.py:515]   File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/variables/functions.py\", line 111, in call_function\nERROR 07-07 12:25:30 [core.py:515]     return tx.inline_user_function_return(self, [*self.self_args(), *args], kwargs)\nERROR 07-07 12:25:30 [core.py:515]   File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/symbolic_convert.py\", line 836, in inline_user_function_return\nERROR 07-07 12:25:30 [core.py:515]     return InliningInstructionTranslator.inline_call(self, fn, args, kwargs)\nERROR 07-07 12:25:30 [core.py:515]   File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/symbolic_convert.py\", line 3011, in inline_call\nERROR 07-07 12:25:30 [core.py:515]     return cls.inline_call_(parent, func, args, kwargs)\nERROR 07-07 12:25:30 [core.py:515]   File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/symbolic_convert.py\", line 3139, in inline_call_\nERROR 07-07 12:25:30 [core.py:515]     tracer.run()\nERROR 07-07 12:25:30 [core.py:515]   File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/symbolic_convert.py\", line 983, in run\nERROR 07-07 12:25:30 [core.py:515]     while self.step():\nERROR 07-07 12:25:30 [core.py:515]   File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/symbolic_convert.py\", line 895, in step\nERROR 07-07 12:25:30 [core.py:515]     self.dispatch_table[inst.opcode](self, inst)\nERROR 07-07 12:25:30 [core.py:515]   File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/symbolic_convert.py\", line 582, in wrapper\nERROR 07-07 12:25:30 [core.py:515]     return inner_fn(self, inst)\nERROR 07-07 12:25:30 [core.py:515]   File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/symbolic_convert.py\", line 1680, in CALL_FUNCTION_EX\nERROR 07-07 12:25:30 [core.py:515]     self.call_function(fn, argsvars.items, kwargsvars)\nERROR 07-07 12:25:30 [core.py:515]   File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/symbolic_convert.py\", line 830, in call_function\nERROR 07-07 12:25:30 [core.py:515]     self.push(fn.call_function(self, args, kwargs))  # type: ignore[arg-type]\nERROR 07-07 12:25:30 [core.py:515]   File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/variables/functions.py\", line 385, in call_function\nERROR 07-07 12:25:30 [core.py:515]     return super().call_function(tx, args, kwargs)\nERROR 07-07 12:25:30 [core.py:515]   File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/variables/functions.py\", line 324, in call_function\nERROR 07-07 12:25:30 [core.py:515]     return super().call_function(tx, args, kwargs)\nERROR 07-07 12:25:30 [core.py:515]   File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/variables/functions.py\", line 111, in call_function\nERROR 07-07 12:25:30 [core.py:515]     return tx.inline_user_function_return(self, [*self.self_args(), *args], kwargs)\nERROR 07-07 12:25:30 [core.py:515]   File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/symbolic_convert.py\", line 836, in inline_user_function_return\nERROR 07-07 12:25:30 [core.py:515]     return InliningInstructionTranslator.inline_call(self, fn, args, kwargs)\nERROR 07-07 12:25:30 [core.py:515]   File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/symbolic_convert.py\", line 3011, in inline_call\nERROR 07-07 12:25:30 [core.py:515]     return cls.inline_call_(parent, func, args, kwargs)\nERROR 07-07 12:25:30 [core.py:515]   File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/symbolic_convert.py\", line 3139, in inline_call_\nERROR 07-07 12:25:30 [core.py:515]     tracer.run()\nERROR 07-07 12:25:30 [core.py:515]   File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/symbolic_convert.py\", line 983, in run\nERROR 07-07 12:25:30 [core.py:515]     while self.step():\nERROR 07-07 12:25:30 [core.py:515]   File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/symbolic_convert.py\", line 895, in step\nERROR 07-07 12:25:30 [core.py:515]     self.dispatch_table[inst.opcode](self, inst)\nERROR 07-07 12:25:30 [core.py:515]   File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/symbolic_convert.py\", line 582, in wrapper\nERROR 07-07 12:25:30 [core.py:515]     return inner_fn(self, inst)\nERROR 07-07 12:25:30 [core.py:515]   File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/symbolic_convert.py\", line 301, in impl\nERROR 07-07 12:25:30 [core.py:515]     self.push(fn_var.call_function(self, self.popn(nargs), {}))\nERROR 07-07 12:25:30 [core.py:515]   File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/variables/builtin.py\", line 967, in call_function\nERROR 07-07 12:25:30 [core.py:515]     return handler(tx, args, kwargs)\nERROR 07-07 12:25:30 [core.py:515]   File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/variables/builtin.py\", line 711, in <lambda>\nERROR 07-07 12:25:30 [core.py:515]     return lambda tx, args, kwargs: obj.call_function(\nERROR 07-07 12:25:30 [core.py:515]   File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/variables/builtin.py\", line 967, in call_function\nERROR 07-07 12:25:30 [core.py:515]     return handler(tx, args, kwargs)\nERROR 07-07 12:25:30 [core.py:515]   File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/variables/builtin.py\", line 943, in _handle_insert_op_in_graph\nERROR 07-07 12:25:30 [core.py:515]     return wrap_fx_proxy(tx, proxy)\nERROR 07-07 12:25:30 [core.py:515]   File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/variables/builder.py\", line 2037, in wrap_fx_proxy\nERROR 07-07 12:25:30 [core.py:515]     return wrap_fx_proxy_cls(target_cls=TensorVariable, **kwargs)\nERROR 07-07 12:25:30 [core.py:515]   File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/variables/builder.py\", line 2124, in wrap_fx_proxy_cls\nERROR 07-07 12:25:30 [core.py:515]     example_value = get_fake_value(proxy.node, tx, allow_non_graph_fake=True)\nERROR 07-07 12:25:30 [core.py:515]   File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/utils.py\", line 2082, in get_fake_value\nERROR 07-07 12:25:30 [core.py:515]     raise TorchRuntimeError(str(e)).with_traceback(e.__traceback__) from None\nERROR 07-07 12:25:30 [core.py:515]   File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/utils.py\", line 2017, in get_fake_value\nERROR 07-07 12:25:30 [core.py:515]     ret_val = wrap_fake_exception(\nERROR 07-07 12:25:30 [core.py:515]   File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/utils.py\", line 1574, in wrap_fake_exception\nERROR 07-07 12:25:30 [core.py:515]     return fn()\nERROR 07-07 12:25:30 [core.py:515]   File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/utils.py\", line 2018, in <lambda>\nERROR 07-07 12:25:30 [core.py:515]     lambda: run_node(tx.output, node, args, kwargs, nnmodule)\nERROR 07-07 12:25:30 [core.py:515]   File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/utils.py\", line 2150, in run_node\nERROR 07-07 12:25:30 [core.py:515]     raise RuntimeError(make_error_message(e)).with_traceback(\nERROR 07-07 12:25:30 [core.py:515]   File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/utils.py\", line 2132, in run_node\nERROR 07-07 12:25:30 [core.py:515]     return node.target(*args, **kwargs)\n### ERROR 07-07 12:25:30 [core.py:515] torch._dynamo.exc.TorchRuntimeError: Failed running call_function <built-in function getitem>(*(FakeTensor(..., device='npu:0', size=(163840, 64), dtype=torch.bfloat16), slice(None, 163840.0, None)), **{}):\nERROR 07-07 12:25:30 [core.py:515] slice indices must be integers or None or have an __index__ method\nERROR 07-07 12:25:30 [core.py:515]\nERROR 07-07 12:25:30 [core.py:515] from user code:\nERROR 07-07 12:25:30 [core.py:515]    File \"/vllm-workspace/vllm-ascend/vllm_ascend/models/deepseek_v2.py\", line 761, in forward\nERROR 07-07 12:25:30 [core.py:515]     hidden_states = self.model(input_ids, positions, kv_caches,\nERROR 07-07 12:25:30 [core.py:515]   File \"/vllm-workspace/vllm-ascend/vllm_ascend/models/deepseek_v2.py\", line 706, in forward\nERROR 07-07 12:25:30 [core.py:515]     hidden_states, residual = layer(\nERROR 07-07 12:25:30 [core.py:515]   File \"/vllm-workspace/vllm-ascend/vllm_ascend/models/deepseek_v2.py\", line 599, in forward\nERROR 07-07 12:25:30 [core.py:515]     hidden_states = self.self_attn(\nERROR 07-07 12:25:30 [core.py:515]   File \"/vllm-workspace/vllm-ascend/vllm_ascend/models/deepseek_v2.py\", line 495, in forward\nERROR 07-07 12:25:30 [core.py:515]     output = self.mla_attn.impl.forward(self.mla_attn,\nERROR 07-07 12:25:30 [core.py:515]   File \"/vllm-workspace/vllm-ascend/vllm_ascend/attention/mla_v1.py\", line 1117, in forward\nERROR 07-07 12:25:30 [core.py:515]     cos = self.rotary_emb.cos_cached[:seq_len].to(\nERROR 07-07 12:25:30 [core.py:515]\nERROR 07-07 12:25:30 [core.py:515] Set TORCH_LOGS=\"+dynamo\" and TORCHDYNAMO_VERBOSE=1 for more information\nERROR 07-07 12:25:30 [core.py:515]\nERROR 07-07 12:25:30 [core.py:515]\nERROR 07-07 12:25:30 [core.py:515] You can suppress this exception and fall back to eager by setting:\nERROR 07-07 12:25:30 [core.py:515]     import torch._dynamo\nERROR 07-07 12:25:30 [core.py:515]     torch._dynamo.config.suppress_errors = True\nERROR 07-07 12:25:30 [core.py:515]\nProcess EngineCore_0:\nTraceback (most recent call last):\n  File \"/usr/local/python3.10.17/lib/python3.10/multiprocessing/process.py\", line 314, in _bootstrap\n    self.run()\n  File \"/usr/local/python3.10.17/lib/python3.10/multiprocessing/process.py\", line 108, in run\n    self._target(*self._args, **self._kwargs)\n  File \"/vllm-workspace/vllm/vllm/v1/engine/core.py\", line 519, in run_engine_core\n    raise e\n  File \"/vllm-workspace/vllm/vllm/v1/engine/core.py\", line 506, in run_engine_core\n    engine_core = EngineCoreProc(*args, **kwargs)\n  File \"/vllm-workspace/vllm/vllm/v1/engine/core.py\", line 390, in __init__\n    super().__init__(vllm_config, executor_class, log_stats,\n  File \"/vllm-workspace/vllm/vllm/v1/engine/core.py\", line 83, in __init__\n    self._initialize_kv_caches(vllm_config)\n  File \"/vllm-workspace/vllm/vllm/v1/engine/core.py\", line 168, in _initialize_kv_caches\n    self.model_executor.initialize_from_config(kv_cache_configs)\n  File \"/vllm-workspace/vllm/vllm/v1/executor/abstract.py\", line 66, in initialize_from_config\n    self.collective_rpc(\"compile_or_warm_up_model\")\n  File \"/vllm-workspace/vllm/vllm/executor/uniproc_executor.py\", line 57, in collective_rpc\n    answer = run_method(self.driver_worker, method, args, kwargs)\n  File \"/vllm-workspace/vllm/vllm/utils.py\", line 2671, in run_method\n    return func(*args, **kwargs)\n  File \"/vllm-workspace/vllm-ascend/vllm_ascend/worker/worker_v1.py\", line 208, in compile_or_warm_up_model\n    self.model_runner.capture_model()\n  File \"/vllm-workspace/vllm-ascend/vllm_ascend/worker/model_runner_v1.py\", line 1976, in capture_model\n    self._dummy_run(num_tokens, is_torchair_compile=True)\n  File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/utils/_contextlib.py\", line 116, in decorate_context\n    return func(*args, **kwargs)\n  File \"/vllm-workspace/vllm-ascend/vllm_ascend/worker/model_runner_v1.py\", line 1662, in _dummy_run\n    hidden_states = compiled_model(\n  File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/nn/modules/module.py\", line 1736, in _wrapped_call_impl\n    return self._call_impl(*args, **kwargs)\n  File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/nn/modules/module.py\", line 1747, in _call_impl\n    return forward_call(*args, **kwargs)\n  File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/eval_frame.py\", line 465, in _fn\n    return fn(*args, **kwargs)\n  File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/nn/modules/module.py\", line 1736, in _wrapped_call_impl\n    return self._call_impl(*args, **kwargs)\n  File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/nn/modules/module.py\", line 1747, in _call_impl\n    return forward_call(*args, **kwargs)\n  File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/convert_frame.py\", line 1269, in __call__\n    return self._torchdynamo_orig_callable(\n  File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/convert_frame.py\", line 526, in __call__\n    return _compile(\n  File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/convert_frame.py\", line 924, in _compile\n    guarded_code = compile_inner(code, one_graph, hooks, transform)\n  File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/convert_frame.py\", line 666, in compile_inner\n    return _compile_inner(code, one_graph, hooks, transform)\n  File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_utils_internal.py\", line 87, in wrapper_function\n    return function(*args, **kwargs)\n  File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/convert_frame.py\", line 699, in _compile_inner\n    out_code = transform_code_object(code, transform)\n  File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/bytecode_transformation.py\", line 1322, in transform_code_object\n    transformations(instructions, code_options)\n  File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/convert_frame.py\", line 219, in _fn\n    return fn(*args, **kwargs)\n  File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/convert_frame.py\", line 634, in transform\n    tracer.run()\n  File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/symbolic_convert.py\", line 2796, in run\n    super().run()\n  File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/symbolic_convert.py\", line 983, in run\n    while self.step():\n  File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/symbolic_convert.py\", line 895, in step\n    self.dispatch_table[inst.opcode](self, inst)\n  File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/symbolic_convert.py\", line 582, in wrapper\n    return inner_fn(self, inst)\n  File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/symbolic_convert.py\", line 1602, in CALL_FUNCTION\n    self.call_function(fn, args, {})\n  File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/symbolic_convert.py\", line 830, in call_function\n    self.push(fn.call_function(self, args, kwargs))  # type: ignore[arg-type]\n  File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/variables/lazy.py\", line 156, in realize_and_forward\n    return getattr(self.realize(), name)(*args, **kwargs)\n  File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/variables/nn_module.py\", line 899, in call_function\n    return variables.UserFunctionVariable(fn, source=source).call_function(\n  File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/variables/functions.py\", line 324, in call_function\n    return super().call_function(tx, args, kwargs)\n  File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/variables/functions.py\", line 111, in call_function\n    return tx.inline_user_function_return(self, [*self.self_args(), *args], kwargs)\n  File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/symbolic_convert.py\", line 836, in inline_user_function_return\n    return InliningInstructionTranslator.inline_call(self, fn, args, kwargs)\n  File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/symbolic_convert.py\", line 3011, in inline_call\n    return cls.inline_call_(parent, func, args, kwargs)\n  File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/symbolic_convert.py\", line 3139, in inline_call_\n    tracer.run()\n  File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/symbolic_convert.py\", line 983, in run\n    while self.step():\n  File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/symbolic_convert.py\", line 895, in step\n    self.dispatch_table[inst.opcode](self, inst)\n  File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/symbolic_convert.py\", line 582, in wrapper\n    return inner_fn(self, inst)\n  File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/symbolic_convert.py\", line 1602, in CALL_FUNCTION\n    self.call_function(fn, args, {})\n  File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/symbolic_convert.py\", line 830, in call_function\n    self.push(fn.call_function(self, args, kwargs))  # type: ignore[arg-type]\n  File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/variables/nn_module.py\", line 899, in call_function\n    return variables.UserFunctionVariable(fn, source=source).call_function(\n  File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/variables/functions.py\", line 324, in call_function\n    return super().call_function(tx, args, kwargs)\n  File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/variables/functions.py\", line 111, in call_function\n    return tx.inline_user_function_return(self, [*self.self_args(), *args], kwargs)\n  File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/symbolic_convert.py\", line 836, in inline_user_function_return\n    return InliningInstructionTranslator.inline_call(self, fn, args, kwargs)\n  File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/symbolic_convert.py\", line 3011, in inline_call\n    return cls.inline_call_(parent, func, args, kwargs)\n  File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/symbolic_convert.py\", line 3139, in inline_call_\n    tracer.run()\n  File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/symbolic_convert.py\", line 983, in run\n    while self.step():\n  File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/symbolic_convert.py\", line 895, in step\n    self.dispatch_table[inst.opcode](self, inst)\n  File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/symbolic_convert.py\", line 582, in wrapper\n    return inner_fn(self, inst)\n  File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/symbolic_convert.py\", line 1692, in CALL_FUNCTION_KW\n    self.call_function(fn, args, kwargs)\n  File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/symbolic_convert.py\", line 830, in call_function\n    self.push(fn.call_function(self, args, kwargs))  # type: ignore[arg-type]\n  File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/variables/lazy.py\", line 156, in realize_and_forward\n    return getattr(self.realize(), name)(*args, **kwargs)\n  File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/variables/nn_module.py\", line 899, in call_function\n    return variables.UserFunctionVariable(fn, source=source).call_function(\n  File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/variables/functions.py\", line 324, in call_function\n    return super().call_function(tx, args, kwargs)\n  File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/variables/functions.py\", line 111, in call_function\n    return tx.inline_user_function_return(self, [*self.self_args(), *args], kwargs)\n  File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/symbolic_convert.py\", line 836, in inline_user_function_return\n    return InliningInstructionTranslator.inline_call(self, fn, args, kwargs)\n  File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/symbolic_convert.py\", line 3011, in inline_call\n    return cls.inline_call_(parent, func, args, kwargs)\n  File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/symbolic_convert.py\", line 3139, in inline_call_\n    tracer.run()\n  File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/symbolic_convert.py\", line 983, in run\n    while self.step():\n  File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/symbolic_convert.py\", line 895, in step\n    self.dispatch_table[inst.opcode](self, inst)\n  File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/symbolic_convert.py\", line 582, in wrapper\n    return inner_fn(self, inst)\n  File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/symbolic_convert.py\", line 1680, in CALL_FUNCTION_EX\n    self.call_function(fn, argsvars.items, kwargsvars)\n  File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/symbolic_convert.py\", line 830, in call_function\n    self.push(fn.call_function(self, args, kwargs))  # type: ignore[arg-type]\n  File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/variables/functions.py\", line 385, in call_function\n    return super().call_function(tx, args, kwargs)\n  File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/variables/functions.py\", line 324, in call_function\n    return super().call_function(tx, args, kwargs)\n  File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/variables/functions.py\", line 111, in call_function\n    return tx.inline_user_function_return(self, [*self.self_args(), *args], kwargs)\n  File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/symbolic_convert.py\", line 836, in inline_user_function_return\n    return InliningInstructionTranslator.inline_call(self, fn, args, kwargs)\n  File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/symbolic_convert.py\", line 3011, in inline_call\n    return cls.inline_call_(parent, func, args, kwargs)\n  File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/symbolic_convert.py\", line 3139, in inline_call_\n    tracer.run()\n  File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/symbolic_convert.py\", line 983, in run\n    while self.step():\n  File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/symbolic_convert.py\", line 895, in step\n    self.dispatch_table[inst.opcode](self, inst)\n  File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/symbolic_convert.py\", line 582, in wrapper\n    return inner_fn(self, inst)\n  File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/symbolic_convert.py\", line 301, in impl\n    self.push(fn_var.call_function(self, self.popn(nargs), {}))\n  File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/variables/builtin.py\", line 967, in call_function\n    return handler(tx, args, kwargs)\n  File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/variables/builtin.py\", line 711, in <lambda>\n    return lambda tx, args, kwargs: obj.call_function(\n  File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/variables/builtin.py\", line 967, in call_function\n    return handler(tx, args, kwargs)\n  File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/variables/builtin.py\", line 943, in _handle_insert_op_in_graph\n    return wrap_fx_proxy(tx, proxy)\n  File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/variables/builder.py\", line 2037, in wrap_fx_proxy\n    return wrap_fx_proxy_cls(target_cls=TensorVariable, **kwargs)\n  File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/variables/builder.py\", line 2124, in wrap_fx_proxy_cls\n    example_value = get_fake_value(proxy.node, tx, allow_non_graph_fake=True)\n  File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/utils.py\", line 2082, in get_fake_value\n    raise TorchRuntimeError(str(e)).with_traceback(e.__traceback__) from None\n  File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/utils.py\", line 2017, in get_fake_value\n    ret_val = wrap_fake_exception(\n  File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/utils.py\", line 1574, in wrap_fake_exception\n    return fn()\n  File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/utils.py\", line 2018, in <lambda>\n    lambda: run_node(tx.output, node, args, kwargs, nnmodule)\n  File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/utils.py\", line 2150, in run_node\n    raise RuntimeError(make_error_message(e)).with_traceback(\n  File \"/usr/local/python3.10.17/lib/python3.10/site-packages/torch/_dynamo/utils.py\", line 2132, in run_node\n    return node.target(*args, **kwargs)\ntorch._dynamo.exc.TorchRuntimeError: Failed running call_function <built-in function getitem>(*(FakeTensor(..., device='npu:0', size=(163840, 64), dtype=torch.bfloat16), slice(None, 163840.0, None)), **{}):\nslice indices must be integers or None or have an __index__ method\n\nfrom user code:\n   File \"/vllm-workspace/vllm-ascend/vllm_ascend/models/deepseek_v2.py\", line 761, in forward\n    hidden_states = self.model(input_ids, positions, kv_caches,\n  File \"/vllm-workspace/vllm-ascend/vllm_ascend/models/deepseek_v2.py\", line 706, in forward\n    hidden_states, residual = layer(\n  File \"/vllm-workspace/vllm-ascend/vllm_ascend/models/deepseek_v2.py\", line 599, in forward\n    hidden_states = self.self_attn(\n  File \"/vllm-workspace/vllm-ascend/vllm_ascend/models/deepseek_v2.py\", line 495, in forward\n    output = self.mla_attn.impl.forward(self.mla_attn,\n  File \"/vllm-workspace/vllm-ascend/vllm_ascend/attention/mla_v1.py\", line 1117, in forward\n    cos = self.rotary_emb.cos_cached[:seq_len].to(\n\nSet TORCH_LOGS=\"+dynamo\" and TORCHDYNAMO_VERBOSE=1 for more information\n\n\nYou can suppress this exception and fall back to eager by setting:\n    import torch._dynamo\n    torch._dynamo.config.suppress_errors = True\n\nTraceback (most recent call last):\n  File \"/work/script/offline_v1_14b.py\", line 31, in <module>\n    main()\n  File \"/work/script/offline_v1_14b.py\", line 11, in main\n    llm = LLM(\n  File \"/vllm-workspace/vllm/vllm/entrypoints/llm.py\", line 243, in __init__\n    self.llm_engine = LLMEngine.from_engine_args(\n  File \"/vllm-workspace/vllm/vllm/v1/engine/llm_engine.py\", line 150, in from_engine_args\n    return cls(vllm_config=vllm_config,\n  File \"/vllm-workspace/vllm/vllm/v1/engine/llm_engine.py\", line 101, in __init__\n    self.engine_core = EngineCoreClient.make_client(\n  File \"/vllm-workspace/vllm/vllm/v1/engine/core_client.py\", line 75, in make_client\n    return SyncMPClient(vllm_config, executor_class, log_stats)\n  File \"/vllm-workspace/vllm/vllm/v1/engine/core_client.py\", line 558, in __init__\n    super().__init__(\n  File \"/vllm-workspace/vllm/vllm/v1/engine/core_client.py\", line 422, in __init__\n    self._init_engines_direct(vllm_config, local_only,\n  File \"/vllm-workspace/vllm/vllm/v1/engine/core_client.py\", line 491, in _init_engines_direct\n    self._wait_for_engine_startup(handshake_socket, input_address,\n  File \"/vllm-workspace/vllm/vllm/v1/engine/core_client.py\", line 511, in _wait_for_engine_startup\n    wait_for_engine_startup(\n  File \"/vllm-workspace/vllm/vllm/v1/utils.py\", line 494, in wait_for_engine_startup\n    raise RuntimeError(\"Engine core initialization failed. \"\nRuntimeError: Engine core initialization failed. See root cause above. Failed core proc(s): {}\n[ERROR] 2025-07-07-12:25:30 (PID:15718, Device:-1, RankID:-1) ERR99999 UNKNOWN applicaiton exception\n",
+            "state": null,
+            "user": null,
+            "assignees": null,
+            "labels": null,
+            "milestone": null,
+            "state_reason": null,
+            "comments": null,
+            "created_at": null,
+            "updated_at": null,
+            "closed_at": null,
+            "display_url": "https://github.com/vllm-project/vllm-ascend/issues/1657",
+            "display_title": "[Bug]: 0.9.1rc1-dev，offline推理下，启动一个自定义类Deepseek模型（只有dense层，有MLA），报错。明显的问题是：切片参数需要时整数，而这里是浮点数"
+          }
+        ]
+      },
+      "isError": false
+    }
+  },
+  {
+    "job_id": "RC-094-GH-PR",
+    "task_ids": [
+      "RC-094"
+    ],
+    "kind": "SEARCH",
+    "resource_type": "PR",
+    "round": 1,
+    "tool": "mcp__codex_apps__github_search_prs",
+    "args": {
+      "repository_full_name": "vllm-project/vllm-ascend",
+      "query": "scaling_factor seq_len",
+      "topn": 3
+    },
+    "checked_at": "2026-11-13T02:33:31.864Z",
+    "response": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Action completed."
+        }
+      ],
+      "structuredContent": {
+        "issues": []
+      },
+      "isError": false
+    }
+  }
+]

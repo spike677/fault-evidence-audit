@@ -1,0 +1,626 @@
+test: allgather mesh 1d kernel增加AIV_INFO调试打印并开启ASCENDC_DUMP-hccl-AtomGit
+Star
+785
+Fork
+744
+Code
+Introduction
+Code
+Issues
+70
+Pull Requests
+265
+Pipeline
+Actions
+Discussion
+Wiki
+Members
+61
+Analysis
+Settings
+Star
+785
+Fork
+744
+Open
+test: allgather mesh 1d kernel增加AIV_INFO调试打印并开启ASCENDC_DUMP
+#4035
+shirokawa_
+Add on
+23 hours ago
+Merged from
+shirokawa_/hccl_aiv：
+debug_aiv_allgather_print
+into
+cann/hccl：
+master
+test: allgather mesh 1d kernel增加AIV_INFO调试打印并开启ASCENDC_DUMP
+#4035
+Open
+shirokawa_
+Add on
+23 hours ago
+Merged from
+shirokawa_/hccl_aiv
+debug_aiv_allgather_print
+into
+cann/hccl
+master
+Merge checks
+Discussion
+0
+Commits
+0
+Checks
+0
+Files changed
+0
+Clone/Download
+0
+shirokawa_
+23 hours ago
+23 hours ago
+描述
+关联的Issue
+测试
+文档更新
+类型标签
+Bug修复
+新特性
+性能优化
+文档更新
+其他，请描述：
+Save
+Cancel
+Merge blocked
+shirokawa_
+23 hours ago
+Created pull request, commit
+70ad8f2c
+23 hours ago
+Created pull request, commit
+70ad8f2c
+atomgit-bot
+23 hours ago
+Comments：
+23 hours ago
+Comments：
+变更摘要
+本 PR 为 allgather mesh 1d 的 AIV kernel 增加调试日志能力：在
+aiv_all_gather_mesh_1d.h
+与
+aiv_all_gather_mesh_1d_write.h
+两个 kernel 实现中插入带编号的
+AIV_INFO
+打印，并在入口、循环与退出等关键节点按
+blockIdx_ == 0
+条件只由首个 block 输出概要信息；同时按 PR 标题所述开启
+ASCENDC_DUMP
+。改动整体聚焦于可观测性，不改变数据搬运与同步流程本身。
+主要改动
+读语义 kernel 全流程埋点
+: 在
+aiv_all_gather_mesh_1d.h
+中新增
+AG1D0000
+～
+AG1D1090
+系列打印，覆盖
+InitCoreInfo
+、
+Run
+、
+RunCtrlCore
+中的
+CpGM2GM
+、
+Record
+、
+WaitFlag
+、
+PipeBarrier
+、
+SyncAll
+以及
+Process
+／
+BarrierAll
+各阶段完成点。
+写语义 kernel 全流程埋点
+: 在
+aiv_all_gather_mesh_1d_write.h
+中新增
+AGW1D0000
+～
+AGW1D0061
+系列打印，覆盖 READY／CONSUMED／READ_DONE 标志的发布与等待、
+SendCachedPiece
+／
+SendPiece
+的
+DataCopyGM2UB
+、
+DataCopyUB2GM
+与
+CpGM2GM
+搬运，以及自拷贝路径和核间同步点。
+单核门控的概要日志
+: 入口参数（
+rank_
+、
+rankSize_
+、
+numBlocks_
+、
+len
+、
+tag_
+、
+sliceId
+、
+pingpong
+）与
+AivAllGatherV2Mesh1DSuperKernel
+的循环进度、退出信息仅在
+op.blockIdx_ == 0
+时打印，避免多核重复输出。
+同步状态可追踪
+: 每条日志同时输出
+blockIdx_
+、
+targetRank
+／
+rank
+、flag 偏移量与
+curTag_
+、搬运计数，便于按核与流水阶段定位多卡同步与数据搬运的执行顺序。
+开启 dump 配置
+: 按 PR 标题所述开启
+ASCENDC_DUMP
+，用于配合上述调试打印进行运行时信息采集。
+🧩 本次 Review 已使用自定义 Skill：
+hccl-review
+Save
+Cancel
+Incorrect?
+atomgit-bot
+23 hours ago
+Comments：
+23 hours ago
+Comments：
+代码审查
+检视结论
+逐文件确认
+CMakeLists.txt
+：发现问题 1 个（P1）——
+ASCENDC_DUMP
+默认值 0→1。
+src/ops/all_gather/algorithm/template/aiv/kernel/aiv_all_gather_mesh_1d.h
+：新增打印本身格式/实参逐一核对无误（含 SK 路径、入口 AIV_INFO_HINT 已存在），无独立缺陷；其热循环打印的性能影响已并入下面第 3 条（P2）。
+src/ops/all_gather/algorithm/template/aiv/kernel/aiv_all_gather_mesh_1d_write.h
+：发现问题 2 个（P2 + P3）。
+问题清单（共 4 条）
+优先级
+文件:行
+问题
+P1
+CMakeLists.txt:37
+ASCENDC_DUMP
+默认改 1，把 AscendC dump/printf 默认编入所有 AIV 算子（
+AIV_INFO
+=
+AscendC::PRINTF
+，见
+aiv_defines.h:160-165
+），且与第 35 行注释相反；调试开关不应作为默认行为合入主干
+P2
+aiv_all_gather_mesh_1d_write.h:371
+AGW1D0021 格式串仅 1 个
+%llu
+却传 2 个实参，
+blockIdx_
+被丢弃（核号丢失 +
+-Wformat-extra-args
+/
+-Werror
+风险）
+P2
+aiv_all_gather_mesh_1d_write.h:386-393
+逐分片×逐 target（另含 321-329、412-418、读语义 113-125/195-206）打印位于热循环，默认启用 dump 后造成通信 kernel 时延上升与日志刷屏
+P3
+aiv_all_gather_mesh_1d_write.h:137-139
+AGW1D0042 的
+flag=
+只打印
+pieceFlag
+，与同函数其它打印的完整键
+targetRank*coreNumStage2+pieceFlag
+不一致，排障时误导
+总体风险判断
+该 PR 为调测性质，kernel 内的打印插入位置与变量取值总体正确，未破坏 flag/WaitFlag/Record 协议；主要风险集中在
+把调测开关的默认值改成生产默认
+（P1，影响仓内全部 AIV 算子并带来运行时开销与日志噪音），以及一处格式串/实参错位与热循环打印粒度问题。建议：将
+ASCENDC_DUMP
+默认值改回 0、修正 AGW1D0021 格式串，并把逐迭代打印收敛到循环外或加调测宏包裹，之后再合入。
+类型
+数量
+🔴 阻塞
+1
+🟡 建议
+3
+⛔ 需要修改
+🧩 本次 Review 已使用自定义 Skill：
+hccl-review
+Save
+Cancel
+Incorrect?
+CANN-robot
+Collaborators
+23 hours ago
+Added label:
+cann-cla/yes
+23 hours ago
+Added label:
+cann-cla/yes
+CANN-robot
+Collaborators
+23 hours ago
+Comments：
+23 hours ago
+Comments：
+Thanks for your pull-request.
+The full list of commands accepted by me can be found at
+here
+.
+You can get sig-info at
+here
+.
+You can self-configure the PR merge rules for this repository. For more details, please refer to
+Here
+.
+For more, you also can visit
+HICANN
+.
+PR Approval Progress
+⚠️ This PR does not yet meet the following requirements:lgtm (requires ≥ 2 person(s) per module)、approve (requires ≥ 1 person(s) per module)
+Module Approval Details
+module
+lgtm status
+approve status
+CMakeLists.txt
+❌ (0/2)(You can also ask:
+陈量
+,
+陈浩
+,
+刘万科
+,
+袁堂植
+,
+文学敏
+)
+❌ (0/1)(You can also ask:
+陈毅
+)
+src
+❌ (0/2)(You can also ask:
+文学敏
+,
+严正行
+,
+宋明阳
+,
+蔡鑫
+,
+钟宇
+)
+❌ (0/1)(You can also ask:
+李标智
+)
+💡 Tip:
+Committer
+can comment
+/approve
+or
+/lgtm
+Commenting
+/approve
+implies both code review (lgtm) and intent to merge (approve)
+CLA Signature Pass
+shirokawa_, thanks for your pull request. All authors of the commits have signed the CLA. 👍
+Save
+Cancel
+CANN-robot
+Collaborators
+23 hours ago
+Set adum,leabclove,weixin_43960572,yjzz1007,yanglianxiang2,linyf950,yanzhenghang,chenliang267,yanyefeng,liuwanke152,zhongyu1,chenhao_,songmingyang,wenxuemin,yangshaohua,bz_lee,chenyia,zhangxp1030,silencesirius as approver
+23 hours ago
+Set adum,leabclove,weixin_43960572,yjzz1007,yanglianxiang2,linyf950,yanzhenghang,chenliang267,yanyefeng,liuwanke152,zhongyu1,chenhao_,songmingyang,wenxuemin,yangshaohua,bz_lee,chenyia,zhangxp1030,silencesirius as approver
+CANN-robot
+Collaborators
+23 hours ago
+Set bz_lee,chenyia as approver
+23 hours ago
+Set bz_lee,chenyia as approver
+atomgit-bot
+22 hours ago
+Start code review
+1
+src/ops/all_gather/algorithm/template/aiv/kernel/aiv_all_gather_mesh_1d.h
+Unresolved
+@@ -112,1 +122,4 @@
+122
++
+"AG1D0031 blockIdx_=%u Run CpGM2GM done targetRank=%u innerIndex=%llu count=%llu\n"
+, blockIdx_,
+123
++
+targetRank, (
+unsigned
+long
+long
+)innerIndex, (
+unsigned
+long
+long
+)sendCurCount);
+112
+124
+PipeBarrier<PIPE_ALL>();
+125
++
+AIV_INFO(
+"AG1D0032 blockIdx_=%u Run PipeBarrier done targetRank=%u\n"
+, blockIdx_, targetRank);
+atomgit-bot
+22 hours ago
+Comments：
+🟡
+Medium Priority
+变更点：本 diff 在
+Run()
+（第 113-125 行）、
+InitCoreInfo()
+（60-67 行）、
+RunCtrlCore()
+（171-213 行）以及 SK 循环（272-282 行）中新增了无编译期开关的
+AIV_INFO
+。
+证据链：
+AIV_INFO
+定义在
+src/ops/op_common/algorithm/template/aiv/aiv_defines.h:160
+，展开为
+AscendC::PRINTF
+（设备端 printf，需要 scalar 侧格式化并写打印缓冲，且会打断流水、引入额外同步等待）。而新增的打印都落在循环体内部：
+失败模式：单次 kernel 调用的打印条数为 O(stage2CoreNum × rankSize_)（例如 8 rank、数十核时已达上千条），大包/小包两条路径都会承担设备端 printf 的固定开销与 host 侧日志膨胀，allgather 属于性能敏感通信算子，合入 master 后这是长期常驻的性能回退；同时海量日志会把真正有用的定位信息淹没（AB1D 系列编号逐条刷屏）。仓内既有约定是仅在算子入口用一条
+AIV_INFO_HINT
+（见
+aiv_all_gather_op.h:25
+、
+aiv_ag_mesh_1d_superkernel.h:16
+），循环内逐次打印没有先例。
+建议
+：用编译期宏包裹 Run()/InitCoreInfo()/RunCtrlCore()/SK 循环内的新增 AIV_INFO（默认关闭），或合入前移除这些高频打印，只保留入口处一条汇总打印。
+Save
+Cancel
+Incorrect?
+atomgit-bot
+22 hours ago
+Start code review
+1
+CMakeLists.txt
+Unresolved
+@@ -35,3 +35,3 @@
+35
+35
+# AIV算子调测阶段可配置为1以打开AscendC打印功能
+36
+36
+if
+(
+NOT
+DEFINED
+ASCENDC_DUMP)
+37
+-
+set(ASCENDC_DUMP "
+0
+")
+37
++
+set(ASCENDC_DUMP "
+1
+")
+atomgit-bot
+22 hours ago
+Comments：
+🟠
+High Priority
+变更行：CMakeLists.txt:37 将
+ASCENDC_DUMP
+的默认值由 "0" 改为 "1"（位于
+if(NOT DEFINED ASCENDC_DUMP)
+分支，即"用户未显式指定"时生效）。
+影响面（证据链）：
+ASCENDC_DUMP
+由顶层 CMakeLists 统一导出，在 src/ops/all_gather/algorithm/template/aiv/kernel/CMakeLists.txt:33/108/405 等处以及 all_reduce、all_to_all_v、recv 等各算子的 kernel 编译命令里都以
+-DASCENDC_DUMP=${ASCENDC_DUMP}
+传入，因此该默认值不是只影响 all_gather，而是影响仓内全部 AIV 算子（910_95 / 920r1 两套 device 目标）。
+AIV_INFO
+在 src/ops/op_common/algorithm/template/aiv/aiv_defines.h:160-163 展开为
+AscendC::PRINTF(...)
+，并且
+aiv_defines.h:165
+的
+AIV_INFO_HINT
+（已存在于每个 AIV kernel 入口：src/ops/all_gather/algorithm/template/aiv/kernel/aiv_all_gather_op.h:27、aiv_ag_mesh_1d_superkernel.h:16 等）本身就是一次
+AIV_INFO
+。也就是说 dump/printf 能力一旦默认打开，所有 AIV 算子（不只本 PR 改的两个头文件）都会在默认构建产物里带上并在运行时执行 printf。
+与注释不一致：第 35 行的注释仍是"AIV算子调测阶段可配置为1以打开AscendC打印功能"，语义是默认关闭、按需
+-DASCENDC_DUMP=1
+打开；改默认值后注释与实际行为相反，后续维护者会误判生产构建是否含 dump。
+失败模式：默认构建（生产包）即开启 AscendC dump/printf —— 通信算子的 AIV kernel 每次启动都会在入口打印，且本 PR 新增的按 piece/rank/target 维度打印会被真正执行，造成 kernel 运行开销与日志刷屏（通信算子对时延敏感），同时 dump/printf 依赖运行时打印 workspace，若 HCCL 的 AIV 启动路径未预留相应 workspace，存在打印写入非法地址的风险。这属于"调试开关被提交为默认行为"的回归，且与 PR 标题(test)的调测意图不一致。
+建议
+：把默认值改回 "0"，仅在调试构建时通过
+-DASCENDC_DUMP=1
+显式开启；不要把调测开关的默认值提交到主干。
+Suggestions
+37
+-
+set(ASCENDC_DUMP "
+1
+")
+37
++
+set(ASCENDC_DUMP "
+0
+")
+Apply suggestion
+Save
+Cancel
+Incorrect?
+atomgit-bot
+22 hours ago
+Start code review
+1
+src/ops/all_gather/algorithm/template/aiv/kernel/aiv_all_gather_mesh_1d_write.h
+Unresolved
+@@ -340,1 +390,4 @@
+340
+390
+Record(target, rank_ * coreNumStage2 + pieceFlag, curTag_);
+391
++
+AIV_INFO(
+392
++
+"AGW1D0024 blockIdx_=%u SendCachedPiece Record done target=%u flag=%llu curTag_=%u\n"
+, blockIdx_,
+393
++
+target, (
+unsigned
+long
+long
+)(rank_ * coreNumStage2 + pieceFlag), curTag_);
+atomgit-bot
+22 hours ago
+Comments：
+🟡
+Medium Priority
+变更行：src/ops/all_gather/algorithm/template/aiv/kernel/aiv_all_gather_mesh_1d_write.h:386-388（
+SendCachedPiece
+中按目标 rank 的循环内）
+证据链：
+AIV_INFO
+在 src/ops/op_common/algorithm/template/aiv/aiv_defines.h:160-163 展开为
+AscendC::PRINTF(...)
+，是真正的设备侧打印（格式化 + 写打印缓冲区），不是编译期空操作；配合本 PR 同时把顶层 CMakeLists 的
+ASCENDC_DUMP
+默认改为 1，这些打印在默认构建/运行下会被实际执行。
+该打印位于
+for (uint32_t step = 0; step < rankSize_; step++)
+（第 380 行）内层，且
+SendCachedPiece
+本身按 piece 被反复调用（InitCoreInfo 第 37 行的 piece 循环），因此单次通信内核的打印条数约为 分片数 × rankSize（每轮 2 条：AGW1D0023/AGW1D0024），随 rank 规模和分片数平方级增长。
+同类热路径打印还有本文件第 321-329 行（CopyCtrlCoreOutput 的 part 循环内 AGW1D0057/AGW1D0058）、第 412-418 行（SendPiece 的 rank 循环内 AGW1D0030/AGW1D0031），以及 aiv_all_gather_mesh_1d.h 第 113-125 行（Run 的 rankSize 循环内 3 条）、第 195-206 行（RunCtrlCore 的 rank 循环内 4 条）。
+失败模式：AllGather 是对时延敏感的集合通信算子，逐分片 × 逐 rank × 逐 part 的 printf 会显著增加 kernel 执行时间（每次 PRINTF 都有格式解析与 GM 写入开销，还可能与搬运动流水争用标量单元），并在多卡多分片场景下产生海量日志刷屏，属于生产性能回归。触发条件明确：启用 dump（本 PR 使其默认启用）+ rankSize 较大或分片较多即触发。
+建议
+：将逐 rank / 逐 part 的 AIV_INFO 移到循环外或改用调测宏包裹，避免默认构建在热循环里执行设备 printf；并同步恢复 ASCENDC_DUMP 默认值为 0。
+Save
+Cancel
+Incorrect?
+atomgit-bot
+22 hours ago
+Start code review
+1
+src/ops/all_gather/algorithm/template/aiv/kernel/aiv_all_gather_mesh_1d_write.h
+Unresolved
+@@ -326,2 +368,4 @@
+368
++
+(
+unsigned
+long
+long
+)pieceFlag, copyCount);
+326
+369
+inOutQue.EnQue(localIn);
+327
+370
+LocalTensor<T> payload = inOutQue.DeQue<T>();
+371
++
+AIV_INFO(
+"AGW1D0021 SendCachedPiece DeQue done flag=%llu\n"
+, blockIdx_, (
+unsigned
+long
+long
+)pieceFlag);
+atomgit-bot
+22 hours ago
+Comments：
+🟡
+Medium Priority
+变更行：src/ops/all_gather/algorithm/template/aiv/kernel/aiv_all_gather_mesh_1d_write.h:371
+格式化占位符与实参个数不一致：格式串中只有 1 个占位符（
+%llu
+），却传入了 2 个参数（
+blockIdx_
+与
+pieceFlag
+）。
+证据链与影响：
+同文件其余打印（如第 366-368 行 AGW1D0020、386-388 行 AGW1D0023、391-393 行 AGW1D0024）统一采用
+"AGW1Dxxxx blockIdx_=%u ..."
+的形式把核号放在首位；本行漏写了
+blockIdx_=%u
+，导致格式串与实参错位。
+失败模式一（诊断正确性）：多出的
+blockIdx_
+实参被 printf 变参机制静默丢弃，日志里没有核号，无法定位是哪个 AIV 核在 SendCachedPiece 阶段卡住/异常，削弱了本次调试打印的核心目的（这批打印正是为定位多核时序问题加的）。
+失败模式二（构建告警/报错风险）：ccec/编译器在开启
+-Wformat-extra-args
+（或
+-Wformat
+系列）且配合
+-Werror
+时会直接判为编译错误；即便不报错，也属于明确的格式串缺陷。
+建议
+：在格式串中补上 blockIdx_ 的占位符，使占位符数量与实参数量一致。
+Suggestions
+371
+-
+AIV_INFO("AGW1D0021 SendCachedPiece DeQue done flag=%llu\n", blockIdx_,
+(unsigned long long)pieceFlag);
+371
++
+AIV_INFO("AGW1D0021
+blockIdx_=%u
+SendCachedPiece DeQue done flag=%llu\n", blockIdx_,
+372
++
+(unsigned long long)pieceFlag);
+Apply suggestion
+Save
+Cancel
+Incorrect?
+Merger
+Not assigned
+Approver
+Not assigned
+Tester
+Not assigned
+Reviewer
+Not assigned
+Label
+cann-cla/yes
+Milestones
+No related milestones
+Kanban
+No related boards
+Link Issue
+No related Issues

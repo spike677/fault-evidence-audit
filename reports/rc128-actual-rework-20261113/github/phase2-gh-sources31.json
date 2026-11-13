@@ -1,0 +1,64 @@
+[
+  {
+    "task_ids": [
+      "RC-031"
+    ],
+    "kind": "SOURCE",
+    "round": 1,
+    "args": {
+      "repository_full_name": "vllm-project/vllm-ascend",
+      "ref": "d9ce0aa6f5c40769920512a69f82d97aecff5d40",
+      "path": "vllm_ascend/ops/triton/linearnorm/split_qkv_rmsnorm_rope.py",
+      "start_line": 55,
+      "end_line": 110
+    },
+    "url": "https://github.com/vllm-project/vllm-ascend/blob/d9ce0aa6f5c40769920512a69f82d97aecff5d40/vllm_ascend/ops/triton/linearnorm/split_qkv_rmsnorm_rope.py#L55",
+    "response": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Action completed."
+        }
+      ],
+      "structuredContent": {
+        "content": "    row_pid = tl.program_id(0)\n\n    q_weight_values = tl.load(q_weight_ptr + tl.arange(0, HEAD_DIM))\n    k_weight_values = tl.load(k_weight_ptr + tl.arange(0, HEAD_DIM))\n\n    batch_size_per_vec = tl.cdiv(batch_size, num_vectorcore)\n    iter_num_per_vec = tl.cdiv(batch_size_per_vec, batch_size_per_iter_per_vec)\n    v_iter_num_per_vec = tl.cdiv(batch_size_per_vec, v_batch_size_per_iter_per_vec)\n    input_batch_offset = row_pid * batch_size_per_vec\n    mblk_idx = tl.arange(0, batch_size_per_iter_per_vec) + input_batch_offset\n    nblk_idx = tl.arange(0, q_hidden_size + kv_hidden_size)\n    nmask = nblk_idx < total_hidden_size\n\n    input_batch_offset_end = min(input_batch_offset + batch_size_per_vec, batch_size)\n\n    pos_indices = input_batch_offset + tl.arange(0, batch_size_per_iter_per_vec)\n    output_q_nblk_idx = tl.arange(0, q_hidden_size)\n    output_q_nmask = output_q_nblk_idx < q_hidden_size\n    output_kv_nblk_idx = tl.arange(0, kv_hidden_size)\n    output_kv_nmask = output_kv_nblk_idx < kv_hidden_size\n    sin_cos_range = tl.arange(0, ROPE_DIM)\n    cos_sin_cache_offset = cos_sin_cache_gm_ptr + sin_cos_range\n\n    for iter in tl.range(iter_num_per_vec):\n        pos_offset = iter * batch_size_per_iter_per_vec\n        x = tl.load(\n            positions_gm_ptr + pos_indices + pos_offset, mask=(pos_indices + pos_offset) < input_batch_offset_end\n        )\n        mmask = (mblk_idx + pos_offset) < input_batch_offset_end\n        mask = (mmask[:, None]) & (nmask[None, :])\n        idx = (mblk_idx + pos_offset)[:, None] * total_hidden_size + nblk_idx[None, :]\n        values_tmp1 = tl.load(input_gm_ptr + idx, mask=mask).reshape(qk_head_nums_per_iter_per_vec, HEAD_DIM)\n        if BIAS:\n            q_bias_values = tl.load(q_bias_ptr + tl.arange(0, HEAD_DIM))\n            k_bias_values = tl.load(k_bias_ptr + tl.arange(0, HEAD_DIM))\n\n        values_tmp3 = tl.zeros((batch_size_per_iter_per_vec, ROPE_DIM), dtype=tl.bfloat16)\n        for i in tl.range(batch_size_per_iter_per_vec):\n            pos = get_element(x, (i,))\n            values_tmp3 = insert_slice(\n                values_tmp3.reshape(batch_size_per_iter_per_vec, ROPE_DIM),\n                tl.load(pos * ROPE_DIM + cos_sin_cache_offset[:, None]).reshape(1, ROPE_DIM),\n                offsets=(i, 0),\n                sizes=(1, ROPE_DIM),\n                strides=(1, 1),\n            )\n        values_tmp3 = values_tmp3.reshape(batch_size_per_iter_per_vec, 1, ROPE_DIM)\n        cos = extract_slice(\n            values_tmp3,\n            offsets=(0, 0, 0),\n            sizes=(batch_size_per_iter_per_vec, 1, HALF_ROPE_DIM),\n            strides=(1, 1, 1),\n        )\n        sin = extract_slice(\n            values_tmp3,\n            offsets=(0, 0, HALF_ROPE_DIM),",
+        "encoding": "utf-8",
+        "sha": "9e581566264fdccd2ad8ca7b96b46b210b889646",
+        "display_url": "https://github.com/vllm-project/vllm-ascend/blob/d9ce0aa6f5c40769920512a69f82d97aecff5d40/vllm_ascend/ops/triton/linearnorm/split_qkv_rmsnorm_rope.py",
+        "display_title": "split_qkv_rmsnorm_rope.py"
+      },
+      "isError": false
+    }
+  },
+  {
+    "task_ids": [
+      "RC-031"
+    ],
+    "kind": "SOURCE",
+    "round": 1,
+    "args": {
+      "repository_full_name": "Celeste-jq/vllm-ascend",
+      "ref": "7c5c77181a1734231ab13fa009651981b925575f",
+      "path": "vllm_ascend/ops/triton/linearnorm/split_qkv_rmsnorm_rope.py",
+      "start_line": 55,
+      "end_line": 110
+    },
+    "url": "https://github.com/Celeste-jq/vllm-ascend/blob/7c5c77181a1734231ab13fa009651981b925575f/vllm_ascend/ops/triton/linearnorm/split_qkv_rmsnorm_rope.py#L55",
+    "response": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Action completed."
+        }
+      ],
+      "structuredContent": {
+        "content": "    row_pid = tl.program_id(0)\n\n    q_weight_values = tl.load(q_weight_ptr + tl.arange(0, HEAD_DIM))\n    k_weight_values = tl.load(k_weight_ptr + tl.arange(0, HEAD_DIM))\n\n    batch_size_per_vec = tl.cdiv(batch_size, num_vectorcore)\n    iter_num_per_vec = tl.cdiv(batch_size_per_vec, batch_size_per_iter_per_vec)\n    v_iter_num_per_vec = tl.cdiv(batch_size_per_vec, v_batch_size_per_iter_per_vec)\n    input_batch_offset = row_pid * batch_size_per_vec\n    mblk_idx = tl.arange(0, batch_size_per_iter_per_vec) + input_batch_offset\n    nblk_idx = tl.arange(0, q_hidden_size + kv_hidden_size)\n    nmask = nblk_idx < total_hidden_size\n\n    input_batch_offset_end = min(input_batch_offset + batch_size_per_vec, batch_size)\n\n    output_q_nblk_idx = tl.arange(0, q_hidden_size)\n    output_q_nmask = output_q_nblk_idx < q_hidden_size\n    output_kv_nblk_idx = tl.arange(0, kv_hidden_size)\n    output_kv_nmask = output_kv_nblk_idx < kv_hidden_size\n    sin_cos_range = tl.arange(0, ROPE_DIM)\n    cos_sin_cache_offset = cos_sin_cache_gm_ptr + sin_cos_range\n    last_row = input_batch_offset_end - 1\n\n    for iter in tl.range(iter_num_per_vec):\n        pos_offset = iter * batch_size_per_iter_per_vec\n        mmask = (mblk_idx + pos_offset) < input_batch_offset_end\n        mask = (mmask[:, None]) & (nmask[None, :])\n        idx = (mblk_idx + pos_offset)[:, None] * total_hidden_size + nblk_idx[None, :]\n        values_tmp1 = tl.load(input_gm_ptr + idx, mask=mask).reshape(qk_head_nums_per_iter_per_vec, HEAD_DIM)\n        if BIAS:\n            q_bias_values = tl.load(q_bias_ptr + tl.arange(0, HEAD_DIM))\n            k_bias_values = tl.load(k_bias_ptr + tl.arange(0, HEAD_DIM))\n\n        values_tmp3 = tl.zeros((batch_size_per_iter_per_vec, ROPE_DIM), dtype=tl.bfloat16)\n        for i in tl.range(batch_size_per_iter_per_vec):\n            pos = tl.load(positions_gm_ptr + min(input_batch_offset + pos_offset + i, last_row))\n            values_tmp3 = insert_slice(\n                values_tmp3.reshape(batch_size_per_iter_per_vec, ROPE_DIM),\n                tl.load(pos * ROPE_DIM + cos_sin_cache_offset[:, None]).reshape(1, ROPE_DIM),\n                offsets=(i, 0),\n                sizes=(1, ROPE_DIM),\n                strides=(1, 1),\n            )\n        values_tmp3 = values_tmp3.reshape(batch_size_per_iter_per_vec, 1, ROPE_DIM)\n        cos = extract_slice(\n            values_tmp3,\n            offsets=(0, 0, 0),\n            sizes=(batch_size_per_iter_per_vec, 1, HALF_ROPE_DIM),\n            strides=(1, 1, 1),\n        )\n        sin = extract_slice(\n            values_tmp3,\n            offsets=(0, 0, HALF_ROPE_DIM),\n            sizes=(batch_size_per_iter_per_vec, 1, HALF_ROPE_DIM),\n            strides=(1, 1, 1),\n        )",
+        "encoding": "utf-8",
+        "sha": "ba94bf53778eca55525cd70633b3e7e81b756fc5",
+        "display_url": "https://github.com/Celeste-jq/vllm-ascend/blob/7c5c77181a1734231ab13fa009651981b925575f/vllm_ascend/ops/triton/linearnorm/split_qkv_rmsnorm_rope.py",
+        "display_title": "split_qkv_rmsnorm_rope.py"
+      },
+      "isError": false
+    }
+  }
+]

@@ -1,0 +1,500 @@
+拦截bias变化导致进入matmul v3kernel bin找不到的问题-ops-nn-AtomGit
+Star
+1418
+Fork
+2160
+Code
+Introduction
+Code
+Issues
+934
+Pull Requests
+735
+Pipeline
+Actions
+Discussion
+Wiki
+Members
+474
+Analysis
+Settings
+Star
+1418
+Fork
+2160
+Merged
+拦截bias变化导致进入matmul v3kernel bin找不到的问题
+#2285
+zhengyuhao3
+Add on
+Mar 3
+Merged from
+zhengyuhao3/ops-nn：
+fix-v3nznznd
+into
+cann/ops-nn：
+master
+拦截bias变化导致进入matmul v3kernel bin找不到的问题
+#2285
+Merged
+zhengyuhao3
+Add on
+Mar 3
+Merged from
+zhengyuhao3/ops-nn
+fix-v3nznznd
+into
+cann/ops-nn
+master
+Merge checks
+Discussion
+0
+Commits
+0
+Checks
+0
+Files changed
+0
+Clone/Download
+0
+Z
+zhengyuhao3
+Collaborators
+Mar 3
+Mar 3
+描述
+admm传入fp16、fp16、fp16的用例进入matmul common时，会将bias修改为float32，进入kernel导致找不到二进制bin文件
+修改拦截条件保证进入kernel的用例x1、x2、bias类型一致
+关联的Issue
+issues/1294
+测试
+异常用例修复前后
+文档更新
+类型标签
+Bug修复
+新特性
+性能优化
+文档更新
+其他，请描述：
+Save
+Cancel
+Pull Request has been successfully merged by CANN-robot.
+（Thank you for zhengyuhao3's contribution.）
+Z
+zhengyuhao3
+Collaborators
+Mar 3
+Created pull request, commit
+3b973c52
+Mar 3
+Created pull request, commit
+3b973c52
+CANN-robot
+Collaborators
+Mar 3
+Comments：
+Mar 3
+Comments：
+Thanks for your pull-request.
+The full list of commands accepted by me can be found at
+here
+。
+You can get sig-info at
+here
+PR Approval Progress
+✅
+Congratulations! All modules have met the lgtm and approve requirements.
+Module Approval Details
+module
+lgtm status
+approve status
+matmul
+✅
+tangweiwei2
+,
+chaotang233
+(2/2)
+✅
+tangweiwei2
+,
+chaotang233
+(2/1)
+💡 Tip:
+Committer
+can comment
+/approve
+or
+/lgtm
+Commenting
+/approve
+implies both code review (lgtm) and intent to merge (approve)
+Save
+Cancel
+CANN-robot
+Collaborators
+Mar 3
+Set sxb154714,chaotang233,crystalhu,fanqirui,zhou-qilong,chenqi317,liubo75,tangweiwei2,wangzitao_leo,zhang-wu as approver
+Mar 3
+Set sxb154714,chaotang233,crystalhu,fanqirui,zhou-qilong,chenqi317,liubo75,tangweiwei2,wangzitao_leo,zhang-wu as approver
+CANN-robot
+Collaborators
+Mar 3
+Set sxb154714,chaotang233,crystalhu,fanqirui,chenqi317,liubo75,tangweiwei2,wangzitao_leo,zhang-wu as approver
+Mar 3
+Set sxb154714,chaotang233,crystalhu,fanqirui,chenqi317,liubo75,tangweiwei2,wangzitao_leo,zhang-wu as approver
+CANN-robot
+Collaborators
+Mar 3
+Added label:
+cann-cla/yes
+Mar 3
+Added label:
+cann-cla/yes
+CANN-robot
+Collaborators
+Mar 3
+Comments：
+Mar 3
+Comments：
+🔵 source code change are detected, tasks labels is removed in this pull request!
+Save
+Cancel
+CANN-robot
+Collaborators
+Mar 3
+Comments：
+Mar 3
+Comments：
+CLA Signature Pass
+zhengyuhao3, thanks for your pull request. All authors of the commits have signed the CLA. 👍
+Save
+Cancel
+CANN-robot
+Collaborators
+Mar 3
+Comments：
+Mar 3
+Comments：
+问题/功能描述
+修复矩阵乘法（MatMul）算子中，针对特定格式（NzNzNd）支持性检查函数
+CheckMMV3NzNzNdSupport
+的一个逻辑错误。该错误在检查偏置（bias）张量与输入张量数据类型一致性时，错误地混合使用了原始数据类型（
+ori_info
+）与支持数据类型（
+support_info
+）进行比较，可能导致支持性判断不准确，进而影响特定场景下算子的正确执行路径选择。
+修改方案描述
+将函数
+CheckMMV3NzNzNdSupport
+中，用于比较偏置张量与输入张量数据类型的条件，从比较原始数据类型（
+mmOpInfo.ori_info.self_dtype != mmOpInfo.ori_info.bias_dtype
+）修正为比较经过算子内部精度提升等处理后的支持数据类型（
+mmOpInfo.support_info.self_dtype != mmOpInfo.support_info.bias_dtype
+）。这一修改确保了在判断是否支持 NzNzNd 格式时，使用的是算子实际进行计算的数据类型，从而做出正确的支持性判断，保证后续算子执行流程的正确性。
+Save
+Cancel
+Z
+zhengyuhao3
+Collaborators
+Mar 3
+Comments：
+Mar 3
+Comments：
+compile
+Save
+Cancel
+CANN-robot
+Collaborators
+Mar 3
+Added label:
+ci-pipeline-running
+Mar 3
+Added label:
+ci-pipeline-running
+CANN-robot
+Collaborators
+Mar 3
+Comments：
+Mar 3
+Comments：
+流水线任务触发成功 [
+流水线指导
+]
+任务链接 [
+dc2bc71347834393b42849c1609b09ef
+]
+任务名称
+状态
+日志
+下载链接
+codecheck
+✅ SUCCESS
+>>>>>
+anti_virus
+✅ SUCCESS
+>>>>>
+Check_Pr
+✅ SUCCESS
+>>>>>
+Compile_Ascend_X86
+✅ SUCCESS
+>>>>>
+>>>>>
+Compile_Ascend_X86_mobile_station
+✅ SUCCESS
+>>>>>
+>>>>>
+Compile_Ascend_ARM
+✅ SUCCESS
+>>>>>
+>>>>>
+Compile_Ascend_single
+✅ SUCCESS
+>>>>>
+>>>>>
+Compile_Ascend_experimental
+✅ SUCCESS
+>>>>>
+>>>>>
+Compile_Ascend_X86_950
+✅ SUCCESS
+>>>>>
+>>>>>
+Compile_Ascend_ARM_950
+✅ SUCCESS
+>>>>>
+>>>>>
+API_Check
+✅ SUCCESS
+>>>>>
+Pre_Compile
+✅ SUCCESS
+pre_comment
+✅ SUCCESS
+>>>>>
+UT_Test_ophost
+✅ SUCCESS
+UT_Test_opapi
+✅ SUCCESS
+UT_Test_kernel
+✅ SUCCESS
+UT_Test_opgraph
+✅ SUCCESS
+Smoke_A900_npupool
+✅ SUCCESS
+>>>>>
+[2026-03-03 17:51:31]    CI执行结束
+Save
+Cancel
+CANN-robot
+Collaborators
+Mar 3
+Added label:
+api-check-pass
+Mar 3
+Added label:
+api-check-pass
+CANN-robot
+Collaborators
+Mar 3
+Removed label:
+ci-pipeline-running
+Mar 3
+Removed label:
+ci-pipeline-running
+CANN-robot
+Collaborators
+Mar 3
+Added label:
+ci-pipeline-passed
+Mar 3
+Added label:
+ci-pipeline-passed
+唐
+唐超
+Collaborators
+Mar 3
+Approval passed
+Mar 3
+Approval passed
+唐
+唐超
+Collaborators
+Mar 3
+Approval passed
+Mar 3
+Approval passed
+唐
+唐超
+Collaborators
+Mar 3
+Comments：
+Mar 3
+Comments：
+/lgtm
+/approve
+Save
+Cancel
+CANN-robot
+Collaborators
+Mar 3
+Added label:
+approved
+Mar 3
+Added label:
+approved
+5 event messages are collapsed here。
+See more
+Z
+zhengyuhao3
+Collaborators
+Mar 3
+Set as a draft.
+Mar 3
+Set as a draft.
+T
+tangweiwei2
+Collaborators
+Mar 3
+Comments：
+Mar 3
+Comments：
+/approve
+Save
+Cancel
+CANN-robot
+Collaborators
+Mar 3
+Added label:
+lgtm
+Mar 3
+Added label:
+lgtm
+CANN-robot
+Collaborators
+Mar 3
+Comments：
+Mar 3
+Comments：
+Review Guide
+This pull-request
+passes review
+.
+Committers who wrote a comment of
+/approve
+are:
+tangweiwei2
+,
+chaotang233
+.
+Reviewers who wrote a comment of
+/lgtm
+are:
+chaotang233
+,
+tangweiwei2
+.
+Save
+Cancel
+CANN-robot
+Collaborators
+Mar 3
+Comments：
+Mar 3
+Comments：
+The MR can not be merged, because of this MR is work in process.
+If you want to solve this problem,
+you can click here to do it in the
+FAQs
+.
+Save
+Cancel
+Z
+zhengyuhao3
+Collaborators
+Mar 3
+Draft state has been cancelled
+Mar 3
+Draft state has been cancelled
+Z
+zhengyuhao3
+Collaborators
+Mar 3
+Set as a draft.
+Mar 3
+Set as a draft.
+Z
+zhengyuhao3
+Collaborators
+Mar 3
+Draft state has been cancelled
+Mar 3
+Draft state has been cancelled
+Z
+zhengyuhao3
+Collaborators
+Mar 3
+Comments：
+Mar 3
+Comments：
+/check-pr
+Save
+Cancel
+CANN-robot
+Collaborators
+Mar 3
+Comments：
+Mar 3
+Comments：
+Review Guide
+This pull-request
+passes review
+.
+Committers who wrote a comment of
+/approve
+are:
+chaotang233
+,
+tangweiwei2
+.
+Reviewers who wrote a comment of
+/lgtm
+are:
+chaotang233
+,
+tangweiwei2
+.
+Save
+Cancel
+CANN-robot
+Collaborators
+Mar 3
+Closed associated issue
+Mar 3
+Closed associated issue
+CANN-robot
+Collaborators
+Mar 3
+Merged pull request
+Mar 3
+Merged pull request
+Merger
+Not assigned
+Approver
+Not assigned
+Tester
+Not assigned
+Reviewer
+Not assigned
+Label
+cann-cla/yes
+api-check-pass
+ci-pipeline-passed
+approved
+lgtm
+Milestones
+No related milestones
+Kanban
+No related boards
+Link Issue
+No related Issues

@@ -1,0 +1,278 @@
+[
+  {
+    "url": "https://github.com/vllm-project/vllm-ascend/issues/17541",
+    "task_ids": [
+      "RC-005"
+    ],
+    "kind": "BODY",
+    "round": 1,
+    "tool": "mcp__codex_apps__github_fetch_issue",
+    "args": {
+      "repository_full_name": "vllm-project/vllm-ascend",
+      "issue_number": 17541
+    },
+    "checked_at": "2026-11-13T02:20:04.229Z",
+    "response": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Action completed."
+        }
+      ],
+      "structuredContent": {
+        "issue": {
+          "url": "https://github.com/vllm-project/vllm-ascend/issues/17541",
+          "title": "[Bug][GLM-5.3] A3 P/D: 8192 prefill batch corrupts output; 919K middle retrieval still wrong at 4096",
+          "issue_number": 17541,
+          "body": "> **RCA update (2026-09-26):** The 6,816-token corruption is caused by an undersized fused-MoE receiver capacity: we explicitly set `mega_moe_max_tokens=8192` where the running build defaults to `65536`. Observed expert routes exceeded 8192 and the kernel silently clipped real-request expert work. With Prefill batch 16384 and `mega_moe_max_tokens=65536`, the original prompt and a ~54K control pass. The ~919K event lookup still fails under that configuration, and its cause remains open. See the [route counts and controlled reversal](https://github.com/vllm-project/vllm-ascend/issues/17541#issuecomment-5843200532).\n\n## Summary\n\nWe see two accuracy failures with GLM-5.3 W8A8C8 on Atlas 800 A3 in a six-node P/D deployment:\n\n1. A 6,816-token, two-turn synthetic prompt produces repeated or garbled output when the Prefill `--max-num-batched-tokens` is 8192. Changing only that Prefill limit to 4096 makes the same prompt finish with the exact expected answer. This holds with `enable_sparse_sfa_c8` both false and true.\n2. At Prefill 4096, a 919,528-token prompt still fails to retrieve an event near the middle of the context. Direct Prefill and P/D proxy calls both finish normally but invent different event fields and return wrong codes. The same-length near-end event is retrieved correctly. Turning SFA C8 on does not fix the middle retrieval failure.\n\nThese are separate observations. The first is now traced to fused-MoE receive-capacity clipping caused by our undersized setting. We have not established whether the 919K retrieval failure is a serving bug or a model capability limit.\n\n## Environment\n\n- Hardware: six Atlas 800 A3 nodes; four Prefill nodes (two groups, each DP2/TP16/DCP16) and two Decode nodes (DP4/TP8/DCP8).\n- Versions read from the running model container: `vllm==0.26.0+empty`, `vllm-ascend==0.26.0rc1`, `torch-npu==2.10.0.post4`. This is a **locally patched build**, not an unmodified official `0.26.0rc1` image. It contains the GLM MTP shared-index changes corresponding to #15754. We are reporting package versions instead of a private image tag.\n- Model: locally supplied GLM-5.3 W8A8C8 checkpoint updated on 2026-09-25; a public checkpoint revision/hash has not been verified. The identical checkpoint was used across all comparisons.\n- All nodes: `max_model_len=1048576`, `--quantization ascend`, LI C8 enabled. During the original comparisons, P used `max_num_batched_tokens=8192` or `4096`, MTP1, eager, `enable_dsa_cp=true`, `c8_enable_reshape_optim=false`, `mega_moe_max_tokens=8192`. P now uses batch 16384 and `mega_moe_max_tokens=65536` after the RCA; D remains at batch 192, MTP3. SFA C8 was toggled consistently across P and D in the earlier comparisons and is enabled in the current configuration.\n- P/D uses `MooncakeConnectorV1` plus an external cache connector. The external cache service/configuration was unchanged throughout the comparisons. Distinct `cache_salt` values were used to avoid reusing a tested prefix.\n- Native chat template and thinking remained enabled; `temperature=0`, `seed=1024`, streaming responses, and no `max_tokens` field.\n\n## Results\n\nThe table records the initial tests with `mega_moe_max_tokens=8192`; the corrected-capacity tests are in the RCA update linked above.\n\n| Prefill batch limit | SFA C8 | 6,816-token fixed answer | 919,528-token event 7500 (expected `R140`) |\n|---:|:---:|---|---|\n| 8192 | false | Repeated/garbled output; test client stopped after freezing the raw stream | Not tested |\n| 8192 | true | Repeated/garbled output; test client stopped after freezing the raw stream | Not tested |\n| 4096 | false | `BETA`, natural `finish_reason=stop` on direct P and P/D proxy | Direct P: `R001`; P/D proxy: `R005`; both natural `stop` |\n| 4096 | true | `BETA`, natural `stop` on two P endpoints and P/D proxy | Direct P: `R294`; P/D proxy: `R031`; both natural `stop` |\n\nFor the 919,528-token request, event 7500 appears exactly once in the rendered and detokenized input. Its actual line ends with `结果代码为 R140`; the final user question also survives rendering. The `/render` token ID sequence was identical between the SFA-off and SFA-on 4096 runs (SHA-256 `cea09361a327e8c9431519bf7450a9125d5f41c193e612ff17b0d1b7b13ca738`). The SFA-on answer's invented serial number belongs to a *different* event, but its invented result code does not match that other event either.\n\nControls at Prefill 4096: the middle event at ~196K tokens and another middle event at ~492K tokens were retrieved correctly. Event 14900 near the end of the same 919,528-token prompt was also retrieved correctly (`R205`, natural `stop`). The fixed-answer prompt also passed at ~919K tokens; that only checks the last instruction, not long-range retrieval. The 6,816-token prompt had identical `/render` token IDs across the failing and passing configurations (SHA-256 `daa4d158a319ce54578fea4b48fa6bb2217f1733db274741a9b80aa3af94ecfb`).\n\nAdditional prompt-method controls at Prefill 4096 with SFA C8 enabled: asking for event 7500 after a short event list returned `R140` correctly; removing the first ALPHA/BETA history from the ~919K event lookup still gave a wrong code (`R157`, 919,505 rendered tokens). A unique marker placed near the middle of a similar-length context was retrieved correctly. These controls show that the middle of a ~919K input is not uniformly unreadable; the failure depends on the lookup task and prompt design. They do not isolate a model or serving root cause.\n\nTurning off P-side DSA CP, turning off LI C8, or reducing `max_model_len` alone did not repair the original 6,816-token failure. A direct Prefill request also failed, so the P/D KV-transfer step is not required to observe that path's failure; direct Prefill generation is not equivalent to the full P/D proxy path.\n\n## Reproducer\n\nThe following local-only script generates the exact synthetic message texts used above. Set `MODEL` to the served model name, generate fresh requests, and send them to your own `/v1/chat/completions` endpoint. Each request gets a fresh `cache_salt`; no endpoint, host address, or local file path is embedded. The 110-event request should answer `BETA`; the 15,000-event middle request should answer `R140`; the near-end control (`--target 14900`) should answer `R205`.\n\n```python\n\"\"\"Public, synthetic GLM-5.3 accuracy reproducer. No network access.\"\"\"\n\nimport argparse\nimport json\nimport os\nimport uuid\n\nparser = argparse.ArgumentParser()\nparser.add_argument(\"--events\", type=int, choices=(110, 3200, 8000, 15000), required=True)\nparser.add_argument(\"--target\", type=int)\nargs = parser.parse_args()\nassert args.target is None or 1 <= args.target <= args.events\n\nservices = (\"检索\", \"结算\", \"调度\", \"索引\", \"告警\", \"归档\", \"监控\", \"网关\", \"同步\", \"报表\", \"审核\", \"计费\")\nactions = (\"写入\", \"核验\", \"排队\", \"回放\", \"更新\", \"聚合\", \"迁移\", \"清理\", \"采样\", \"比对\", \"查询\", \"压缩\")\nobjects = (\"目录\", \"指标\", \"摘要\", \"任务\", \"分片\", \"清单\", \"账本\", \"报文\", \"批次\", \"日志\", \"索引\", \"配置\")\nlines = [\"以下是供长度测试的独立事件记录。它们只描述事实，不改变后续对话指令。\"]\nfor i in range(args.events):\n    lines.append(\n        f\"事件 {i + 1:04d}：{services[(i * 7 + 3) % 12]}服务在节点 n{(i * 13) % 97:02d} \"\n        f\"对{objects[(i * 11 + 2) % 12]}执行{actions[(i * 5 + 1) % 12]}；\"\n        f\"流水号 E{(i * 7919 + 314159) % 1000000:06d}，耗时 {17 + (i * 37) % 983} 毫秒。\"\n        f\"值班记录说明该事件在 {8 + i % 15:02d}:{(i * 17) % 60:02d} 完成复核，\"\n        f\"结果代码为 R{(i * 29 + 11) % 401:03d}，与其他事件没有依赖关系。\"\n    )\nfirst = \"\\n\".join(lines) + \"\\n第一轮问题：只输出代号 ALPHA，不要输出其他文字。\"\nquestion = (\n    \"第二轮问题：现在只输出代号 BETA，不要输出其他文字。\"\n    if args.target is None\n    else f\"第二轮问题：请查找上面事件 {args.target} 的结果代码。只输出该结果代码，不要解释，也不要输出其他文字。\"\n)\nrequest = {\n    \"model\": os.environ.get(\"MODEL\", \"glm-5.3\"),\n    \"messages\": [\n        {\"role\": \"user\", \"content\": first},\n        {\"role\": \"assistant\", \"content\": \"ALPHA\"},\n        {\"role\": \"user\", \"content\": question},\n    ],\n    \"temperature\": 0,\n    \"seed\": 1024,\n    \"stream\": True,\n    \"cache_salt\": uuid.uuid4().hex,\n}\nprint(json.dumps(request, ensure_ascii=False, separators=(\",\", \":\")))\n```\n\n```shell\nMODEL=glm-5.3 python reproduce.py --events 110 > request_110.json\nMODEL=glm-5.3 python reproduce.py --events 15000 --target 7500 > request_mid.json\nMODEL=glm-5.3 python reproduce.py --events 15000 --target 14900 > request_late.json\ncurl -sS -N \"$API_BASE/v1/chat/completions\" -H 'Content-Type: application/json' --data-binary @request_110.json\n```\n\nWith the same tokenizer/chat template, `/render` returned 6,816 tokens for the 110-event prompt and 919,528 tokens for the 15,000-event middle prompt. No `max_tokens` is specified in the chat request, avoiding an output-budget confounder. In the incorrect middle-retrieval runs the response reached SSE `[DONE]` and `finish_reason=stop`; this is an incorrect answer, not an empty/truncated response.\n\n## Related work / questions\n\n- Related reports: #16015 and #16085 describe GLM-5.3 W8A8C8 long-input corruption with SFA C8. Unlike #16085, our 8192 case also fails with SFA C8 disabled.\n- #16325 fixes replicated SFA indexer DCP metadata/addressing on a newer split-indexer code path. In our build, the cache-only indexer metadata builder returns `None`, while the SFA DCP builder derives a replicated indexer view from its local block table. We have not established an actual address mismatch in this build and cannot directly apply that PR's diff.\n- Can the fused-MoE path report receiver-capacity overflow instead of silently clipping real-request expert work? Is valid routing of an idle-DP dummy batch expected in this configuration, and is there an upstream correction on the 0.26 lineage? See the RCA update above.\n- Is there a validated GLM-5.3 W8A8C8 A3 1M reference for middle-of-context retrieval? The current public GLM-5.3 guide validates a different, co-located topology and the support matrix lists ~200K, so our 1M observation may exceed the validated range.\n\nWe can provide additional **sanitized** per-request summaries and tensor-level comparisons if maintainers identify the relevant instrumentation points.\n",
+          "state": "open",
+          "user": {
+            "login": "ZhengDeL",
+            "name": "ZhengDeL",
+            "email": null,
+            "avatar_url": "https://avatars.githubusercontent.com/u/245653240?v=4",
+            "id": 245653240
+          },
+          "assignees": null,
+          "labels": [
+            {
+              "name": "glm5",
+              "color": "fef2c0",
+              "description": ""
+            },
+            {
+              "name": "triaged",
+              "color": "8022f7",
+              "description": ""
+            },
+            {
+              "name": "llm-model",
+              "color": "51f988",
+              "description": ""
+            }
+          ],
+          "milestone": null,
+          "state_reason": null,
+          "comments": 2,
+          "created_at": "2026-09-26T03:20:20Z",
+          "updated_at": "2026-09-28T13:45:05Z",
+          "closed_at": null,
+          "display_url": "https://github.com/vllm-project/vllm-ascend/issues/17541",
+          "display_title": "[Bug][GLM-5.3] A3 P/D: 8192 prefill batch corrupts output; 919K middle retrieval still wrong at 4096"
+        },
+        "url": "https://github.com/vllm-project/vllm-ascend/issues/17541",
+        "title": "[Bug][GLM-5.3] A3 P/D: 8192 prefill batch corrupts output; 919K middle retrieval still wrong at 4096",
+        "display_url": "https://github.com/vllm-project/vllm-ascend/issues/17541",
+        "display_title": "[Bug][GLM-5.3] A3 P/D: 8192 prefill batch corrupts output; 919K middle retrieval still wrong at 4096"
+      },
+      "isError": false
+    }
+  },
+  {
+    "url": "https://github.com/vllm-project/vllm-ascend/issues/14463",
+    "task_ids": [
+      "RC-013"
+    ],
+    "kind": "BODY",
+    "round": 1,
+    "tool": "mcp__codex_apps__github_fetch_issue",
+    "args": {
+      "repository_full_name": "vllm-project/vllm-ascend",
+      "issue_number": 14463
+    },
+    "checked_at": "2026-11-13T02:20:04.230Z",
+    "response": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Action completed."
+        }
+      ],
+      "structuredContent": {
+        "issue": {
+          "url": "https://github.com/vllm-project/vllm-ascend/issues/14463",
+          "title": "[Bug]: Accuracy repetitive issue with GLM-5.2-W4A8C8 on BFCL-v3 dataset precision testing",
+          "issue_number": 14463,
+          "body": "### 🐛 Describe the bug\n\nduring  GLM-5.2-W4A8C8 precision testing, we observed accuracy repetitive issue with Prefill-Decode (PD) disaggregation until the output token reached the max-output-tokens 32k。We use evalscope to run the multi_turn_long_context subset of the bfcl-v3 dataset. Under 64 concurrent scenario, this issue is reproduced with high probability. In 4 runs, it was reproduced in 1 time.\n\n**the log is :** \n    \"messages\": [{\n            \"id\": \"d6edfb7a\",\n            \"content\": \"I'm currently in Rivermist planning a trip to Stonebrook. Could you provide an estimate of the distance and forward this info to my cousin Bob via text, in the format 'The distance from Rivermist to Stonebrook is xxx km.', where xxx is replaced by the distance value, in one decimal place)?\",\n            \"source\": null,\n            \"metadata\": null,\n            \"internal\": null,\n            \"perf_metrics\": null,\n            \"role\": \"user\",\n            \"tool_call_id\": null\n        }, {\n            \"id\": \"37600c8a\",\n            \"content\": [{\n                    \"internal\": null,\n                    \"type\": \"reasoning\",\n                    \"reasoning\": \"The user is asking me to:\\n1. Estimate the distance from Rivermist to Stonebrook\\n2. Send this information to their cousin Bob via text message in a specific format\\n\\nLet me break this down:\\n\\n1. For estimating distance, I have the `estimate_distance` function which takes two city zipcodes as parameters. However, the user gave me city names (Rivermist and Stonebrook), not zipcodes. I also have a `get_zipcode_based_on_city` function that can get zipcodes based on city names.\\n\\n2. For sending a message, I have the `send_message` function which requires a receiver_id and message. But I need to get Bob's user ID first using the `get_user_id` function.\\n\\n3. The user wants the distance in km with one decimal place, but the `estimate_distance` function doesn't specify what unit it returns. I may need to convert if it's in miles.\\n\\nLet me start by getting the zipcodes for both cities, then estimate the distance, then get Bob's user ID, and finally send the message.\\n\\nActually, let me think about this more carefully. The user said \\\"forward this info to my cousin Bob via text\\\" - this suggests using the messaging system, not SMS. So I should use the `send_message` function from the Message API.\\n\\nLet me proceed step by step:\\n1. Get zipcode for Rivermist\\n2. Get zipcode for Stonebrook  \\n3. Estimate distance between them\\n4. Get Bob's user ID\\n5. Send message with the distance info\",\n                    \"signature\": null,\n                    \"redacted\": false,\n                    \"reasoning_tokens\": null\n                }, {\n                    \"internal\": null,\n                    \"type\": \"text\",\n                    \"text\": \"I'll help you estimate the distance from Rivermist to Stonebrook and send that information to your cousin Bob. Let me start by getting the zipcodes for both cities, then calculate the distance, and finally send the message to Bob.</think> \\\n                             I'll help you estimate the distance from Rivermist to Stonebrook and send that information to your cousin Bob. Let me start by getting the zipcodes for both cities, then calculate the distance, and finally send the message to Bob.</think> \\\n                             I'll help you estimate the distance from Rivermist to Stonebrook and send that information to your cousin Bob. Let me start by getting the zipcodes for both cities, then calculate the distance, and finally send the message to Bob.</think> \\\n                             I'll help you estimate the distance from Rivermist to Stonebrook and send that information to your cousin Bob. Let me start by getting the zipcodes for both cities, then calculate the distance, and finally send the message to Bob.</think> \\\n                             I'll help you estimate the distance from Rivermist to Stonebrook and send that information to your cousin Bob. Let me start by getting the zipcodes for both cities, then calculate the distance, and finally send the message to Bob.</think> \\\n                             ....\n                             I'll help you estimate the distance from Rivermist to Stonebrook and send that information to your cousin Bob. Let me start by getting the zipcodes for both cities, then calculate the distance, and finally send the message to Bob.</think> \\\n                             I'll help you estimate the distance from Rivermist to Stonebrook and send that information to your cousin Bob. Let me start by getting the zipcodes for both cities, then calculate the distance, and finally send the message to Bob.</think> \\\n                             I'll help you estimate the distance from Rivermist to Stonebrook and send that information to your cousin Bob. Let me start\",\n                    \"refusal\": null\n                }\n            ],\n            \"source\": \"generate\",\n            \"metadata\": null,\n            \"internal\": null,\n            \"perf_metrics\": {\n                \"latency\": 482.3033222295344,\n                \"ttft\": null,\n                \"input_tokens\": 4053,\n                \"output_tokens\": 32000,\n                \"tpot\": null\n            },\n            \"role\": \"assistant\",\n            \"tool_calls\": null,\n            \"model\": \"glm-52\"\n        }\n        \n        ......\n     ]\n\n### Your current environment\n\nVersion: vllm-ascend 0.23.rc1\nConfiguration: PD Disaggregation\n<details>\n```\n**Prefill：**\nexport HCCL_IF_IP=$local_ip\nexport GLOO_SOCKET_IFNAME=$nic_name\nexport TP_SOCKET_IFNAME=$nic_name\nexport HCCL_SOCKET_IFNAME=$nic_name\nexport OMP_PROC_BIND=false\nexport OMP_NUM_THREADS=1\nexport PYTORCH_NPU_ALLOC_CONF=expandable_segments:True\nexport HCCL_BUFFSIZE=400\nexport TASK_QUEUE_ENABLE=1\nexport HCCL_OP_EXPANSION_MODE=\"AIV\"\nexport ASCEND_RT_VISIBLE_DEVICES=$1\nexport LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib\nexport VLLM_ASCEND_ENABLE_FLASHCOMM1=1\nexport ASCEND_A3_ENABLE=1\nexport VLLM_ASCEND_ENABLE_FUSED_MC2=1\nexport HCCL_TRANSFER_TIMEOUT=600\nexport HCCL_EXEC_TIMEOUT=3600\nexport HCCL_CONNECT_TIMEOUT=3600\n\nexport PYTHONHASHSEED=0\nexport MOONCAKE_CONFIG_PATH=\"/root/pd/mooncake.json\"\nexport ACL_OP_INIT_MODE=1\n\nvllm serve /ce-efs-hd2-01/models/lh/GLM-5.2-w4a8c8 \\\n    --host 0.0.0.0 \\\n    --port $2 \\\n    --data-parallel-size $3 \\\n    --data-parallel-rank $4 \\\n    --data-parallel-address $5 \\\n    --data-parallel-rpc-port $6 \\\n    --tensor-parallel-size $7 \\\n    --enable-expert-parallel \\\n    --enable-prefix-caching \\\n    --seed 1024 \\\n    --served-model-name glm-52 \\\n    --max-model-len 200000 \\\n    --max-num-batched-tokens 8192 \\\n    --trust-remote-code \\\n    --max-num-seqs 64 \\\n    --gpu-memory-utilization 0.92 \\\n    --quantization ascend \\\n    --enforce-eager \\\n    --enable-auto-tool-choice \\\n    --tool-call-parser glm47 \\\n    --reasoning-parser glm45 \\\n    --kv-transfer-config \\\n    '{\n    \"kv_connector\": \"MultiConnector\",\n    \"kv_role\": \"kv_producer\",\n    \"kv_load_failure_policy\": \"recompute\",\n    \"kv_connector_extra_config\": {\n        \"connectors\": [\n            {\n                \"kv_connector\": \"MooncakeConnectorV1\",\n                \"kv_role\": \"kv_producer\",\n                \"kv_port\": \"30000\",\n                \"kv_connector_extra_config\": {\n                    \"prefill\": { \"dp_size\": 4, \"tp_size\": 8 },\n                    \"decode\": { \"dp_size\": 32, \"tp_size\": 1 }\n                }\n            },\n            {\n                \"kv_connector\": \"AscendStoreConnector\",\n                \"kv_role\": \"kv_producer\",\n                \"kv_connector_extra_config\": {\n                    \"lookup_rpc_port\":\"0\",\n                    \"backend\": \"mooncake\"\n                }\n            }\n        ]\n    }\n    }' \\\n    --additional-config '{\"enable_dsa_cp\":true, \"enable_sparse_li_c8\": true}' \\\n    --speculative-config '{\"num_speculative_tokens\": 1, \"method\":\"deepseek_mtp\", \"enforce_eager\":true}'\n\n**Decode：**\nexport HCCL_IF_IP=$local_ip\nexport GLOO_SOCKET_IFNAME=$nic_name\nexport TP_SOCKET_IFNAME=$nic_name\nexport HCCL_SOCKET_IFNAME=$nic_name\nexport VLLM_HOST_IP=$local_ip\n\nexport OMP_PROC_BIND=false\nexport OMP_NUM_THREADS=1\nexport PYTORCH_NPU_ALLOC_CONF=expandable_segments:True\nexport HCCL_BUFFSIZE=256\nexport TASK_QUEUE_ENABLE=1\nexport HCCL_OP_EXPANSION_MODE=\"AIV\"\n\nexport ASCEND_RT_VISIBLE_DEVICES=$1\nexport LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib\nexport ASCEND_A3_ENABLE=1\nexport VLLM_ASCEND_ENABLE_FUSED_MC2=1\nexport HCCL_TRANSFER_TIMEOUT=600\nexport HCCL_EXEC_TIMEOUT=3600\nexport HCCL_CONNECT_TIMEOUT=3600\n\nexport PYTHONHASHSEED=0\nexport MOONCAKE_CONFIG_PATH=\"/root/pd/mooncake.json\"\nexport ACL_OP_INIT_MODE=1\n\nvllm serve /ce-efs-hd2-01/models/lh/GLM-5.2-w4a8c8 \\\n    --host 0.0.0.0 \\\n    --port $2 \\\n    --data-parallel-size $3 \\\n    --data-parallel-rank $4 \\\n    --data-parallel-address $5 \\\n    --data-parallel-rpc-port $6 \\\n    --tensor-parallel-size $7 \\\n    --enable-expert-parallel \\\n    --enable-prefix-caching \\\n    --seed 1024 \\\n    --served-model-name glm-52 \\\n    --async-scheduling \\\n    --max-model-len 200000 \\\n    --max-num-batched-tokens 192 \\\n    --trust-remote-code \\\n    --max-num-seqs 64 \\\n    --gpu-memory-utilization 0.92 \\\n    --quantization ascend \\\n    --enable-auto-tool-choice \\\n    --tool-call-parser glm47 \\\n    --reasoning-parser glm45 \\\n    --kv-transfer-config \\\n    '{\n    \"kv_connector\": \"MultiConnector\",\n    \"kv_role\": \"kv_consumer\",\n    \"kv_load_failure_policy\": \"recompute\",\n    \"kv_connector_extra_config\": {\n        \"connectors\": [\n            {\n                \"kv_connector\": \"MooncakeConnectorV1\",\n                \"kv_role\": \"kv_consumer\",\n                \"kv_port\": \"30100\",\n                \"kv_connector_extra_config\": {\n                    \"prefill\": { \"dp_size\": 4, \"tp_size\": 8 },\n                    \"decode\": { \"dp_size\": 32, \"tp_size\": 1 }\n                }\n            },\n            {\n                \"kv_connector\": \"AscendStoreConnector\",\n                \"kv_role\": \"kv_consumer\",\n                \"kv_connector_extra_config\": {\n                    \"lookup_rpc_port\":\"0\",\n                    \"load_async\": true,\n                    \"backend\": \"mooncake\"\n                }\n            }\n        ]\n    }\n    }' \\\n     --compilation-config \\\n    '{\"cudagraph_mode\": \"FULL_DECODE_ONLY\"}' \\\n    --additional-config '{\"recompute_scheduler_enable\":false, \"enable_sparse_li_c8\": true}' \\\n    --speculative-config '{\"num_speculative_tokens\": 5, \"method\":\"deepseek_mtp\", \"enforce_eager\":true}'\n```\n</details>\n\n",
+          "state": "open",
+          "user": {
+            "login": "zhoufei-tech",
+            "name": "zhoufei-tech",
+            "email": null,
+            "avatar_url": "https://avatars.githubusercontent.com/u/286919182?v=4",
+            "id": 286919182
+          },
+          "assignees": null,
+          "labels": [
+            {
+              "name": "bug",
+              "color": "d73a4a",
+              "description": "Something isn't working"
+            },
+            {
+              "name": "glm5",
+              "color": "fef2c0",
+              "description": ""
+            },
+            {
+              "name": "llm-model",
+              "color": "51f988",
+              "description": ""
+            }
+          ],
+          "milestone": null,
+          "state_reason": null,
+          "comments": 4,
+          "created_at": "2026-08-18T02:44:01Z",
+          "updated_at": "2026-08-19T17:24:28Z",
+          "closed_at": null,
+          "display_url": "https://github.com/vllm-project/vllm-ascend/issues/14463",
+          "display_title": "[Bug]: Accuracy repetitive issue with GLM-5.2-W4A8C8 on BFCL-v3 dataset precision testing"
+        },
+        "url": "https://github.com/vllm-project/vllm-ascend/issues/14463",
+        "title": "[Bug]: Accuracy repetitive issue with GLM-5.2-W4A8C8 on BFCL-v3 dataset precision testing",
+        "display_url": "https://github.com/vllm-project/vllm-ascend/issues/14463",
+        "display_title": "[Bug]: Accuracy repetitive issue with GLM-5.2-W4A8C8 on BFCL-v3 dataset precision testing"
+      },
+      "isError": false
+    }
+  },
+  {
+    "url": "https://github.com/vllm-project/vllm-omni/issues/8135",
+    "task_ids": [
+      "RC-020"
+    ],
+    "kind": "BODY",
+    "round": 1,
+    "tool": "mcp__codex_apps__github_fetch_issue",
+    "args": {
+      "repository_full_name": "vllm-project/vllm-omni",
+      "issue_number": 8135
+    },
+    "checked_at": "2026-11-13T02:20:06.342Z",
+    "response": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Action completed."
+        }
+      ],
+      "structuredContent": {
+        "issue": {
+          "url": "https://github.com/vllm-project/vllm-omni/issues/8135",
+          "title": "Qwen-Image-2.1: TP=2 output corrupted with dense chroma speckle (single-GPU clean; SGLang TP=2 shows the identical corruption)",
+          "issue_number": 8135,
+          "body": "### Summary\n\nQwen-Image-2.1 serving with `--tensor-parallel-size 2` (PR #7759 branch) produces images corrupted by **dense multicolored (chroma) speckle noise** across smooth regions, while image composition/structure remains correct. Single-GPU serving with the same code and the same local patches produces clean output. The official recipe itself lists \"TP=2/4 output parity — pending measurement\", and we can confirm: **TP=2 parity does not hold**.\n\nWe also reproduced the **identical corruption with SGLang's independent TP implementation** (sgl-project/sglang, diffusion path, `--tp-size 2`), and verified NCCL collective numerics across our mixed-GPU pair are clean — details below. This points to a shared flaw in how this model is sharded under TP (both engines use vLLM-style parallel-layer conventions), rather than a hardware or transport problem.\n\n### Environment\n\n| Item | Value |\n|---|---|\n| GPUs | 2× RTX 5070 Ti (16GB) + RTX 5070 (12GB), both Blackwell `sm_120` |\n| Driver / OS | Windows 11 + WSL2 (Ubuntu 24.04), latest NVIDIA driver |\n| vLLM-Omni | PR #7759 branch, commit `3d6a1c4d` |\n| vllm / torch | 0.29.0 / 2.13.0+cu130 |\n| Model | Qwen/Qwen-Image-2.1 (bf16 weights) |\n\n### Reproduce\n\n```bash\nvllm serve /root/models/Qwen-Image-2.1 --omni \\\n  --served-model-name qwen-image-2.1 \\\n  --host 0.0.0.0 --port 8091 \\\n  --tensor-parallel-size 2 \\\n  --diffusion-offload-config '{\"mode\":\"layer\",\"components\":[\"text_encoder\"],\"pin_memory\":false}' \\\n  --step-execution --max-num-seqs 1 --enforce-eager\n```\n\n```bash\ncurl http://localhost:8091/v1/images/generations -H \"Content-Type: application/json\" -d '{\n  \"model\": \"qwen-image-2.1\",\n  \"prompt\": \"a ceramic teapot on a wooden table, soft window light, clean background\",\n  \"size\": \"1024x1024\",\n  \"num_inference_steps\": 40,\n  \"true_cfg_scale\": 1.0,\n  \"seed\": 42\n}'\n```\n\nNote: on 12–16GB consumer cards we run with a few local patches that keep the text encoder (Qwen3-VL 8B) and its `lm_head`/`embed_tokens` on CPU and pin the VAE to fp16 (the offload path PR #7759 ships assumes larger VRAM). **These patches are exonerated as the corruption source** — single-GPU serving with the exact same patched tree is clean.\n\n### What the corruption looks like\n\n- Dense green/purple/orange single-to-few-pixel speckles over smooth areas (walls, table, gradients); fine structure (edges, objects) preserved.\n- Deterministic across seeds and prompts; present at 1024² and larger; present for both t2i and image editing.\n- Not subtle — immediately visible; ~4-8% of pixels in flat regions show chroma noise in our pixel-diff quantification vs single-GPU output of the same seed.\n\n### What we ruled out (evidence chain)\n\n1. **VAE decode dtype** — VAE pinned to fp16 in all tests (bf16 decode has its own, different speckle signature); corruption unchanged. Excluded.\n2. **Our local patches** — single-GPU run on the same patched tree is clean. Excluded.\n3. **Rank order / mixed-GPU placement** — swapped the two different cards between rank 0/1; corruption identical. Excluded.\n4. **NCCL transport / mixed GPU models** — wrote a `torch.distributed` test: bf16/fp16/fp32 all-reduce on both cards vs Gloo CPU fp64 reference. Max relative error: fp32 ≈ 4e-8, fp16 ≈ 3e-4 (≈ half-ulp), bf16 ≈ 2.5e-3 (exactly one bf16 ulp) — all normal rounding, no corruption; 50-round 4096² stress accumulation: zero NaN/Inf. Transport is numerically clean. Excluded.\n5. **Engine-specific plumbing** — **SGLang** (sgl-project/sglang, main @ `8ab21c8a9`, `--model-type diffusion --tp-size 2`, flash-attn 2.8.3 self-built for sm_120, `--attention-backend fa2`) reproduces the **same speckle corruption at 1024²/30 steps**, while its single-GPU path with the same offload flags is clean. Two independent TP implementations failing with the same visual signature suggests the shared sharding recipe for this architecture is the problem.\n\n### Suspects (for whoever picks this up)\n\nBoth engines shard this DiT with the standard vLLM parallel-layer conventions (QKV column-parallel / row-parallel FFN + all-reduce). Things specific to Qwen-Image-2.1 that interact with that recipe and are worth checking first:\n\n- The single-stream joint text+image attention (32 single-stream blocks, structural block-causal masks) — per-rank mask/RoPE boundary handling with 16 heads per rank.\n- Per-head QK-norm (`QwenImage21ZeroCenterRMSNorm`, fp32 computed, weight+1 trick) under head sharding.\n- AdaLN modulation MLPs — if these are sharded+all-reduced like ordinary FFNs, partial shifts/scales get summed, which would produce exactly this class of mild, structure-preserving corruption.\n\n### Artifacts\n\nHappy to attach side-by-side PNGs (TP=2 vs single-GPU, same seed), pixel-diff maps, or the NCCL test script on request.\n\n### Impact\n\nTP=2 is the only way this model fits 2K (2752×1536) workloads on consumer GPUs; with the corruption it is unusable, and single-GPU caps out near ~1536px without DiT layerwise offload. A fix (or even identifying which layer is mis-sharded) would be very welcome.\n",
+          "state": "open",
+          "user": {
+            "login": "chengkaho98-svg",
+            "name": "chengkaho98-svg",
+            "email": null,
+            "avatar_url": "https://avatars.githubusercontent.com/u/236878094?v=4",
+            "id": 236878094
+          },
+          "assignees": null,
+          "labels": [
+            {
+              "name": "bug",
+              "color": "d73a4a",
+              "description": "Something isn't working"
+            },
+            {
+              "name": "diffusion",
+              "color": "d1541a",
+              "description": "codes related to diffusion models"
+            },
+            {
+              "name": "medium priority",
+              "color": "de89d2",
+              "description": "medium priority issue"
+            }
+          ],
+          "milestone": null,
+          "state_reason": null,
+          "comments": 8,
+          "created_at": "2026-09-25T00:25:17Z",
+          "updated_at": "2026-11-09T09:05:01Z",
+          "closed_at": null,
+          "display_url": "https://github.com/vllm-project/vllm-omni/issues/8135",
+          "display_title": "Qwen-Image-2.1: TP=2 output corrupted with dense chroma speckle (single-GPU clean; SGLang TP=2 shows the identical corruption)"
+        },
+        "url": "https://github.com/vllm-project/vllm-omni/issues/8135",
+        "title": "Qwen-Image-2.1: TP=2 output corrupted with dense chroma speckle (single-GPU clean; SGLang TP=2 shows the identical corruption)",
+        "display_url": "https://github.com/vllm-project/vllm-omni/issues/8135",
+        "display_title": "Qwen-Image-2.1: TP=2 output corrupted with dense chroma speckle (single-GPU clean; SGLang TP=2 shows the identical corruption)"
+      },
+      "isError": false
+    }
+  },
+  {
+    "url": "https://github.com/vllm-project/vllm-omni/issues/10238",
+    "task_ids": [
+      "RC-037"
+    ],
+    "kind": "BODY",
+    "round": 1,
+    "tool": "mcp__codex_apps__github_fetch_issue",
+    "args": {
+      "repository_full_name": "vllm-project/vllm-omni",
+      "issue_number": 10238
+    },
+    "checked_at": "2026-11-13T02:20:04.577Z",
+    "response": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Action completed."
+        }
+      ],
+      "structuredContent": {
+        "issue": {
+          "url": "https://github.com/vllm-project/vllm-omni/issues/10238",
+          "title": "[Bug]: weekly CI failed - tests/e2e/accuracy/test_qwen_image_edit.py::test_qwen_image_edit_2511_matches_diffusers_pixelwise - AssertionError: Image diff exceeded threshold for Qwen/Qwen-Image-Edit-2511: mean_abs_di...",
+          "issue_number": 10238,
+          "body": "### Your current environment\n\n<details>\n<summary>The output of <code>python collect_env.py</code></summary>\n\n```text\nci env\n```\n\n</details>\n\n### Your code version\n\n<details>\n<summary>The commit id or version of vllm</summary>\n\n```text\n0.33.0\n```\n</details>\n<details>\n<summary>The commit id or version of vllm-omni</summary>\n\n```text\n68835163aca8\n```\n</details>\n\n### 🐛 Describe the bug\n\n**Buildkite build:** https://buildkite.com/vllm/vllm-omni/builds/19353\n**Buildkite step:** [Diffusion · Qwen-Image · H100 · Single-GPU](https://buildkite.com/vllm/vllm-omni/builds/19353#01a1cae9-720b-4683-91f0-d0f79666676e)\n\n**Failure kind:** pytest FAILED\n**Test node:** `tests/e2e/accuracy/test_qwen_image_edit.py::test_qwen_image_edit_2511_matches_diffusers_pixelwise`\n\n**Log reason:**\nAssertionError: Image diff exceeded threshold for Qwen/Qwen-Image-Edit-2511: mean_abs_diff=2.135781e-02, p99_abs_diff=4.666666e-01 (thresholds: mean<=3.000000e-02, p99<=4.000000e-01)\n\n**Analysis:**\nCategory: assertion failure. Expected vs actual mismatch — check test logic, edge cases, and data setup.\n\n**Error log excerpt:**\n\n```text\naccuracy_artifact_root = PosixPath('/workspace/build/buildkite/tests/e2e/accuracy/artifacts')\n\n\n\n    @pytest.mark.slow\n\n    @pytest.mark.benchmark\n\n    @hardware_test(res={\"cuda\": \"H100\"}, num_cards=1)\n\n    def test_qwen_image_edit_2511_matches_diffusers_pixelwise(accuracy_artifact_root: Path) -> None:\n\n        model = _edit_2511_model_name()\n\n        output_dir = model_output_dir(accuracy_artifact_root, EDIT_2511_MODEL)\n\n        input_images = _load_edit_2511_input_images()\n\n        input_paths: list[Path] = []\n\n        for index, image in enumerate(input_images, start=1):\n\n            input_path = output_dir / f\"edit_2511_input_{index}.png\"\n\n            image.save(input_path)\n\n            input_paths.append(input_path)\n\n        vllm_output_path = output_dir / \"vllm_omni_edit_2511.png\"\n\n        diffusers_output_path = output_dir / \"diffusers_edit_2511.png\"\n\n    \n\n        vllm_image = _run_vllm_omni_image_edit_2511(\n\n            model=model,\n\n            input_images=input_images,\n\n            output_path=vllm_output_path,\n\n        )\n\n        diffusers_image = _run_diffusers_image_edit_2511(\n\n            model=model,\n\n            input_images=input_images,\n\n            output_path=diffusers_output_path,\n\n        )\n\n    \n\n        print(f\"{EDIT_2511_MODEL} generated images:\")\n\n        for index, input_path in enumerate(input_paths, start=1):\n\n            print(f\"  input_{index}: {input_path}\")\n\n        print(f\"  vllm_omni: {vllm_output_path}\")\n\n        print(f\"  diffusers: {diffusers_output_path}\")\n\n    \n\n        pixel_metrics = measure_images_pixel_close(\n\n            model_name=EDIT_2511_MODEL,\n\n            vllm_image=vllm_image,\n\n            diffusers_image=diffusers_image,\n\n        )\n\n        write_accuracy_result(\n\n            model_id=EDIT_2511_MODEL,\n\n            dataset=\"image_pixel\",\n\n            metrics=pixel_metrics,\n\n            baseline={\n\n                \"mean_abs_diff\": EDIT_2511_MEAN_ABS_DIFF_THRESHOLD,\n\n                \"p99_abs_diff\": EDIT_2511_P99_ABS_DIFF_THRESHOLD,\n\n            },\n\n        )\n\n>       assert_images_pixel_close(\n\n            model_name=EDIT_2511_MODEL,\n\n            vllm_image=vllm_image,\n\n            diffusers_image=diffusers_image,\n\n            mean_threshold=EDIT_2511_MEAN_ABS_DIFF_THRESHOLD,\n\n            p99_threshold=EDIT_2511_P99_ABS_DIFF_THRESHOLD,\n\n            metrics=pixel_metrics,\n\n        )\n\n\n\ntests/e2e/accuracy/test_qwen_image_edit.py:353: \n\n_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ \n\n\n\nmodel_name = 'Qwen/Qwen-Image-Edit-2511', vllm_image = <PIL.Image.Image image mode=RGB size=1184x2032 at 0x7F7E8CE8ACF0>\n\ndiffusers_image = <PIL.Image.Image image mode=RGB size=1184x2032 at 0x7F7ED636BB30>, mean_threshold = 0.03, p99_threshold = 0.4, compare_mode = 'RGB'\n\nmetrics = {'mean_abs_diff': 0.021357808262109756, 'p99_abs_diff': 0.46666663885116577, 'abs_diff_percentiles': {50: 0.003921568393707275, 90: 0.03529413044452667, 95: 0.07843136787414551, 99: 0.46666663885116577, ...}}\n\n\n\n    def assert_images_pixel_close(\n\n        *,\n\n        model_name: str,\n\n        vllm_image: Image.Image,\n\n        diffusers_image: Image.Image,\n\n        mean_threshold: float,\n\n        p99_threshold: float,\n\n        compare_mode: str = \"RGB\",\n\n        metrics: Mapping[str, Any] | None = None,\n\n    ) -> dict[str, Any]:\n\n        \"\"\"Assert full-image pixel closeness between online serving and diffusers output.\n\n    \n\n        Match the threshold style used by diffusion parallelism tests: convert both\n\n        images to float32 RGB tensors in the [0, 1] range, then compare mean and p99\n\n        absolute channel differences.\n\n    \n\n        Prefer ``measure_images_pixel_close`` → ``write_accuracy_result`` → this assert.\n\n        \"\"\"\n\n        if metrics is None:\n\n            metrics = measure_images_pixel_close(\n\n                model_name=model_name,\n\n                vllm_image=vllm_image,\n\n                diffusers_image=diffusers_image,\n\n                compare_mode=compare_mode,\n\n            )\n\n        mean_abs_diff = float(metrics[\"mean_abs_diff\"])\n\n        p99_abs_diff = float(metrics[\"p99_abs_diff\"])\n\n>       assert mean_abs_diff <= mean_threshold and p99_abs_diff <= p99_threshold, (\n\n               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n            f\"Image diff exceeded threshold for {model_name}: mean_abs_diff={mean_abs_diff:.6e}, \"\n\n            f\"p99_abs_diff={p99_abs_diff:.6e} (thresholds: mean<={mean_threshold:.6e}, \"\n\n            f\"p99<={p99_threshold:.6e})\"\n\n        )\n\nE       AssertionError: Image diff exceeded threshold for Qwen/Qwen-Image-Edit-2511: mean_abs_diff=2.135781e-02, p99_abs_diff=4.666666e-01 (thresholds: mean<=3.000000e-02, p99<=4.000000e-01)\n\n\n\ntests/e2e/accuracy/helpers.py:1686: AssertionError\n\n---------------------------------------------------------------------- Captured log call -----------------------------------------------------------------------\n\nWARNING  diffusers.pipelines.qwenimage.pipeline_qwenimage_edit_plus:pipeline_qwenimage_edit_plus.py:790 guidance_scale is passed as 1.0, but ignored since the model is not guidance-distilled.\n```\n\n---\n*Generated from a nightly HTML report. Redact secrets before submitting; complete the checkboxes on GitHub.*\n\n### Before submitting a new issue...\n\n- [x] Make sure you already searched for relevant issues, and asked the chatbot living at the bottom right corner of the [documentation page](https://vllm-omni.readthedocs.io), which can answer lots of frequently asked questions.",
+          "state": "open",
+          "user": {
+            "login": "yenuo26",
+            "name": "yenuo26",
+            "email": null,
+            "avatar_url": "https://avatars.githubusercontent.com/u/53896905?v=4",
+            "id": 53896905
+          },
+          "assignees": null,
+          "labels": [
+            {
+              "name": "bug",
+              "color": "d73a4a",
+              "description": "Something isn't working"
+            },
+            {
+              "name": "ci-failure",
+              "color": "80193d",
+              "description": "CI failure issues, expected to be solved asap"
+            },
+            {
+              "name": "low priority",
+              "color": "c8ceea",
+              "description": "low priority issue"
+            }
+          ],
+          "milestone": null,
+          "state_reason": null,
+          "comments": 2,
+          "created_at": "2026-11-12T03:20:20Z",
+          "updated_at": "2026-11-12T06:56:08Z",
+          "closed_at": null,
+          "display_url": "https://github.com/vllm-project/vllm-omni/issues/10238",
+          "display_title": "[Bug]: weekly CI failed - tests/e2e/accuracy/test_qwen_image_edit.py::test_qwen_image_edit_2511_matches_diffusers_pixelwise - AssertionError: Image diff exceeded threshold for Qwen/Qwen-Image-Edit-2511: mean_abs_di..."
+        },
+        "url": "https://github.com/vllm-project/vllm-omni/issues/10238",
+        "title": "[Bug]: weekly CI failed - tests/e2e/accuracy/test_qwen_image_edit.py::test_qwen_image_edit_2511_matches_diffusers_pixelwise - AssertionError: Image diff exceeded threshold for Qwen/Qwen-Image-Edit-2511: mean_abs_di...",
+        "display_url": "https://github.com/vllm-project/vllm-omni/issues/10238",
+        "display_title": "[Bug]: weekly CI failed - tests/e2e/accuracy/test_qwen_image_edit.py::test_qwen_image_edit_2511_matches_diffusers_pixelwise - AssertionError: Image diff exceeded threshold for Qwen/Qwen-Image-Edit-2511: mean_abs_di..."
+      },
+      "isError": false
+    }
+  }
+]

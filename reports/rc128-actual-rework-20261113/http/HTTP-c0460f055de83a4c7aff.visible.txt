@@ -1,0 +1,421 @@
+fix(sub_mul_concat): 补齐InferShape动态维/axis/x-y一致性校验-ops-math-AtomGit
+Star
+1754
+Fork
+1658
+Code
+Introduction
+Code
+Issues
+495
+Pull Requests
+578
+Pipeline
+Actions
+Discussion
+Wiki
+Members
+299
+Analysis
+Settings
+Star
+1754
+Fork
+1658
+Merged
+fix(sub_mul_concat): 补齐InferShape动态维/axis/x-y一致性校验
+#7343
+小王！
+Add on
+1 day ago
+Merged from
+qq_52056150/ops-math：
+fix/submulconcat-infershape-validation-20261110
+into
+cann/ops-math：
+master
+fix(sub_mul_concat): 补齐InferShape动态维/axis/x-y一致性校验
+#7343
+Merged
+小王！
+Add on
+1 day ago
+Merged from
+qq_52056150/ops-math
+fix/submulconcat-infershape-validation-20261110
+into
+cann/ops-math
+master
+Merge checks
+Discussion
+0
+Commits
+0
+Checks
+0
+Files changed
+0
+Clone/Download
+0
+小王！
+1 day ago
+1 day ago
+描述
+SubMulConcat
+是内部融合算子（无公开 ACLNN/E2E 接口）。本次修复 InferShape 的三类校验缺口，并同步最小文档与 UT：
+动态末维
+-1
+：原样传播，不再执行
+4*W
+；非负末维继续计算并保留正向溢出检查。
+负描述符边界：
+-1
+合法；
+-2
+（UNKNOWN_DIM_NUM，未知 rank）及
+<-2
+拒绝。
+axis
+：仅接受
+-1/2
+；缺失按注册默认
+-1
+，其他值返回
+GRAPH_FAILED
+。
+x/y 一致性：
+y
+必须 rank 3；x/y 对应已知维必须相等；合法未知维跳过静态不等判断；Tiling 原检查保留。
+README/README_en：明确 axis、动态维
+-1
+、未知 rank
+-2
+语义，并补充内部 Host 定义链接。
+修改文件：
+math/sub_mul_concat/op_host/sub_mul_concat_infershape.cpp
+math/sub_mul_concat/tests/ut/op_host/test_sub_mul_concat_infershape.cpp
+math/sub_mul_concat/README.md
+math/sub_mul_concat/README_en.md
+关联的Issue
+#4705
+https://gitcode.com/cann/ops-math/issues/4705
+测试
+Host UT：
+SubMulConcatInferShape
+17 +
+SubMulConcatTilingArch35
+15 =
+32/32 PASS
+（CANN 9.3.0，ascend950）。
+pre-commit：trailing-whitespace、end-of-file-fixer、clang-format、codespell、OAT 全部通过。
+git diff --check
+：通过。
+CANN 9.3.0 / Ascend950PR_958b：GEIR 动态
+(-1,-1,-1)
+、
+(2,3,-1)
+FAIL→PASS；
+axis=0/1/99
+正确拒绝；本地复测 1000+ 条用例无功能问题，冒烟已过。
+文档更新
+math/sub_mul_concat/README.md
+math/sub_mul_concat/README_en.md
+类型标签
+Bug修复
+文档更新
+新特性
+性能优化
+其他，请描述：
+AI/Agent生成声明
+AI辅助编写
+Save
+Cancel
+Pull Request has been successfully merged by CANN-robot.
+（Thank you for 小王！'s contribution.）
+小王！
+1 day ago
+Created pull request, commit
+45ea6bb0
+1 day ago
+Created pull request, commit
+45ea6bb0
+atomgit-bot
+1 day ago
+Comments：
+1 day ago
+Comments：
+变更摘要
+本次 PR 标题指向
+sub_mul_concat
+算子的
+InferShape
+校验能力补齐，意图覆盖动态维、
+axis
+参数以及两个输入
+x
+、
+y
+之间的一致性检查。但任务提供的材料中，变更文件列表为空、代码增删行数均为 0，PR 描述仅为
+test
+，因此没有任何可据以还原实现细节的补丁内容，无法确认具体新增或调整的接口、校验分支与判定逻辑。
+主要改动
+材料缺失说明
+: 当前 PR 信息显示变更文件数为 0、新增与删除行数均为 0，未提供任何文件补丁，因此无法列出对应具体代码行的改动点。
+标题所述目标范围
+: 依据标题，改动目标为
+sub_mul_concat
+的
+InferShape
+校验，涉及动态维处理、
+axis
+参数校验与
+x
+、
+y
+一致性校验三方面，但材料中无对应实现内容可供描述。
+🧩 本次 Review 已使用自定义 Skill：
+ascendc-code-review
+Save
+Cancel
+Incorrect?
+atomgit-bot
+1 day ago
+Comments：
+1 day ago
+Comments：
+🤖 本次改动均为数据 / 生成 / 二进制文件（如测试用例、锁文件、媒体资源），没有可审查的代码逻辑，已跳过 AI 代码审查。
+Save
+Cancel
+Incorrect?
+CANN-robot
+Collaborators
+1 day ago
+Comments：
+1 day ago
+Comments：
+Warning
+The PR commit(s) can not be got, please check it!
+Save
+Cancel
+CANN-robot
+Collaborators
+1 day ago
+Comments：
+1 day ago
+Comments：
+Thanks for your pull-request.
+The full list of commands accepted by me can be found at
+here
+.
+You can get sig-info at
+here
+.
+You can self-configure the PR merge rules for this repository. For more details, please refer to
+Here
+.
+For more, you also can visit
+HICANN
+.
+PR Approval Progress
+✅
+Congratulations! All modules have met the lgtm and approve requirements.
+Module Approval Details
+module
+lgtm status
+approve status
+*/*/README.md
+✅
+冯英
+,
+顾宝成
+,
+xuejinghui
+(3/2)
+✅
+冯英
+(1/1)
+repo-cann/ops-math
+✅
+xuejinghui
+,
+顾宝成
+(2/2)
+✅
+xuejinghui
+,
+顾宝成
+(2/1)
+💡 Tip:
+Committer
+can comment
+/approve
+or
+/lgtm
+Commenting
+/approve
+implies both code review (lgtm) and intent to merge (approve)
+CLA Signature Pass
+qq_52056150, thanks for your pull request. All authors of the commits have signed the CLA. 👍
+Save
+Cancel
+小王！
+1 day ago
+Pre merge succeeded (commit_id: 9fd14c62ba6a179f4711f8fcba18b9282d6d0d6c)
+1 day ago
+Pre merge succeeded (commit_id: 9fd14c62ba6a179f4711f8fcba18b9282d6d0d6c)
+8 event messages are collapsed here。
+See more
+小王！
+1 day ago
+Modify description of pull request
+1 day ago
+Modify description of pull request
+小王！
+20 hours ago
+Comments：
+20 hours ago
+Comments：
+compile
+Save
+Cancel
+小王！
+20 hours ago
+Pre merge succeeded (commit_id: 6158c89896d4ddc004c3de6194ea40e15b2058cc)
+20 hours ago
+Pre merge succeeded (commit_id: 6158c89896d4ddc004c3de6194ea40e15b2058cc)
+CANN-robot
+Collaborators
+20 hours ago
+Comments：
+20 hours ago
+Comments：
+🚀 CI 流水线已启动
+📋 执行详情:
+点击查看流水线
+Save
+Cancel
+CANN-robot
+Collaborators
+20 hours ago
+Added label:
+ci-pipeline-running
+20 hours ago
+Added label:
+ci-pipeline-running
+小王！
+20 hours ago
+Modify description of pull request
+20 hours ago
+Modify description of pull request
+小王！
+20 hours ago
+Modify description of pull request
+20 hours ago
+Modify description of pull request
+CANN-robot
+Collaborators
+19 hours ago
+Removed label:
+ci-pipeline-running
+19 hours ago
+Removed label:
+ci-pipeline-running
+CANN-robot
+Collaborators
+19 hours ago
+Added label:
+ci-pipeline-passed
+19 hours ago
+Added label:
+ci-pipeline-passed
+G
+gubaocheng
+Collaborators
+19 hours ago
+Comments：
+19 hours ago
+Comments：
+/lgtm
+/approve
+by agent
+Save
+Cancel
+小王！
+16 hours ago
+Modify description of pull request
+16 hours ago
+Modify description of pull request
+小王！
+56 minutes ago
+Modify description of pull request
+56 minutes ago
+Modify description of pull request
+X
+xuejinghui
+Collaborators
+54 minutes ago
+Comments：
+54 minutes ago
+Comments：
+/lgtm
+/approve
+Save
+Cancel
+CANN-robot
+Collaborators
+54 minutes ago
+Added label:
+lgtm
+54 minutes ago
+Added label:
+lgtm
+F
+fengying555682
+Collaborators
+51 minutes ago
+Comments：
+51 minutes ago
+Comments：
+/lgtm
+/approve
+Save
+Cancel
+CANN-robot
+Collaborators
+51 minutes ago
+Added label:
+approved
+51 minutes ago
+Added label:
+approved
+CANN-robot
+Collaborators
+51 minutes ago
+Closed associated issue
+51 minutes ago
+Closed associated issue
+CANN-robot
+Collaborators
+51 minutes ago
+Merged pull request
+51 minutes ago
+Merged pull request
+Merger
+Not assigned
+Approver
+Not assigned
+Tester
+Not assigned
+Reviewer
+Not assigned
+Label
+cann-cla/yes
+ci-pipeline-passed
+lgtm
+approved
+Milestones
+No related milestones
+Kanban
+No related boards
+Link Issue
+No related Issues
