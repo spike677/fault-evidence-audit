@@ -1,6 +1,6 @@
 // Pure offline interaction checks. No browser, network, production state or device.
 const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),assert=require('node:assert/strict');
-const folder=path.resolve(process.argv[2]||'reports/rc128-mechanism-design-20261112-r4');
+const folder=path.resolve(process.argv[2]||'reports/archive/rc128-mechanism-design-20261112-r4');
 const html=fs.readFileSync(path.join(folder,'report.html'),'utf8');
 const raw=html.match(/<script type="application\/json" id="payload">([\s\S]*?)<\/script>/)[1];
 const script=html.match(/<script>([\s\S]*?)<\/script>/)[1];

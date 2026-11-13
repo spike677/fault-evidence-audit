@@ -1,6 +1,6 @@
 // Built-in Node VM checks; never launches a browser, device or model.
 const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),assert=require('node:assert/strict');
-const folder=path.resolve(process.argv[2]||'reports/expansion-v1-20261110');
+const folder=path.resolve(process.argv[2]||'reports/archive/expansion-v1-20261110');
 const html=fs.readFileSync(path.join(folder,'CANN_EXPANSION_FULL_RESULTS.html'),'utf8');
 const payload=html.match(/<script type="application\/json" id="payload">([\s\S]*?)<\/script>/)[1];
 const script=html.match(/<script>([\s\S]*?)<\/script>/)[1];

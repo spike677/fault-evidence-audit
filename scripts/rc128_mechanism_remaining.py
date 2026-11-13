@@ -16,7 +16,7 @@ from pathlib import Path
 
 
 EXCLUDED_TASK_IDS = frozenset(f"RC-{n:03}" for n in (2, 24, 29, 30, 31, 99, 122))
-R3 = Path(__file__).resolve().parents[1] / "reports" / "rc128-evidence-review-20261112-r3"
+R3 = Path(__file__).resolve().parents[1] / "reports" / "archive" / "rc128-evidence-review-20261112-r3"
 
 
 def p(reference, checks, path, conditions="", scope="SPECIFIC_TEST_DIRECTION"):

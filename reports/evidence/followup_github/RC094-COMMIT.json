@@ -1,0 +1,62 @@
+{
+  "id": "RC094-COMMIT",
+  "task_ids": [
+    "RC-094"
+  ],
+  "tool": "mcp__codex_apps__github_fetch_commit",
+  "args": {
+    "repo_full_name": "vllm-project/vllm-ascend",
+    "commit_sha": "a3a3d38"
+  },
+  "round": 1,
+  "checked_at": "2026-11-13T08:57:50.395Z",
+  "response": {
+    "content": [
+      {
+        "type": "text",
+        "text": "Action completed."
+      }
+    ],
+    "structuredContent": {
+      "commit": {
+        "sha": "a3a3d38ef0298c78442c73a0098c2352bd19da91",
+        "message": "[v0.9.1][bugfix] fix accuracy prolem for deepseek V3/R1 models with torchair graph in long sequence predictions (#1332)\n\n### What this PR does / why we need it?\nFix the issue of insufficient cached cosine and sine length in MLA's\nTorchAir graph mode, which causes accuracy deviation during\nlong-sequence inference.\n\n### Does this PR introduce _any_ user-facing change?\nNo.\n\n### How was this patch tested?\nWe tested the accuracy of this patch with DeepSeek R1 e2e becnhmark\nserving, and get 83.33 sore for AIME2024 dataset with DP4TP4EP16\nsetting.\n\n![image](https://github.com/user-attachments/assets/517c63bf-164a-493f-a3cd-6ecae84f502e)\n\nSigned-off-by: linfeng-yuan <1102311262@qq.com>",
+        "url": "https://api.github.com/repos/vllm-project/vllm-ascend/commits/a3a3d38ef0298c78442c73a0098c2352bd19da91",
+        "html_url": "https://github.com/vllm-project/vllm-ascend/commit/a3a3d38ef0298c78442c73a0098c2352bd19da91",
+        "diff": "@@ -1076,7 +1076,7 @@ def forward(\n             decode_k_nope = None\n             assert attn_metadata.decode is not None\n             if self.running_in_graph:\n-                seq_len = self.rotary_emb.max_position_embeddings\n+                seq_len = self.rotary_emb.max_position_embeddings * self.rotary_emb.scaling_factor\n                 cos = self.rotary_emb.cos_cached[:seq_len].to(\n                     dtype=decode_hs_or_q_c.dtype)\n                 sin = self.rotary_emb.sin_cached[:seq_len].to(\n@@ -1121,7 +1121,7 @@ def forward(\n             prefill_q_nope = prefill_q[..., :self.qk_nope_head_dim]\n             if self.torchair_graph_enabled:\n                 num_tokens = prefill_hs_or_q_c.shape[0]\n-                seq_len = self.rotary_emb.max_position_embeddings\n+                seq_len = self.rotary_emb.max_position_embeddings * self.rotary_emb.scaling_factor\n                 cos = self.rotary_emb.cos_cached[:seq_len].to(\n                     dtype=prefill_q_pe.dtype)\n                 sin = self.rotary_emb.sin_cached[:seq_len].to(",
+        "files": [
+          {
+            "filename": "vllm_ascend/attention/mla_v1.py",
+            "patch": "@@ -1076,7 +1076,7 @@ def forward(\n             decode_k_nope = None\n             assert attn_metadata.decode is not None\n             if self.running_in_graph:\n-                seq_len = self.rotary_emb.max_position_embeddings\n+                seq_len = self.rotary_emb.max_position_embeddings * self.rotary_emb.scaling_factor\n                 cos = self.rotary_emb.cos_cached[:seq_len].to(\n                     dtype=decode_hs_or_q_c.dtype)\n                 sin = self.rotary_emb.sin_cached[:seq_len].to(\n@@ -1121,7 +1121,7 @@ def forward(\n             prefill_q_nope = prefill_q[..., :self.qk_nope_head_dim]\n             if self.torchair_graph_enabled:\n                 num_tokens = prefill_hs_or_q_c.shape[0]\n-                seq_len = self.rotary_emb.max_position_embeddings\n+                seq_len = self.rotary_emb.max_position_embeddings * self.rotary_emb.scaling_factor\n                 cos = self.rotary_emb.cos_cached[:seq_len].to(\n                     dtype=prefill_q_pe.dtype)\n                 sin = self.rotary_emb.sin_cached[:seq_len].to("
+          }
+        ],
+        "repository_full_name": "vllm-project/vllm-ascend",
+        "comments": null,
+        "author": {
+          "login": "linfeng-yuan",
+          "name": null,
+          "email": null,
+          "avatar_url": "https://avatars.githubusercontent.com/u/194351811?v=4",
+          "id": 194351811
+        },
+        "committer": {
+          "login": "web-flow",
+          "name": null,
+          "email": null,
+          "avatar_url": "https://avatars.githubusercontent.com/u/19864447?v=4",
+          "id": 19864447
+        },
+        "created_at": "2025-06-21T10:04:35Z",
+        "git_author_email": null,
+        "display_url": "https://github.com/vllm-project/vllm-ascend/commit/a3a3d38ef0298c78442c73a0098c2352bd19da91",
+        "display_title": "[v0.9.1][bugfix] fix accuracy prolem for deepseek V3/R1 models with torchair graph in long sequence predictions (#1332)"
+      },
+      "url": "https://github.com/vllm-project/vllm-ascend/commit/a3a3d38ef0298c78442c73a0098c2352bd19da91",
+      "title": "[v0.9.1][bugfix] fix accuracy prolem for deepseek V3/R1 models with torchair graph in long sequence predictions (#1332)\n\n### What this PR does / why we need it?\nFix the issue of insufficient cached cosine and sine length in MLA's\nTorchAir graph mode, which causes accuracy deviation during\nlong-sequence inference.\n\n### Does this PR introduce _any_ user-facing change?\nNo.\n\n### How was this patch tested?\nWe tested the accuracy of this patch with DeepSeek R1 e2e becnhmark\nserving, and get 83.33 sore for AIME2024 dataset with DP4TP4EP16\nsetting.\n\n![image](https://github.com/user-attachments/assets/517c63bf-164a-493f-a3cd-6ecae84f502e)\n\nSigned-off-by: linfeng-yuan <1102311262@qq.com>",
+      "diff": "@@ -1076,7 +1076,7 @@ def forward(\n             decode_k_nope = None\n             assert attn_metadata.decode is not None\n             if self.running_in_graph:\n-                seq_len = self.rotary_emb.max_position_embeddings\n+                seq_len = self.rotary_emb.max_position_embeddings * self.rotary_emb.scaling_factor\n                 cos = self.rotary_emb.cos_cached[:seq_len].to(\n                     dtype=decode_hs_or_q_c.dtype)\n                 sin = self.rotary_emb.sin_cached[:seq_len].to(\n@@ -1121,7 +1121,7 @@ def forward(\n             prefill_q_nope = prefill_q[..., :self.qk_nope_head_dim]\n             if self.torchair_graph_enabled:\n                 num_tokens = prefill_hs_or_q_c.shape[0]\n-                seq_len = self.rotary_emb.max_position_embeddings\n+                seq_len = self.rotary_emb.max_position_embeddings * self.rotary_emb.scaling_factor\n                 cos = self.rotary_emb.cos_cached[:seq_len].to(\n                     dtype=prefill_q_pe.dtype)\n                 sin = self.rotary_emb.sin_cached[:seq_len].to(",
+      "display_url": "https://github.com/vllm-project/vllm-ascend/commit/a3a3d38ef0298c78442c73a0098c2352bd19da91",
+      "display_title": "[v0.9.1][bugfix] fix accuracy prolem for deepseek V3/R1 models with torchair graph in long sequence predictions (#1332)\n\n### What this PR does / why we need it?\nFix the issue of insufficient cached cosine and sine length in MLA's\nTorchAir graph mode, which causes accuracy deviation during\nlong-sequence inference.\n\n### Does this PR introduce _any_ user-facing change?\nNo.\n\n### How was this patch tested?\nWe tested the accuracy of this patch with DeepSeek R1 e2e becnhmark\nserving, and get 83.33 sore for AIME2024 dataset with DP4TP4EP16\nsetting.\n\n![image](https://github.com/user-attachments/assets/517c63bf-164a-493f-a3cd-6ecae84f502e)\n\nSigned-off-by: linfeng-yuan <1102311262@qq.com>"
+    },
+    "isError": false
+  }
+}

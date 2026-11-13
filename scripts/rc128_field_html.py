@@ -74,9 +74,9 @@ README='''# 128条官方源逐项核验 · 2026-11-12 R3
 ## 重建、核验与打包
 
 ```powershell
-python scripts/rc128_review.py build reports/rc128-evidence-review-20261112-r3 --source-bundle reports/rc128-evidence-review-20261112-r2 --field-audit
-python scripts/rc128_review.py verify reports/rc128-evidence-review-20261112-r3
-node scripts/verify_rc128_field_ui.cjs reports/rc128-evidence-review-20261112-r3
+python scripts/rc128_review.py build reports/archive/rc128-evidence-review-20261112-r3 --source-bundle reports/archive/rc128-evidence-review-20261112-r2 --field-audit
+python scripts/rc128_review.py verify reports/archive/rc128-evidence-review-20261112-r3
+node scripts/verify_rc128_field_ui.cjs reports/archive/rc128-evidence-review-20261112-r3
 ```
 
 重建完全离线，复用本轮已保存的采集回执，不重新检索。必须明确独立输出和R2源目录，不默认覆盖R1/R2/试跑。原128 JSONL字节、原30、原42、V4、INVARIANTS及state和历史均不修改。

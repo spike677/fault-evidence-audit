@@ -336,10 +336,10 @@ semantic_applicability与construction_feasibility独立；Requires／Skip和每�
 ## 构建与核验
 
 ```powershell
-python scripts/rc128_review.py build reports/rc128-evidence-review-20261112-r2 --source-bundle reports/rc128-evidence-review-20261111
-python scripts/rc128_review.py verify reports/rc128-evidence-review-20261112-r2
-python scripts/rc128_review.py verify reports/rc128-evidence-review-20261111
-node scripts/verify_rc128_revision_ui.cjs reports/rc128-evidence-review-20261112-r2
+python scripts/rc128_review.py build reports/archive/rc128-evidence-review-20261112-r2 --source-bundle reports/archive/rc128-evidence-review-20261111
+python scripts/rc128_review.py verify reports/archive/rc128-evidence-review-20261112-r2
+python scripts/rc128_review.py verify reports/archive/rc128-evidence-review-20261111
+node scripts/verify_rc128_revision_ui.cjs reports/archive/rc128-evidence-review-20261112-r2
 ```
 
 build只允许独立输出目录，禁止写入旧归档。verify只读；旧包按原manifest核验并明确历史策略身份，不改旧validation。

@@ -1,14 +1,18 @@
 # Fault Evidence Audit
 
-2026-11-12：[分类目标、分析基座与53／原42／V4完整梳理](reports/foundation-53-api42-v4-20261112/index.html)。主目标已确认是可泛化的CANN算子精度机理库，其他层先归因分流；逐项保留原定义、适用边界和引文，再比较分工。冻结53基准与远端新增FP-B16（实际54条、部分版本文字未同步）分开保存，不自动转换标签或入库。
+当前128条阅读入口：[可信根因、代码补证与原30条关系](reports/current/report.html) · [完整离线下载包](reports/evidence/rc128-trusted-review.zip)。周报原根因与公开代码状态分开，来源冲突逐条保留，不把缺PR写成根因未定位。仅资料审读，不自动入库、ACCEPT或执行设备测试。
 
-2026-11-12：[128条失效机理→原42／V4条件→目标路径→判据](reports/rc128-mechanism-design-20261112-r4/README.md)。先验收7条代码代表、11个独立公开子问题，再整理128条的158份分析与原生测试卡；3份离线设计就绪、155份仍需补事实。完整HTML、精确代码证据、JSONL及下载包均保留来源和范围。原42／V4定义不改，周报事件与公开代码独立；不自动入库、不运行设备、不操作现场state。
+报告统一为四类：[inputs 可信输入](reports/inputs/README.md)、[current 当前结果](reports/current/README.md)、[evidence 证据与验证](reports/evidence/README.md)、[archive 历史入口](reports/archive/README.md)。下方旧成果按原版本归档；历史清单和Init包字节保持不变，本地未发布实验不随本次提交。
 
-2026-11-11：[原30条API42／V4逐条总结与完整HTML](reports/baseline-30-api42-v4-20261111/README.md)已补齐，含M006／M026／M004讨论更新、原始数据Init、现有来源转录及0.1.17历史预检state。现场37f05b15数据库未找到；数据Init完成与工作流冻结状态分开，续接见包内说明。
+2026-11-12：[分类目标、分析基座与53／原42／V4完整梳理](reports/archive/foundation-53-api42-v4-20261112/index.html)。主目标已确认是可泛化的CANN算子精度机理库，其他层先归因分流；逐项保留原定义、适用边界和引文，再比较分工。冻结53基准与远端新增FP-B16（实际54条、部分版本文字未同步）分开保存，不自动转换标签或入库。
 
-2026-11-10：[CANN Expansion 公开技术审查包](reports/expansion-v1-20261110/README.md)已整理19条公开代码案例、23条API42/V4关系、逐项源码定位、42项测试设计索引及可重跑的离线检查。18/19/20三种API42口径独立展示；正式入库和设备执行均为0。该11月10日审查包不含原始Init、内部原文及现场state；11月11日新增交付见上方链接。审查包不改变应用版本或生产流程。
+2026-11-12：[128条失效机理→原42／V4条件→目标路径→判据](reports/archive/rc128-mechanism-design-20261112-r4/README.md)。先验收7条代码代表、11个独立公开子问题，再整理128条的158份分析与原生测试卡；3份离线设计就绪、155份仍需补事实。完整HTML、精确代码证据、JSONL及下载包均保留来源和范围。原42／V4定义不改，周报事件与公开代码独立；不自动入库、不运行设备、不操作现场state。
 
-[完整自包含HTML结果](reports/expansion-v1-20261110/CANN_EXPANSION_FULL_RESULTS.html) · [每案最强证据](reports/expansion-v1-20261110/evidence/STRONGEST_EVIDENCE.md)。HTML下载后可在远端机器浏览器打开，不依赖本机路径或外部JSON；GitHub文件页显示源码。
+2026-11-11：[原30条API42／V4逐条总结与完整HTML](reports/archive/baseline-30-api42-v4-20261111/README.md)已补齐，含M006／M026／M004讨论更新、原始数据Init、现有来源转录及0.1.17历史预检state。现场37f05b15数据库未找到；数据Init完成与工作流冻结状态分开，续接见包内说明。
+
+2026-11-10：[CANN Expansion 公开技术审查包](reports/archive/expansion-v1-20261110/README.md)已整理19条公开代码案例、23条API42/V4关系、逐项源码定位、42项测试设计索引及可重跑的离线检查。18/19/20三种API42口径独立展示；正式入库和设备执行均为0。该11月10日审查包不含原始Init、内部原文及现场state；11月11日新增交付见上方链接。审查包不改变应用版本或生产流程。
+
+[完整自包含HTML结果](reports/archive/expansion-v1-20261110/CANN_EXPANSION_FULL_RESULTS.html) · [每案最强证据](reports/archive/expansion-v1-20261110/evidence/STRONGEST_EVIDENCE.md)。HTML下载后可在远端机器浏览器打开，不依赖本机路径或外部JSON；GitHub文件页显示源码。
 
 0.1.20定向修复Baseline协议：A1由程序物化原始SOURCE_RECORD，模型只选source_id及字段用途；A2保留三级事实门禁，增加正确/错误示例和具体ID反馈；A3明确稀疏UNKNOWN、特定排除与全轴非API依赖。历史UNKNOWN不能通过REUSE升级。完整原请求与同任务纠错上下文共同检查预算，旧attempt和进程日志保留。已完成A2/A3/A4只有依赖未变且通过当前Validator时才只读复用，旧Policy不改写，旧请求不可继续提交。升级及隔离复测见[SCHEMA_REMEDIATION.md](integration/SCHEMA_REMEDIATION.md)。现场真实OpenCode回放仍需单独验收，不自动ACCEPT、冻结或重采已有证据。
 
@@ -47,7 +51,7 @@ python run_faultaudit.py --state .faultaudit trigger-workflow configure-v4 `
 
 `next/submit/drive`自动衔接分类与设计任务。若有实际执行器能力声明，可在`init`或`configure-v4`增加`--capabilities-file`；文件只声明能力，不能当执行记录。示例结构为`{"provenance":"实际能力检查来源","classes":{"T1":{"construction":"BLOCKED","reason":"实际入口自动连续化"}},"methods":{}}`。预算仍检查完整序列化请求，默认48,000字符；超限明确阻塞，不删减31类定义或修订42条。
 
-0.1.14 将 42 项输入触发条件与 Branch 2/3 作为主要分类框架，先分类条件，再整理机理和对照原库。原文声明归类与资料确认分开；保留 0.1.13 的来源定义 Init、采集、独立摘要和模型文件协议。完整回归和本轮实机结果见[验收记录](VALIDATION.md)，异机续跑见[交接说明](integration/OPENCODE_HANDOFF.md)。此前 0.1.12 的 25+5 停止点保留在[历史验证报告](reports/pilot-25plus5-20261106.xlsx)。公开仓库不包含本轮 Init、私有运行状态或原始响应。
+0.1.14 将 42 项输入触发条件与 Branch 2/3 作为主要分类框架，先分类条件，再整理机理和对照原库。原文声明归类与资料确认分开；保留 0.1.13 的来源定义 Init、采集、独立摘要和模型文件协议。完整回归和本轮实机结果见[验收记录](VALIDATION.md)，异机续跑见[交接说明](integration/OPENCODE_HANDOFF.md)。此前 0.1.12 的 25+5 停止点保留在[历史验证报告](reports/archive/pilot-25plus5-20261106.xlsx)。公开仓库不包含本轮 Init、私有运行状态或原始响应。
 
 ## 结构化 XLSX 全流程（本轮默认入口）
 

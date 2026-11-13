@@ -56,9 +56,9 @@ def markdown(data):
         lines += ['', '**待确认项：** '+'；'.join(m['unresolved_gaps']),'',
           f"证据状态：{m['mode_definition_status']}；原文独立核验={m['source_verified']}；设备验证={m['hardware_validated']}。"]
     lines += ['','## 复现本报告','', '```sh',
-      'python scripts/render_baseline30_review.py render reports/baseline-30-api42-v4-20261111',
-      'python scripts/render_baseline30_review.py verify reports/baseline-30-api42-v4-20261111',
-      'node scripts/verify_baseline30_ui.cjs reports/baseline-30-api42-v4-20261111','```','',
+      'python scripts/render_baseline30_review.py render reports/archive/baseline-30-api42-v4-20261111',
+      'python scripts/render_baseline30_review.py verify reports/archive/baseline-30-api42-v4-20261111',
+      'node scripts/verify_baseline30_ui.cjs reports/archive/baseline-30-api42-v4-20261111','```','',
       '命令仅重放已冻结的数据和检查离线报告，不重新运行Init、采集、模型或设备。历史验证回执保留其原日期和范围，新发布检查单独记录。','']
     return '\n'.join(lines)
 
@@ -121,6 +121,8 @@ def verify(folder):
 if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__);p.add_argument('action',choices=['render','manifest','verify']);p.add_argument('folder',type=Path)
     a=p.parse_args()
+    if a.action!='verify' and (folder_archive := (Path(__file__).resolve().parents[1]/'reports/archive').resolve()) in a.folder.resolve().parents:
+        raise ValueError('Archived Baseline is read-only; do not regenerate historical reports.')
     if a.action=='render':render(a.folder)
     elif a.action=='manifest':manifest(a.folder)
     else:

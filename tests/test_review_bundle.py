@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 from faultaudit import review_bundle as bundle
 
-ROOT=Path(__file__).resolve().parents[1]/'reports/expansion-v1-20261110'
+ROOT=Path(__file__).resolve().parents[1]/'reports/archive/expansion-v1-20261110'
 
 
 class PublicReviewBundleTests(unittest.TestCase):

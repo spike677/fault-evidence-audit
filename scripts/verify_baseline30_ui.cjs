@@ -1,7 +1,7 @@
 // Pure JavaScript unit harness. This does not launch or control a browser.
 'use strict';
 const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),assert=require('node:assert/strict'),crypto=require('node:crypto');
-const dir=path.resolve(process.argv[2]||'reports/baseline-30-api42-v4-20261111'),file=path.join(dir,'CANN_30_MODES_API42_V4_REVIEW.html');
+const dir=path.resolve(process.argv[2]||'reports/archive/baseline-30-api42-v4-20261111'),file=path.join(dir,'CANN_30_MODES_API42_V4_REVIEW.html');
 const html=fs.readFileSync(file,'utf8');
 const payload=html.match(/<script id="coverage-data" type="application\/json">([\s\S]*?)<\/script>/)[1];
 const js=html.match(/<script>\s*([\s\S]*?)<\/script>/)[1];

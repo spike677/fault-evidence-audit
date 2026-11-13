@@ -10,7 +10,7 @@ import json
 from pathlib import Path
 
 
-R3 = Path(__file__).resolve().parents[1] / "reports/rc128-evidence-review-20261112-r3"
+R3 = Path(__file__).resolve().parents[1] / "reports/archive/rc128-evidence-review-20261112-r3"
 EVIDENCE_LEVEL = "CODE_OBSERVED_WITH_LIMITS"
 REPRESENTATIVE_TASK_IDS = ("RC-002", "RC-024", "RC-029", "RC-030", "RC-031", "RC-099", "RC-122")
 

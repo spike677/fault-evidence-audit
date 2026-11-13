@@ -22,7 +22,7 @@ from rc128_field_decisions import INPUT_SHA256, FINDINGS, MISMATCH_FINDINGS, SIX
 VERSION='RC128-OFFICIAL-SOURCE-AUDIT-3'
 SOURCE=core.DEFAULT
 PILOT=pilot.PILOT
-OUTPUT=core.REPO/'reports/rc128-evidence-review-20261112-r3'
+OUTPUT=core.REPO/'reports/archive/rc128-evidence-review-20261112-r3'
 CODE=['scripts/rc128_review.py','scripts/rc128_revision.py','scripts/rc128_field_audit.py',
       'scripts/rc128_field_decisions.py','scripts/rc128_field_html.py','scripts/official_repo_pilot.py']
 EXCLUDED={'manifest.json','validation.json','ui_validation.json','test_results.txt','git_publication.json','browser_validation.json'}
@@ -557,8 +557,14 @@ def verify(folder,git_index=False):
     check('all_evidence_input_receipts_sha_match',lambda:all(core.sha(folder/p)==h for p,h in core.read(folder/'evidence_sha256_manifest.json')['files'].items()))
     check('historical_bundles_readonly_match_collection_baseline',lambda:historical_unchanged(folder))
     check('complete_manifest_payload_no_unlisted_files',lambda:set(r2.file_hashes(folder))-EXCLUDED==set(m['payload_sha256'])and all(core.sha(folder/p)==h for p,h in m['payload_sha256'].items()))
-    code,fp=fingerprint(folder)
-    check('current_code_policy_budget_fingerprint',lambda:code==m['analysis_code_sha256']and fp==m['policy_fingerprint'])
+    historical=folder.resolve().is_relative_to((core.REPO/'reports/archive').resolve())
+    if historical:
+        code=core.historical_code_hashes(m['analysis_code_sha256'])
+        fp=hashlib.sha256(json.dumps(dict(code=code,policy=core.read(folder/'review_policy.json')),sort_keys=True,ensure_ascii=False).encode()).hexdigest()
+        check('historical_code_policy_budget_fingerprint',lambda:code==m['analysis_code_sha256']and fp==m['policy_fingerprint'])
+    else:
+        code,fp=fingerprint(folder)
+        check('current_code_policy_budget_fingerprint',lambda:code==m['analysis_code_sha256']and fp==m['policy_fingerprint'])
     if git_index:
         check('git_index_exact_payload_bytes',lambda:all(index_sha(folder/p)==h for p,h in m['payload_sha256'].items()))
     import importlib.metadata
@@ -568,7 +574,8 @@ def verify(folder,git_index=False):
         except importlib.metadata.PackageNotFoundError:deps[n]='NOT_INSTALLED'
     result=dict(status='FAIL'if any(c['status']=='FAIL'for c in checks)else'PASS',checks=checks,check_count=len(checks),
         policy_version=VERSION,policy_fingerprint=fp,read_only=True,python=sys.version,executable=sys.executable,dependencies=deps,
-        records=128,device_runs=0,scope='SOURCE_SEARCH_AND_SELECTED_BODY_DIFF_AUDIT_NOT_HARDWARE_REPRODUCTION')
+        records=128,device_runs=0,policy_status='HISTORICAL_POLICY_NOT_CURRENT_REVIEW'if historical else'CURRENT_POLICY',
+        scope='SOURCE_SEARCH_AND_SELECTED_BODY_DIFF_AUDIT_NOT_HARDWARE_REPRODUCTION')
     if result['status']=='FAIL':raise ValueError(json.dumps(result,ensure_ascii=False))
     return result
 
@@ -582,7 +589,7 @@ def historical_unchanged(folder):
     baseline=core.read(folder/'collection/source_archive_hashes.json')
     for name,hashes in baseline.items():
         # Collection uses directory names, with platform-native separators.
-        p=core.REPO/Path(name.replace('\\','/'))
+        p=core.resolve_historical_path(name)
         if p.exists()and {str(Path(k)).replace('\\','/'):v for k,v in hashes.items()}!=r2.file_hashes(p):return False
     return True
 

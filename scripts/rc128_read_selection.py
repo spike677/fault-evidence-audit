@@ -7,7 +7,8 @@ from pathlib import Path
 from datetime import datetime, timezone
 
 ROOT = Path(__file__).resolve().parents[1]
-OUT = ROOT / 'reports/rc128-actual-rework-20261113'
+OUT = ROOT / 'reports/archive/rc128-actual-rework-20261113'
+LOG = ROOT / 'reports/evidence/read_selections_legacy_format.jsonl'
 
 
 def run():
@@ -54,7 +55,8 @@ def run():
                      'last_line': body[:end].count('\n')+1,
                      'read_at': datetime.now(timezone.utc).isoformat(),
                      'selection_sha256': hashlib.sha256(body[start:end].encode()).hexdigest()}
-        with (OUT / 'read_sessions.jsonl').open('a', encoding='utf-8') as f:
+        LOG.parent.mkdir(parents=True, exist_ok=True)
+        with LOG.open('a', encoding='utf-8') as f:
             f.write(json.dumps(selection, ensure_ascii=False) + '\n')
         print(json.dumps({**selection, 'text': body[start:end]}, ensure_ascii=False))
 

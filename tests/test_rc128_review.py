@@ -13,7 +13,7 @@ sys.path.insert(0,str(ROOT/'scripts'))
 import rc128_review as review
 import rc128_decisions as decisions
 
-BUNDLE=ROOT/'reports/rc128-evidence-review-20261111'
+BUNDLE=ROOT/'reports/archive/rc128-evidence-review-20261111'
 
 
 class ReviewContractTests(unittest.TestCase):

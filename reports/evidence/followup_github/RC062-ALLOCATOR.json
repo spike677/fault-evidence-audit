@@ -1,0 +1,30 @@
+{
+  "id": "RC062-ALLOCATOR",
+  "args": {
+    "repository_full_name": "vllm-project/vllm-ascend",
+    "ref": "dd24be2fe924a77754ae472f77b439fe3eac3091",
+    "path": "vllm_ascend/device_allocator/camem.py",
+    "start_line": 180,
+    "end_line": 250
+  },
+  "task_ids": [
+    "RC-062"
+  ],
+  "kind": "SOURCE",
+  "response": {
+    "content": [
+      {
+        "type": "text",
+        "text": "Action completed."
+      }
+    ],
+    "structuredContent": {
+      "content": "    def sleep(self, offload_tags: tuple[str, ...] | str | None = None) -> None:\n        \"\"\"\n        Put the allocator in sleep mode.\n        All data in the memory allocation with the specified tag will be\n        offloaded to CPU memory, and others will be discarded.\n        :param offload_tags: The tags of the memory allocation that will be\n            offloaded. The rest of the memory allocation will be discarded.\n        \"\"\"\n        if offload_tags is None:\n            # by default, allocated tensors are offloaded\n            # when the allocator sleeps\n            offload_tags = (CaMemAllocator.default_tag,)\n        elif isinstance(offload_tags, str):\n            offload_tags = (offload_tags,)\n\n        assert isinstance(offload_tags, tuple)\n\n        offload_count = sum(1 for data in self.pointer_to_data.values() if data.tag in offload_tags)\n        logger.info(\n            \"CaMem sleep: offloading %s/%s allocations (tags=%s)\",\n            offload_count,\n            len(self.pointer_to_data),\n            offload_tags,\n        )\n        # Workaround for verl v0.8.0: synchronize pending NPU work before\n        # unmapping tensor memory. The exact root cause is unclear, but this\n        # avoids rtMemcpy errors observed when releasing the mappings too early.\n        torch.npu.synchronize()\n\n        for ptr, data in self.pointer_to_data.items():\n            if data.tag == CaMemAllocator.sleep_persistent_tag:\n                # This memory is not offloaded or released during sleep.\n                continue\n            handle = data.handle\n            if data.tag in offload_tags:\n                size_in_bytes = handle[1]\n                cpu_backup_tensor = torch.empty(size_in_bytes, dtype=torch.uint8, device=\"cpu\", pin_memory=True)\n                cpu_ptr = cpu_backup_tensor.data_ptr()\n                ACL_MEMCPY_DEVICE_TO_HOST = 2\n                dest_max = cpu_ptr + size_in_bytes * 2\n                memcpy(cpu_ptr, dest_max, ptr, size_in_bytes, ACL_MEMCPY_DEVICE_TO_HOST)\n                data.cpu_backup_tensor = cpu_backup_tensor\n            unmap_and_release(handle)\n\n        gc.collect()\n        torch.npu.empty_cache()\n\n    def wake_up(self, tags: list[str] | None = None) -> None:\n        \"\"\"\n        Wake up the allocator from sleep mode.\n        All data that is previously offloaded will be loaded back to GPU\n        memory, and the rest of the data will have empty memory.\"\"\"\n        restore_count = sum(1 for data in self.pointer_to_data.values() if tags is None or data.tag in tags)\n        logger.info(\n            \"CaMem wake_up: restoring %s/%s allocations (tags=%s)\",\n            restore_count,\n            len(self.pointer_to_data),\n            tags or \"all\",\n        )\n        for ptr, data in self.pointer_to_data.items():\n            if data.tag == CaMemAllocator.sleep_persistent_tag:\n                # It was never released in sleep(), so there is nothing to remap.\n                continue\n            if tags is None or data.tag in tags:\n                handle = data.handle\n                create_and_map(handle)\n                if data.cpu_backup_tensor is not None:\n                    cpu_backup_tensor = data.cpu_backup_tensor\n                    if cpu_backup_tensor is not None:\n                        size_in_bytes = cpu_backup_tensor.numel() * cpu_backup_tensor.element_size()\n                        cpu_ptr = cpu_backup_tensor.data_ptr()",
+      "encoding": "utf-8",
+      "sha": "70bdbc3a2f1229f8ea20f06dec409fd73410e464",
+      "display_url": "https://github.com/vllm-project/vllm-ascend/blob/dd24be2fe924a77754ae472f77b439fe3eac3091/vllm_ascend/device_allocator/camem.py",
+      "display_title": "camem.py"
+    },
+    "isError": false
+  }
+}

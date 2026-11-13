@@ -126,12 +126,12 @@ class MechanismReviewIntegrationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             out = Path(tmp) / 'new-output'
             run = subprocess.run([sys.executable, 'scripts/rc128_mechanism_review.py', 'pilot', str(out),
-                '--source-bundle', 'reports/rc128-evidence-review-20261112-r3'],
+                '--source-bundle', 'reports/archive/rc128-evidence-review-20261112-r3'],
                 cwd=r4.core.REPO, capture_output=True, encoding='utf-8')
             self.assertEqual(run.returncode, 0, run.stderr)
             # Build needs an archive path within the repo for provenance, but
             # the destination is an independent temporary directory.
-            result = r4.build(out, Path('reports/rc128-evidence-review-20261112-r3'))
+            result = r4.build(out, Path('reports/archive/rc128-evidence-review-20261112-r3'))
             self.assertEqual(result['status'], 'PASS', result['errors'])
             self.assertEqual(r4.r2.file_hashes(r3.OUTPUT), source_hashes)
             with self.assertRaisesRegex(ValueError, 'immutable'):

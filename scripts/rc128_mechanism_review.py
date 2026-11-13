@@ -25,7 +25,7 @@ from rc128_mechanism_contracts import validate_analysis
 from faultaudit.trigger_v4 import canonical_conditions
 
 VERSION = 'RC128-MECHANISM-DESIGN-4'
-OUTPUT = core.REPO / 'reports/rc128-mechanism-design-20261112-r4'
+OUTPUT = core.REPO / 'reports/archive/rc128-mechanism-design-20261112-r4'
 SOURCE = r3.OUTPUT
 PILOT_IDS = ['RC-002', 'RC-024', 'RC-029', 'RC-030', 'RC-031', 'RC-099', 'RC-122']
 BUDGET = 160000
@@ -517,7 +517,13 @@ def verify(folder, git_index=False):
     check('summary_html_json_identical', core.read(folder / 'summary.json') == data['summary'])
     check('all_immutable_evidence_sha', all(core.sha(folder / p) == h for p, h in core.read(folder / 'evidence_sha256_manifest.json')['files'].items()))
     check('manifest_complete_and_hashes_match', set(r2.file_hashes(folder)) - EXCLUDED == set(m['payload_sha256']) and all(core.sha(folder / p) == h for p, h in m['payload_sha256'].items()))
-    check('current_code_policy_budget_fingerprint', m['policy_fingerprint'] == fingerprint() and m['analysis_code_sha256'] == code_hashes())
+    historical=folder.resolve().is_relative_to((core.REPO/'reports/archive').resolve())
+    if historical:
+        old_code=core.historical_code_hashes(m['analysis_code_sha256'])
+        old_fp=digest(dict(code=old_code,policy=core.read(folder/'review_policy.json')))
+        check('historical_code_policy_budget_fingerprint',m['policy_fingerprint']==old_fp and m['analysis_code_sha256']==old_code)
+    else:
+        check('current_code_policy_budget_fingerprint', m['policy_fingerprint'] == fingerprint() and m['analysis_code_sha256'] == code_hashes())
     p = core.read(folder / 'pilot_validation.json')
     check('pilot_passed_before_batch_same_policy', p['status'] == 'PASS' and p['policy_fingerprint'] == m['policy_fingerprint'])
     budget = core.read(folder / 'input_budget.json')
@@ -525,7 +531,7 @@ def verify(folder, git_index=False):
     blocked_cases = {r['case_id'] for r in budget['receipts'] if r['status'] == 'BLOCKED'}
     check('blocked_input_never_success', all(x['mechanism_processing']['status'] == ('BLOCKED' if x['task_id'] in blocked_cases else 'ANALYSIS_ATTEMPT_COMPLETED') for x in data['results']))
     src = core.read(folder / 'source_revision.json')
-    source = core.REPO / src['source_bundle']
+    source = core.resolve_historical_path(src['source_bundle'])
     check('entire_source_archive_unchanged', r2.file_hashes(source) == src['source_file_sha256'])
     check('source_historical_validation_not_rewritten', core.sha(folder / 'history/r3/validation.json') == src['source_file_sha256']['validation.json'])
     if git_index:
@@ -533,7 +539,8 @@ def verify(folder, git_index=False):
     errors = [c['name'] for c in checks if not c['passed']]
     return dict(status='FAIL' if errors else 'PASS', checks=checks, errors=errors, check_count=len(checks),
         policy_fingerprint=m['policy_fingerprint'], records=128, read_only=True,
-        device_validation=False, root_cause_confirmation=False)
+        device_validation=False, root_cause_confirmation=False,
+        policy_status='HISTORICAL_POLICY_NOT_CURRENT_REVIEW'if historical else'CURRENT_POLICY')
 
 
 def readme(folder, s):
@@ -554,8 +561,8 @@ DESIGN_READY只指可继续实现的离线设计，不代表执行器已实现�
 
 复现（仓库根目录，Python3.12+及requirements）：
 ```
-python scripts/rc128_mechanism_review.py pilot NEW_DIR --source-bundle reports/rc128-evidence-review-20261112-r3
-python scripts/rc128_mechanism_review.py build NEW_DIR --source-bundle reports/rc128-evidence-review-20261112-r3
+python scripts/rc128_mechanism_review.py pilot NEW_DIR --source-bundle reports/archive/rc128-evidence-review-20261112-r3
+python scripts/rc128_mechanism_review.py build NEW_DIR --source-bundle reports/archive/rc128-evidence-review-20261112-r3
 python scripts/rc128_mechanism_review.py verify {rel}
 python scripts/rc128_mechanism_review.py verify {rel} --git-index
 python scripts/rc128_mechanism_review.py package {rel}

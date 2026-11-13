@@ -17,8 +17,8 @@ import zipfile
 
 from rc128_review import REPO, read, rows, sha, check_patch_hunks
 
-PILOT=REPO/'reports/rc128-official-repo-pilot-20261112'
-SOURCE=REPO/'reports/rc128-evidence-review-20261112-r2'
+PILOT=REPO/'reports/archive/rc128-official-repo-pilot-20261112'
+SOURCE=REPO/'reports/archive/rc128-evidence-review-20261112-r2'
 CASE_IDS=['RC-002','RC-003','RC-009','RC-030','RC-111']
 REPO_RECEIPTS={
  'deepseek-ai/DeepSeek-R1':'REPO-DEEPSEEK', 'vllm-project/vllm':'REPO-VLLM',
@@ -229,7 +229,11 @@ def verify():
     data=json.loads(re.search(r'<script id="data" type="application/json">(.*?)</script>',(PILOT/'report.html').read_text(encoding='utf-8'),re.S)[1])
     check('HTML_JSON_statistics_identical',data['cases']==reviews and data['resources']==resources and data['searches']==queries and data['summary']['search_requests']==len(queries))
     check('all_payload_bytes_match_manifest',all(sha(PILOT/p)==h for p,h in manifest['payload_sha256'].items()))
-    check('analysis_script_matches_manifest',sha(Path(__file__))==manifest['analysis_script_sha256'])
+    # Migration changes current path constants. Validate the archived policy's
+    # script bytes at its recorded commit, not against today's report adapter.
+    historical_script = __import__('subprocess').check_output(
+        ['git','-c','safe.directory='+REPO.as_posix(),'show','9d8f108:scripts/official_repo_pilot.py'],cwd=REPO)
+    check('historical_analysis_script_matches_manifest',hashlib.sha256(historical_script).hexdigest()==manifest['analysis_script_sha256'])
     result=dict(status='PASS'if all(c['status']=='PASS'for c in checks)else'FAIL',check_count=len(checks),checks=checks,python=sys.version,
         scope='OFFLINE_PROVENANCE_AND_REPORT_CHECKS; not hardware or all128 review')
     if result['status']!='PASS':raise ValueError(json.dumps(result,ensure_ascii=False))
@@ -251,4 +255,6 @@ def package():
 
 if __name__=='__main__':
     parser=argparse.ArgumentParser(__doc__);parser.add_argument('command',choices=['build','verify','package'])
-    args=parser.parse_args();print(json.dumps(globals()[args.command](),ensure_ascii=False,indent=2))
+    args=parser.parse_args()
+    if args.command!='verify':raise ValueError('Published pilot is read-only; use the current report entry point.')
+    print(json.dumps(verify(),ensure_ascii=False,indent=2))

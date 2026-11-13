@@ -13,16 +13,38 @@ import shutil
 import sys
 
 REPO = Path(__file__).resolve().parents[1]
-LEGACY_BUNDLE = REPO / 'reports/rc128-evidence-review-20261111'
-DEFAULT = REPO / 'reports/rc128-evidence-review-20261112-r2'
+LEGACY_BUNDLE = REPO / 'reports/archive/rc128-evidence-review-20261111'
+DEFAULT = REPO / 'reports/archive/rc128-evidence-review-20261112-r2'
 
 
 def writable_output(folder):
-    """The published R1 snapshot is immutable, including through symlinks."""
+    """All published snapshots are immutable, including through symlinks."""
     p = Path(folder).resolve()
-    if p == LEGACY_BUNDLE.resolve() or LEGACY_BUNDLE.resolve() in p.parents:
+    archive=(REPO/'reports/archive').resolve()
+    if p == archive or archive in p.parents:
         raise ValueError('Historical bundle is read-only; choose an independent output directory.')
     return p
+
+
+def resolve_historical_path(reference):
+    """Resolve an old report reference without rewriting historical documents."""
+    from rc128_report_layout import PUBLISHED
+    p=Path(str(reference).replace('\\','/'))
+    if not p.is_absolute():p=REPO/p
+    for name in PUBLISHED:
+        old=REPO/'reports'/name
+        if p==old or old in p.parents:
+            return REPO/'reports/archive'/name/p.relative_to(old)
+    return p
+
+
+def historical_code_hashes(recorded):
+    """Read the pre-migration Git objects, never today's rules as old policy."""
+    import subprocess
+    receipt=read(REPO/'reports/evidence/layout_migration.json')
+    return {path:hashlib.sha256(subprocess.check_output(
+        ['git','-c','safe.directory='+REPO.as_posix(),'show',receipt['source_commit']+':'+path],cwd=REPO)).hexdigest()
+        for path in recorded}
 
 
 def read(path):
@@ -55,18 +77,18 @@ def init(folder=DEFAULT):
         'sources/original/handoff.jsonl': workspace / '数据/CANN_WEEKLY_EXTERNEL_SEARCH_HANDOFF_FOR_CODEX_20261111.jsonl',
         'sources/original/handoff.md': workspace / '数据/CANN_WEEKLY_EXTERNEL_SEARCH_HANDOFF_FOR_CODEX_20261111.md',
         'sources/original/CANN_30_MODES_WIKI_DTS_BASELINE_20261110.md': workspace / '数据/CANN_30_MODES_WIKI_DTS_BASELINE_20261110.md',
-        'sources/baseline_30.json': REPO / 'reports/baseline-30-api42-v4-20261111/review_data.json',
+        'sources/baseline_30.json': REPO / 'reports/archive/baseline-30-api42-v4-20261111/review_data.json',
         'sources/original/trigger_library.md': REPO / 'knowledge/trigger_library.md',
         'sources/original/api42_trigger_library_original.md': Path(r'D:\project\typora\trigger_library.md'),
         'sources/original/precision_trigger_knowledge_v4.md': REPO / 'knowledge/precision_trigger_knowledge_v4.md',
         'sources/semantic30_prior.json': workspace / 'work/semantic30_relationship_review_20261111/semantic30_data.json',
-        'sources/prior_technical_cases.json': REPO / 'reports/expansion-v1-20261110/technical_cases.json',
-        'sources/prior_observations.json': REPO / 'reports/expansion-v1-20261110/evidence/observations.json',
-        'sources/prior_condition_relations.json': REPO / 'reports/expansion-v1-20261110/condition_relations.json',
-        'sources/prior_definitions.json': REPO / 'reports/expansion-v1-20261110/condition_definitions.json',
-        'sources/prior_contexts.json': REPO / 'reports/expansion-v1-20261110/evidence/pinned_support_contexts.json',
-        'sources/prior_dequant_constants.json': REPO / 'reports/expansion-v1-20261110/evidence/dequant_constants.json',
-        'sources/prior_gather_exact_diff.json': REPO / 'reports/expansion-v1-20261110/evidence/gather_1562_diff.json',
+        'sources/prior_technical_cases.json': REPO / 'reports/archive/expansion-v1-20261110/technical_cases.json',
+        'sources/prior_observations.json': REPO / 'reports/archive/expansion-v1-20261110/evidence/observations.json',
+        'sources/prior_condition_relations.json': REPO / 'reports/archive/expansion-v1-20261110/condition_relations.json',
+        'sources/prior_definitions.json': REPO / 'reports/archive/expansion-v1-20261110/condition_definitions.json',
+        'sources/prior_contexts.json': REPO / 'reports/archive/expansion-v1-20261110/evidence/pinned_support_contexts.json',
+        'sources/prior_dequant_constants.json': REPO / 'reports/archive/expansion-v1-20261110/evidence/dequant_constants.json',
+        'sources/prior_gather_exact_diff.json': REPO / 'reports/archive/expansion-v1-20261110/evidence/gather_1562_diff.json',
     }
     receipts = []
     for name, source in inputs.items():
@@ -810,10 +832,10 @@ def write_readme(folder,summary):
 ## 复现和验证
 
 ```text
-python scripts/rc128_review.py build reports/rc128-evidence-review-20261111
-python scripts/rc128_review.py verify reports/rc128-evidence-review-20261111
+python scripts/rc128_review.py build reports/archive/rc128-evidence-review-20261111
+python scripts/rc128_review.py verify reports/archive/rc128-evidence-review-20261111
 python -m unittest discover -s tests -p test_rc128_review.py -v
-node scripts/verify_rc128_ui.cjs reports/rc128-evidence-review-20261111
+node scripts/verify_rc128_ui.cjs reports/archive/rc128-evidence-review-20261111
 ```
 
 发布包可离线复建，不需要内网原文、模型服务或设备。`init`仅用于开发机第一次从本机原路径冻结输入，不是Baseline初始化。

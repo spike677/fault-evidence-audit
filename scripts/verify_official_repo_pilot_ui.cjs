@@ -1,6 +1,6 @@
 // Offline report interaction checks, separate from actual Side source inspection.
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict'),path=require('node:path');
-const dir=path.resolve('reports/rc128-official-repo-pilot-20261112'),html=fs.readFileSync(path.join(dir,'report.html'),'utf8');
+const dir=path.resolve('reports/archive/rc128-official-repo-pilot-20261112'),html=fs.readFileSync(path.join(dir,'report.html'),'utf8');
 const raw=html.match(/<script id="data" type="application\/json">([\s\S]*?)<\/script>/)[1];
 const script=html.match(/<script>([\s\S]*?)<\/script>/)[1],nodes=new Map();
 function node(id){if(!nodes.has(id))nodes.set(id,{textContent:id==='data'?raw:'',innerHTML:'',value:'',listeners:new Map(),addEventListener(k,f){this.listeners.set(k,f)}});return nodes.get(id)}

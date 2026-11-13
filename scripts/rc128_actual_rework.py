@@ -13,7 +13,7 @@ from urllib.request import Request, urlopen
 
 
 ROOT = Path(__file__).resolve().parents[1]
-OUT = ROOT / "reports/rc128-actual-rework-20261113"
+OUT = ROOT / "reports/evidence/followup_http"
 
 
 def load(path):
@@ -141,11 +141,16 @@ def inspect(resource_ids, max_chars):
 
 
 def main():
+    global OUT
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("action", choices=["http", "inspect"])
     parser.add_argument("values", nargs="+")
     parser.add_argument("--max-chars", type=int, default=10000)
+    parser.add_argument("--out", type=Path, default=OUT)
     args = parser.parse_args()
+    OUT = args.out.resolve()
+    if OUT.is_relative_to((ROOT/'reports/archive').resolve()):
+        raise ValueError('Archived evidence is read-only; select a new --out directory')
     if args.action == "http":
         collect_http(Path(args.values[0]))
     else:

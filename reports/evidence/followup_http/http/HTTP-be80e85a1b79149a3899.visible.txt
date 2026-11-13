@@ -1,0 +1,536 @@
+[Bug-Report|缺陷反馈]: SLIKG BF16 dQ 未对齐清零路径漏写，导致 NaN（PR #11435）-ops-transformer-AtomGit
+Star
+1692
+Fork
+3404
+Code
+Introduction
+Code
+Issues
+435
+Pull Requests
+723
+Pipeline
+Actions
+Discussion
+Wiki
+Members
+623
+Analysis
+Settings
+Star
+1692
+Fork
+3404
+Closed
+[Bug-Report|缺陷反馈]: SLIKG BF16 dQ 未对齐清零路径漏写，导致 NaN（PR #11435）
+#5420
+xuyujun
+Add on
+Sep 18
+Closed at
+Sep 18
+X
+xuyujun
+Collaborators
+Sep 18
+Create
+Sep 18
+Create
+Describe the current behavior / 问题描述
+A3 上
+sparse_lightning_indexer_kl_loss_grad
+的 BF16
+dQ
+在无可见压缩 KV 的 query 行保留显存旧值，导致训练首步
+grad_norm=NaN
+。所有浮点输入均有限；其他三个算子输出有限。无需 compile 即可复现。
+已定位到 PR
+#11435
+，commit
+d77a4cac919f3fca9a1bb6991e48a640db01986a
+（SparseLightningIndexerKLLossGrad supports top-k generalization in the range of 1 to 8192）。
+attention/sparse_lightning_indexer_kl_loss_grad/op_kernel/arch22/sparse_lightning_indexer_kl_loss_grad_base.h
+的
+ClearInvalidS1Output
+（当前 master 613–622 行）由无条件清零改为：
+constexpr
+int64_t
+align =
+32
+/
+static_cast
+<
+int64_t
+>(
+sizeof
+(CLEAR_T));
+if
+((gmOffset % align ==
+0
+) && (n % align ==
+0
+)) {
+    AscendC::
+InitOutput
+(outputGm[gmOffset], n,
+static_cast
+<CLEAR_T>(
+0
+));
+}
+else
+if
+constexpr
+(IsSameType<CLEAR_T, T>::value) {
+    vectorService.
+ZeroFp32Gm
+(outputGm, gmOffset, n);
+}
+未对齐时只有 FP32 (
+T
+) 分支；BF16 dQ 不满足类型判断，直接漏写。
+CalcCoreClearRange
+按元素均分，不能保证每段16个BF16元素对齐。后续计算会跳过无可见KV的query，无法补写这些位置。
+在本复现的18个document、54个无有效KV的query、每行64×128个BF16、40个AIV的情况下，每核clear范围为
+ceil(54*8192/40)=11060
+个元素。逐段模拟上述判断得到漏写
+383344
+个元素，与NPU实测完全一致。对应改动在检查时的master
+1e878a0cdf15eba39382def8cdd599e8233c11b8
+中仍存在。
+Environment Information / 环境信息
+Ascend A3，单卡即可复现；非确定性模式。
+CANN 9.2.0 w0916。
+Python 3.12.10；torch distribution 2.14.0+cpu；torch_npu 2.14.0.dev20260916；cann-ops-transformer 1.0.0。
+TND；q=[4096,64,128] BF16，k=[1016,1,128] BF16，w=[4096,64] FP32；topk=512，mask_mode=3，cmp_ratio=4。
+使用cu_seqlens，不传seqused_q/k。
+Steps to reproduce the issue / 重现步骤
+以下脚本仅生成随机输入，不依赖模型、训练数据或保存的tensor。先加载上述CANN环境，再用空闲A3卡执行。预填充值用于暴露未写入的输出，
+reused=True
+确认输出确实复用了被预填的缓冲区。
+"""A3/CANN 9.2 w0916: standalone SLIG dQ allocator-sentinel regression."""
+import
+torch
+import
+torch_npu
+import
+cann_ops_transformer
+
+torch.manual_seed(
+42
+)
+torch.use_deterministic_algorithms(
+False
+)
+device =
+'npu'
+# Packed documents; each has three queries with no visible compressed key.
+lengths = [
+390
+,
+282
+,
+128
+,
+39
+,
+270
+,
+256
+,
+229
+,
+106
+,
+45
+,
+341
+,
+394
+,
+126
+,
+419
+,
+388
+,
+47
+,
+146
+,
+263
+,
+227
+]
+cuq = torch.tensor([
+0
+] + lengths, dtype=torch.int32).cumsum(
+0
+).
+int
+()
+cuk = torch.tensor([
+0
+] + [n //
+4
+for
+n
+in
+lengths], dtype=torch.int32).cumsum(
+0
+).
+int
+()
+t, tk, h, d, topk =
+int
+(cuq[-
+1
+]),
+int
+(cuk[-
+1
+]),
+64
+,
+128
+,
+512
+q = (torch.randn(t, h, d) *
+0.2
+).bfloat16().to(device)
+k = (torch.randn(tk,
+1
+, d) *
+0.2
+).bfloat16().to(device)
+w = (torch.randn(t, h) *
+0.01
+).to(device)
+indices = torch.full((t,
+1
+, topk), -
+1
+, dtype=torch.int32)
+teacher = torch.zeros((t,
+1
+, topk), dtype=torch.float32)
+for
+start, length
+in
+zip
+(cuq[:-
+1
+].tolist(), lengths):
+for
+pos
+in
+range
+(length):
+        visible =
+min
+((pos +
+1
+) //
+4
+, topk)
+if
+visible:
+            indices[start + pos,
+0
+, :visible] = torch.arange(visible)
+            teacher[start + pos,
+0
+, :visible] =
+1.0
+/ visible
+no_key = (indices <
+0
+).
+all
+(-
+1
+).flatten()
+cuq, cuk = cuq.to(device), cuk.to(device)
+residual = torch.tensor([n %
+4
+for
+n
+in
+lengths], dtype=torch.int32, device=device)
+metadata = torch.ops.cann_ops_transformer.sparse_lightning_indexer_kl_loss_grad_metadata(
+    h,
+1
+, d, cu_seqlens_q=cuq, cu_seqlens_k=cuk, cmp_residual_k=residual,
+    batch_size=
+len
+(lengths), max_seqlen_q=
+max
+(lengths), max_seqlen_k=
+max
+(n //
+4
+for
+n
+in
+lengths),
+    topk=topk, layout_q=
+'TND'
+, layout_k=
+'TND'
+, mask_mode=
+3
+, cmp_ratio=
+4
+,
+)
+kwargs =
+dict
+(q=q, k=k, w=w, sparse_indices=indices.to(device),
+              attn_softmax_l1_norm=teacher.to(device), cu_seqlens_q=cuq,
+              cu_seqlens_k=cuk, cmp_residual_k=residual, metadata=metadata,
+              layout_q=
+'TND'
+, layout_k=
+'TND'
+, mask_mode=
+3
+, cmp_ratio=
+4
+)
+fn = torch.ops.cann_ops_transformer.sparse_lightning_indexer_kl_loss_grad
+out = fn(**kwargs)
+torch.npu.synchronize()
+for
+fill
+in
+(
+float
+(
+'nan'
+),
+123.0
+,
+0.0
+):
+del
+out
+    buffers = [torch.full_like(q, fill)
+for
+_
+in
+range
+(
+16
+)]
+    pointers = {b.data_ptr()
+for
+b
+in
+buffers}
+    torch.npu.synchronize()
+del
+buffers
+    out = fn(**kwargs)
+    torch.npu.synchronize()
+    dq = out[
+0
+].cpu()
+    bad = ~torch.isfinite(dq).
+all
+(-
+1
+).
+all
+(-
+1
+)
+print
+(
+dict
+(fill=fill, reused=out[
+0
+].data_ptr()
+in
+pointers,
+               bad_rows=
+int
+(bad.
+sum
+()), bad_rows_with_valid_kv=
+int
+((bad & ~no_key).
+sum
+()),
+               empty_support_nonzero=
+int
+((dq[no_key] !=
+0
+).
+sum
+())), flush=
+True
+)
+Describe the expected behavior / 预期结果
+无可见压缩KV的query，其indexer KL loss对应dQ应全为零，与分配器旧数据无关；所有输入有限时，不应生成NaN/Inf。建议为BF16/FP16补齐未对齐清零路径，或按对齐块划分清零范围，并保证边界完整覆盖。
+Related log / screenshot / 日志
+同一输入，确认复用相应缓冲区：
+fill=NaN: reused=True, bad_rows=50, bad_rows_with_valid_kv=0, empty_support_nonzero=383344
+fill=123: reused=True, bad_rows=0,  bad_rows_with_valid_kv=0, empty_support_nonzero=383344
+fill=0:   reused=True, bad_rows=0,  bad_rows_with_valid_kv=0, empty_support_nonzero=0
+实际43层DeepSeek V4、8卡EP训练同样复现。仅在验证副本中对无有效KV的dQ行使用torch.where置零后，两步eager训练的grad_norm为9.7881、9.8792，所有rank参数梯度均有限。
+Special notes / 备注
+引入提交的定位依据为源码前后差异、分片清零模拟与NPU sentinel复现三者一致；尚未重新编译该提交前后两个完整CANN版本做二进制bisect。没有将A5、FP16或确定性路径标记为已实测。
+Save
+Cancel
+X
+xuyujun
+Collaborators
+Sep 18
+Added label:
+bug-report
+Sep 18
+Added label:
+bug-report
+X
+xuyujun
+Collaborators
+Sep 18
+Associated pull request
+Sep 18
+Associated pull request
+CANN-robot
+Collaborators
+Sep 18
+Assign xuyujun as responsible person
+Sep 18
+Assign xuyujun as responsible person
+X
+xuyujun
+Collaborators
+Sep 18
+Removed responsible person xuyujun
+Sep 18
+Removed responsible person xuyujun
+X
+xuyujun
+Collaborators
+Sep 18
+Comments：
+Sep 18
+Comments：
+/assign
+@xuyujun
+@youzhen5418
+我是提交bug，我没法解决，请找对应负责人
+Save
+Cancel
+游
+游震
+Collaborators
+Sep 18
+Comments：
+Sep 18
+Comments：
+感谢您提交的缺陷报告，包括完备的复现脚本和根因分析。我们已经确认 PR #11435 中 BF16/FP16 未对齐清零路径确实存在遗漏，导致
+dQ
+未正确归零并产生 NaN。您提供的分析（
+ClearInvalidS1Output
+函数中类型分支缺失）定位非常精准。团队将尽快修复此问题，补全未对齐时的清零逻辑，并补充相应的单元测试。再次感谢您的贡献！
+Save
+Cancel
+CANN-robot
+Collaborators
+Sep 18
+Assign xuyujun as responsible person
+Sep 18
+Assign xuyujun as responsible person
+游
+游震
+Collaborators
+Sep 18
+Comments：
+Sep 18
+Comments：
+/assign
+@yu-xinjie62
+Save
+Cancel
+CANN-robot
+Collaborators
+Sep 18
+Assign yu-xinjie62 as responsible person
+Sep 18
+Assign yu-xinjie62 as responsible person
+游
+游震
+Collaborators
+Sep 18
+Removed responsible person xuyujun
+Sep 18
+Removed responsible person xuyujun
+游
+游震
+Collaborators
+Sep 18
+Comments：
+Sep 18
+Comments：
+/assign
+@xuyujun
+@youzhen5418
+我是提交bug，我没法解决，请找对应负责人
+@xuyujun
+抱歉，因为提交人同时引用PR，误判成自提的issue分发了
+Save
+Cancel
+memorecool
+Collaborators
+Sep 18
+Assign mufei_L as responsible person
+Sep 18
+Assign mufei_L as responsible person
+M
+mufei_L
+Collaborators
+Sep 18
+Associated pull request
+Sep 18
+Associated pull request
+M
+mufei_L
+Collaborators
+Sep 18
+Associated pull request
+Sep 18
+Associated pull request
+CANN-robot
+Collaborators
+Sep 18
+Close issue
+Sep 18
+Close issue
+CANN-robot
+Collaborators
+Sep 18
+Added label:
+resolved
+Sep 18
+Added label:
+resolved
+Assignees
+於
+於欣洁
+M
+mufei_L
+Label
+bug-report
+resolved
+Kanban
+No board linked yet
+Milestones
+No related milestones
+Link PR
+No related PR
+Branch
+No branches linked yet

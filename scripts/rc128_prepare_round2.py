@@ -4,7 +4,7 @@ import re
 from pathlib import Path
 from urllib.parse import quote
 
-P = Path(__file__).resolve().parents[1] / 'reports/rc128-actual-rework-20261113'
+P = Path(__file__).resolve().parents[1] / 'reports/archive/rc128-actual-rework-20261113'
 TERMS = '''001|cann/ascend-transformer-boost|rms_norm
 004|Ascend/MindIE-LLM|ring
 005|Ascend/MindIE-LLM|长稳
@@ -80,6 +80,7 @@ TERMS = '''001|cann/ascend-transformer-boost|rms_norm
 
 
 def main():
+    raise RuntimeError('Historical query plans are read-only; author an explicit new evidence plan instead.')
     jobs=[]
     for line in TERMS.splitlines():
         number,repo,term=line.split('|')

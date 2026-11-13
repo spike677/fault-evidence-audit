@@ -1,0 +1,30 @@
+{
+  "id": "RC062-WORKER",
+  "args": {
+    "repository_full_name": "vllm-project/vllm-ascend",
+    "ref": "dd24be2fe924a77754ae472f77b439fe3eac3091",
+    "path": "vllm_ascend/worker/worker.py",
+    "start_line": 235,
+    "end_line": 310
+  },
+  "task_ids": [
+    "RC-062"
+  ],
+  "kind": "SOURCE",
+  "response": {
+    "content": [
+      {
+        "type": "text",
+        "text": "Action completed."
+      }
+    ],
+    "structuredContent": {
+      "content": "                    fcntl.flock(lock_fd, fcntl.LOCK_UN)\n                    if os.path.exists(lock_file_path):\n                        os.remove(lock_file_path)\n                except Exception:\n                    return\n\n    def sleep(self, level: int = 1) -> None:\n        free_bytes_before_sleep = torch.npu.mem_get_info()[0]\n        # Level-1 only offloads the weights pool. Persistent metadata such as\n        # the DSA Hadamard matrix is allocated outside the kv_cache pool, so it\n        # stays resident and does not need a CPU backup.\n        if level == 1:\n            self._sleep_saved_buffers = {}\n        else:\n            model = self.model_runner.model\n            self._sleep_saved_buffers = {name: buffer.cpu().clone() for name, buffer in model.named_buffers()}\n\n        rl_config = get_ascend_config().rl_config\n        cleanup_enabled = rl_config.enabled and rl_config.sleep_mode_extra_cleanup\n        if cleanup_enabled:\n            self.sleep_wakeup_manager.sleep()\n\n        allocator = CaMemAllocator.get_instance()\n        allocator.sleep(offload_tags=(\"weights\",) if level == 1 else tuple())\n        free_bytes_after_sleep, total = torch.npu.mem_get_info()\n        freed_bytes = free_bytes_after_sleep - free_bytes_before_sleep\n        used_bytes = total - free_bytes_after_sleep\n        assert freed_bytes >= 0, \"Memory usage increased after sleeping.\"\n\n        logger.info(\n            \"Sleep mode (level=%s) freed %.2f GiB memory, %.2f GiB memory is still in use.\",\n            level,\n            freed_bytes / GiB_bytes,\n            used_bytes / GiB_bytes,\n        )\n\n    def wake_up(self, tags: list[str] | None = None) -> None:\n        nz_mode = get_ascend_config().weight_nz_mode\n        if nz_mode:\n            raise ValueError(\n                \"FRACTAL_NZ mode is enabled. This may cause model parameter precision issues \"\n                \"in the RL scenarios. Please set weight_nz_mode=0 via --additional-config, \"\n                \"or enable additional_config.rl_config (enabled: true) which disables NZ \"\n                \"automatically.\"\n            )\n        allocator = CaMemAllocator.get_instance()\n        allocator.wake_up(tags=tags)\n\n        # Restore the buffers after level 2 sleep\n        if len(self._sleep_saved_buffers):\n            model = self.model_runner.model\n            for name, buffer in model.named_buffers():\n                if name in self._sleep_saved_buffers:\n                    buffer.data.copy_(self._sleep_saved_buffers[name].data)\n            self._sleep_saved_buffers = {}\n\n        rl_config = get_ascend_config().rl_config\n        cleanup_enabled = rl_config.enabled and rl_config.sleep_mode_extra_cleanup\n        if cleanup_enabled:\n            self.sleep_wakeup_manager.wakeup(tags)\n\n    def _check_weight_transfer_engine(self) -> None:\n        if self.weight_transfer_engine is None:\n            raise RuntimeError(\n                \"Weight transfer not configured. Please set weight_transfer_config to enable weight transfer.\"\n            )\n\n    def init_weight_transfer_engine(self, init_info: dict) -> None:\n        \"\"\"Initialize the HCCL weight transfer process group with the trainer.\"\"\"\n        self._check_weight_transfer_engine()\n        assert self.weight_transfer_engine is not None\n        typed_init_info = self.weight_transfer_engine.parse_init_info(init_info)\n        self.weight_transfer_engine.init_transfer_engine(typed_init_info)\n\n    def _check_nz_disabled(self) -> None:\n        if get_ascend_config().weight_nz_mode:",
+      "encoding": "utf-8",
+      "sha": "9c1417c659a2ab2dc03e263d6f359cb184a2ce02",
+      "display_url": "https://github.com/vllm-project/vllm-ascend/blob/dd24be2fe924a77754ae472f77b439fe3eac3091/vllm_ascend/worker/worker.py",
+      "display_title": "worker.py"
+    },
+    "isError": false
+  }
+}
