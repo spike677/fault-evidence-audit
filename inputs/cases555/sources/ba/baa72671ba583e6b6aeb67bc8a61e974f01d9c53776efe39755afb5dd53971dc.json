@@ -1,0 +1,110 @@
+[
+  {
+    "additions": 2,
+    "blob_id": "adad4dd48c67678ad33e6ef55096eae82aaa320c",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/676ccb9abff39076e882a6b2e43d9061916e04e3/norm/group_norm_swish_grad/docs/aclnnGroupNormSwishGrad.md",
+    "deletions": 2,
+    "filename": "norm/group_norm_swish_grad/docs/aclnnGroupNormSwishGrad.md",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 2,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -23,11 +23,11 @@ dYTemp_i = \\hat{x_i} \\cdot gamma + beta\n $$\n \n $$\n-dSwishTemp_i = dYTemp_i  - \\frac{dYTemp_i}{ \\exp {dYTemp_i * (-swishScale)} + 1} + 1\n+dSwishTemp_i = swishScale \\cdot dYTemp_i - \\frac{swishScale \\cdot dYTemp_i}{\\exp(-swishScale \\cdot dYTemp_i) + 1} + 1\n $$\n \n $$\n-dYNew_i = \\frac{dSwishTemp_i}{ \\exp (- dYTemp_i * swishScale) + 1} * dy\n+dYNew_i = \\frac{dSwishTemp_i}{\\exp(-swishScale \\cdot dYTemp_i) + 1} \\cdot dy\n $$\n \n $$\n",
+      "new_file": false,
+      "new_path": "norm/group_norm_swish_grad/docs/aclnnGroupNormSwishGrad.md",
+      "old_path": "norm/group_norm_swish_grad/docs/aclnnGroupNormSwishGrad.md",
+      "removed_lines": 2,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/676ccb9abff39076e882a6b2e43d9061916e04e3/norm/group_norm_swish_grad/docs/aclnnGroupNormSwishGrad.md",
+    "sha": "676ccb9abff39076e882a6b2e43d9061916e04e3",
+    "source_branch": "master",
+    "source_project": {
+      "full_name": "qiansunchi159/ops-nn",
+      "human_name": "qiansunchi159 / ops-nn",
+      "id": 9557971,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 9,
+    "blob_id": "5ccfcfeda90b1d81105066e6ab93305dd49ad0bc",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/676ccb9abff39076e882a6b2e43d9061916e04e3/norm/group_norm_swish_grad/op_kernel/group_norm_swish_grad.h",
+    "deletions": 0,
+    "filename": "norm/group_norm_swish_grad/op_kernel/group_norm_swish_grad.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 9,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -220,6 +220,7 @@ private:\n                 Adds(dswish_res, dswish_res, float(1.0), this->ele_num_per_channel);\n                 Div(temp_hxw_local, dy_new, dswish_res, this->ele_num_per_channel);\n                 Sub(temp_hxw_local, dy_new, temp_hxw_local, this->ele_num_per_channel);\n+                Muls(temp_hxw_local, temp_hxw_local, this->swish_scale, this->ele_num_per_channel);\n                 Adds(temp_hxw_local, temp_hxw_local, float(1.0), this->ele_num_per_channel);\n                 Div(dswish_res, temp_hxw_local, dswish_res, this->ele_num_per_channel);\n                 Mul(dy_new, dswish_res, dy_local[offset], this->ele_num_per_channel);\n@@ -248,6 +249,7 @@ private:\n                 Adds(dswish_res, dswish_res, float(1.0), this->ele_num_per_channel);\n                 Div(temp_hxw_local, dy_new, dswish_res, this->ele_num_per_channel);\n                 Sub(temp_hxw_local, dy_new, temp_hxw_local, this->ele_num_per_channel);\n+                Muls(temp_hxw_local, temp_hxw_local, this->swish_scale, this->ele_num_per_channel);\n                 Adds(temp_hxw_local, temp_hxw_local, float(1.0), this->ele_num_per_channel);\n                 Div(dswish_res, temp_hxw_local, dswish_res, this->ele_num_per_channel);\n                 Mul(unalign_channel_dy, dswish_res, unalign_channel_dy, this->ele_num_per_channel);\n@@ -285,6 +287,7 @@ private:\n                 Adds(dswish_res, dswish_res, float(1.0), this->ele_num_per_channel);\n                 Div(temp_hxw_local, dy_new, dswish_res, this->ele_num_per_channel);\n                 Sub(temp_hxw_local, dy_new, temp_hxw_local, this->ele_num_per_channel);\n+                Muls(temp_hxw_local, temp_hxw_local, this->swish_scale, this->ele_num_per_channel);\n                 Adds(temp_hxw_local, temp_hxw_local, float(1.0), this->ele_num_per_channel);\n                 Div(dswish_res, temp_hxw_local, dswish_res, this->ele_num_per_channel);\n                 Mul(dy_new, dswish_res, dy_local[offset], this->ele_num_per_channel);\n@@ -315,6 +318,7 @@ private:\n                 Adds(dswish_res, dswish_res, float(1.0), this->ele_num_per_channel);\n                 Div(temp_hxw_local, dy_new, dswish_res, this->ele_num_per_channel);\n                 Sub(temp_hxw_local, dy_new, temp_hxw_local, this->ele_num_per_channel);\n+                Muls(temp_hxw_local, temp_hxw_local, this->swish_scale, this->ele_num_per_channel);\n                 Adds(temp_hxw_local, temp_hxw_local, float(1.0), this->ele_num_per_channel);\n                 Div(dswish_res, temp_hxw_local, dswish_res, this->ele_num_per_channel);\n                 Mul(dy_new, dswish_res, dy_local[offset], this->ele_num_per_channel);\n@@ -392,6 +396,7 @@ private:\n             Adds(dswish_res, dswish_res, float(1.0), this->ele_num_per_channel);\n             Div(temp_hxw_local, dy_new, dswish_res, this->ele_num_per_channel);\n             Sub(temp_hxw_local, dy_new, temp_hxw_local, this->ele_num_per_channel);\n+            Muls(temp_hxw_local, temp_hxw_local, this->swish_scale, this->ele_num_per_channel);\n             Adds(temp_hxw_local, temp_hxw_local, float(1.0), this->ele_num_per_channel);\n             Div(dswish_res, temp_hxw_local, dswish_res, this->ele_num_per_channel);\n             Mul(dy_new, dswish_res, dy_local, this->ele_num_per_channel);\n@@ -436,6 +441,7 @@ private:\n             Adds(dswish_res, dswish_res, float(1.0), this->ele_num_per_channel);\n             Div(temp_hxw_local, dy_new, dswish_res, this->ele_num_per_channel);\n             Sub(temp_hxw_local, dy_new, temp_hxw_local, this->ele_num_per_channel);\n+            Muls(temp_hxw_local, temp_hxw_local, this->swish_scale, this->ele_num_per_channel);\n             Adds(temp_hxw_local, temp_hxw_local, float(1.0), this->ele_num_per_channel);\n             Div(dswish_res, temp_hxw_local, dswish_res, this->ele_num_per_channel);\n             Mul(dy_new, dswish_res, dy_local, this->ele_num_per_channel);\n@@ -498,6 +504,7 @@ private:\n         Adds(dswish_res, dswish_res, float(1.0), process_num);\n         Div(temp_hxw_local, dy_new, dswish_res, process_num);\n         Sub(temp_hxw_local, dy_new, temp_hxw_local, process_num);\n+        Muls(temp_hxw_local, temp_hxw_local, this->swish_scale, process_num);\n         Adds(temp_hxw_local, temp_hxw_local, float(1.0), process_num);\n         Div(dswish_res, temp_hxw_local, dswish_res, process_num);\n         Mul(dy_new, dswish_res, dy_local, process_num);\n@@ -575,6 +582,7 @@ private:\n                 Adds(dswish_res, dswish_res, float(1.0), this->mode2_ub_capacity_ele);\n                 Div(temp_hxw_local, dy_new, dswish_res, this->mode2_ub_capacity_ele);\n                 Sub(temp_hxw_local, dy_new, temp_hxw_local, this->mode2_ub_capacity_ele);\n+                Muls(temp_hxw_local, temp_hxw_local, this->swish_scale, this->mode2_ub_capacity_ele);\n                 Adds(temp_hxw_local, temp_hxw_local, float(1.0), this->mode2_ub_capacity_ele);\n                 Div(dswish_res, temp_hxw_local, dswish_res, this->mode2_ub_capacity_ele);\n                 Mul(dy_new, dswish_res, dy_local, this->mode2_ub_capacity_ele);\n@@ -604,6 +612,7 @@ private:\n                 Adds(dswish_res, dswish_res, float(1.0), this->mode2_ub_tail_num);\n                 Div(temp_hxw_local, dy_new, dswish_res, this->mode2_ub_tail_num);\n                 Sub(temp_hxw_local, dy_new, temp_hxw_local, this->mode2_ub_tail_num);\n+                Muls(temp_hxw_local, temp_hxw_local, this->swish_scale, this->mode2_ub_tail_num);\n                 Adds(temp_hxw_local, temp_hxw_local, float(1.0), this->mode2_ub_tail_num);\n                 Div(dswish_res, temp_hxw_local, dswish_res, this->mode2_ub_tail_num);\n                 Mul(dy_new, dswish_res, dy_local, this->mode2_ub_tail_num);\n",
+      "new_file": false,
+      "new_path": "norm/group_norm_swish_grad/op_kernel/group_norm_swish_grad.h",
+      "old_path": "norm/group_norm_swish_grad/op_kernel/group_norm_swish_grad.h",
+      "removed_lines": 0,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/676ccb9abff39076e882a6b2e43d9061916e04e3/norm/group_norm_swish_grad/op_kernel/group_norm_swish_grad.h",
+    "sha": "676ccb9abff39076e882a6b2e43d9061916e04e3",
+    "source_branch": "master",
+    "source_project": {
+      "full_name": "qiansunchi159/ops-nn",
+      "human_name": "qiansunchi159 / ops-nn",
+      "id": 9557971,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 2,
+    "blob_id": "fa4dfb5f3d1991ae3f179c931ffb586b5748209a",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/676ccb9abff39076e882a6b2e43d9061916e04e3/norm/group_norm_swish_grad/tests/st/aclnnGroupNormSwishGrad/executor_aclnnGroupNormSwishGrad.py",
+    "deletions": 2,
+    "filename": "norm/group_norm_swish_grad/tests/st/aclnnGroupNormSwishGrad/executor_aclnnGroupNormSwishGrad.py",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 2,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -120,8 +120,8 @@ class AsceneGroupNormSwishGradApi(BaseApi):\n                         dswish_res_i = dy_new_i * (-swish_scale)\n                         dswish_res_i = torch.exp(dswish_res_i)\n                         dswish_res_i = dswish_res_i + 1.0\n-                        tmp_res = dy_new_i / dswish_res_i\n-                        tmp_res = dy_new_i - tmp_res\n+                        tmp_res = swish_scale * dy_new_i / dswish_res_i\n+                        tmp_res = swish_scale * dy_new_i - tmp_res\n                         tmp_res = tmp_res + 1.0\n                         dswish_res_i = tmp_res / dswish_res_i\n                         # dy_new_i 等于激活函数的结果\n",
+      "new_file": false,
+      "new_path": "norm/group_norm_swish_grad/tests/st/aclnnGroupNormSwishGrad/executor_aclnnGroupNormSwishGrad.py",
+      "old_path": "norm/group_norm_swish_grad/tests/st/aclnnGroupNormSwishGrad/executor_aclnnGroupNormSwishGrad.py",
+      "removed_lines": 2,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/676ccb9abff39076e882a6b2e43d9061916e04e3/norm/group_norm_swish_grad/tests/st/aclnnGroupNormSwishGrad/executor_aclnnGroupNormSwishGrad.py",
+    "sha": "676ccb9abff39076e882a6b2e43d9061916e04e3",
+    "source_branch": "master",
+    "source_project": {
+      "full_name": "qiansunchi159/ops-nn",
+      "human_name": "qiansunchi159 / ops-nn",
+      "id": 9557971,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  }
+]

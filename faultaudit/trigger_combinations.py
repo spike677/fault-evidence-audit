@@ -3,6 +3,8 @@ from __future__ import annotations
 
 from itertools import combinations
 
+from .store import AuditError
+
 POSITIVE = {"APPLICABLE", "PARTIAL"}
 
 
@@ -22,7 +24,9 @@ def analyze(data):
     units = sorted(set(unit_for.values()))
     assessments = _current(data)
     tax = data.get("taxonomy", {})
-    api_scheme = data.get("input_condition_scheme", "REVISED42")
+    api_scheme = data.get("input_condition_scheme", "ORIGINAL42")
+    if api_scheme != "ORIGINAL42":
+        raise AuditError("Archived input scheme cannot enter original-rule combination reports")
     frames = [(api_scheme, tax.get("definition_version") or tax.get("taxonomy_hash") or tax.get("taxonomy_id") or "UNVERSIONED", tax.get("items", []), "rows")]
     if data.get("v4_taxonomy"):
         v4 = data["v4_taxonomy"]
@@ -42,7 +46,9 @@ def analyze(data):
                     continue
                 u = unit_for[cid]; result = a["result"]
                 versions = result.get("definition_versions", {})
-                result_version = versions.get("v4" if scheme == "V4" else "original42" if scheme == "ORIGINAL42" else "revised42", version)
+                if scheme == "ORIGINAL42" and ("revised42" in versions or result.get("input_condition_scheme") == "REVISED42"):
+                    continue  # Archived frames are never relabelled as original.
+                result_version = versions.get("v4" if scheme == "V4" else "original42", version)
                 if result_version != version:
                     continue
                 assessed.add(u)

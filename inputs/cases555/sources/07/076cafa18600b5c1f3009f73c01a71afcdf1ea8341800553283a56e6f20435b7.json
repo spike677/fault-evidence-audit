@@ -1,0 +1,80 @@
+{
+  "assignee": {
+    "html_url": "https://gitcode.com/yourealize",
+    "id": "684598ba4229be333029be60",
+    "login": "yourealize",
+    "name": "陈展熹",
+    "object_id": "684598ba4229be333029be60"
+  },
+  "assignees": [
+    {
+      "html_url": "https://gitcode.com/yourealize",
+      "id": "684598ba4229be333029be60",
+      "login": "yourealize",
+      "name": "陈展熹",
+      "object_id": "684598ba4229be333029be60"
+    }
+  ],
+  "body": "#### 一、问题描述\n\nscatter_nd_add 算子在确定性（deterministic）模式下，`QuantizeForSumVf` 和 `InverseQuantizeVf` 两个 SIMD VF 函数存在 mask 计算 bug。\n\n`AscendC::MicroAPI::UpdateMask` 在每次调用时会消费（递减）`maskLen` 的值。原代码中 `maskLen` 作为函数参数传入，在内层循环中被 `UpdateMask` 消费后，外层行循环进入下一行时 `maskLen` 已变为 0 或残余值，导致后续所有行的 mask 设置错误。\n\n当 `rowLen > 1` 时，只有第一行的量化/反量化结果正确，后续行全部因 mask 异常而产生错误结果。\n\n#### 二、环境信息\n\n- 硬件：Ascend 910B\n- 软件：CANN 9.1.0\n- 算子：scatter_nd_add（确定性模式）\n\n#### 三、重现步骤\n\n1. 使用确定性模式（`context->GetDeterministic() == 1`）运行 scatter_nd_add 算子\n2. 构造 tiling data 使得 `rowLen > 1`（即 `eachCoreIndexCount > ubQuantaIndxFactor` 或 `eachCoreVarCount > ubRowFactor`）\n3. 观察第二步量化和第三步反量化的输出，第二行及之后的行数据错误\n\n#### 四、预期结果\n\n每行循环开始时 `maskLen` 应被重置为 `afterAxis`（或 `colLen`），确保所有行的 mask 设置正确，量化/反量化结果无误。\n\n#### 五、日志 / 截图\n\n修复方案已提交，详见关联 PR：https://gitcode.com/cann/ops-nn/merge_requests/6712\n\n#### 六、备注\n\n影响文件：`index/scatter_nd_add/op_kernel/arch35/scatter_nd_add_determinstic.h`\n",
+  "comments": 0,
+  "created_at": "2026-06-29T11:42:16+08:00",
+  "finished_at": "2026-06-30T09:22:14+08:00",
+  "html_url": "https://gitcode.com/cann/ops-nn/issues/3661",
+  "id": 4123336,
+  "issue_priority_detail": {
+    "id": 116,
+    "title": "无优先级"
+  },
+  "issue_state": "进行中",
+  "issue_state_detail": {
+    "id": 285,
+    "serial": 0,
+    "title": "进行中"
+  },
+  "issue_type": "任务",
+  "issue_type_detail": {
+    "id": 255,
+    "is_system": false,
+    "title": "任务"
+  },
+  "labels": [
+    {
+      "color": "#DB2828",
+      "created_at": "2025-06-10T14:17:23+08:00",
+      "id": 3870,
+      "name": "bug-report",
+      "updated_at": "2026-06-29T11:42:16+08:00"
+    },
+    {
+      "color": "#35e029",
+      "created_at": "2026-03-20T11:25:13+08:00",
+      "id": 38861,
+      "name": "resolved",
+      "updated_at": "2026-06-30T09:37:15+08:00"
+    }
+  ],
+  "number": "3661",
+  "priority": 0,
+  "repository": {
+    "assigner": {},
+    "created_at": "2025-09-27T17:40:34+08:00",
+    "description": "本项目是CANN提供的神经网络类计算算子库，实现网络在NPU上加速计算。",
+    "full_name": "cann/ops-nn",
+    "id": 7665709,
+    "name": "ops-nn",
+    "paas": "",
+    "path": "ops-nn",
+    "updated_at": "2025-09-27T18:09:31+08:00"
+  },
+  "state": "closed",
+  "title": "[Bug-Report|缺陷反馈]: scatter_nd_add deterministic path maskLen consumed by UpdateMask causing incorrect results for multi-row cases",
+  "updated_at": "2026-06-30T09:22:14+08:00",
+  "user": {
+    "html_url": "https://gitcode.com/yourealize",
+    "id": "684598ba4229be333029be60",
+    "login": "yourealize",
+    "name": "陈展熹",
+    "object_id": "684598ba4229be333029be60"
+  },
+  "visibility_reason": "public"
+}

@@ -1,0 +1,152 @@
+{
+  "approval_reviewers": [],
+  "assignees": [],
+  "assignees_number": 0,
+  "base": {
+    "label": "master",
+    "ref": "master",
+    "repo": {
+      "full_name": "cann/ops-nn",
+      "html_url": "https://gitcode.com/cann/ops-nn.git",
+      "name": "ops-nn",
+      "namespace": {
+        "path": "cann"
+      },
+      "path": "ops-nn"
+    },
+    "sha": "a90fa6a3529ced92b05169ccf8629500cdfbf628"
+  },
+  "body": "## 描述\n\n修复 scatter_nd_add 确定性路径中 QuantizeForSumVf 和 InverseQuantizeVf 两个 SIMD VF 函数的 mask 计算错误。\n\n### 问题原因\n\nAscendC::MicroAPI::UpdateMask 在每次调用时会消费（递减）maskLen 的值。原代码中 maskLen 作为函数参数传入，在内层循环中被 UpdateMask 消费后，外层行循环进入下一行时 maskLen 已变为 0 或残余值，导致后续所有行的 mask 设置错误。\n\n当 rowLen > 1 时，只有第一行的量化/反量化是正确的，后续行全部因 mask 异常而产生错误结果。\n\n### 修复方法\n\n- QuantizeForSumVf：将参数 maskLen 改为 afterAxis，在每行循环开始时重新赋值 maskLen = afterAxis\n- InverseQuantizeVf：将参数 maskLen 改为 colLen，在每行循环开始时重新赋值 maskLen = colLen\n\n## 关联的Issue\n\nhttps://gitcode.com/cann/ops-nn/issues/3662\n\n## 测试\n\n通过确定性模式用例验证，修复后多行场景下量化/反量化结果正确。\n\n## 文档更新\n\n无需更新文档\n\n## 类型标签\n- [x] Bug修复\n- [ ] 新特性\n- [ ] 性能优化\n- [ ] 文档更新\n- [ ] 其他",
+  "can_merge_check": true,
+  "close_related_issue": true,
+  "closed_at": "2026-06-30T09:22:14+08:00",
+  "created_at": "2026-06-29T11:41:29+08:00",
+  "draft": false,
+  "head": {
+    "label": "masked",
+    "ref": "masked",
+    "repo": {
+      "full_name": "yourealize/ops-nn",
+      "html_url": "https://gitcode.com/yourealize/ops-nn.git",
+      "name": "ops-nn",
+      "namespace": {
+        "path": "yourealize"
+      },
+      "path": "ops-nn"
+    },
+    "sha": "656326d78cc8a3d405b09618ab9993ae9b7df399",
+    "user": {
+      "html_url": "https://gitcode.com/yourealize",
+      "id": "684598ba4229be333029be60",
+      "login": "yourealize",
+      "name": "陈展熹"
+    }
+  },
+  "html_url": "https://gitcode.com/cann/ops-nn/merge_requests/6712",
+  "id": 8799055,
+  "issue_url": "https://api.gitcode.com/api/v5/repos/cann/ops-nn/pulls/6712/issues",
+  "labels": [
+    {
+      "color": "#2865E0",
+      "created_at": "2025-06-21T10:53:09+08:00",
+      "id": 4929,
+      "name": "cann-cla/yes",
+      "repository_id": 7665709,
+      "updated_at": "2026-06-29T14:19:05+08:00"
+    },
+    {
+      "color": "#3ee029",
+      "created_at": "2025-12-16T09:45:21+08:00",
+      "id": 22553,
+      "name": "api-check-pass",
+      "repository_id": 7665709,
+      "updated_at": "2026-06-29T14:36:11+08:00"
+    },
+    {
+      "color": "#21BA45",
+      "created_at": "2025-06-10T14:17:23+08:00",
+      "id": 3873,
+      "name": "ci-pipeline-passed",
+      "repository_id": 7665709,
+      "updated_at": "2026-06-29T14:36:56+08:00"
+    },
+    {
+      "color": "#22ed07",
+      "created_at": "2025-05-29T20:14:31+08:00",
+      "id": 2742,
+      "name": "approved",
+      "repository_id": 7665709,
+      "updated_at": "2026-06-29T15:53:02+08:00"
+    },
+    {
+      "color": "#17f207",
+      "created_at": "2025-05-29T20:14:01+08:00",
+      "id": 2741,
+      "name": "lgtm",
+      "repository_id": 7665709,
+      "updated_at": "2026-06-30T09:22:07+08:00"
+    }
+  ],
+  "mergeable": true,
+  "mergeable_state": {
+    "all_depend_merge_request_merged_passed": true,
+    "approval_approvers_required_passed": true,
+    "approval_approvers_result": 2,
+    "approval_reviewers_required_passed": true,
+    "approval_testers_required_passed": true,
+    "approval_testers_result": 2,
+    "branch_missing_passed": true,
+    "can_force_merge": false,
+    "check_tasks_num": 0,
+    "ci_state_passed": true,
+    "conflict_passed": true,
+    "merge_by_self_passed": true,
+    "merge_request_id": 8799055,
+    "merge_request_switch": {
+      "add_notes_after_merged": true,
+      "approval_required_reviewers_branch": "*",
+      "approval_required_reviewers_count": 0,
+      "can_force_merge": false,
+      "can_reopen": true,
+      "disable_merge_by_self": false,
+      "disable_squash_merge": false,
+      "mark_auto_merged_mr_as_closed": false,
+      "merge_method": "merge",
+      "only_allow_merge_if_all_discussions_are_resolved": true,
+      "only_allow_merge_if_pipeline_succeeds": false,
+      "review_mode": "approval",
+      "squash_merge_with_no_merge_commit": true
+    },
+    "merged_by_user_passed": true,
+    "mr_state_passed": true,
+    "non_ff_passed": true,
+    "reason": {},
+    "resolve_discussion_passed": true,
+    "state": true,
+    "status_without_user_auth": true,
+    "work_in_progress_passed": true
+  },
+  "merged_at": "2026-06-30T09:22:14+08:00",
+  "merged_by": {
+    "avatar_url": "https://cdn-img.gitcode.com/bf/ad/b7f29486a040d7b2f52bf6c78414692d7d585eb1ec628cea3eb01c9d63f68618.png?time=1755691472703",
+    "html_url": "https://gitcode.com/cann-robot",
+    "id": "673c1552584fe8295cfd4a13",
+    "login": "cann-robot",
+    "name": "CANN-robot"
+  },
+  "number": 6712,
+  "prune_branch": false,
+  "squash_merge": true,
+  "state": "merged",
+  "testers": [],
+  "title": "fix: reset maskLen per row in QuantizeForSumVf and InverseQuantizeVf",
+  "updated_at": "2026-06-30T09:22:16+08:00",
+  "url": "https://api.gitcode.com/api/v5/repos/cann/ops-nn/pulls/6712",
+  "user": {
+    "html_url": "https://gitcode.com/yourealize",
+    "id": "684598ba4229be333029be60",
+    "login": "yourealize",
+    "name": "陈展熹"
+  },
+  "visibility_reason": "public"
+}

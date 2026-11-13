@@ -79,6 +79,8 @@ class TriggerAssessmentTests(unittest.TestCase):
         self.assertIn("TriggerAssessment", response_schema()["title"])
         self.assertIn("MODE_ENTRY is not an incident", instructions())
         self.assertIn("every original mode", instructions())
+        self.assertNotIn("INT32 address-offset overflow maps to 1.3.2", instructions())
+        self.assertIn("Missing required argument evidence stays UNKNOWN", instructions())
 
     def test_frozen_identity_and_all_42_unique_are_required(self):
         for mutate in (lambda r: r.update(request_hash="b" * 64), lambda r: r.update(case_id="other"),

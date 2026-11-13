@@ -349,6 +349,7 @@ class IndependentAxisGateTests(unittest.TestCase):
 
     def test_original42_link_cannot_use_revised42_or_v4_crosswalk(self):
         p, r = sparse_attempt(); p.update(baseline_axis='API42', input_condition_scheme='ORIGINAL42')
+        r['label_links'][0]['scheme'] = 'REVISED42'
         with self.assertRaises(AuditError): validate_assessment(p, r, HASH)
         r['label_links'][0]['scheme'] = 'ORIGINAL42'
         out = validate_assessment(p, r, HASH)

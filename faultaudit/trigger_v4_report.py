@@ -1,4 +1,4 @@
-"""V4-first report tables; crosswalk rows never generate classifications."""
+"""Original V4 report tables; no interpretation or crosswalk tables."""
 from __future__ import annotations
 
 from collections import Counter
@@ -70,22 +70,12 @@ def extend_workbook(book, data):
                     "executor": participant["executor"], "生命周期": participant["lifecycle"],
                     "串行基准": card["serial_baseline"], "event记录位置": card["event_record"], "wait位置": card["consumer_wait"],
                     "执行结果": "NOT_RUN"})
-    mapping = data["mapping"]
-    mapping_rows = [{"来源规则版本": r["source_scheme"], "来源编号": r["source_id"],
-        "目标规则版本": r["target_scheme"], "目标编号": r["target_id"] or "无对应",
-        "映射语义": r["relation"], "说明": r["reason"], "传递适用性": "禁止", "传递覆盖": "禁止",
-        "映射版本": mapping["mapping_version"]} for r in mapping["rows"]]
     definitions = [{"V4类编号": i["id"], "名称": i["name"], "完整定义": i["definition"],
         "原Requires": "\n".join(i["original_requires"]), "原Skip": "\n".join(i["original_skip_if"]),
         "规范Requires": "\n".join(i["requires"]), "规范Skip": "\n".join(i["skip_if"]),
         "构造能力条件": "\n".join(i["construction_requires"]), "路径前提": "\n".join(i["path_requires"]),
-        "分析要求": "\n".join(i["analysis_requires"]), "解释修订原因": i["revision_reason"],
+        "原始规则状态": i.get("source_status", "ORIGINAL_VERBATIM"),
         "原文位置": f"{v4['source_file']}:{i['line_start']}", "规则版本": v4["definition_version"]} for i in v4["items"]]
-    revisions = [{"原42编号": item["id"], "原定义版本": data["taxonomy"]["original_definition_version"],
-        "修订规则版本": data["taxonomy"]["definition_version"], "原完整定义": item["original_definition"],
-        "修订完整定义": item["definition"], "原因": item["revision_reason"],
-        "族Requires覆盖": "\n".join(item.get("family_requires_override", [])),
-        "族Skip覆盖": "\n".join(item.get("family_skip_override", []))} for item in data["taxonomy"]["items"]]
     protocol_rows = [{"规程编号": m["method_id"], "名称": m["name"], "完整执行规程": m["definition"],
         "执行能力": "未实现；仅设计规程", "计入输入类别": "否"} for m in v4["methods"]]
     extra = [_table("V4条件分类", new_rows, list(new_rows[0]) if new_rows else
@@ -94,8 +84,7 @@ def extend_workbook(book, data):
                     ["原编号", "case_id", "V4类编号", "构造代码", "语义适用性", "说明"]),
         _table("用例设计卡", designs, list(designs[0]) if designs else ["case_id", "设计状态", "能力缺口", "执行结果"]),
         _table("参与者与对照", participants, list(participants[0]) if participants else ["case_id", "参与者", "目标调用", "执行结果"]),
-        _table("42与V4映射", mapping_rows), _table("V4定义与解释", definitions),
-        _table("42定义版本修订", revisions), _table("执行规程", protocol_rows)]
+        _table("V4原始定义", definitions), _table("执行规程", protocol_rows)]
     frozen = data.get("baseline") or {}
     if frozen.get("status") != "STALE" and frozen.get("v4_definition_version") == v4["definition_version"]:
         init_rows = []
@@ -121,7 +110,7 @@ def extend_workbook(book, data):
                 item = next(i for i in data["taxonomy"]["items"] if i["id"] == row["trigger_id"])
                 changes.append({"阶段": phase, **source, "子问题": a["issue_label"], "原42编号": row["trigger_id"],
                     "旧适用性": prior_row["applicability"] if prior_row else "无同范围旧评估", "旧理由": prior_row["reason"] if prior_row else "",
-                    "新适用性": row["applicability"], "新理由": row["reason"], "定义修订原因": item["revision_reason"],
+                    "新适用性": row["applicability"], "新理由": row["reason"], "原始规则状态": item.get("source_status", "ORIGINAL_VERBATIM"),
                     "新原文及位置": _condition_refs(row, a["result"]), "旧判断编号": prior["assessment_id"] if prior else "",
                     "新判断编号": a["assessment_id"], "旧定义版本": old_version,
                     "新定义版本": data["taxonomy"]["definition_version"], "覆盖传递": "无；新旧独立评估"})
@@ -146,6 +135,6 @@ def extend_workbook(book, data):
         ["当前设计case数", len({v["case_id"] for v in data.get("designs", [])}), "设计与执行分别验收"],
         ["当前设计卡数", len(designs), "case内card_id；多张卡不等于多个故障"],
         ["实际设备执行数", 0, "本阶段没有执行适配器；全部NOT_RUN"],
-        ["V4规则版本", v4["definition_version"], "原文、解释修订和映射版本分别冻结"]])
+        ["V4规则版本", v4["definition_version"], "按原文SHA冻结；无解释覆盖或crosswalk"]])
     book["sheets"][1:1] = extra
     return book

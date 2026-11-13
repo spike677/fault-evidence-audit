@@ -1,0 +1,113 @@
+模式名称	故障原因	故障影响	\
+空tensor处理不当	embedding前向输入为空导致反向NaN	第一步gradnorm为NAN	https\://wiki.huawei.com/domains/61412/wiki/89331/WIKI202508257989332\
+越界读写：shape错误	SetSize算子的infershape接口存在问题，output shape是-1，导致其后面的算子ReduceSum推导出的shape是个标量，进而导致分配内存异常；	在进行虚机+容器精度测试下：TF_WideDeep的单P并发精度 测试时，出现训练失败的问题	DTS2023020209588\
+越界读写：tiling切分策略的逻辑错误	测试脚本中输入的indices的tensor大小未对齐32b	batch较大场景下泛化用例精度不够	DTS2024122806843\
+越界读写：偏移量计算错误	window区偏移计算存在问题,导致地址有踩踏，从而导致精度问题	MC2反向精度出现nan	DTS2025030355089\
+缺少同步	多核同时搬运可能会导致偶现精度问题	算子输出偶现不一致	DTS2025011622129\
+搬运逻辑错误：blocktable有错误	Block Table 目前的索引和但kvCacheOut 的batch 偏移不一致	某些特定shape用例下算子精度错误	DTS2025010620513\
+数据排布转换错误	数据在内存排布转换发生错误，如NZ排布转换实现方案存在问题。	导致上层算子某些情况下精度错误	DTS2025030601724\
+算子实现精度不一致：低精度误差累积	混合精度模式下npu和gpu的实现行为不一致，如混精下gpu默认先转fp32再计算，npu先fp16计算再转fp32，单算子相同输入gpu侧输出可以正常（超fp16没超fp32）npu溢出	混精训练容易lossNAN 	https\://wiki.huawei.com/domains/61412/wiki/89331/WIKI202509028101266\
+数学等价但计算结果不等价	FA反向计算时顺序不合适（数学等价）导致精度不足	大模型训练崩溃	字节自研FA精度问题\
+浮点数累加序不当	通信累加顺序不一致导致测试不通过，如不同测试脚本目前是只按照一种求和顺序来比较，而集合通信ReduceScatter实现不同rank天然就会有不同的加法顺序，出现结果不相等的情况。	reducescatterV在数据类型为float16、bfloat16  reducetype为sum时有精度问题	DTS2025011636666\
+tiling切分策略的逻辑异常	tiling逻辑计算有误，如未适配多种芯片核数，例310P3 8个核，310P1 10个核，前者能正常执行但后者报错	算子执行报错	DTS2025081528952\
+tiling切分策略分支错误	tiling逻辑判断或具体条件判断错误，导致走入错误分支	网络loss不收敛	DTS2025060510413\
+确定性计算未实现	RMSNorm小算子（Pow + ReduceMean + Add +Rsqrt）实现与RMSNorm算子不同；ReduceMean的确定性未能固定	有随机性，小算子无误差，可能导致无法复现故障	"https\://wiki.huawei.com/domains/71532/wiki/112294/WIKI202411215175747\
+https\://wiki.huawei.com/domains/71532/wiki/112294/WIKI202412195470589"\
+浮点数累加序不当	累加序实现不一致，如二分累加对比顺序累加，导致精度差异，如未设置export CLOSE_MATMUL_K_SHIFT=1时会有计算误差，具体可能是在router选择时容易出现较大偏差，导致评分下降	模型在某些推理任务上下游评分下降	https\://wiki.huawei.com/domains/61412/wiki/89331/WIKI202501245830826\
+硬件导致算子不支持未拦截	如300I系列机器均不支持处理fp32的dtype数据，matmul算子先将输入cast为FP16后进行计算；如310P不支持inf nan；如reshapeAndCacheNd在输入shape较大时走入了使用DataCopyPad分支，在310p上不支持该指令	模型输出吞字、产生冗余信息、错误信息；有精度问题	https\://wiki.huawei.com/domains/71532/wiki/112294/WIKI202411155126134 \
+NPU适配引入额外参数	tik底层对coreNum特性，block_dim为scalar时支持不够导致的，需添加常量折叠配置。	 tf框架bert离线推理精度下降21%左右	DTS2022122705052\
+tensor下标超出数值范围	偏移量超出INT32数值范围	推理出现异常	A2大EP长稳推理\
+精度溢出：数值格式精度不够导致精度溢出	baddbmm公式out=β input +α (batch1@batch2),计算时括号内为中间变量，超出fp16表示范围	推理计算值为Inf	https\://wiki.huawei.com/domains/61412/wiki/89331/WIKI202505286967655\
+算子实现精度不一致：指数函数精度实现错误	Tensor.exponoential_算子实现精度不一致	推理评分降低，从60降低至30	https\://wiki.huawei.com/domains/61412/wiki/89331/WIKI202508047751047\
+确定性计算未实现	reducescatter算子，HCCL场景支持确定性计算，LCCL场景不支持确定性计算	deepseek A2单机精度,数据集aime,相邻版本正确率差异超10%	https\://wiki.huawei.com/domains/71532/wiki/112294/WIKI202507047384047\
+越界读写：内存踩踏覆盖	FIA算子踩踏reducesum的内存，导致传入残差入口（add_3算子）的数据发生误差，导致残差之后的误差会不断放大	输出乱码	https\://wiki.huawei.com/domains/71532/wiki/112294/WIKI202411155126134\
+竞品实现不一致：特定私有数据排列格式	特定私有格式（NC1HWC0、NDHWC、NDC1HWC0、Z_3D）， 不支持as_strided的改变stride的view操作	图生视频，输出有竖线	https\://wiki.huawei.com/domains/71532/wiki/112294/WIKI202412195470579\
+tiling切分策略的逻辑异常	reduce轴没有切多核，但m轴在多batch下切分不同，由于FA是下三角的sparse计算，导致核内的reduce轴切分粒度不同	单batch、多batch输出不一致	https\://wiki.huawei.com/domains/71532/wiki/112294/WIKI202411215175550\
+精度溢出：特定硬件数值格式导致精度溢出	调用的是BNInferenceD算子，该算子在310P fp16场景有概率发生精度溢出	onnx转om出现精度下降	https\://wiki.huawei.com/domains/71532/wiki/112294/WIKI202412205476910\
+边界值异常	INTrainingUpdataV2算子variance算出来有负值，导致开根后变为nan	输出异常nan值	https\://wiki.huawei.com/domains/71532/wiki/112294/WIKI202501145730935\
+融合算子反量化位置不当	图优化阶段因反量化（Dequantize）节点摆放位置错误，导致本应以纯INT8执行的融合算子退化为“反量化+高精度计算+再量化”路径，或使量化参数（scale/zero_point）传递断裂，最终引发精度异常	推理输出乱码	\
+输入数据类型强转低精丢失	conv2d算子在进行计算之前，会把输入的tensor强制转换成FP16格式的，因为算子内部不支持FP32格式。所以计算出的结果和onnx就不对齐	推理精度不达标	https\://wiki.huawei.com/domains/71532/wiki/112294/WIKI202502266073644?title=\_fa04c75b\
+tiling切分策略不同分支处理精度不一致	PageAttention blockSize 不同时，会有不同的tiling选择，结果精度不能保持二进制一致	开启确定性计算，每次推理输出结果不一致	https\://wiki.huawei.com/domains/71532/wiki/112294/WIKI202408014188827?title=%E9%97%AE%E9%A2%98%E7%8E%B0%E8%B1%A1\
+矩阵乘加融合后数据格式转换精度丢失	MatmulAtomicAddUbFusion打开矩阵乘法加法融合，特定shape下matmul算子 在线编译和二进制的输出会有精度差距	盘古7B 从910B迁移到310P存在精度误差	https\://wiki.huawei.com/domains/71532/wiki/112294/WIKI202411215175792\
+浮点数累加序不当	attention算子输入shape不一样导致Tiling 策略并行粒度变化，输出微小差异带来精度误差	全量4096输入 vs 91输入输出结果不一致	https\://wiki.huawei.com/domains/61412/wiki/89331/WIKI202412175438561\
+上面是已有的cann算子故障模式库，现在考虑基于已经整理完成的触发条件库，\*\*1.1 5 项\*\*  \
+\*\*Empty / Degenerate\*\*  \
+1.1.1 零维 shape  \
+1.1.2 循环 / repeat=0  \
+1.1.3 非空 shape 但数据全零  \
+1.1.4 空 expert / 空路由  \
+1.1.5 分核后空 shard  \
+\
+\---\
+\
+\*\*1.2 8 项\*\*  \
+\*\*Shape & Boundary\*\*  \
+1.2.1 核心维=1  \
+1.2.2 尾块不对齐  \
+1.2.3 split 数超限  \
+1.2.4 超大维 / 整型边界  \
+1.2.5 广播退化  \
+1.2.6 tiling 模板边界 ±1  \
+1.2.7 卷积等几何组合  \
+1.2.8 输出小于最小搬运粒度  \
+\
+\---\
+\
+\*\*1.3 4 项\*\*  \
+\*\*Index & Range\*\*  \
+1.3.1 下标 OOB / 极端  \
+1.3.2 偏移溢出  \
+1.3.3 滑窗 / 范围边界  \
+1.3.4 路由下标组合  \
+\
+\---\
+\
+\*\*1.4 3 项\*\*  \
+\*\*Layout & Stride\*\*  \
+1.4.1 非连续（接口暴露时）  \
+1.4.2 大 stride  \
+1.4.3 特殊 format（NZ / TND）  \
+\
+\---\
+\
+\*\*1.5 4 项\*\*  \
+\*\*Sequence & Context\*\*  \
+1.5.1 非对齐 seq  \
+1.5.2 超长 seq  \
+1.5.3 seq=1  \
+1.5.4 head dim 非对齐  \
+\
+\---\
+\
+\*\*1.6 2 项\*\*  \
+\*\*Batch & Sample\*\*  \
+1.6.1 batch > 1  \
+1.6.2 路由 / 专家 token 不均分  \
+\
+\---\
+\
+\*\*1.7 6 项\*\*  \
+\*\*Data Value Pattern\*\*  \
+1.7.1 全零 → 除零 / scale=INF  \
+1.7.2 NaN / Inf  \
+1.7.3 极大值溢出  \
+1.7.4 近零除数  \
+1.7.5 log 域不稳  \
+1.7.6 中间溢出  \
+\
+\---\
+\
+\*\*1.8 3 项\*\*  \
+\*\*Masking & Organization\*\*  \
+1.8.1 packed 变长  \
+1.8.2 mask 类型组合  \
+1.8.3 负 padding（crop）  \
+**1.C 7 项**\
+**Control Arguments**\
+1.C.1 量化模式/粒度\
+1.C.2 输出低精度\
+1.C.3 cubeMathType/KEEP_DTYPE\
+1.C.4 RoPE/sink\
+1.C.5 deterministic/accumulate\
+1.C.6 format/NZ\
+1.C.7 reduction/dim/transpose   先看哪些触发条件是当前算子故障模式库没有覆盖的，然后去555条案例种找相关案例，先确认没有覆盖的，需要新增的故障模式

@@ -1,0 +1,38 @@
+[
+  {
+    "additions": 3,
+    "blob_id": "2d219a85f5d3c59bc4a339768564042f83e21c3b",
+    "blob_url": "https://gitcode.com/cann/ops-math/blob/e2e4c30f83e38153b417f7d65db68c7babb08905/math/tensor_equal/op_api/aclnn_equal.cpp",
+    "deletions": 1,
+    "filename": "math/tensor_equal/op_api/aclnn_equal.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 3,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -173,7 +173,9 @@ aclnnStatus aclnnEqualGetWorkspaceSize(const aclTensor *self, const aclTensor *o\n   }\n \n   auto promoteType = op::PromoteType(self->GetDataType(), other->GetDataType());\n-\n+  if (promoteType == op::DataType::DT_BF16) {\n+    promoteType = op::DataType::DT_FLOAT;\n+  }\n   // 固定写法，将输入self转换成连续的tensor\n   auto selfContiguous = l0op::Contiguous(self, uniqueExecutor.get());\n   CHECK_RET(selfContiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);\n",
+      "new_file": false,
+      "new_path": "math/tensor_equal/op_api/aclnn_equal.cpp",
+      "old_path": "math/tensor_equal/op_api/aclnn_equal.cpp",
+      "removed_lines": 1,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-math/raw/e2e4c30f83e38153b417f7d65db68c7babb08905/math/tensor_equal/op_api/aclnn_equal.cpp",
+    "sha": "e2e4c30f83e38153b417f7d65db68c7babb08905",
+    "source_branch": "md_s",
+    "source_project": {
+      "full_name": "sakuraqqz/ops-math",
+      "human_name": "sakuraqqz / ops-math",
+      "id": 7650764,
+      "path": "ops-math"
+    },
+    "target_branch": "9.0.0",
+    "target_project": {
+      "full_name": "cann/ops-math",
+      "human_name": "CANN / ops-math",
+      "id": 7649531,
+      "path": "ops-math"
+    }
+  }
+]

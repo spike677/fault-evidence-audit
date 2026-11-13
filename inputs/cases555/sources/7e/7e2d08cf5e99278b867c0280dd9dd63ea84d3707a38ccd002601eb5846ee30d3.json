@@ -1,0 +1,38 @@
+[
+  {
+    "additions": 4,
+    "blob_id": "5664fd4b67cea9f5a6cc22858e5f9078e126dfd3",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/656326d78cc8a3d405b09618ab9993ae9b7df399/index/scatter_nd_add/op_kernel/arch35/scatter_nd_add_determinstic.h",
+    "deletions": 2,
+    "filename": "index/scatter_nd_add/op_kernel/arch35/scatter_nd_add_determinstic.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 4,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -34,7 +34,7 @@ static constexpr MicroAPI::CastTrait castTraitFp32ToVarT = {\n template <typename T>\n __simd_vf__ inline void QuantizeForSumVf(\n     __ubuf__ float* sumAddr, __ubuf__ float* rValueAddr, __ubuf__ int32_t* quantaSumAddr, uint16_t rowLen,\n-    uint16_t loopCnt, uint32_t maskLen, uint32_t afterAxisAlignFp32, uint32_t vfLen, float scaling)\n+    uint16_t loopCnt, uint32_t afterAxis, uint32_t afterAxisAlignFp32, uint32_t vfLen, float scaling)\n {\n     AscendC::MicroAPI::RegTensor<float> dataReg;\n     AscendC::MicroAPI::RegTensor<float> rValueReg;\n@@ -44,6 +44,7 @@ __simd_vf__ inline void QuantizeForSumVf(\n     AscendC::MicroAPI::MaskReg maskReg;\n     AscendC::MicroAPI::MaskReg cmpReg;\n     for (uint16_t rowIdx = 0; rowIdx < static_cast<uint16_t>(rowLen); rowIdx++) {\n+        uint32_t maskLen = afterAxis;\n         AscendC::MicroAPI::Duplicate(oneReg, (float)1);\n         for (uint16_t i = 0; i < loopCnt; i++) {\n             maskReg = AscendC::MicroAPI::UpdateMask<float>(maskLen);\n@@ -66,7 +67,7 @@ __simd_vf__ inline void QuantizeForSumVf(\n template <typename T>\n __simd_vf__ inline void InverseQuantizeVf(\n     __ubuf__ int32_t* sumQuanToIntAddr, __ubuf__ float* rValueAddr, __ubuf__ T* invQuantDataAddr, uint16_t rowLen,\n-    uint16_t loopCnt, uint32_t maskLen, uint32_t afterAxisAlignFp32, uint32_t afterAxisAlignSize, uint32_t vfLen,\n+    uint16_t loopCnt, uint32_t colLen, uint32_t afterAxisAlignFp32, uint32_t afterAxisAlignSize, uint32_t vfLen,\n     float scaleValue)\n {\n     AscendC::MicroAPI::RegTensor<int32_t> dataReg;\n@@ -79,6 +80,7 @@ __simd_vf__ inline void InverseQuantizeVf(\n     maskReg = AscendC::MicroAPI::CreateMask<float, AscendC::MicroAPI::MaskPattern::ALL>();\n     AscendC::MicroAPI::Duplicate(scaleReg, scaleValue, maskReg);\n     for (uint16_t rowIdx = 0; rowIdx < static_cast<uint16_t>(rowLen); rowIdx++) {\n+        uint32_t maskLen = colLen;\n         for (uint16_t i = 0; i < loopCnt; ++i) {\n             pregLoop = AscendC::MicroAPI::UpdateMask<uint32_t>(maskLen);\n             auto rowAlignOfst = rowIdx * afterAxisAlignFp32 + i * vfLen;\n",
+      "new_file": false,
+      "new_path": "index/scatter_nd_add/op_kernel/arch35/scatter_nd_add_determinstic.h",
+      "old_path": "index/scatter_nd_add/op_kernel/arch35/scatter_nd_add_determinstic.h",
+      "removed_lines": 2,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/656326d78cc8a3d405b09618ab9993ae9b7df399/index/scatter_nd_add/op_kernel/arch35/scatter_nd_add_determinstic.h",
+    "sha": "656326d78cc8a3d405b09618ab9993ae9b7df399",
+    "source_branch": "masked",
+    "source_project": {
+      "full_name": "yourealize/ops-nn",
+      "human_name": "yourealize / ops-nn",
+      "id": 8853379,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  }
+]

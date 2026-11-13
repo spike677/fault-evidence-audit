@@ -1,0 +1,74 @@
+[
+  {
+    "additions": 2,
+    "blob_id": "5b149b089f9e80b10211ec76b2d2e89e3b13600f",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/4fc79cce09236be9214a3ecbc7147a8e6f070b53/conv/conv3d_backprop_input_v2/op_kernel/arch35/conv3d_backprop_input_v2/conv3d_backprop_input_v2_init_output.h",
+    "deletions": 2,
+    "filename": "conv/conv3d_backprop_input_v2/op_kernel/arch35/conv3d_backprop_input_v2/conv3d_backprop_input_v2_init_output.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 2,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -76,10 +76,10 @@ public:\n \n     __aicore__ inline void Process(GM_ADDR y)\n     {\n-        if ASCEND_IS_AIV {\n+        if ASCEND_IS_AIV_SCALAR {\n             ProcessWithL0(y);\n         }\n-        if ASCEND_IS_AIC {\n+        if ASCEND_IS_AIC_SCALAR {\n         #if (__NPU_ARCH__ == 5102)\n             AscendC::TQueSync<PIPE_MTE1, PIPE_MTE3> sync;\n             sync.WaitFlag(VEC_FALG_ID);\n",
+      "new_file": false,
+      "new_path": "conv/conv3d_backprop_input_v2/op_kernel/arch35/conv3d_backprop_input_v2/conv3d_backprop_input_v2_init_output.h",
+      "old_path": "conv/conv3d_backprop_input_v2/op_kernel/arch35/conv3d_backprop_input_v2/conv3d_backprop_input_v2_init_output.h",
+      "removed_lines": 2,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/4fc79cce09236be9214a3ecbc7147a8e6f070b53/conv/conv3d_backprop_input_v2/op_kernel/arch35/conv3d_backprop_input_v2/conv3d_backprop_input_v2_init_output.h",
+    "sha": "4fc79cce09236be9214a3ecbc7147a8e6f070b53",
+    "source_branch": "fix_init_output",
+    "source_project": {
+      "full_name": "YuanTianyi/ops-nn",
+      "human_name": "YuanTianyi / ops-nn",
+      "id": 8003191,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 1,
+    "blob_id": "64157f716d0875bdb497d56d723280684f2234c4",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/4fc79cce09236be9214a3ecbc7147a8e6f070b53/conv/conv3d_backprop_input_v2/op_kernel/arch35/conv3d_backprop_input_v2_arch35.h",
+    "deletions": 1,
+    "filename": "conv/conv3d_backprop_input_v2/op_kernel/arch35/conv3d_backprop_input_v2_arch35.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 1,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -55,7 +55,7 @@ __global__ __aicore__ void conv3d_backprop_input_v2_arch35(GM_ADDR input_size, G\n         opInitOutput.Destroy();\n     }\n \n-    if ASCEND_IS_AIV {\n+    if ASCEND_IS_AIV_SCALAR {\n         if (tilingData.conv3DDxTiling.enableVecTrans) {\n             // VecTranspose\n             DxVecTranspose::Conv3dDxVecTranspose<DTYPE_FILTER> opVecTranspose;\n",
+      "new_file": false,
+      "new_path": "conv/conv3d_backprop_input_v2/op_kernel/arch35/conv3d_backprop_input_v2_arch35.h",
+      "old_path": "conv/conv3d_backprop_input_v2/op_kernel/arch35/conv3d_backprop_input_v2_arch35.h",
+      "removed_lines": 1,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/4fc79cce09236be9214a3ecbc7147a8e6f070b53/conv/conv3d_backprop_input_v2/op_kernel/arch35/conv3d_backprop_input_v2_arch35.h",
+    "sha": "4fc79cce09236be9214a3ecbc7147a8e6f070b53",
+    "source_branch": "fix_init_output",
+    "source_project": {
+      "full_name": "YuanTianyi/ops-nn",
+      "human_name": "YuanTianyi / ops-nn",
+      "id": 8003191,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  }
+]

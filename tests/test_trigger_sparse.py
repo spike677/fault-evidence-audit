@@ -21,7 +21,7 @@ def sparse_attempt(text="INT32地址偏移溢出", role="INDEX_OR_OFFSET"):
             "evidence_basis": "SOURCE_DEFINITION", "source_cells": [cell]}],
         classification_summary={"status": "CLASSIFIED", "reason": "原文有明确偏移条件", "unknowns": ["公式未知"]},
         scenarios=[{"scenario_id": "s1", "title": "偏移边界", "condition_fact_ids": ["F"], "reason": "同一原文条件"}],
-        label_links=[{"scheme": "REVISED42", "definition_version": frame_version(p, "REVISED42"),
+        label_links=[{"scheme": "ORIGINAL42", "definition_version": frame_version(p, "ORIGINAL42"),
             "trigger_id": "1.3.2", "detail_ids": ["D1"], "scenario_ids": ["s1"], "condition_fact_ids": ["F"]}],
         decision={"action": "INIT_ONLY", "reason": "只整理原定义"})
     return p, r
@@ -214,6 +214,12 @@ class CombinationTests(unittest.TestCase):
         self.assertIn('同情景',report)
         self.assertIn('NOT_ASSESSED',report)
         self.assertIn('原始定义',report)
+        self.assertNotIn('版本映射（不传递覆盖）',report)
+        self.assertIn('不使用crosswalk或自动标签转换',report)
+        data['knowledge_profile']='synthetic-original-profile'
+        baseline_report=render(data)
+        self.assertNotIn('暂缺，不阻塞分类',baseline_report)
+        self.assertIn('原V4与原42独立判断；本profile不使用crosswalk',baseline_report)
         self.assertEqual(len(index_workbook(data)['sheets']),4)
 
 

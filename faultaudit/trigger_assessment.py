@@ -218,10 +218,10 @@ an established source MATCH permit describing the applicable issue; neither conf
 For each row applicability is DESCRIPTION classification: APPLICABLE, PARTIAL, UNKNOWN or
 NOT_APPLICABLE. relation is the SEPARATE existing evidence-confirmation judgment. A source-only
 APPLICABLE/PARTIAL description never authorizes strong MATCH, DIRECT, SAME_EVENT or formal ADD.
-Link positive description rows and decided predicate_checks to their condition_fact_ids. Exact
-statement of a condition can yield a PARTIAL description label while Requires/Skip remain unknown;
-for example INT32 address-offset overflow maps to 1.3.2, retaining missing address-mapping argument
-or threshold-formula information. APPLICABLE needs the whole predicate, including Requires/Skip.
+Link positive description rows and decided predicate_checks to their condition_fact_ids. Use only
+the original local and family predicates. An error name or shared numerical keyword does not
+itself assign a trigger ID. Missing required argument evidence stays UNKNOWN; state the gap and
+do not widen the original rule. APPLICABLE needs the whole predicate, including Requires/Skip.
 Intermediate Inf is not input Inf. Internal nondeterminism is not an exposed deterministic API
 control. All 1.C positives need a stated API-control fact, not an internal algorithm name.
 Assess every explicitly defined Branch 2/3 leaf in category_checks, preserving its fact IDs and
@@ -362,7 +362,7 @@ def _validate_conditions(payload, result, grounded, definitions, families):
             raise AuditError("Condition classification must check every complete canonical definition/Requires/Skip exactly once")
         selected = support(row, row.trigger_id, needed=row.applicability != "UNKNOWN",
                            decisive=row.applicability != "UNKNOWN")
-        required_roles = set(item.get("allowed_fact_roles", condition_role_requirements(row.trigger_id)))
+        required_roles = condition_role_requirements(row.trigger_id)
         if row.applicability != "UNKNOWN" and required_roles and not required_roles & {f.role for f in selected}:
             raise AuditError("Condition label needs the proper input/index/API semantic role, not intermediate/internal facts")
         for check in row.predicate_checks:
@@ -414,6 +414,8 @@ def validate_assessment(payload: dict, response: dict, request_hash: str) -> dic
     Semantic entailment remains the Agent's responsibility. Mechanical gates
     check provenance, scope, completeness and the explicit decision prerequisites.
     """
+    from .trigger_v4 import require_original_profile
+    require_original_profile(payload)
     if payload.get("classification_contract") == "SPARSE_SCENARIOS_V5":
         from .trigger_sparse import validate_sparse
         return validate_sparse(payload, response, request_hash)
@@ -488,17 +490,8 @@ def validate_assessment(payload: dict, response: dict, request_hash: str) -> dic
     definitions = {item["id"]: item for item in items}
     families = {family["family_id"]: family for family in payload["taxonomy"].get("families", [])}
     _validate_conditions(payload, result, grounded, definitions, families)
-    from .trigger_v4_assessment import validate_v4, validate_derivation
+    from .trigger_v4_assessment import validate_v4
     validate_v4(payload, result, grounded)
-    if payload["taxonomy"].get("definition_version") == "TRIGGER42-BOUNDARIES-0.1.15":
-        facts = {f.fact_id: f for f in result.condition_facts}
-        offset = rows.get("1.3.2")
-        if offset and offset.applicability == "APPLICABLE":
-            derived = [facts[key] for key in offset.condition_fact_ids if facts[key].derivation]
-            if not derived:
-                raise AuditError("Revised offset full applicability needs the actual address derivation")
-            for fact in derived:
-                validate_derivation(fact, facts, complete=True)
     for row in result.rows:
         grounded(row, row.trigger_id)
         _unique(row.detail_ids, "Row detail IDs")
@@ -712,9 +705,8 @@ def validate_assessment(payload: dict, response: dict, request_hash: str) -> dic
     output["coverage_kind"] = assessment_basis
     if payload.get("v4_taxonomy"):
         output["classification_profile"] = payload["classification_profile"]
-        output["definition_versions"] = {"legacy": payload["mapping"]["source_definition_version"],
-            "revised42": payload["taxonomy"]["definition_version"],
-            "v4": payload["v4_taxonomy"]["definition_version"], "mapping": payload["mapping"]["mapping_version"]}
+        output["definition_versions"] = {"original42": payload["taxonomy"].get("definition_version", "TRIGGER42-ORIGINAL-v1"),
+            "v4": payload["v4_taxonomy"]["definition_version"]}
         output["v4_processing_status"] = ("ASSESSED_WITH_UNKNOWNS" if any(
             r.applicability in {"UNKNOWN", "PARTIAL"} for r in result.v4_rows) else "ASSESSED")
     if payload.get("classification_framework") == CLASSIFICATION_FRAMEWORK:

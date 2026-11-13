@@ -1,0 +1,38 @@
+[
+  {
+    "additions": 18,
+    "blob_id": "d21e53d118d3acb60de094179fa8174fbbb1de22",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/1e2ac00315c1d83938958ad887a9a485799be347/index/repeat_interleave/op_kernel/arch35/repeat_interleave.h",
+    "deletions": 12,
+    "filename": "index/repeat_interleave/op_kernel/arch35/repeat_interleave.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 18,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -71,6 +71,8 @@ private:\n     int64_t copyToMatchOutNum_{0};\n     int64_t copyToGmNum_{0};\n     int64_t outStartOffset_{0};\n+    int64_t curRepeatHeadPos_{0};\n+    int64_t curRepeatTailPos_{0};\n };\n \n template <typename T, typename U>\n@@ -102,16 +104,16 @@ __aicore__ inline void RepeatInterleaveImpl<T, U>::CopyInRepeats(int64_t repeatD\n \n     /* repeats搬入地址起始位置 */\n     int64_t offset = repeatDimIdx % tilingData_.mergedDims[1];\n-    int64_t dataLen =\n-        ((offset + tilingData_.ubFactor) > tilingData_.mergedDims[1] ? (tilingData_.mergedDims[1] - offset) :\n-                                                                       tilingData_.ubFactor) *\n-        sizeof(U);\n+    int64_t dataLen = (offset + tilingData_.ubFactor) > tilingData_.mergedDims[1] ?\n+        (tilingData_.mergedDims[1] - offset) : tilingData_.ubFactor;\n \n-    DataCopyExtParams inParams = {1, static_cast<uint32_t>(dataLen), 0, 0, 0};\n+    DataCopyExtParams inParams = {1, static_cast<uint32_t>(dataLen * sizeof(U)), 0, 0, 0};\n     DataCopyPadExtParams<U> padParams = {false, 0, 0, 0};\n     LocalTensor<U> repeatsLocal = repeatsQueue_.AllocTensor<U>();\n     DataCopyPad(repeatsLocal, repeatsGm_[offset], inParams, padParams);\n     repeatsQueue_.EnQue(repeatsLocal);\n+    curRepeatHeadPos_ = offset;\n+    curRepeatTailPos_ = offset + dataLen;\n }\n \n template <typename T, typename U>\n@@ -123,7 +125,7 @@ __aicore__ inline void RepeatInterleaveImpl<T, U>::ComputeRepeatsOnCurDim(int64_\n         return;\n     }\n     LocalTensor<U> repeatsLocal = repeatsQueue_.DeQue<U>();\n-    uint32_t repeatOffset = repeatDimIdx % tilingData_.mergedDims[1] % tilingData_.ubFactor;\n+    uint32_t repeatOffset = repeatDimIdx % tilingData_.mergedDims[1] - curRepeatHeadPos_;\n     event_t eventIdMte2ToS = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::MTE2_S));\n     SetFlag<HardEvent::MTE2_S>(eventIdMte2ToS);\n     WaitFlag<HardEvent::MTE2_S>(eventIdMte2ToS);\n@@ -202,11 +204,13 @@ __aicore__ inline void RepeatInterleaveImpl<T, U>::CopyXToMatchOut(int64_t start\n     LocalTensor<T> xOutLocal = xOutQueue_.AllocTensor<T>();\n     xOutQueue_.EnQue(xOutLocal);\n \n-    for (int64_t repeatDimIdx = 0; repeatDimIdx < cpCount; repeatDimIdx++) {\n-        if (!isRepeatsScalar_ && (repeatDimIdx % tilingData_.mergedDims[2]) >= tilingData_.ubFactor) {\n+    for (int64_t i = 0; i < cpCount; i++) {\n+        int64_t repeatDimIdx = i + startCpIdx;\n+        if (!isRepeatsScalar_ && ((repeatDimIdx % tilingData_.mergedDims[1]) >= curRepeatTailPos_ ||\n+            (repeatDimIdx % tilingData_.mergedDims[1]) < curRepeatHeadPos_)) {\n             CopyInRepeats(repeatDimIdx);\n         }\n-        ComputeRepeatsOnCurDim(startCpIdx + repeatDimIdx);\n+        ComputeRepeatsOnCurDim(repeatDimIdx);\n         int64_t loopSize = (curCoreRepeatsCountOnCurDim_ + cpCountInUbFactor_ - 1) / cpCountInUbFactor_;\n         int64_t mainRepeatTimes = cpCountInUbFactor_;\n         int64_t tailRepeatTimes = curCoreRepeatsCountOnCurDim_ - cpCountInUbFactor_ * (loopSize - 1);\n@@ -222,7 +226,7 @@ __aicore__ inline void RepeatInterleaveImpl<T, U>::CopyXToMatchOut(int64_t start\n         }\n         CopyOneCpToRepeatOut(xInLocal, tailRepeatTimes);\n         CopyMatchOutToY();\n-        if (likely(repeatDimIdx < cpCount - 1)) {\n+        if (likely(i < cpCount - 1)) {\n             xOutLocal = xOutQueue_.AllocTensor<T>();\n             xOutQueue_.EnQue(xOutLocal);\n         }\n@@ -345,7 +349,8 @@ __aicore__ inline void RepeatInterleaveImpl<T, U>::ProcessWholeCp()\n     /* 先完成一次repeats搬运，当处理的repeatDim超过搬运的repeats大小时，再次搬运 */\n     CopyInRepeats(0);\n     for (int64_t repeatDimIdx = startCpIdx; repeatDimIdx < startCpIdx + curCoreCpCount; repeatDimIdx++) {\n-        if (!isRepeatsScalar_ && (repeatDimIdx % tilingData_.mergedDims[2]) >= tilingData_.ubFactor) {\n+        if (!isRepeatsScalar_ && ((repeatDimIdx % tilingData_.mergedDims[1]) >= curRepeatTailPos_ ||\n+            (repeatDimIdx % tilingData_.mergedDims[1]) < curRepeatHeadPos_)) {\n             CopyInRepeats(repeatDimIdx);\n         }\n         ComputeRepeatsOnCurDim(repeatDimIdx);\n@@ -376,7 +381,8 @@ __aicore__ inline void RepeatInterleaveImpl<T, U>::ProcessSplitCp()\n     /* 先完成一次repeats搬运，当处理的repeatDim超过搬运的repeats大小时，再次搬运 */\n     CopyInRepeats(0);\n     for (int64_t repeatDimIdx = startCpIdx; repeatDimIdx < startCpIdx + tilingData_.mergedDims[1]; repeatDimIdx++) {\n-        if (!isRepeatsScalar_ && (repeatDimIdx % tilingData_.mergedDims[2]) >= tilingData_.ubFactor) {\n+        if (!isRepeatsScalar_ && ((repeatDimIdx % tilingData_.mergedDims[1]) >= curRepeatTailPos_ ||\n+            (repeatDimIdx % tilingData_.mergedDims[1]) < curRepeatHeadPos_)) {\n             CopyInRepeats(repeatDimIdx);\n         }\n         ComputeRepeatsOnCurDim(repeatDimIdx);\n",
+      "new_file": false,
+      "new_path": "index/repeat_interleave/op_kernel/arch35/repeat_interleave.h",
+      "old_path": "index/repeat_interleave/op_kernel/arch35/repeat_interleave.h",
+      "removed_lines": 12,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/1e2ac00315c1d83938958ad887a9a485799be347/index/repeat_interleave/op_kernel/arch35/repeat_interleave.h",
+    "sha": "1e2ac00315c1d83938958ad887a9a485799be347",
+    "source_branch": "master",
+    "source_project": {
+      "full_name": "yezhao1/ops-nn",
+      "human_name": "yezhao1 / ops-nn",
+      "id": 9124821,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  }
+]

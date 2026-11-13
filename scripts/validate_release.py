@@ -16,7 +16,7 @@ sys.path.insert(0, str(ROOT))
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--out", type=Path, default=ROOT / "examples" / "validation_result.json")
+    parser.add_argument("--out", type=Path, default=ROOT / "dist" / "validation_result.json")
     args = parser.parse_args()
     suite = unittest.defaultTestLoader.discover(str(ROOT / "tests"))
     result = unittest.TextTestRunner(verbosity=2).run(suite)

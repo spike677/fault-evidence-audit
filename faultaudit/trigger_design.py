@@ -95,13 +95,12 @@ proposed inputs may instead cite selected guidance explicitly. All outputs are N
 execution_implemented=false, path_coverage UNKNOWN/NOT_COVERED/DESIGN_ONLY. A formula-only
 address design cannot claim device coverage. DESIGN_READY means the design is specified,
 not executed or known to reproduce the original incident.
-Choose E1-E5 or B3.2-PRODUCER-CONSUMER-v1 only when useful. A protocol is not a synchronization
+Choose only the original E1-E5 methods when useful. A protocol is not a synchronization
 root-cause label. E2 fixes target T; predecessors P/Q vary. E4 compares each target call to its
 own serial reference; interfering threads may have different parameters. Keep each participant's
 argument/output ownership, context, stream, executor and lifecycle. Do not falsely claim all
-participants have the same arguments. E2/E4/cross-stream cards require target_invariant and a
+participants have the same arguments. E2/E4 cards require target_invariant and a
 serial_baseline. Distinct concurrent participants cannot share an output buffer accidentally.
-Cross-stream plans need separate producer/consumer, event_record and consumer_wait positions.
 E3 uses only a supported out/state binding; otherwise mark CAPABILITY_BLOCKED/NEEDS_FACTS.
 Keep all existing capture and input-size gaps visible. Do not claim a selected guide is a
 device-verified history case; companion source audit is unavailable. Complete one bounded
@@ -177,11 +176,11 @@ def payloads(store, run_id, *, pending_case_ids=()):
         # Definitions/Requires/Skip are never clipped. Selection is a design
         # scope, not a claim to have classified only the selected categories.
         items = [{k: v[k] for k in ("id", "name", "definition", "requires", "skip_if", "construction_requires",
-                    "path_requires", "analysis_requires", "construction_ids", "allowed_fact_roles")} for v in selected_items]
+                    "path_requires", "analysis_requires", "construction_ids")} for v in selected_items]
         ids = {code for item in items for code in item["construction_ids"]}
         blocks = [b for b in current_blocks if cid in b.get("case_ids", [])]
         yield {"case": case, "case_ids": [cid], "assessment_views": views,
-            "v4_definition_version": frozen["definition_version"], "mapping_id": settings["mapping_id"],
+            "v4_definition_version": frozen["definition_version"],
             "selected_categories": items,
             "selected_constructions": [{k: c[k] for k in ("id", "name", "definition")} for c in frozen["constructions"] if c["id"] in ids],
             "guidance": [{k: g[k] for k in ("guide_id", "category_id", "title", "text", "source_status", "line_start", "line_end")} for g in guides],
@@ -205,6 +204,8 @@ def validate_design(payload, response, request_hash):
     categories = {v["id"]: v for v in payload["selected_categories"]}
     guides = {v["guide_id"]: v for v in payload["guidance"]}
     methods = {v["method_id"] for v in payload["methods"]}
+    if not methods <= {"E1", "E2", "E3", "E4", "E5"}:
+        raise AuditError("Archived execution method is not part of the original E1-E5 source")
     ids = [c.card_id for c in result.cards]
     if len(ids) != len(set(ids)):
         raise AuditError("Design card IDs must be unique")
@@ -255,7 +256,7 @@ def validate_design(payload, response, request_hash):
         participant_ids = [p.participant_id for p in card.participants]
         if len(participant_ids) != len(set(participant_ids)):
             raise AuditError("Participant IDs must be unique within a protocol")
-        scoped = set(card.execution_method_ids) & {"E2", "E4", "B3.2-PRODUCER-CONSUMER-v1"}
+        scoped = set(card.execution_method_ids) & {"E2", "E4"}
         if scoped:
             invariant = card.target_invariant
             if not invariant or not card.serial_baseline or not card.protocol_steps:
@@ -268,9 +269,7 @@ def validate_design(payload, response, request_hash):
             if "E4" in scoped and (not any(p.role == "INTERFERER" for p in card.participants)
                     or len({p.output_owner for p in card.participants}) != len(card.participants)):
                 raise AuditError("Host isolation needs an interfering participant and distinct output ownership")
-            if "B3.2-PRODUCER-CONSUMER-v1" in scoped and (not card.event_record or not card.consumer_wait
-                    or not {"PRODUCER", "CONSUMER"} <= {p.role for p in card.participants}):
-                raise AuditError("Cross-stream design needs producer, consumer, event record and wait positions")
+
     check = result.self_check
     if not check.passed or check.issues or not all(getattr(check, key) for key in (
             "numeric_meaning_checked", "citations_checked", "counterevidence_checked", "issue_scope_checked", "event_vs_technical_checked")):

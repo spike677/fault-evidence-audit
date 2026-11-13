@@ -7,8 +7,8 @@ import unittest
 from unittest.mock import patch
 
 from faultaudit.store import AuditError, Store, digest
-from faultaudit.trigger_v4 import (load_v4, model_v4, revise_42, freeze_mapping,
-    CLASS_IDS, V4_VERSION, REVISED_VERSION, LEGACY_VERSION, PROFILE, canonical_conditions)
+from faultaudit.trigger_v4 import (load_v4, model_v4, require_original_profile,
+    CLASS_IDS, V4_VERSION, LEGACY_VERSION, PROFILE, canonical_conditions)
 from faultaudit.trigger_assessment import validate_assessment
 from faultaudit.trigger_design import validate_design
 from tests.test_condition_classification import attempt, leaf
@@ -35,9 +35,9 @@ class V4Tests(unittest.TestCase):
         original = synthetic_taxonomy()
         # Retain the existing fixture's clauses so its own 42 checks remain valid.
         original.update(items=p['taxonomy']['items'], families=p['taxonomy'].get('families', []))
-        revised = revise_42(original)
+        revised = {**original, "definition_version": LEGACY_VERSION}
         p.update(taxonomy=revised, v4_taxonomy=model_v4(self.v4), classification_profile=PROFILE,
-            mapping={'mapping_version':'synthetic-map','source_definition_version':LEGACY_VERSION},
+            input_condition_scheme='ORIGINAL42',
             execution_capabilities={'classes':{},'methods':{},'provenance':'synthetic-only'})
         for row in r['rows']:
             item = next(i for i in revised['items'] if i['id']==row['trigger_id'])
@@ -69,13 +69,31 @@ class V4Tests(unittest.TestCase):
         self.assertFalse(model['input_scope']['guidance_examples_included'])
         self.assertEqual(len(model['constructions']),55)
 
-    def test_original_source_and_interpretations_both_retained(self):
+    def test_original_source_prerequisites_and_methods_are_preserved(self):
         before=self.path.read_bytes()
         c2=next(i for i in self.v4['items'] if i['id']=='C2')
-        self.assertIn('API',c2['requires'][0])
-        self.assertNotEqual(c2['requires'],c2['original_requires'])
+        self.assertEqual(c2['requires'],c2['original_requires'])
+        self.assertEqual(c2['skip_if'],c2['original_skip_if'])
+        self.assertEqual({m['method_id'] for m in self.v4['methods']}, {'E1','E2','E3','E4','E5'})
+        self.assertTrue(all(not item.get('construction_requires') and not item.get('path_requires') and not item.get('analysis_requires') for item in self.v4['items']))
         self.assertIn('合成语义前提',c2['original_requires'][0])
         self.assertEqual(self.path.read_bytes(),before)
+
+    def test_archived_profile_and_predicate_overrides_are_rejected(self):
+        p,r,_=self.attempt()
+        p['input_condition_scheme']='REVISED42'
+        with self.assertRaisesRegex(AuditError,'Archived revised profile'):
+            validate_assessment(p,r,HASH)
+        p['input_condition_scheme']='ORIGINAL42'
+        p['v4_taxonomy']['items'][0]['requires']=['a widened replacement']
+        with self.assertRaisesRegex(AuditError,'cannot be overridden'):
+            validate_assessment(p,r,HASH)
+
+    def test_added_execution_method_is_not_accepted_as_original(self):
+        p,r=self.design()
+        p['methods'].append({'method_id':'B3.2-PRODUCER-CONSUMER-v1'})
+        with self.assertRaisesRegex(AuditError,'Archived execution method'):
+            validate_design(p,r,HASH)
 
     def test_shared_constructor_definition_cannot_change_silently(self):
         text=markdown().replace('合成构造定义synthetic_code_0','另一种定义',1)
@@ -88,71 +106,12 @@ class V4Tests(unittest.TestCase):
         self.path.write_text(markdown().replace('1. **D1-01**','1. **bad-id**'),encoding='utf-8')
         with self.assertRaisesRegex(AuditError,'195'):load_v4(self.path)
 
-    def test_old_and_revised_definitions_have_distinct_identity(self):
-        original=synthetic_taxonomy();before=copy.deepcopy(original)
-        revised=revise_42(original)
-        self.assertEqual(original,before)
-        self.assertNotEqual(original['taxonomy_id'],revised['taxonomy_id'])
-        self.assertEqual(revised['definition_version'],REVISED_VERSION)
-        item=next(i for i in revised['items'] if i['id']=='1.3.2')
-        self.assertEqual(item['family_requires_override'],[])
-        self.assertIn('INPUT_SHAPE',item['allowed_fact_roles'])
 
-    def test_mapping_is_explanatory_directional_and_never_transfers_status(self):
-        original=synthetic_taxonomy();revised=revise_42(original)
-        m=freeze_mapping(original,revised,self.v4)
-        self.assertEqual({r['source_id'] for r in m['rows'] if r['source_scheme']==LEGACY_VERSION},set(i['id'] for i in original['items']))
-        self.assertTrue(all(not r['propagate_applicability'] and not r['propagate_coverage'] for r in m['rows']))
-        self.assertTrue(any(r['relation']=='NO_COUNTERPART' for r in m['rows']))
 
-    def test_plain_tensor_can_enter_address_analysis_without_confirming_overflow(self):
-        p,r,cell=self.attempt()
-        self.label(r,'I3',cell)
-        row=next(v for v in r['rows'] if v['trigger_id']=='1.3.2')
-        row.update(applicability='PARTIAL',condition_fact_ids=['F'],source_cells=[cell],evidence_basis='SOURCE_DEFINITION')
-        result=validate_assessment(p,r,HASH)
-        self.assertEqual(result['decision']['action'],'UNDETERMINED')
-        self.assertEqual(result['v4_rows'][22]['coverage']['execution'],'NOT_RUN')
-        self.label(r,'I3',cell,'APPLICABLE',full=True)
-        with self.assertRaisesRegex(AuditError,'formula'):validate_assessment(p,r,HASH)
 
-    def add_address_derivation(self,r,cell):
-        r['condition_facts'].append({'fact_id':'D','statement':'合成逐步算址','subject':'SOURCE_RECORD',
-            'role':'DERIVED_CONTROL','evidence_basis':'SOURCE_DEFINITION','source_cells':[cell],
-            'derivation':{'driving_input_fact_ids':['F'],'expression':'off=i*stride*itemsize',
-                'arithmetic_types':['i32 multiply then i64 assignment'],'promotion':'after multiply',
-                'boundary':'2^31-1','unit':'bytes','capacity':'allocated storage sufficient in synthetic contract'}})
 
-    def test_full_address_requires_width_promotion_capacity_and_legal_driver(self):
-        p,r,cell=self.attempt()
-        self.add_address_derivation(r,cell)
-        self.label(r,'I3',cell,'APPLICABLE',['F','D'],full=True)
-        validate_assessment(p,r,HASH)
-        r['condition_facts'][-1]['derivation']['promotion']='未知'
-        with self.assertRaisesRegex(AuditError,'widths'):validate_assessment(p,r,HASH)
 
-    def test_input_driven_dispatch_is_separate_from_api(self):
-        p,r,cell=self.attempt('shape=512通过完整谓词选择内部路径','INPUT_SHAPE')
-        r['condition_facts'] += [
-            {'fact_id':'P','statement':'合成路径选择','subject':'SOURCE_RECORD','role':'PATH_PREDICATE',
-             'evidence_basis':'SOURCE_DEFINITION','source_cells':[cell]},
-            {'fact_id':'D','statement':'派生控制不是API','subject':'SOURCE_RECORD','role':'DERIVED_CONTROL',
-             'evidence_basis':'SOURCE_DEFINITION','source_cells':[cell],
-             'derivation':{'driving_input_fact_ids':['F'],'expression':'ceil(shape/8)','dispatch_predicate':'shape>511 and dtype=f32','path_fact_ids':['P']}}]
-        self.label(r,'C4',cell,'APPLICABLE',['F','D','P'],full=True)
-        validate_assessment(p,r,HASH)
-        r['condition_facts'][-1]['derivation']['path_fact_ids']=[]
-        with self.assertRaisesRegex(AuditError,'path evidence'):validate_assessment(p,r,HASH)
 
-    def test_view_capability_block_does_not_negate_semantic_applicability(self):
-        p,r,cell=self.attempt('接口支持非连续view但执行器自动contiguous','INPUT_LAYOUT')
-        p['execution_capabilities']['classes']['T1']={'construction':'BLOCKED','reason':'自动连续化'}
-        row=self.label(r,'T1',cell,'APPLICABLE',full=True)
-        row['coverage'].update(construction='BLOCKED',construction_reason='实际stride无法保留',path='NOT_COVERED')
-        output=validate_assessment(p,r,HASH)
-        self.assertEqual(next(v for v in output['v4_rows'] if v['trigger_id']=='T1')['applicability'],'APPLICABLE')
-        row['coverage']['execution']='PASSED'
-        with self.assertRaises(AuditError):validate_assessment(p,r,HASH)
 
     def test_unsupported_capability_claim_and_fake_path_coverage_rejected(self):
         p,r,_=self.attempt()
@@ -173,15 +132,6 @@ class V4Tests(unittest.TestCase):
         r['v4_rows'][0]['applicability']='PARTIAL'
         with self.assertRaisesRegex(AuditError,'local condition'):validate_assessment(p,r,HASH)
 
-    def test_branch3_scopes_same_inputs_to_target_not_every_participant(self):
-        p,r,cell=self.attempt('目标T同实参同二进制，前序P不同','SYNC_RACE')
-        for key in ('SAME_ARGUMENTS','SAME_BINARY'):
-            r['condition_facts'].append({**copy.deepcopy(r['condition_facts'][0]),'fact_id':key,'role':key,'target_call_id':'T'})
-        category=leaf(r,'3.3',cell,facts=['F','SAME_ARGUMENTS','SAME_BINARY'])
-        category['comparison_target_call_id']='T'
-        validate_assessment(p,r,HASH)
-        category['comparison_target_call_id']='P'
-        with self.assertRaisesRegex(AuditError,'compared target'):validate_assessment(p,r,HASH)
 
     def design(self):
         p,r,cell=self.attempt()
@@ -191,7 +141,7 @@ class V4Tests(unittest.TestCase):
             'selected_rows':[{'trigger_id':'I3'}]}],
             'selected_categories':[{'id':'I3','construction_ids':['idx']}],
             'guidance':[{'guide_id':'I3-01','category_id':'I3'}],
-            'methods':[{'method_id':v} for v in ('E1','E2','E3','E4','E5','B3.2-PRODUCER-CONSUMER-v1')]}
+            'methods':[{'method_id':v} for v in ('E1','E2','E3','E4','E5')]}
         response={k:copy.deepcopy(r[k]) for k in ('executor','producer','self_check')}
         response.update(request_hash=HASH,case_id='C',cards=[{'card_id':'card','assessment_id':'A','status':'NEEDS_FACTS',
             'category_ids':['I3'],'construction_ids':['idx'],'guide_ids':['I3-01'],'condition_fact_ids':['F'],
@@ -232,15 +182,6 @@ class V4Tests(unittest.TestCase):
         card['participants'][1]['output_owner']=card['participants'][0]['output_owner']
         with self.assertRaisesRegex(AuditError,'distinct output'):validate_design(p,r,HASH)
 
-    def test_cross_stream_requires_event_and_wait_and_two_roles(self):
-        p,r=self.design();card=r['cards'][0]
-        card.update(execution_method_ids=['B3.2-PRODUCER-CONSUMER-v1'],
-            participants=[self.participant('producer','PRODUCER','P'),self.participant('consumer','CONSUMER')],
-            target_invariant={'target_call_id':'T','variable_participant_ids':['producer']},serial_baseline='serial producer then consumer',
-            protocol_steps=['produce','record','wait','consume'],event_record='producer stream after write',consumer_wait='consumer stream before read')
-        validate_design(p,r,HASH)
-        card['consumer_wait']=''
-        with self.assertRaisesRegex(AuditError,'wait positions'):validate_design(p,r,HASH)
 
 
 class V4WorkflowTests(unittest.TestCase):
@@ -265,7 +206,7 @@ class V4WorkflowTests(unittest.TestCase):
             task=queue['tasks'][0];req=self.store.get(self.run,'workflow_requests',task['task_id'])
             self.assertEqual(req['payload']['evaluation_order'][1:3],['v4_rows','rows'])
             response=self.response(req,definition_only=True)
-            # Rebuild the revised canonical checks; fixture is explicitly synthetic.
+            # Rebuild original canonical checks; fixture is explicitly synthetic.
             for row in response['rows']:
                 item=next(i for i in req['payload']['taxonomy']['items'] if i['id']==row['trigger_id'])
                 row['predicate_checks']=[{'clause_role':k,'clause':v,'result':'UNKNOWN'} for k,v in sorted(canonical_conditions(item))]
@@ -292,6 +233,20 @@ class V4WorkflowTests(unittest.TestCase):
             self.assertEqual(card_table['rows'][0][card_table['columns'].index('执行结果')],'NOT_RUN')
             base=workflow.finalize(self.store,self.run)
             self.assertEqual(base['v4_definition_version'],V4_VERSION)
+            self.assertNotIn('mapping_id',base)
+            self.assertNotIn('revised_definition_version',base)
+            from openpyxl import Workbook
+            source=self.root/'synthetic-incremental.xlsx'
+            workbook=Workbook()
+            workbook.active.append(['统一ID','问题描述'])
+            workbook.active.append(['SYN-NEW','Synthetic new case with unknown mechanism'])
+            workbook.save(source)
+            incremental=workflow.start_incremental(self.store,source,self.run,self.work,executor='codex')
+            inc_run=incremental['run_id']
+            self.assertEqual(workflow._settings(self.store,inc_run)['input_condition_scheme'],'ORIGINAL42')
+            self.assertEqual(self.store.records(inc_run,'trigger_mappings'),[])
+            self.assertEqual(workflow._projection(self.store,inc_run)['v4_taxonomy']['definition_version'],V4_VERSION)
+
             self.assertEqual(len(base['condition_index'][0]['v4_rows']),31)
             combined=copy.deepcopy(projection)
             combined.update(phase='INCREMENTAL',baseline=copy.deepcopy(base))

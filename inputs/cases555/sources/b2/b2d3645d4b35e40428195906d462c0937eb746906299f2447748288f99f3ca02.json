@@ -1,0 +1,110 @@
+[
+  {
+    "additions": 4,
+    "blob_id": "66e233291ffd6ffbad25ea83a50c94e09a5aad9d",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/850ed95612991b37ca7510eefdd87e28a76c2eaa/loss/mse_loss/op_host/arch35/mse_loss_tiling_arch35.cpp",
+    "deletions": 28,
+    "filename": "loss/mse_loss/op_host/arch35/mse_loss_tiling_arch35.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 4,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -36,28 +36,6 @@ static const std::map<std::string, uint32_t> STR_2_INT = {{\"none\", 0}, {\"sum\", 1\n static const std::map<ge::DataType, uint32_t> DTYEP_2_INT_KEY{\n     {ge::DT_FLOAT16, 10}, {ge::DT_FLOAT, 20}, {ge::DT_BF16, 30}};\n \n-void MseLossTiling::ConvertReduceOpTilingData(ReduceOpTilingDataV2* dst, const Ops::Base::ReduceOpTilingData* src)\n-{\n-    dst->factorACntPerCore = src->factorACntPerCore;\n-    dst->factorATotalCnt = src->factorATotalCnt;\n-    dst->ubFactorA = src->ubFactorA;\n-    dst->factorRCntPerCore = src->factorRCntPerCore;\n-    dst->factorRTotalCnt = src->factorRTotalCnt;\n-    dst->ubFactorR = src->ubFactorR;\n-    dst->groupR = src->groupR;\n-    dst->outSize = src->outSize;\n-    dst->basicBlock = src->basicBlock;\n-    dst->resultBlock = src->resultBlock;\n-    dst->coreNum = src->coreNum;\n-    dst->useNddma = src->useNddma;\n-    dst->meanVar = src->meanVar;\n-    for (int32_t i = 0; i < Ops::Base::ReduceOpTmpl::MAX_DIM; i++) {\n-        dst->shape[i] = src->shape[i];\n-        dst->stride[i] = src->stride[i];\n-        dst->dstStride[i] = src->dstStride[i];\n-    }\n-}\n-\n ge::graphStatus MseLossTiling::CheckShape()\n {\n     auto predictStorageShape = tilingContext->GetInputShape(0);\n@@ -142,33 +120,31 @@ ge::graphStatus MseLossTiling::TilingReduce(const MseLossCompileInfo* compileInf\n     for (size_t i = 0; i < opInput.shape.size(); i++) {\n         opInput.axes[i] = i;\n     }\n-    ReduceOpTilingData optiling;\n     if (this->outputDtype == ge::DT_FLOAT16 || this->outputDtype == ge::DT_BF16) {\n         if (static_cast<int32_t>(this->reduction) == 1) {\n             OP_CHECK_IF(\n                 (Tiling4ReduceOp<MseLoss::MseLossSumDag<half, float>::OpDag>(\n-                     tilingContext, opInput, key.ReduceTiling, &compileInfo->opInfo, &optiling) == ge::GRAPH_FAILED),\n+                     tilingContext, opInput, key.ReduceTiling, &compileInfo->opInfo, &tiling->reduceTiling) == ge::GRAPH_FAILED),\n                 OP_LOGE(tilingContext->GetNodeName(), \"MseLoss Tiling failed\"), return ge::GRAPH_FAILED);\n         } else {\n             OP_CHECK_IF(\n                 (Tiling4ReduceOp<MseLoss::MseLossMeanDag<half, float>::OpDag>(\n-                     tilingContext, opInput, key.ReduceTiling, &compileInfo->opInfo, &optiling) == ge::GRAPH_FAILED),\n+                     tilingContext, opInput, key.ReduceTiling, &compileInfo->opInfo, &tiling->reduceTiling) == ge::GRAPH_FAILED),\n                 OP_LOGE(tilingContext->GetNodeName(), \"MseLoss Tiling failed\"), return ge::GRAPH_FAILED);\n         }\n     } else {\n         if (static_cast<int32_t>(this->reduction) == 1) {\n             OP_CHECK_IF(\n                 (Tiling4ReduceOp<MseLoss::MseLossSumDag<float, float>::OpDag>(\n-                     tilingContext, opInput, key.ReduceTiling, &compileInfo->opInfo, &optiling) == ge::GRAPH_FAILED),\n+                     tilingContext, opInput, key.ReduceTiling, &compileInfo->opInfo, &tiling->reduceTiling) == ge::GRAPH_FAILED),\n                 OP_LOGE(tilingContext->GetNodeName(), \"MseLoss Tiling failed\"), return ge::GRAPH_FAILED);\n         } else {\n             OP_CHECK_IF(\n                 (Tiling4ReduceOp<MseLoss::MseLossMeanDag<float, float>::OpDag>(\n-                     tilingContext, opInput, key.ReduceTiling, &compileInfo->opInfo, &optiling) == ge::GRAPH_FAILED),\n+                     tilingContext, opInput, key.ReduceTiling, &compileInfo->opInfo, &tiling->reduceTiling) == ge::GRAPH_FAILED),\n                 OP_LOGE(tilingContext->GetNodeName(), \"MseLoss Tiling failed\"), return ge::GRAPH_FAILED);\n         }\n     }\n-    ConvertReduceOpTilingData(&tiling->reduceTiling, &optiling);\n     return ge::GRAPH_SUCCESS;\n }\n \n",
+      "new_file": false,
+      "new_path": "loss/mse_loss/op_host/arch35/mse_loss_tiling_arch35.cpp",
+      "old_path": "loss/mse_loss/op_host/arch35/mse_loss_tiling_arch35.cpp",
+      "removed_lines": 28,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/850ed95612991b37ca7510eefdd87e28a76c2eaa/loss/mse_loss/op_host/arch35/mse_loss_tiling_arch35.cpp",
+    "sha": "850ed95612991b37ca7510eefdd87e28a76c2eaa",
+    "source_branch": "mse_loss",
+    "source_project": {
+      "full_name": "pingchuantang/ops-nn-tpc",
+      "human_name": "pingchuantang / ops-nn-tpc",
+      "id": 8824949,
+      "path": "ops-nn-tpc"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 0,
+    "blob_id": "0f78d31c9707048badf8ded560f629c2890fdce4",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/850ed95612991b37ca7510eefdd87e28a76c2eaa/loss/mse_loss/op_host/arch35/mse_loss_tiling_arch35.h",
+    "deletions": 1,
+    "filename": "loss/mse_loss/op_host/arch35/mse_loss_tiling_arch35.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 0,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -43,7 +43,6 @@ protected:\n     ge::graphStatus CheckShape();\n     ge::graphStatus TilingEle();\n     ge::graphStatus TilingReduce(const MseLossCompileInfo* compileInfo);\n-    void ConvertReduceOpTilingData(ReduceOpTilingDataV2* dst, const Ops::Base::ReduceOpTilingData* src);\n \n private:\n     ge::DataType outputDtype;\n",
+      "new_file": false,
+      "new_path": "loss/mse_loss/op_host/arch35/mse_loss_tiling_arch35.h",
+      "old_path": "loss/mse_loss/op_host/arch35/mse_loss_tiling_arch35.h",
+      "removed_lines": 1,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/850ed95612991b37ca7510eefdd87e28a76c2eaa/loss/mse_loss/op_host/arch35/mse_loss_tiling_arch35.h",
+    "sha": "850ed95612991b37ca7510eefdd87e28a76c2eaa",
+    "source_branch": "mse_loss",
+    "source_project": {
+      "full_name": "pingchuantang/ops-nn-tpc",
+      "human_name": "pingchuantang / ops-nn-tpc",
+      "id": 8824949,
+      "path": "ops-nn-tpc"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 2,
+    "blob_id": "62a817974c005ab24dae0c73734de4ecc7f410b9",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/850ed95612991b37ca7510eefdd87e28a76c2eaa/loss/mse_loss/op_kernel/arch35/mse_loss_tiling_def.h",
+    "deletions": 19,
+    "filename": "loss/mse_loss/op_kernel/arch35/mse_loss_tiling_def.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 2,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -17,30 +17,13 @@\n #define __MSE_LOSS_TILING_DATA_H__\r\n \r\n #include \"atvoss/elewise/elewise_base_struct.h\"\r\n+#include \"atvoss/reduce/reduce_tiling_data.h\"\r\n \r\n using namespace Ops::Base;\r\n-struct ReduceOpTilingDataV2 {\r\n-    uint64_t factorACntPerCore;\r\n-    uint64_t factorATotalCnt;\r\n-    uint64_t ubFactorA;\r\n-    uint64_t factorRCntPerCore;\r\n-    uint64_t factorRTotalCnt;\r\n-    uint64_t ubFactorR;\r\n-    uint64_t groupR;\r\n-    uint64_t outSize;\r\n-    uint64_t basicBlock;\r\n-    uint64_t resultBlock;\r\n-    int32_t coreNum;\r\n-    int32_t useNddma;\r\n-    float meanVar;\r\n-    uint64_t shape[Ops::Base::ReduceOpTmpl::MAX_DIM];\r\n-    uint64_t stride[Ops::Base::ReduceOpTmpl::MAX_DIM];\r\n-    uint64_t dstStride[Ops::Base::ReduceOpTmpl::MAX_DIM];\r\n-};\r\n \r\n struct MseLossTilingData {\r\n     EleBaseTilingData baseTiling;\r\n-    ReduceOpTilingDataV2 reduceTiling;\r\n+    ReduceOpTilingData reduceTiling;\r\n };\r\n \r\n #endif\n\\ No newline at end of file\n",
+      "new_file": false,
+      "new_path": "loss/mse_loss/op_kernel/arch35/mse_loss_tiling_def.h",
+      "old_path": "loss/mse_loss/op_kernel/arch35/mse_loss_tiling_def.h",
+      "removed_lines": 19,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/850ed95612991b37ca7510eefdd87e28a76c2eaa/loss/mse_loss/op_kernel/arch35/mse_loss_tiling_def.h",
+    "sha": "850ed95612991b37ca7510eefdd87e28a76c2eaa",
+    "source_branch": "mse_loss",
+    "source_project": {
+      "full_name": "pingchuantang/ops-nn-tpc",
+      "human_name": "pingchuantang / ops-nn-tpc",
+      "id": 8824949,
+      "path": "ops-nn-tpc"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  }
+]

@@ -15,16 +15,18 @@ def build() -> Path:
     destination.mkdir(exist_ok=True)
     paths = []
     allowed = {"faultaudit": {".py"}, "scripts": {".py", ".mjs"}, "integration": {".py", ".md", ".yaml"},
-               "tests": {".py"}, "schemas": {".json"}, "examples": {".json", ".tsv", ".txt"}}
+               "tests": {".py"}, "schemas": {".json"}, "examples": {".json", ".tsv", ".txt"},
+               "knowledge": {".md", ".json"}, "research": {".md"}, "inputs": None}
     for name, extensions in allowed.items():
         directory = root / name
         if directory.exists():
             paths.extend(p for p in directory.rglob("*") if p.is_file()
-                         and "__pycache__" not in p.parts and p.suffix in extensions
+                         and "__pycache__" not in p.parts and (extensions is None or p.suffix in extensions)
                          and ".scratch" not in p.relative_to(directory).parts
                          and not any(part.startswith("tmp") for part in p.relative_to(directory).parts[:-1]))
     paths.extend(root / name for name in ("README.md", "THIRD_PARTY_REFERENCES.md", "pyproject.toml",
-                                          "requirements.txt", "run_faultaudit.py", "VALIDATION.md", ".gitignore") if (root / name).is_file())
+                                          "requirements.txt", "run_faultaudit.py", "VALIDATION.md", ".gitignore",
+                                          ".gitattributes") if (root / name).is_file())
     unique = sorted(set(paths), key=lambda p: p.relative_to(root).as_posix())
     manifest = {p.relative_to(root).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest() for p in unique}
     text = json.dumps({"version": __version__, "files": manifest}, ensure_ascii=False, indent=2) + "\n"

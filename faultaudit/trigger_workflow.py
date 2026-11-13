@@ -20,13 +20,20 @@ from .store import AuditError, Store, digest
 from .trigger_assessment import CLASSIFICATION_FRAMEWORK, instructions, response_schema, validate_assessment
 from .trigger_taxonomy import builtin_user_branches, load_taxonomy
 
-RULE_VERSION = "cann-baseline-builder-0.1.20"
+RULE_VERSION = "cann-baseline-builder-0.1.21"
 
 
 def _settings(store, run_id):
     value = store.get(run_id, "trigger_config", "config")
     if not value:
         raise AuditError("Start a trigger initialization/classification run first")
+    from .trigger_v4 import require_original_profile
+    require_original_profile({
+        **value,
+        "taxonomy": store.get(run_id, "trigger_taxonomies", value.get("taxonomy_id", "")) or {},
+        "v4_taxonomy": store.get(run_id, "trigger_v4_taxonomies", value.get("v4_taxonomy_id", "")) or {},
+        "mapping": value.get("mapping_id"),
+    })
     return value
 
 
@@ -52,6 +59,8 @@ def start_init(store: Store, modes: Path, taxonomy: Path, work_root: Path, *,
         raise AuditError("Initialization requires a nonempty library with unique original mode IDs")
     frozen = load_taxonomy(taxonomy, branch_source,
         user_branch_definitions=builtin_user_branches() if user_branches and not branch_source else None)
+    from .trigger_v4 import LEGACY_VERSION
+    frozen = {**frozen, "definition_version": LEGACY_VERSION}
     imported = import_cases(modes, "LEGACY_TABLE")
     by_row = {(c["sheet"], c["row"]): c for c in imported["cases"]}
     subjects = []
@@ -84,7 +93,7 @@ def start_init(store: Store, modes: Path, taxonomy: Path, work_root: Path, *,
     pin(store, run_id, get_budget_chars() if input_budget_chars is None else input_budget_chars, reason="WORKFLOW_START")
     store.put(run_id, "trigger_config", "config", {"phase": "INIT", "taxonomy_id": frozen["taxonomy_id"],
         "catalog_hash": digest(_catalog(store, run_id)), "rule_version": RULE_VERSION, "basis": basis,
-        "classification_framework": CLASSIFICATION_FRAMEWORK})
+        "classification_framework": CLASSIFICATION_FRAMEWORK, "input_condition_scheme": "ORIGINAL42"})
     register_search_policy(store, run_id, {"required_sources": ["WIKI"]})
     if v4_source is not None:
         configure_v4(store, run_id, v4_source, capabilities=capabilities)
@@ -129,8 +138,8 @@ def configure_v5(store, run_id, *, with_designs=False):
 
 @run_scoped
 def configure_v4(store, run_id, source, *, capabilities=None):
-    """Freeze a versioned interpretation without overwriting any old definition."""
-    from .trigger_v4 import load_v4, revise_42, freeze_mapping, PROFILE, LEGACY_VERSION
+    """Freeze the original V4 and API42 without deriving a revised taxonomy."""
+    from .trigger_v4 import load_v4, PROFILE, LEGACY_VERSION
     from .xlsx_workflow import config
     settings = _settings(store, run_id)
     if settings["phase"] != "INIT":
@@ -138,8 +147,10 @@ def configure_v4(store, run_id, source, *, capabilities=None):
     current = _taxonomy(store, run_id)
     original = store.get(run_id, "trigger_taxonomies", current.get("original_taxonomy_id", current["taxonomy_id"]))
     frozen = load_v4(Path(source))
-    revised = revise_42(original)
-    mapping = freeze_mapping(original, revised, frozen)
+    original_profile = {**original, "definition_version": LEGACY_VERSION,
+        "original_definition_version": LEGACY_VERSION,
+        "original_taxonomy_id": original["taxonomy_id"], "input_condition_scheme": "ORIGINAL42"}
+    original_profile["taxonomy_id"] = "original42-profile-" + digest(original_profile)[:24]
     capabilities = capabilities or {"classes": {}, "methods": {}, "provenance": "NOT_PROVIDED"}
     if not isinstance(capabilities, dict) or set(capabilities) - {"classes", "methods", "provenance"}:
         raise AuditError("Capabilities are declared design constraints, not execution results")
@@ -153,22 +164,21 @@ def configure_v4(store, run_id, source, *, capabilities=None):
             raise AuditError("Method capabilities describe declared availability, never successful execution")
     store.put(run_id, "trigger_original_definitions", original["taxonomy_id"],
         {"definition_version": LEGACY_VERSION, "taxonomy": original})
-    store.put(run_id, "trigger_taxonomies", revised["taxonomy_id"], revised)
+    store.put(run_id, "trigger_taxonomies", original_profile["taxonomy_id"], original_profile)
     store.put(run_id, "trigger_v4_taxonomies", frozen["taxonomy_id"], frozen)
-    store.put(run_id, "trigger_mappings", mapping["mapping_id"], mapping)
-    updated = {**settings, "taxonomy_id": revised["taxonomy_id"], "v4_taxonomy_id": frozen["taxonomy_id"],
-        "mapping_id": mapping["mapping_id"], "classification_profile": PROFILE,
+    updated = {**settings, "taxonomy_id": original_profile["taxonomy_id"], "v4_taxonomy_id": frozen["taxonomy_id"],
+        "input_condition_scheme": "ORIGINAL42", "classification_profile": PROFILE,
         "execution_capabilities": capabilities, "rule_version": RULE_VERSION}
     store.put(run_id, "trigger_config", "config", updated, mutable=True)
     cfg = config(store, run_id)
     store.put(run_id, "xlsx_workflow", "config", {**cfg, "rule_version": RULE_VERSION}, mutable=True)
     store.event(run_id, "trigger_v4_configured", {"previous_taxonomy_id": current["taxonomy_id"],
-        "taxonomy_id": revised["taxonomy_id"], "v4_taxonomy_id": frozen["taxonomy_id"], "mapping_id": mapping["mapping_id"]})
+        "taxonomy_id": original_profile["taxonomy_id"], "v4_taxonomy_id": frozen["taxonomy_id"], "mapping_generated": False})
     if settings.get("knowledge_profile"):
         from .cann_baseline import configure
         configure(store, run_id)
     return {"run_id": run_id, "classification_profile": PROFILE, "legacy_version": LEGACY_VERSION,
-        "revised_version": revised["definition_version"], "v4_version": frozen["definition_version"],
+        "api_definition_version": LEGACY_VERSION, "v4_version": frozen["definition_version"],
         "categories": 31, "constructions": 55, "mounts": 64, "guides": 195,
         "execution_implemented": False}
 
@@ -183,9 +193,6 @@ def _model_taxonomy(frozen):
     value = {k: frozen[k] for k in ("taxonomy_id", "taxonomy_hash", "source_file", "source_sha256", "item_count")}
     value["items"] = [{k: item[k] for k in ("id", "family_id", "name", "definition", "requires", "skip_if", "line_start", "line_end") if k in item}
                        for item in frozen["items"]]
-    for item, source in zip(value["items"], frozen["items"]):
-        item.update({k: source[k] for k in ("allowed_fact_roles", "family_requires_override", "family_skip_override",
-            "construction_requires", "analysis_requires", "revision_reason") if k in source})
     value.update({k: frozen[k] for k in ("definition_version", "original_definition_version", "original_taxonomy_id",
         "branch_comparison_scope") if k in frozen})
     value["families"] = frozen.get("families", [])
@@ -454,7 +461,7 @@ def classification_payloads(store, run_id, *, for_baseline_axes=False):
                     "comparison_projection_excludes": "Repeated raw source chapters/quote bundles and prior trigger rationales; all definitions and mechanism detail fields are retained in full"},
                 "basis_hash": _basis(store, run_id, subject, (issue or {}).get("snapshot_id")),
                 "case_ids": [cid], "response_schema": response_schema(include_v4=bool(v4))}
-            payload.update(input_condition_scheme=settings.get("input_condition_scheme", "REVISED42"))
+            payload.update(input_condition_scheme=settings.get("input_condition_scheme", "ORIGINAL42"))
             if settings.get("knowledge_profile"):
                 payload["knowledge_profile"] = settings["knowledge_profile"]
                 if subject["subject_id"] in definitions:
@@ -462,18 +469,15 @@ def classification_payloads(store, run_id, *, for_baseline_axes=False):
                     payload["normalized_mode"] = technical_projection(definitions[subject["subject_id"]]["result"])
             if v4:
                 from .trigger_v4 import model_v4
-                mapping = store.get(run_id, "trigger_mappings", settings["mapping_id"])
                 payload.update(classification_profile=settings["classification_profile"], v4_taxonomy=model_v4(v4),
-                    mapping={k: mapping[k] for k in ("mapping_id", "mapping_version", "source_definition_version",
-                        "revised_definition_version", "relation_direction", "purpose", "rows")},
                     execution_capabilities=settings["execution_capabilities"],
                     evaluation_order=["condition_facts", "v4_rows", "rows", "external_branches", "details", "declared_comparison", "decision"])
             if settings.get("classification_contract") == "SPARSE_SCENARIOS_V5":
                 from .trigger_sparse import CONTRACT, schema, frame_version
                 payload.update(classification_contract=CONTRACT, response_schema=schema(),
                     frame_versions={scheme: frame_version(payload, scheme)
-                        for scheme in ([settings.get("input_condition_scheme", "REVISED42"), "BRANCH", "V4"] if v4
-                            else [settings.get("input_condition_scheme", "REVISED42"), "BRANCH"])},
+                        for scheme in ([settings.get("input_condition_scheme", "ORIGINAL42"), "BRANCH", "V4"] if v4
+                            else [settings.get("input_condition_scheme", "ORIGINAL42"), "BRANCH"])},
                     evaluation_order=["condition_facts", "details", "scenarios", "rows", "v4_rows",
                         "external_branches", "label_links", "classification_summary", "declared_comparison", "candidate_proposal", "decision"])
                 payload["input_scope"].update(output_rule_scope="SELECTED_RULES", omitted_rules="NOT_ASSESSED")
@@ -491,14 +495,7 @@ def classification_instructions(payload):
     text = instructions()
     if payload.get("v4_taxonomy"):
         from .trigger_v4_assessment import instructions as v4_instructions
-        text = text.replace("The primary framework is the 42 INPUT conditions plus Branch 2/3.",
-            "The primary framework is V4's 31 categories/55 constructions plus Branch 2/3; rows is the independent revised-42 compatibility frame.")
-        text = text.replace("extract condition_facts, assess all 42 rows and Branch 2/3, organize",
-            "extract condition_facts, assess all V4 rows/constructions, independently assess revised 42 rows and Branch 2/3, organize")
-        text = text.replace("All 1.C positives need a stated API-control fact, not an internal algorithm name.",
-            "The revised-42 API-control items retain their own allowed-role metadata; V4 C2/C4 separately allow traced input-driven paths.")
         text = v4_instructions() + "\n" + text
-        text += "\nFor revised rows use each item's allowed_fact_roles and family overrides. The original 1.3 family exclusion does not apply to revised 1.3.2.\n"
     return text
 
 
@@ -686,7 +683,7 @@ def _projection(store, run_id, *, include_baseline_review=True):
         "coverage_kind": cfg.get("basis", "HISTORICAL_EVIDENCE"),
         "taxonomy": _taxonomy(store, run_id), "subjects": subjects,
         "classification_contract": cfg.get("classification_contract", "DENSE_V1"),
-        "input_condition_scheme": cfg.get("input_condition_scheme", "REVISED42"),
+        "input_condition_scheme": cfg.get("input_condition_scheme", "ORIGINAL42"),
         "assessments": assessments, "wiki_checks": checks, "resources": resources,
         "gaps": gaps, "baseline": baseline}
     if _v4(store, run_id):
@@ -701,7 +698,6 @@ def _projection(store, run_id, *, include_baseline_review=True):
             if any(r["applicability"] in {"PARTIAL", "UNKNOWN"} for r in a["result"].get("v4_rows", [])):
                 gaps.append({"case_id": a["case_id"], "kind": "V4_UNKNOWNS", "reason": "V4 semantic classification keeps explicit unknown prerequisites"})
         projection.update(v4_taxonomy=_v4(store, run_id),
-            mapping=store.get(run_id, "trigger_mappings", cfg["mapping_id"]),
             execution_capabilities=cfg["execution_capabilities"], designs=designs,
             original_taxonomy=store.get(run_id, "trigger_taxonomies", _taxonomy(store, run_id)["original_taxonomy_id"]))
     if cfg.get("knowledge_profile"):
@@ -838,7 +834,7 @@ def finalize(store, run_id, *, allow_pending=False):
     if data.get("v4_taxonomy"):
         baseline.update(v4_taxonomy_id=data["v4_taxonomy"]["taxonomy_id"],
             v4_definition_version=data["v4_taxonomy"]["definition_version"],
-            mapping_id=data["mapping"]["mapping_id"], revised_definition_version=data["taxonomy"]["definition_version"])
+            api_definition_version=data["taxonomy"]["definition_version"])
     if data.get("knowledge_profile"):
         baseline.pop("revised_definition_version", None)
         baseline["api_definition_version"] = data["taxonomy"]["definition_version"]
@@ -908,7 +904,7 @@ def start_incremental(store, source, baseline_run, work_root, *, executor="openc
         "baseline_run": baseline_run, "baseline_id": baseline["baseline_id"], "allow_pending_baseline": allow_pending_baseline,
         "catalog_hash": digest(catalog), "rule_version": RULE_VERSION, "basis": "HISTORICAL_EVIDENCE",
         "baseline_basis": baseline.get("coverage_kind", "HISTORICAL_EVIDENCE"),
-        "classification_framework": CLASSIFICATION_FRAMEWORK})
+        "classification_framework": CLASSIFICATION_FRAMEWORK, "input_condition_scheme": "ORIGINAL42"})
     baseline_settings = _settings(store, baseline_run)
     if baseline_settings.get("classification_contract"):
         settings = _settings(store, run_id)
@@ -922,12 +918,11 @@ def start_incremental(store, source, baseline_run, work_root, *, executor="openc
             store.put(run_id, "trigger_config", "config", {**_settings(store, run_id), "api42_registry_id": registry_id}, mutable=True)
     if baseline_settings.get("v4_taxonomy_id"):
         for kind, key in (("trigger_v4_taxonomies", baseline_settings["v4_taxonomy_id"]),
-                          ("trigger_mappings", baseline_settings["mapping_id"]),
                           ("trigger_taxonomies", frozen["original_taxonomy_id"])):
             store.put(run_id, kind, key, store.get(baseline_run, kind, key))
         settings = _settings(store, run_id)
         store.put(run_id, "trigger_config", "config", {**settings,
-            **{k: baseline_settings[k] for k in ("classification_profile", "v4_taxonomy_id", "mapping_id", "execution_capabilities")}}, mutable=True)
+            **{k: baseline_settings[k] for k in ("classification_profile", "v4_taxonomy_id", "execution_capabilities")}}, mutable=True)
     for case in store.records(run_id, "cases"):
         subject = {"subject_id": "case-subject-" + digest(case["case_id"])[:24],
             "case_id": case["case_id"], "subject_kind": "FAULT_CASE"}

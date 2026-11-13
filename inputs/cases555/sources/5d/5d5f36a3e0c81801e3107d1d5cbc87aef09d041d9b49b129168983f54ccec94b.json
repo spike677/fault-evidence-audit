@@ -1,0 +1,41 @@
+[
+  {
+    "author": {
+      "html_url": "https://gitcode.com/yourealize",
+      "id": "684598ba4229be333029be60",
+      "login": "yourealize",
+      "name": "陈展熹",
+      "object_id": "684598ba4229be333029be60"
+    },
+    "co_authors": [],
+    "commit": {
+      "author": {
+        "date": "2026-06-29T14:16:50+08:00",
+        "email": "chenzhanxi1@huawei.com",
+        "login": "yourealize",
+        "name": "yourealize"
+      },
+      "committer": {
+        "email": "chenzhanxi1@huawei.com",
+        "login": "yourealize",
+        "name": "yourealize"
+      },
+      "message": "fix: reset maskLen per row in QuantizeForSumVf and InverseQuantizeVf\n\nUpdateMask consumes maskLen during inner loop iteration, leaving it\nat 0 or a residual value for subsequent rows. This caused incorrect\nmask behavior when rowLen > 1 in the deterministic scatter_nd_add path.\n\nChanges:\n- QuantizeForSumVf: rename param maskLen -> afterAxis, reassign\n  maskLen = afterAxis at the start of each row loop\n- InverseQuantizeVf: rename param maskLen -> colLen, reassign\n  maskLen = colLen at the start of each row loop\n"
+    },
+    "committer": {
+      "html_url": "https://gitcode.com/yourealize",
+      "id": "684598ba4229be333029be60",
+      "login": "yourealize",
+      "name": "陈展熹",
+      "object_id": "684598ba4229be333029be60"
+    },
+    "html_url": "https://gitcode.com/cann/ops-nn/commit/16ae5af1643571a9a811b04d0ff3b57b9d60aba5",
+    "parents": {
+      "sha": "55b1f9f97bba2e1a479469ae7e1961896a3123ab",
+      "shas": [
+        "55b1f9f97bba2e1a479469ae7e1961896a3123ab"
+      ]
+    },
+    "sha": "16ae5af1643571a9a811b04d0ff3b57b9d60aba5"
+  }
+]

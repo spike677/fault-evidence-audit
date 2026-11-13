@@ -1,0 +1,110 @@
+[
+  {
+    "additions": 1,
+    "blob_id": "e8783b23b675dd2e5b4e1640ce55bb6487b7c84b",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/80e2013723eeb6bc52da0da90934e603f728d120/conv/conv3d_backprop_input_v2/op_host/op_tiling/arch35/conv3d_backprop_input_v2_inner_product_tiling.cpp",
+    "deletions": 1,
+    "filename": "conv/conv3d_backprop_input_v2/op_host/op_tiling/arch35/conv3d_backprop_input_v2_inner_product_tiling.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 1,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -873,7 +873,7 @@ bool Conv3DDXV2InnerProductTiling::IsL1ParamsValid(const L1TilingParams& l1Param\n         biasSize = Ops::Base::CeilAlign(dtypeByteBtBuffer * l0Params.baseN, static_cast<uint64_t>(BYTE_BLOCK));\n     }\n     // 移除 IsSocVersionFuse 条件，统一在所有场景下计算\n-    return aL1Size + bL1Size + biasSize + scaleSize <= platformInfo_.l1_size;\n+    return aL1Size + bL1Size + biasSize + scaleSize < platformInfo_.l1_size;\n }\n \n void Conv3DDXV2InnerProductTiling::CloseL0PingPong(L0TilingParams& l0Params)\n",
+      "new_file": false,
+      "new_path": "conv/conv3d_backprop_input_v2/op_host/op_tiling/arch35/conv3d_backprop_input_v2_inner_product_tiling.cpp",
+      "old_path": "conv/conv3d_backprop_input_v2/op_host/op_tiling/arch35/conv3d_backprop_input_v2_inner_product_tiling.cpp",
+      "removed_lines": 1,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/80e2013723eeb6bc52da0da90934e603f728d120/conv/conv3d_backprop_input_v2/op_host/op_tiling/arch35/conv3d_backprop_input_v2_inner_product_tiling.cpp",
+    "sha": "80e2013723eeb6bc52da0da90934e603f728d120",
+    "source_branch": "fix-big-kernel-error",
+    "source_project": {
+      "full_name": "linruihan/ops-nn",
+      "human_name": "linruihan / ops-nn",
+      "id": 7858845,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 2,
+    "blob_id": "0b185e8e453d3e95c596dd8f0ecdfb97b60d6aa9",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/80e2013723eeb6bc52da0da90934e603f728d120/conv/conv3d_backprop_input_v2/op_kernel/arch35/convolution_3d_backprop/impl/conv_bp_sub_func.h",
+    "deletions": 0,
+    "filename": "conv/conv3d_backprop_input_v2/op_kernel/arch35/convolution_3d_backprop/impl/conv_bp_sub_func.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 2,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -577,6 +577,8 @@ static __aicore__ inline void LoadL0c2GmForNz2Nd(Intf *self, const GlobalTensor<\n     }\n     if (self->ctx.useUbAccumForSplitK_) {\n #if (__NPU_ARCH__ != 5102)\n+        // 写入workspace需要保证数据连续便于UB搬运和Cast\n+        fixPipeParams.dstStride = self->ctx.baseUseN_;\n         Fixpipe<float, float, CFG_ROW_MAJOR>(self->ctx.l0cOutGm_[dstOffset], useC1Buf, fixPipeParams);\n #endif\n     } else {\n",
+      "new_file": false,
+      "new_path": "conv/conv3d_backprop_input_v2/op_kernel/arch35/convolution_3d_backprop/impl/conv_bp_sub_func.h",
+      "old_path": "conv/conv3d_backprop_input_v2/op_kernel/arch35/convolution_3d_backprop/impl/conv_bp_sub_func.h",
+      "removed_lines": 0,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/80e2013723eeb6bc52da0da90934e603f728d120/conv/conv3d_backprop_input_v2/op_kernel/arch35/convolution_3d_backprop/impl/conv_bp_sub_func.h",
+    "sha": "80e2013723eeb6bc52da0da90934e603f728d120",
+    "source_branch": "fix-big-kernel-error",
+    "source_project": {
+      "full_name": "linruihan/ops-nn",
+      "human_name": "linruihan / ops-nn",
+      "id": 7858845,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 1,
+    "blob_id": "c3924ab41aa3530f04d1a9689a9d8cb79270f562",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/80e2013723eeb6bc52da0da90934e603f728d120/conv/conv3d_backprop_input_v2/tests/ut/op_host/test_conv3d_backprop_input_v2_arch35_tiling.cpp",
+    "deletions": 1,
+    "filename": "conv/conv3d_backprop_input_v2/tests/ut/op_host/test_conv3d_backprop_input_v2_arch35_tiling.cpp",
+    "patch": {
+      "a_mode": "100755",
+      "added_lines": 1,
+      "b_mode": "100755",
+      "deleted_file": false,
+      "diff": "@@ -535,7 +535,7 @@ Conv3DBpInputV2TilingTestParam cases_params_950[] = {\n      true,\n      32,\n      16777218,\n-     \"1 1 1 1 1 1 32 0 2 2 2 2 2 1 16 4 4 1 0 0 257 16 128 512 128 512 32 8 32 8 20 8 16 20 8 16 3 3 1 1 1 1 1 1 1 1 1 1 0 0 1 1 1 0 0 1 1 1 1 512 128 1 128 96 128 8 8 3 0 1 0 128 0 0 0 0 0 0 0 0 0 0 0 0 0 \"},\n+     \"1 1 1 1 1 1 32 0 2 2 2 2 2 1 16 4 4 1 0 0 257 16 128 512 128 512 32 8 32 8 20 8 16 20 8 16 3 3 1 1 1 1 1 1 1 1 1 1 0 0 1 1 1 0 0 1 1 1 1 512 128 1 128 96 128 7 7 3 0 1 0 128 0 0 0 0 0 0 0 0 0 0 0 0 0 \"},\n     {\"conv3d_dx_10\",\n      \"3510\",\n      \"3510\",\n",
+      "new_file": false,
+      "new_path": "conv/conv3d_backprop_input_v2/tests/ut/op_host/test_conv3d_backprop_input_v2_arch35_tiling.cpp",
+      "old_path": "conv/conv3d_backprop_input_v2/tests/ut/op_host/test_conv3d_backprop_input_v2_arch35_tiling.cpp",
+      "removed_lines": 1,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/80e2013723eeb6bc52da0da90934e603f728d120/conv/conv3d_backprop_input_v2/tests/ut/op_host/test_conv3d_backprop_input_v2_arch35_tiling.cpp",
+    "sha": "80e2013723eeb6bc52da0da90934e603f728d120",
+    "source_branch": "fix-big-kernel-error",
+    "source_project": {
+      "full_name": "linruihan/ops-nn",
+      "human_name": "linruihan / ops-nn",
+      "id": 7858845,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  }
+]

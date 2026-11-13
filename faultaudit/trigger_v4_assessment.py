@@ -6,39 +6,23 @@ from .trigger_v4 import INPUT_ROLES, V4_VERSION, canonical_conditions
 
 
 def instructions() -> str:
-    return """This request has TWO independently versioned classification frames. First assess
-v4_rows: all 31 V4 categories, each complete normalized definition/Requires/Skip and every
-mounted construction (55 unique codes, 64 category-code mounts). Then assess rows: all 42
-revised compatibility predicates. The frozen crosswalk explains relationships only. NEVER
-copy applicability, evidence or coverage through a mapping. The same cited fact may legitimately
-support two independently checked predicates. Preserve specific decode/head/MoE/packed semantics.
-Original V4 clauses and authorized interpretations are both included; classify using the
-versioned normalized semantic clauses. Record construction, path and execution separately.
-An interface-supported view can be APPLICABLE while construction is BLOCKED by automatic
-contiguous conversion. Resource shortage does not prove semantic non-applicability. A formula
-sample is a design result, not device coverage. This phase has NO execution adapter: every
-coverage.execution is NOT_RUN and path can only be UNKNOWN, NOT_COVERED or DESIGN_ONLY.
-No current device PASS/COVERED/REPRODUCED result, human ACCEPT or formal adoption may be invented.
-Construction DECLARED_SUPPORTED/BLOCKED requires the matching explicit capability profile;
-without it use UNKNOWN. Historical source-reported execution remains a cited historical fact.
-I3 and revised 1.3.2 allow ordinary tensor shape/stride to drive internal address arithmetic.
-A large shape alone does not prove overflow. A full APPLICABLE assertion needs a cited derivation:
-legal driving inputs, element/byte formula, arithmetic types, promotion position, boundary/unit
-and capacity. Missing parts permit only PARTIAL/UNKNOWN; retain exact unknowns.
-C2/C4 distinguish explicit API controls from legal-input-driven paths. DERIVED_CONTROL and
-PATH_PREDICATE facts retain driving_input_fact_ids, expression/dispatch_predicate and path_fact_ids.
-loopRpSize is derived, never an API argument. For an input-driven full applicability claim,
-record the complete dispatch condition and path evidence. Internal Inf stays separate from
-input Inf; an internal numerical strategy is not automatically an exposed API option.
-Branch 3 compares a named TARGET CALL, not all participants. SAME_ARGUMENTS/SAME_BINARY facts
-must have that target_call_id; BranchCategory.comparison_target_call_id binds it. Predecessors
-or interfering threads may intentionally have different inputs. Do not say their parameters
-are identical. E1-E5 and B3.2 producer-consumer are design protocols, not root-cause labels.
-Ground every positive label/check in local condition facts and exact immutable cells or this
-issue's permitted snapshot quotations. Unbound candidate facts cannot classify the original.
-All unknowns remain visible. Do not merge issues, search to fill unknown fields, or inherit
-human decisions. A later, separate design task selects frozen guidance examples and protocols;
-the 195-example document is NOT claimed to be included in this classification task.
+    return """This request contains independently frozen ORIGINAL V4 and API42 frames.
+For v4_rows use the exact original definition/Requires/Skip for all 31 condition classes
+and every mounted construction (55 unique codes, 64 mounts). For rows use the exact
+original API42 clauses and family requirements. No revised definitions or crosswalk
+are supplied. Never transfer applicability, evidence or coverage between the frames.
+Original prerequisites remain binding even when they describe executor or resource
+limits; do not split, override or reinterpret them into a broader applicability rule.
+Record gaps, conflicts and uncertain interpretation as PARTIAL/UNKNOWN with evidence.
+E1-E5 are the original design protocols, not additional input classes or root causes.
+Construction capability and planned paths are reported separately without overriding
+any original prerequisite. This phase has no device adapter: execution stays NOT_RUN.
+A formula, supported capability declaration or design card is not proof of reproduction.
+Every label and predicate check must cite local condition facts and exact permitted
+source cells or immutable quotations. An unrelated search candidate cannot classify the
+original record. No invented device result, human ACCEPT or formal adoption is allowed.
+All 195 reference guides are retained separately for design selection; they are not
+claimed as observed failures or as necessary classification predicates.
 """
 
 
@@ -75,7 +59,7 @@ def validate_v4(payload, result, grounded):
             raise AuditError("V4 results need an explicitly frozen V4 definition set")
         return
     if taxonomy.get("definition_version") != V4_VERSION:
-        raise AuditError("V4 definition version does not match current interpretations")
+        raise AuditError("V4 definition version does not match the original-source profile")
     definitions = {v["id"]: v for v in taxonomy["items"]}
     if len(definitions) != 31 or len(result.v4_rows) != 31 or {r.trigger_id for r in result.v4_rows} != set(definitions):
         raise AuditError("V4 requires every one of its 31 category IDs exactly once")
@@ -112,13 +96,8 @@ def validate_v4(payload, result, grounded):
         if len(checks) != len(set(checks)) or set(checks) != wanted:
             raise AuditError("V4 must check every whole semantic definition/Requires/Skip exactly once")
         selected = support(row, decided=row.applicability != "UNKNOWN")
-        if row.applicability != "UNKNOWN" and not set(item["allowed_fact_roles"]) & {f.role for f in selected}:
-            raise AuditError("V4 category needs its own allowed semantic fact roles")
         for check in row.predicate_checks:
             check_facts = support(check, decided=check.result != "UNKNOWN")
-            if (check.clause == item["definition"] and check.result != "UNKNOWN"
-                    and not set(item["allowed_fact_roles"]) & {f.role for f in check_facts}):
-                raise AuditError("V4 defining predicate must use its own allowed fact roles")
         negative = any(c.result == ("NOT_MET" if c.clause_role == "INCLUSION" else "MET") for c in row.predicate_checks)
         complete = all(c.result == ("MET" if c.clause_role == "INCLUSION" else "NOT_MET") for c in row.predicate_checks)
         if row.applicability == "APPLICABLE" and not complete:
@@ -147,18 +126,6 @@ def validate_v4(payload, result, grounded):
             raise AuditError("Partial V4 applicability must state its missing semantic conditions")
         if payload.get("assessment_basis") == "SOURCE_DEFINITIONS" and row.relation not in {"UNKNOWN", "PARTIAL"}:
             raise AuditError("Definition-only V4 classification never establishes strong or negative webpage matching")
-        if row.trigger_id == "I3" and row.applicability == "APPLICABLE":
-            derived = [f for f in selected if f.derivation]
-            if not derived:
-                raise AuditError("I3 full applicability needs its address formula, not merely a large shape")
-            for fact in derived:
-                validate_derivation(fact, facts, complete=True)
-        if row.trigger_id in {"C2", "C4"} and row.applicability == "APPLICABLE" and not any(f.role == "API_CONTROL" for f in selected):
-            derived = [f for f in selected if f.role in {"DERIVED_CONTROL", "PATH_PREDICATE"} and f.derivation]
-            if not derived:
-                raise AuditError("A full input-driven C2/C4 label needs a traced dispatch derivation")
-            for fact in derived:
-                validate_derivation(fact, facts, complete=True, dispatch=True)
         capability = ((payload.get("execution_capabilities") or {}).get("classes") or {}).get(row.trigger_id, {})
         if row.coverage.construction != "UNKNOWN" and row.coverage.construction != capability.get("construction"):
             raise AuditError("Construction support/blocking needs the explicit capability profile; it is not semantic applicability")
@@ -176,9 +143,8 @@ def validate_v4(payload, result, grounded):
                 raise AuditError("A fully applicable construction needs its own definition and the parent prerequisites")
             if check.applicability == "NOT_APPLICABLE" and predicate.result != "NOT_MET":
                 raise AuditError("Construction exclusion needs its own positive counterevidence")
-            if check.applicability in {"APPLICABLE", "PARTIAL"} and (predicate.result == "NOT_MET"
-                    or not set(item["allowed_fact_roles"]) & {f.role for f in selected_child}):
-                raise AuditError("Construction labels need appropriate cited roles, not mapped labels")
+            if check.applicability in {"APPLICABLE", "PARTIAL"} and predicate.result == "NOT_MET":
+                raise AuditError("Construction labels cannot contradict their original definition")
 
 
 def validate_target_scope(payload, result):

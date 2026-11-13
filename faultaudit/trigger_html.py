@@ -1,4 +1,4 @@
-"""Primary, standalone V5 review report; dense audit data stays in JSON."""
+"""Standalone original-rule review report; dense audit data stays in JSON."""
 from __future__ import annotations
 
 import html
@@ -41,10 +41,10 @@ def render(data):
             result = a["result"]
             summary = result.get("classification_summary", {})
             labels = []
-            for scheme, key in ((data.get("input_condition_scheme", "REVISED42"), "rows"), ("V4", "v4_rows")):
+            for scheme, key in ((data.get("input_condition_scheme", "ORIGINAL42"), "rows"), ("V4", "v4_rows")):
                 for row in result.get(key, []):
                     if row["applicability"] in {"APPLICABLE", "PARTIAL"}:
-                        title = "V4条件类" if scheme == "V4" else "42条API输入条件（原版）" if scheme == "ORIGINAL42" else "42条API输入条件（修订版）"
+                        title = "V4条件类" if scheme == "V4" else "42条API输入条件（原版）" if scheme == "ORIGINAL42" else "未知规则框架"
                         constructions = ''.join('<li>' + _esc(c['construction_id']) + ' · ' + _esc(c.get('construction_recipe') or c['reason']) + '</li>' for c in row.get('construction_checks', []) if c['applicability'] in {'APPLICABLE','PARTIAL'})
                         labels.append(f'<details class="label"><summary>{title} {_esc(row["trigger_id"])} · {_esc(row["applicability"])} · 证据 {_esc(row["relation"])}</summary>'
                             + ('<h4>V4具体构造情形 · 设计建议</h4><ul>' + constructions + '</ul>' if constructions else '')
@@ -86,7 +86,7 @@ def render(data):
             + (''.join(sections) or '<p class="pending">UNASSESSED：没有当前有效分类。旧结果不自动继承。</p>')
             + '<details><summary>相关设计卡（未执行）</summary>' + _pre([d for d in data.get("designs", []) if d["case_id"] == cid]) + '</details></article>')
     definitions = []
-    for scheme, taxonomy in ((data.get("input_condition_scheme", "REVISED42"), data["taxonomy"]), ("V4", data.get("v4_taxonomy"))):
+    for scheme, taxonomy in ((data.get("input_condition_scheme", "ORIGINAL42"), data["taxonomy"]), ("V4", data.get("v4_taxonomy"))):
         if taxonomy:
             definitions.append('<details><summary>' + scheme + ' · ' + _esc(taxonomy.get("definition_version", taxonomy.get("taxonomy_id")))
                 + '</summary>' + ''.join('<details><summary>' + _esc(i["id"]) + ' · ' + _esc(i.get("name", "")) + '</summary>'
@@ -101,20 +101,20 @@ def render(data):
             'A4执行证据整理模式数':len({e['case_id'] for e in data.get('baseline_execution',[])}),
             '基线冻结':data.get('baseline_freeze',{'status':'NOT_FROZEN'}),
             '42原始基准':{**{k:registry.get(k) for k in ('source_file','actual_ids','duplicate_ids','missing_ids','unexpected_ids')},'SHA-256':registry.get('source_sha256')},
-            '映射文件':'暂缺，不阻塞分类；禁止自动转换标签'}) + '<h3>运行预算、历史兼容与剩余阶段</h3>' + _pre(data.get('recovery', {})) + '<h3>横向审查</h3>' + _pre(data.get('baseline_review') or '尚未完成横向审查，不可冻结Baseline v1') + '</section>'
+            '分类框架':'原V4与原42独立判断；本profile不使用crosswalk'}) + '<h3>运行预算、历史兼容与剩余阶段</h3>' + _pre(data.get('recovery', {})) + '<h3>横向审查</h3>' + _pre(data.get('baseline_review') or '尚未完成横向审查，不可冻结Baseline v1') + '</section>'
     header = f'''<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>CANN V5 故障模式与条件审查</title><style>
+<title>CANN故障模式与原始条件审查</title><style>
 body{{font:15px/1.6 system-ui,sans-serif;color:#172b4d;background:#f5f7fa;margin:0}}main{{max-width:1280px;margin:auto;padding:24px}}
 nav{{position:sticky;top:0;background:#fff;padding:10px;z-index:2}}nav a{{margin-right:20px}}h1{{font-size:25px}}h2{{font-size:20px}}h3{{font-size:17px}}
 article,section.panel{{background:#fff;border:1px solid #dce3ed;border-radius:8px;padding:20px;margin:16px 0}}details{{margin:8px 0}}summary{{cursor:pointer}}pre{{white-space:pre-wrap;overflow-wrap:anywhere;font:13px/1.6 ui-monospace,monospace;background:#f7f9fc;padding:10px}}
 .label{{border-left:3px solid #476b9d;padding-left:10px}}.pending{{color:#8b5700}}.scroll{{overflow:auto}}button,input,select{{font:inherit;padding:6px;margin:4px}}table{{border-collapse:collapse;width:100%}}th,td{{text-align:left;border-bottom:1px solid #ddd;padding:7px}}small,.muted{{color:#526477}}[hidden]{{display:none!important}}svg text{{font-family:system-ui,sans-serif}}a{{color:#205b9b}}
-</style></head><body><main><h1>CANN V5 故障模式与条件审查</h1><p>运行 {_esc(data['run_id'])} · {_esc(data['phase'])} · {_esc(data.get('classification_contract', 'DENSE_V1'))}</p>
+</style></head><body><main><h1>CANN故障模式与原始条件审查</h1><p>运行 {_esc(data['run_id'])} · {_esc(data['phase'])} · {_esc(data.get('classification_contract', 'DENSE_V1'))}</p>
 <p>{len(statistics['unit_ids'])} 个{('模式' if data['phase']=='INIT' else '来源case')}，{len(assessments)} 个当前子问题评估。描述归类、证据确认、候选建议、正式入库及实机执行分别记录。</p>
 <nav><a href="#baseline">Baseline进度与横向审查</a><a href="#cases">模式／案例</a><a href="#combinations">组合分析</a><a href="#rules">分类定义</a><a href="#gaps">缺口与证据</a></nav>
 {baseline_section}
 <section id="cases"><h2>模式／案例详情</h2><input id="query" aria-label="搜索" placeholder="编号、算子、机理、来源或原文"><button id="reset">清除组合筛选</button><p id="case-count"></p>{''.join(cards)}</section>
 <section id="combinations" class="panel"><h2>组合分析</h2><p>精确组合是已记录标签集合。灰点仅表示未关联，不能解释为不适用。同案共现不等于同情景，更不证明因果或充分触发。</p><select id="frame" aria-label="规则及证据口径"></select><select id="limit" aria-label="显示组合数量"><option value="20">前20个</option><option value="40">前40个</option><option value="all">全部</option></select><p id="combo-note"></p><div id="upset" class="scroll"></div><h3>精确组合</h3><div id="exact"></div><h3>两类共现：包含式交集</h3><div id="pairs"></div><p>点击数量或图柱回查模式／案例。未处理与已处理但无标签分别列明；空集合计入总数。</p></section>
-<section id="rules" class="panel"><h2>独立冻结的分类定义</h2>{''.join(definitions)}<details><summary>版本映射（不传递覆盖）</summary>{_pre(data.get('mapping', {}))}</details></section>
+<section id="rules" class="panel"><h2>独立冻结的分类定义</h2><p>本配置使用原始规则，不使用crosswalk或自动标签转换。</p>{''.join(definitions)}</section>
 <section id="gaps" class="panel"><h2>缺口与证据</h2>{_pre(data.get('gaps', []))}<details><summary>资料与采集状态</summary>{_pre(data.get('resources', []))}{_links(data.get('resources', []))}</details><p>完整当前投影见同目录 {_esc(data.get('report_json_name', 'report.json'))}；旧响应及人工历史保留在state。本报告不执行入库或设备实验。</p></section>
 <script id="combination-data" type="application/json">{embedded}</script>'''
     return header + SCRIPT + '</main></body></html>'

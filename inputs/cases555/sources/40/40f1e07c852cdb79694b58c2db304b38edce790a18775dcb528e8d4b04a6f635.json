@@ -1,0 +1,38 @@
+[
+  {
+    "additions": 11,
+    "blob_id": "fac319734cfd9b460754f034a71844871774f103",
+    "blob_url": "https://gitcode.com/cann/ops-math/blob/75d3e364b8510c090c150d35f2917e1f36f37b46/math/reduce_sum/op_api/aclnn_reduce_sum.cpp",
+    "deletions": 17,
+    "filename": "math/reduce_sum/op_api/aclnn_reduce_sum.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 11,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -258,16 +258,15 @@ aclnnStatus aclnnReduceSumGetWorkspaceSize(\n         dims = uniqueExecutor.get()->AllocIntArray(appendDim, dimDum);\n     }\n \n-    // self为bool，dtype为int64处理 \n-     if (selfType == op::DataType::DT_BOOL && dataType == op::DataType::DT_INT64) { \n-         static const size_t maxDim = 16777216; // 2^24 \n-         size_t reduceDims = 1; \n-         for (int i = 0; i < static_cast<int>(dims->Size()); i++) { \n-             reduceDims *= shape[(*dims)[i]]; \n-         } \n-         promoteType = (reduceDims < maxDim) ? op::DataType::DT_FLOAT : op::DataType::DT_INT64; \n-     }\n-\n+    // self为bool，dtype为int64处理\n+    if (selfType == op::DataType::DT_BOOL && dataType == op::DataType::DT_INT64) {\n+        static const size_t maxDim = 16777216; // 2^24\n+        size_t reduceDims = 1;\n+        for (int i = 0; i < static_cast<int>(dims->Size()); i++) {\n+            reduceDims *= shape[(*dims)[i]];\n+        }\n+        promoteType = (reduceDims < maxDim) ? op::DataType::DT_FLOAT : op::DataType::DT_INT64;\n+    }\n     if (IsNonContiguousSupport(self, promoteType, dims)) {\n         OP_LOGD(\"Enter NonContigous\");\n         auto selfContiguous = uniqueExecutor.get()->CreateView(\n@@ -288,12 +287,8 @@ aclnnStatus aclnnReduceSumGetWorkspaceSize(\n         CHECK_RET(selfContiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);\n \n         // 将输入self的数据类型进行转换\n-\n-        const aclTensor* selfContiguousCasted = selfContiguous;\n-        if (!(selfType == op::DataType::DT_BOOL && dataType == op::DataType::DT_INT64 && IsRegBase())) {\n-            selfContiguousCasted = l0op::Cast(selfContiguous, promoteType, uniqueExecutor.get());\n-            CHECK_RET(selfContiguousCasted != nullptr, ACLNN_ERR_INNER_NULLPTR);\n-        }\n+        auto selfContiguousCasted = l0op::Cast(selfContiguous, promoteType, uniqueExecutor.get());\n+        CHECK_RET(selfContiguousCasted != nullptr, ACLNN_ERR_INNER_NULLPTR);\n \n         // 调用ReduceSum算子kernel,将输入self的数据类型转换成指定的数据类型\n         const aclTensor* reduceSumOut = nullptr;\n@@ -302,7 +297,6 @@ aclnnStatus aclnnReduceSumGetWorkspaceSize(\n         } else {\n             reduceSumOut = l0op::ReduceSumOp(selfContiguousCasted, dims, keepDims, uniqueExecutor.get());\n         }\n-\n         CHECK_RET(reduceSumOut != nullptr, ACLNN_ERR_INNER_NULLPTR);\n         CHECK_RET(CheckShapeAndScalarSame(reduceSumOut, out), ACLNN_ERR_PARAM_INVALID);\n \n",
+      "new_file": false,
+      "new_path": "math/reduce_sum/op_api/aclnn_reduce_sum.cpp",
+      "old_path": "math/reduce_sum/op_api/aclnn_reduce_sum.cpp",
+      "removed_lines": 17,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-math/raw/75d3e364b8510c090c150d35f2917e1f36f37b46/math/reduce_sum/op_api/aclnn_reduce_sum.cpp",
+    "sha": "75d3e364b8510c090c150d35f2917e1f36f37b46",
+    "source_branch": "master",
+    "source_project": {
+      "full_name": "sakuraqqz/ops-math",
+      "human_name": "sakuraqqz / ops-math",
+      "id": 7650764,
+      "path": "ops-math"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-math",
+      "human_name": "CANN / ops-math",
+      "id": 7649531,
+      "path": "ops-math"
+    }
+  }
+]

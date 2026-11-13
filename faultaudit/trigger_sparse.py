@@ -66,7 +66,7 @@ class Scenario(Contract):
 
 
 class LabelLink(Contract):
-    scheme: Literal["ORIGINAL42", "REVISED42", "V4", "BRANCH"]
+    scheme: Literal["ORIGINAL42", "V4", "BRANCH"]
     definition_version: str = Field(min_length=1)
     trigger_id: str = Field(min_length=1)
     detail_ids: list[str] = Field(min_length=1)
@@ -115,7 +115,7 @@ def frame_version(payload, scheme):
 
 
 def input_scheme(payload):
-    return payload.get("input_condition_scheme", "REVISED42")
+    return payload.get("input_condition_scheme", "ORIGINAL42")
 
 
 def instructions():
@@ -131,7 +131,7 @@ V4 has 6 themes, 31 CONDITION classes, 55 CONSTRUCTION scenarios and 195 referen
 S5 is a condition class. Actual causal mechanisms belong to CANN failure_mechanism/details,
 not V4 classes or constructions. Do not redefine any frozen knowledge source.
 Use payload.input_condition_scheme for rows: ORIGINAL42 preserves the original API42 clauses;
-REVISED42 is only the separately versioned compatibility profile. Crosswalks never assign labels.
+No revised interpretation or crosswalk is supplied. Original clauses must be checked verbatim.
 Extract local condition_facts, mechanism details, then scenarios and typed label_links. Each
 positive 42/V4/Branch label MUST have a link with the supplied scheme/version, detail IDs,
 condition fact IDs and local scenario IDs. Never infer links by taxonomy crosswalk. Detail
@@ -200,7 +200,7 @@ def validate_sparse(payload, response, request_hash):
     selected = {axis: {r.trigger_id: r for r in sparse.rows},
                 "V4": {r.trigger_id: r for r in sparse.v4_rows},
                 "BRANCH": {c.category_id: c for b in sparse.external_branches for c in b.category_checks}}
-    for name, values in (("REVISED42", sparse.rows), ("V4", sparse.v4_rows)):
+    for name, values in ((axis, sparse.rows), ("V4", sparse.v4_rows)):
         _unique([r.trigger_id for r in values], name + " labels")
         if any(r.applicability == "UNKNOWN" for r in values):
             raise AuditError("Omit UNKNOWN rules in sparse output; put unresolved facts in the summary")
@@ -301,13 +301,13 @@ def validate_sparse(payload, response, request_hash):
         wanted = sorted(key for (scheme, key), ids in linked.items()
                         if scheme == axis and detail["detail_id"] in ids)
         if detail["trigger_ids"] and set(detail["trigger_ids"]) != set(wanted):
-            raise AuditError("Legacy detail trigger IDs conflict with typed revised42 links")
+            raise AuditError("Legacy detail trigger IDs conflict with typed original42 links")
         detail["trigger_ids"] = wanted
     families = {f["family_id"]: f for f in payload["taxonomy"].get("families", [])}
     actual42 = {r["trigger_id"]: r for r in legacy["rows"]}
     expected42 = {i["id"] for i in payload["taxonomy"]["items"]}
     if not set(actual42) <= expected42:
-        raise AuditError("Unknown revised42 rule")
+        raise AuditError("Unknown original42 rule")
     legacy["rows"] = [actual42.get(i["id"]) or _unknown(i, families.get(i.get("family_id"), {}))
                        for i in payload["taxonomy"]["items"]]
     v4 = payload.get("v4_taxonomy")
