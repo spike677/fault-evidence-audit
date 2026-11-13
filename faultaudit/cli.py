@@ -211,7 +211,7 @@ def parser() -> argparse.ArgumentParser:
     classify.add_argument("--baseline-id")
     classify.add_argument("--input", type=Path, required=True)
     classify.add_argument("--allow-pending-baseline", action="store_true")
-    configure_v4 = trigger_flow.add_parser("configure-v4", help="Maintain an Init with separately frozen V4 and revised42 rules")
+    configure_v4 = trigger_flow.add_parser("configure-v4", help="Maintain an Init with separately frozen original V4 and original42 rules")
     configure_v4.add_argument("--run", default="latest")
     configure_v4.add_argument("--source", type=Path, required=True)
     configure_v4.add_argument("--capabilities-file", type=Path)

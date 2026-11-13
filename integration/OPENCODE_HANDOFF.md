@@ -4,7 +4,7 @@
 
 ## 输入与规则
 
-使用本仓原件：`knowledge/trigger_library.md`、`knowledge/precision_trigger_knowledge_v4.md`。不要使用本地archive中的修订42、解释覆盖或映射替代它们。原42与V4独立判断，映射缺失不阻塞。
+使用本仓原件：`knowledge/trigger_library.md`、`knowledge/precision_trigger_knowledge_v4.md`。不要使用本地archive中的修订42、解释覆盖或映射替代它们。原42与V4独立判断；本profile不使用crosswalk。
 
 `inputs/cann30_original.txt`是用户最早四字段文本，不是后期15列XLSX。原始XLSX未随此交付取得；如需走XLSX导入，显式准备并记录字段映射和派生关系，不把转换表冒称原工作簿。缺失字段保留UNKNOWN，不从旧整理稿回填答案。
 
