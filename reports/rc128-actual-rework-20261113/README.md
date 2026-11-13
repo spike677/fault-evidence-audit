@@ -44,7 +44,7 @@ python scripts/rc128_actual_report.py package
 
 `build`默认写入本独立目录，优先使用已经冻结的inputs，不覆盖旧包；实际网络采集由独立HTTP脚本及连接器完成，生成报告不会自动检索或运行模型/设备。
 
-本轮新增11项针对性测试通过；当前工作区完整回归为1005项通过。解释器、全部实际安装依赖版本及原始日志保存在 `runtime_versions.json`、`test_results.txt`。工作区另有本轮之前的未提交实验文件；发布树将另外执行隔离回归并记录结果，不把未提交文件混入本次提交。
+本轮新增11项针对性测试通过。实际提交 `c64acc5ee29caca25926774aa1aa669d43d75845` 的干净隔离树完整回归为998项通过，命令为 `python -m unittest discover -s tests -v`；日志与实际命令保存在 `commit_tree_test_results.txt`、`commit_tree_regression.json`。这次隔离运行不依赖未提交的实验脚本。当前开发工作区另有7项此前的未提交实验测试，连同它们运行时是1005项通过；该次记录另存于 `test_results.txt`，不混作发布树测试数量。实际解释器为Python 3.12.14，依赖版本见 `runtime_versions.json`。
 
 交互检查直接执行报告生成的JS，对真实128条数据验证搜索、证据层级、模式交集、展开/收起和复位共9项。此为DOM测试框架检查，未声称浏览器渲染验收成功；无界面Edge尝试退出0但未取得DOM。
 
