@@ -24,10 +24,12 @@
 
 - 555条身份与原9382条来源引用均保留；新增来源组件单独追加。
 - 555条案例附有至少一份原始来源资料，0条仍无随包原始payload；有资料不代表正文、评论、diff和责任源码完整。
-- 555条仍有组件采集或定位缺口，component_collection_complete=false；无‘完全零材料’案例不等于无需继续补采。
-- 原9382条引用中9145条有payload、237条无payload；新增6398条中1316条有payload、5082条无payload。新旧分母分别比较。
-- 共15780条来源引用，其中5319条没有随包payload；登记引用并非每条都属于必要机理证据。
-- 8499个不同内容payload按SHA256保存；同内容不计作独立证据。
+- 兼容键cases_with_component_gaps=555混合待采、协议未决与完整性未评，不表示这些案例都已证实缺件；component_collection_complete=false。
+- 35条案例有非optional的GET待采或失败记录（349个不同请求）；5条有分页协议未决（5个不同请求），重复整表不等于已证缺页。
+- 555条案例的发现或整体组件完整性尚未评定（1304个不同DERIVE任务）；DERIVE无HTTP不当作取件失败，必要机理证据充分性仍为NOT_ASSESSED。
+- 原9382条引用中9170条有payload、212条无payload；新增7084条中4756条有payload、2328条无payload。新旧分母分别比较。
+- 共16466条来源引用，其中2540条没有随包payload；登记引用并非每条都属于必要机理证据。
+- 10322个不同内容payload按SHA256保存；同内容不计作独立证据。
 - 这些数量只说明材料可用性，不说明根因已证、分类成立、测试成功或规则覆盖率。最新冻结状态见recovery清单。
 
 保存方式分开记录：
@@ -62,3 +64,5 @@ python inputs/verify.py
 本轮补充原公开来源的保存正文、API 对象、固定版本仓文件及附件；保留原 9382 条引用和原 URL，规范化请求与实际获取地址单独记录于 `cases555/recovery/normalization.jsonl`。`recovery/summary.json` 给出同一数据库只读快照的覆盖状态，`case_components.jsonl` 逐例记录组件及传输缺口。
 
 保存的 UTF-8 正文、base64 解码源码、重编码 API 对象及分页聚合表示均明确标注；重编码数据不冒称原 HTTP 字节。历史无显式分页参数的快照和聚合资料不能证明 canonical 单页或全部分页已取得。材料可用与必要机理证据充分是不同问题；尚未完成 555 例语义复核或设备验证。
+
+自动扩展与版本context的optional范围见`recovery/optional_discovery.jsonl`；它保留真实done/failed/deferred状态及是否已有来源capture，不把未采线索或可选请求失败当作必要缺件，也不抹掉已取得资料。原source_ref非空的请求禁止划入optional。`source_sides`与`comparison_contexts`仅记录定位用途；单值source_side是首次观测而非排他归属，不表示faulty/fixed。`content_equivalence.jsonl`仅记录同Git对象的内容等价事实，不把它计作独立内容，也不冒称目标URL已发生新的HTTP取件。

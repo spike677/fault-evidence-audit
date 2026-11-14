@@ -1,0 +1,821 @@
+/**
+ * Copyright (c) 2026 Huawei Technologies Co., Ltd.
+ * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
+ * CANN Open Software License Agreement Version 2.0 (the "License").
+ * Please refer to the License for details. You may not use this file except in compliance with the License.
+ * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
+ * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
+ * See LICENSE in the root of the software repository for the full text of the License.
+ */
+
+/*!
+ * \file batch_to_space_largec.h
+ * \brief batch_to_space_largec
+ */
+
+#ifndef BATCH_TO_SPACE_LARGEC_H
+#define BATCH_TO_SPACE_LARGEC_H
+
+#include "kernel_operator.h"
+#include "op_kernel/platform_util.h"
+#include "op_kernel/math_util.h"
+#include "batch_to_space_nd_tiling_data.h"
+
+namespace B2SND {
+using namespace AscendC;
+using namespace Ops::Base;
+
+template <typename T>
+class BatchToSpaceLargeC {
+private:
+    TPipe* pipe_ = nullptr;
+    const B2SNDLargeCTilingData* tdPtr_ = nullptr;
+
+    // buffer
+    GlobalTensor<T> inputGm_;
+    GlobalTensor<T> outputGm_;
+    TBuf<TPosition::VECCALC> inQueue_;
+
+    uint32_t blockIdx_{0};
+    uint32_t rank_{0};
+    uint32_t blockShapeSize_{0};
+    uint64_t blockShapeProduct_{1};
+    uint8_t ubAxis_{0};
+    uint32_t ubFactor_{0};
+    int32_t outputTileSize_{0};
+    uint64_t originC_, alignC_;
+
+    // tileQueryNums矩阵维度 totalCount_/N',切H时用该矩阵来索引。
+    int32_t tileQueryNumsDim_{0};
+    // 整块切分内部切分矩阵维度
+    int32_t innerTileNumsDim_{0};
+
+    uint32_t headTilesDim_{0};
+    uint32_t tailTilesDim_{0};
+
+    uint32_t alignedCLength_{0};
+
+    uint64_t totalCount_{0};
+    uint64_t perCoreCount_{0};
+    uint32_t axisPreProduct_{1};
+    uint64_t inStride_[MAX_INPUT_RANK] = {0, 0, 0, 0, 0, 0, 0, 0, 0};
+    uint64_t outStride_[MAX_INPUT_RANK] = {0, 0, 0, 0, 0, 0, 0, 0, 0};
+    uint64_t instrideBS[MAX_INPUT_RANK] = {0, 0, 0, 0, 0, 0, 0, 0, 0};
+    uint32_t cropHtop_{0};
+    uint32_t cropHbottom_{0};
+    uint32_t BSH_{0};
+    uint32_t inH_{0};
+    uint32_t headLenH_{0}; 
+    uint32_t middleLenH_{0};
+    uint32_t tailLenH_{0};
+    constexpr static uint32_t BUFFER_NUM = 2;
+    constexpr static uint32_t UB_BLOCK = Ops::Base::GetUbBlockSize();
+    constexpr static uint32_t BLK_ELEMS = UB_BLOCK / sizeof(T);
+
+public:
+    __aicore__ inline BatchToSpaceLargeC(TPipe* pipe)
+    {
+        pipe_ = pipe;
+    }
+
+    __aicore__ inline void Init(GM_ADDR x, GM_ADDR y, const B2SNDLargeCTilingData* tilingData)
+    {
+        blockIdx_ = GetBlockIdx();
+        tdPtr_ = tilingData;
+        rank_ = tdPtr_->input.rank; // N` + M + C >2：等于2时remain_shape为0，进gather模板；<6：block_shape大于3时走SIMT
+        blockShapeSize_ = rank_ - 2; // M
+        ubAxis_ = tdPtr_->ubAxis;
+        ubFactor_ = tdPtr_->ubFactor;
+
+        inputGm_.SetGlobalBuffer((__gm__ T*)x);
+        outputGm_.SetGlobalBuffer((__gm__ T*)y);
+        outputTileSize_ = tdPtr_->outputBufferSize / BUFFER_NUM;
+        pipe_->InitBuffer(inQueue_, tdPtr_->outputBufferSize);
+
+        alignedCLength_ = CeilAlign(static_cast<uint32_t>(tdPtr_->input.outShape[rank_ - 1]), BLK_ELEMS);
+        totalCount_ = tdPtr_->totalCount;
+        perCoreCount_ = tdPtr_->perCoreCount;
+
+        for (int i = ubAxis_ - 1; i >= 0; i--) {
+            axisPreProduct_ *= tdPtr_->input.outShape[i];
+        }
+        tileQueryNumsDim_ = totalCount_ / axisPreProduct_;
+        if (blockShapeSize_ >= 2) {
+            cropHtop_ = tdPtr_->input.crops[blockShapeSize_ - 2][0];
+            cropHbottom_ = tdPtr_->input.crops[blockShapeSize_ - 2][1];
+            BSH_ = tdPtr_->input.blockShape[blockShapeSize_ - 2];
+            inH_ = tdPtr_->input.inShape[rank_ - 3];
+            if (inH_ == 1) {
+                headTilesDim_ = 0;
+                tailTilesDim_ = 0;
+                middleLenH_ = tdPtr_->input.outShape[rank_ - 3];
+            } else {
+                headLenH_ = remainToBoundary(cropHtop_, BSH_);
+                tailLenH_ = remainToBoundary(cropHbottom_, BSH_);
+                middleLenH_ = tdPtr_->input.outShape[rank_ - 3] - headLenH_ % ubFactor_ - tailLenH_ % ubFactor_;
+                headTilesDim_ = Ops::Base::CeilDiv(headLenH_, ubFactor_);
+                tailTilesDim_ = Ops::Base::CeilDiv(tailLenH_, ubFactor_);
+            }
+        }
+    }
+
+    __aicore__ inline void Process()
+    {
+        // 空tensor直接返回
+        for (uint8_t i = 0; i < rank_; i++) {
+            if (tdPtr_->input.outShape[i] == 0) {
+                return;
+            }
+        }
+
+        uint32_t startIdx = blockIdx_ * perCoreCount_;
+        if (startIdx >= totalCount_) {
+            return;
+        }
+
+        uint64_t inShapeSize = 1UL;
+        uint64_t outShapeSize = 1UL;
+        for (int64_t i = rank_ - 1; i >= 0; --i) {
+            // compute in stride
+            inStride_[i] = inShapeSize;
+            inShapeSize *= tdPtr_->input.inShape[i];
+            // compute out stride
+            outStride_[i] = outShapeSize;
+            outShapeSize *= tdPtr_->input.outShape[i];
+        }
+        instrideBS[0] = inShapeSize;
+        for (uint8_t i = 0; i < blockShapeSize_; i++) {
+            blockShapeProduct_ *= tdPtr_->input.blockShape[i];
+            instrideBS[i + 1] = inShapeSize / blockShapeProduct_;
+        }
+
+        originC_ = tdPtr_->input.inShape[rank_ - 1];
+        alignC_ = Ops::Base::CeilAlign(originC_, static_cast<uint64_t>(BLK_ELEMS));
+        LocalTensor<T> input = inQueue_.Get<T>();
+        uint32_t endIdx = (blockIdx_ + 1L) * perCoreCount_;
+        endIdx = endIdx < totalCount_ ? endIdx : totalCount_;
+
+        if ((rank_ == 4 && ubAxis_ == 1) || (rank_ == 5 && ubAxis_ == 2)) {
+            int sum = getTileNumPrefixSum(startIdx);
+
+            uint64_t curOutIndex[MAX_INPUT_RANK] = {0, 0, 0, 0, 0, 0, 0, 0, 0};
+            uint64_t outIndex[MAX_INPUT_RANK] = {0, 0, 0, 0, 0, 0, 0, 0, 0};
+            uint64_t inIndex[MAX_INPUT_RANK] = {0, 0, 0, 0, 0, 0, 0, 0, 0};
+
+            convert(outIndex, sum);
+
+            // Update outIndex for next iteration
+            for (uint8_t i = 0; i < rank_; i++) {
+                curOutIndex[i] = outIndex[i];
+            }
+            for (uint32_t idx = startIdx; idx < endIdx; idx++) {
+                uint32_t ubAxisInCopyNum = 0;
+                LocalTensor<T> srcLocal = input[((idx - startIdx) & (BUFFER_NUM - 1)) * outputTileSize_ / sizeof(T)];
+                // CopyIn
+                CopyIn(srcLocal, curOutIndex, inIndex, ubAxisInCopyNum, idx, (idx - startIdx));
+                SetEvent<HardEvent::MTE2_MTE3>(HardEvent::MTE2_MTE3);
+                // CopyOut
+                CopyOut(srcLocal, outIndex, ubAxisInCopyNum);
+                SetEvent<HardEvent::MTE3_V>(HardEvent::MTE3_V);
+
+                // Update outIndex for next iteration
+                for (uint8_t i = 0; i < rank_; i++) {
+                    outIndex[i] = curOutIndex[i];
+                }
+            }
+        } else {
+            for (uint32_t idx = startIdx; idx < endIdx; idx++) {
+                uint64_t outIndex[MAX_INPUT_RANK] = {0, 0, 0, 0, 0, 0, 0, 0, 0};
+                uint64_t inIndex[MAX_INPUT_RANK] = {0, 0, 0, 0, 0, 0, 0, 0, 0};
+                uint32_t ubAxisInCopyNum = 0;
+
+                LocalTensor<T> srcLocal = input[((idx - startIdx) & (BUFFER_NUM - 1)) * outputTileSize_ / sizeof(T)];
+                // CopyIn
+                CopyIn(srcLocal, outIndex, inIndex, ubAxisInCopyNum, idx, (idx - startIdx));
+                SetEvent<HardEvent::MTE2_MTE3>(HardEvent::MTE2_MTE3);
+                // CopyOut
+                CopyOut(srcLocal, outIndex, ubAxisInCopyNum);
+                SetEvent<HardEvent::MTE3_V>(HardEvent::MTE3_V);
+            }
+        }
+    }
+
+private:
+    __aicore__ inline void CalculateOutIndex(uint32_t curIdx, uint64_t* outIndex)
+    {
+        for (int8_t i = ubAxis_; i >= 0; i--) { // Changed from uint8_t to int8_t to handle potential negative
+            uint64_t factor = tdPtr_->input.outShape[i];
+            if (i == ubAxis_) {
+                factor = Ops::Base::CeilDiv(factor, static_cast<uint64_t>(ubFactor_));
+            }
+            if (factor != 0) {
+                outIndex[i] = (i == ubAxis_ ? curIdx % factor * ubFactor_ : curIdx % factor);
+            }
+            if (factor != 0) {
+                curIdx = curIdx / factor;
+            }
+        }
+    }
+
+    __aicore__ inline void Conver2InIndex(uint64_t* outIndex, uint64_t* inIndex)
+    {
+        // transalate outIndex to inIndex
+        // compute inIndex[1..M] and blockOffset
+        uint64_t blockOffset = 0;
+        for (uint8_t i = 0; i < blockShapeSize_; i++) {
+            uint64_t u = outIndex[i + 1] + tdPtr_->input.crops[i][0];
+            uint64_t b = tdPtr_->input.blockShape[i];
+            uint64_t t = u % b;
+            inIndex[i + 1] = u / b;
+            blockOffset = blockOffset * b + t;
+        }
+        // N
+        inIndex[0] = blockOffset * tdPtr_->input.outShape[0] + outIndex[0];
+        // C
+        inIndex[rank_ - 1] = outIndex[rank_ - 1];
+    }
+
+    __aicore__ inline void CopyIn(
+        const LocalTensor<T>& src, uint64_t* outIndex, uint64_t* inIndex, uint32_t& ubAxisInCopyNum, uint32_t idx,
+        uint32_t x)
+    {
+        if (ubAxis_ >= rank_) {
+            return;
+        }
+        if (x >= 1) {
+            SetEvent<HardEvent::V_MTE2>(HardEvent::V_MTE2);
+        }
+
+        if (ubAxis_ == rank_ - 1) {
+            DoCopyInAxisC(src, outIndex, inIndex, ubAxisInCopyNum, idx);
+        } else if (ubAxis_ == rank_ - 2) {
+            DoCopyInAxisW(src, outIndex, inIndex, ubAxisInCopyNum, idx);
+        } else if (ubAxis_ == rank_ - 3 && rank_ == 3) {
+            DoCopyInAxisN3(src, outIndex, inIndex, ubAxisInCopyNum, idx);
+        } else if (ubAxis_ == rank_ - 3 && rank_ >= 4) { // H轴
+            DoCopyInAxisH(src, outIndex, inIndex, ubAxisInCopyNum, idx);
+        }
+    }
+
+    __aicore__ inline void DoCopyInAxisC(
+        const LocalTensor<T>& src, uint64_t* outIndex, uint64_t* inIndex, uint32_t& ubAxisInCopyNum, uint32_t idx)
+    {
+        CalculateOutIndex(idx, outIndex);
+        Conver2InIndex(outIndex, inIndex);
+
+        uint64_t ubTailFactor = tdPtr_->input.outShape[ubAxis_] % ubFactor_;
+        ubTailFactor = (ubTailFactor == 0) ? ubFactor_ : ubTailFactor;
+        ubAxisInCopyNum = (outIndex[ubAxis_] + ubFactor_ > tdPtr_->input.outShape[ubAxis_]) ? ubTailFactor : ubFactor_;
+
+        uint64_t inAddr = 0;
+        for (uint8_t i = 0; i < rank_; i++) {
+            inAddr += inIndex[i] * inStride_[i];
+        }
+        uint32_t copyInNum = ubAxisInCopyNum * inStride_[ubAxis_]; // 此时stride为1
+        DataCopyExtParams copyInParams;
+        copyInParams.blockCount = 1;
+        copyInParams.blockLen = copyInNum * sizeof(T);
+        copyInParams.srcStride = 0;
+        copyInParams.dstStride = 0;
+        DataCopyPadExtParams<T> padParams{false, 0, 0, 0};
+        DataCopyPad(src, inputGm_[inAddr], copyInParams, padParams);
+    }
+
+    __aicore__ inline void DoCopyInAxisW(
+        const LocalTensor<T>& src, uint64_t* outIndex, uint64_t* inIndex, uint32_t& ubAxisInCopyNum, uint32_t idx)
+    {
+        CalcFactorAxisW(outIndex, ubAxisInCopyNum, idx);
+        Conver2InIndex(outIndex, inIndex);
+
+        uint64_t inAddr = 0;
+        uint32_t strideC = tdPtr_->input.outShape[0];
+        for (uint8_t i = 0; i < rank_; i++) {
+            inAddr += inIndex[i] * inStride_[i];
+            if (i != 0) {
+                strideC *= tdPtr_->input.inShape[i];
+            }
+        }
+
+        uint64_t wBlockShape = tdPtr_->input.blockShape[blockShapeSize_ - 1];
+        bool cond = ubAxisInCopyNum <= wBlockShape;
+        DataCopyExtParams copyInParams;
+        copyInParams.blockCount = cond ? ubAxisInCopyNum : wBlockShape;
+        copyInParams.blockLen = originC_ * sizeof(T);
+        copyInParams.srcStride = (strideC - originC_) * sizeof(T);
+        copyInParams.dstStride = 0;
+        DataCopyPadExtParams<T> padParams{false, 0, 0, 0};
+
+        LoopModeParams loopParams;
+        loopParams.loop2Size = 1;
+        loopParams.loop1Size = cond ? 1 : ubAxisInCopyNum / wBlockShape;
+        loopParams.loop1SrcStride = originC_ * sizeof(T);
+        loopParams.loop1DstStride = alignC_ * wBlockShape * sizeof(T);
+        SetLoopModePara(loopParams, DataCopyMVType::OUT_TO_UB);
+        DataCopyPad(src, inputGm_[inAddr], copyInParams, padParams);
+        ResetLoopModePara(DataCopyMVType::OUT_TO_UB);
+    }
+
+    __aicore__ inline void GetAxisLoop(
+        uint8_t ubAxis, uint32_t ubFactor, uint32_t& headLoop, uint32_t& headMode, uint32_t& centerLoop,
+        uint32_t& centerMode, uint32_t& centerBSLoop, uint32_t& tailLoop, uint32_t& tailMode, uint32_t& totalLoop)
+    {
+        if (tdPtr_->input.outShape[ubAxis] <= tdPtr_->input.blockShape[ubAxis - 1]) {
+            uint32_t centerCountAxis = tdPtr_->input.outShape[ubAxis];
+            centerLoop = Ops::Base::CeilDiv(centerCountAxis, ubFactor);
+            centerMode = centerCountAxis % ubFactor;
+            totalLoop = centerLoop;
+            return;
+        }
+
+        uint32_t tmp = tdPtr_->input.crops[ubAxis - 1][0] % tdPtr_->input.blockShape[ubAxis - 1];
+        uint32_t headCountAxis = tmp == 0 ? 0 : tdPtr_->input.blockShape[ubAxis - 1] - tmp;
+        tmp = tdPtr_->input.crops[ubAxis - 1][1] % tdPtr_->input.blockShape[ubAxis - 1];
+        uint32_t tailCountAxis = tmp == 0 ? 0 : tdPtr_->input.blockShape[ubAxis - 1] - tmp;
+        uint32_t centerCountAxis = tdPtr_->input.outShape[ubAxis] - headCountAxis - tailCountAxis;
+
+        headLoop = Ops::Base::CeilDiv(headCountAxis, ubFactor);
+        headMode = headCountAxis % ubFactor;
+        centerLoop = Ops::Base::CeilDiv(centerCountAxis, ubFactor);
+        centerMode = centerCountAxis % ubFactor;
+        if (tdPtr_->input.blockShape[ubAxis - 1] > ubFactor) {
+            centerBSLoop = centerCountAxis / tdPtr_->input.blockShape[ubAxis - 1];
+            centerLoop = centerBSLoop *
+                         Ops::Base::CeilDiv(static_cast<uint32_t>(tdPtr_->input.blockShape[ubAxis - 1]), ubFactor);
+            centerMode = tdPtr_->input.blockShape[ubAxis - 1] % ubFactor;
+        }
+        tailLoop = Ops::Base::CeilDiv(tailCountAxis, ubFactor);
+        tailMode = tailCountAxis % ubFactor;
+        totalLoop = headLoop + centerLoop + tailLoop;
+    }
+
+    __aicore__ inline void CalcFactorAxisW(uint64_t* outIndex, uint32_t& ubAxisInCopyNum, uint32_t idx)
+    {
+        uint32_t wSize = tdPtr_->input.outShape[ubAxis_];
+        uint32_t wFactor = ubFactor_;
+        uint32_t headLoop{0}, headMode{0}, centerLoop{0}, centerMode{0}, centerBSLoop{1}, tailLoop{0}, tailMode{0},
+            wLoop{0};
+        GetAxisLoop(
+            ubAxis_, wFactor, headLoop, headMode, centerLoop, centerMode, centerBSLoop, tailLoop, tailMode, wLoop);
+
+        uint32_t wIndex = idx % wLoop;
+        GetCopyInNum(
+            ubAxisInCopyNum, wIndex, headLoop, headMode, centerLoop, centerMode, tailLoop, tailMode, centerBSLoop,
+            wFactor);
+
+        // calc outIndex
+        uint32_t totalWIndex = idx / wLoop * wSize;
+        uint32_t tmpCopyNum = 0;
+        for (int i = 0; i < wIndex; i++) {
+            GetCopyInNum(
+                tmpCopyNum, i, headLoop, headMode, centerLoop, centerMode, tailLoop, tailMode, centerBSLoop, wFactor);
+            totalWIndex += tmpCopyNum;
+        }
+
+        uint64_t totalIndex = totalWIndex * tdPtr_->input.outShape[rank_ - 1];
+        for (int8_t i = rank_ - 1; i >= 0; i--) {
+            outIndex[i] = totalIndex % tdPtr_->input.outShape[i];
+            totalIndex /= tdPtr_->input.outShape[i];
+        }
+    }
+
+    __aicore__ inline void DoCopyInAxisN3(
+        const LocalTensor<T>& src, uint64_t* outIndex, uint64_t* inIndex, uint32_t& ubAxisInCopyNum, uint32_t idx)
+    {
+        uint64_t ubTailFactor = tdPtr_->input.outShape[ubAxis_] % ubFactor_;
+        ubTailFactor = (ubTailFactor == 0) ? ubFactor_ : ubTailFactor;
+        ubAxisInCopyNum = (idx == tdPtr_->totalCount - 1) ? ubTailFactor : ubFactor_;
+
+        // 换算成切W的逻辑，将loop2用起来作为N上的循环
+        uint32_t headLoop{0}, headMode{0}, centerLoop{0}, centerMode{0}, centerBSLoop{1}, tailLoop{0}, tailMode{0},
+            wLoop{0};
+        uint32_t wSize = tdPtr_->input.outShape[ubAxis_ + 1];
+        GetAxisLoop(
+            ubAxis_ + 1, wSize, headLoop, headMode, centerLoop, centerMode, centerBSLoop, tailLoop, tailMode, wLoop);
+
+        uint32_t strideC = tdPtr_->input.outShape[0];
+        for (uint8_t i = 0; i < rank_; i++) {
+            if (i != 0) {
+                strideC *= tdPtr_->input.inShape[i];
+            }
+        }
+
+        // translate idx(in N) to widx(in W)
+        outIndex[0] = idx * ubFactor_;                  // 每个核上处理ubAxisInCopyNum个N
+        uint64_t loopOutIndex[3] = {outIndex[0], 0, 0}; // 原始outIndex用于多次输入后的合并输出，不要污染而启用新变量
+        uint32_t W = 0;
+        uint64_t wBlockShape = tdPtr_->input.blockShape[blockShapeSize_ - 1];
+        DataCopyExtParams copyInParams;
+        copyInParams.blockLen = originC_ * sizeof(T);
+        copyInParams.srcStride = (strideC - originC_) * sizeof(T);
+        copyInParams.dstStride = 0;
+        DataCopyPadExtParams<T> padParams{false, 0, 0, 0};
+        LoopModeParams loopParams;
+        loopParams.loop2Size = 1;
+        loopParams.loop1SrcStride = originC_ * sizeof(T);
+
+        for (uint32_t widx = 0; widx < wLoop; widx++) {
+            uint32_t wIndex = widx % wLoop;
+            uint32_t ubWInCopyNum = 0;
+            loopOutIndex[1] = W;
+            GetCopyInNum(
+                ubWInCopyNum, wIndex, headLoop, headMode, centerLoop, centerMode, tailLoop, tailMode, centerBSLoop,
+                wSize);
+            uint64_t ubInOffset = W * alignC_;
+            W += ubWInCopyNum;
+            Conver2InIndex(loopOutIndex, inIndex);
+            uint64_t inAddr = 0;
+            for (uint8_t i = 0; i < rank_; i++) {
+                inAddr += inIndex[i] * inStride_[i];
+            }
+
+            bool cond = ubWInCopyNum <= wBlockShape;
+            copyInParams.blockCount = cond ? ubWInCopyNum : wBlockShape;
+            loopParams.loop1Size = cond ? 1 : ubWInCopyNum / wBlockShape;
+            loopParams.loop1DstStride = alignC_ * copyInParams.blockCount * sizeof(T);
+            loopParams.loop2Size = ubAxisInCopyNum;
+            loopParams.loop2SrcStride = inStride_[ubAxis_] * sizeof(T);
+            loopParams.loop2DstStride = wSize * alignC_ * sizeof(T);
+            SetLoopModePara(loopParams, DataCopyMVType::OUT_TO_UB);
+            DataCopyPad(src[ubInOffset], inputGm_[inAddr], copyInParams, padParams);
+            ResetLoopModePara(DataCopyMVType::OUT_TO_UB);
+        }
+    }
+
+    __aicore__ inline void GetCopyInNum(
+        uint32_t& ubAxisInCopyNum, uint32_t wIndex, uint32_t headLoop, uint32_t headMode, int32_t centerLoop,
+        uint32_t centerMode, uint32_t tailLoop, uint32_t tailMode, uint32_t centerBSLoop, uint32_t ubFactor)
+    {
+        if (wIndex < headLoop) {
+            ubAxisInCopyNum = (headMode != 0 && wIndex == headLoop - 1) ? headMode : ubFactor;
+        } else if (wIndex >= headLoop && wIndex < headLoop + centerLoop) {
+            wIndex -= headLoop;
+            if (centerMode != 0) {
+                if (centerBSLoop > 1) {
+                    if ((wIndex + 1) % centerBSLoop == 0) {
+                        ubAxisInCopyNum = centerMode;
+                        return;
+                    }
+                } else {
+                    if ((wIndex + 1) == centerLoop) {
+                        ubAxisInCopyNum = centerMode;
+                        return;
+                    }
+                }
+            }
+            ubAxisInCopyNum = ubFactor;
+        } else {
+            wIndex -= headLoop + centerLoop;
+            ubAxisInCopyNum = (tailMode != 0 && wIndex == tailLoop - 1) ? tailMode : ubFactor;
+        }
+    }
+
+    __aicore__ inline void DoCopyInAxisH(
+        const LocalTensor<T>& src, uint64_t* curOutIndex, uint64_t* inIndex, uint32_t& ubAxisInCopyNum, uint32_t idx)
+    {
+        uint32_t curUbFactor = 0;
+        if (ubFactor_ < BSH_ && middleLenH_ >= BSH_) {
+            innerTileNumsDim_ = Ops::Base::CeilDiv(BSH_, ubFactor_);
+            curUbFactor = getTileNumByIdx(idx, tileQueryNumsDim_, innerTileNumsDim_, headLenH_, tailLenH_, BSH_);
+        } else {
+            innerTileNumsDim_ = safeSubU32(tileQueryNumsDim_, headTilesDim_ + tailTilesDim_);
+            curUbFactor = getTileNumByIdx(idx, tileQueryNumsDim_, innerTileNumsDim_, headLenH_, tailLenH_, middleLenH_);
+        }
+
+        ubAxisInCopyNum = curUbFactor;
+        DoCopyInAxisHForTile(src, curOutIndex, inIndex, curUbFactor);
+    }
+
+    __aicore__ inline void DoCopyInAxisHForTile(
+        const LocalTensor<T>& src, uint64_t* outIndex, uint64_t* inIndex, uint32_t curUbFactor)
+    {
+        if (curUbFactor == 0)
+            return;
+
+        // 获取维度参数
+        uint32_t cropLeft = tdPtr_->input.crops[blockShapeSize_ - 1][0];
+        uint32_t cropRight = tdPtr_->input.crops[blockShapeSize_ - 1][1];
+        uint32_t inW = tdPtr_->input.inShape[rank_ - 2];
+        uint32_t inC = tdPtr_->input.inShape[rank_ - 1];
+        uint32_t outW = tdPtr_->input.outShape[rank_ - 2];
+        uint32_t BSW = tdPtr_->input.blockShape[blockShapeSize_ - 1];
+        uint32_t instrideBSW = instrideBS[rank_ - 2];
+        uint32_t instrideBSH_ = instrideBS[rank_ - 3];
+
+        uint32_t leftCopyLen = 0, rightCopyLen = 0, middleCopyLen = 0;
+        if (inW == 1) {
+            middleCopyLen = BSW - cropLeft - cropRight;
+        } else {
+            leftCopyLen   = (cropLeft == 0) ? 0 : remainToBoundary(cropLeft, BSW);
+            rightCopyLen  = (cropRight == 0) ? 0 : remainToBoundary(cropRight, BSW);
+            middleCopyLen = safeSubU32(outW, leftCopyLen + rightCopyLen);
+        }
+
+        uint32_t ubAddr = 0;
+
+        // 左残块拷贝
+        if (leftCopyLen > 0) {
+            CopySegment(
+                src, outIndex, inIndex, leftCopyLen, ubAddr, curUbFactor, inW, inC, outW, BSW, instrideBSW, instrideBSH_,
+                true, true);
+        }
+
+        // 中间连续段拷贝
+        if (middleCopyLen > 0) {
+            CopySegment(
+                src, outIndex, inIndex, middleCopyLen, ubAddr, curUbFactor, inW, inC, outW, BSW, instrideBSW,
+                instrideBSH_, false, true);
+        }
+
+        // 右残块拷贝
+        if (rightCopyLen > 0) {
+            CopySegment(
+                src, outIndex, inIndex, rightCopyLen, ubAddr, curUbFactor, inW, inC, outW, BSW, instrideBSW,
+                instrideBSH_, true, false);
+        }
+
+        // 更新索引
+        outIndex[rank_ - 2] = 0;
+        updateOutIndexByCarry(outIndex, curUbFactor, rank_ - 3);
+    }
+
+    __aicore__ inline uint64_t getTileNumPrefixSum(uint32_t m)
+    {
+        if (m == 0)
+            return 0;
+
+        const uint32_t P = tileQueryNumsDim_;
+        if (P == 0)
+            return 0;
+
+        uint32_t innerTileNumsDim = 0;
+        uint32_t ubRealFactorTotal = 0;
+
+        if (ubFactor_ < BSH_ && middleLenH_ >= BSH_) {
+            innerTileNumsDim = Ops::Base::CeilDiv(BSH_, ubFactor_);
+            ubRealFactorTotal = BSH_;
+        } else {
+            uint32_t ht = headTilesDim_;
+            uint32_t tt = tailTilesDim_;
+            innerTileNumsDim = (P >= ht + tt) ? (P - ht - tt) : 0;
+            ubRealFactorTotal = middleLenH_;
+        }
+
+        // 每周期总和：必须按 getTileNumByIdx 实际累加（保证一致）
+        uint64_t periodTotal = 0;
+        for (uint32_t i = 0; i < P; ++i) {
+            periodTotal += getTileNumByIdx(i, P, innerTileNumsDim, headLenH_, tailLenH_, ubRealFactorTotal);
+        }
+
+        uint32_t k = m / P;
+        uint32_t r = m % P;
+
+        uint64_t rem = 0;
+        for (uint32_t i = 0; i < r; ++i) {
+            rem += getTileNumByIdx(i, P, innerTileNumsDim, headLenH_, tailLenH_, ubRealFactorTotal);
+        }
+
+        return (uint64_t)k * periodTotal + rem;
+    }
+
+    __aicore__ inline uint32_t getTileNumByInnerModIdx(
+        uint32_t innerModIdx, uint32_t ubRealFactorTotal, uint32_t ubFactor,
+        bool smallFirst) // true: 小块在前(如15->7,8), false: 小块在后(如15->8,7)
+    {
+        if (ubFactor == 0 || ubRealFactorTotal == 0) {
+            return 0;
+        }
+
+        uint32_t fullBlocks = ubRealFactorTotal / ubFactor;
+        uint32_t remainder = ubRealFactorTotal % ubFactor;
+
+        if (!smallFirst) {
+            // 大块在前，尾小块在后
+            if (innerModIdx < fullBlocks) {
+                return ubFactor;
+            }
+            if (innerModIdx == fullBlocks && remainder != 0) {
+                return remainder;
+            }
+            return 0;
+        } else {
+            // 小块在前，大块在后
+            if (remainder != 0) {
+                if (innerModIdx == 0) {
+                    return remainder;
+                }
+                if (innerModIdx >= 1 && innerModIdx <= fullBlocks) {
+                    return ubFactor;
+                }
+                return 0;
+            } else {
+                // 整除时全部是大块
+                if (innerModIdx < fullBlocks) {
+                    return ubFactor;
+                }
+                return 0;
+            }
+        }
+    }
+
+    __aicore__ inline uint32_t getTileNumByIdx(
+        uint32_t idx, uint32_t tileQueryNumsDim, uint32_t innerTileNumsDim, uint32_t headLenH_, uint32_t tailLenH_,
+        uint32_t ubRealFactorTotal)
+    {
+        if (tileQueryNumsDim == 0) {
+            return 0;
+        }
+
+        uint32_t modIdx = idx % tileQueryNumsDim;
+
+        // 头部区域：使用 smallFirst=true（满足你说的 idx=0 返回7 这种场景）
+        if (modIdx < headTilesDim_) {
+            return getTileNumByInnerModIdx(
+                modIdx, // 0,1,2...
+                headLenH_, ubFactor_, true);
+        }
+
+        // 尾部区域：保持原先方向 smallFirst=false
+        if (modIdx >= tileQueryNumsDim - tailTilesDim_) {
+            uint32_t tailIdx = modIdx - (tileQueryNumsDim - tailTilesDim_);
+            return getTileNumByInnerModIdx(
+                tailIdx, // 0,1,2...
+                tailLenH_, ubFactor_, false);
+        }
+
+        // 中间区域：smallFirst=false
+        if (innerTileNumsDim == 0) {
+            return 0;
+        }
+
+        uint32_t middleIdx = modIdx - headTilesDim_;
+        uint32_t innerModIdx = middleIdx % innerTileNumsDim;
+
+        return getTileNumByInnerModIdx(innerModIdx, ubRealFactorTotal, ubFactor_, false);
+    }
+
+    __aicore__ inline uint32_t remainToBoundary(uint32_t crop, uint32_t block)
+    {
+        if (block == 0)
+            return 0;
+        return (block - (crop % block)) % block;
+    }
+
+    __aicore__ inline uint32_t safeSubU32(uint32_t a, uint32_t b)
+    {
+        return (a >= b) ? (a - b) : 0;
+    }
+
+    __aicore__ inline void updateOutIndexByCarry(uint64_t* outIndex, uint32_t curUbFactor, uint32_t axis)
+    {
+        outIndex[axis] += curUbFactor;
+        while (axis < rank_ && tdPtr_->input.outShape[axis] > 0 && outIndex[axis] >= tdPtr_->input.outShape[axis]) {
+            outIndex[axis] = 0;
+            if (axis > 0) {
+                axis--;
+                outIndex[axis] += 1;
+            } else {
+                break;
+            }
+        }
+    }
+
+    __aicore__ inline bool convert(uint64_t* outIndex, uint64_t sum)
+    {
+        // 1) 清零
+        for (uint32_t i = 0; i < MAX_INPUT_RANK; ++i) {
+            outIndex[i] = 0;
+        }
+
+        uint32_t axis = rank_ - 3; // 例如 rank=4 -> axis=1
+
+        outIndex[axis] = sum;
+
+        // 3) 从 axis 往前连续进位到 0 轴
+        for (int32_t d = (int32_t)axis; d > 0; --d) {
+            uint64_t dim = tdPtr_->input.outShape[d];
+            if (dim == 0)
+                return false; // 防御
+
+            uint64_t carry = outIndex[d] / dim;
+            outIndex[d] = outIndex[d] % dim;
+            outIndex[d - 1] += carry;
+        }
+
+        // 4) 检查最高维是否越界
+        if (outIndex[0] >= tdPtr_->input.outShape[0]) {
+            return false;
+        }
+
+        return true;
+    }
+
+    // 辅助函数：执行单段拷贝
+    __aicore__ inline void CopySegment(
+        const LocalTensor<T>& src, uint64_t* outIndex, uint64_t* inIndex, uint32_t copyLen, uint32_t& ubAddr,
+        uint32_t curUbFactor, uint32_t inW, uint32_t inC, uint32_t outW, uint32_t BSW, uint32_t instrideBSW,
+        uint32_t instrideBSH_,
+        bool isResidual, // true: 残块(left/right), false: 中间连续段
+        bool updateAddr) // true: 更新ubAddr和outIndex, false: 不更新(右残块)
+    {
+        Conver2InIndex(outIndex, inIndex);
+
+        // 计算GM地址
+        uint64_t inAddr = 0;
+        for (uint8_t i = 0; i < rank_; i++) {
+            inAddr += inIndex[i] * inStride_[i];
+        }
+
+        // 配置拷贝参数
+        DataCopyExtParams copyParams;
+        copyParams.blockLen = inC * sizeof(T);
+        copyParams.srcStride = (instrideBSW - inC) * sizeof(T);
+        copyParams.dstStride = 0;
+
+        LoopModeParams loopParams;
+        DataCopyPadExtParams<T> padParams(false, 0, 0, 0);
+
+        // 设置loop1参数
+        if (!isResidual && copyLen > BSW) {
+            copyParams.blockCount = BSW;
+            loopParams.loop1Size = copyLen / BSW;
+            loopParams.loop1SrcStride = inC * sizeof(T);
+            loopParams.loop1DstStride = alignedCLength_ * BSW * sizeof(T);
+        } else {
+            copyParams.blockCount = copyLen;
+            loopParams.loop1Size = 1;
+            loopParams.loop1SrcStride = 0;
+            loopParams.loop1DstStride = 0;
+        }
+
+        // 设置loop2参数
+        uint32_t outerLoop = 1;
+        if (curUbFactor <= BSH_) {
+            loopParams.loop2Size = curUbFactor;
+            loopParams.loop2SrcStride = instrideBSH_ * sizeof(T);
+            loopParams.loop2DstStride = alignedCLength_ * outW * sizeof(T);
+        } else {
+            loopParams.loop2Size = BSH_;
+            loopParams.loop2SrcStride = instrideBSH_ * sizeof(T);
+            loopParams.loop2DstStride = alignedCLength_ * outW * sizeof(T);
+            outerLoop = curUbFactor / BSH_;
+        }
+
+        // 执行拷贝
+        for (uint32_t i = 0; i < outerLoop; i++) {
+            uint32_t gmOffset = inW * inC * i;
+            uint32_t ubOffset = BSH_ * outW * alignedCLength_ * i;
+
+            SetLoopModePara(loopParams, DataCopyMVType::OUT_TO_UB);
+            DataCopyPad(src[ubAddr + ubOffset], inputGm_[inAddr + gmOffset], copyParams, padParams);
+            ResetLoopModePara(DataCopyMVType::OUT_TO_UB);
+        }
+
+        // 更新地址和索引
+        if (updateAddr) {
+            ubAddr += copyLen * alignedCLength_;
+            outIndex[rank_ - 2] += copyLen;
+        }
+    }
+
+    __aicore__ inline void CopyOut(const LocalTensor<T>& src, const uint64_t* outIndex, uint32_t ubAxisOutCopyNum)
+    {
+        uint64_t outAddr = 0;
+        for (uint32_t i = 0; i < rank_; i++) {
+            outAddr += outIndex[i] * outStride_[i];
+        }
+        DataCopyExtParams copyOutParams;
+        if (ubAxis_ == rank_ - 1) {
+            copyOutParams.blockCount = 1;
+            copyOutParams.blockLen = ubAxisOutCopyNum * outStride_[ubAxis_] * sizeof(T);
+            copyOutParams.srcStride = 0;
+            copyOutParams.dstStride = 0;
+        } else if (ubAxis_ == rank_ - 2) {
+            copyOutParams.blockCount = ubAxisOutCopyNum;
+            copyOutParams.blockLen = originC_ * sizeof(T);
+            copyOutParams.srcStride = 0;
+            copyOutParams.dstStride = 0;
+        } else if (ubAxis_ == rank_ - 3 && rank_ == 3) {
+            copyOutParams.blockCount = ubAxisOutCopyNum * tdPtr_->input.outShape[ubAxis_ + 1]; // N-Axis*L
+            copyOutParams.blockLen = originC_ * sizeof(T);                                     // C
+            copyOutParams.srcStride = 0;
+            copyOutParams.dstStride = 0;
+        } else if (ubAxis_ == rank_ - 3 && rank_ >= 4) { // H轴
+            copyOutParams.blockCount = ubAxisOutCopyNum * tdPtr_->input.outShape[rank_ - 2];
+            copyOutParams.blockLen = tdPtr_->input.outShape[rank_ - 1] * sizeof(T);
+            copyOutParams.srcStride = 0;
+            copyOutParams.dstStride = 0;
+        }
+        DataCopyPad(outputGm_[outAddr], src[0], copyOutParams);
+    }
+
+    template <HardEvent EVENT>
+    __aicore__ inline void SetEvent(HardEvent evt)
+    {
+        event_t eventId = static_cast<event_t>(GetTPipePtr()->FetchEventID(evt));
+        SetFlag<EVENT>(eventId);
+        WaitFlag<EVENT>(eventId);
+    }
+};
+} // namespace B2SND
+
+#endif // BATCH_TO_SPACE_LARGEC_H
