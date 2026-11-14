@@ -1,0 +1,80 @@
+{
+  "assignee": {
+    "html_url": "https://gitcode.com/qianzehong",
+    "id": "68c138243be0a23c91c2437b",
+    "login": "qianzehong",
+    "name": "qianzehong",
+    "object_id": "68c138243be0a23c91c2437b"
+  },
+  "assignees": [
+    {
+      "html_url": "https://gitcode.com/qianzehong",
+      "id": "68c138243be0a23c91c2437b",
+      "login": "qianzehong",
+      "name": "qianzehong",
+      "object_id": "68c138243be0a23c91c2437b"
+    }
+  ],
+  "body": "### Describe the current behavior / 问题描述\n\n`KvRmsNormRopeCache` 的 regbase recompute 模板（tilingKey 20000）在 **dv 单块场景**下，RmsNorm 的平方和 Σx² **完全没有被计算**，`totalSumLocal` 是一个默认构造、从未被赋值的 `LocalTensor`。\n\n**根因**：host tiling `kv_rms_norm_rope_cache_regbase_recompute_tiling.cpp:357`\n\n```cpp\nint64_t basicBlockLoop = FindNearestPower2(ubFactorDvLoopCountCeil);\n```\n\n而 `FindNearestPower2(value)` 对 `value <= 1` 返回 **0**（`kv_rms_norm_rope_cache_regbase_recompute_tiling.cpp:243`）。因此当 `dv <= ubFactor`（dv 一个 UB 块即可载入，`ubFactorDvLoopCountCeil == 1`）时 `basicBlockLoop == 0`，kernel 侧 `ReduceSumBasicComputeVF`（`op_kernel/arch35/kv_rms_norm_rope_cache_regbase_recompute.h`）的二分折叠循环：\n\n```cpp\nfor (uint64_t basicBlockIdx = 0; basicBlockIdx < basicBlockLoop; basicBlockIdx++) { ... }\n```\n\n**一次都不会进入**，导致：\n\n1. **Σx² 根本没有计算**：循环体内的 `DataCopyPad` / `CastPowVF` / `ReduceSum` / `UpdateCache` 全部未执行，`cacheBuffer` 从未被写入。\n2. **`totalSumLocal` 从未被赋值**：它是类成员的默认构造 `LocalTensor<float>`，其赋值语句 `totalSumLocal = cacheLocal[...]` 只存在于上述循环体内部。\n\n随后 `RmsNormWithoutQuant` / `RmsNormAsymQuantWithVCache` / `RmsNormSymQuantWithVCache` / `RmsNormAsymQuant` / `RmsNormSymQuant` 五处均**无条件**执行：\n\n```cpp\n__local_mem__ float* xSumPtr = (__local_mem__ float*)totalSumLocal.GetPhyAddr();\n```\n\n把这个未初始化的 `LocalTensor` 的地址当作平方和读入，用于 `1/sqrt(Σx²/dv + eps)`。\n\n**后果**：\n\n- 已上板实测确认：rmsnorm 缩放系数为脏数据，输出整体错误（见「日志 / 截图」）。\n- 机制上分析：对默认构造的 `LocalTensor` 调 `GetPhyAddr()` 取到的是未初始化的成员值，并非一个保证合法且对齐的 UB 地址，因此该路径除了静默算错之外，还存在偶发 UB 不对齐 / 越界访问（aic error）的风险。这一点为代码机制推断，本次实测中表现为静默算错。\n\n值得注意的是，`Init()` 中已有 `if (basicBlockLoop == 0) { resultCacheID_ = 0; }` 的特判，说明 `basicBlockLoop == 0` 是被预期到的合法状态，但计算路径没有做相应处理。\n\n### Environment / 环境信息\n\n- 硬件：Ascend950（`Ascend950PR_9589`）\n- 软件：CANN 9.1.0\n- 算子：`KvRmsNormRopeCache`，regbase recompute 模板（tilingKey 20000，`op_kernel/arch35/`）\n- 数据类型：bf16，非量化\n- 受影响分支：master（`f0116064a880061a6b7522eb2946d8dafb4590d9`）\n\n### Steps to reproduce the issue / 重现步骤\n\n**触发条件**：recompute 模板在 full_load 模板 tiling 失败（`ubFactor <= 0`）时被选中。full_load 的 UB 分母（`inUbSize` / `outUbSize` / `inCosSinUbSize`）在 `dk > dv` 时几乎完全由 dk 主导，dv 仅贡献 `rmsNormWspSize`。因此 **dk 超大 + dv 小**时会落入 recompute，且满足 `dv <= ubFactor`：\n\n- bf16、非量化，取 `dk=32768, dv=512` 即命中 `ubFactorDvLoopCountCeil == 1`（已上板复现）；\n- `dv == ubFactor` 恰好整除（`floor=1, tail=0, ceil=1`）同样命中。\n\n**复现步骤**：\n\n1. 构建并安装自定义算子包为 vendor：\n\n   ```bash\n   bash build.sh --pkg --soc=ascend950 --ops=kv_rms_norm_rope_cache\n   ```\n\n2. 通过 TTK 执行 kernel 用例：\n\n   ```bash\n   python3 -m ttk kernel -b=release --seed 42\n   ```\n\n3. 用例参数：\n\n   | 项 | 值 |\n   |---|---|\n   | `kv` | `[1, 1, 2, 33280]`（dv=512, dk=32768） |\n   | `gamma` | `[512]` |\n   | `cos` / `sin` | `[1, 1, 2, 32768]` |\n   | dtype | bf16 |\n   | `cache_mode` | `Norm` |\n   | `is_output_kv` | `true` |\n   | `epsilon` | `1e-5` |\n\n4. 该算子无内置 golden，dump 输入输出后用 numpy 按 `c_kv = x / sqrt(mean(x^2) + eps) * gamma` 独立校验第 4 个输出 `c_kv`（bf16 容差 `rtol = atol = 4e-3`）。\n\n### Describe the expected behavior / 预期结果\n\n`dv <= ubFactor` 时，Σx² 应按 dv 的实际长度完成归约，`totalSumLocal` 应指向存放该归约结果的 cache，`c_kv` 应满足 `c_kv = x / sqrt(mean(x^2) + eps) * gamma`，在 bf16 容差（`rtol = atol = 4e-3`）内与 numpy golden 一致。\n\n### Related log / screenshot / 日志 / 截图\n\n对同一用例，修复前后两版包除 `op_kernel/arch35/kv_rms_norm_rope_cache_regbase_recompute.h` 一个文件外完全相同（修复前那份已 `cmp` 确认与 upstream/master 逐字节一致）：\n\n| | 修复前（master） | 修复后 |\n|---|---|---|\n| `c_kv[0, :4]` | `[316., 211., -184., 62.5]` | `[1.3828, 0.9219, -0.8047, 0.2734]` |\n| numpy golden `[0, :4]` | `[1.3858, 0.9232, -0.8066, 0.2734]` | 同左 |\n| max_abs_diff | 314.62 | 0.0039 |\n| max_rel_diff | 229.36 | 0.0038 |\n| 不匹配元素 | **1024 / 1024** | **0 / 1024** |\n| 结论 | FAIL（全部输出为脏数据） | PASS |\n\n修复前 `c_kv` 整体被放大约 228 倍，与「把未初始化 UB 地址上的残留值当作 Σx² 代入 `1/sqrt(Σx²/dv + eps)`」的预期一致；修复后全部元素落在 bf16 精度标准内。\n\n### Special notes for this issue / 备注\n\n**修复方案**：`ReduceSumBasicComputeVF` 增加 `basicBlockLoop == 0` 的单块归约分支，按 dv 的实际长度搬运一块、取平方、`ReduceSum` 后写入 `cache[0]`，并给 `totalSumLocal` 赋值。\n\n未复用主循环的原因：主循环主块的 `DataCopyPad` 搬运长度恒为 `ubFactor`（`xDataCopyParams.blockLen = this->ubFactor * sizeof(T_KV)`），单块场景下 `floor(dv/ubFactor) == 0`，会越界读 GM `ubFactor - dv` 个元素；同时 `basicBlockIdx(0) == mainFoldCount(0) && ubFactorDvTail > 0` 成立，尾块折叠分支会去搬 dv 之外的数据折叠进来。因此单开一条路径，而不是把 `FindNearestPower2(1)` 改成返回 1。\n\n**测试缺口**：`dv <= ubFactor` 这条路径此前没有精度用例覆盖，建议随修复补充。\n\n**同根因的关联风险点（尚未修复，当前不可达）**：`op_kernel/arch35/kv_rms_norm_rope_cache_regbase_base.h` 的 `RmsNormBasicComputeVF` 同样使用 `foldPoint = FindNearestPower2(ceilVLCount)`。当 `ceilVLCount == 1` 时 `foldPoint == 0`，会导致 `unFoldLoopTimes = foldPoint + foldPoint - ceilVLCount` 在 `uint16_t` 上回绕为 65535、`foldSrcBOffset == 0` 使两个折叠源指向同一地址、`outerLoopDstStride == 0` 使所有行写同一地址。目前该函数的 5 个调用方（`RmsNormVF` / `RmsNormAsymQuantWithKvVF` / `RmsNormSymQuantWithKvVF` / `RmsNormAsymQuantVF` / `RmsNormSymQuantVF`）均有 `actualCol <= CONST_TWO * VL_FP32` 的早退分支，把 `dv <= 128` 挡在外面，因此该缺陷当前不可达；但函数本身没有自保护，属于依赖调用方的隐式前置条件，建议一并加固。\n\n关联 PR：https://gitcode.com/cann/ops-transformer/pull/8518\n",
+  "comments": 1,
+  "created_at": "2026-07-09T16:39:05+08:00",
+  "finished_at": "2026-07-09T18:41:25+08:00",
+  "html_url": "https://gitcode.com/cann/ops-transformer/issues/3691",
+  "id": 4154026,
+  "issue_priority_detail": {
+    "id": 116,
+    "title": "无优先级"
+  },
+  "issue_state": "进行中",
+  "issue_state_detail": {
+    "id": 285,
+    "serial": 0,
+    "title": "进行中"
+  },
+  "issue_type": "任务",
+  "issue_type_detail": {
+    "id": 255,
+    "is_system": false,
+    "title": "任务"
+  },
+  "labels": [
+    {
+      "color": "#DB2828",
+      "created_at": "2025-06-10T14:17:23+08:00",
+      "id": 3870,
+      "name": "bug-report",
+      "updated_at": "2026-07-09T16:39:06+08:00"
+    },
+    {
+      "color": "#35e029",
+      "created_at": "2026-03-20T11:25:13+08:00",
+      "id": 38861,
+      "name": "resolved",
+      "updated_at": "2026-07-09T20:37:46+08:00"
+    }
+  ],
+  "number": "3691",
+  "priority": 0,
+  "repository": {
+    "assigner": {},
+    "created_at": "2025-09-28T17:54:46+08:00",
+    "description": "本项目是CANN提供的transformer类大模型算子库，实现网络在NPU上加速计算。",
+    "full_name": "cann/ops-transformer",
+    "id": 7673863,
+    "name": "ops-transformer",
+    "paas": "",
+    "path": "ops-transformer",
+    "updated_at": "2025-09-28T18:06:48+08:00"
+  },
+  "state": "closed",
+  "title": "[Bug-Report|缺陷反馈]: KvRmsNormRopeCache regbase recompute 模板 dv 单块场景 Σx² 未计算，totalSumLocal 使用未初始化 LocalTensor",
+  "updated_at": "2026-07-09T18:41:25+08:00",
+  "user": {
+    "html_url": "https://gitcode.com/qianzehong",
+    "id": "68c138243be0a23c91c2437b",
+    "login": "qianzehong",
+    "name": "qianzehong",
+    "object_id": "68c138243be0a23c91c2437b"
+  },
+  "visibility_reason": "public"
+}

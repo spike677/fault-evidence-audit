@@ -1,0 +1,38 @@
+[
+  {
+    "additions": 11,
+    "blob_id": "b701c0821f334e524319d967cc2f278a122fc340",
+    "blob_url": "https://gitcode.com/cann/ops-cv/blob/62b0e647ee5ff770eb69f4defea69034f11c489c/image/upsample_nearest/op_host/op_api/aclnn_upsample_nearest_exact1d.cpp",
+    "deletions": 4,
+    "filename": "image/upsample_nearest/op_host/op_api/aclnn_upsample_nearest_exact1d.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 11,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -148,8 +148,9 @@ static aclnnStatus CheckParams(const aclTensor *self, const aclIntArray *outputS\n     return ACLNN_SUCCESS;\n }\n \n-static const aclTensor *upsampleNearestExact1dCompute(\n-    const aclTensor *selfContiguous, const aclIntArray *outputSize, float scales, const aclTensor* outContiguous, aclOpExecutor *executor)\n+static const aclTensor* upsampleNearestExact1dCompute(const aclTensor* selfContiguous, const aclIntArray* outputSize,\n+                                                      float scales, float originScales, const aclTensor* outContiguous,\n+                                                      aclOpExecutor* executor)\n {\n     if (IsRegBase()) {\n         // 仅支持NCL和ND格式的输入\n@@ -167,7 +168,11 @@ static const aclTensor *upsampleNearestExact1dCompute(\n \n             auto size = executor->ConvertToTensor(outputSizeArray, op::ToOpDataType(ACL_INT32));\n             CHECK_RET(size != nullptr, nullptr);\n-            auto result = l0op::ResizeNearestNeighborV2(self4d, size, nullptr, false, true, out4d, executor);\n+\n+            vector<float> scalesList{1, originScales};\n+            const aclFloatArray* scalesArray = executor->AllocFloatArray(scalesList.data(), DIM_TWO);\n+            CHECK_RET(scalesArray != nullptr, nullptr);\n+            auto result = l0op::ResizeNearestNeighborV2(self4d, size, scalesArray, false, true, out4d, executor);\n             CHECK_RET(result != nullptr, nullptr);\n             return View4dAs3d(result, selfContiguous->GetStorageFormat(), executor);\n         }\n@@ -225,9 +230,11 @@ aclnnStatus aclnnUpsampleNearestExact1dGetWorkspaceSize(const aclTensor *self, c\n     CHECK_RET(outContiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);\n     // 使用double类型计算1/scale，避免tiling中用float计算造成精度损失\n     float realScales = scales > 0 ? static_cast<float>(1.0 / scales) : 0;\n+    float originScales = scales > 0 ? static_cast<float>(scales) : 0;\n \n     // 调用upsampleNearestExact1dCompute计算\n-    auto result = upsampleNearestExact1dCompute(selfContiguous, outputSize, realScales, outContiguous, uniqueExecutor.get());\n+    auto result = upsampleNearestExact1dCompute(selfContiguous, outputSize, realScales, originScales, outContiguous,\n+                                                uniqueExecutor.get());\n     CHECK_RET(result != nullptr, ACLNN_ERR_INNER_NULLPTR);\n \n     // 固定写法，将计算结果拷贝到输出out上，out可能是非连续的tensor\n",
+      "new_file": false,
+      "new_path": "image/upsample_nearest/op_host/op_api/aclnn_upsample_nearest_exact1d.cpp",
+      "old_path": "image/upsample_nearest/op_host/op_api/aclnn_upsample_nearest_exact1d.cpp",
+      "removed_lines": 4,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-cv/raw/62b0e647ee5ff770eb69f4defea69034f11c489c/image/upsample_nearest/op_host/op_api/aclnn_upsample_nearest_exact1d.cpp",
+    "sha": "62b0e647ee5ff770eb69f4defea69034f11c489c",
+    "source_branch": "9.1.0",
+    "source_project": {
+      "full_name": "cuijie25/ops-cv",
+      "human_name": "cuijie25 / ops-cv",
+      "id": 9200564,
+      "path": "ops-cv"
+    },
+    "target_branch": "9.1.0",
+    "target_project": {
+      "full_name": "cann/ops-cv",
+      "human_name": "CANN / ops-cv",
+      "id": 7657293,
+      "path": "ops-cv"
+    }
+  }
+]

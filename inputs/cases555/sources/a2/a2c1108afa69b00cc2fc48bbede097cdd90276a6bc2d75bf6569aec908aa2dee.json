@@ -1,0 +1,579 @@
+[
+  {
+    "additions": 56,
+    "blob_id": "7c8d2e0e5c2e511d0bad38541c3d9293953cf915",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/1740f4beaf0111ef8e50790b8c030c0578d991c9/mc2/common/op_kernel/apace/basic/fragment_tensor/fragment_tensor.h",
+    "deletions": 58,
+    "filename": "mc2/common/op_kernel/apace/basic/fragment_tensor/fragment_tensor.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 56,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -90,18 +90,21 @@ class FragmentTensor {\n public:\n     __aicore__ inline FragmentTensor() = default;\n \n+    /*!\n+     * \\brief 构造函数\n+     * \\note addrList 必须在 FragmentTensor 整个生命周期内保持有效，\n+     *       本类只保存指针，不拷贝数组内容。调用方须保证 addrList 非空。\n+     */\n     __aicore__ inline FragmentTensor(\n         const FragmentParam<Dims>& fragParam,\n-        GM_ADDR* addrList)\n+        GM_ADDR const* addrList)\n         : fragParam_(fragParam)\n     {\n-        for (uint32_t i = 0; i < fragParam.fragmentCnt; ++i) {\n-            addrList_[i] = addrList[i];\n-        }\n-        for (uint32_t d = 0; d < Dims; ++d) {\n-            sliceCoord_[d] = 0;\n-            sliceShape_[d] = fragParam.assembledShape[d];\n+        if (addrList != nullptr) {\n+            addrList_ = addrList;\n         }\n+        ArrayFill(sliceCoord_, 0, AscendC::Std::make_index_sequence<Dims>{});\n+        ArrayCopy(sliceShape_, fragParam_.assembledShape, AscendC::Std::make_index_sequence<Dims>{});\n     }\n \n     __aicore__ inline auto GetFragment(uint32_t idx) const\n@@ -109,9 +112,7 @@ public:\n         auto fragmentAddr = reinterpret_cast<__gm__ ElementType*>(addrList_[idx]);\n \n         uint64_t fragmentShape[Dims];\n-        for (uint32_t i = 0; i < Dims; ++i) {\n-            fragmentShape[i] = fragParam_.assembledShape[i];\n-        }\n+        ArrayCopy(fragmentShape, fragParam_.assembledShape, AscendC::Std::make_index_sequence<Dims>{});\n         fragmentShape[fragParam_.assembleAxis] = fragParam_.fragmentSize;\n \n         auto memPtr = AscendC::Te::MakeMemPtr<AscendC::Te::Location::GM>(fragmentAddr);\n@@ -143,10 +144,10 @@ public:\n         return addrList_[idx];\n     }\n \n-    __aicore__ inline void UpdateAddrList(GM_ADDR* addrList)\n+        __aicore__ inline void UpdateAddrList(GM_ADDR const* addrList)\n     {\n-        for (uint32_t i = 0; i < fragParam_.fragmentCnt; ++i) {\n-            addrList_[i] = addrList[i];\n+        if (addrList != nullptr) {\n+            addrList_ = addrList;\n         }\n     }\n \n@@ -246,11 +247,9 @@ public:\n         info.addr = addrList_[info.fragmentIdx];\n \n         // 非 assembleAxis 槽位：直接整体复制 slice 视图，assembleAxis 槽位下面覆盖\n-        for (uint32_t d = 0; d < Dims; ++d) {\n-            info.fragCoord[d] = sliceCoord_[d];\n-            info.localCoord[d] = 0;\n-            info.copyShape[d] = sliceShape_[d];\n-        }\n+        ArrayCopy(info.fragCoord, sliceCoord_, AscendC::Std::make_index_sequence<Dims>{});\n+        ArrayFill(info.localCoord, 0, AscendC::Std::make_index_sequence<Dims>{});\n+        ArrayCopy(info.copyShape, sliceShape_, AscendC::Std::make_index_sequence<Dims>{});\n \n         // assembleAxis 槽位：head/body/tail 三选一\n         if (localIdx == 0) {\n@@ -271,6 +270,22 @@ public:\n     }\n \n private:\n+    template<size_t... Is>\n+    static __aicore__ inline void ArrayCopy(\n+        uint64_t (&dst)[Dims], const uint64_t (&src)[Dims],\n+        AscendC::Std::index_sequence<Is...>)\n+    {\n+        ((dst[Is] = src[Is]), ...);\n+    }\n+\n+    template<size_t... Is>\n+    static __aicore__ inline void ArrayFill(\n+        uint64_t (&dst)[Dims], uint64_t val,\n+        AscendC::Std::index_sequence<Is...>)\n+    {\n+        ((dst[Is] = val), ...);\n+    }\n+\n     template<typename CoordType, typename ShapeType, size_t... Is>\n     __aicore__ inline void SliceImpl(\n         uint64_t (&coord)[Dims], uint64_t (&shape)[Dims],\n@@ -294,61 +309,44 @@ private:\n     }\n \n     FragmentParam<Dims> fragParam_;\n-    GM_ADDR addrList_[MaxFragments];\n+    GM_ADDR const *addrList_{nullptr};\n     uint64_t sliceCoord_[Dims]{};\n     uint64_t sliceShape_[Dims]{};\n };\n \n-template<typename CopyHandle, typename DestTensor,\n+template<bool isScatter, typename CopyHandle, typename TensorType,\n          uint32_t Dims, uint32_t MaxF, typename GmLayoutF, typename ElemT>\n __aicore__ inline void FragmentSliceCopy(\n     CopyHandle copyHandle,\n-    DestTensor& dest,\n-    const FragmentTensor<Dims, MaxF, GmLayoutF, ElemT>& src)\n+    TensorType& tensor,\n+    const FragmentTensor<Dims, MaxF, GmLayoutF, ElemT>& fragmentTensor)\n {\n-    const auto assembleAxis = src.GetSplitAxis();\n-    auto composition = src.ComputeFragmentComposition(\n-        src.GetSliceCoord(assembleAxis), src.GetSliceShape(assembleAxis));\n+    const auto assembleAxis = fragmentTensor.GetSplitAxis();\n+    auto composition = fragmentTensor.ComputeFragmentComposition(\n+        fragmentTensor.GetSliceCoord(assembleAxis), fragmentTensor.GetSliceShape(assembleAxis));\n \n     for (uint32_t idx = 0; idx < composition.totalFragmentCnt; ++idx) {\n-        auto info = src.GetFragmentInfo(idx, composition);\n-        auto fragment = src.GetFragment(info.fragmentIdx);\n-        auto gmTensor = fragment.Slice(\n-            MakeCoordFromArray<Dims>(info.fragCoord), MakeShapeFromArray<Dims>(info.copyShape));\n-        auto l1Tensor = dest.Slice(\n-            MakeCoordFromArray<Dims>(info.localCoord), MakeShapeFromArray<Dims>(info.copyShape));\n-        AscendC::Te::Copy(copyHandle, l1Tensor, gmTensor);\n-    }\n-}\n+        auto info = fragmentTensor.GetFragmentInfo(idx, composition);\n \n-template<typename CopyHandle, uint32_t Dims, uint32_t MaxF, typename LayoutF, typename ElemT, typename DestTensor>\n-__aicore__ inline void FragmentSliceScatter(\n-    CopyHandle copyHandle,\n-    const FragmentTensor<Dims, MaxF, LayoutF, ElemT>& src,\n-    DestTensor& dest)\n-{\n-    const auto assembleAxis = src.GetSplitAxis();\n-    const uint64_t realFragmentSize = src.GetRealFragmentSize();\n-\n-    auto composition = src.ComputeFragmentComposition(\n-        src.GetSliceCoord(assembleAxis), src.GetSliceShape(assembleAxis));\n-\n-    for (uint32_t idx = 0; idx < composition.totalFragmentCnt; ++idx) {\n-        auto info = src.GetFragmentInfo(idx, composition);\n-\n-        // assembleAxis 方向按 realFragmentSize 裁剪（尾块 pad 行不拷贝）\n-        if (info.fragCoord[assembleAxis] >= realFragmentSize) { continue; }\n-        uint64_t remain = realFragmentSize - info.fragCoord[assembleAxis];\n-        if (info.copyShape[assembleAxis] > remain) {\n-            info.copyShape[assembleAxis] = remain;\n+        if constexpr (isScatter) {\n+            const uint64_t realFragmentSize = fragmentTensor.GetRealFragmentSize();\n+            if (info.fragCoord[assembleAxis] >= realFragmentSize) { continue; }\n+            uint64_t remain = realFragmentSize - info.fragCoord[assembleAxis];\n+            if (info.copyShape[assembleAxis] > remain) {\n+                info.copyShape[assembleAxis] = remain;\n+            }\n         }\n \n-        auto fragment = src.GetFragment(info.fragmentIdx);\n-        auto cBlock = fragment.Slice(\n+        auto fragment = fragmentTensor.GetFragment(info.fragmentIdx);\n+        auto fragSlice = fragment.Slice(\n             MakeCoordFromArray<Dims>(info.fragCoord), MakeShapeFromArray<Dims>(info.copyShape));\n-        auto l0cSlice = dest.Slice(\n+        auto tensorSlice = tensor.Slice(\n             MakeCoordFromArray<Dims>(info.localCoord), MakeShapeFromArray<Dims>(info.copyShape));\n-        AscendC::Te::Copy(copyHandle, cBlock, l0cSlice);\n+        if constexpr (isScatter) {\n+            AscendC::Te::Copy(copyHandle, fragSlice, tensorSlice);\n+        } else {\n+            AscendC::Te::Copy(copyHandle, tensorSlice, fragSlice);\n+        }\n     }\n }\n \n",
+      "new_file": false,
+      "new_path": "mc2/common/op_kernel/apace/basic/fragment_tensor/fragment_tensor.h",
+      "old_path": "mc2/common/op_kernel/apace/basic/fragment_tensor/fragment_tensor.h",
+      "removed_lines": 58,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/1740f4beaf0111ef8e50790b8c030c0578d991c9/mc2/common/op_kernel/apace/basic/fragment_tensor/fragment_tensor.h",
+    "sha": "1740f4beaf0111ef8e50790b8c030c0578d991c9",
+    "source_branch": "master",
+    "source_project": {
+      "full_name": "mengziyu/ops-transformer_master",
+      "human_name": "mengziyu / ops-transformer_master",
+      "id": 10540481,
+      "path": "ops-transformer_master"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  },
+  {
+    "additions": 1,
+    "blob_id": "da648f58f08e379c5ff7850256f455e6cf9a7382",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/1740f4beaf0111ef8e50790b8c030c0578d991c9/mc2/common/op_kernel/apace/basic/fragment_tensor/fragment_tensor_api.h",
+    "deletions": 1,
+    "filename": "mc2/common/op_kernel/apace/basic/fragment_tensor/fragment_tensor_api.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 1,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -27,7 +27,7 @@ template<uint32_t Dims, uint32_t MaxFragments = MAX_FRAGMENT_COUNT,\n     typename LayoutFactory = void, typename ElementType = uint8_t>\n __aicore__ inline auto MakeFragmentTensor(\n     const FragmentParam<Dims>& fragParam,\n-    GM_ADDR* addrList) {\n+    GM_ADDR const* addrList) {\n     return FragmentTensor<Dims, MaxFragments, LayoutFactory, ElementType>(fragParam, addrList);\n }\n \n",
+      "new_file": false,
+      "new_path": "mc2/common/op_kernel/apace/basic/fragment_tensor/fragment_tensor_api.h",
+      "old_path": "mc2/common/op_kernel/apace/basic/fragment_tensor/fragment_tensor_api.h",
+      "removed_lines": 1,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/1740f4beaf0111ef8e50790b8c030c0578d991c9/mc2/common/op_kernel/apace/basic/fragment_tensor/fragment_tensor_api.h",
+    "sha": "1740f4beaf0111ef8e50790b8c030c0578d991c9",
+    "source_branch": "master",
+    "source_project": {
+      "full_name": "mengziyu/ops-transformer_master",
+      "human_name": "mengziyu / ops-transformer_master",
+      "id": 10540481,
+      "path": "ops-transformer_master"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  },
+  {
+    "additions": 5,
+    "blob_id": "1222b70be8ca1547fc5fc57250799dafa35af7dd",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/1740f4beaf0111ef8e50790b8c030c0578d991c9/mc2/common/op_kernel/apace/block/blaze_ext/gemm/block/qmm_mx_block_mmad_fragment.h",
+    "deletions": 5,
+    "filename": "mc2/common/op_kernel/apace/block/blaze_ext/gemm/block/qmm_mx_block_mmad_fragment.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 5,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -236,7 +236,7 @@ public:\n                 auto blockScaleA = gmScaleA.Slice(\n                     AscendC::Te::MakeCoord(0, scaleKStart),\n                     AscendC::Te::MakeShape(tileL1L0Param.curM, scaleKLength));\n-                    FragmentSliceCopy(CopyScaleGM2L1, tensorScaleAL1, blockScaleA);\n+                    FragmentSliceCopy<false>(CopyScaleGM2L1, tensorScaleAL1, blockScaleA);\n \n                 auto gmBlockScaleB = gmScaleB.Slice(\n                     AscendC::Te::MakeCoord(scaleKStart, 0),\n@@ -265,7 +265,7 @@ public:\n                 AscendC::Te::Copy(CopyScaleGM2L1, tensorScaleBL1, gmBlockScaleB);\n             }\n             if (abL1LoopCnt_ == 0) {\n-                    FragmentSliceCopy(CopyScaleGM2L1, tensorScaleAL1, gmScaleA);\n+                    FragmentSliceCopy<false>(CopyScaleGM2L1, tensorScaleAL1, gmScaleA);\n             }\n             return ScalePair<decltype(tensorScaleAL1), decltype(tensorScaleBL1)>{\n                 tensorScaleAL1, tensorScaleBL1};\n@@ -284,7 +284,7 @@ public:\n                 AscendC::Te::MakeCoord(0, iter0 * kL1_),\n                 AscendC::Te::MakeShape(tileL1L0Param.curM, tileL1L0Param.curGmAKL1));\n             Apace::Basic::PadMxKAL1Zero(tensorAL1, tileL1L0Param.curGmAKL1);\n-                FragmentSliceCopy(copyGM2L1, tensorAL1, blockA);\n+                FragmentSliceCopy<false>(copyGM2L1, tensorAL1, blockA);\n             return tensorAL1;\n         } else {\n             auto layoutAL1 = MakeLayoutAL1{}(tileL1L0Param.curM, Blaze::Gemm::CeilAlign(k_, MXFP_DIVISOR_SIZE));\n@@ -299,7 +299,7 @@ public:\n                     AscendC::Te::MakeCoord(0, iter0 * kL1_),\n                     AscendC::Te::MakeShape(tileL1L0Param.curM, tileL1L0Param.curGmAKL1));\n                 Apace::Basic::PadMxKAL1Zero(tensorAL1, tileL1L0Param.curGmAKL1);\n-                    FragmentSliceCopy(copyGM2L1, tensorAL1, blockA);\n+                    FragmentSliceCopy<false>(copyGM2L1, tensorAL1, blockA);\n             }\n             return tensorAL1;\n         }\n@@ -481,7 +481,7 @@ public:\n     __aicore__ inline void ScatterL0C2GM(TensorC const& gmC, TensorL0C& tensorL0C)\n     {\n         auto copyL0C2GM = AscendC::Te::MakeCopy(AscendC::Te::CopyL0C2GM{});\n-        FragmentSliceScatter(copyL0C2GM.with(AscendC::Te::FixpipeParams(3)), gmC, tensorL0C);\n+        FragmentSliceCopy<true>(copyL0C2GM.with(AscendC::Te::FixpipeParams(3)), tensorL0C, gmC);\n         if (enableL0cPingPong_) {\n             l0cPingPong_++;\n         }\n",
+      "new_file": false,
+      "new_path": "mc2/common/op_kernel/apace/block/blaze_ext/gemm/block/qmm_mx_block_mmad_fragment.h",
+      "old_path": "mc2/common/op_kernel/apace/block/blaze_ext/gemm/block/qmm_mx_block_mmad_fragment.h",
+      "removed_lines": 5,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/1740f4beaf0111ef8e50790b8c030c0578d991c9/mc2/common/op_kernel/apace/block/blaze_ext/gemm/block/qmm_mx_block_mmad_fragment.h",
+    "sha": "1740f4beaf0111ef8e50790b8c030c0578d991c9",
+    "source_branch": "master",
+    "source_project": {
+      "full_name": "mengziyu/ops-transformer_master",
+      "human_name": "mengziyu / ops-transformer_master",
+      "id": 10540481,
+      "path": "ops-transformer_master"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  },
+  {
+    "additions": 14,
+    "blob_id": "8a1f9b35872d30df91598fc98112470dd249d505",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/1740f4beaf0111ef8e50790b8c030c0578d991c9/mc2/common/op_kernel/apace/kernel/all_gather_quant_matmul/all_gather_mx_matmul_udma_impl.h",
+    "deletions": 12,
+    "filename": "mc2/common/op_kernel/apace/kernel/all_gather_quant_matmul/all_gather_mx_matmul_udma_impl.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 14,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -69,8 +69,8 @@ private:\n     using AllGatherCommScale = Apace::AivComm::CollectiveComm<\n       Apace::AivComm::CommCollectiveOp::AllGather,\n       Apace::AivComm::CommMode::PUT, AscendC::fp8_e8m0_t, TeamBarrier>;\n-    AllGatherCommData all_gather_data_;\n-    AllGatherCommScale all_gather_scale_;\n+    AllGatherCommData allGatherData_;\n+    AllGatherCommScale allGatherScale_;\n     CommTilingData commTilingData_{};\n     CommTilingData commTilingScale_{};\n     TeamBarrier teamBarrier_;\n@@ -145,6 +145,8 @@ __aicore__ inline void AllGatherMxMatmulUdmaImpl<AType, BType, CType>::Init(\n     uint32_t ubOffset = 0;\n     auto commBuf = AscendC::Te::MakeMemPtr<AscendC::Te::Location::UB, uint8_t>(ubOffset);\n     ubOffset += COMM_WORKSPACE_SIZE;\n+    auto commScaleBuf = AscendC::Te::MakeMemPtr<AscendC::Te::Location::UB, uint8_t>(ubOffset);\n+    ubOffset += COMM_WORKSPACE_SIZE;\n     auto barrierBuf = AscendC::Te::MakeMemPtr<AscendC::Te::Location::UB, uint8_t>(ubOffset);\n     teamBarrier_.Init(barrierBuf.Get(), ubmemCtx_, rankSize_,\n                       static_cast<uint32_t>(GetBlockIdx()));\n@@ -161,11 +163,11 @@ __aicore__ inline void AllGatherMxMatmulUdmaImpl<AType, BType, CType>::Init(\n     commTilingScale_.splitAxisTailCnt = tailCnt_;\n     scaleKLen_ = scaleKGroups_ * static_cast<uint64_t>(Blaze::Gemm::MXFP_MULTI_BASE_SIZE);\n     commTilingScale_.nonSplitAxisSize = scaleKLen_;\n-    all_gather_data_.template Init<BARRIER_NONE>(udmaCtx_, teamBarrier_, commTilingData_,\n+    allGatherData_.template Init<BARRIER_NONE>(udmaCtx_, teamBarrier_, commTilingData_,\n                           aGM_, commBuf.Get(), rankSize_,\n                           static_cast<uint32_t>(GetBlockIdx()));\n-    all_gather_scale_.Init(udmaCtx_, teamBarrier_, commTilingScale_,\n-                          aScaleGM_, commBuf.Get(), rankSize_,\n+    allGatherScale_.template Init<BARRIER_DEVICE>(udmaCtx_, teamBarrier_, commTilingScale_,\n+                          aScaleGM_, commScaleBuf.Get(), rankSize_,\n                           static_cast<uint32_t>(GetBlockIdx()), dataRegionBytes_);\n     AscendC::SyncAll<true>();\n }\n@@ -243,21 +245,21 @@ __aicore__ inline GM_ADDR AllGatherMxMatmulUdmaImpl<AType, BType, CType>::GetWin\n template <typename AType, typename BType, typename CType>\n __aicore__ inline void AllGatherMxMatmulUdmaImpl<AType, BType, CType>::AllGatherProcess()\n {\n-    // 预触发 dependId=0：自身数据始终就绪，AIC 可直接消费。\n+    // 预触发 dependTileIdx=0：自身数据始终就绪，AIC 可直接消费。\n     CrossCoreSetFlag<0x2, PIPE_MTE3>(0);\n \n     for (uint32_t round = 0; round < commTurn_; ++round) {\n         if (static_cast<uint32_t>(GetBlockIdx()) < rankSize_) {\n-            all_gather_scale_.Commit();\n-            all_gather_data_.Commit();\n-            all_gather_data_.template Wait<BARRIER_DEVICE>();\n+            allGatherScale_.Commit();\n+            allGatherData_.Commit();\n+            allGatherData_.template Wait<BARRIER_DEVICE>();\n         }\n         AscendC::SyncAll<true>();\n-        // round 0 对应 dependId=1，AIC 侧按 dependId 等待对应的远端 round 数据。\n+        // round 0 对应 dependTileIdx=1，AIC 侧按 dependTileIdx 等待对应的远端 round 数据。\n         CrossCoreSetFlag<0x2, PIPE_MTE3>(round + 1);\n     }\n-    all_gather_scale_.Finalize();\n-    all_gather_data_.Finalize();\n+    allGatherScale_.Finalize();\n+    allGatherData_.Finalize();\n }\n \n } // namespace AllGatherQuantMatmulImpl\n",
+      "new_file": false,
+      "new_path": "mc2/common/op_kernel/apace/kernel/all_gather_quant_matmul/all_gather_mx_matmul_udma_impl.h",
+      "old_path": "mc2/common/op_kernel/apace/kernel/all_gather_quant_matmul/all_gather_mx_matmul_udma_impl.h",
+      "removed_lines": 12,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/1740f4beaf0111ef8e50790b8c030c0578d991c9/mc2/common/op_kernel/apace/kernel/all_gather_quant_matmul/all_gather_mx_matmul_udma_impl.h",
+    "sha": "1740f4beaf0111ef8e50790b8c030c0578d991c9",
+    "source_branch": "master",
+    "source_project": {
+      "full_name": "mengziyu/ops-transformer_master",
+      "human_name": "mengziyu / ops-transformer_master",
+      "id": 10540481,
+      "path": "ops-transformer_master"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  },
+  {
+    "additions": 54,
+    "blob_id": "6b47ef0f161adb8adf6264bf1e8f3072231c01e6",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/1740f4beaf0111ef8e50790b8c030c0578d991c9/mc2/common/op_kernel/apace/kernel/all_gather_quant_matmul/qmm_mx_kernel_ag_udma.h",
+    "deletions": 49,
+    "filename": "mc2/common/op_kernel/apace/kernel/all_gather_quant_matmul/qmm_mx_kernel_ag_udma.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 54,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -168,7 +168,7 @@ private:\n \n     // ---- Tile context resolution ----\n     struct TileCtx {\n-        uint32_t dependId;\n+        uint32_t dependTileIdx;\n         uint32_t roundIdx;\n         RegionTag region;\n         int64_t regionMPos;\n@@ -203,6 +203,18 @@ private:\n     GM_ADDR cFragAddrs_[8]{};\n     GM_ADDR winDataRankBase_[8]{};\n     GM_ADDR winScaleRankBase_[8]{};\n+\n+    static constexpr uint32_t MAX_FRAG = Apace::Basic::MAX_FRAGMENT_COUNT;\n+    GM_ADDR headAddrListA_[MAX_FRAG]{};\n+    GM_ADDR headAddrListScale_[MAX_FRAG]{};\n+    GM_ADDR headAddrListC_[MAX_FRAG]{};\n+    GM_ADDR mainAddrListA_[MAX_FRAG]{};\n+    GM_ADDR mainAddrListScale_[MAX_FRAG]{};\n+    GM_ADDR mainAddrListC_[MAX_FRAG]{};\n+    GM_ADDR tailAddrListA_[MAX_FRAG]{};\n+    GM_ADDR tailAddrListScale_[MAX_FRAG]{};\n+    GM_ADDR tailAddrListC_[MAX_FRAG]{};\n+\n     uint32_t curMainRoundIdx_{0xFFFFFFFF};\n     bool winBasesReady_{false};\n     bool tailBuilt_{false};\n@@ -328,8 +340,14 @@ __aicore__ inline void QmmMxKernelAgUdma<AType, BType, CType>::Process(\n     auto gmBias = Te::MakeTensor(Te::MakeMemPtr<Te::Location::GM>(biasNull),\n                     Te::MakeFrameLayout<Te::NDExtLayoutPtn>(1L, Ni));\n \n+    const auto& mTailTile = mmT.mTailTile;\n+    const auto& nTailTile = mmT.nTailTile;\n+    // 尾块拆分：需核数(尾块数×M拆分×N拆分)≤总核数才拆分；mTailTile=nTailTile=1时等价no-op。\n+    if ((sch.GetEndBlockIdx() + 1) * mTailTile * nTailTile <= AscendC::GetBlockNum()) {\n+        sch.UpdateTailTile(mTailTile, nTailTile);\n+    }\n     uint32_t waitedMask = 0U;\n-    // dependId=0 由 AIV 预触发，无需等待。\n+    // dependTileIdx=0 由 AIV 预触发，无需等待。\n \n     Te::Coord<int64_t, int64_t, int64_t, int64_t> blockIdx;\n     int64_t mPos = 0L, nPos = 0L;\n@@ -348,10 +366,10 @@ __aicore__ inline void QmmMxKernelAgUdma<AType, BType, CType>::Process(\n         auto ctx = ResolveTileCtx(mPos, headMainRows, mainRoundRows, mainSectionRows,\n                                   fp.rankSize, fp.commTurn);\n \n-        // 按位记录已等待过的 dependId，避免重复 wait。\n-        if ((waitedMask & (1U << ctx.dependId)) == 0U) {\n-            CrossCoreWaitFlag<0x2, PIPE_MTE2>(ctx.dependId);\n-            waitedMask |= (1U << ctx.dependId);\n+        // 按位记录已等待过的 dependTileIdx，避免重复 wait。\n+        if ((waitedMask & (1U << ctx.dependTileIdx)) == 0U) {\n+            CrossCoreWaitFlag<0x2, PIPE_MTE2>(ctx.dependTileIdx);\n+            waitedMask |= (1U << ctx.dependTileIdx);\n         }\n \n         // Per-tile L2 cache hint\n@@ -388,7 +406,7 @@ __aicore__ inline void QmmMxKernelAgUdma<AType, BType, CType>::Process(\n                 ctx.rankCnt, Ni, singleShape, ctx.regionMPos, nPos, 0, blockC);\n     }\n \n-    // 确保所有 dependId 均已 wait（收尾清理）。\n+    // 确保所有 dependTileIdx 均已 wait（收尾清理）。\n     for (uint32_t t = 0; t <= fp.commTurn; ++t) {\n         if ((waitedMask & (1U << t)) == 0U) {\n             CrossCoreWaitFlag<0x2, PIPE_MTE2>(t);\n@@ -415,7 +433,6 @@ template <typename AType, typename BType, typename CType>\n __aicore__ inline void QmmMxKernelAgUdma<AType, BType, CType>::BuildFragmentTensors(const Params& params)\n {\n     const auto& fp = params.fragParams;\n-    constexpr uint32_t MAX_FRAG = Apace::Basic::MAX_FRAGMENT_COUNT;\n \n     for (uint32_t r = 0; r < fp.rankSize; ++r) {\n         cFragAddrs_[r] = params.cGM + static_cast<uint64_t>(r) * fp.mPerRank * params.cBytesPerM;\n@@ -426,15 +443,15 @@ __aicore__ inline void QmmMxKernelAgUdma<AType, BType, CType>::BuildFragmentTens\n     tileMCStride_ = static_cast<uint64_t>(fp.tileM) * params.cBytesPerM;\n \n     // HEAD：自身数据，单 fragment tensor。\n-    GM_ADDR addrListA[MAX_FRAG] = {params.aGM};\n-    GM_ADDR addrListScale[MAX_FRAG] = {params.aScaleGM};\n-    GM_ADDR addrListC[MAX_FRAG] = {cFragAddrs_[fp.rankId]};\n+    headAddrListA_[0] = params.aGM;\n+    headAddrListScale_[0] = params.aScaleGM;\n+    headAddrListC_[0] = cFragAddrs_[fp.rankId];\n     headFragA_ = Apace::Basic::MakeFragmentTensor<2, MAX_FRAG, MakeLayoutA, AType>(\n-        MakeFragParam(fp.headRows, fp.headRows, 1, fp.k), addrListA);\n+        MakeFragParam(fp.headRows, fp.headRows, 1, fp.k), headAddrListA_);\n     headFragScaleA_ = Apace::Basic::MakeFragmentTensor<2, MAX_FRAG, MakeLayoutScaleA, AscendC::fp8_e8m0_t>(\n-        MakeFragParam(fp.headRows, fp.headRows, 1, fp.scaleKLen), addrListScale);\n+        MakeFragParam(fp.headRows, fp.headRows, 1, fp.scaleKLen), headAddrListScale_);\n     headFragC_ = Apace::Basic::MakeFragmentTensor<2, MAX_FRAG, MakeLayoutC, CType>(\n-        MakeFragParam(fp.headRows, fp.headRows, 1, fp.n), addrListC);\n+        MakeFragParam(fp.headRows, fp.headRows, 1, fp.n), headAddrListC_);\n     // main / tail 的 fragment tensor 延迟到首次使用时构建，构建开销被 comm wait 掩盖。\n }\n \n@@ -458,31 +475,27 @@ __aicore__ inline void QmmMxKernelAgUdma<AType, BType, CType>::BuildMainFragment\n {\n     EnsureWinRankBasesReady(params);\n     const auto& fp = params.fragParams;\n-    constexpr uint32_t MAX_FRAG = Apace::Basic::MAX_FRAGMENT_COUNT;\n \n     curRoundDataOff_ = static_cast<uint64_t>(roundIdx) * tileMDataStride_;\n     curRoundScaleOff_ = static_cast<uint64_t>(roundIdx) * tileMScaleStride_;\n     curRoundCOff_ = static_cast<uint64_t>(roundIdx) * tileMCStride_;\n \n-    GM_ADDR addrListA[MAX_FRAG];\n-    GM_ADDR addrListScale[MAX_FRAG];\n-    GM_ADDR addrListC[MAX_FRAG];\n     uint32_t fragIdx = 0;\n     for (uint32_t r = 0; r < fp.rankSize; ++r) {\n         if (r == fp.rankId) {\n             continue;\n         }\n-        addrListA[fragIdx] = winDataRankBase_[r] + curRoundDataOff_;\n-        addrListScale[fragIdx] = winScaleRankBase_[r] + curRoundScaleOff_;\n-        addrListC[fragIdx] = cFragAddrs_[r] + curRoundCOff_;\n+        mainAddrListA_[fragIdx] = winDataRankBase_[r] + curRoundDataOff_;\n+        mainAddrListScale_[fragIdx] = winScaleRankBase_[r] + curRoundScaleOff_;\n+        mainAddrListC_[fragIdx] = cFragAddrs_[r] + curRoundCOff_;\n         fragIdx++;\n     }\n     curMainA_ = Apace::Basic::MakeFragmentTensor<2, MAX_FRAG, MakeLayoutA, AType>(\n-        MakeFragParam(fp.tileM, fp.tileM, fp.rankSize - 1, fp.k), addrListA);\n+        MakeFragParam(fp.tileM, fp.tileM, fp.rankSize - 1, fp.k), mainAddrListA_);\n     curMainScaleA_ = Apace::Basic::MakeFragmentTensor<2, MAX_FRAG, MakeLayoutScaleA, AscendC::fp8_e8m0_t>(\n-        MakeFragParam(fp.tileM, fp.tileM, fp.rankSize - 1, fp.scaleKLen), addrListScale);\n+        MakeFragParam(fp.tileM, fp.tileM, fp.rankSize - 1, fp.scaleKLen), mainAddrListScale_);\n     curMainC_ = Apace::Basic::MakeFragmentTensor<2, MAX_FRAG, MakeLayoutC, CType>(\n-        MakeFragParam(fp.tileM, fp.tileM, fp.rankSize - 1, fp.n), addrListC);\n+        MakeFragParam(fp.tileM, fp.tileM, fp.rankSize - 1, fp.n), mainAddrListC_);\n     curMainRoundIdx_ = roundIdx;\n }\n \n@@ -491,32 +504,28 @@ __aicore__ inline void QmmMxKernelAgUdma<AType, BType, CType>::BuildTailFragment\n {\n     EnsureWinRankBasesReady(params);\n     const auto& fp = params.fragParams;\n-    constexpr uint32_t MAX_FRAG = Apace::Basic::MAX_FRAGMENT_COUNT;\n \n     uint64_t tailRowOff = fp.headRows;\n     uint64_t tailDataOff = tailRowOff * params.dataBytesPerMRow;\n     uint64_t tailScaleOff = tailRowOff * params.scaleBytesPerMRow;\n     uint64_t tailCOff = tailRowOff * params.cBytesPerM;\n \n-    GM_ADDR addrListA[MAX_FRAG];\n-    GM_ADDR addrListScale[MAX_FRAG];\n-    GM_ADDR addrListC[MAX_FRAG];\n     for (uint32_t r = 0; r < fp.rankSize; ++r) {\n         if (r == fp.rankId) {\n-            addrListA[r] = params.aGM + tailDataOff;\n-            addrListScale[r] = params.aScaleGM + tailScaleOff;\n+            tailAddrListA_[r] = params.aGM + tailDataOff;\n+            tailAddrListScale_[r] = params.aScaleGM + tailScaleOff;\n         } else {\n-            addrListA[r] = winDataRankBase_[r] + tailDataOff;\n-            addrListScale[r] = winScaleRankBase_[r] + tailScaleOff;\n+            tailAddrListA_[r] = winDataRankBase_[r] + tailDataOff;\n+            tailAddrListScale_[r] = winScaleRankBase_[r] + tailScaleOff;\n         }\n-        addrListC[r] = cFragAddrs_[r] + tailCOff;\n+        tailAddrListC_[r] = cFragAddrs_[r] + tailCOff;\n     }\n     tailFragA_ = Apace::Basic::MakeFragmentTensor<2, MAX_FRAG, MakeLayoutA, AType>(\n-        MakeFragParam(fp.paddedTailM, fp.tailM, fp.rankSize, fp.k), addrListA);\n+        MakeFragParam(fp.paddedTailM, fp.tailM, fp.rankSize, fp.k), tailAddrListA_);\n     tailFragScaleA_ = Apace::Basic::MakeFragmentTensor<2, MAX_FRAG, MakeLayoutScaleA, AscendC::fp8_e8m0_t>(\n-        MakeFragParam(fp.paddedTailM, fp.tailM, fp.rankSize, fp.scaleKLen), addrListScale);\n+        MakeFragParam(fp.paddedTailM, fp.tailM, fp.rankSize, fp.scaleKLen), tailAddrListScale_);\n     tailFragC_ = Apace::Basic::MakeFragmentTensor<2, MAX_FRAG, MakeLayoutC, CType>(\n-        MakeFragParam(fp.paddedTailM, fp.tailM, fp.rankSize, fp.n), addrListC);\n+        MakeFragParam(fp.paddedTailM, fp.tailM, fp.rankSize, fp.n), tailAddrListC_);\n }\n \n template <typename AType, typename BType, typename CType>\n@@ -529,23 +538,19 @@ __aicore__ inline void QmmMxKernelAgUdma<AType, BType, CType>::UpdateMainRoundAd\n     curRoundScaleOff_ += static_cast<uint64_t>(delta) * tileMScaleStride_;\n     curRoundCOff_ += static_cast<uint64_t>(delta) * tileMCStride_;\n \n-    constexpr uint32_t MAX_FRAG = Apace::Basic::MAX_FRAGMENT_COUNT;\n-    GM_ADDR addrListA[MAX_FRAG];\n-    GM_ADDR addrListScale[MAX_FRAG];\n-    GM_ADDR addrListC[MAX_FRAG];\n     uint32_t fragIdx = 0;\n     for (uint32_t r = 0; r < fp.rankSize; ++r) {\n         if (r == fp.rankId) {\n             continue;\n         }\n-        addrListA[fragIdx] = winDataRankBase_[r] + curRoundDataOff_;\n-        addrListScale[fragIdx] = winScaleRankBase_[r] + curRoundScaleOff_;\n-        addrListC[fragIdx] = cFragAddrs_[r] + curRoundCOff_;\n+        mainAddrListA_[fragIdx] = winDataRankBase_[r] + curRoundDataOff_;\n+        mainAddrListScale_[fragIdx] = winScaleRankBase_[r] + curRoundScaleOff_;\n+        mainAddrListC_[fragIdx] = cFragAddrs_[r] + curRoundCOff_;\n         fragIdx++;\n     }\n-    curMainA_.UpdateAddrList(addrListA);\n-    curMainScaleA_.UpdateAddrList(addrListScale);\n-    curMainC_.UpdateAddrList(addrListC);\n+    curMainA_.UpdateAddrList(mainAddrListA_);\n+    curMainScaleA_.UpdateAddrList(mainAddrListScale_);\n+    curMainC_.UpdateAddrList(mainAddrListC_);\n     curMainRoundIdx_ = roundIdx;\n }\n \n@@ -557,7 +562,7 @@ QmmMxKernelAgUdma<AType, BType, CType>::ResolveTileCtx(\n {\n     TileCtx ctx{};\n     if (mPos < headMainRows) {\n-        ctx.dependId = 0;\n+        ctx.dependTileIdx = 0;\n         ctx.region = HEAD;\n         ctx.regionMPos = mPos;\n         ctx.fragA = &headFragA_;\n@@ -567,7 +572,7 @@ QmmMxKernelAgUdma<AType, BType, CType>::ResolveTileCtx(\n     } else if (mPos < headMainRows + mainSectionRows) {\n         int64_t relPos = mPos - headMainRows;\n         ctx.roundIdx = static_cast<uint32_t>(relPos / mainRoundRows);\n-        ctx.dependId = ctx.roundIdx + 1;\n+        ctx.dependTileIdx = ctx.roundIdx + 1;\n         ctx.region = MAIN;\n         ctx.regionMPos = relPos % mainRoundRows;\n         ctx.fragA = &curMainA_;\n@@ -575,7 +580,7 @@ QmmMxKernelAgUdma<AType, BType, CType>::ResolveTileCtx(\n         ctx.fragC = &curMainC_;\n         ctx.rankCnt = static_cast<uint64_t>(rankSize - 1);\n     } else {\n-        ctx.dependId = commTurn;\n+        ctx.dependTileIdx = commTurn;\n         ctx.region = TAIL;\n         ctx.regionMPos = mPos - headMainRows - mainSectionRows;\n         ctx.fragA = &tailFragA_;\n",
+      "new_file": false,
+      "new_path": "mc2/common/op_kernel/apace/kernel/all_gather_quant_matmul/qmm_mx_kernel_ag_udma.h",
+      "old_path": "mc2/common/op_kernel/apace/kernel/all_gather_quant_matmul/qmm_mx_kernel_ag_udma.h",
+      "removed_lines": 49,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/1740f4beaf0111ef8e50790b8c030c0578d991c9/mc2/common/op_kernel/apace/kernel/all_gather_quant_matmul/qmm_mx_kernel_ag_udma.h",
+    "sha": "1740f4beaf0111ef8e50790b8c030c0578d991c9",
+    "source_branch": "master",
+    "source_project": {
+      "full_name": "mengziyu/ops-transformer_master",
+      "human_name": "mengziyu / ops-transformer_master",
+      "id": 10540481,
+      "path": "ops-transformer_master"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  },
+  {
+    "additions": 16,
+    "blob_id": "90c5ea2518066b28c1a2999941a4ddf9e1d295df",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/1740f4beaf0111ef8e50790b8c030c0578d991c9/mc2/common/op_kernel/apace/tests/st/all_gather_quant_matmul/cases.csv",
+    "deletions": 3,
+    "filename": "mc2/common/op_kernel/apace/tests/st/all_gather_quant_matmul/cases.csv",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 16,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -1,4 +1,17 @@\n-# AllGatherQuantMatmul Prefill ST cases\n-# M,K,N,rankNum\n-1024,4096,2560,4\n+m,k,n,rank_num\n 2048,4096,2560,4\n+2061,4096,2560,4\n+3072,4096,2560,4\n+3085,4096,2560,4\n+4096,4096,2560,4\n+4109,4096,2560,4\n+8192,4096,2560,4\n+8205,4096,2560,4\n+2048,4096,6144,4\n+2061,4096,6144,4\n+3072,4096,6144,4\n+3085,4096,6144,4\n+4096,4096,6144,4\n+4109,4096,6144,4\n+8192,4096,6144,4\n+8205,4096,6144,4\n",
+      "new_file": false,
+      "new_path": "mc2/common/op_kernel/apace/tests/st/all_gather_quant_matmul/cases.csv",
+      "old_path": "mc2/common/op_kernel/apace/tests/st/all_gather_quant_matmul/cases.csv",
+      "removed_lines": 3,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/1740f4beaf0111ef8e50790b8c030c0578d991c9/mc2/common/op_kernel/apace/tests/st/all_gather_quant_matmul/cases.csv",
+    "sha": "1740f4beaf0111ef8e50790b8c030c0578d991c9",
+    "source_branch": "master",
+    "source_project": {
+      "full_name": "mengziyu/ops-transformer_master",
+      "human_name": "mengziyu / ops-transformer_master",
+      "id": 10540481,
+      "path": "ops-transformer_master"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  },
+  {
+    "additions": 268,
+    "blob_id": "82b048e7631112c716c3827009c2f02a7c198e27",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/1740f4beaf0111ef8e50790b8c030c0578d991c9/mc2/common/op_kernel/apace/tests/st/all_gather_quant_matmul/run.sh",
+    "deletions": 61,
+    "filename": "mc2/common/op_kernel/apace/tests/st/all_gather_quant_matmul/run.sh",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 268,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -1,34 +1,99 @@\n #!/bin/bash\n # run.sh — apace AllGatherQuantMatmul Prefill ST\n #\n+# 流程: 生成数据 -> 编译 -> 多 rank 运行 -> 精度比对\n+#\n # 用法:\n-#   bash run.sh                        # 运行 cases.csv 全部 case\n+#   bash run.sh                        # 无参数: 列出 cases.csv 全部 case，依次运行\n #   bash run.sh 1                      # 运行 CSV 第 1 行\n-#   bash run.sh --cli m k n r          # 命令行模式\n+#   bash run.sh 1 3 5                  # 运行 CSV 第 1/3/5 行\n+#   bash run.sh 2-4                    # 运行 CSV 第 2~4 行\n+#   bash run.sh all                    # 运行 CSV 全部行\n+#   bash run.sh --csv <file> 1 3       # 指定 csv 文件 + 行号\n+#   bash run.sh --cli m k n r          # 命令行模式(绕过 csv)\n #   bash run.sh --skip-build ...       # 跳过编译\n+#   bash run.sh --gen-only ...         # 仅生成 CPU golden\n+#   bash run.sh --verify-only ...      # 仅精度比对\n+#   bash run.sh --perf ...             # 性能模式(msprof采集)\n+#   环境变量 KERNEL_TIMEOUT=<秒>       # 覆盖默认超时(600s)\n+#   perf 模式跑完后: python3 scripts/parse_prof.py --all  解析性能数据\n set -e\n \n SCRIPT_DIR=\"$(cd \"$(dirname \"${BASH_SOURCE[0]}\")\" && pwd)\"\n ST_DIR=\"$(cd \"${SCRIPT_DIR}/..\" && pwd)\"\n BUILD_DIR=\"${ST_DIR}/build\"\n+PROF_DIR=\"${SCRIPT_DIR}/prof\"\n+KERNEL_TIMEOUT=${KERNEL_TIMEOUT:-600}  # 默认600秒(10分钟)，可用环境变量 KERNEL_TIMEOUT 覆盖\n \n-SKIP_BUILD=0\n+SKIP_BUILD=0; GEN_ONLY=0; VERIFY_ONLY=0; CLI_MODE=0; PERF_MODE=0\n CSV_FILE=\"${SCRIPT_DIR}/cases.csv\"\n \n+# ---- 解析参数 ----\n ARGS=()\n while [ $# -gt 0 ]; do\n     case \"$1\" in\n         --skip-build)  SKIP_BUILD=1; shift ;;\n+        --gen-only)    GEN_ONLY=1; shift ;;\n+        --verify-only) VERIFY_ONLY=1; shift ;;\n         --cli)         CLI_MODE=1; shift ;;\n+        --csv)         CSV_FILE=\"$2\"; shift 2 ;;\n+        --perf)        PERF_MODE=1; shift ;;\n         -h|--help)\n-            sed -n '1,15p' \"$0\"; exit 0 ;;\n+            sed -n '1,20p' \"$0\"; exit 0 ;;\n         *)\n             ARGS+=(\"$1\"); shift ;;\n     esac\n done\n \n+if [ \"$GEN_ONLY\" -eq 1 ] && [ \"$VERIFY_ONLY\" -eq 1 ]; then\n+    echo \"ERROR: --gen-only and --verify-only are mutually exclusive\"; exit 1\n+fi\n+if [ \"$PERF_MODE\" -eq 1 ] && [ \"$VERIFY_ONLY\" -eq 1 ]; then\n+    echo \"ERROR: --perf and --verify-only are mutually exclusive\"; exit 1\n+fi\n+\n+# ---- 将行号参数展开为列表（支持 \"1 3 5\"、\"2-4\"、\"all\"）----\n+expand_rows() {\n+    local input=(\"$@\")\n+    local result=()\n+    for item in \"${input[@]}\"; do\n+        if [ \"$item\" = \"all\" ]; then\n+            for ((i=1; i<=TOTAL_LINES; i++)); do result+=($i); done\n+        elif [[ \"$item\" =~ ^([0-9]+)-([0-9]+)$ ]]; then\n+            local start=${BASH_REMATCH[1]} end=${BASH_REMATCH[2]}\n+            for ((i=start; i<=end; i++)); do result+=($i); done\n+        elif [[ \"$item\" =~ ^[0-9]+$ ]]; then\n+            result+=($item)\n+        fi\n+    done\n+    echo \"${result[@]}\"\n+}\n+\n+# ---- 环境检查（提前做，避免多行重复）----\n+if [ -n \"${ASCEND_HOME_PATH:-}\" ] && [ -f \"${ASCEND_HOME_PATH}/set_env.sh\" ]; then\n+    source \"${ASCEND_HOME_PATH}/set_env.sh\" >/dev/null 2>&1 || true\n+else\n+    echo \"ERROR: ASCEND_HOME_PATH not set or set_env.sh missing\"; exit 1\n+fi\n command -v python3 >/dev/null || { echo \"ERROR: python3 not available\"; exit 1; }\n \n+# ---- 获取 prof 目录列表（用于 msprof 前后对比找新增目录）----\n+get_prof_dirs() {\n+    find \"$PROF_DIR\" -maxdepth 1 -mindepth 1 -type d -printf '%f\\n' 2>/dev/null | sort || true\n+}\n+\n+# ---- perf 模式结束后提示用户解析性能数据 ----\n+print_perf_hint() {\n+    if [ \"$PERF_MODE\" -eq 1 ]; then\n+        echo \"\"\n+        echo \"==========================================\"\n+        echo \"Performance data saved to: $PROF_DIR\"\n+        echo \"Parse with: python3 scripts/parse_prof.py --all\"\n+        echo \"==========================================\"\n+    fi\n+}\n+\n+# ---- 单 case 执行函数 ----\n run_single() {\n     local M=$1 K=$2 N=$3 RANK_NUM=$4\n     echo \"\"\n@@ -40,72 +105,204 @@ run_single() {\n     cd \"$SCRIPT_DIR\"\n     rm -rf input output\n \n+    # ---- 1. 生成数据 ----\n     echo \"[1/4] Generate CPU golden + input data...\"\n     python3 scripts/gen_data.py \"$M\" \"$K\" \"$N\" \"$RANK_NUM\"\n \n-    if [ \"$SKIP_BUILD\" -eq 0 ]; then\n-        echo \"[2/4] Build...\"\n-        rm -rf \"$BUILD_DIR\"\n-        mkdir -p \"$BUILD_DIR\"\n-        cmake -S \"$ST_DIR\" -B \"$BUILD_DIR\" || { echo \"ERROR: cmake failed\"; return 1; }\n-        cmake --build \"$BUILD_DIR\" --target apace_ag_qmm_st --parallel 4 || { echo \"ERROR: build failed\"; return 1; }\n-    else\n-        [ -x \"$BUILD_DIR/all_gather_quant_matmul/apace_ag_qmm_st\" ] || { echo \"ERROR: --skip-build but binary missing\"; return 1; }\n-        echo \"[2/4] Skip build (--skip-build)\"\n-    fi\n \n-    echo \"[3/4] NPU run ($RANK_NUM ranks)...\"\n-    local EXE_PATH=\"$BUILD_DIR/all_gather_quant_matmul/apace_ag_qmm_st\"\n-    local EXE_DIR=\"$(dirname \"$EXE_PATH\")\"\n-    rm -rf \"$EXE_DIR/input\" \"$EXE_DIR/output\"\n-    cp -r input \"$EXE_DIR/input\"\n-    mkdir -p \"$EXE_DIR/output\"\n-    for r in $(seq 0 $((RANK_NUM-1))); do\n-        mkdir -p \"$EXE_DIR/output/$r\"\n-    done\n+    if [ \"$GEN_ONLY\" -eq 1 ]; then return 0; fi\n \n-    MAX_RETRY=3\n-    RETRY=0\n-    while [ ${RETRY} -lt ${MAX_RETRY} ]; do\n-        fuser -k 8998/tcp 2>/dev/null || true\n-        sleep 1\n-\n-        KERNEL_OUT=$(\"$EXE_PATH\" $M $K $N $RANK_NUM 2>&1)\n-        KERNEL_RC=$?\n-        echo \"${KERNEL_OUT}\"\n-\n-        if [ ${KERNEL_RC} -eq 0 ] && echo \"${KERNEL_OUT}\" | grep -q \"Status: SUCCESS\"; then\n-            echo \"  Kernel finished!\"\n-            break\n+    # ---- 2. 编译 ----\n+    if [ \"$VERIFY_ONLY\" -eq 0 ]; then\n+        if [ \"$SKIP_BUILD\" -eq 0 ]; then\n+            echo \"[2/4] Build...\"\n+            mkdir -p \"$BUILD_DIR\"\n+            cmake -S \"$ST_DIR\" -B \"$BUILD_DIR\" || { echo \"ERROR: cmake failed\"; return 1; }\n+            cmake --build \"$BUILD_DIR\" --target apace_ag_qmm_st --parallel 4 || { echo \"ERROR: build failed\"; return 1; }\n+        else\n+            [ -x \"$BUILD_DIR/all_gather_quant_matmul/apace_ag_qmm_st\" ] || { echo \"ERROR: --skip-build but binary missing\"; return 1; }\n+            echo \"[2/4] Skip build (--skip-build)\"\n         fi\n \n-        if echo \"${KERNEL_OUT}\" | grep -q \"connect peers failed\"; then\n-            RETRY=$((RETRY + 1))\n-            echo \"  [retry ${RETRY}/${MAX_RETRY}] connect conflict...\"\n-            sleep 2\n-            continue\n+        # ---- 3. 多 rank 运行 ----\n+        echo \"[3/4] NPU run ($RANK_NUM ranks)...\"\n+        local EXE_PATH=\"$BUILD_DIR/all_gather_quant_matmul/apace_ag_qmm_st\"\n+        local EXE_DIR=\"$(dirname \"$EXE_PATH\")\"\n+        rm -rf \"$EXE_DIR/input\" \"$EXE_DIR/output\"\n+        cp -r input \"$EXE_DIR/input\"\n+        mkdir -p \"$EXE_DIR/output\"\n+        for r in $(seq 0 $((RANK_NUM-1))); do\n+            mkdir -p \"$EXE_DIR/output/$r\"\n+        done\n+\n+        MAX_RETRY=3\n+        RETRY=0\n+        local MODE=\"precision\"\n+        [ \"$PERF_MODE\" -eq 1 ] && MODE=\"perf\"\n+        while [ ${RETRY} -lt ${MAX_RETRY} ]; do\n+            if command -v fuser >/dev/null 2>&1; then\n+                fuser -k 8998/tcp 2>/dev/null || true\n+            else\n+                echo \"  [WARN] fuser not installed, skip port cleanup\"\n+            fi\n+            sleep 1\n+\n+            if [ \"$PERF_MODE\" -eq 1 ]; then\n+                # ---- perf 模式: msprof 包裹 exe ----\n+                if ! command -v msprof >/dev/null 2>&1; then\n+                    echo \"ERROR: msprof not found in PATH\"; return 1\n+                fi\n+                mkdir -p \"$PROF_DIR\"\n+                local before_dirs after_dirs new_dirs\n+                before_dirs=$(get_prof_dirs)\n+\n+                echo \"  [msprof] Running $EXE_PATH $M $K $N $RANK_NUM $MODE ...\"\n+                if command -v timeout >/dev/null 2>&1; then\n+                    set +e\n+                    timeout ${KERNEL_TIMEOUT}s msprof --output=\"$PROF_DIR\" \\\n+                        --application=\"$EXE_PATH $M $K $N $RANK_NUM $MODE\" 2>&1\n+                    local MSPROF_RC=$?\n+                    set -e\n+                else\n+                    set +e\n+                    msprof --output=\"$PROF_DIR\" \\\n+                        --application=\"$EXE_PATH $M $K $N $RANK_NUM $MODE\" 2>&1\n+                    local MSPROF_RC=$?\n+                    set -e\n+                fi\n+\n+                if [ ${MSPROF_RC} -eq 124 ]; then\n+                    echo \"ERROR: msprof timeout after ${KERNEL_TIMEOUT}s\"\n+                    return 1\n+                fi\n+\n+                after_dirs=$(get_prof_dirs)\n+                new_dirs=\"\"\n+                for d in $after_dirs; do\n+                    if ! echo \"$before_dirs\" | grep -qFx \"$d\"; then\n+                        new_dirs=\"$new_dirs $d\"\n+                    fi\n+                done\n+                new_dirs=$(echo \"$new_dirs\" | xargs)\n+\n+                if [ -z \"$new_dirs\" ]; then\n+                    echo \"  [retry ${RETRY}/${MAX_RETRY}] No new PROF dirs created\"\n+                    RETRY=$((RETRY + 1))\n+                    sleep 2\n+                    continue\n+                fi\n+\n+                for d in $new_dirs; do\n+                    echo \"M=$M K=$K N=$N\" > \"$PROF_DIR/$d/case_info.txt\"\n+                done\n+\n+                # ---- 校验 PROF 数据有效性（op_summary CSV 是否能解析出 latency）----\n+                local parse_out latency\n+                set +e\n+                parse_out=$(python3 scripts/parse_prof.py --check-latest-threshold 999999999 \\\n+                    --mkn \"$M $K $N\" --prof-dir \"$PROF_DIR\" 2>/dev/null)\n+                set -e\n+                latency=$(echo \"$parse_out\" | grep -E '^[0-9]+\\.[0-9]+$' | head -1)\n+\n+                if [ -z \"$latency\" ]; then\n+                    echo \"  [retry ${RETRY}/${MAX_RETRY}] Cannot parse latency from PROF data\"\n+                    for d in $new_dirs; do rm -rf \"$PROF_DIR/$d\"; done\n+                    RETRY=$((RETRY + 1))\n+                    sleep 2\n+                    continue\n+                fi\n+                echo \"  [msprof] latency=${latency}us\"\n+\n+                cd \"$SCRIPT_DIR\"\n+                for r in $(seq 0 $((RANK_NUM-1))); do\n+                    mkdir -p \"output/$r\"\n+                    cp \"$EXE_DIR/output/$r/npu_out.bin\" \"output/$r/npu_out.bin\" 2>/dev/null || true\n+                done\n+\n+                local precision=\"FAIL\"\n+                if [ -d \"$SCRIPT_DIR/output\" ]; then\n+                    set +e\n+                    precision=$(python3 scripts/verify_result.py \"$M\" \"$N\" \"$RANK_NUM\" \"$SCRIPT_DIR/output\" --check 2>/dev/null)\n+                    [ -z \"$precision\" ] && precision=\"FAIL\"\n+                    set -e\n+                fi\n+\n+                for d in $new_dirs; do\n+                    echo \"$precision\" > \"$PROF_DIR/$d/case_precision.txt\"\n+                done\n+\n+                if [ \"$precision\" != \"PASS\" ]; then\n+                    echo \"  [retry ${RETRY}/${MAX_RETRY}] Precision FAILED\"\n+                    for d in $new_dirs; do rm -rf \"$PROF_DIR/$d\"; done\n+                    RETRY=$((RETRY + 1))\n+                    sleep 2\n+                    continue\n+                fi\n+\n+                echo \"  [OK] msprof done, precision=PASS, dirs=$new_dirs\"\n+                break\n+            else\n+                # ---- precision 模式: 直接调 exe ----\n+                if command -v timeout >/dev/null 2>&1; then\n+                    set +e\n+                    KERNEL_OUT=$(timeout ${KERNEL_TIMEOUT}s \"$EXE_PATH\" $M $K $N $RANK_NUM \"$MODE\" 2>&1)\n+                    KERNEL_RC=$?\n+                    set -e\n+                else\n+                    set +e\n+                    KERNEL_OUT=$(\"$EXE_PATH\" $M $K $N $RANK_NUM \"$MODE\" 2>&1)\n+                    KERNEL_RC=$?\n+                    set -e\n+                fi\n+                echo \"${KERNEL_OUT}\"\n+\n+                if [ ${KERNEL_RC} -eq 124 ]; then\n+                    echo \"ERROR: Kernel timeout after ${KERNEL_TIMEOUT}s\"\n+                    return 1\n+                fi\n+\n+                if [ ${KERNEL_RC} -eq 0 ] && echo \"${KERNEL_OUT}\" | grep -q \"Status: SUCCESS\"; then\n+                    echo \"  Kernel finished!\"\n+                    break\n+                fi\n+\n+                if echo \"${KERNEL_OUT}\" | grep -q \"connect peers failed\"; then\n+                    RETRY=$((RETRY + 1))\n+                    echo \"  [retry ${RETRY}/${MAX_RETRY}] connect conflict...\"\n+                    sleep 2\n+                    continue\n+                fi\n+\n+                echo \"ERROR: Kernel failed\"\n+                return 1\n+            fi\n+        done\n+\n+        if [ ${RETRY} -ge ${MAX_RETRY} ]; then\n+            echo \"ERROR: Max retries exceeded\"\n+            return 1\n         fi\n \n-        echo \"ERROR: Kernel failed\"\n-        return 1\n-    done\n-\n-    if [ ${RETRY} -ge ${MAX_RETRY} ]; then\n-        echo \"ERROR: Max retries exceeded\"\n-        return 1\n+        if [ \"$PERF_MODE\" -eq 0 ]; then\n+            cd \"$SCRIPT_DIR\"\n+            for r in $(seq 0 $((RANK_NUM-1))); do\n+                mkdir -p \"output/$r\"\n+                cp \"$EXE_DIR/output/$r/npu_out.bin\" \"output/$r/npu_out.bin\" 2>/dev/null || true\n+            done\n+        fi\n     fi\n \n-    cd \"$SCRIPT_DIR\"\n-    for r in $(seq 0 $((RANK_NUM-1))); do\n-        mkdir -p \"output/$r\"\n-        cp \"$EXE_DIR/output/$r/npu_out.bin\" \"output/$r/npu_out.bin\" 2>/dev/null || true\n-    done\n-\n-    echo \"[4/4] Verify...\"\n-    python3 scripts/verify_result.py \"$M\" \"$N\" \"$RANK_NUM\" \"./output\"\n-    return $?\n+    # ---- 4. 精度比对（perf 模式已在步骤3内完成 verify，此处跳过）----\n+    if [ \"$PERF_MODE\" -eq 0 ]; then\n+        echo \"[4/4] Verify...\"\n+        python3 scripts/verify_result.py \"$M\" \"$N\" \"$RANK_NUM\" \"./output\"\n+        return $?\n+    fi\n+    echo \"[4/4] Verify (done in perf loop)\"\n+    return 0\n }\n \n+# ---- 选择参数来源 ----\n if [ \"${CLI_MODE:-0}\" -eq 1 ]; then\n     M=2048; K=3584; N=4096; RANK_NUM=4\n     idx=0\n@@ -114,16 +311,20 @@ if [ \"${CLI_MODE:-0}\" -eq 1 ]; then\n     [ $idx -lt ${#ARGS[@]} ] && { N=${ARGS[$idx]}; idx=$((idx+1)); }\n     [ $idx -lt ${#ARGS[@]} ] && { RANK_NUM=${ARGS[$idx]}; idx=$((idx+1)); }\n     run_single \"$M\" \"$K\" \"$N\" \"$RANK_NUM\"\n-    exit $?\n+    rc=$?\n+    print_perf_hint\n+    exit $rc\n fi\n \n+# ---- CSV 模式 ----\n if [ ! -f \"$CSV_FILE\" ]; then\n     echo \"ERROR: CSV not found: $CSV_FILE\"; exit 1\n fi\n \n-DATA_LINES=$(grep -v '^#' \"$CSV_FILE\" | grep -v '^$')\n+DATA_LINES=$(grep -v '^#' \"$CSV_FILE\" | grep -v '^$' | tail -n +2)\n TOTAL_LINES=$(echo \"$DATA_LINES\" | grep -c .)\n \n+# 无参数: 列出全部 case 并全部运行\n if [ ${#ARGS[@]} -eq 0 ]; then\n     echo \"==== cases.csv ($TOTAL_LINES cases) ====\"\n     echo \"Row  M      K     N     rank\"\n@@ -136,9 +337,10 @@ if [ ${#ARGS[@]} -eq 0 ]; then\n     echo \"Running all $TOTAL_LINES cases...\"\n     SELECTED_ROWS=($(seq 1 $TOTAL_LINES))\n else\n-    SELECTED_ROWS=(\"${ARGS[@]}\")\n+    SELECTED_ROWS=($(expand_rows \"${ARGS[@]}\"))\n fi\n \n+# 校验行号范围\n for row in \"${SELECTED_ROWS[@]}\"; do\n     if [ \"$row\" -lt 1 ] || [ \"$row\" -gt \"$TOTAL_LINES\" ]; then\n         echo \"ERROR: row $row out of range (1-$TOTAL_LINES)\"; exit 1\n@@ -147,6 +349,7 @@ done\n \n echo \"==== Running ${#SELECTED_ROWS[@]} case(s): ${SELECTED_ROWS[*]} ====\"\n \n+# ---- 逐行执行 ----\n PASS_CNT=0; FAIL_CNT=0\n RESULTS=()\n \n@@ -167,9 +370,11 @@ for row in \"${SELECTED_ROWS[@]}\"; do\n         FAIL_CNT=$((FAIL_CNT + 1))\n         RESULTS+=(\"FAIL  row$row  M=$M K=$K N=$N rank=$RANK_NUM\")\n     fi\n+    # 首次编译后，后续 case 跳过编译\n     SKIP_BUILD=1\n done\n \n+# ---- 汇总 ----\n echo \"\"\n echo \"==========================================\"\n echo \"Summary: PASS=$PASS_CNT  FAIL=$FAIL_CNT  total=${#SELECTED_ROWS[@]}\"\n@@ -178,4 +383,6 @@ for r in \"${RESULTS[@]}\"; do\n     echo \"  $r\"\n done\n \n-[ \"$FAIL_CNT\" -eq 0 ]\n+print_perf_hint\n+\n+if [ \"$FAIL_CNT\" -eq 0 ]; then exit 0; else exit 1; fi\n",
+      "new_file": false,
+      "new_path": "mc2/common/op_kernel/apace/tests/st/all_gather_quant_matmul/run.sh",
+      "old_path": "mc2/common/op_kernel/apace/tests/st/all_gather_quant_matmul/run.sh",
+      "removed_lines": 61,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/1740f4beaf0111ef8e50790b8c030c0578d991c9/mc2/common/op_kernel/apace/tests/st/all_gather_quant_matmul/run.sh",
+    "sha": "1740f4beaf0111ef8e50790b8c030c0578d991c9",
+    "source_branch": "master",
+    "source_project": {
+      "full_name": "mengziyu/ops-transformer_master",
+      "human_name": "mengziyu / ops-transformer_master",
+      "id": 10540481,
+      "path": "ops-transformer_master"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  },
+  {
+    "additions": 12,
+    "blob_id": "bc5de51591cc290cc3c4ce94bc7a73ac6ac48a57",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/1740f4beaf0111ef8e50790b8c030c0578d991c9/mc2/common/op_kernel/apace/tests/st/all_gather_quant_matmul/scripts/gen_data.py",
+    "deletions": 1,
+    "filename": "mc2/common/op_kernel/apace/tests/st/all_gather_quant_matmul/scripts/gen_data.py",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 12,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -1,5 +1,16 @@\n-#!/usr/bin/env python3\n+#!/usr/bin/python3\n # coding=utf-8\n+\n+# ----------------------------------------------------------------------------------------------------------\n+# Copyright (c) 2026 Huawei Technologies Co., Ltd.\n+# This program is free software, you can redistribute it and/or modify it under terms and conditions of\n+# CANN Open Software License Agreement Version 2.0 (the \"License\").\n+# Please refer to the License for details. You may not use this file except in compliance with the License.\n+# THIS SOFTWARE IS PROVIDED ON AN \"AS IS\" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,\n+# INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.\n+# See LICENSE in the root of the software repository for the full text of the License.\n+# ----------------------------------------------------------------------------------------------------------\n+\n \"\"\"\n Generate MXFP8 test data for AllGatherQuantMatmul operator.\n \n",
+      "new_file": false,
+      "new_path": "mc2/common/op_kernel/apace/tests/st/all_gather_quant_matmul/scripts/gen_data.py",
+      "old_path": "mc2/common/op_kernel/apace/tests/st/all_gather_quant_matmul/scripts/gen_data.py",
+      "removed_lines": 1,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/1740f4beaf0111ef8e50790b8c030c0578d991c9/mc2/common/op_kernel/apace/tests/st/all_gather_quant_matmul/scripts/gen_data.py",
+    "sha": "1740f4beaf0111ef8e50790b8c030c0578d991c9",
+    "source_branch": "master",
+    "source_project": {
+      "full_name": "mengziyu/ops-transformer_master",
+      "human_name": "mengziyu / ops-transformer_master",
+      "id": 10540481,
+      "path": "ops-transformer_master"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  },
+  {
+    "additions": 47,
+    "blob_id": "d14e4b195e86e0fe065ee9d09e353f6717b8a4a5",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/1740f4beaf0111ef8e50790b8c030c0578d991c9/mc2/common/op_kernel/apace/tests/st/all_gather_quant_matmul/scripts/parse_prof.py",
+    "deletions": 22,
+    "filename": "mc2/common/op_kernel/apace/tests/st/all_gather_quant_matmul/scripts/parse_prof.py",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 47,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -1,4 +1,16 @@\n-#!/usr/bin/env python3\n+#!/usr/bin/python3\n+# coding=utf-8\n+\n+# ----------------------------------------------------------------------------------------------------------\n+# Copyright (c) 2026 Huawei Technologies Co., Ltd.\n+# This program is free software, you can redistribute it and/or modify it under terms and conditions of\n+# CANN Open Software License Agreement Version 2.0 (the \"License\").\n+# Please refer to the License for details. You may not use this file except in compliance with the License.\n+# THIS SOFTWARE IS PROVIDED ON AN \"AS IS\" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,\n+# INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.\n+# See LICENSE in the root of the software repository for the full text of the License.\n+# ----------------------------------------------------------------------------------------------------------\n+\n \"\"\"Parse msprof op_summary CSVs and compute operator latency.\n \n Groups PROF_* directories by collection timestamp into separate cases.\n@@ -21,6 +33,14 @@ _DEFAULT_PROF = os.path.join(\n )\n KERNEL_SUBSTR = \"AllGatherQuantMatmulKernel\"\n GROUP_THRESHOLD_S = 5\n+OUTLIER_FACTOR = 1.2\n+WARMUP_SKIP = 3  # 删除前 N 轮数据（冷启动 + 预热）\n+\n+\n+def filter_outliers(durs, factor=OUTLIER_FACTOR):\n+    min_val = min(durs)\n+    threshold = min_val * factor\n+    return [d for d in durs if d <= threshold]\n \n _TS_RE = re.compile(r\"PROF_\\d+_(\\d{17})_\")\n \n@@ -132,34 +152,39 @@ def report_case(prof_base, case_dirs, case_idx, mkn_str=None):\n         print(f\"  {info_line}\")\n     print(\"  \" + \"-\" * 58)\n     for dev in sorted(all_devices.keys(), key=lambda x: int(x)):\n-        durs = sorted(all_devices[dev])\n-        med = median(durs)\n-        medians.append(med)\n+        raw_durs = all_devices[dev]\n+        total_cnt = len(raw_durs)\n+        warmup_cnt = min(WARMUP_SKIP, total_cnt)\n+        remaining = raw_durs[warmup_cnt:] if total_cnt > WARMUP_SKIP else raw_durs\n+        durs = sorted(remaining)\n+        filtered = filter_outliers(durs)\n+        rank_avg = sum(filtered) / len(filtered)\n+        medians.append(rank_avg)\n         cube_vals = all_cubes.get(dev, [0.0])\n         cube_med = median(cube_vals)\n         cube_medians.append(cube_med)\n         print(\n-            f\"    Rank {dev:4s} | {len(durs):3d} iters | \"\n-            f\"median={med:.3f} us | min={durs[0]:.3f} us | max={durs[-1]:.3f} us | \"\n+            f\"    Rank {dev:4s} | {total_cnt} total, {warmup_cnt} warmup skipped, \"\n+            f\"{len(remaining)} remaining, {len(filtered)} valid ({len(remaining) - len(filtered)} filtered) | \"\n+            f\"avg={rank_avg:.3f} us | min={durs[0]:.3f} us | max={durs[-1]:.3f} us | \"\n             f\"cube={cube_med:.1f}%\"\n         )\n         for i, d in enumerate(durs):\n-            print(f\"                 iter[{i:2d}] = {d:.3f} us\")\n+            tag = \" *outlier*\" if d > min(durs) * OUTLIER_FACTOR else \"\"\n+            print(f\"                 iter[{i:2d}] = {d:.3f} us{tag}\")\n \n     avg = sum(medians) / len(medians)\n-    cube_avg = sum(cube_medians) / len(cube_medians) if cube_medians else 0.0\n     print(\"  \" + \"-\" * 58)\n     print(\n-        f\"    Overall latency (avg of card medians): \"\n+        f\"    Overall latency (avg of card avgs): \"\n         f\"{avg:.3f} us  ({len(medians)} cards)\"\n     )\n-    print(f\"    Cube utilization (avg of card medians): {cube_avg:.1f}%\")\n \n     precision = read_case_precision(prof_base, case_dirs)\n     if precision:\n         print(f\"    Precision: {precision}\")\n     print()\n-    return avg, info, precision, cube_avg\n+    return avg, info, precision\n \n \n def print_summary(results):\n@@ -167,10 +192,10 @@ def print_summary(results):\n     print(\"=\" * 72)\n     print(\"Summary\")\n     print(\"=\" * 72)\n-    header = f\"  {'Case':>4s}  {'M':>5s}  {'K':>5s}  {'N':>5s}  {'Latency(us)':>12s}  {'Cube(%)':>7s}  {'Precision':<8s}\"\n+    header = f\"  {'Case':>4s}  {'M':>5s}  {'K':>5s}  {'N':>5s}  {'Latency(us)':>12s}  {'Precision':<8s}\"\n     print(header)\n     print(\"  \" + \"-\" * (len(header) - 2))\n-    for case_idx, info, avg, precision, cube_avg in results:\n+    for case_idx, info, avg, precision in results:\n         parts = dict()\n         if info:\n             for kv in info.split():\n@@ -181,7 +206,7 @@ def print_summary(results):\n         k = parts.get(\"K\", \"N/A\")\n         n = parts.get(\"N\", \"N/A\")\n         prec = precision if precision else \"N/A\"\n-        print(f\"  {case_idx:4d}  {m:>5s}  {k:>5s}  {n:>5s}  {avg:12.3f}  {cube_avg:7.1f}  {prec:<8s}\")\n+        print(f\"  {case_idx:4d}  {m:>5s}  {k:>5s}  {n:>5s}  {avg:12.3f}  {prec:<8s}\")\n     print()\n \n \n@@ -215,7 +240,7 @@ def main():\n         idx = len(cases)\n         ret = report_case(prof_base, cases[-1], idx, args.mkn)\n         if ret:\n-            avg, info, precision, cube_avg = ret\n+            avg, info, precision = ret\n             print(f\"{avg:.3f}\")\n             if avg <= args.check_latest_threshold:\n                 return 0\n@@ -226,7 +251,7 @@ def main():\n     print(f\"Found {len(cases)} case(s) in {prof_base}\\n\")\n \n     print(\"=\" * 64)\n-    print(\"AllGatherQuantMatmul — Per-Card Latency (median of iterations)\")\n+    print(\"AllGatherQuantMatmul — Per-Card Latency (avg, outliers > 2x min excluded)\")\n     print(\"=\" * 64)\n \n     results = []\n@@ -234,8 +259,8 @@ def main():\n         for i, case_dirs in enumerate(cases, 1):\n             ret = report_case(prof_base, case_dirs, i, args.mkn)\n             if ret:\n-                avg, info, precision, cube_avg = ret\n-                results.append((i, info, avg, precision, cube_avg))\n+                avg, info, precision = ret\n+                results.append((i, info, avg, precision))\n     elif args.case is not None:\n         if args.case < 1 or args.case > len(cases):\n             print(f\"--case {args.case} out of range (1..{len(cases)})\",\n@@ -243,14 +268,14 @@ def main():\n             return 1\n         ret = report_case(prof_base, cases[args.case - 1], args.case, args.mkn)\n         if ret:\n-            avg, info, precision, cube_avg = ret\n-            results.append((args.case, info, avg, precision, cube_avg))\n+            avg, info, precision = ret\n+            results.append((args.case, info, avg, precision))\n     else:\n         idx = len(cases)\n         ret = report_case(prof_base, cases[-1], idx, args.mkn)\n         if ret:\n-            avg, info, precision, cube_avg = ret\n-            results.append((idx, info, avg, precision, cube_avg))\n+            avg, info, precision = ret\n+            results.append((idx, info, avg, precision))\n \n     if results:\n         print_summary(results)\n",
+      "new_file": false,
+      "new_path": "mc2/common/op_kernel/apace/tests/st/all_gather_quant_matmul/scripts/parse_prof.py",
+      "old_path": "mc2/common/op_kernel/apace/tests/st/all_gather_quant_matmul/scripts/parse_prof.py",
+      "removed_lines": 22,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/1740f4beaf0111ef8e50790b8c030c0578d991c9/mc2/common/op_kernel/apace/tests/st/all_gather_quant_matmul/scripts/parse_prof.py",
+    "sha": "1740f4beaf0111ef8e50790b8c030c0578d991c9",
+    "source_branch": "master",
+    "source_project": {
+      "full_name": "mengziyu/ops-transformer_master",
+      "human_name": "mengziyu / ops-transformer_master",
+      "id": 10540481,
+      "path": "ops-transformer_master"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  },
+  {
+    "additions": 12,
+    "blob_id": "bdd0f188ea81d85ad14596f94d6d0de1a2e79c96",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/1740f4beaf0111ef8e50790b8c030c0578d991c9/mc2/common/op_kernel/apace/tests/st/all_gather_quant_matmul/scripts/verify_result.py",
+    "deletions": 1,
+    "filename": "mc2/common/op_kernel/apace/tests/st/all_gather_quant_matmul/scripts/verify_result.py",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 12,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -1,5 +1,16 @@\n-#!/usr/bin/env python3\n+#!/usr/bin/python3\n # coding=utf-8\n+\n+# ----------------------------------------------------------------------------------------------------------\n+# Copyright (c) 2026 Huawei Technologies Co., Ltd.\n+# This program is free software, you can redistribute it and/or modify it under terms and conditions of\n+# CANN Open Software License Agreement Version 2.0 (the \"License\").\n+# Please refer to the License for details. You may not use this file except in compliance with the License.\n+# THIS SOFTWARE IS PROVIDED ON AN \"AS IS\" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,\n+# INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.\n+# See LICENSE in the root of the software repository for the full text of the License.\n+# ----------------------------------------------------------------------------------------------------------\n+\n \"\"\"\n Verify AllGatherQuantMatmul operator output.\n \n",
+      "new_file": false,
+      "new_path": "mc2/common/op_kernel/apace/tests/st/all_gather_quant_matmul/scripts/verify_result.py",
+      "old_path": "mc2/common/op_kernel/apace/tests/st/all_gather_quant_matmul/scripts/verify_result.py",
+      "removed_lines": 1,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/1740f4beaf0111ef8e50790b8c030c0578d991c9/mc2/common/op_kernel/apace/tests/st/all_gather_quant_matmul/scripts/verify_result.py",
+    "sha": "1740f4beaf0111ef8e50790b8c030c0578d991c9",
+    "source_branch": "master",
+    "source_project": {
+      "full_name": "mengziyu/ops-transformer_master",
+      "human_name": "mengziyu / ops-transformer_master",
+      "id": 10540481,
+      "path": "ops-transformer_master"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  },
+  {
+    "additions": 43,
+    "blob_id": "e0a21693b14d5fb219864300eaf96d2b1220ec60",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/1740f4beaf0111ef8e50790b8c030c0578d991c9/mc2/common/op_kernel/apace/tests/st/all_gather_quant_matmul/src/main.cpp",
+    "deletions": 28,
+    "filename": "mc2/common/op_kernel/apace/tests/st/all_gather_quant_matmul/src/main.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 43,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -43,7 +43,7 @@ using namespace AllGatherQuantMatmulImpl;\n using namespace Apace::AivComm;\n \n using CommContext = Apace::AivComm::CommContext;\n-static constexpr int32_t BENCHMARK_ITERATIONS = 10;\n+static constexpr int32_t BENCHMARK_ITERATIONS = 20;\n static constexpr uint32_t TILE_M = 512;\n \n #define HCCL_CHECK(status) do { \\\n@@ -53,14 +53,15 @@ static constexpr uint32_t TILE_M = 512;\n   } \\\n } while (0)\n \n-void ParseArgs(int argc, char *argv[], int *m, int *k, int *n, int *rankNum)\n+void ParseArgs(int argc, char *argv[], int *m, int *k, int *n, int *rankNum, std::string &mode)\n {\n   if (argc >= 2 && (std::string(argv[1]) == \"--help\" || std::string(argv[1]) == \"-h\")) {\n-    std::cerr << \"Usage: \" << argv[0] << \" m k n rankNum\" << std::endl;\n+    std::cerr << \"Usage: \" << argv[0] << \" m k n rankNum [mode]\" << std::endl;\n     std::cerr << \"  m: row of matrix A per rank\" << std::endl;\n     std::cerr << \"  k: col of matrix A (= row of matrix B, full K)\" << std::endl;\n     std::cerr << \"  n: col of matrix B (total N)\" << std::endl;\n     std::cerr << \"  rankNum: number of ranks\" << std::endl;\n+    std::cerr << \"  mode: optional, 'precision' (default) | 'perf'\" << std::endl;\n     exit(1);\n   }\n   if (argc < 5) {\n@@ -83,6 +84,10 @@ void ParseArgs(int argc, char *argv[], int *m, int *k, int *n, int *rankNum)\n   if (CeilDiv(*k, static_cast<int>(::MXFP_DIVISOR_SIZE)) % 2 != 0) {\n     throw std::invalid_argument(\"ERROR: CeilDiv(K, 64) must be an even number\");\n   }\n+  mode = (argc >= 6) ? std::string(argv[5]) : std::string(\"precision\");\n+  if (mode != \"precision\" && mode != \"perf\") {\n+    throw std::invalid_argument(\"ERROR: mode must be 'precision' or 'perf'\");\n+  }\n }\n \n int LaunchKernel(uint32_t usedCoreNum, aclrtStream stream,\n@@ -96,7 +101,7 @@ int LaunchKernel(uint32_t usedCoreNum, aclrtStream stream,\n   return 0;\n }\n \n-int RunAllGatherQuantMatmul(int rankNum, int rankId, int m, int k, int n)\n+int RunAllGatherQuantMatmul(int rankNum, int rankId, int m, int k, int n, const std::string &mode)\n {\n   const char *ipport = \"tcp://127.0.0.1:8998\";\n   INFO_LOG(\"rankNum=%d, rankId=%d\", rankNum, rankId);\n@@ -117,6 +122,7 @@ int RunAllGatherQuantMatmul(int rankNum, int rankId, int m, int k, int n)\n \n   QuantMatmulTilingSwat<mm::DataType::DT_FLOAT8_E4M3FN, mm::DataType::DT_FLOAT8_E4M3FN> tilingEngine;\n   tilingEngine.SetOptimizeEnable(false);\n+  tilingEngine.SetMTailAlignEnable(true);\n   tilingEngine.GetTilingData(totalLogicalM, static_cast<uint32_t>(n),\n                   static_cast<uint32_t>(k), tilingData.mmTile);\n   tilingData.commTile.splitAxisTileSize = tileM;\n@@ -218,32 +224,40 @@ int RunAllGatherQuantMatmul(int rankNum, int rankId, int m, int k, int n)\n   printf(\"[Rank %d] Launching AllGatherQuantMatmulKernel...\\n\", rankId);\n   fflush(stdout);\n \n-  aclrtEvent kernelStartEvent = nullptr, kernelEndEvent = nullptr;\n-  ACL_CHECK(aclrtCreateEvent(&kernelStartEvent));\n-  ACL_CHECK(aclrtCreateEvent(&kernelEndEvent));\n-  ACL_CHECK(aclrtRecordEvent(kernelStartEvent, stream));\n-\n-  for (int i = 0; i < BENCHMARK_ITERATIONS; ++i) {\n-    LaunchKernel(tilingData.mmTile.usedCoreNum, stream, devContext,\n-               deviceA, deviceScaleA, deviceB, deviceScaleB, deviceOutput, tilingData);\n-  }\n-  ACL_CHECK(aclrtRecordEvent(kernelEndEvent, stream));\n+  LaunchKernel(tilingData.mmTile.usedCoreNum, stream, devContext,\n+             deviceA, deviceScaleA, deviceB, deviceScaleB, deviceOutput, tilingData);\n   ACL_CHECK(aclrtSynchronizeStream(stream));\n-\n-  float kernelElapsedMs = 0.0F;\n-  ACL_CHECK(aclrtEventElapsedTime(&kernelElapsedMs, kernelStartEvent, kernelEndEvent));\n-  double kernelElapsedUs = static_cast<double>(kernelElapsedMs) * 1000.0;\n-  printf(\"[Rank %d] Kernel completed! Elapsed time: %.3f us (avg over %d iterations)\\n\",\n-       rankId, kernelElapsedUs / BENCHMARK_ITERATIONS, BENCHMARK_ITERATIONS);\n-  fflush(stdout);\n-\n   size_t outputSize = static_cast<size_t>(rankNum) * m * n * sizeof(uint16_t);\n   ACL_CHECK(aclrtMemcpy(hostOutput.data(), outputSize, deviceOutput, outputSize, ACL_MEMCPY_DEVICE_TO_HOST));\n+\n+  int32_t iterations = (mode == \"perf\") ? BENCHMARK_ITERATIONS : 1;\n+  if (iterations > 1) {\n+      aclrtEvent kernelStartEvent = nullptr, kernelEndEvent = nullptr;\n+      ACL_CHECK(aclrtCreateEvent(&kernelStartEvent));\n+      ACL_CHECK(aclrtCreateEvent(&kernelEndEvent));\n+      ACL_CHECK(aclrtRecordEvent(kernelStartEvent, stream));\n+      for (int i = 1; i < iterations; ++i) {\n+          LaunchKernel(tilingData.mmTile.usedCoreNum, stream, devContext,\n+                     deviceA, deviceScaleA, deviceB, deviceScaleB, deviceOutput, tilingData);\n+      }\n+      ACL_CHECK(aclrtRecordEvent(kernelEndEvent, stream));\n+      ACL_CHECK(aclrtSynchronizeStream(stream));\n+\n+      float kernelElapsedMs = 0.0F;\n+      ACL_CHECK(aclrtEventElapsedTime(&kernelElapsedMs, kernelStartEvent, kernelEndEvent));\n+      double kernelElapsedUs = static_cast<double>(kernelElapsedMs) * 1000.0;\n+      printf(\"[Rank %d] Kernel completed! Elapsed time: %.3f us (avg over %d iterations)\\n\",\n+           rankId, kernelElapsedUs / (iterations - 1), iterations - 1);\n+      fflush(stdout);\n+      if (kernelEndEvent) aclrtDestroyEvent(kernelEndEvent);\n+      if (kernelStartEvent) aclrtDestroyEvent(kernelStartEvent);\n+  } else {\n+      printf(\"[Rank %d] Kernel completed! (precision mode)\\n\", rankId);\n+      fflush(stdout);\n+  }\n+\n   { std::string cmd = \"mkdir -p \" + outputDir; system(cmd.c_str()); }\n   WriteFile(outputDir + \"/npu_out.bin\", hostOutput.data(), outputSize);\n-\n-  if (kernelEndEvent) aclrtDestroyEvent(kernelEndEvent);\n-  if (kernelStartEvent) aclrtDestroyEvent(kernelStartEvent);\n   aclrtFree(devContext);\n   aclrtFree(deviceA); aclrtFree(deviceScaleA); aclrtFree(deviceB);\n   aclrtFree(deviceScaleB); aclrtFree(deviceOutput);\n@@ -257,17 +271,18 @@ int RunAllGatherQuantMatmul(int rankNum, int rankId, int m, int k, int n)\n int main(int argc, char *argv[])\n {\n   int m = 0, k = 0, n = 0, rankNum = 0;\n-  try { ParseArgs(argc, argv, &m, &k, &n, &rankNum); }\n+  std::string mode;\n+  try { ParseArgs(argc, argv, &m, &k, &n, &rankNum, mode); }\n   catch (const std::invalid_argument& e) {\n     std::cerr << e.what() << std::endl; return -1;\n   }\n-  INFO_LOG(\"Master (PID=%d) will fork %d processes\", getpid(), rankNum);\n+  INFO_LOG(\"Master (PID=%d) will fork %d processes (mode=%s)\", getpid(), rankNum, mode.c_str());\n \n   std::vector<pid_t> pids(rankNum);\n   for (int rankId = 0; rankId < rankNum; ++rankId) {\n     pid_t pid = fork();\n     if (pid < 0) { ERROR_LOG(\"Fork failed for rank %d\", rankId); exit(-1); }\n-    else if (pid == 0) { exit(RunAllGatherQuantMatmul(rankNum, rankId, m, k, n)); }\n+    else if (pid == 0) { exit(RunAllGatherQuantMatmul(rankNum, rankId, m, k, n, mode)); }\n     else { pids[rankId] = pid; INFO_LOG(\"Forked Rank %d -> PID %d\", rankId, pid); }\n   }\n \n",
+      "new_file": false,
+      "new_path": "mc2/common/op_kernel/apace/tests/st/all_gather_quant_matmul/src/main.cpp",
+      "old_path": "mc2/common/op_kernel/apace/tests/st/all_gather_quant_matmul/src/main.cpp",
+      "removed_lines": 28,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/1740f4beaf0111ef8e50790b8c030c0578d991c9/mc2/common/op_kernel/apace/tests/st/all_gather_quant_matmul/src/main.cpp",
+    "sha": "1740f4beaf0111ef8e50790b8c030c0578d991c9",
+    "source_branch": "master",
+    "source_project": {
+      "full_name": "mengziyu/ops-transformer_master",
+      "human_name": "mengziyu / ops-transformer_master",
+      "id": 10540481,
+      "path": "ops-transformer_master"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  },
+  {
+    "additions": 227,
+    "blob_id": "6b6c613236350f2c55f85264a13815f266cf4f46",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/1740f4beaf0111ef8e50790b8c030c0578d991c9/mc2/common/op_kernel/apace/tests/st/all_to_all_quant_matmul/run.sh",
+    "deletions": 48,
+    "filename": "mc2/common/op_kernel/apace/tests/st/all_to_all_quant_matmul/run.sh",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 227,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -1,5 +1,5 @@\n #!/bin/bash\n-# run.sh — apace AllToAllQuantMatmul ST 一键脚本\n+# run.sh — apace AllToAllQuantMatmul ST\n #\n # 流程: 生成数据 -> 编译 -> 多 rank 运行 -> 精度比对\n #\n@@ -14,13 +14,18 @@\n #   bash run.sh --skip-build ...       # 跳过编译\n #   bash run.sh --gen-only ...         # 仅生成 CPU golden\n #   bash run.sh --verify-only ...      # 仅精度比对\n+#   bash run.sh --perf ...             # 性能模式(msprof采集)\n+#   环境变量 KERNEL_TIMEOUT=<秒>       # 覆盖默认超时(600s)\n+#   perf 模式跑完后: python3 scripts/parse_prof.py --all  解析性能数据\n set -e\n \n SCRIPT_DIR=\"$(cd \"$(dirname \"${BASH_SOURCE[0]}\")\" && pwd)\"\n ST_DIR=\"$(cd \"${SCRIPT_DIR}/..\" && pwd)\"\n BUILD_DIR=\"${ST_DIR}/build\"\n+PROF_DIR=\"${SCRIPT_DIR}/prof\"\n+KERNEL_TIMEOUT=${KERNEL_TIMEOUT:-600}  # 默认600秒(10分钟)，可用环境变量 KERNEL_TIMEOUT 覆盖\n \n-SKIP_BUILD=0; GEN_ONLY=0; VERIFY_ONLY=0; CLI_MODE=0\n+SKIP_BUILD=0; GEN_ONLY=0; VERIFY_ONLY=0; CLI_MODE=0; PERF_MODE=0\n CSV_FILE=\"${SCRIPT_DIR}/cases.csv\"\n \n # ---- 解析参数 ----\n@@ -32,13 +37,21 @@ while [ $# -gt 0 ]; do\n         --verify-only) VERIFY_ONLY=1; shift ;;\n         --cli)         CLI_MODE=1; shift ;;\n         --csv)         CSV_FILE=\"$2\"; shift 2 ;;\n+        --perf)        PERF_MODE=1; shift ;;\n         -h|--help)\n-            sed -n '1,18p' \"$0\"; exit 0 ;;\n+            sed -n '1,20p' \"$0\"; exit 0 ;;\n         *)\n             ARGS+=(\"$1\"); shift ;;\n     esac\n done\n \n+if [ \"$GEN_ONLY\" -eq 1 ] && [ \"$VERIFY_ONLY\" -eq 1 ]; then\n+    echo \"ERROR: --gen-only and --verify-only are mutually exclusive\"; exit 1\n+fi\n+if [ \"$PERF_MODE\" -eq 1 ] && [ \"$VERIFY_ONLY\" -eq 1 ]; then\n+    echo \"ERROR: --perf and --verify-only are mutually exclusive\"; exit 1\n+fi\n+\n # ---- 将行号参数展开为列表（支持 \"1 3 5\"、\"2-4\"、\"all\"）----\n expand_rows() {\n     local input=(\"$@\")\n@@ -60,16 +73,29 @@ expand_rows() {\n if [ -n \"${ASCEND_HOME_PATH:-}\" ] && [ -f \"${ASCEND_HOME_PATH}/set_env.sh\" ]; then\n     source \"${ASCEND_HOME_PATH}/set_env.sh\" >/dev/null 2>&1 || true\n else\n-    echo \"ERROR: ASCEND_HOME_PATH 未设置\"; exit 1\n+    echo \"ERROR: ASCEND_HOME_PATH not set or set_env.sh missing\"; exit 1\n fi\n-command -v python3 >/dev/null || { echo \"ERROR: python3 不可用\"; exit 1; }\n+command -v python3 >/dev/null || { echo \"ERROR: python3 not available\"; exit 1; }\n+\n+# ---- 获取 prof 目录列表（用于 msprof 前后对比找新增目录）----\n+get_prof_dirs() {\n+    find \"$PROF_DIR\" -maxdepth 1 -mindepth 1 -type d -printf '%f\\n' 2>/dev/null | sort || true\n+}\n+\n+# ---- perf 模式结束后提示用户解析性能数据 ----\n+print_perf_hint() {\n+    if [ \"$PERF_MODE\" -eq 1 ]; then\n+        echo \"\"\n+        echo \"==========================================\"\n+        echo \"Performance data saved to: $PROF_DIR\"\n+        echo \"Parse with: python3 scripts/parse_prof.py --all\"\n+        echo \"==========================================\"\n+    fi\n+}\n \n # ---- 单 case 执行函数 ----\n run_single() {\n     local M=$1 K=$2 N=$3 RANK_NUM=$4 HEAD_M_SIZE=$5\n-\n-    local MODE=\"precision\"\n-\n     echo \"\"\n     echo \"==========================================\"\n     echo \"apace AllToAllQuantMatmul ST\"\n@@ -80,7 +106,7 @@ run_single() {\n     rm -rf input output\n \n     # ---- 1. 生成数据 ----\n-    echo \"[1/4] 生成 CPU golden + 输入数据...\"\n+    echo \"[1/4] Generate CPU golden + input data...\"\n     python3 scripts/gen_data.py \"$M\" \"$K\" \"$N\" \"$RANK_NUM\"\n \n     if [ \"$GEN_ONLY\" -eq 1 ]; then return 0; fi\n@@ -88,18 +114,17 @@ run_single() {\n     # ---- 2. 编译 ----\n     if [ \"$VERIFY_ONLY\" -eq 0 ]; then\n         if [ \"$SKIP_BUILD\" -eq 0 ]; then\n-            echo \"[2/4] 编译...\"\n+            echo \"[2/4] Build...\"\n             mkdir -p \"$BUILD_DIR\"\n-            cmake -S \"$ST_DIR\" -B \"$BUILD_DIR\" || { echo \"ERROR: cmake 失败\"; return 1; }\n-            cmake --build \"$BUILD_DIR\" --target apace_a2a_qmm_udma_st --parallel 4 || {\n-                echo \"ERROR: 编译失败。\"; return 1; }\n+            cmake -S \"$ST_DIR\" -B \"$BUILD_DIR\" || { echo \"ERROR: cmake failed\"; return 1; }\n+            cmake --build \"$BUILD_DIR\" --target apace_a2a_qmm_udma_st --parallel 4 || { echo \"ERROR: build failed\"; return 1; }\n         else\n-            [ -x \"$BUILD_DIR/all_to_all_quant_matmul/apace_a2a_qmm_udma_st\" ] || { echo \"ERROR: --skip-build 但二进制不存在\"; return 1; }\n-            echo \"[2/4] 跳过编译 (--skip-build)\"\n+            [ -x \"$BUILD_DIR/all_to_all_quant_matmul/apace_a2a_qmm_udma_st\" ] || { echo \"ERROR: --skip-build but binary missing\"; return 1; }\n+            echo \"[2/4] Skip build (--skip-build)\"\n         fi\n \n         # ---- 3. 多 rank 运行 ----\n-        echo \"[3/4] NPU 运行 ($RANK_NUM ranks)...\"\n+        echo \"[3/4] NPU run ($RANK_NUM ranks)...\"\n         local EXE_PATH=\"$BUILD_DIR/all_to_all_quant_matmul/apace_a2a_qmm_udma_st\"\n         local EXE_DIR=\"$(dirname \"$EXE_PATH\")\"\n         rm -rf \"$EXE_DIR/input\" \"$EXE_DIR/output\"\n@@ -108,41 +133,193 @@ run_single() {\n         for r in $(seq 0 $((RANK_NUM-1))); do\n             mkdir -p \"$EXE_DIR/output/$r\"\n         done\n-        cd \"$EXE_DIR\"\n-        \"./apace_a2a_qmm_udma_st\" \"$M\" \"$K\" \"$N\" \"$RANK_NUM\" \"$MODE\" \"$HEAD_M_SIZE\"\n-        # 回拷 npu_out\n-        cd \"$SCRIPT_DIR\"\n-        for r in $(seq 0 $((RANK_NUM-1))); do\n-            mkdir -p \"output/$r\"\n-            cp \"$EXE_DIR/output/$r/npu_out.bin\" \"output/$r/npu_out.bin\" 2>/dev/null || true\n+\n+        MAX_RETRY=3\n+        RETRY=0\n+        local MODE=\"precision\"\n+        [ \"$PERF_MODE\" -eq 1 ] && MODE=\"perf\"\n+        while [ ${RETRY} -lt ${MAX_RETRY} ]; do\n+            if command -v fuser >/dev/null 2>&1; then\n+                fuser -k 8998/tcp 2>/dev/null || true\n+            else\n+                echo \"  [WARN] fuser not installed, skip port cleanup\"\n+            fi\n+            sleep 1\n+\n+            if [ \"$PERF_MODE\" -eq 1 ]; then\n+                # ---- perf 模式: msprof 包裹 exe ----\n+                if ! command -v msprof >/dev/null 2>&1; then\n+                    echo \"ERROR: msprof not found in PATH\"; return 1\n+                fi\n+                mkdir -p \"$PROF_DIR\"\n+                local before_dirs after_dirs new_dirs\n+                before_dirs=$(get_prof_dirs)\n+\n+                echo \"  [msprof] Running $EXE_PATH $M $K $N $RANK_NUM $MODE $HEAD_M_SIZE ...\"\n+                if command -v timeout >/dev/null 2>&1; then\n+                    set +e\n+                    timeout ${KERNEL_TIMEOUT}s msprof --output=\"$PROF_DIR\" \\\n+                        --application=\"$EXE_PATH $M $K $N $RANK_NUM $MODE $HEAD_M_SIZE\" 2>&1\n+                    local MSPROF_RC=$?\n+                    set -e\n+                else\n+                    set +e\n+                    msprof --output=\"$PROF_DIR\" \\\n+                        --application=\"$EXE_PATH $M $K $N $RANK_NUM $MODE $HEAD_M_SIZE\" 2>&1\n+                    local MSPROF_RC=$?\n+                    set -e\n+                fi\n+\n+                if [ ${MSPROF_RC} -eq 124 ]; then\n+                    echo \"ERROR: msprof timeout after ${KERNEL_TIMEOUT}s\"\n+                    return 1\n+                fi\n+\n+                after_dirs=$(get_prof_dirs)\n+                new_dirs=\"\"\n+                for d in $after_dirs; do\n+                    if ! echo \"$before_dirs\" | grep -qFx \"$d\"; then\n+                        new_dirs=\"$new_dirs $d\"\n+                    fi\n+                done\n+                new_dirs=$(echo \"$new_dirs\" | xargs)\n+\n+                if [ -z \"$new_dirs\" ]; then\n+                    echo \"  [retry ${RETRY}/${MAX_RETRY}] No new PROF dirs created\"\n+                    RETRY=$((RETRY + 1))\n+                    sleep 2\n+                    continue\n+                fi\n+\n+                for d in $new_dirs; do\n+                    echo \"M=$M K=$K N=$N headM=$HEAD_M_SIZE\" > \"$PROF_DIR/$d/case_info.txt\"\n+                done\n+\n+                # ---- 校验 PROF 数据有效性（op_summary CSV 是否能解析出 latency）----\n+                local parse_out latency\n+                set +e\n+                parse_out=$(python3 scripts/parse_prof.py --check-latest-threshold 999999999 \\\n+                    --mkn \"$M $K $N\" --prof-dir \"$PROF_DIR\" 2>/dev/null)\n+                set -e\n+                latency=$(echo \"$parse_out\" | grep -E '^[0-9]+\\.[0-9]+$' | head -1)\n+\n+                if [ -z \"$latency\" ]; then\n+                    echo \"  [retry ${RETRY}/${MAX_RETRY}] Cannot parse latency from PROF data\"\n+                    for d in $new_dirs; do rm -rf \"$PROF_DIR/$d\"; done\n+                    RETRY=$((RETRY + 1))\n+                    sleep 2\n+                    continue\n+                fi\n+                echo \"  [msprof] latency=${latency}us\"\n+\n+                cd \"$SCRIPT_DIR\"\n+                for r in $(seq 0 $((RANK_NUM-1))); do\n+                    mkdir -p \"output/$r\"\n+                    cp \"$EXE_DIR/output/$r/npu_out.bin\" \"output/$r/npu_out.bin\" 2>/dev/null || true\n+                done\n+\n+                local precision=\"FAIL\"\n+                if [ -d \"$SCRIPT_DIR/output\" ]; then\n+                    set +e\n+                    python3 scripts/verify_result.py \"$M\" \"$N\" \"$RANK_NUM\" \"$SCRIPT_DIR/output\" >/dev/null 2>&1\n+                    local verify_rc=$?\n+                    set -e\n+                    if [ $verify_rc -eq 0 ]; then precision=\"PASS\"; fi\n+                fi\n+\n+                for d in $new_dirs; do\n+                    echo \"$precision\" > \"$PROF_DIR/$d/case_precision.txt\"\n+                done\n+\n+                if [ \"$precision\" != \"PASS\" ]; then\n+                    echo \"  [retry ${RETRY}/${MAX_RETRY}] Precision FAILED\"\n+                    for d in $new_dirs; do rm -rf \"$PROF_DIR/$d\"; done\n+                    RETRY=$((RETRY + 1))\n+                    sleep 2\n+                    continue\n+                fi\n+\n+                echo \"  [OK] msprof done, precision=PASS, dirs=$new_dirs\"\n+                break\n+            else\n+                # ---- precision 模式: 直接调 exe ----\n+                if command -v timeout >/dev/null 2>&1; then\n+                    set +e\n+                    KERNEL_OUT=$(timeout ${KERNEL_TIMEOUT}s \"$EXE_PATH\" $M $K $N $RANK_NUM \"$MODE\" \"$HEAD_M_SIZE\" 2>&1)\n+                    KERNEL_RC=$?\n+                    set -e\n+                else\n+                    set +e\n+                    KERNEL_OUT=$(\"$EXE_PATH\" $M $K $N $RANK_NUM \"$MODE\" \"$HEAD_M_SIZE\" 2>&1)\n+                    KERNEL_RC=$?\n+                    set -e\n+                fi\n+                echo \"${KERNEL_OUT}\"\n+\n+                if [ ${KERNEL_RC} -eq 124 ]; then\n+                    echo \"ERROR: Kernel timeout after ${KERNEL_TIMEOUT}s\"\n+                    return 1\n+                fi\n+\n+                if [ ${KERNEL_RC} -eq 0 ] && echo \"${KERNEL_OUT}\" | grep -q \"Status: SUCCESS\"; then\n+                    echo \"  Kernel finished!\"\n+                    break\n+                fi\n+\n+                if echo \"${KERNEL_OUT}\" | grep -q \"connect peers failed\"; then\n+                    RETRY=$((RETRY + 1))\n+                    echo \"  [retry ${RETRY}/${MAX_RETRY}] connect conflict...\"\n+                    sleep 2\n+                    continue\n+                fi\n+\n+                echo \"ERROR: Kernel failed\"\n+                return 1\n+            fi\n         done\n+\n+        if [ ${RETRY} -ge ${MAX_RETRY} ]; then\n+            echo \"ERROR: Max retries exceeded\"\n+            return 1\n+        fi\n+\n+        if [ \"$PERF_MODE\" -eq 0 ]; then\n+            cd \"$SCRIPT_DIR\"\n+            for r in $(seq 0 $((RANK_NUM-1))); do\n+                mkdir -p \"output/$r\"\n+                cp \"$EXE_DIR/output/$r/npu_out.bin\" \"output/$r/npu_out.bin\" 2>/dev/null || true\n+            done\n+        fi\n     fi\n \n-    # ---- 4. 精度比对 ----\n-    echo \"[4/4] 精度比对...\"\n-    python3 scripts/verify_result.py \"$M\" \"$N\" \"$RANK_NUM\" \"./output\"\n-    return $?\n+    # ---- 4. 精度比对（perf 模式已在步骤3内完成 verify，此处跳过）----\n+    if [ \"$PERF_MODE\" -eq 0 ]; then\n+        echo \"[4/4] Verify...\"\n+        python3 scripts/verify_result.py \"$M\" \"$N\" \"$RANK_NUM\" \"./output\"\n+        return $?\n+    fi\n+    echo \"[4/4] Verify (done in perf loop)\"\n+    return 0\n }\n \n # ---- 选择参数来源 ----\n-if [ \"$CLI_MODE\" -eq 1 ]; then\n-    # 命令行模式\n+if [ \"${CLI_MODE:-0}\" -eq 1 ]; then\n     M=2048; K=3584; N=4096; RANK_NUM=2; HEAD_M_SIZE=512\n     idx=0\n-    if [ ${#ARGS[@]} -gt 0 ]; then\n-        [ $idx -lt ${#ARGS[@]} ] && { M=${ARGS[$idx]}; idx=$((idx+1)); }\n-        [ $idx -lt ${#ARGS[@]} ] && { K=${ARGS[$idx]}; idx=$((idx+1)); }\n-        [ $idx -lt ${#ARGS[@]} ] && { N=${ARGS[$idx]}; idx=$((idx+1)); }\n-        [ $idx -lt ${#ARGS[@]} ] && { RANK_NUM=${ARGS[$idx]}; idx=$((idx+1)); }\n-        [ $idx -lt ${#ARGS[@]} ] && { HEAD_M_SIZE=${ARGS[$idx]}; idx=$((idx+1)); }\n-    fi\n+    [ $idx -lt ${#ARGS[@]} ] && { M=${ARGS[$idx]}; idx=$((idx+1)); }\n+    [ $idx -lt ${#ARGS[@]} ] && { K=${ARGS[$idx]}; idx=$((idx+1)); }\n+    [ $idx -lt ${#ARGS[@]} ] && { N=${ARGS[$idx]}; idx=$((idx+1)); }\n+    [ $idx -lt ${#ARGS[@]} ] && { RANK_NUM=${ARGS[$idx]}; idx=$((idx+1)); }\n+    [ $idx -lt ${#ARGS[@]} ] && { HEAD_M_SIZE=${ARGS[$idx]}; idx=$((idx+1)); }\n     run_single \"$M\" \"$K\" \"$N\" \"$RANK_NUM\" \"$HEAD_M_SIZE\"\n-    exit $?\n+    rc=$?\n+    print_perf_hint\n+    exit $rc\n fi\n \n # ---- CSV 模式 ----\n if [ ! -f \"$CSV_FILE\" ]; then\n-    echo \"ERROR: CSV 文件不存在: $CSV_FILE\"; exit 1\n+    echo \"ERROR: CSV not found: $CSV_FILE\"; exit 1\n fi\n \n DATA_LINES=$(grep -v '^#' \"$CSV_FILE\" | grep -v '^$' | tail -n +2)\n@@ -150,15 +327,15 @@ TOTAL_LINES=$(echo \"$DATA_LINES\" | grep -c .)\n \n # 无参数: 列出全部 case 并全部运行\n if [ ${#ARGS[@]} -eq 0 ]; then\n-    echo \"==== cases.csv (共 $TOTAL_LINES 个 case) ====\"\n-    echo \"行号  M      K     N     rank  headMSize\"\n+    echo \"==== cases.csv ($TOTAL_LINES cases) ====\"\n+    echo \"Row  M      K     N     rank  headMSize\"\n     local_idx=0\n     while IFS= read -r line; do\n         local_idx=$((local_idx + 1))\n         printf \"%-5s %s\\n\" \"$local_idx\" \"$(echo \"$line\" | awk -F, '{printf \"%-6s %-5s %-5s %-5s %s\", $1,$2,$3,$4,$5}')\"\n     done <<< \"$DATA_LINES\"\n     echo \"\"\n-    echo \"将依次运行全部 $TOTAL_LINES 个 case...\"\n+    echo \"Running all $TOTAL_LINES cases...\"\n     SELECTED_ROWS=($(seq 1 $TOTAL_LINES))\n else\n     SELECTED_ROWS=($(expand_rows \"${ARGS[@]}\"))\n@@ -167,11 +344,11 @@ fi\n # 校验行号范围\n for row in \"${SELECTED_ROWS[@]}\"; do\n     if [ \"$row\" -lt 1 ] || [ \"$row\" -gt \"$TOTAL_LINES\" ]; then\n-        echo \"ERROR: 行号 $row 超出范围 (1-$TOTAL_LINES)\"; exit 1\n+        echo \"ERROR: row $row out of range (1-$TOTAL_LINES)\"; exit 1\n     fi\n done\n \n-echo \"==== 将运行 ${#SELECTED_ROWS[@]} 个 case: ${SELECTED_ROWS[*]} ====\"\n+echo \"==== Running ${#SELECTED_ROWS[@]} case(s): ${SELECTED_ROWS[*]} ====\"\n \n # ---- 逐行执行 ----\n PASS_CNT=0; FAIL_CNT=0\n@@ -186,14 +363,14 @@ for row in \"${SELECTED_ROWS[@]}\"; do\n     HEAD_M_SIZE=$(echo \"$SELECTED\" | awk -F, '{print $5}')\n \n     echo \"\"\n-    echo \"########## CSV 第 ${row}/${TOTAL_LINES} 行 ##########\"\n+    echo \"########## CSV row ${row}/${TOTAL_LINES} ##########\"\n \n     if run_single \"$M\" \"$K\" \"$N\" \"$RANK_NUM\" \"$HEAD_M_SIZE\"; then\n         PASS_CNT=$((PASS_CNT + 1))\n-        RESULTS+=(\"PASS  行$row  M=$M K=$K N=$N rank=$RANK_NUM headM=$HEAD_M_SIZE\")\n+        RESULTS+=(\"PASS  row$row  M=$M K=$K N=$N rank=$RANK_NUM headM=$HEAD_M_SIZE\")\n     else\n         FAIL_CNT=$((FAIL_CNT + 1))\n-        RESULTS+=(\"FAIL  行$row  M=$M K=$K N=$N rank=$RANK_NUM headM=$HEAD_M_SIZE\")\n+        RESULTS+=(\"FAIL  row$row  M=$M K=$K N=$N rank=$RANK_NUM headM=$HEAD_M_SIZE\")\n     fi\n     # 首次编译后，后续 case 跳过编译\n     SKIP_BUILD=1\n@@ -202,10 +379,12 @@ done\n # ---- 汇总 ----\n echo \"\"\n echo \"==========================================\"\n-echo \"汇总: PASS=$PASS_CNT  FAIL=$FAIL_CNT  共${#SELECTED_ROWS[@]}个case\"\n+echo \"Summary: PASS=$PASS_CNT  FAIL=$FAIL_CNT  total=${#SELECTED_ROWS[@]}\"\n echo \"==========================================\"\n for r in \"${RESULTS[@]}\"; do\n     echo \"  $r\"\n done\n \n-[ \"$FAIL_CNT\" -eq 0 ]\n+print_perf_hint\n+\n+if [ \"$FAIL_CNT\" -eq 0 ]; then exit 0; else exit 1; fi\n",
+      "new_file": false,
+      "new_path": "mc2/common/op_kernel/apace/tests/st/all_to_all_quant_matmul/run.sh",
+      "old_path": "mc2/common/op_kernel/apace/tests/st/all_to_all_quant_matmul/run.sh",
+      "removed_lines": 48,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/1740f4beaf0111ef8e50790b8c030c0578d991c9/mc2/common/op_kernel/apace/tests/st/all_to_all_quant_matmul/run.sh",
+    "sha": "1740f4beaf0111ef8e50790b8c030c0578d991c9",
+    "source_branch": "master",
+    "source_project": {
+      "full_name": "mengziyu/ops-transformer_master",
+      "human_name": "mengziyu / ops-transformer_master",
+      "id": 10540481,
+      "path": "ops-transformer_master"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  },
+  {
+    "additions": 287,
+    "blob_id": "c5db28f566118a182dd9ee146a01d97583e84325",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/1740f4beaf0111ef8e50790b8c030c0578d991c9/mc2/common/op_kernel/apace/tests/st/all_to_all_quant_matmul/scripts/parse_prof.py",
+    "deletions": 0,
+    "filename": "mc2/common/op_kernel/apace/tests/st/all_to_all_quant_matmul/scripts/parse_prof.py",
+    "patch": {
+      "a_mode": "0",
+      "added_lines": 287,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -0,0 +1,287 @@\n+#!/usr/bin/python3\n+# coding=utf-8\n+\n+# ----------------------------------------------------------------------------------------------------------\n+# Copyright (c) 2026 Huawei Technologies Co., Ltd.\n+# This program is free software, you can redistribute it and/or modify it under terms and conditions of\n+# CANN Open Software License Agreement Version 2.0 (the \"License\").\n+# Please refer to the License for details. You may not use this file except in compliance with the License.\n+# THIS SOFTWARE IS PROVIDED ON AN \"AS IS\" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,\n+# INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.\n+# See LICENSE in the root of the software repository for the full text of the License.\n+# ----------------------------------------------------------------------------------------------------------\n+\n+\"\"\"Parse msprof op_summary CSVs and compute operator latency.\n+\n+Groups PROF_* directories by collection timestamp into separate cases.\n+  --case N   : analyze case N only (1-indexed, sorted by time)\n+  --latest   : analyze the most recent case (default)\n+  --all      : analyze all cases\n+\"\"\"\n+\n+import argparse\n+import csv\n+import glob\n+import os\n+import re\n+import sys\n+from datetime import datetime\n+from statistics import median\n+\n+_DEFAULT_PROF = os.path.join(\n+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), \"prof\"\n+)\n+KERNEL_SUBSTR = \"AllToAllQuantMatmulKernelE4M3E4M3_Udma\"\n+GROUP_THRESHOLD_S = 5\n+OUTLIER_FACTOR = 1.2\n+WARMUP_SKIP = 3  # 删除前 N 轮数据（冷启动 + 预热）\n+\n+\n+def filter_outliers(durs, factor=OUTLIER_FACTOR):\n+    min_val = min(durs)\n+    threshold = min_val * factor\n+    return [d for d in durs if d <= threshold]\n+\n+_TS_RE = re.compile(r\"PROF_\\d+_(\\d{17})_\")\n+\n+\n+def parse_ts_from_dir(dirname):\n+    m = _TS_RE.search(dirname)\n+    if not m:\n+        return None\n+    return datetime.strptime(m.group(1), \"%Y%m%d%H%M%S%f\")\n+\n+\n+def find_csvs(prof_base, prof_dir_name):\n+    return glob.glob(\n+        os.path.join(prof_base, prof_dir_name,\n+                     \"mindstudio_profiler_output\", \"op_summary_*.csv\")\n+    )\n+\n+\n+def parse_csv(csv_path):\n+    device_durations = {}\n+    device_cubes = {}\n+    with open(csv_path, newline=\"\") as f:\n+        reader = csv.DictReader(f)\n+        for row in reader:\n+            if KERNEL_SUBSTR not in row.get(\"Op Name\", \"\"):\n+                continue\n+            dev = row[\"Device_id\"].strip()\n+            try:\n+                dur = float(row[\"Task Duration(us)\"].strip())\n+            except (KeyError, ValueError):\n+                continue\n+            device_durations.setdefault(dev, []).append(dur)\n+            try:\n+                cube = float(row[\"cube_utilization(%)\"].strip())\n+            except (KeyError, ValueError):\n+                cube = 0.0\n+            device_cubes.setdefault(dev, []).append(cube)\n+    return device_durations, device_cubes\n+\n+\n+def group_cases(prof_dirs):\n+    prof_dirs_sorted = sorted(prof_dirs, key=parse_ts_from_dir)\n+    cases = []\n+    current_group = []\n+    for d in prof_dirs_sorted:\n+        ts = parse_ts_from_dir(d)\n+        if not current_group or (ts - parse_ts_from_dir(current_group[0])).total_seconds() < GROUP_THRESHOLD_S:\n+            current_group.append(d)\n+        else:\n+            cases.append(current_group)\n+            current_group = [d]\n+    if current_group:\n+        cases.append(current_group)\n+    return cases\n+\n+\n+def read_case_info(prof_base, case_dirs):\n+    for d in case_dirs:\n+        info_path = os.path.join(prof_base, d, \"case_info.txt\")\n+        if os.path.isfile(info_path):\n+            with open(info_path) as f:\n+                return f.read().strip()\n+    return None\n+\n+\n+def read_case_precision(prof_base, case_dirs):\n+    for d in case_dirs:\n+        prec_path = os.path.join(prof_base, d, \"case_precision.txt\")\n+        if os.path.isfile(prec_path):\n+            with open(prec_path) as f:\n+                return f.read().strip()\n+    return None\n+\n+\n+def read_case_info_from_input(prof_base, case_dirs, mkn_str=None):\n+    info = read_case_info(prof_base, case_dirs)\n+    if info:\n+        return info\n+    if mkn_str:\n+        parts = mkn_str.split()\n+        if len(parts) >= 3:\n+            return f\"M={parts[0]} K={parts[1]} N={parts[2]}\"\n+        return f\"M={mkn_str}\"\n+    return None\n+\n+\n+def report_case(prof_base, case_dirs, case_idx, mkn_str=None):\n+    all_devices = {}\n+    all_cubes = {}\n+    for prof_dir in case_dirs:\n+        for csv_path in find_csvs(prof_base, prof_dir):\n+            durs, cubes = parse_csv(csv_path)\n+            for dev, dv in durs.items():\n+                all_devices.setdefault(dev, []).extend(dv)\n+            for dev, cv in cubes.items():\n+                all_cubes.setdefault(dev, []).extend(cv)\n+\n+    if not all_devices:\n+        print(f\"  [Case {case_idx}] No AllToAllQuantMatmulKernel rows found.\\n\")\n+        return None\n+\n+    info = read_case_info_from_input(prof_base, case_dirs, mkn_str)\n+    info_line = f\"  [{info}]\" if info else \"\"\n+\n+    medians = []\n+    cube_medians = []\n+    print(f\"  [Case {case_idx}]  ({len(case_dirs)} ranks, {case_dirs[0]})\")\n+    if info_line:\n+        print(f\"  {info_line}\")\n+    print(\"  \" + \"-\" * 58)\n+    for dev in sorted(all_devices.keys(), key=lambda x: int(x)):\n+        raw_durs = all_devices[dev]\n+        total_cnt = len(raw_durs)\n+        warmup_cnt = min(WARMUP_SKIP, total_cnt)\n+        remaining = raw_durs[warmup_cnt:] if total_cnt > WARMUP_SKIP else raw_durs\n+        durs = sorted(remaining)\n+        filtered = filter_outliers(durs)\n+        rank_avg = sum(filtered) / len(filtered)\n+        medians.append(rank_avg)\n+        cube_vals = all_cubes.get(dev, [0.0])\n+        cube_med = median(cube_vals)\n+        cube_medians.append(cube_med)\n+        print(\n+            f\"    Rank {dev:4s} | {total_cnt} total, {warmup_cnt} warmup skipped, \"\n+            f\"{len(remaining)} remaining, {len(filtered)} valid ({len(remaining) - len(filtered)} filtered) | \"\n+            f\"avg={rank_avg:.3f} us | min={durs[0]:.3f} us | max={durs[-1]:.3f} us | \"\n+            f\"cube={cube_med:.1f}%\"\n+        )\n+        for i, d in enumerate(durs):\n+            tag = \" *outlier*\" if d > min(durs) * OUTLIER_FACTOR else \"\"\n+            print(f\"                 iter[{i:2d}] = {d:.3f} us{tag}\")\n+\n+    avg = sum(medians) / len(medians)\n+    print(\"  \" + \"-\" * 58)\n+    print(\n+        f\"    Overall latency (avg of card avgs): \"\n+        f\"{avg:.3f} us  ({len(medians)} cards)\"\n+    )\n+\n+    precision = read_case_precision(prof_base, case_dirs)\n+    if precision:\n+        print(f\"    Precision: {precision}\")\n+    print()\n+    return avg, info, precision\n+\n+\n+def print_summary(results):\n+    print()\n+    print(\"=\" * 72)\n+    print(\"Summary\")\n+    print(\"=\" * 72)\n+    header = f\"  {'Case':>4s}  {'M':>5s}  {'K':>5s}  {'N':>5s}  {'Latency(us)':>12s}  {'Precision':<8s}\"\n+    print(header)\n+    print(\"  \" + \"-\" * (len(header) - 2))\n+    for case_idx, info, avg, precision in results:\n+        parts = dict()\n+        if info:\n+            for kv in info.split():\n+                if \"=\" in kv:\n+                    k, v = kv.split(\"=\", 1)\n+                    parts[k] = v\n+        m = parts.get(\"M\", \"N/A\")\n+        k = parts.get(\"K\", \"N/A\")\n+        n = parts.get(\"N\", \"N/A\")\n+        prec = precision if precision else \"N/A\"\n+        print(f\"  {case_idx:4d}  {m:>5s}  {k:>5s}  {n:>5s}  {avg:12.3f}  {prec:<8s}\")\n+    print()\n+\n+\n+def main():\n+    parser = argparse.ArgumentParser(description=\"Parse msprof op_summary CSVs.\")\n+    grp = parser.add_mutually_exclusive_group()\n+    grp.add_argument(\"--case\", type=int, help=\"Case index (1-based, sorted by time)\")\n+    grp.add_argument(\"--latest\", action=\"store_true\", default=True,\n+                     help=\"Analyze the most recent case (default)\")\n+    grp.add_argument(\"--all\", action=\"store_true\", help=\"Analyze all cases\")\n+    grp.add_argument(\"--check-latest-threshold\", type=float, default=None,\n+                     help=\"Check latest case's latency against threshold. Print only the latency number. Exit 0 if <= threshold, exit 2 if > threshold.\")\n+    parser.add_argument(\"--mkn\", type=str, default=None,\n+                        help=\"M K N string, e.g. '1010 4096 2560'\")\n+    parser.add_argument(\"--prof-dir\", default=_DEFAULT_PROF,\n+                        help=\"prof/ directory (default: auto-detect)\")\n+    args = parser.parse_args()\n+    prof_base = os.path.abspath(args.prof_dir)\n+\n+    prof_dirs = [\n+        d for d in os.listdir(prof_base)\n+        if re.match(r\"PROF_\\d+_\\d{17}_\", d)\n+    ]\n+    if not prof_dirs:\n+        print(f\"No PROF directories found under {prof_base}\", file=sys.stderr)\n+        return 1\n+\n+    cases = group_cases(prof_dirs)\n+\n+    if args.check_latest_threshold is not None:\n+        idx = len(cases)\n+        ret = report_case(prof_base, cases[-1], idx, args.mkn)\n+        if ret:\n+            avg, info, precision = ret\n+            print(f\"{avg:.3f}\")\n+            if avg <= args.check_latest_threshold:\n+                return 0\n+            else:\n+                return 2\n+        return 1\n+\n+    print(f\"Found {len(cases)} case(s) in {prof_base}\\n\")\n+\n+    print(\"=\" * 64)\n+    print(\"AllToAllQuantMatmul — Per-Card Latency (avg, outliers > 2x min excluded)\")\n+    print(\"=\" * 64)\n+\n+    results = []\n+    if args.all:\n+        for i, case_dirs in enumerate(cases, 1):\n+            ret = report_case(prof_base, case_dirs, i, args.mkn)\n+            if ret:\n+                avg, info, precision = ret\n+                results.append((i, info, avg, precision))\n+    elif args.case is not None:\n+        if args.case < 1 or args.case > len(cases):\n+            print(f\"--case {args.case} out of range (1..{len(cases)})\",\n+                  file=sys.stderr)\n+            return 1\n+        ret = report_case(prof_base, cases[args.case - 1], args.case, args.mkn)\n+        if ret:\n+            avg, info, precision = ret\n+            results.append((args.case, info, avg, precision))\n+    else:\n+        idx = len(cases)\n+        ret = report_case(prof_base, cases[-1], idx, args.mkn)\n+        if ret:\n+            avg, info, precision = ret\n+            results.append((idx, info, avg, precision))\n+\n+    if results:\n+        print_summary(results)\n+\n+    return 0\n+\n+\n+if __name__ == \"__main__\":\n+    sys.exit(main())\n",
+      "new_file": true,
+      "new_path": "mc2/common/op_kernel/apace/tests/st/all_to_all_quant_matmul/scripts/parse_prof.py",
+      "old_path": "mc2/common/op_kernel/apace/tests/st/all_to_all_quant_matmul/scripts/parse_prof.py",
+      "removed_lines": 0,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/1740f4beaf0111ef8e50790b8c030c0578d991c9/mc2/common/op_kernel/apace/tests/st/all_to_all_quant_matmul/scripts/parse_prof.py",
+    "sha": "1740f4beaf0111ef8e50790b8c030c0578d991c9",
+    "source_branch": "master",
+    "source_project": {
+      "full_name": "mengziyu/ops-transformer_master",
+      "human_name": "mengziyu / ops-transformer_master",
+      "id": 10540481,
+      "path": "ops-transformer_master"
+    },
+    "status": "added",
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  },
+  {
+    "additions": 4,
+    "blob_id": "663f0cb77b31d1f510a65941210c4a929ceb1642",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/1740f4beaf0111ef8e50790b8c030c0578d991c9/mc2/common/op_kernel/apace/tests/st/all_to_all_quant_matmul/src/main.cpp",
+    "deletions": 0,
+    "filename": "mc2/common/op_kernel/apace/tests/st/all_to_all_quant_matmul/src/main.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 4,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -278,6 +278,10 @@ int runAllToAllMatmul(int rankNum, int rankId, int m, int k, int n, const std::s\n         INFO_LOG(\"[Rank %d] headMSize=%u tileCnt=%u | per-iter ms: avg=%.3f min=%.3f max=%.3f (excl warmup)\",\n                  rankId, headMSize, tileCnt, avg, minv, maxv);\n \n+        ACL_CHECK(aclrtSynchronizeStream(stream));\n+        ACL_CHECK(aclrtMemcpy(hostOutput.data(), sizeOutput, deviceOutput, sizeOutput, ACL_MEMCPY_DEVICE_TO_HOST));\n+        WriteFile(outputDir + \"/npu_out.bin\", hostOutput.data(), sizeOutput);\n+\n         aclrtFree(boostIn);\n         aclrtFree(boostOut);\n         aclrtFree(cacheFlush);\n",
+      "new_file": false,
+      "new_path": "mc2/common/op_kernel/apace/tests/st/all_to_all_quant_matmul/src/main.cpp",
+      "old_path": "mc2/common/op_kernel/apace/tests/st/all_to_all_quant_matmul/src/main.cpp",
+      "removed_lines": 0,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/1740f4beaf0111ef8e50790b8c030c0578d991c9/mc2/common/op_kernel/apace/tests/st/all_to_all_quant_matmul/src/main.cpp",
+    "sha": "1740f4beaf0111ef8e50790b8c030c0578d991c9",
+    "source_branch": "master",
+    "source_project": {
+      "full_name": "mengziyu/ops-transformer_master",
+      "human_name": "mengziyu / ops-transformer_master",
+      "id": 10540481,
+      "path": "ops-transformer_master"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  },
+  {
+    "additions": 2,
+    "blob_id": "cbd74db432fd09dc138afdfea9543e7bf3f03d2d",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/1740f4beaf0111ef8e50790b8c030c0578d991c9/mc2/common/op_kernel/apace/tiling/quant_matmul_tiling_base.h",
+    "deletions": 0,
+    "filename": "mc2/common/op_kernel/apace/tiling/quant_matmul_tiling_base.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 2,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -54,6 +54,7 @@ public:\n     }\n \n     void SetOptimizeEnable(bool enable) { isOpenOptimize_ = enable; }\n+    void SetMTailAlignEnable(bool enable) { enableMTailAlign_ = enable; }\n \n protected:\n     QuantMatmulArgs args_{};\n@@ -61,6 +62,7 @@ protected:\n     QuantMatmulRunInfo runInfo_{};\n \n     bool isOpenOptimize_{true};\n+    bool enableMTailAlign_{false};\n \n     virtual const char* TilingName() const = 0;\n \n",
+      "new_file": false,
+      "new_path": "mc2/common/op_kernel/apace/tiling/quant_matmul_tiling_base.h",
+      "old_path": "mc2/common/op_kernel/apace/tiling/quant_matmul_tiling_base.h",
+      "removed_lines": 0,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/1740f4beaf0111ef8e50790b8c030c0578d991c9/mc2/common/op_kernel/apace/tiling/quant_matmul_tiling_base.h",
+    "sha": "1740f4beaf0111ef8e50790b8c030c0578d991c9",
+    "source_branch": "master",
+    "source_project": {
+      "full_name": "mengziyu/ops-transformer_master",
+      "human_name": "mengziyu / ops-transformer_master",
+      "id": 10540481,
+      "path": "ops-transformer_master"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  },
+  {
+    "additions": 56,
+    "blob_id": "68c0129234c22ed3f86d1b0f3b3cc028d48aa377",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/1740f4beaf0111ef8e50790b8c030c0578d991c9/mc2/common/op_kernel/apace/tiling/quant_matmul_tiling_swat.h",
+    "deletions": 6,
+    "filename": "mc2/common/op_kernel/apace/tiling/quant_matmul_tiling_swat.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 56,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -52,6 +52,7 @@ private:\n     using Base::platformInfo_;\n     using Base::runInfo_;\n     using Base::isOpenOptimize_;\n+    using Base::enableMTailAlign_;\n \n private:\n     uint32_t CalcScaleKL1() const\n@@ -109,13 +110,47 @@ private:\n         uint64_t nTileMax = std::min(tileMax, CeilDiv(runInfo_.baseN, CUBE_BLOCK));\n         uint64_t preSplitMax = runInfo_.mTailSize >= runInfo_.nTailSize ? mTileMax : nTileMax;\n         uint64_t secSplitMax = runInfo_.mTailSize >= runInfo_.nTailSize ? nTileMax : mTileMax;\n-        while ((CalUsedCoreNum(runInfo_, preSplit + 1UL, secSplit) <= platformInfo_.aicNum && preSplit < preSplitMax) ||\n-               (CalUsedCoreNum(runInfo_, preSplit, secSplit + 1UL) <= platformInfo_.aicNum && secSplit < secSplitMax)) {\n-            if (CalUsedCoreNum(runInfo_, preSplit + 1UL, secSplit) <= platformInfo_.aicNum && preSplit < preSplitMax) {\n-                preSplitValid = ++preSplit;\n+\n+        if (enableMTailAlign_) {\n+            bool preIsM = (runInfo_.mTailSize >= runInfo_.nTailSize);\n+            while (true) {\n+                uint64_t newPreTile = preSplit;\n+                uint64_t newSecTile = secSplit;\n+\n+                if (preSplit < preSplitMax &&\n+                    CalUsedCoreNum(runInfo_, preSplit + 1UL, secSplit) <= platformInfo_.aicNum) {\n+                    uint64_t nextTileCount = CalcAlignedSplit(preSplit, secSplit, preSplitMax,\n+                                                              preIsM ? runInfo_.mTailSize : 0);\n+                    if (nextTileCount > 0) { newPreTile = nextTileCount; }\n+                }\n+\n+                if (secSplit < secSplitMax &&\n+                    CalUsedCoreNum(runInfo_, newPreTile, secSplit + 1UL) <= platformInfo_.aicNum) {\n+                    uint64_t nextTileCount = CalcAlignedSplit(secSplit, newPreTile, secSplitMax,\n+                                                              !preIsM ? runInfo_.mTailSize : 0);\n+                    if (nextTileCount > 0) { newSecTile = nextTileCount; }\n+                }\n+\n+                if (newPreTile == preSplit && newSecTile == secSplit) { break; }\n+\n+                preSplit = newPreTile;\n+                secSplit = newSecTile;\n+                preSplitValid = newPreTile;\n+                secSplitValid = newSecTile;\n             }\n-            if (CalUsedCoreNum(runInfo_, preSplit, secSplit + 1UL) <= platformInfo_.aicNum && secSplit < secSplitMax) {\n-                secSplitValid = ++secSplit;\n+        } else {\n+            while ((preSplit < preSplitMax &&\n+                    CalUsedCoreNum(runInfo_, preSplit + 1UL, secSplit) <= platformInfo_.aicNum) ||\n+                   (secSplit < secSplitMax &&\n+                    CalUsedCoreNum(runInfo_, preSplit, secSplit + 1UL) <= platformInfo_.aicNum)) {\n+                if (preSplit < preSplitMax &&\n+                    CalUsedCoreNum(runInfo_, preSplit + 1UL, secSplit) <= platformInfo_.aicNum) {\n+                    preSplitValid = ++preSplit;\n+                }\n+                if (secSplit < secSplitMax &&\n+                    CalUsedCoreNum(runInfo_, preSplit, secSplit + 1UL) <= platformInfo_.aicNum) {\n+                    secSplitValid = ++secSplit;\n+                }\n             }\n         }\n \n@@ -313,6 +348,21 @@ private:\n         return mTile * nTile * runInfo.tailBlockCnt;\n     }\n \n+    uint64_t CalcAlignedSplit(uint64_t growTileCount, uint64_t fixedTileCount,\n+                              uint64_t tileCountMax, uint64_t alignTailSize)\n+    {\n+        for (uint64_t increment = 1; increment <= 2; ++increment) {\n+            uint64_t nextTileCount = growTileCount + increment;\n+            if (nextTileCount > tileCountMax) { break; }\n+            uint64_t usedCores = CalUsedCoreNum(runInfo_, nextTileCount, fixedTileCount);\n+            if (usedCores > platformInfo_.aicNum) { break; }\n+            if (alignTailSize == 0 || CeilDiv(alignTailSize, nextTileCount) % CUBE_BLOCK == 0) {\n+                return nextTileCount;\n+            }\n+        }\n+        return 0;\n+    }\n+\n     uint64_t GetDepthA1B1(const QuantMatmulRunInfo& runInfo, uint64_t leftSize, uint64_t perDepthSize,\n                                  uint64_t depthInit)\n     {\n",
+      "new_file": false,
+      "new_path": "mc2/common/op_kernel/apace/tiling/quant_matmul_tiling_swat.h",
+      "old_path": "mc2/common/op_kernel/apace/tiling/quant_matmul_tiling_swat.h",
+      "removed_lines": 6,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/1740f4beaf0111ef8e50790b8c030c0578d991c9/mc2/common/op_kernel/apace/tiling/quant_matmul_tiling_swat.h",
+    "sha": "1740f4beaf0111ef8e50790b8c030c0578d991c9",
+    "source_branch": "master",
+    "source_project": {
+      "full_name": "mengziyu/ops-transformer_master",
+      "human_name": "mengziyu / ops-transformer_master",
+      "id": 10540481,
+      "path": "ops-transformer_master"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  }
+]

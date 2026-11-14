@@ -1,0 +1,182 @@
+[
+  {
+    "additions": 3,
+    "blob_id": "ad693488cc9e091c0343bfcf31130752e3501301",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/8f21a66a151a4bdac99b553f0cc593e99c4824fa/norm/batch_norm/op_host/arch35/batch_norm_tiling_infer_arch35.cpp",
+    "deletions": 1,
+    "filename": "norm/batch_norm/op_host/arch35/batch_norm_tiling_infer_arch35.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 3,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -26,6 +26,7 @@ constexpr int64_t BIG_SHAPE_NUM = 2;    // x, y\n constexpr int64_t SMALL_AB1_FACTOR_LIMIT = 32;\n constexpr int64_t MIN_SMALL_AB1_B0_CORE_FACTOR = 2;\n constexpr int64_t SMALL_AB1_CACHE_BUFFER_NUM = 5;\n+constexpr int64_t MEAN_VAR_OUTPUT_COUNT = 2;  // mean, var\n }  // namespace\n \n namespace optiling\n@@ -103,7 +104,8 @@ ge::graphStatus BatchNormInferTiling::DoOpTiling()\n         int64_t paramCacheElemLen = (vlFp32_ / abLen) * abLen;\n         int64_t alignedParamCacheLen = CeilDiv(paramCacheElemLen, vlFp32_) * vlFp32_;\n         int64_t smallAB1CacheBytes = SMALL_AB1_CACHE_BUFFER_NUM * alignedParamCacheLen * FLOAT32_BYTES;\n-        int64_t ubCanUseBytes = static_cast<int64_t>(aicoreParams_.ubSize) - DOUBLE_BUFFER * paramBytes -\n+        int64_t meanVarOutBytes = MEAN_VAR_OUTPUT_COUNT * AlignUp(FLOAT32_BYTES * aInner, static_cast<int64_t>(blockSize_));\n+        int64_t ubCanUseBytes = static_cast<int64_t>(aicoreParams_.ubSize) - DOUBLE_BUFFER * paramBytes - meanVarOutBytes -\n                                 smallAB1CacheBytes;\n         int64_t bytesPerB0 = abLen * bytesPerElement_ * BIG_SHAPE_NUM * DOUBLE_BUFFER;\n         b0Inner = bytesPerB0 == 0 ? 1 : ubCanUseBytes / bytesPerB0;\n",
+      "new_file": false,
+      "new_path": "norm/batch_norm/op_host/arch35/batch_norm_tiling_infer_arch35.cpp",
+      "old_path": "norm/batch_norm/op_host/arch35/batch_norm_tiling_infer_arch35.cpp",
+      "removed_lines": 1,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/8f21a66a151a4bdac99b553f0cc593e99c4824fa/norm/batch_norm/op_host/arch35/batch_norm_tiling_infer_arch35.cpp",
+    "sha": "8f21a66a151a4bdac99b553f0cc593e99c4824fa",
+    "source_branch": "fix/batch_norm_remove_redundant_meanvar_write",
+    "source_project": {
+      "full_name": "qianzehong/ops-nn",
+      "human_name": "qianzehong / ops-nn",
+      "id": 9179997,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 5,
+    "blob_id": "5b94f028091e3097661cc47b6032b118de4da1ea",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/8f21a66a151a4bdac99b553f0cc593e99c4824fa/norm/batch_norm/op_host/arch35/batch_norm_tiling_infer_last_channel_arch35.cpp",
+    "deletions": 2,
+    "filename": "norm/batch_norm/op_host/arch35/batch_norm_tiling_infer_last_channel_arch35.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 5,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -28,6 +28,7 @@ constexpr int64_t MAX_CONTINUOUS_A_OUTER_FP16 = 3;\n constexpr int64_t MIN_SMALL_A_B_LEN = 65536;\n constexpr int64_t SMALL_SHAPE_NUM = 6;  // scale, offset, mean, var, outMean, outVar\n constexpr int64_t BIG_SHAPE_NUM = 2;    // x, y\n+constexpr int64_t MEAN_VAR_OUTPUT_COUNT = 2;  // mean, var\n constexpr int64_t SMALL_LAST_CHANNEL_CACHE_BUFFER_NUM = 4;\n }  // namespace\n \n@@ -141,7 +142,8 @@ ge::graphStatus BatchNormInferLastChannelTiling::DoOpTiling()\n \n     isSmallLastChannel_ = fusedALen_ > 0 && fusedALen_ <= MAX_SMALL_A && fusedB0Len_ > MIN_SMALL_A_B_LEN;\n     if (isSmallLastChannel_) {\n-        int64_t paramBytes = DOUBLE_BUFFER * SMALL_SHAPE_NUM * FLOAT32_BYTES * fusedALen_;\n+        int64_t meanVarOutBytes = MEAN_VAR_OUTPUT_COUNT * AlignUp(FLOAT32_BYTES * fusedALen_, blockSize_);\n+        int64_t paramBytes = DOUBLE_BUFFER * SMALL_SHAPE_NUM * FLOAT32_BYTES * fusedALen_ + meanVarOutBytes;\n         int64_t paramCacheElemLen = (vlFp32_ / fusedALen_) * fusedALen_;\n         int64_t offsetBytes = AlignUp(paramCacheElemLen * static_cast<int64_t>(sizeof(uint32_t)), blockSize_);\n         int64_t cacheBytes = offsetBytes + SMALL_LAST_CHANNEL_CACHE_BUFFER_NUM *\n@@ -155,7 +157,8 @@ ge::graphStatus BatchNormInferLastChannelTiling::DoOpTiling()\n                                baseAOuter > 1 && baseAOuter <= maxContinuousAOuter;\n     if (isContinuousLastChannel_) {\n         int64_t paramAlignLen = AlignUp(fusedALen_, vlFp32_);\n-        int64_t paramBytes = DOUBLE_BUFFER * SMALL_SHAPE_NUM * FLOAT32_BYTES * paramAlignLen;\n+        int64_t meanVarOutBytes = MEAN_VAR_OUTPUT_COUNT * AlignUp(FLOAT32_BYTES * fusedALen_, blockSize_);\n+        int64_t paramBytes = DOUBLE_BUFFER * SMALL_SHAPE_NUM * FLOAT32_BYTES * paramAlignLen + meanVarOutBytes;\n         int64_t paramCacheBytes = SMALL_SHAPE_NUM * FLOAT32_BYTES * paramAlignLen;\n         return FillLastChannelTilingForBSplit(paramBytes, paramCacheBytes);\n     }\n",
+      "new_file": false,
+      "new_path": "norm/batch_norm/op_host/arch35/batch_norm_tiling_infer_last_channel_arch35.cpp",
+      "old_path": "norm/batch_norm/op_host/arch35/batch_norm_tiling_infer_last_channel_arch35.cpp",
+      "removed_lines": 2,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/8f21a66a151a4bdac99b553f0cc593e99c4824fa/norm/batch_norm/op_host/arch35/batch_norm_tiling_infer_last_channel_arch35.cpp",
+    "sha": "8f21a66a151a4bdac99b553f0cc593e99c4824fa",
+    "source_branch": "fix/batch_norm_remove_redundant_meanvar_write",
+    "source_project": {
+      "full_name": "qianzehong/ops-nn",
+      "human_name": "qianzehong / ops-nn",
+      "id": 9179997,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 29,
+    "blob_id": "a3bbe4d7b81402b644d9d3185ab9d6178c094e81",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/8f21a66a151a4bdac99b553f0cc593e99c4824fa/norm/batch_norm/op_kernel/arch35/batch_norm_infer_last_channel_continuous_a.h",
+    "deletions": 7,
+    "filename": "norm/batch_norm/op_kernel/arch35/batch_norm_infer_last_channel_continuous_a.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 29,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -35,6 +35,8 @@ class BatchNormInferLastChannelContinuousA {\n \n     static constexpr uint16_t VECTOR_LENGTH = BatchNormOps::VECTOR_LENGTH;\n     static constexpr uint16_t VL_FP32 = VECTOR_LENGTH / sizeof(float);\n+    static constexpr int64_t BLOCK_SIZE = BatchNormOps::BLOCK_SIZE;\n+    static constexpr int32_t MEAN_VAR_OUTPUT_COUNT = 2;  // mean, var\n \n     constexpr static AscendC::MicroAPI::CastTrait castTraitB162B32 = {\n         AscendC::MicroAPI::RegLayout::ZERO, AscendC::MicroAPI::SatMode::UNKNOWN, MaskMergeMode::ZEROING,\n@@ -82,6 +84,8 @@ public:\n         int64_t xShapeLen = tilingData_->tileBlockBLen * tilingData_->tileBlockALen;\n         pipe_->InitBuffer(xQueue_, BUFFER_NUM, xShapeLen * sizeof(T));\n         pipe_->InitBuffer(yQueue_, BUFFER_NUM, xShapeLen * sizeof(T));\n+        int64_t varOffset = AlignUp(tilingData_->tileBlockALen, BLOCK_SIZE / sizeof(T_RUNNING_MEAN));\n+        pipe_->InitBuffer(meanVarOutQueue_, BUFFER_DEPTH, MEAN_VAR_OUTPUT_COUNT * varOffset * sizeof(T_RUNNING_MEAN));\n     }\n \n     __aicore__ inline void Process()\n@@ -184,7 +188,7 @@ private:\n \n         VFPrepareParamCache(\n             gammaLocal, betaLocal, meanLocal, varLocal, gammaFp32Local, betaFp32Local, meanFp32Local, rstdFp32Local);\n-        CopyOutMeanVar(mean, var, tilingData_->tileBlockALen);\n+        CopyOutMeanVar(tilingData_->tileBlockALen);\n \n         betaQueue_.FreeTensor<T_GAMMA>(beta);\n         gammaQueue_.FreeTensor<T_GAMMA>(gamma);\n@@ -192,18 +196,35 @@ private:\n         varQueue_.FreeTensor<T_RUNNING_MEAN>(var);\n     }\n \n-    __aicore__ inline void CopyOutMeanVar(\n-        const LocalTensor<T_RUNNING_MEAN>& mean, const LocalTensor<T_RUNNING_MEAN>& var, int64_t curTileALen)\n+    __aicore__ inline void CopyOutMeanVar(int64_t curTileALen)\n     {\n+        if (GetBlockIdx() != 0) { return; }\n+\n         DataCopyExtParams extParams;\n         extParams.blockLen = curTileALen * sizeof(T_RUNNING_MEAN);\n         extParams.srcStride = 0;\n         extParams.dstStride = 0;\n         extParams.blockCount = 1;\n-        DataCopyPad(batchMeanGm_[0], mean, extParams);\n-        DataCopyPad(reserveSpace1Gm_[0], mean, extParams);\n-        DataCopyPad(batchVarGm_[0], var, extParams);\n-        DataCopyPad(reserveSpace2Gm_[0], var, extParams);\n+\n+        int64_t varOffset = AlignUp(curTileALen, BLOCK_SIZE / sizeof(T_RUNNING_MEAN));\n+        LocalTensor<T_RUNNING_MEAN> meanVarBuf = meanVarOutQueue_.AllocTensor<T_RUNNING_MEAN>();\n+\n+        DataCopyPadExtParams<T_RUNNING_MEAN> padExtParams;\n+        padExtParams.isPad = false;\n+        DataCopyPad(meanVarBuf, meanGm_[0], extParams, padExtParams);\n+        DataCopyPad(meanVarBuf[varOffset], varGm_[0], extParams, padExtParams);\n+\n+        meanVarOutQueue_.EnQue<QuePosition::GM, QuePosition::VECIN, T_RUNNING_MEAN>(meanVarBuf);\n+\n+        LocalTensor<T_RUNNING_MEAN> meanVarOut =\n+            meanVarOutQueue_.DeQue<QuePosition::VECOUT, QuePosition::GM, T_RUNNING_MEAN>();\n+\n+        DataCopyPad(batchMeanGm_[0], meanVarOut, extParams);\n+        DataCopyPad(reserveSpace1Gm_[0], meanVarOut, extParams);\n+        DataCopyPad(batchVarGm_[0], meanVarOut[varOffset], extParams);\n+        DataCopyPad(reserveSpace2Gm_[0], meanVarOut[varOffset], extParams);\n+\n+        meanVarOutQueue_.FreeTensor(meanVarOut);\n     }\n \n     __aicore__ inline void Compute(int64_t curTileBLen)\n@@ -352,6 +373,7 @@ private:\n     TQue<QuePosition::VECIN, BUFFER_DEPTH> meanQueue_;\n     TQue<QuePosition::VECIN, BUFFER_DEPTH> varQueue_;\n     TQue<QuePosition::VECOUT, BUFFER_DEPTH> yQueue_;\n+    TQueBind<TPosition::VECIN, TPosition::VECOUT, BUFFER_DEPTH> meanVarOutQueue_;\n     TBuf<TPosition::VECCALC> betaFp32Buf_;\n     TBuf<TPosition::VECCALC> gammaFp32Buf_;\n     TBuf<TPosition::VECCALC> meanFp32Buf_;\n",
+      "new_file": false,
+      "new_path": "norm/batch_norm/op_kernel/arch35/batch_norm_infer_last_channel_continuous_a.h",
+      "old_path": "norm/batch_norm/op_kernel/arch35/batch_norm_infer_last_channel_continuous_a.h",
+      "removed_lines": 7,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/8f21a66a151a4bdac99b553f0cc593e99c4824fa/norm/batch_norm/op_kernel/arch35/batch_norm_infer_last_channel_continuous_a.h",
+    "sha": "8f21a66a151a4bdac99b553f0cc593e99c4824fa",
+    "source_branch": "fix/batch_norm_remove_redundant_meanvar_write",
+    "source_project": {
+      "full_name": "qianzehong/ops-nn",
+      "human_name": "qianzehong / ops-nn",
+      "id": 9179997,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 28,
+    "blob_id": "8e438ca49d09ce9525139f20674c25e562f7896d",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/8f21a66a151a4bdac99b553f0cc593e99c4824fa/norm/batch_norm/op_kernel/arch35/batch_norm_infer_last_channel_small_a.h",
+    "deletions": 7,
+    "filename": "norm/batch_norm/op_kernel/arch35/batch_norm_infer_last_channel_small_a.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 28,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -35,6 +35,7 @@ class BatchNormInferLastChannelSmallA {\n     static constexpr uint16_t VECTOR_LENGTH = BatchNormOps::VECTOR_LENGTH;\n     static constexpr uint16_t VL_FP32 = VECTOR_LENGTH / sizeof(float);\n     static constexpr int64_t BLOCK_SIZE = BatchNormOps::BLOCK_SIZE;\n+    static constexpr int32_t MEAN_VAR_OUTPUT_COUNT = 2;  // mean, var\n \n     constexpr static AscendC::MicroAPI::CastTrait castTraitB162B32 = {\n         AscendC::MicroAPI::RegLayout::ZERO, AscendC::MicroAPI::SatMode::UNKNOWN, MaskMergeMode::ZEROING,\n@@ -78,6 +79,8 @@ public:\n         int64_t xShapeLen = tilingData_->tileBlockBLen * tilingData_->tileBlockALen;\n         pipe_->InitBuffer(xQueue_, BUFFER_NUM, xShapeLen * sizeof(T));\n         pipe_->InitBuffer(yQueue_, BUFFER_NUM, xShapeLen * sizeof(T));\n+        int64_t varOffset = AlignUp(tilingData_->tileBlockALen, BLOCK_SIZE / sizeof(T_RUNNING_MEAN));\n+        pipe_->InitBuffer(meanVarOutQueue_, BUFFER_DEPTH, MEAN_VAR_OUTPUT_COUNT * varOffset * sizeof(T_RUNNING_MEAN));\n \n         int64_t paramCacheElemLen = GetSmallLastChannelParamCacheElemLen();\n         int64_t offsetLen = AlignUp(paramCacheElemLen, BLOCK_SIZE / sizeof(uint32_t));\n@@ -207,7 +210,7 @@ private:\n \n         VFPrepareSmallLastChannelParamCache(gammaLocal, betaLocal, meanLocal, varLocal, offsetLocal, gammaFp32Local,\n             betaFp32Local, meanFp32Local, rstdFp32Local);\n-        CopyOutMeanVar(mean, var, tilingData_->tileBlockALen);\n+        CopyOutMeanVar(tilingData_->tileBlockALen);\n \n         betaQueue_.FreeTensor<T_GAMMA>(beta);\n         gammaQueue_.FreeTensor<T_GAMMA>(gamma);\n@@ -215,18 +218,35 @@ private:\n         varQueue_.FreeTensor<T_RUNNING_MEAN>(var);\n     }\n \n-    __aicore__ inline void CopyOutMeanVar(\n-        const LocalTensor<T_RUNNING_MEAN>& mean, const LocalTensor<T_RUNNING_MEAN>& var, int64_t curTileALen)\n+    __aicore__ inline void CopyOutMeanVar(int64_t curTileALen)\n     {\n+        if (GetBlockIdx() != 0) { return; }\n+\n         DataCopyExtParams extParams;\n         extParams.blockLen = curTileALen * sizeof(T_RUNNING_MEAN);\n         extParams.srcStride = 0;\n         extParams.dstStride = 0;\n         extParams.blockCount = 1;\n-        DataCopyPad(batchMeanGm_[0], mean, extParams);\n-        DataCopyPad(reserveSpace1Gm_[0], mean, extParams);\n-        DataCopyPad(batchVarGm_[0], var, extParams);\n-        DataCopyPad(reserveSpace2Gm_[0], var, extParams);\n+\n+        int64_t varOffset = AlignUp(curTileALen, BLOCK_SIZE / sizeof(T_RUNNING_MEAN));\n+        LocalTensor<T_RUNNING_MEAN> meanVarBuf = meanVarOutQueue_.AllocTensor<T_RUNNING_MEAN>();\n+\n+        DataCopyPadExtParams<T_RUNNING_MEAN> padExtParams;\n+        padExtParams.isPad = false;\n+        DataCopyPad(meanVarBuf, meanGm_[0], extParams, padExtParams);\n+        DataCopyPad(meanVarBuf[varOffset], varGm_[0], extParams, padExtParams);\n+\n+        meanVarOutQueue_.EnQue<QuePosition::GM, QuePosition::VECIN, T_RUNNING_MEAN>(meanVarBuf);\n+\n+        LocalTensor<T_RUNNING_MEAN> meanVarOut =\n+            meanVarOutQueue_.DeQue<QuePosition::VECOUT, QuePosition::GM, T_RUNNING_MEAN>();\n+\n+        DataCopyPad(batchMeanGm_[0], meanVarOut, extParams);\n+        DataCopyPad(reserveSpace1Gm_[0], meanVarOut, extParams);\n+        DataCopyPad(batchVarGm_[0], meanVarOut[varOffset], extParams);\n+        DataCopyPad(reserveSpace2Gm_[0], meanVarOut[varOffset], extParams);\n+\n+        meanVarOutQueue_.FreeTensor(meanVarOut);\n     }\n \n     __aicore__ inline void Compute(int64_t curTileBLen, int64_t curTileALen)\n@@ -386,6 +406,7 @@ private:\n     TQue<QuePosition::VECIN, BUFFER_DEPTH> meanQueue_;\n     TQue<QuePosition::VECIN, BUFFER_DEPTH> varQueue_;\n     TQue<QuePosition::VECOUT, BUFFER_DEPTH> yQueue_;\n+    TQueBind<TPosition::VECIN, TPosition::VECOUT, BUFFER_DEPTH> meanVarOutQueue_;\n     TBuf<TPosition::VECCALC> offsetBuf_;\n     TBuf<TPosition::VECCALC> betaFp32Buf_;\n     TBuf<TPosition::VECCALC> gammaFp32Buf_;\n",
+      "new_file": false,
+      "new_path": "norm/batch_norm/op_kernel/arch35/batch_norm_infer_last_channel_small_a.h",
+      "old_path": "norm/batch_norm/op_kernel/arch35/batch_norm_infer_last_channel_small_a.h",
+      "removed_lines": 7,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/8f21a66a151a4bdac99b553f0cc593e99c4824fa/norm/batch_norm/op_kernel/arch35/batch_norm_infer_last_channel_small_a.h",
+    "sha": "8f21a66a151a4bdac99b553f0cc593e99c4824fa",
+    "source_branch": "fix/batch_norm_remove_redundant_meanvar_write",
+    "source_project": {
+      "full_name": "qianzehong/ops-nn",
+      "human_name": "qianzehong / ops-nn",
+      "id": 9179997,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 29,
+    "blob_id": "cebad7a440eb8da18ae6d497aaf1341ceb5232b3",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/8f21a66a151a4bdac99b553f0cc593e99c4824fa/norm/batch_norm/op_kernel/arch35/batch_norm_infer_small_ab1.h",
+    "deletions": 7,
+    "filename": "norm/batch_norm/op_kernel/arch35/batch_norm_infer_small_ab1.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 29,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -35,6 +35,8 @@ class BatchNormInferSmallAB1 {\n \n     static constexpr uint16_t VECTOR_LENGTH = BatchNormOps::VECTOR_LENGTH;\n     static constexpr uint32_t VL_FP32 = VECTOR_LENGTH / sizeof(float);\n+    static constexpr int64_t BLOCK_SIZE = BatchNormOps::BLOCK_SIZE;\n+    static constexpr int32_t MEAN_VAR_OUTPUT_COUNT = 2;  // mean, var\n \n     constexpr static AscendC::MicroAPI::CastTrait castTraitB162B32 = {\n         AscendC::MicroAPI::RegLayout::ZERO, AscendC::MicroAPI::SatMode::UNKNOWN, MaskMergeMode::ZEROING,\n@@ -74,6 +76,8 @@ public:\n         int64_t xShapeLen = tilingData_->tileBlockB0Len * tilingData_->totalALen * tilingData_->totalB1Len;\n         pipe_->InitBuffer(xQueue_, BUFFER_NUM, xShapeLen * sizeof(T));\n         pipe_->InitBuffer(yQueue_, BUFFER_NUM, xShapeLen * sizeof(T));\n+        int64_t varOffset = AlignUp(tilingData_->totalALen, BLOCK_SIZE / sizeof(T_RUNNING_MEAN));\n+        pipe_->InitBuffer(meanVarOutQueue_, BUFFER_DEPTH, MEAN_VAR_OUTPUT_COUNT * varOffset * sizeof(T_RUNNING_MEAN));\n \n         int64_t paramCacheElemLen = GetSmallAB1ParamCacheElemLen();\n         int64_t alignedParamCacheLen = AlignUp(paramCacheElemLen, VL_FP32);\n@@ -200,7 +204,7 @@ private:\n \n         VFPrepareSmallAB1ParamCache(gammaLocal, betaLocal, meanLocal, varLocal, offsetLocal, gammaFp32Local,\n             betaFp32Local, meanFp32Local, rstdFp32Local);\n-        CopyOutMeanVar(mean, var, tilingData_->totalALen);\n+        CopyOutMeanVar(tilingData_->totalALen);\n \n         betaQueue_.FreeTensor<T_GAMMA>(beta);\n         gammaQueue_.FreeTensor<T_GAMMA>(gamma);\n@@ -208,18 +212,35 @@ private:\n         varQueue_.FreeTensor<T_RUNNING_MEAN>(var);\n     }\n \n-    __aicore__ inline void CopyOutMeanVar(\n-        const LocalTensor<T_RUNNING_MEAN>& mean, const LocalTensor<T_RUNNING_MEAN>& var, int64_t curTileALen)\n+    __aicore__ inline void CopyOutMeanVar(int64_t curTileALen)\n     {\n+        if (GetBlockIdx() != 0) { return; }\n+\n         DataCopyExtParams extParams;\n         extParams.blockLen = curTileALen * sizeof(T_RUNNING_MEAN);\n         extParams.srcStride = 0;\n         extParams.dstStride = 0;\n         extParams.blockCount = 1;\n-        DataCopyPad(batchMeanGm_[0], mean, extParams);\n-        DataCopyPad(reserveSpace1Gm_[0], mean, extParams);\n-        DataCopyPad(batchVarGm_[0], var, extParams);\n-        DataCopyPad(reserveSpace2Gm_[0], var, extParams);\n+\n+        int64_t varOffset = AlignUp(curTileALen, BLOCK_SIZE / sizeof(T_RUNNING_MEAN));\n+        LocalTensor<T_RUNNING_MEAN> meanVarBuf = meanVarOutQueue_.AllocTensor<T_RUNNING_MEAN>();\n+\n+        DataCopyPadExtParams<T_RUNNING_MEAN> padExtParams;\n+        padExtParams.isPad = false;\n+        DataCopyPad(meanVarBuf, meanGm_[0], extParams, padExtParams);\n+        DataCopyPad(meanVarBuf[varOffset], varGm_[0], extParams, padExtParams);\n+\n+        meanVarOutQueue_.EnQue<QuePosition::GM, QuePosition::VECIN, T_RUNNING_MEAN>(meanVarBuf);\n+\n+        LocalTensor<T_RUNNING_MEAN> meanVarOut =\n+            meanVarOutQueue_.DeQue<QuePosition::VECOUT, QuePosition::GM, T_RUNNING_MEAN>();\n+\n+        DataCopyPad(batchMeanGm_[0], meanVarOut, extParams);\n+        DataCopyPad(reserveSpace1Gm_[0], meanVarOut, extParams);\n+        DataCopyPad(batchVarGm_[0], meanVarOut[varOffset], extParams);\n+        DataCopyPad(reserveSpace2Gm_[0], meanVarOut[varOffset], extParams);\n+\n+        meanVarOutQueue_.FreeTensor(meanVarOut);\n     }\n \n     __aicore__ inline void Compute(int64_t curTileB0Len)\n@@ -383,6 +404,7 @@ private:\n     TQue<QuePosition::VECIN, BUFFER_DEPTH> meanQueue_;\n     TQue<QuePosition::VECIN, BUFFER_DEPTH> varQueue_;\n     TQue<QuePosition::VECOUT, BUFFER_DEPTH> yQueue_;\n+    TQueBind<TPosition::VECIN, TPosition::VECOUT, BUFFER_DEPTH> meanVarOutQueue_;\n     TBuf<TPosition::VECCALC> offsetBuf_;\n     TBuf<TPosition::VECCALC> betaFp32Buf_;\n     TBuf<TPosition::VECCALC> gammaFp32Buf_;\n",
+      "new_file": false,
+      "new_path": "norm/batch_norm/op_kernel/arch35/batch_norm_infer_small_ab1.h",
+      "old_path": "norm/batch_norm/op_kernel/arch35/batch_norm_infer_small_ab1.h",
+      "removed_lines": 7,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/8f21a66a151a4bdac99b553f0cc593e99c4824fa/norm/batch_norm/op_kernel/arch35/batch_norm_infer_small_ab1.h",
+    "sha": "8f21a66a151a4bdac99b553f0cc593e99c4824fa",
+    "source_branch": "fix/batch_norm_remove_redundant_meanvar_write",
+    "source_project": {
+      "full_name": "qianzehong/ops-nn",
+      "human_name": "qianzehong / ops-nn",
+      "id": 9179997,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  }
+]

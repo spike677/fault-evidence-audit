@@ -1,0 +1,146 @@
+[
+  {
+    "additions": 3,
+    "blob_id": "9a6af13711949ba2daac6132c3249b5fb1a8591a",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/26bc8b70207454cfe25c7002135d7046f8d161b8/attention/common/op_kernel/arch35/flash_attention_score_block_vec_infer.h",
+    "deletions": 8,
+    "filename": "attention/common/op_kernel/arch35/flash_attention_score_block_vec_infer.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 3,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -422,14 +422,9 @@ __aicore__ inline void FABlockVecInfer<TEMPLATE_ARGS>::SoftmaxDataCopyOut(\n TEMPLATES_DEF_NO_DEFAULT\n __aicore__ inline void FABlockVecInfer<TEMPLATE_ARGS>::Vec1SinkCompute(RunInfo<isInfer> &runInfo, ConstInfo<isInfer, hasRope> &constInfo, LocalTensor<float> &sumUb, LocalTensor<float> &maxUb) \n {\n-    int64_t sinkOffset = 0;\n-    LocalTensor<float> sinkUb = sinkQue.AllocTensor<float>();\n-    for (int64_t loop = 0; loop < runInfo.halfS1RealSize; ++loop) {\n-        sinkOffset = runInfo.n2oIdx * constInfo.gSize + runInfo.goIdx;\n-        sinkUb.SetValue(loop, ToFloat(this->sinkGm.GetValue(sinkOffset)));\n-    }\n-    SinkSubExpAddVF<float>(sinkUb, sumUb, maxUb, runInfo.halfS1RealSize);\n-    sinkQue.FreeTensor<float>(sinkUb);\n+    int64_t sinkOffset = runInfo.n2oIdx * constInfo.gSize + runInfo.goIdx;\n+    float sinkValue = ToFloat(this->sinkGm.GetValue(sinkOffset));\n+    SinkSubExpAddVF<float>(sumUb, maxUb, sinkValue, runInfo.halfS1RealSize);\n }\n \n TEMPLATES_DEF_NO_DEFAULT\n",
+      "new_file": false,
+      "new_path": "attention/common/op_kernel/arch35/flash_attention_score_block_vec_infer.h",
+      "old_path": "attention/common/op_kernel/arch35/flash_attention_score_block_vec_infer.h",
+      "removed_lines": 8,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/26bc8b70207454cfe25c7002135d7046f8d161b8/attention/common/op_kernel/arch35/flash_attention_score_block_vec_infer.h",
+    "sha": "26bc8b70207454cfe25c7002135d7046f8d161b8",
+    "source_branch": "sinkfix",
+    "source_project": {
+      "full_name": "mayday773/ops-transformer-sinkfix",
+      "human_name": "mayday773 / ops-transformer-sinkfix",
+      "id": 9120220,
+      "path": "ops-transformer-sinkfix"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  },
+  {
+    "additions": 6,
+    "blob_id": "c693979c0abdd8463f75bb5c5eee704bac5b329d",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/26bc8b70207454cfe25c7002135d7046f8d161b8/attention/common/op_kernel/arch35/vf/vf_flashupdate_new.h",
+    "deletions": 7,
+    "filename": "attention/common/op_kernel/arch35/vf/vf_flashupdate_new.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 6,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -530,7 +530,7 @@ __aicore__ inline void ComputeLseOutputVF(const LocalTensor<T>& dstTensor, const\n }\n \n template <typename T>\n-__simd_vf__ inline void SinkSubExpAddVF(__ubuf__ T *srcSumUb, __ubuf__ T *srcMaxUb, __ubuf__ T *sinkUb, const uint32_t dealCount)\n+__simd_vf__ inline void SinkSubExpAddVF(__ubuf__ T *srcSumUb, __ubuf__ T *srcMaxUb, const T sinkValue, const uint32_t dealCount)\n {\n     MicroAPI::RegTensor<T> vregSum;\n     MicroAPI::RegTensor<T> vregMax;\n@@ -547,7 +547,7 @@ __simd_vf__ inline void SinkSubExpAddVF(__ubuf__ T *srcSumUb, __ubuf__ T *srcMax\n     MicroAPI::MaskReg pregAll = MicroAPI::CreateMask<T, MicroAPI::MaskPattern::ALL>();\n     MicroAPI::MaskReg pregTail = MicroAPI::UpdateMask<T>(pltTail);\n \n-    MicroAPI::LoadAlign<T, MicroAPI::LoadDist::DIST_BRC_B32>(vregSink, sinkUb);\n+    Duplicate(vregSink, sinkValue);\n \n     for (uint16_t i = 0; i < updateLoops; ++i) {\n         MicroAPI::LoadAlign<T, MicroAPI::LoadDist::DIST_NORM>(vregSum, srcSumUb + (i * floatRepSize));\n@@ -573,14 +573,13 @@ __simd_vf__ inline void SinkSubExpAddVF(__ubuf__ T *srcSumUb, __ubuf__ T *srcMax\n }\n \n template <typename T>\n-__aicore__ inline void SinkSubExpAddVF(const LocalTensor<T>& dstTensor, const LocalTensor<T>& softmaxSumTensor,\n-    const LocalTensor<T>& softmaxMaxTensor, uint32_t dealCount)\n+__aicore__ inline void SinkSubExpAddVF(const LocalTensor<T>& softmaxSumTensor, const LocalTensor<T>& softmaxMaxTensor, \n+    const T sinkValue, uint32_t dealCount)\n {\n     __ubuf__ T * srcSumUb = (__ubuf__ T *)softmaxSumTensor.GetPhyAddr();\n     __ubuf__ T * srcMaxUb = (__ubuf__ T *)softmaxMaxTensor.GetPhyAddr();\n-    __ubuf__ T * dstUb = (__ubuf__ T *)dstTensor.GetPhyAddr();\n-\n-    SinkSubExpAddVF<T>(srcSumUb, srcMaxUb, dstUb, dealCount);\n+    \n+    SinkSubExpAddVF<T>(srcSumUb, srcMaxUb, sinkValue, dealCount);\n }\n \n template <typename T, typename SINK_T>\n",
+      "new_file": false,
+      "new_path": "attention/common/op_kernel/arch35/vf/vf_flashupdate_new.h",
+      "old_path": "attention/common/op_kernel/arch35/vf/vf_flashupdate_new.h",
+      "removed_lines": 7,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/26bc8b70207454cfe25c7002135d7046f8d161b8/attention/common/op_kernel/arch35/vf/vf_flashupdate_new.h",
+    "sha": "26bc8b70207454cfe25c7002135d7046f8d161b8",
+    "source_branch": "sinkfix",
+    "source_project": {
+      "full_name": "mayday773/ops-transformer-sinkfix",
+      "human_name": "mayday773 / ops-transformer-sinkfix",
+      "id": 9120220,
+      "path": "ops-transformer-sinkfix"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  },
+  {
+    "additions": 16,
+    "blob_id": "541ead5eb522a56e3289c0682649eeff23336155",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/26bc8b70207454cfe25c7002135d7046f8d161b8/attention/fused_infer_attention_score/docs/aclnnFusedInferAttentionScoreV5.md",
+    "deletions": 0,
+    "filename": "attention/fused_infer_attention_score/docs/aclnnFusedInferAttentionScoreV5.md",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 16,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -597,6 +597,22 @@ aclnnStatus aclnnFusedInferAttentionScoreV5(\n         <td>见<a href=\"#约束说明\">约束说明</a></td>\n         <td>-</td>\n     </tr>\n+    <tr>\n+        <td>learnableSinkOptional</td>\n+        <td>输入</td>\n+        <td>表示通过可学习的\"Sink Token\"起到吸收Attention Score的作用。</td>\n+        <td>\n+        <ul>\n+            <li>仅支持非量化场景。</li>\n+            <li>仅支持V_D=128/64。</li>\n+            <li>不支持pse/左padding/公共前缀/后量化。</li>\n+        </ul>\n+        </td>\n+        <td>BFLOAT16</td>\n+        <td>ND</td>\n+        <td>(Q_N,)</a></td>\n+        <td>×</td>\n+    </tr>\n     <tr> \n         <td>qStartIdxOptional</td>\n         <td>输入</td>\n",
+      "new_file": false,
+      "new_path": "attention/fused_infer_attention_score/docs/aclnnFusedInferAttentionScoreV5.md",
+      "old_path": "attention/fused_infer_attention_score/docs/aclnnFusedInferAttentionScoreV5.md",
+      "removed_lines": 0,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/26bc8b70207454cfe25c7002135d7046f8d161b8/attention/fused_infer_attention_score/docs/aclnnFusedInferAttentionScoreV5.md",
+    "sha": "26bc8b70207454cfe25c7002135d7046f8d161b8",
+    "source_branch": "sinkfix",
+    "source_project": {
+      "full_name": "mayday773/ops-transformer-sinkfix",
+      "human_name": "mayday773 / ops-transformer-sinkfix",
+      "id": 9120220,
+      "path": "ops-transformer-sinkfix"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  },
+  {
+    "additions": 4,
+    "blob_id": "ecadfcf164dfb04680fd11da502825f7f0a39154",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/26bc8b70207454cfe25c7002135d7046f8d161b8/attention/prompt_flash_attention/op_host/prompt_flash_attention_tiling_v2.cpp",
+    "deletions": 0,
+    "filename": "attention/prompt_flash_attention/op_host/prompt_flash_attention_tiling_v2.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 4,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -2722,6 +2722,10 @@ bool PromptFlashAttentionTilingV2::CheckLearnSink(ContextParamsForPFATiling &con\n         return true;\n     }\n \n+    OP_CHECK_IF(contextKeyParams.learnableSink->GetStorageShape().GetDim(0) != queryShapeInfo.n, \n+            OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, \"When learnable sink is used, shape of learnable sink(%ld) must be same with query's N(%ld).\", \n+            contextKeyParams.learnableSink->GetStorageShape().GetDim(0), queryShapeInfo.n),\n+        return false);\n     OP_CHECK_IF(contextKeyParams.learnableSinkDataType != ge::DT_BF16, OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, \n             \"When learnable sink is used, dataType of learnable sink(%s) must be bf16.\", GetPfaDataTypeStr(contextKeyParams.learnableSinkDataType).c_str()),\n         return false);\n",
+      "new_file": false,
+      "new_path": "attention/prompt_flash_attention/op_host/prompt_flash_attention_tiling_v2.cpp",
+      "old_path": "attention/prompt_flash_attention/op_host/prompt_flash_attention_tiling_v2.cpp",
+      "removed_lines": 0,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/26bc8b70207454cfe25c7002135d7046f8d161b8/attention/prompt_flash_attention/op_host/prompt_flash_attention_tiling_v2.cpp",
+    "sha": "26bc8b70207454cfe25c7002135d7046f8d161b8",
+    "source_branch": "sinkfix",
+    "source_project": {
+      "full_name": "mayday773/ops-transformer-sinkfix",
+      "human_name": "mayday773 / ops-transformer-sinkfix",
+      "id": 9120220,
+      "path": "ops-transformer-sinkfix"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  }
+]

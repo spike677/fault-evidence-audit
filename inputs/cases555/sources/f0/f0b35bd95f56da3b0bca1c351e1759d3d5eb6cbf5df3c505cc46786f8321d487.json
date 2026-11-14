@@ -1,0 +1,218 @@
+[
+  {
+    "additions": 4,
+    "blob_id": "c9c37314e9a917d30ef634bf36bf17243d954a39",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/181fb41ce2aa63ff9066baf447d37abd1b2e33d5/index/scatter_nd_add/op_api/scatter_nd_add.cpp",
+    "deletions": 3,
+    "filename": "index/scatter_nd_add/op_api/scatter_nd_add.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 4,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -13,6 +13,7 @@\n #include \"opdev/make_op_executor.h\"\n #include \"opdev/op_dfx.h\"\n #include \"opdev/aicpu/aicpu_task.h\"\n+#include \"op_api/aclnn_util.h\"\n #include \"aclnn_kernels/common/op_error_check.h\"\n \n using namespace op;\n@@ -23,14 +24,14 @@ OP_TYPE_REGISTER(ScatterNdAdd);\n static const std::initializer_list<op::DataType> AICORE_DTYPE_SUPPORT_LIST = {\n     op::DataType::DT_FLOAT, op::DataType::DT_FLOAT16, op::DataType::DT_INT32, op::DataType::DT_BOOL};\n \n-static const std::initializer_list<op::DataType> AICORE_DTYPE_SUPPORT_LIST_950 = {\n+static const std::initializer_list<op::DataType> AICORE_DTYPE_SUPPORT_LIST_REGBASE = {\n     op::DataType::DT_FLOAT, op::DataType::DT_FLOAT16, op::DataType::DT_INT32, op::DataType::DT_INT64,\n     op::DataType::DT_BOOL};\n \n inline static bool IsAiCoreSupport(const aclTensor* self) {\n   // ScatterNdAdd只需要判断self\n-  if (op::GetCurrentPlatformInfo().GetSocVersion() >= op::SocVersion::ASCEND950) {\n-    return CheckType(self->GetDataType(), AICORE_DTYPE_SUPPORT_LIST_950);\n+  if (Ops::NN::AclnnUtil::IsRegbase()) {\n+    return CheckType(self->GetDataType(), AICORE_DTYPE_SUPPORT_LIST_REGBASE);\n   }\n   return CheckType(self->GetDataType(), AICORE_DTYPE_SUPPORT_LIST);\n }\n",
+      "new_file": false,
+      "new_path": "index/scatter_nd_add/op_api/scatter_nd_add.cpp",
+      "old_path": "index/scatter_nd_add/op_api/scatter_nd_add.cpp",
+      "removed_lines": 3,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/181fb41ce2aa63ff9066baf447d37abd1b2e33d5/index/scatter_nd_add/op_api/scatter_nd_add.cpp",
+    "sha": "181fb41ce2aa63ff9066baf447d37abd1b2e33d5",
+    "source_branch": "fix_scatter_nd_add",
+    "source_project": {
+      "full_name": "yu_qinfei/ops-nn",
+      "human_name": "yu_qinfei / ops-nn",
+      "id": 9098650,
+      "path": "ops-nn"
+    },
+    "target_branch": "9.0.0-beta.1",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 103,
+    "blob_id": "7e00e30eee44f1a8f72aa138c4f0a0cdca96cc24",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/181fb41ce2aa63ff9066baf447d37abd1b2e33d5/index/scatter_nd_add/op_host/arch35/scatter_nd_add_tiling_base.cpp",
+    "deletions": 21,
+    "filename": "index/scatter_nd_add/op_host/arch35/scatter_nd_add_tiling_base.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 103,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -50,6 +50,7 @@ static constexpr int64_t BASE_UPDATES_SIZE = 1024;\n static constexpr int64_t SORT_LIMIT = 5;\n static constexpr int64_t FULL_LOAD_LIMIT = 16;\n static constexpr int64_t CORE_NUM = 64;\n+static constexpr float THRESHOLD_FACTOR = 0.1;\n \n \n static const std::set<ge::DataType> DETERMIN_DTYPE = {ge::DT_FLOAT, ge::DT_FLOAT16};\n@@ -163,7 +164,7 @@ void ScatterNdAddSimtTiling::SelectTiling(){\n         isSimdNonDeterminstic_ = 1;\n     }\n     //是否排序\n-    if (indicesAxis_ / varInAxis_ >= SORT_LIMIT) {\n+    if (indicesAxis_ / varInAxis_ >= SORT_LIMIT && updateDtype_ != ge::DT_INT64) {\n         isSort_ = 1;\n     }\n }\n@@ -249,8 +250,8 @@ int64_t ScatterNdAddSimtTiling::GetRestAvailableSize(int64_t sampleNum, int64_t\n \n void ScatterNdAddSimtTiling::DoOpTilingSplitAfter()\n {\n-    int64_t halfUbSize = static_cast<int64_t>((ubSize_ - RESERVE_SIZE) / DB_BUFFER);\n-    halfUbSize = halfUbSize - MIN_HANDLE_SIZE * FP32_BYTES;//maxScore\n+    int64_t UbSize = static_cast<int64_t>((ubSize_ - RESERVE_SIZE));\n+    UbSize = UbSize - MIN_HANDLE_SIZE * FP32_BYTES;//maxScore\n     int64_t alignNum = ALIGN_SIZE / varTypeSize_;\n     /* split afterAxis */\n     eachCoreAfterAxisCount_ = Ops::Base::CeilDiv(afterAxis_, totalCoreNum_);\n@@ -269,9 +270,9 @@ void ScatterNdAddSimtTiling::DoOpTilingSplitAfter()\n                           Ops::Base::CeilAlign(INT32_BYTES, ubBlock) + \n                           Ops::Base::CeilAlign(INT32_BYTES * TWO, ubBlock) +\n                           Ops::Base::CeilAlign(indicesTypeSize_, ubBlock) +\n-                          GetSortTmpSize(indicesType_, 1, false);\n+                          GetSortTmpSize(indiceDtype_, 1, false);\n     int64_t oneBlockSize = indicesSize + (varTypeSize_ + FP32_BYTES) * eachCoreAfterAxisCount_;\n-    indicesFactor_ = halfUbSize / oneBlockSize;\n+    indicesFactor_ = UbSize / oneBlockSize;\n \n     int64_t occupy = Ops::Base::CeilAlign(rankSize_ * indicesTypeSize_, ubBlock) +\n                      Ops::Base::CeilAlign(indicesTypeSize_, ubBlock) +\n@@ -281,21 +282,21 @@ void ScatterNdAddSimtTiling::DoOpTilingSplitAfter()\n                      Ops::Base::CeilAlign(indicesTypeSize_, ubBlock) + \n                      Ops::Base::CeilAlign(varTypeSize_ * eachCoreAfterAxisCount_, ubBlock) + \n                      Ops::Base::CeilAlign(FP32_BYTES * eachCoreAfterAxisCount_, ubBlock) + \n-                     GetSortTmpSize(indicesType_, 1, false);\n-    if (occupy > halfUbSize) {\n+                     GetSortTmpSize(indiceDtype_, 1, false);\n+    if (occupy > UbSize) {\n         int64_t indicesUbSize = std::min(INDICES_MIN_BLOCK_SIZE, indicesAxis_ * indicesSize);\n         /* indicesBuf_ + outOfstBuf_ */\n         indicesFactor_ = Ops::Base::CeilAlign(indicesUbSize, ALIGN_SIZE) / indicesSize;\n-        afterAxisFactor_ = (halfUbSize - indicesFactor_ * indicesSize) / indicesFactor_;\n+        afterAxisFactor_ = (UbSize - indicesFactor_ * indicesSize) / indicesFactor_;\n         afterAxisFactor_ = Ops::Base::FloorAlign(afterAxisFactor_, alignNum);\n     } else {\n         afterAxisFactor_ = Ops::Base::CeilAlign(eachCoreAfterAxisCount_, alignNum);\n-        indicesFactor_ = halfUbSize / (afterAxisFactor_ * (varTypeSize_ + FP32_BYTES) + indicesSize);\n+        indicesFactor_ = UbSize / (afterAxisFactor_ * (varTypeSize_ + FP32_BYTES) + indicesSize);\n         \n         int64_t restSize = static_cast<int64_t>(-1);\n         while (restSize <= 0) {\n             --indicesFactor_;\n-            restSize = halfUbSize - (Ops::Base::CeilAlign(indicesFactor_ * rankSize_ * indicesTypeSize_, ubBlock) +\n+            restSize = UbSize - (Ops::Base::CeilAlign(indicesFactor_ * rankSize_ * indicesTypeSize_, ubBlock) +\n                                     Ops::Base::CeilAlign(indicesFactor_ * indicesTypeSize_, ubBlock) +\n                                     Ops::Base::CeilAlign(indicesFactor_ * (indicesTypeSize_ + TWO * ALIGN_SIZE), ubBlock) + \n                                     Ops::Base::CeilAlign(indicesFactor_ * INT32_BYTES, ubBlock) + \n@@ -303,13 +304,13 @@ void ScatterNdAddSimtTiling::DoOpTilingSplitAfter()\n                                     Ops::Base::CeilAlign(indicesFactor_ * indicesTypeSize_, ubBlock) + \n                                     indicesFactor_ * Ops::Base::CeilAlign((varTypeSize_) * eachCoreAfterAxisCount_, ubBlock) + \n                                     indicesFactor_ * Ops::Base::CeilAlign((FP32_BYTES) * eachCoreAfterAxisCount_, ubBlock) + \n-                                    GetSortTmpSize(indicesType_, indicesFactor_, false));\n+                                    GetSortTmpSize(indiceDtype_, indicesFactor_, false));\n             if (indicesFactor_ > indicesAxis_) {\n                 indicesFactor_ = indicesAxis_;\n                 break;\n             }\n         }\n-        // indicesFactor_ = ops::CeilAlign(indicesFactor_ * indicesTypeSize_, ALIGN_SIZE) / indicesTypeSize_;\n+        // indicesFactor_ = Ops::Base::CeilAlign(indicesFactor_ * indicesTypeSize_, ALIGN_SIZE) / indicesTypeSize_;\n     }\n \n     /* 每个核分的indices相同 */\n@@ -358,10 +359,10 @@ void ScatterNdAddSimtTiling::DoOpTilingForDeterminsticSplitIndices()\n     int64_t restSize = static_cast<int64_t>(-1);\n     while (restSize <= 0) {\n         --indicesFactor_;\n-        restSize = GetRestAvailableSize(indicesFactor_, varTypeSize_, halfUbSize, afterAxis_, indicesType_);\n+        restSize = GetRestAvailableSize(indicesFactor_, varTypeSize_, halfUbSize, afterAxis_, indiceDtype_);\n     }\n-    if (indicesFactor_ > indicesAxis_) {\n-        indicesFactor_ = indicesAxis_;\n+    if (indicesFactor_ > eachCoreIndexCount_) {\n+        indicesFactor_ = eachCoreIndexCount_;\n     }\n \n     /* second step */\n@@ -379,8 +380,8 @@ void ScatterNdAddSimtTiling::DoOpTilingForDeterminsticSplitIndices()\n                         ubQuantaIndxFactor_ * Ops::Base::CeilAlign(INT32_BYTES * afterAxis_, ubBlock);\n         restSize = halfUbSize - occupy;\n     }\n-    if (ubQuantaIndxFactor_ > indicesAxis_) {\n-        ubQuantaIndxFactor_ = indicesAxis_;   // quantaFactor Align\n+    if (ubQuantaIndxFactor_ > eachCoreVarCount_) {\n+        ubQuantaIndxFactor_ = eachCoreVarCount_;   // quantaFactor Align\n     }\n     \n     /* third step */\n@@ -398,6 +399,27 @@ void ScatterNdAddSimtTiling::DoOpTilingForDeterminsticSplitIndices()\n     if (ubRowFactor_ > eachCoreVarCount_) {\n         ubRowFactor_ = eachCoreVarCount_;\n     }\n+\n+    float xValue = static_cast<float>(indicesAxis_) / varInAxis_;\n+    if (xValue < THRESHOLD_FACTOR) {\n+        isOpti_ = 1;\n+    }\n+\n+    /* 优化分支 */\n+    oneBlockSize = indicesTypeSize_ + (INT32_BYTES + FP32_BYTES + FP32_BYTES) * afterAxisAlignFp32;\n+    ubRowOptiFactor_ = halfUbSize / oneBlockSize;\n+    restSize = static_cast<int64_t>(-1);\n+    while (restSize <= 0) {\n+        --ubRowOptiFactor_;\n+        int64_t occupy = Ops::Base::CeilAlign(ubRowOptiFactor_ * indicesTypeSize_, ubBlock) +\n+                        ubRowOptiFactor_ * Ops::Base::CeilAlign(INT32_BYTES * afterAxis_, ubBlock) + \n+                        ubRowOptiFactor_ * Ops::Base::CeilAlign(FP32_BYTES * afterAxis_, ubBlock) + \n+                        ubRowOptiFactor_ * Ops::Base::CeilAlign(FP32_BYTES * afterAxis_, ubBlock);\n+        restSize = halfUbSize - occupy;\n+    }\n+    if (ubRowOptiFactor_ > eachCoreIndexCount_) {\n+        ubRowOptiFactor_ = eachCoreIndexCount_;\n+    }\n }\n \n void ScatterNdAddSimtTiling::DoOpTilingSimdSplitIndices()\n@@ -427,7 +449,7 @@ void ScatterNdAddSimtTiling::DoOpTilingSimdSplitIndices()\n \n       int64_t updateAlignSize = Ops::Base::CeilAlign(varTypeSize_ * afterAxis_, ubBlock) + \n                                 Ops::Base::CeilAlign(FP32_BYTES * afterAxis_, ubBlock) + \n-                                GetSortTmpSize(indicesType_, 1, false);\n+                                GetSortTmpSize(indiceDtype_, 1, false);\n     if (indicesAlignSize + updateAlignSize > halfUbSize) {\n         int64_t indicesSize = std::min(INDICES_MIN_BLOCK_SIZE, indicesAxis_ * indicesAlignSize);\n         /* indicesBuf_ + outOfstBuf_ */\n@@ -448,7 +470,7 @@ void ScatterNdAddSimtTiling::DoOpTilingSimdSplitIndices()\n                             Ops::Base::CeilAlign(indicesFactor_ * indicesTypeSize_, ubBlock) + \n                             indicesFactor_ * Ops::Base::CeilAlign((varTypeSize_) * afterAxisFactor_, ubBlock) + \n                             indicesFactor_ * Ops::Base::CeilAlign((FP32_BYTES) * afterAxisFactor_, ubBlock) + \n-                            GetSortTmpSize(indicesType_, indicesFactor_, false);\n+                            GetSortTmpSize(indiceDtype_, indicesFactor_, false);\n             restSize = halfUbSize - occupy;\n             if (indicesFactor_ > indicesAxis_) {\n                 indicesFactor_ = indicesAxis_;\n@@ -547,13 +569,23 @@ ge::graphStatus ScatterNdAddSimtTiling::PostTiling()\n     workspaces[0] = workspaceSize;\n     context_->SetTilingKey(GetTilingKey());\n     context_->SetBlockDim(blockNum);\n+    context_->SetScheduleMode(1);\n     if (indiceShapeSize == 0 || updateShapeSize == 0) {\n         // 输入为空tensor时，设置blockNum为1，在kernel中直接返回\n         context_->SetBlockDim(1);\n     }\n-    if (isDeterminstic_ == 1 || isSimdNonDeterminstic_ == 1 || isSort_ == 1) {\n+    if (isSimdNonDeterminstic_ == 1 || isSort_ == 1) {\n         context_->SetBlockDim(usedCoreNumBefore_);\n     }\n+    if (isDeterminstic_ == 1) {\n+        int64_t usedCoreNum = 0;\n+        if (isOpti_ == 1) {\n+            usedCoreNum = usedCoreNumBefore_;\n+        } else {\n+            usedCoreNum = std::max(usedCoreNumAfter_, usedCoreNumBefore_);\n+        }\n+        context_->SetBlockDim(usedCoreNum);\n+    }\n     tilingData.SaveToBuffer(context_->GetRawTilingData()->GetData(),\n                             context_->GetRawTilingData()->GetCapacity());\n     context_->GetRawTilingData()->SetDataSize(tilingData.GetDataSize());\n@@ -606,7 +638,57 @@ void ScatterNdAddSimtTiling::SetTilingData()\n     tilingData.set_isDeterminstic(isDeterminstic_);\n     tilingData.set_isSimdNonDeterminstic(isSimdNonDeterminstic_);\n     tilingData.set_isSort(isSort_);\n+    tilingData.set_ubRowOptiFactor(ubRowOptiFactor_);\n+    tilingData.set_isOpti(isOpti_);\n }\n \n-} // namespace optiling\n \n+std::string ScatterNdAddSimtTiling::TilingDataToString()\n+{\n+    // 基础分块参数\n+    std::string result = \"blockNum: \" + std::to_string(tilingData.get_blockNum());\n+    result += \"blockTilingSize: \" + std::to_string(tilingData.get_blockTilingSize());\n+    result += \"tailBlockTilingSize: \" + std::to_string(tilingData.get_tailBlockTilingSize());\n+    result += \"ubTilingSize: \" + std::to_string(tilingData.get_ubTilingSize());\n+    result += \"sliceSize: \" + std::to_string(tilingData.get_sliceSize());\n+    result += \"rankSize: \" + std::to_string(tilingData.get_rankSize());\n+\n+    // 轴相关参数\n+    result +=\"varInAxis: \" + std::to_string(tilingData.get_varInAxis());\n+    result +=\"indexRankSize: \" + std::to_string(tilingData.get_indexRankSize());\n+    result +=\"afterAxis: \" + std::to_string(tilingData.get_afterAxis());\n+    result +=\"usedCoreNumBefore: \" + std::to_string(tilingData.get_usedCoreNumBefore());\n+    result +=\"usedCoreNumAfter: \" + std::to_string(tilingData.get_usedCoreNumAfter());\n+    result +=\"eachCoreAfterAxisCount: \" + std::to_string(tilingData.get_eachCoreAfterAxisCount());\n+    result +=\"tailCoreAfterAxisCount: \" + std::to_string(tilingData.get_tailCoreAfterAxisCount());\n+\n+    // 循环与索引相关参数\n+    result +=\"updateLoopSize: \" + std::to_string(tilingData.get_updateLoopSize());\n+    result +=\"updateTailNum: \" + std::to_string(tilingData.get_updateTailNum());\n+    result +=\"indicesLoopSize: \" + std::to_string(tilingData.get_indicesLoopSize());\n+    result +=\"indiceTailNum: \" + std::to_string(tilingData.get_indiceTailNum());\n+    result +=\"tailUpdateLoopSize: \" + std::to_string(tilingData.get_tailUpdateLoopSize());\n+    result +=\"tailUpdateAxisNum: \" + std::to_string(tilingData.get_tailUpdateAxisNum());\n+    result +=\"isSplitAfterAxis: \" + std::to_string(tilingData.get_isSplitAfterAxis());\n+    result +=\"eachCoreIndexCount: \" + std::to_string(tilingData.get_eachCoreIndexCount());\n+    result +=\"tailCoreIndexCount: \" + std::to_string(tilingData.get_tailCoreIndexCount());\n+    result +=\"eachCoreVarCount: \" + std::to_string(tilingData.get_eachCoreVarCount());\n+    result +=\"tailCoreVarCount: \" + std::to_string(tilingData.get_tailCoreVarCount());\n+    result +=\"indicesFactor: \" + std::to_string(tilingData.get_indicesFactor());\n+    result +=\"afterAxisFactor: \" + std::to_string(tilingData.get_afterAxisFactor());\n+    result +=\"ubQuantaIndxFactor: \" + std::to_string(tilingData.get_ubQuantaIndxFactor());\n+    result +=\"ubRowFactor: \" + std::to_string(tilingData.get_ubRowFactor());\n+    result +=\"isDeterminstic: \" + std::to_string(tilingData.get_isDeterminstic());\n+    result +=\"isSimdNonDeterminstic: \" + std::to_string(tilingData.get_isSimdNonDeterminstic());\n+    result +=\"isSort: \" + std::to_string(tilingData.get_isSort());\n+    result +=\"ubRowOptiFactor: \" + std::to_string(tilingData.get_ubRowOptiFactor());\n+    result +=\"isOpti: \" + std::to_string(tilingData.get_isOpti());\n+    return result;\n+}\n+\n+void ScatterNdAddSimtTiling::DumpTilingInfo()\n+{\n+    OP_LOGI(context_->GetNodeName(), \"Tiling info is: %s\", TilingDataToString().c_str());\n+}\n+\n+} // namespace optiling\n\\ No newline at end of file\n",
+      "new_file": false,
+      "new_path": "index/scatter_nd_add/op_host/arch35/scatter_nd_add_tiling_base.cpp",
+      "old_path": "index/scatter_nd_add/op_host/arch35/scatter_nd_add_tiling_base.cpp",
+      "removed_lines": 21,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/181fb41ce2aa63ff9066baf447d37abd1b2e33d5/index/scatter_nd_add/op_host/arch35/scatter_nd_add_tiling_base.cpp",
+    "sha": "181fb41ce2aa63ff9066baf447d37abd1b2e33d5",
+    "source_branch": "fix_scatter_nd_add",
+    "source_project": {
+      "full_name": "yu_qinfei/ops-nn",
+      "human_name": "yu_qinfei / ops-nn",
+      "id": 9098650,
+      "path": "ops-nn"
+    },
+    "target_branch": "9.0.0-beta.1",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 7,
+    "blob_id": "1f07793e319f7c9b765b82cab1beaa560cdd6bd9",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/181fb41ce2aa63ff9066baf447d37abd1b2e33d5/index/scatter_nd_add/op_host/arch35/scatter_nd_add_tiling_base.h",
+    "deletions": 2,
+    "filename": "index/scatter_nd_add/op_host/arch35/scatter_nd_add_tiling_base.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 7,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -60,6 +60,7 @@ BEGIN_TILING_DATA_DEF(ScatterNdAddTilingData)\n \n   TILING_DATA_FIELD_DEF(int64_t, ubQuantaIndxFactor);\n   TILING_DATA_FIELD_DEF(int64_t, ubRowFactor);\n+  TILING_DATA_FIELD_DEF(int64_t, ubRowOptiFactor);\n   TILING_DATA_FIELD_DEF(int64_t, eachCoreIndexCount);\n   TILING_DATA_FIELD_DEF(int64_t, tailCoreIndexCount);\n   TILING_DATA_FIELD_DEF(int64_t, eachCoreVarCount);\n@@ -68,6 +69,7 @@ BEGIN_TILING_DATA_DEF(ScatterNdAddTilingData)\n   TILING_DATA_FIELD_DEF(int64_t, isDeterminstic);\n   TILING_DATA_FIELD_DEF(int64_t, isSimdNonDeterminstic);\n   TILING_DATA_FIELD_DEF(int64_t, isSort);\n+  TILING_DATA_FIELD_DEF(int64_t, isOpti);\n END_TILING_DATA_DEF;\n \n REGISTER_TILING_DATA_CLASS(ScatterNdAdd, ScatterNdAddTilingData)\n@@ -99,6 +101,7 @@ protected:\n     void DoOpTilingForDeterminstic();\n     void DoOpTilingForSimdNonDetermin();\n     void SelectTiling();\n+    void DumpTilingInfo() override;\n     ge::graphStatus DoOpTiling() override;\n     ge::graphStatus DoLibApiTiling() override;\n     uint64_t GetTilingKey() const override;\n@@ -113,6 +116,7 @@ private:\n   void BlockTiling();\n   void SetTilingData();\n   void SetStride();\n+  std::string TilingDataToString();\n \n private:\n     int64_t totalCoreNum_ {0};\n@@ -156,6 +160,7 @@ private:\n     int64_t tailUpdateLoopSize_ = 0;\n     int64_t tailUpdateTailNum_ = 0;\n     int64_t isSplitAfterAxis_ = 0;\n+    int64_t ubRowOptiFactor_ = 0;\n \n     int64_t eachCoreIndexCount_ = 0;\n     int64_t tailCoreIndexCount_ = 0;\n@@ -164,8 +169,8 @@ private:\n     int64_t isDeterminstic_ = 0;\n     int64_t isSimdNonDeterminstic_ = 0;\n     int64_t isSort_ = 0;\n-\n-    ge::DataType indicesType_ = ge::DT_UNDEFINED;\n+    int64_t isOpti_ = 0;\n+    \n     const char* opName = \"ScatterNdAdd\";\n     ScatterNdAddTilingData tilingData;\n };\n",
+      "new_file": false,
+      "new_path": "index/scatter_nd_add/op_host/arch35/scatter_nd_add_tiling_base.h",
+      "old_path": "index/scatter_nd_add/op_host/arch35/scatter_nd_add_tiling_base.h",
+      "removed_lines": 2,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/181fb41ce2aa63ff9066baf447d37abd1b2e33d5/index/scatter_nd_add/op_host/arch35/scatter_nd_add_tiling_base.h",
+    "sha": "181fb41ce2aa63ff9066baf447d37abd1b2e33d5",
+    "source_branch": "fix_scatter_nd_add",
+    "source_project": {
+      "full_name": "yu_qinfei/ops-nn",
+      "human_name": "yu_qinfei / ops-nn",
+      "id": 9098650,
+      "path": "ops-nn"
+    },
+    "target_branch": "9.0.0-beta.1",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 48,
+    "blob_id": "88fac0396ffcbfc0f33043569599595c5493552d",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/181fb41ce2aa63ff9066baf447d37abd1b2e33d5/index/scatter_nd_add/op_kernel/arch35/scatter_nd_add_common.h",
+    "deletions": 11,
+    "filename": "index/scatter_nd_add/op_kernel/arch35/scatter_nd_add_common.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 48,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -73,13 +73,13 @@ public:\n     TBuf<QuePosition::VECCALC> outOfstBuf_;\n     TBuf<QuePosition::VECCALC> strideBuf_;\n     TBuf<QuePosition::VECCALC> maxScoreBuf_;\n-    TQueBind<QuePosition::VECIN, QuePosition::VECOUT, DOUBLE_BUFFER> dataQueue_;\n+    TQueBind<QuePosition::VECIN, QuePosition::VECOUT, 1> dataQueue_;\n \n     TBuf<QuePosition::VECCALC> sortIndicesQue_;\n-    TQue<QuePosition::VECIN, DOUBLE_BUFFER> updatesOriginIdexQue_;\n-    TQue<QuePosition::VECIN, DOUBLE_BUFFER> uniqueIdCountQue_;\n-    TQue<QuePosition::VECOUT, DOUBLE_BUFFER> updateSumIdxQue_;\n-    TQue<QuePosition::VECOUT, DOUBLE_BUFFER> updateSumQue_;\n+    TQue<QuePosition::VECIN, 1> updatesOriginIdexQue_;\n+    TQue<QuePosition::VECIN, 1> uniqueIdCountQue_;\n+    TQue<QuePosition::VECOUT, 1> updateSumIdxQue_;\n+    TQue<QuePosition::VECOUT, 1> updateSumQue_;\n \n     using IndexRegType = typename std::conditional<\n         IsSameType<U, int64_t>::value,\n@@ -100,7 +100,7 @@ public:\n         yGm_.SetGlobalBuffer((__gm__ T*)(y));\n \n         pipe.InitBuffer(strideBuf_, MAX_RANK_COUNT * sizeof(U));\n-        pipe.InitBuffer(dataQueue_, DOUBLE_BUFFER, indicesFactor_ * afterAxisFactor_ * sizeof(T));\n+        pipe.InitBuffer(dataQueue_, 1, indicesFactor_ * afterAxisFactor_ * sizeof(T));\n         pipe.InitBuffer(outOfstBuf_, indicesFactor_ * sizeof(U));\n         pipe.InitBuffer(indicesBuf_, indicesFactor_ * indexRankSize_ * sizeof(U));\n         pipe.InitBuffer(maxScoreBuf_, HASH_SCORE_BUF_SIZE * sizeof(float));\n@@ -108,12 +108,12 @@ public:\n         pipe.InitBuffer(\n             sortIndicesQue_,\n             ops::CeilAlign(indicesFactor_ * sizeof(U) + SORT_PAD_NUM * UB_AGLIN_VALUE, UB_AGLIN_VALUE));\n-        pipe.InitBuffer(updatesOriginIdexQue_, DOUBLE_BUFFER, indicesFactor_ * sizeof(uint32_t));\n+        pipe.InitBuffer(updatesOriginIdexQue_, 1, indicesFactor_ * sizeof(uint32_t));\n         pipe.InitBuffer(\n-            uniqueIdCountQue_, DOUBLE_BUFFER, ops::CeilAlign((indicesFactor_ + 1) * sizeof(int32_t), UB_AGLIN_VALUE));\n+            uniqueIdCountQue_, 1, ops::CeilAlign((indicesFactor_ + 1) * sizeof(int32_t), UB_AGLIN_VALUE));\n         pipe.InitBuffer(\n-            updateSumIdxQue_, DOUBLE_BUFFER, ops::CeilAlign((indicesFactor_ + 1) * sizeof(U), UB_AGLIN_VALUE));\n-        pipe.InitBuffer(updateSumQue_, DOUBLE_BUFFER, indicesFactor_ * afterAxisFactor_ * sizeof(float));\n+            updateSumIdxQue_, 1, ops::CeilAlign((indicesFactor_ + 1) * sizeof(U), UB_AGLIN_VALUE));\n+        pipe.InitBuffer(updateSumQue_, 1, indicesFactor_ * afterAxisFactor_ * sizeof(float));\n     }\n \n     template <typename PARAM_T>\n@@ -330,6 +330,24 @@ public:\n         }\n     }\n \n+    __aicore__ void ComputeIdxCount(\n+        LocalTensor<U> outOfstLocal, int64_t rowLen, int64_t colLen)\n+    {\n+        LocalTensor<U> sortIndicesLocal = sortIndicesQue_.Get<U>();\n+        LocalTensor<int32_t> uniqueIdCountLocal = uniqueIdCountQue_.AllocTensor<int32_t>();\n+        LocalTensor<uint32_t> updatesOriginIdexLocal = updatesOriginIdexQue_.AllocTensor<uint32_t>();\n+        LocalTensor<U> shiftSortLocal = sortIndicesLocal[shiftOffset_];\n+        AscendC::Sort<U, false, sortConfig>(\n+            shiftSortLocal, updatesOriginIdexLocal, outOfstLocal, static_cast<uint32_t>(rowLen));\n+        Duplicate(sortIndicesLocal, (U)-1, shiftOffset_);\n+        shiftSortLocal(rowLen) = -1;\n+        PipeBarrier<PIPE_V>();\n+\n+        uniqueIdNum_ = ComputeUniqueIdNum(sortIndicesLocal, uniqueIdCountLocal, rowLen);\n+        uniqueIdCountQue_.FreeTensor(uniqueIdCountLocal);\n+        updatesOriginIdexQue_.FreeTensor(updatesOriginIdexLocal);\n+    }\n+\n     __aicore__ void ComputeSumForUniqueIdx(\n         LocalTensor<U> outOfstLocal, LocalTensor<T> updatesLocal, int64_t rowLen, int64_t colLen)\n     {\n@@ -585,6 +603,20 @@ public:\n         }\n     }\n \n+    __aicore__ inline void CopyOutSplitAfterDuplicateIdx(\n+        LocalTensor<U> ofstLocal, LocalTensor<T> dataLocal, int64_t rowLen, int64_t colLen, int64_t colIdx)\n+    {\n+        int64_t colLenAlignSize = ops::CeilAlign(colLen * sizeof(T), UB_AGLIN_VALUE) / sizeof(T);\n+        for (int64_t i = 0; i < rowLen; i++) {\n+            int64_t rowOfset = ofstLocal(i) * afterAxis_;\n+            int64_t outOfset = rowOfset + GetBlockIdx() * eachCoreAfterAxisCount_ + colIdx * afterAxisFactor_;\n+            PipeBarrier<PIPE_MTE3>();\n+            SetAtomicAdd<T>();\n+            CopyOut<T>(yGm_[outOfset], dataLocal[i * colLenAlignSize], colLen);\n+            SetAtomicNone();\n+        }\n+    }\n+\n     __aicore__ inline void CopyIndiceInSplitAfter(int64_t rowIdx, int64_t rowLen)\n     {\n         LocalTensor<U> indicesLocal = indicesBuf_.Get<U>();\n@@ -689,7 +721,12 @@ public:\n         WaitFlag<HardEvent::MTE2_MTE3>(eventIdMte2ToMte3);\n \n         if (rowLen < MIN_SAME_IDX_ACCM_COUNT) {\n-            CopyOutSplitAfter(outOfstLocal, updatesLocal, rowLen, colLen, colIdx);\n+            ComputeIdxCount(outOfstLocal, rowLen, colLen);\n+            if (uniqueIdNum_ == rowLen) {\n+                CopyOutSplitAfter(outOfstLocal, updatesLocal, rowLen, colLen, colIdx);\n+            } else {\n+                CopyOutSplitAfterDuplicateIdx(outOfstLocal, updatesLocal, rowLen, colLen, colIdx);\n+            }\n             dataQueue_.FreeTensor(updatesLocal);\n             return;\n         }\n",
+      "new_file": false,
+      "new_path": "index/scatter_nd_add/op_kernel/arch35/scatter_nd_add_common.h",
+      "old_path": "index/scatter_nd_add/op_kernel/arch35/scatter_nd_add_common.h",
+      "removed_lines": 11,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/181fb41ce2aa63ff9066baf447d37abd1b2e33d5/index/scatter_nd_add/op_kernel/arch35/scatter_nd_add_common.h",
+    "sha": "181fb41ce2aa63ff9066baf447d37abd1b2e33d5",
+    "source_branch": "fix_scatter_nd_add",
+    "source_project": {
+      "full_name": "yu_qinfei/ops-nn",
+      "human_name": "yu_qinfei / ops-nn",
+      "id": 9098650,
+      "path": "ops-nn"
+    },
+    "target_branch": "9.0.0-beta.1",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 111,
+    "blob_id": "b53f4960eef3a6758b034b3994257a17dce9f4bd",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/181fb41ce2aa63ff9066baf447d37abd1b2e33d5/index/scatter_nd_add/op_kernel/arch35/scatter_nd_add_determinstic.h",
+    "deletions": 19,
+    "filename": "index/scatter_nd_add/op_kernel/arch35/scatter_nd_add_determinstic.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 111,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -51,7 +51,10 @@ public:\n                                                       int64_t rowLen, int64_t colLen);\n     __aicore__ inline void CopyRValueAndIntWsIn(int64_t rowIdx, int64_t colIdx,\n                                                 int64_t rowLen, int64_t colLen);\n+    __aicore__ inline void CopyRValueAndIntWsAndIndexInOpti(int64_t rowIdx, int64_t colIdx,\n+                                                int64_t rowLen, int64_t colLen);\n     __aicore__ inline void InverseQuantize(int64_t rowLen, int64_t colLen);\n+    __aicore__ inline void CopyInverseQuantizedValueOutOpti(int64_t colLen);\n     __aicore__ inline void CopyInverseQuantizedValueOut(int64_t rowIdx, int64_t colIdx,\n                                                         int64_t rowLen, int64_t colLen);\n     __aicore__ inline void ProcessFirstStep();\n@@ -95,6 +98,7 @@ private:\n \n     uint64_t afterAxisAlignSize_{0};\n     uint64_t afterAxisAlignFp32_{0};\n+    uint64_t uniqueSumIdNum_{0};\n };\n \n template <typename T, typename U>\n@@ -143,6 +147,9 @@ __aicore__ inline void ScatterNdAddDeterministic<T, U>::Init(GM_ADDR var, GM_ADD\n     workspaceInitGm_.SetGlobalBuffer((__gm__ float *)workspace + wsInitOfset, curCoreLen);\n     InitGlobalMemory(workspaceInitGm_, curCoreLen, (float)0);\n \n+    event_t eventIdMte3ToS = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::MTE3_S));\n+    SetFlag<HardEvent::MTE3_S>(eventIdMte3ToS);\n+    WaitFlag<HardEvent::MTE3_S>(eventIdMte3ToS);\n     sameIdxCountWsGm_.SetGlobalBuffer((__gm__ uint32_t *)workspace, varRowCount);\n     updateRValueWsGm_.SetGlobalBuffer((__gm__ float *)workspace + varRowCount, varNumel_);\n     sumQuanToIntWsGm_.SetGlobalBuffer((__gm__ int32_t *)workspace + rValueWsSize_, varNumel_);\n@@ -153,7 +160,7 @@ __aicore__ inline void ScatterNdAddDeterministic<T, U>::Init(GM_ADDR var, GM_ADD\n                                     GetBlockIdx() * tilingData_.eachCoreIndexCount, tilingData_.eachCoreIndexCount);\n     \n     InitGlobalMemory(updateSumWsGm_, sumWsSize_, (float)(0));\n-    InitGlobalMemory(updateSumIdxWsGm_, tilingData_.eachCoreIndexCount, (U)(0));\n+    InitGlobalMemory(updateSumIdxWsGm_, tilingData_.eachCoreIndexCount, (U)(-1));\n     AscendC::SyncAll();\n }\n \n@@ -203,7 +210,7 @@ __aicore__ inline void ScatterNdAddDeterministic<T, U>::CopyIndicesAndUpdatesIn(\n     updatesQue_.EnQue(updatesLocal);\n \n     LocalTensor<U> indicesLocal = this->indicesBuf_.template Get<U>();\n-    offset = GetBlockIdx() * tilingData_.eachCoreIndexCount * tilingData_.indexRankSize + rowIdx * tilingData_.indicesFactor;\n+    offset = GetBlockIdx() * tilingData_.eachCoreIndexCount * tilingData_.indexRankSize + rowIdx * tilingData_.indicesFactor * tilingData_.indexRankSize;\n     this->template CopyIn<U>(indicesLocal, indicesGm_[offset], rowLen * tilingData_.indexRankSize);\n }\n \n@@ -274,7 +281,7 @@ __aicore__ inline void ScatterNdAddDeterministic<T, U>::CopySumAndRValueIn(\n \n     int32_t rowOfset = rowIdx * tilingData_.ubQuantaIndxFactor;\n     this->template CopyIn<U>(sumIdxLocal, updateSumIdxWsGm_[rowOfset], rowLen);\n-    int32_t inOfset = rowOfset;\n+    int32_t inOfset = rowOfset * tilingData_.afterAxis;\n \n     DataCopyExtParams copyParams = {static_cast<uint16_t>(rowLen), static_cast<uint32_t>(colLen * sizeof(float)),\n                                     static_cast<uint32_t>(0),\n@@ -286,6 +293,9 @@ __aicore__ inline void ScatterNdAddDeterministic<T, U>::CopySumAndRValueIn(\n     WaitFlag<HardEvent::MTE2_S>(eventIdMte2ToS);\n     for (int64_t i = 0; i < rowLen; i++) {\n         int64_t sumIdx = sumIdxLocal(i);\n+        if (sumIdx < 0 || sumIdx >= tilingData_.varInAxis) {\n+            sumIdx = 0;\n+        }        \n         uint32_t count = sameIdxCountWsGm_(sumIdx);\n         int64_t rowOfset = sumIdx * tilingData_.afterAxis;\n         int64_t localOfset = i * afterAxisAlignFp32_;\n@@ -364,6 +374,10 @@ __aicore__ void ScatterNdAddDeterministic<T, U>::CopyQuantizedSumOutToIntWs(\n \n     SetAtomicAdd<int32_t>();\n     for (int32_t i = 0; i < rowLen; i++) {\n+        int64_t sumIdx = sumIdxLocal(i);\n+        if (sumIdx < 0 || sumIdx >= tilingData_.varInAxis) {\n+            continue;\n+        }\n         int64_t rowOfset = sumIdxLocal(i) * tilingData_.afterAxis;\n         int64_t outOfset = rowOfset;\n         event_t eventIdSToMte3 = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::S_MTE3));\n@@ -415,6 +429,47 @@ __aicore__ inline void ScatterNdAddDeterministic<T, U>::CopyRValueAndIntWsIn(\n     rValueQue_.EnQue(rValueLocal);\n }\n \n+template <typename T, typename U>\n+__aicore__ inline void ScatterNdAddDeterministic<T, U>::CopyRValueAndIntWsAndIndexInOpti(\n+    int64_t rowIdx, int64_t colIdx, int64_t rowLen, int64_t colLen)\n+{\n+    LocalTensor<U> sumIdxLocal = sumIdxQue_.AllocTensor<U>();\n+    LocalTensor<float> rValueLocal = rValueQue_.AllocTensor<float>();\n+    LocalTensor<int32_t> sumQuanToIntLocal = sumQuanToIntQue_.AllocTensor<int32_t>();\n+\n+    int64_t outOfset = rowIdx * tilingData_.ubRowOptiFactor;\n+    this->template CopyIn<U>(sumIdxLocal, updateSumIdxWsGm_[outOfset], rowLen);\n+    event_t eventIdMte2ToS = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::MTE2_S));\n+    SetFlag<HardEvent::MTE2_S>(eventIdMte2ToS);\n+    WaitFlag<HardEvent::MTE2_S>(eventIdMte2ToS);\n+\n+    bool zeroFlag = false;\n+    uint64_t leftFlag = 0;\n+    for (int64_t i = 0; i < rowLen; i++) {\n+        int64_t sumIdx = sumIdxLocal(i);  \n+        if (sumIdx < 0 || sumIdx >= tilingData_.varInAxis) {\n+            continue;\n+        }\n+        uint32_t count = AscendC::AtomicExch(const_cast<__gm__ uint32_t *>(sameIdxCountWsGm_[sumIdx].GetPhyAddr()), uint32_t(0));\n+        if (count == 0) {\n+            continue;\n+        }\n+        sumIdxLocal(leftFlag) = sumIdxLocal(i);\n+        int64_t rowOfset = sumIdx * tilingData_.afterAxis;\n+        int64_t localOfset = (leftFlag++) * afterAxisAlignFp32_;\n+        this->template CopyIn<float>(rValueLocal[localOfset], updateRValueWsGm_[rowOfset], colLen);\n+        this->template CopyIn<int32_t>(sumQuanToIntLocal[localOfset], sumQuanToIntWsGm_[rowOfset], colLen);\n+        event_t eventIdMte2ToV = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::MTE2_V));\n+        SetFlag<HardEvent::MTE2_V>(eventIdMte2ToV);\n+        WaitFlag<HardEvent::MTE2_V>(eventIdMte2ToV);\n+        AscendC::Muls(rValueLocal[localOfset], rValueLocal[localOfset], (float)count, colLen);\n+    }\n+    uniqueSumIdNum_ = leftFlag;\n+    sumIdxQue_.EnQue(sumIdxLocal);\n+    rValueQue_.EnQue(rValueLocal);\n+    sumQuanToIntQue_.EnQue(sumQuanToIntLocal);\n+}\n+\n template <typename T, typename U>\n __aicore__ inline void ScatterNdAddDeterministic<T, U>::InverseQuantize(int64_t rowLen, int64_t colLen)\n {\n@@ -466,6 +521,26 @@ __aicore__ inline void ScatterNdAddDeterministic<T, U>::InverseQuantize(int64_t\n     rValueQue_.FreeTensor(rValueLocal);\n }\n \n+template <typename T, typename U>\n+__aicore__ void ScatterNdAddDeterministic<T, U>::CopyInverseQuantizedValueOutOpti(int64_t colLen)\n+{\n+    LocalTensor<T> inverseQuantData = invQuanDataQue_.DeQue<T>();\n+    LocalTensor<U> sumIdxLocal = sumIdxQue_.DeQue<U>();\n+\n+    SetAtomicAdd<T>();                                          \n+    for (uint64_t i = 0; i < this->uniqueSumIdNum_; i++) {\n+        int64_t sumIdx = sumIdxLocal(i);                            \n+        int64_t rowOfset = sumIdx * tilingData_.afterAxis;\n+        event_t eventIdSToMte3 = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::S_MTE3));\n+        SetFlag<HardEvent::S_MTE3>(eventIdSToMte3);\n+        WaitFlag<HardEvent::S_MTE3>(eventIdSToMte3);\n+        this->template CopyOut<T>(yGm_[rowOfset], inverseQuantData[i * afterAxisAlignSize_], colLen);\n+    }\n+    SetAtomicNone();\n+    invQuanDataQue_.FreeTensor(inverseQuantData);\n+    sumIdxQue_.FreeTensor(sumIdxLocal); \n+}\n+\n template <typename T, typename U>\n __aicore__ void ScatterNdAddDeterministic<T, U>::CopyInverseQuantizedValueOut(\n     int64_t rowIdx, int64_t colIdx, int64_t rowLen, int64_t colLen)\n@@ -538,27 +613,44 @@ __aicore__ inline void ScatterNdAddDeterministic<T, U>::ProcessSecondStep()\n template <typename T, typename U>\n __aicore__ inline void ScatterNdAddDeterministic<T, U>::ProcessThirdStep()\n {\n-    if (GetBlockIdx() >= tilingData_.usedCoreNumAfter) {\n+    int64_t usedCoreNum = 0;\n+    if (tilingData_.isOpti == 1) {\n+        usedCoreNum = tilingData_.usedCoreNumBefore;\n+    } else {\n+        usedCoreNum = tilingData_.usedCoreNumAfter;\n+    }\n+    if (GetBlockIdx() >= usedCoreNum) {\n         return;\n     }\n     /* step 3: invers quantization and add to var */\n+    int64_t rowMainDataLen = tilingData_.isOpti == 1 ? tilingData_.ubRowOptiFactor : tilingData_.ubRowFactor;\n+    int64_t curCoreProcessCount = tilingData_.isOpti == 1 ? curCoreIndexCount_ : curCoreVarCount_;\n+    int64_t rowLoopNum = ops::CeilDiv(curCoreProcessCount, rowMainDataLen);\n+    int64_t rowTailDataLen = curCoreProcessCount - rowMainDataLen * (rowLoopNum - 1);\n     pipe_.Reset();\n-    pipe_.InitBuffer(sumQuanToIntQue_, DOUBLE_BUFFER, tilingData_.ubRowFactor * afterAxisAlignFp32_ * sizeof(int32_t));\n-    pipe_.InitBuffer(rValueQue_, DOUBLE_BUFFER, tilingData_.ubRowFactor * afterAxisAlignFp32_ * sizeof(float));\n-    pipe_.InitBuffer(invQuanDataQue_, DOUBLE_BUFFER, tilingData_.ubRowFactor * afterAxisAlignSize_ * sizeof(T));\n-\n-    int64_t rowLoopNum = ops::CeilDiv(curCoreVarCount_, tilingData_.ubRowFactor);\n-    int64_t rowMainDataLen = tilingData_.ubRowFactor; // align by 32 bytes\n-    int64_t rowTailDataLen = curCoreVarCount_ - tilingData_.ubRowFactor * (rowLoopNum - 1);\n-\n-    for (int32_t rowIdx = 0; rowIdx < rowLoopNum - 1; rowIdx++) {\n-        CopyRValueAndIntWsIn(rowIdx, 0, rowMainDataLen, tilingData_.afterAxis);\n-        InverseQuantize(rowMainDataLen, tilingData_.afterAxis);\n-        CopyInverseQuantizedValueOut(rowIdx, 0, rowMainDataLen, tilingData_.afterAxis);\n+    pipe_.InitBuffer(sumQuanToIntQue_, DOUBLE_BUFFER, rowMainDataLen * afterAxisAlignFp32_ * sizeof(int32_t));\n+    pipe_.InitBuffer(rValueQue_, DOUBLE_BUFFER, rowMainDataLen * afterAxisAlignFp32_ * sizeof(float));\n+    pipe_.InitBuffer(invQuanDataQue_, DOUBLE_BUFFER, rowMainDataLen * afterAxisAlignSize_ * sizeof(T));\n+    if (tilingData_.isOpti == 1) {\n+        pipe_.InitBuffer(sumIdxQue_, DOUBLE_BUFFER, rowMainDataLen * sizeof(U));\n+        for (uint64_t rowIdx = 0; rowIdx < rowLoopNum - 1; rowIdx++) {\n+            CopyRValueAndIntWsAndIndexInOpti(rowIdx, 0, rowMainDataLen, tilingData_.afterAxis);\n+            InverseQuantize(this->uniqueSumIdNum_, tilingData_.afterAxis);\n+            CopyInverseQuantizedValueOutOpti(tilingData_.afterAxis);\n+        }\n+        CopyRValueAndIntWsAndIndexInOpti(rowLoopNum - 1, 0, rowTailDataLen, tilingData_.afterAxis);\n+        InverseQuantize(this->uniqueSumIdNum_, tilingData_.afterAxis);\n+        CopyInverseQuantizedValueOutOpti(tilingData_.afterAxis);\n+    } else {\n+        for (uint64_t rowIdx = 0; rowIdx < rowLoopNum - 1; rowIdx++) {\n+            CopyRValueAndIntWsIn(rowIdx, 0, rowMainDataLen, tilingData_.afterAxis);\n+            InverseQuantize(rowMainDataLen, tilingData_.afterAxis);\n+            CopyInverseQuantizedValueOut(rowIdx, 0, rowMainDataLen, tilingData_.afterAxis);\n+        }\n+        CopyRValueAndIntWsIn(rowLoopNum - 1, 0, rowTailDataLen, tilingData_.afterAxis);\n+        InverseQuantize(rowTailDataLen, tilingData_.afterAxis);\n+        CopyInverseQuantizedValueOut(rowLoopNum - 1, 0, rowTailDataLen, tilingData_.afterAxis);\n     }\n-    CopyRValueAndIntWsIn(rowLoopNum - 1, 0, rowTailDataLen, tilingData_.afterAxis);\n-    InverseQuantize(rowTailDataLen, tilingData_.afterAxis);\n-    CopyInverseQuantizedValueOut(rowLoopNum - 1, 0, rowTailDataLen, tilingData_.afterAxis);\n }\n \n template <typename T, typename U>\n",
+      "new_file": false,
+      "new_path": "index/scatter_nd_add/op_kernel/arch35/scatter_nd_add_determinstic.h",
+      "old_path": "index/scatter_nd_add/op_kernel/arch35/scatter_nd_add_determinstic.h",
+      "removed_lines": 19,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/181fb41ce2aa63ff9066baf447d37abd1b2e33d5/index/scatter_nd_add/op_kernel/arch35/scatter_nd_add_determinstic.h",
+    "sha": "181fb41ce2aa63ff9066baf447d37abd1b2e33d5",
+    "source_branch": "fix_scatter_nd_add",
+    "source_project": {
+      "full_name": "yu_qinfei/ops-nn",
+      "human_name": "yu_qinfei / ops-nn",
+      "id": 9098650,
+      "path": "ops-nn"
+    },
+    "target_branch": "9.0.0-beta.1",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 2,
+    "blob_id": "2275c24a7a8e564fb3617dd84004991314cfb4e2",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/181fb41ce2aa63ff9066baf447d37abd1b2e33d5/index/scatter_nd_add/op_kernel/arch35/scatter_nd_add_struct.h",
+    "deletions": 0,
+    "filename": "index/scatter_nd_add/op_kernel/arch35/scatter_nd_add_struct.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 2,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -53,6 +53,7 @@ public:\n \n     int64_t ubQuantaIndxFactor;\n     int64_t ubRowFactor;\n+    int64_t ubRowOptiFactor;\n     int64_t eachCoreIndexCount;\n     int64_t tailCoreIndexCount;\n     int64_t eachCoreVarCount;\n@@ -61,5 +62,6 @@ public:\n     int64_t isDeterminstic;\n     int64_t isSimdNonDeterminstic;\n     int64_t isSort;\n+    int64_t isOpti;\n };} // namespace ScatterNdAdd\n #endif\n\\ No newline at end of file\n",
+      "new_file": false,
+      "new_path": "index/scatter_nd_add/op_kernel/arch35/scatter_nd_add_struct.h",
+      "old_path": "index/scatter_nd_add/op_kernel/arch35/scatter_nd_add_struct.h",
+      "removed_lines": 0,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/181fb41ce2aa63ff9066baf447d37abd1b2e33d5/index/scatter_nd_add/op_kernel/arch35/scatter_nd_add_struct.h",
+    "sha": "181fb41ce2aa63ff9066baf447d37abd1b2e33d5",
+    "source_branch": "fix_scatter_nd_add",
+    "source_project": {
+      "full_name": "yu_qinfei/ops-nn",
+      "human_name": "yu_qinfei / ops-nn",
+      "id": 9098650,
+      "path": "ops-nn"
+    },
+    "target_branch": "9.0.0-beta.1",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  }
+]

@@ -1,0 +1,183 @@
+[
+  {
+    "additions": 7,
+    "blob_id": "d0068453921f97f4bbd8bf45f141dbfa131af360",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/b5a380913cf446f2a2e18ee6a2c55eb762730eed/quant/dynamic_quant/op_kernel/dynamic_quant.cpp",
+    "deletions": 1,
+    "filename": "quant/dynamic_quant/op_kernel/dynamic_quant.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 7,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -25,10 +25,16 @@\n #include \"dynamic_quant_moe.h\"\n #include \"dynamic_quant_moe_large_shape.h\"\n \n+#ifdef __CCE_KT_TEST__\n+#define KERNEL_LINKAGE static\n+#else\n+#define KERNEL_LINKAGE extern \"C\"\n+#endif\n+\n using namespace AscendC;\n using namespace DynamicQuantNDOpt;\n \n-extern \"C\" __global__ __aicore__ void dynamic_quant(\n+KERNEL_LINKAGE __global__ __aicore__ void dynamic_quant(\n     GM_ADDR x, GM_ADDR smooth_scales, GM_ADDR group_index, GM_ADDR y, GM_ADDR scale, GM_ADDR workSpace, GM_ADDR tiling)\n {\n     if (x == nullptr || y == nullptr || scale == nullptr) {\n",
+      "new_file": false,
+      "new_path": "quant/dynamic_quant/op_kernel/dynamic_quant.cpp",
+      "old_path": "quant/dynamic_quant/op_kernel/dynamic_quant.cpp",
+      "removed_lines": 1,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/b5a380913cf446f2a2e18ee6a2c55eb762730eed/quant/dynamic_quant/op_kernel/dynamic_quant.cpp",
+    "sha": "b5a380913cf446f2a2e18ee6a2c55eb762730eed",
+    "source_branch": "dynamic_quant_310p",
+    "source_project": {
+      "full_name": "cuijie25/ops-nn",
+      "human_name": "cuijie25 / ops-nn",
+      "id": 7987967,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 29,
+    "blob_id": "72bb4baad2cf5172cbf2f63ab912a09289446a60",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/b5a380913cf446f2a2e18ee6a2c55eb762730eed/quant/dynamic_quant/op_kernel/dynamic_quant_unalign_large_310p.h",
+    "deletions": 24,
+    "filename": "quant/dynamic_quant/op_kernel/dynamic_quant_unalign_large_310p.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 29,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -134,15 +134,13 @@ private:\n         inQueue_.FreeTensor(inLocal);\n     }\n \n-    __aicore__ inline void QuantCompute(uint32_t calRow, uint32_t calCol)\n+    __aicore__ inline void QuantCompute(AscendC::LocalTensor<float>& scaleLocal, uint32_t calRow, uint32_t calCol)\n     {\n         // 尾块只需要搬运一次，直接量化生成结果\n         // deque input tensors from VECIN queue\n         AscendC::LocalTensor<int8_t> outLocal = outQueue_.AllocTensor<int8_t>();\n         AscendC::LocalTensor<half> temp = fp16Buf_.Get<half>();\n         AscendC::LocalTensor<half> inLocal = inQueue_.DeQue<half>();\n-        AscendC::LocalTensor<float> scaleLocal = scaleQueue_.DeQue<float>();\n-\n         uint32_t idx;\n         float scale;\n         for (uint32_t i = 0; i < calRow; i++) {\n@@ -186,10 +184,8 @@ private:\n         outQueue_.FreeTensor(outLocal);\n     }\n \n-    __aicore__ inline void CopyScalesOut(uint32_t progress, uint32_t calRow)\n+    __aicore__ inline void CopyScalesOut(AscendC::LocalTensor<float>& scaleLocal, uint32_t progress, uint32_t calRow)\n     {\n-        // deque scale tensor from VECOUT queue\n-        AscendC::LocalTensor<float> scaleLocal = scaleQueue_.DeQue<float>();\n         // copy progress_th tile from local tensor to global tensor\n         Muls(scaleLocal, scaleLocal, static_cast<float>(1.0f / DYNAMIC_QUANT_MAX_VALUE), calRow);\n         AscendC::SetFlag<HardEvent::V_MTE3>(EVENT_ID0);\n@@ -216,36 +212,45 @@ private:\n             ComputeGetMaxValue(innerLoopIndex, calRow, calCol);\n         }\n \n+        uint16_t safeCalRow = calRow;\n         // 如果核内切的有尾块\n         if (innerLoopTail_ > 0) {\n-            innerOffsetBase = offsetBase + this->innerLoopTimes_ * calCol;\n+            safeCalRow = ((this->sizeH_ - innerLoopTail_) * sizeof(half) / BLOCK_SIZE > UINT16_MAX) ? 1 : calRow;\n             // 直接进行计算，可以最后一次尾块的搬运\n             splitCopyinParams = {\n-                static_cast<uint16_t>(calRow), static_cast<uint16_t>(innerLoopTail_ * sizeof(half) / BLOCK_SIZE),\n+                static_cast<uint16_t>(safeCalRow), static_cast<uint16_t>(innerLoopTail_ * sizeof(half) / BLOCK_SIZE),\n                 static_cast<uint16_t>((this->sizeH_ - innerLoopTail_) * sizeof(half) / BLOCK_SIZE), 0};\n             splitCopyoutParams = {\n-                static_cast<uint16_t>(calRow), static_cast<uint16_t>(innerLoopTail_ * sizeof(int8_t) / BLOCK_SIZE), 0,\n+                static_cast<uint16_t>(safeCalRow), static_cast<uint16_t>(innerLoopTail_ * sizeof(int8_t) / BLOCK_SIZE), 0,\n                 static_cast<uint16_t>((this->sizeH_ - innerLoopTail_) * sizeof(int8_t) / BLOCK_SIZE)};\n-            CopyIn(innerOffsetBase, splitCopyinParams);\n-            ComputeInnerTail(calRow, this->innerLoopTail_);\n-            CopyOut(innerOffsetBase, splitCopyoutParams);\n+\n+            for (uint32_t rowIndex = 0; rowIndex < calRow; rowIndex += safeCalRow) {\n+                innerOffsetBase = offsetBase + this->innerLoopTimes_ * calCol + rowIndex * this->sizeH_;\n+                CopyIn(innerOffsetBase, splitCopyinParams);\n+                ComputeInnerTail(safeCalRow, this->innerLoopTail_);\n+                CopyOut(innerOffsetBase, splitCopyoutParams);\n+            }\n         }\n \n+        safeCalRow = ((this->sizeH_ - calCol) * sizeof(half) / BLOCK_SIZE) ? 1 : calRow;\n+        // 拷贝数据，一次拷贝8行数据数据起始地址innerOffsetBase，间隔sizeH_ - calCol，数据量calCol，\n+        splitCopyinParams = {\n+            static_cast<uint16_t>(safeCalRow), static_cast<uint16_t>(calCol * sizeof(half) / BLOCK_SIZE),\n+            static_cast<uint16_t>((this->sizeH_ - calCol) * sizeof(half) / BLOCK_SIZE), 0};\n+        splitCopyoutParams = {\n+            static_cast<uint16_t>(safeCalRow), static_cast<uint16_t>(calCol * sizeof(int8_t) / BLOCK_SIZE), 0,\n+            static_cast<uint16_t>((this->sizeH_ - calCol) * sizeof(int8_t) / BLOCK_SIZE)};\n+        AscendC::LocalTensor<float> scaleLocal = scaleQueue_.DeQue<float>();\n         // 量化计算\n         for (uint32_t innerLoopIndex = 0; innerLoopIndex < this->innerLoopTimes_; innerLoopIndex++) {\n-            innerOffsetBase = offsetBase + innerLoopIndex * calCol;\n-            // 拷贝数据，一次拷贝8行数据数据起始地址innerOffsetBase，间隔sizeH_ - calCol，数据量calCol，\n-            splitCopyinParams = {\n-                static_cast<uint16_t>(calRow), static_cast<uint16_t>(calCol * sizeof(half) / BLOCK_SIZE),\n-                static_cast<uint16_t>((this->sizeH_ - calCol) * sizeof(half) / BLOCK_SIZE), 0};\n-            splitCopyoutParams = {\n-                static_cast<uint16_t>(calRow), static_cast<uint16_t>(calCol * sizeof(int8_t) / BLOCK_SIZE), 0,\n-                static_cast<uint16_t>((this->sizeH_ - calCol) * sizeof(int8_t) / BLOCK_SIZE)};\n-            CopyIn(innerOffsetBase, splitCopyinParams);\n-            QuantCompute(calRow, calCol);\n-            CopyOut(innerOffsetBase, splitCopyoutParams);\n+            for (uint32_t rowIndex = 0; rowIndex < calRow; rowIndex+=safeCalRow) {\n+                innerOffsetBase = offsetBase + innerLoopIndex * calCol + rowIndex * this->sizeH_;\n+                CopyIn(innerOffsetBase, splitCopyinParams);\n+                QuantCompute(scaleLocal, safeCalRow, calCol);\n+                CopyOut(innerOffsetBase, splitCopyoutParams);\n+            }\n         }\n-        CopyScalesOut(loopIndex, calRow);\n+        CopyScalesOut(scaleLocal, loopIndex, calRow);\n     }\n \n     __aicore__ inline void ProcessSymmetrical()\n",
+      "new_file": false,
+      "new_path": "quant/dynamic_quant/op_kernel/dynamic_quant_unalign_large_310p.h",
+      "old_path": "quant/dynamic_quant/op_kernel/dynamic_quant_unalign_large_310p.h",
+      "removed_lines": 24,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/b5a380913cf446f2a2e18ee6a2c55eb762730eed/quant/dynamic_quant/op_kernel/dynamic_quant_unalign_large_310p.h",
+    "sha": "b5a380913cf446f2a2e18ee6a2c55eb762730eed",
+    "source_branch": "dynamic_quant_310p",
+    "source_project": {
+      "full_name": "cuijie25/ops-nn",
+      "human_name": "cuijie25 / ops-nn",
+      "id": 7987967,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 1,
+    "blob_id": "bfa36994d7621cd772e229e166c13a61b0556d38",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/b5a380913cf446f2a2e18ee6a2c55eb762730eed/quant/dynamic_quant/tests/ut/op_kernel/CMakeLists.txt",
+    "deletions": 1,
+    "filename": "quant/dynamic_quant/tests/ut/op_kernel/CMakeLists.txt",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 1,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -8,5 +8,5 @@\n # See LICENSE in the root of the software repository for the full text of the License.\n # ----------------------------------------------------------------------------\n if ((UT_TEST_ALL OR OP_KERNEL_UT) AND NOT UT_DONE)\n-    AddOpTestCase(dynamic_quant \"ascend910B1\" \"\" )\n+    AddOpTestCase(dynamic_quant \"ascend910B1\" \"\" \"MULTI_KERNEL_TARGET\")\n endif()\n\\ No newline at end of file\n",
+      "new_file": false,
+      "new_path": "quant/dynamic_quant/tests/ut/op_kernel/CMakeLists.txt",
+      "old_path": "quant/dynamic_quant/tests/ut/op_kernel/CMakeLists.txt",
+      "removed_lines": 1,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/b5a380913cf446f2a2e18ee6a2c55eb762730eed/quant/dynamic_quant/tests/ut/op_kernel/CMakeLists.txt",
+    "sha": "b5a380913cf446f2a2e18ee6a2c55eb762730eed",
+    "source_branch": "dynamic_quant_310p",
+    "source_project": {
+      "full_name": "cuijie25/ops-nn",
+      "human_name": "cuijie25 / ops-nn",
+      "id": 7987967,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 3,
+    "blob_id": "c1ed107e8af9f5062505e367bbeccbaa89656cd9",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/b5a380913cf446f2a2e18ee6a2c55eb762730eed/quant/dynamic_quant/tests/ut/op_kernel/test_dynamic_quant.cpp",
+    "deletions": 185,
+    "filename": "quant/dynamic_quant/tests/ut/op_kernel/test_dynamic_quant.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 3,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -18,11 +18,12 @@\n #include \"data_utils.h\"\n \n #include <cstdint>\n-#define __CCE_AICORE__ 310\n+#define __CCE_AICORE__ 220\n+#include \"dynamic_quant.cpp\"\n \n using namespace std;\n \n-extern \"C\" void dynamic_quant(\n+void dynamic_quant(\n     GM_ADDR x, GM_ADDR smooth_scales, GM_ADDR group_index, GM_ADDR y, GM_ADDR scale, GM_ADDR workSpace, GM_ADDR tiling);\n \n class dynamic_quant_test : public testing::Test\n@@ -414,186 +415,3 @@ TEST_F(dynamic_quant_test, test_case_largeShape_fp16_int8_2)\n     AscendC::GmFree(tiling);\n     free(path_);\n }\n-\n-TEST_F(dynamic_quant_test, test_case_310_01)\n-{\n-    size_t inputByteSize = 8 * 1024 * sizeof(uint16_t);\n-    size_t outputByteSize = 8 * 1024 * sizeof(int8_t);\n-    size_t scaleByteSize = 8 * sizeof(uint32_t);\n-    size_t tiling_data_size = sizeof(DynamicQuantTilingData);\n-    uint32_t blockDim = 8;\n-\n-    uint8_t* input = (uint8_t*)AscendC::GmAlloc(inputByteSize);\n-    uint8_t* output = (uint8_t*)AscendC::GmAlloc(outputByteSize);\n-    uint8_t* scale = (uint8_t*)AscendC::GmAlloc(scaleByteSize);\n-\n-    uint8_t* workSpace = (uint8_t*)AscendC::GmAlloc(1024 * 1024 * 16);\n-    uint8_t* tiling = (uint8_t*)AscendC::GmAlloc(tiling_data_size);\n-\n-    char* path_ = get_current_dir_name();\n-    string path(path_);\n-\n-    DynamicQuantTilingData* tilingDatafromBin = reinterpret_cast<DynamicQuantTilingData*>(tiling);\n-\n-    tilingDatafromBin->coreNum = blockDim;\n-    tilingDatafromBin->rowLen = 0;\n-    tilingDatafromBin->headCoreNum = 0;\n-    tilingDatafromBin->rowPerHeadCore = 0;\n-    tilingDatafromBin->rowPerTailCore = 0;\n-    tilingDatafromBin->multiRowNumHeadCore = 0;\n-    tilingDatafromBin->multiRowNumTailCore = 0;\n-    tilingDatafromBin->groupNum = 0;\n-    tilingDatafromBin->alignGroupNum = 0;\n-    tilingDatafromBin->hasSmooth = 0;\n-\n-    tilingDatafromBin->sizeH = 1024;\n-    tilingDatafromBin->sizeX = 1024;\n-    tilingDatafromBin->sizeZOut = 1024;\n-    tilingDatafromBin->sizeCopyRow = 8;\n-    tilingDatafromBin->numCopyRow = 8;\n-    tilingDatafromBin->numHeadCore = 1;\n-    tilingDatafromBin->numTailCore = 7;\n-    tilingDatafromBin->numHeadTimes = 1;\n-    tilingDatafromBin->numTailTimes = 0;\n-    tilingDatafromBin->numLastTailRow = 0;\n-    tilingDatafromBin->innerLoopEle = 0;\n-    tilingDatafromBin->innerLoopTimes = 0;\n-    tilingDatafromBin->innerLoopTail = 0;\n-    tilingDatafromBin->alignType = 0;\n-    tilingDatafromBin->ubSize = 191*1024;\n-\n-    // bf16\n-    ICPU_SET_TILING_KEY(10100);\n-    AscendC::SetKernelMode(KernelMode::AIV_MODE);\n-    ICPU_RUN_KF(\n-        dynamic_quant, blockDim, input, nullptr, nullptr, output, scale, workSpace, (uint8_t*)(tilingDatafromBin));\n-\n-    AscendC::GmFree(input);\n-    AscendC::GmFree(output);\n-    AscendC::GmFree(scale);\n-    AscendC::GmFree(workSpace);\n-    AscendC::GmFree(tiling);\n-    free(path_);\n-}\n-\n-TEST_F(dynamic_quant_test, test_case_310_02)\n-{\n-    size_t inputByteSize = 10 * 1088 * sizeof(uint16_t);\n-    size_t outputByteSize = 10 * 1088 * sizeof(int8_t);\n-    size_t scaleByteSize = 10 * sizeof(uint32_t);\n-    size_t tiling_data_size = sizeof(DynamicQuantTilingData);\n-    uint32_t blockDim = 8;\n-\n-    uint8_t* input = (uint8_t*)AscendC::GmAlloc(inputByteSize);\n-    uint8_t* output = (uint8_t*)AscendC::GmAlloc(outputByteSize);\n-    uint8_t* scale = (uint8_t*)AscendC::GmAlloc(scaleByteSize);\n-\n-    uint8_t* workSpace = (uint8_t*)AscendC::GmAlloc(1024 * 1024 * 16);\n-    uint8_t* tiling = (uint8_t*)AscendC::GmAlloc(tiling_data_size);\n-\n-    char* path_ = get_current_dir_name();\n-    string path(path_);\n-\n-    DynamicQuantTilingData* tilingDatafromBin = reinterpret_cast<DynamicQuantTilingData*>(tiling);\n-\n-    tilingDatafromBin->coreNum = blockDim;\n-    tilingDatafromBin->rowLen = 0;\n-    tilingDatafromBin->headCoreNum = 0;\n-    tilingDatafromBin->rowPerHeadCore = 0;\n-    tilingDatafromBin->rowPerTailCore = 0;\n-    tilingDatafromBin->multiRowNumHeadCore = 0;\n-    tilingDatafromBin->multiRowNumTailCore = 0;\n-    tilingDatafromBin->groupNum = 0;\n-    tilingDatafromBin->alignGroupNum = 0;\n-    tilingDatafromBin->hasSmooth = 0;\n-\n-    tilingDatafromBin->sizeH = 1088;\n-    tilingDatafromBin->sizeX = 1088;\n-    tilingDatafromBin->sizeZOut = 1088;\n-    tilingDatafromBin->sizeCopyRow = 8;\n-    tilingDatafromBin->numCopyRow = 8;\n-    tilingDatafromBin->numHeadCore = 1;\n-    tilingDatafromBin->numTailCore = 7;\n-    tilingDatafromBin->numHeadTimes = 1;\n-    tilingDatafromBin->numTailTimes = 0;\n-    tilingDatafromBin->numLastTailRow = 2;\n-    tilingDatafromBin->innerLoopEle = 0;\n-    tilingDatafromBin->innerLoopTimes = 0;\n-    tilingDatafromBin->innerLoopTail = 0;\n-    tilingDatafromBin->alignType = 1;\n-    tilingDatafromBin->ubSize = 191*1024;\n-\n-    // bf16\n-    ICPU_SET_TILING_KEY(11000);\n-    AscendC::SetKernelMode(KernelMode::AIV_MODE);\n-    ICPU_RUN_KF(\n-        dynamic_quant, blockDim, input, nullptr, nullptr, output, scale, workSpace, (uint8_t*)(tilingDatafromBin));\n-\n-    AscendC::GmFree(input);\n-    AscendC::GmFree(output);\n-    AscendC::GmFree(scale);\n-    AscendC::GmFree(workSpace);\n-    AscendC::GmFree(tiling);\n-    free(path_);\n-}\n-\n-TEST_F(dynamic_quant_test, test_case_310_03)\n-{\n-    size_t inputByteSize = 8 * 7168 * sizeof(uint16_t);\n-    size_t outputByteSize = 8 * 7168 * sizeof(int8_t);\n-    size_t scaleByteSize = 8 * sizeof(uint32_t);\n-    size_t tiling_data_size = sizeof(DynamicQuantTilingData);\n-    uint32_t blockDim = 8;\n-\n-    uint8_t* input = (uint8_t*)AscendC::GmAlloc(inputByteSize);\n-    uint8_t* output = (uint8_t*)AscendC::GmAlloc(outputByteSize);\n-    uint8_t* scale = (uint8_t*)AscendC::GmAlloc(scaleByteSize);\n-\n-    uint8_t* workSpace = (uint8_t*)AscendC::GmAlloc(1024 * 1024 * 16);\n-    uint8_t* tiling = (uint8_t*)AscendC::GmAlloc(tiling_data_size);\n-\n-    char* path_ = get_current_dir_name();\n-    string path(path_);\n-\n-    DynamicQuantTilingData* tilingDatafromBin = reinterpret_cast<DynamicQuantTilingData*>(tiling);\n-\n-    tilingDatafromBin->coreNum = blockDim;\n-    tilingDatafromBin->rowLen = 0;\n-    tilingDatafromBin->headCoreNum = 0;\n-    tilingDatafromBin->rowPerHeadCore = 0;\n-    tilingDatafromBin->rowPerTailCore = 0;\n-    tilingDatafromBin->multiRowNumHeadCore = 0;\n-    tilingDatafromBin->multiRowNumTailCore = 0;\n-    tilingDatafromBin->groupNum = 0;\n-    tilingDatafromBin->alignGroupNum = 0;\n-    tilingDatafromBin->hasSmooth = 0;\n-\n-    tilingDatafromBin->sizeH = 7168;\n-    tilingDatafromBin->sizeX = 7168;\n-    tilingDatafromBin->sizeZOut = 7168;\n-    tilingDatafromBin->sizeCopyRow = 8;\n-    tilingDatafromBin->numCopyRow = 8;\n-    tilingDatafromBin->numHeadCore = 1;\n-    tilingDatafromBin->numTailCore = 7;\n-    tilingDatafromBin->numHeadTimes = 1;\n-    tilingDatafromBin->numTailTimes = 0;\n-    tilingDatafromBin->numLastTailRow = 0;\n-    tilingDatafromBin->innerLoopEle = 4096;\n-    tilingDatafromBin->innerLoopTimes = 1;\n-    tilingDatafromBin->innerLoopTail = 3072;\n-    tilingDatafromBin->alignType = 1;\n-    tilingDatafromBin->ubSize = 191*1024;\n-\n-    // bf16\n-    ICPU_SET_TILING_KEY(11001);\n-    AscendC::SetKernelMode(KernelMode::AIV_MODE);\n-    ICPU_RUN_KF(\n-        dynamic_quant, blockDim, input, nullptr, nullptr, output, scale, workSpace, (uint8_t*)(tilingDatafromBin));\n-\n-    AscendC::GmFree(input);\n-    AscendC::GmFree(output);\n-    AscendC::GmFree(scale);\n-    AscendC::GmFree(workSpace);\n-    AscendC::GmFree(tiling);\n-    free(path_);\n-}\n\\ No newline at end of file\n",
+      "new_file": false,
+      "new_path": "quant/dynamic_quant/tests/ut/op_kernel/test_dynamic_quant.cpp",
+      "old_path": "quant/dynamic_quant/tests/ut/op_kernel/test_dynamic_quant.cpp",
+      "removed_lines": 185,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/b5a380913cf446f2a2e18ee6a2c55eb762730eed/quant/dynamic_quant/tests/ut/op_kernel/test_dynamic_quant.cpp",
+    "sha": "b5a380913cf446f2a2e18ee6a2c55eb762730eed",
+    "source_branch": "dynamic_quant_310p",
+    "source_project": {
+      "full_name": "cuijie25/ops-nn",
+      "human_name": "cuijie25 / ops-nn",
+      "id": 7987967,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 226,
+    "blob_id": "faab27a019c13e7b7812a30e4b4dc91976962110",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/b5a380913cf446f2a2e18ee6a2c55eb762730eed/quant/dynamic_quant/tests/ut/op_kernel/test_dynamic_quant_dav_2002.cpp",
+    "deletions": 0,
+    "filename": "quant/dynamic_quant/tests/ut/op_kernel/test_dynamic_quant_dav_2002.cpp",
+    "patch": {
+      "a_mode": "0",
+      "added_lines": 226,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -0,0 +1,226 @@\n+/**\n+ * Copyright (c) 2025 Huawei Technologies Co., Ltd.\n+ * This program is free software, you can redistribute it and/or modify it under the terms and conditions of\n+ * CANN Open Software License Agreement Version 2.0 (the \"License\").\n+ * Please refer to the License for details. You may not use this file except in compliance with the License.\n+ * THIS SOFTWARE IS PROVIDED ON AN \"AS IS\" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,\n+ * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.\n+ * See LICENSE in the root of the software repository for the full text of the License.\n+ */\n+#include <array>\n+#include <vector>\n+#include <iostream>\n+#include <string>\n+#include <cstdint>\n+#include \"gtest/gtest.h\"\n+#include \"tikicpulib.h\"\n+#include \"dynamic_quant_tiling_def.h\"\n+#include \"data_utils.h\"\n+\n+#include <cstdint>\n+\n+#define __CCE_AICORE__ 200\n+#include \"dynamic_quant.cpp\"\n+\n+using namespace std;\n+\n+void dynamic_quant(\n+    GM_ADDR x, GM_ADDR smooth_scales, GM_ADDR group_index, GM_ADDR y, GM_ADDR scale, GM_ADDR workSpace, GM_ADDR tiling);\n+\n+class dynamic_quant_test : public testing::Test\n+{\n+protected:\n+    static void SetUpTestCase()\n+    {\n+        cout << \"dynamic_quant_test SetUp\\n\" << endl;\n+    }\n+    static void TearDownTestCase()\n+    {\n+        cout << \"dynamic_quant_test TearDown\\n\" << endl;\n+    }\n+};\n+\n+TEST_F(dynamic_quant_test, test_case_310_01)\n+{\n+    size_t inputByteSize = 32 * 1088 * sizeof(uint16_t);\n+    size_t outputByteSize = 32 * 1088 * sizeof(int8_t);\n+    size_t scaleByteSize = 32 * sizeof(uint32_t);\n+    size_t tiling_data_size = sizeof(DynamicQuantTilingData);\n+    uint32_t blockDim = 8;\n+\n+    uint8_t* input = (uint8_t*)AscendC::GmAlloc(inputByteSize);\n+    uint8_t* output = (uint8_t*)AscendC::GmAlloc(outputByteSize);\n+    uint8_t* scale = (uint8_t*)AscendC::GmAlloc(scaleByteSize);\n+\n+    uint8_t* workSpace = (uint8_t*)AscendC::GmAlloc(1024 * 1024 * 16);\n+    uint8_t* tiling = (uint8_t*)AscendC::GmAlloc(tiling_data_size);\n+\n+    char* path_ = get_current_dir_name();\n+    string path(path_);\n+\n+    DynamicQuantTilingData* tilingDatafromBin = reinterpret_cast<DynamicQuantTilingData*>(tiling);\n+\n+    tilingDatafromBin->coreNum = blockDim;\n+    tilingDatafromBin->rowLen = 0;\n+    tilingDatafromBin->headCoreNum = 0;\n+    tilingDatafromBin->rowPerHeadCore = 0;\n+    tilingDatafromBin->rowPerTailCore = 0;\n+    tilingDatafromBin->multiRowNumHeadCore = 0;\n+    tilingDatafromBin->multiRowNumTailCore = 0;\n+    tilingDatafromBin->groupNum = 0;\n+    tilingDatafromBin->alignGroupNum = 0;\n+    tilingDatafromBin->hasSmooth = 0;\n+\n+    tilingDatafromBin->sizeH = 1088;\n+    tilingDatafromBin->sizeX = 1088;\n+    tilingDatafromBin->sizeZOut = 1088;\n+    tilingDatafromBin->sizeCopyRow = 8;\n+    tilingDatafromBin->numCopyRow = 8;\n+    tilingDatafromBin->numHeadCore = 4;\n+    tilingDatafromBin->numTailCore = 4;\n+    tilingDatafromBin->numHeadTimes = 1;\n+    tilingDatafromBin->numTailTimes = 0;\n+    tilingDatafromBin->numLastTailRow = 0;\n+    tilingDatafromBin->innerLoopEle = 0;\n+    tilingDatafromBin->innerLoopTimes = 0;\n+    tilingDatafromBin->innerLoopTail = 0;\n+    tilingDatafromBin->alignType = 0;\n+    tilingDatafromBin->ubSize = 191*1024;\n+\n+    // bf16\n+    ICPU_SET_TILING_KEY(10100);\n+    AscendC::SetKernelMode(KernelMode::AIV_MODE);\n+    ICPU_RUN_KF(\n+        dynamic_quant, blockDim, input, nullptr, nullptr, output, scale, workSpace, (uint8_t*)(tilingDatafromBin));\n+\n+    AscendC::GmFree(input);\n+    AscendC::GmFree(output);\n+    AscendC::GmFree(scale);\n+    AscendC::GmFree(workSpace);\n+    AscendC::GmFree(tiling);\n+    free(path_);\n+}\n+\n+\n+TEST_F(dynamic_quant_test, test_case_310_02)\n+{\n+    size_t inputByteSize = 32 * 1088 * sizeof(uint16_t);\n+    size_t outputByteSize = 32 * 1088 * sizeof(int8_t);\n+    size_t scaleByteSize = 32 * sizeof(uint32_t);\n+    size_t tiling_data_size = sizeof(DynamicQuantTilingData);\n+    uint32_t blockDim = 8;\n+\n+    uint8_t* input = (uint8_t*)AscendC::GmAlloc(inputByteSize);\n+    uint8_t* output = (uint8_t*)AscendC::GmAlloc(outputByteSize);\n+    uint8_t* scale = (uint8_t*)AscendC::GmAlloc(scaleByteSize);\n+\n+    uint8_t* workSpace = (uint8_t*)AscendC::GmAlloc(1024 * 1024 * 16);\n+    uint8_t* tiling = (uint8_t*)AscendC::GmAlloc(tiling_data_size);\n+\n+    char* path_ = get_current_dir_name();\n+    string path(path_);\n+\n+    DynamicQuantTilingData* tilingDatafromBin = reinterpret_cast<DynamicQuantTilingData*>(tiling);\n+\n+    tilingDatafromBin->coreNum = blockDim;\n+    tilingDatafromBin->rowLen = 0;\n+    tilingDatafromBin->headCoreNum = 0;\n+    tilingDatafromBin->rowPerHeadCore = 0;\n+    tilingDatafromBin->rowPerTailCore = 0;\n+    tilingDatafromBin->multiRowNumHeadCore = 0;\n+    tilingDatafromBin->multiRowNumTailCore = 0;\n+    tilingDatafromBin->groupNum = 0;\n+    tilingDatafromBin->alignGroupNum = 0;\n+    tilingDatafromBin->hasSmooth = 0;\n+\n+    tilingDatafromBin->sizeH = 1088;\n+    tilingDatafromBin->sizeX = 1088;\n+    tilingDatafromBin->sizeZOut = 1088;\n+    tilingDatafromBin->sizeCopyRow = 8;\n+    tilingDatafromBin->numCopyRow = 8;\n+    tilingDatafromBin->numHeadCore = 1;\n+    tilingDatafromBin->numTailCore = 7;\n+    tilingDatafromBin->numHeadTimes = 1;\n+    tilingDatafromBin->numTailTimes = 0;\n+    tilingDatafromBin->numLastTailRow = 2;\n+    tilingDatafromBin->innerLoopEle = 0;\n+    tilingDatafromBin->innerLoopTimes = 0;\n+    tilingDatafromBin->innerLoopTail = 0;\n+    tilingDatafromBin->alignType = 1;\n+    tilingDatafromBin->ubSize = 191*1024;\n+\n+    // bf16\n+    ICPU_SET_TILING_KEY(11000);\n+    AscendC::SetKernelMode(KernelMode::AIV_MODE);\n+    ICPU_RUN_KF(\n+        dynamic_quant, blockDim, input, nullptr, nullptr, output, scale, workSpace, (uint8_t*)(tilingDatafromBin));\n+\n+    AscendC::GmFree(input);\n+    AscendC::GmFree(output);\n+    AscendC::GmFree(scale);\n+    AscendC::GmFree(workSpace);\n+    AscendC::GmFree(tiling);\n+    free(path_);\n+}\n+\n+\n+TEST_F(dynamic_quant_test, test_case_310_03)\n+{\n+    size_t inputByteSize = 32 * 7168 * sizeof(uint16_t);\n+    size_t outputByteSize = 32 * 7168 * sizeof(int8_t);\n+    size_t scaleByteSize = 32 * sizeof(uint32_t);\n+    size_t tiling_data_size = sizeof(DynamicQuantTilingData);\n+    uint32_t blockDim = 8;\n+\n+    uint8_t* input = (uint8_t*)AscendC::GmAlloc(inputByteSize);\n+    uint8_t* output = (uint8_t*)AscendC::GmAlloc(outputByteSize);\n+    uint8_t* scale = (uint8_t*)AscendC::GmAlloc(scaleByteSize);\n+\n+    uint8_t* workSpace = (uint8_t*)AscendC::GmAlloc(1024 * 1024 * 16);\n+    uint8_t* tiling = (uint8_t*)AscendC::GmAlloc(tiling_data_size);\n+\n+    char* path_ = get_current_dir_name();\n+    string path(path_);\n+\n+    DynamicQuantTilingData* tilingDatafromBin = reinterpret_cast<DynamicQuantTilingData*>(tiling);\n+\n+    tilingDatafromBin->coreNum = blockDim;\n+    tilingDatafromBin->rowLen = 0;\n+    tilingDatafromBin->headCoreNum = 0;\n+    tilingDatafromBin->rowPerHeadCore = 0;\n+    tilingDatafromBin->rowPerTailCore = 0;\n+    tilingDatafromBin->multiRowNumHeadCore = 0;\n+    tilingDatafromBin->multiRowNumTailCore = 0;\n+    tilingDatafromBin->groupNum = 0;\n+    tilingDatafromBin->alignGroupNum = 0;\n+    tilingDatafromBin->hasSmooth = 0;\n+\n+    tilingDatafromBin->sizeH = 7168;\n+    tilingDatafromBin->sizeX = 7168;\n+    tilingDatafromBin->sizeZOut = 7168;\n+    tilingDatafromBin->sizeCopyRow = 8;\n+    tilingDatafromBin->numCopyRow = 8;\n+    tilingDatafromBin->numHeadCore = 4;\n+    tilingDatafromBin->numTailCore = 4;\n+    tilingDatafromBin->numHeadTimes = 1;\n+    tilingDatafromBin->numTailTimes = 0;\n+    tilingDatafromBin->numLastTailRow = 0;\n+    tilingDatafromBin->innerLoopEle = 4096;\n+    tilingDatafromBin->innerLoopTimes = 1;\n+    tilingDatafromBin->innerLoopTail = 3072;\n+    tilingDatafromBin->alignType = 1;\n+    tilingDatafromBin->ubSize = 191*1024;\n+\n+    // bf16\n+    ICPU_SET_TILING_KEY(11001);\n+    AscendC::SetKernelMode(KernelMode::AIV_MODE);\n+    ICPU_RUN_KF(\n+        dynamic_quant, blockDim, input, nullptr, nullptr, output, scale, workSpace, (uint8_t*)(tilingDatafromBin));\n+\n+    AscendC::GmFree(input);\n+    AscendC::GmFree(output);\n+    AscendC::GmFree(scale);\n+    AscendC::GmFree(workSpace);\n+    AscendC::GmFree(tiling);\n+    free(path_);\n+}\n",
+      "new_file": true,
+      "new_path": "quant/dynamic_quant/tests/ut/op_kernel/test_dynamic_quant_dav_2002.cpp",
+      "old_path": "quant/dynamic_quant/tests/ut/op_kernel/test_dynamic_quant_dav_2002.cpp",
+      "removed_lines": 0,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/b5a380913cf446f2a2e18ee6a2c55eb762730eed/quant/dynamic_quant/tests/ut/op_kernel/test_dynamic_quant_dav_2002.cpp",
+    "sha": "b5a380913cf446f2a2e18ee6a2c55eb762730eed",
+    "source_branch": "dynamic_quant_310p",
+    "source_project": {
+      "full_name": "cuijie25/ops-nn",
+      "human_name": "cuijie25 / ops-nn",
+      "id": 7987967,
+      "path": "ops-nn"
+    },
+    "status": "added",
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  }
+]

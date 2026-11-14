@@ -1,0 +1,76 @@
+{
+  "assignee": {
+    "avatar_url": "https://cdn-img.gitcode.com/ee/cd/eec19811dc7cf8455ff842f34fe264521e857510526454b9e5903256dd69be2b.png",
+    "html_url": "https://gitcode.com/liu-wei",
+    "id": "686253426134b2596efc1cd9",
+    "login": "liu-wei",
+    "name": "liu-wei",
+    "object_id": "686253426134b2596efc1cd9"
+  },
+  "assignees": [
+    {
+      "avatar_url": "https://cdn-img.gitcode.com/ee/cd/eec19811dc7cf8455ff842f34fe264521e857510526454b9e5903256dd69be2b.png",
+      "html_url": "https://gitcode.com/liu-wei",
+      "id": "686253426134b2596efc1cd9",
+      "login": "liu-wei",
+      "name": "liu-wei",
+      "object_id": "686253426134b2596efc1cd9"
+    }
+  ],
+  "body": "Tile AICPU 在 3D 非 Eigen 计算路径下的输出拷贝问题，并补齐分片拷贝失败时的错误码传递。\n\n主要问题如下：\n- `TileCompute3DSharderFirst/Second/Third/Fourth` 由 `void` 返回值调整为 `uint32_t`，将 `CallCopyHook` 的执行结果返回给上层。\n- `TileComputeWith3DNotUsingEigen` 调用各个 sharder 时增加 `KERNEL_HANDLE_ERROR`，当分片拷贝失败时能够及时返回错误，不再静默继续执行。\n- 修正第三阶段分片拷贝的偏移和拷贝长度计算：将原先使用 `x_first_dim` 的位置调整为 `x_second_dim`，避免 3D Tile 场景下第二维扩展时输出数据布局错误。\n- `TileCompute3DSharderThird` 接口增加 `x_second_dim` 参数，用于正确计算第三阶段输出偏移。\n- Tile AICPU 注册点使用 `OPS_MATH_REGISTER_CPU_KERNELV2(kTile, TileCpuKernel)`，保持与当前 AICPU host V2 注册封装一致。\n\n改动目的：\n- 修复 Tile 在 3D 非 Eigen 路径下特定维度组合可能出现的输出错误。\n- 提升内部并行分片拷贝的错误处理能力，避免底层拷贝失败后上层仍返回成功。\n- 本次未改动 Tile 的参数解析、类型分发、1D/2D 计算路径和 Eigen 计算路径。",
+  "comments": 0,
+  "created_at": "2026-05-22T15:43:22+08:00",
+  "finished_at": "2026-05-29T11:30:49+08:00",
+  "html_url": "https://gitcode.com/cann/ops-math/issues/1640",
+  "id": 4040134,
+  "issue_priority_detail": {
+    "id": 116,
+    "title": "无优先级"
+  },
+  "issue_state": "进行中",
+  "issue_state_detail": {
+    "id": 285,
+    "serial": 0,
+    "title": "进行中"
+  },
+  "issue_type": "任务",
+  "issue_type_detail": {
+    "id": 255,
+    "is_system": false,
+    "title": "任务"
+  },
+  "labels": [
+    {
+      "color": "#35e029",
+      "created_at": "2026-03-20T11:25:13+08:00",
+      "id": 38861,
+      "name": "resolved",
+      "updated_at": "2026-05-29T12:12:23+08:00"
+    }
+  ],
+  "number": "1640",
+  "priority": 0,
+  "repository": {
+    "assigner": {},
+    "created_at": "2025-09-25T16:01:52+08:00",
+    "description": "本项目是CANN提供的数学类基础计算算子库，实现网络在NPU上加速计算。",
+    "full_name": "cann/ops-math",
+    "id": 7649531,
+    "name": "ops-math",
+    "paas": "",
+    "path": "ops-math",
+    "updated_at": "2025-09-25T16:05:53+08:00"
+  },
+  "state": "closed",
+  "title": "[Bug] Tile算子 canndev 实现存在 output 索引错误",
+  "updated_at": "2026-05-29T11:30:49+08:00",
+  "user": {
+    "avatar_url": "https://cdn-img.gitcode.com/ee/cd/eec19811dc7cf8455ff842f34fe264521e857510526454b9e5903256dd69be2b.png",
+    "html_url": "https://gitcode.com/liu-wei",
+    "id": "686253426134b2596efc1cd9",
+    "login": "liu-wei",
+    "name": "liu-wei",
+    "object_id": "686253426134b2596efc1cd9"
+  },
+  "visibility_reason": "public"
+}

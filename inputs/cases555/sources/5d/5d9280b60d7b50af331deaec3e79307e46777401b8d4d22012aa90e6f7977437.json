@@ -1,0 +1,146 @@
+[
+  {
+    "additions": 9,
+    "blob_id": "57cae2e990ba006dffccad463aa80c9a6120679a",
+    "blob_url": "https://gitcode.com/cann/ops-math/blob/d6730711fef36adb4567d721341daf694bdbe913/random/drop_out_do_mask_v3/README.md",
+    "deletions": 9,
+    "filename": "random/drop_out_do_mask_v3/README.md",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 9,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -13,16 +13,16 @@\n \r\n ## 功能说明\r\n \r\n-- 算子功能：训练过程中，按照概率keep_prob随机将输入中的元素置零，并将输出按照1/(1-keep_prob)的比例放大。若mask对应比特位为1，则输入中相应的元素放大。若mask中比特位为0，则gradOutput相应的元素置零。特别地，若keep_prob为0，则不改变gradOutput的元素；若keep_prob为1，则将所有元素置为0。\r\n+- 算子功能：训练过程中，按照概率keep_prob随机保留输入中的元素，并将输出按照1/keep_prob的比例放大。若mask对应比特位为1，则输入中相应的元素放大。若mask中比特位为0，则gradOutput相应的元素置零。特别地，若keep_prob为0，则将所有元素置为0；若keep_prob为1，则不改变gradOutput的元素。\n \r\n - 计算公式：\r\n \r\n $$\r\n-gradOutput_i=\\begin{cases}\r\n-0,&\\text { with probability }keep\\_prob \\\\\r\n-\\frac{1}{1-keep\\_prob}self_i, &\\text { with probability }1-keep\\_prob\r\n-\\end{cases}\r\n-$$\r\n+gradOutput_i=\\begin{cases}\n+0,&mask_i=0 \\\\\n+\\frac{1}{keep\\_prob}self_i, &mask_i=1\n+\\end{cases}\n+$$\n \r\n ## 参数说明\r\n \r\n@@ -59,7 +59,7 @@ $$\n     <tr>\r\n       <td>keep_prob</td>\r\n       <td>输入</td>\r\n-      <td>用于计算输出数据缩放比例的概率值。</td>\r\n+      <td>用于计算输出数据缩放比例的概率值，shape需要为(1)。</td>\n       <td>FLOAT、FLOAT16、BFLOAT16</td>\r\n       <td>ND</td>\r\n     </tr>\r\n@@ -74,7 +74,7 @@ $$\n \r\n ## 约束说明\r\n \r\n-1. keep_prob的值必须在0和1之间。\r\n+1. keep_prob的值必须在0和1之间。\n 2. mask的shape必须满足条件：$$\\text{mask\\_shape} = \\frac{\\text{align}(\\text{num}(self), 128)}{8}$$\r\n 3. 数据维度支持0-8维。\r\n \r\n@@ -82,4 +82,4 @@ $$\n \r\n | 调用方式  | 样例代码                                                     | 说明                                                         |\r\n | --------- | ------------------------------------------------------------ | ------------------------------------------------------------ |\r\n-| 图模式调用 | [test_geir_drop_out_do_mask_v3](./examples/test_geir_drop_out_do_mask_v3.cpp)   | 通过[算子IR](./op_graph/drop_out_do_mask_v3_proto.h)构图方式调用TruncatedNormalV2算子。 |\r\n+| 图模式调用 | [test_geir_drop_out_do_mask_v3](./examples/test_geir_drop_out_do_mask_v3.cpp)   | 通过[算子IR](./op_graph/drop_out_do_mask_v3_proto.h)构图方式调用DropOutDoMaskV3算子。 |\n",
+      "new_file": false,
+      "new_path": "random/drop_out_do_mask_v3/README.md",
+      "old_path": "random/drop_out_do_mask_v3/README.md",
+      "removed_lines": 9,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-math/raw/d6730711fef36adb4567d721341daf694bdbe913/random/drop_out_do_mask_v3/README.md",
+    "sha": "d6730711fef36adb4567d721341daf694bdbe913",
+    "source_branch": "v3d56",
+    "source_project": {
+      "full_name": "fenglin28/ops-math_private",
+      "human_name": "fenglin28 / ops-math_private",
+      "id": 9089227,
+      "path": "ops-math_private"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-math",
+      "human_name": "CANN / ops-math",
+      "id": 7649531,
+      "path": "ops-math"
+    }
+  },
+  {
+    "additions": 6,
+    "blob_id": "50c057283b2d526b039bb7dff2afdcbd3f808bb1",
+    "blob_url": "https://gitcode.com/cann/ops-math/blob/d6730711fef36adb4567d721341daf694bdbe913/random/drop_out_do_mask_v3_d/README.md",
+    "deletions": 6,
+    "filename": "random/drop_out_do_mask_v3_d/README.md",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 6,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -13,16 +13,16 @@\n \r\n ## 功能说明\r\n \r\n-- 算子功能：训练过程中，按照概率keep_prob随机将输入中的元素置零，并将输出按照1/(1-keep_prob)的比例放大。若mask对应比特位为1，则输入中相应的元素放大。若mask中比特位为0，则gradOutput相应的元素置零。特别地，若keep_prob为0，则不改变gradOutput的元素；若keep_prob为1，则将所有元素置为0。\r\n+- 算子功能：训练过程中，按照概率keep_prob随机保留输入中的元素，并将输出按照1/keep_prob的比例放大。若mask对应比特位为1，则输入中相应的元素放大。若mask中比特位为0，则gradOutput相应的元素置零。特别地，若keep_prob为0，则将所有元素置为0；若keep_prob为1，则不改变gradOutput的元素。\n \r\n - 计算公式：\r\n \r\n $$\r\n-gradOutput_i=\\begin{cases}\r\n-0,&\\text { with probability }keep\\_prob \\\\\r\n-\\frac{1}{1-keep\\_prob}self_i, &\\text { with probability }1-keep\\_prob\r\n-\\end{cases}\r\n-$$\r\n+gradOutput_i=\\begin{cases}\n+0,&mask_i=0 \\\\\n+\\frac{1}{keep\\_prob}self_i, &mask_i=1\n+\\end{cases}\n+$$\n \r\n ## 参数说明\r\n \r\n",
+      "new_file": false,
+      "new_path": "random/drop_out_do_mask_v3_d/README.md",
+      "old_path": "random/drop_out_do_mask_v3_d/README.md",
+      "removed_lines": 6,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-math/raw/d6730711fef36adb4567d721341daf694bdbe913/random/drop_out_do_mask_v3_d/README.md",
+    "sha": "d6730711fef36adb4567d721341daf694bdbe913",
+    "source_branch": "v3d56",
+    "source_project": {
+      "full_name": "fenglin28/ops-math_private",
+      "human_name": "fenglin28 / ops-math_private",
+      "id": 9089227,
+      "path": "ops-math_private"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-math",
+      "human_name": "CANN / ops-math",
+      "id": 7649531,
+      "path": "ops-math"
+    }
+  },
+  {
+    "additions": 16,
+    "blob_id": "7e3c6ea6d038c8df084177156056480d0ef10a1c",
+    "blob_url": "https://gitcode.com/cann/ops-math/blob/d6730711fef36adb4567d721341daf694bdbe913/random/drop_out_do_mask_v3_d/op_graph/drop_out_do_mask_v3_d_proto.h",
+    "deletions": 16,
+    "filename": "random/drop_out_do_mask_v3_d/op_graph/drop_out_do_mask_v3_d_proto.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 16,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -25,22 +25,22 @@ namespace ge {\n *  scale_x = x *(1 / keep_prob)  \\n\r\n *  output = select(mask == 1, scale_x, 0)  \\n\r\n \r\n-* @par Inputs:\r\n-* Three inputs, including:\r\n-* @li x: A mutable Tensor. A ND tensor. Support 1D ~ 8D. Must be one of the following types:\r\n-*     float16, float32, bfloat16.\r\n-* @li mask: A mutable Tensor. A ND tensor. Must met all of the following rules:\r\n-*     shape of mask should be 1D.\r\n-*     dtype of mask should be uint8 or bool.\r\n-*     value of shape should met the following algorithm:\r\n-*     value = value = ((size(x) + 127) / 128) * 128 / 8.\r\n-* @li keep_prob: A mutable Tensor.Must met all of the following rules:\r\n-*     shape of \"keep_prob\" should be (1,).\r\n-*     Has the same type as \"x\" . \\n\r\n-\r\n-* @par Outputs:\r\n-* y: A mutable Tensor. Has the same type, shape and format as \"x\".\r\n-*/\r\n+* @par Inputs:\n+* Two inputs, including:\n+* @li x: A mutable Tensor. A ND tensor. Support 1D ~ 8D. Must be one of the following types:\n+*     float16, float32, bfloat16.\n+* @li mask: A mutable Tensor. A ND tensor. Must met all of the following rules:\n+*     shape of mask should be 1D.\n+*     dtype of mask should be uint8 or bool.\n+*     value of shape should met the following algorithm:\n+*     value = value = ((size(x) + 127) / 128) * 128 / 8.\n+\n+* @par Attributes:\n+* @li keep_prob: A required Float attribute. Must satisfy 0 <= keep_prob <= 1.\n+\n+* @par Outputs:\n+* y: A mutable Tensor. Has the same type, shape and format as \"x\".\n+*/\n REG_OP(DropOutDoMaskV3D)\r\n     .INPUT(x, TensorType({DT_FLOAT, DT_FLOAT16, DT_BF16}))\r\n     .INPUT(mask, TensorType({DT_UINT8, DT_BOOL}))\r\n",
+      "new_file": false,
+      "new_path": "random/drop_out_do_mask_v3_d/op_graph/drop_out_do_mask_v3_d_proto.h",
+      "old_path": "random/drop_out_do_mask_v3_d/op_graph/drop_out_do_mask_v3_d_proto.h",
+      "removed_lines": 16,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-math/raw/d6730711fef36adb4567d721341daf694bdbe913/random/drop_out_do_mask_v3_d/op_graph/drop_out_do_mask_v3_d_proto.h",
+    "sha": "d6730711fef36adb4567d721341daf694bdbe913",
+    "source_branch": "v3d56",
+    "source_project": {
+      "full_name": "fenglin28/ops-math_private",
+      "human_name": "fenglin28 / ops-math_private",
+      "id": 9089227,
+      "path": "ops-math_private"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-math",
+      "human_name": "CANN / ops-math",
+      "id": 7649531,
+      "path": "ops-math"
+    }
+  },
+  {
+    "additions": 10,
+    "blob_id": "5c9a1e0f62875dda567fb7c187c9156af23037a9",
+    "blob_url": "https://gitcode.com/cann/ops-math/blob/d6730711fef36adb4567d721341daf694bdbe913/random/drop_out_do_mask_v3_d/op_host/arch35/drop_out_do_mask_v3_d_tiling_arch35.cpp",
+    "deletions": 41,
+    "filename": "random/drop_out_do_mask_v3_d/op_host/arch35/drop_out_do_mask_v3_d_tiling_arch35.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 10,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -17,11 +17,9 @@\n #include \"platform/platform_ascendc.h\"\r\n #include \"op_common/op_host/util/platform_util.h\"\r\n #include \"random/random_common/op_host/arch35/random_tiling_base.h\"\r\n-#include \"exe_graph/runtime/shape.h\"\r\n-#include \"op_host/tiling_base.h\"\r\n-#include \"drop_out_do_mask_v3_d_tiling_arch35.h\"\r\n-#include \"util/fp16.h\"\r\n-#include \"util/bfloat16.h\"\r\n+#include \"exe_graph/runtime/shape.h\"\n+#include \"op_host/tiling_base.h\"\n+#include \"drop_out_do_mask_v3_d_tiling_arch35.h\"\n \r\n using namespace ge;\r\n \r\n@@ -82,42 +80,13 @@ OpTilingConfig DropOutDoMaskV3DTiling::BuildOpConfig()\n \r\n ge::graphStatus DropOutDoMaskV3DTiling::UniqueProcess()\r\n {\r\n-    auto* attrs = context_->GetAttrs();\r\n-    OP_CHECK_NULL_WITH_CONTEXT(context_, attrs);\r\n-    const float* attrDtype = attrs->GetAttrPointer<float>(KEEP_PROB_IDX);\r\n-    OP_CHECK_NULL_WITH_CONTEXT(context_, attrDtype);\r\n-    ge::DataType keepDtype = static_cast<ge::DataType>(*attrDtype);\r\n-    float keepProbNum = 0.0f;\r\n-    switch (keepDtype) {\r\n-        case DT_FLOAT: {\r\n-            const auto* keepProbAttr = attrs->GetAttrPointer<float>(KEEP_PROB_IDX);\r\n-            keepProbNum = *keepProbAttr;\r\n-            tilingData_.keepProb = keepProbNum;\r\n-            break;\r\n-        }\r\n-        case DT_FLOAT16: {\r\n-            const auto* keepProbAttr = attrs->GetAttrPointer<Ops::Base::fp16_t>(KEEP_PROB_IDX);\r\n-            keepProbNum = static_cast<float>(*keepProbAttr);\r\n-            tilingData_.keepProb = keepProbNum;\r\n-            break;\r\n-        }\r\n-        case DT_BF16: {\r\n-            const auto* keepProbAttr = attrs->GetAttrPointer<Ops::Base::bfloat16>(KEEP_PROB_IDX);\r\n-            keepProbNum = static_cast<float>(*keepProbAttr);\r\n-            tilingData_.keepProb = keepProbNum;\r\n-            break;\r\n-        }\r\n-        default: {\r\n-            OP_LOGE(context_, \"Unsupported data type: %d\", static_cast<int>(keepDtype));\r\n-            return ge::GRAPH_FAILED;\r\n-        }\r\n-    }\r\n-    if (keepProbNum > 1 || keepProbNum < 0) {\r\n-        OP_LOGE(context_, \"keepProbNum out of range: %d\", static_cast<int>(keepProbNum));\r\n-        return ge::GRAPH_FAILED;\r\n-    }\r\n-    return ge::GRAPH_SUCCESS;\r\n-}\r\n+    auto* attrs = context_->GetAttrs();\n+    OP_CHECK_NULL_WITH_CONTEXT(context_, attrs);\n+    const float* keepProbAttr = attrs->GetAttrPointer<float>(KEEP_PROB_IDX);\n+    OP_CHECK_NULL_WITH_CONTEXT(context_, keepProbAttr);\n+    tilingData_.keepProb = *keepProbAttr;\n+    return ge::GRAPH_SUCCESS;\n+}\n \r\n DropOutDoMaskV3DTiling::DropOutDoMaskV3DTiling(gert::TilingContext* ctx) : RandomTilingArch35(ctx, BuildOpConfig())\r\n {}\r\n",
+      "new_file": false,
+      "new_path": "random/drop_out_do_mask_v3_d/op_host/arch35/drop_out_do_mask_v3_d_tiling_arch35.cpp",
+      "old_path": "random/drop_out_do_mask_v3_d/op_host/arch35/drop_out_do_mask_v3_d_tiling_arch35.cpp",
+      "removed_lines": 41,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-math/raw/d6730711fef36adb4567d721341daf694bdbe913/random/drop_out_do_mask_v3_d/op_host/arch35/drop_out_do_mask_v3_d_tiling_arch35.cpp",
+    "sha": "d6730711fef36adb4567d721341daf694bdbe913",
+    "source_branch": "v3d56",
+    "source_project": {
+      "full_name": "fenglin28/ops-math_private",
+      "human_name": "fenglin28 / ops-math_private",
+      "id": 9089227,
+      "path": "ops-math_private"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-math",
+      "human_name": "CANN / ops-math",
+      "id": 7649531,
+      "path": "ops-math"
+    }
+  }
+]

@@ -1,0 +1,80 @@
+{
+  "assignee": {
+    "html_url": "https://gitcode.com/yourealize",
+    "id": "684598ba4229be333029be60",
+    "login": "yourealize",
+    "name": "陈展熹",
+    "object_id": "684598ba4229be333029be60"
+  },
+  "assignees": [
+    {
+      "html_url": "https://gitcode.com/yourealize",
+      "id": "684598ba4229be333029be60",
+      "login": "yourealize",
+      "name": "陈展熹",
+      "object_id": "684598ba4229be333029be60"
+    }
+  ],
+  "body": "\n\nThanks for sending an issue! Please fill in the following template to help quickly solve your problem.\n\n### Describe the current behavior / 问题描述 (Mandatory / 必填)\n            \n在测试repeat_interleave算子大shape场景是发生aic error。用例repeat类型为int32，将类型切换为int64后复跑通过。\n### Environment / 环境信息 (Mandatory / 必填)\n            \nascend950\n### Steps to reproduce the issue / 重现步骤 (Mandatory / 必填)\n            \n用例repeatSum超出int32表示范围时可复现\n### Describe the expected behavior / 预期结果 (Mandatory / 必填)\n            \n跑出精度准确的结果\n### Related log / screenshot / 日志 / 截图 (Mandatory / 必填)\n            \nACL_NN_OP_MULTI_THREAD:(tid=[3456854],file=[acl_nn_op_case_base.cpp],line=[900])[ERROR] aclrtSynchronizeStream failed. ERROR_CODE:507015 , PID:3454271 , ERROR_MSG:EZ9999: Inner Error!\nEZ9999[PID: 3454271] 2026-02-05-17:59:18.548.306 (EZ9999):  The error from device(chipId:0, dieId:0), serial number is 177, there is an aivec error exception, core id is 0, error code = 0, dump info: pc start: 0x1b4e09bc, current: 0x51c                                              ddce518000000, sc error info: 0, su error info: 0,0x20699, mte error info: 0x5e607368003118f6, vec error info: 0, cube error info: 0, l1 error info: 0x295856, aic error mask: 0x100000200000, para base: 0.[FUNC:ProcessDavidStarsCoreError                                              Info][FILE:device_error_proc_c.cc][LINE:521]\n        TraceBack (most recent call last):\n       The extend info: errcode:(0) errorStr: timeout or trap error. subErrType: 0.[FUNC:ProcessDavidStarsCoreErrorInfo][FILE:device_error_proc_c.cc][LINE:524]\n       The error from device(chipId:0, dieId:0), serial number is 177, there is an aivec error exception, core id is 17593347876352, error code = 128, 129, 130, 131, 180, dump info: pc start: 0x77f6feefd000204b, current: 0, sc error inf                                              o: 0, su error info: 0x2d9bb,0x5e607364003118f6, mte error info: 0, vec error info: 0, cube error info: 0x295856, l1 error info: 0x100000200000, aic error mask: 0, para base: 0x800000000.[FUNC:ProcessDavidStarsCoreErrorInfo][FILE:device                                              _error_proc_c.cc][LINE:521]\n       The extend info: errcode:(128, 129, 130, 131, 180) errorStr: L0A MEM read/write conflict(L0A_RDWR_CFLT).L0B MEM read/write conflict(L0B_RDWR_CFLT).LOAD2D instruction address overflow (READ_OVERFLOW).LOAD2D instruction address ove                                              rflow(WRITE_OVERFLOW).Instruction address misalign. subErrType: 0.[FUNC:ProcessDavidStarsCoreErrorInfo][FILE:device_error_proc_c.cc][LINE:524]\n       The error from device(chipId:0, dieId:0), serial number is 177, there is an aivec error exception, core id is 17593347886104, error code = 4, 130, 142, 143, 148, 152, dump info: pc start: 0, current: 0, sc error info: 0x2d9bb, su                                               error info: 0x5e607364003118f6,0, mte error info: 0, vec error info: 0x295856, cube error info: 0x100000200000, l1 error info: 0, aic error mask: 0x800000000, para base: 0.[FUNC:ProcessDavidStarsCoreErrorInfo][FILE:device_error_proc_c.                                              cc][LINE:521]\n       The extend info: errcode:(4, 130, 142, 143, 148, 152) errorStr: the data of L0a and L0b read back is the INF or NAN data.LOAD2D instruction address overflow (READ_OVERFLOW).The value of CHN_SIZE is illegal.The value of K_M_EXT_ST                                              EP is illegal.The feature map size of the mte load3d instruction is illegal(size = 0).The write address of the mte load3d instruction is out of range. subErrType: 0.[FUNC:ProcessDavidStarsCoreErrorInfo][FILE:device_error_proc_c.cc][LINE                                              :524]\n       The error from device(chipId:0, dieId:0), serial number is 177, there is an aivec error exception, core id is 281474976710655, error code = 320, 321, 322, 5, 7, 8, 10, 11, 14, dump info: pc start: 0, current: 0x2d9bb, sc error in                                              fo: 0x5e607364003118f6, su error info: 0,0, mte error info: 0x295856, vec error info: 0x100000200000, cube error info: 0, l1 error info: 0x800000000, aic error mask: 0, para base: 0.[FUNC:ProcessDavidStarsCoreErrorInfo][FILE:device_erro                                              r_proc_c.cc][LINE:521]\n       The extend info: errcode:(320, 321, 322, 5, 7, 8, 10, 11, 14) errorStr: Data from the MTE is abnormal.Data from the CCU is abnormal.Data from the VEC is abnormal.The operation address of L0A exceeds the maximum range of L0A.The o                                              peration address of L0C exceeds the maximum range of L0C.ECC verification failed when L0A read/write.ECC verification failed when L0C read/write.The instruction configuration of CUBE is illegal.A round error occurs in the CUBE FIXP_BUFF                                              ER. subErrType: 0.[FUNC:ProcessDavidStarsCoreErrorInfo][FILE:device_error_proc_c.cc][LINE:524]\n       The error from device(chipId:0, dieId:0), serial number is 177, there is an aivec error exception, core id is 16124011175327828412, error code = 64, 65, 66, 67, 322, 327, 328, 330, 331, 334, 12, dump info: pc start: 0x2d9bb, curr                                              ent: 0x5e607364003118f6, sc error info: 0, su error info: 0,0x295856, mte error info: 0x100000200000, vec error info: 0, cube error info: 0x800000000, l1 error info: 0, aic error mask: 0, para base: 0.[FUNC:ProcessDavidStarsCoreErrorInf                                              o][FILE:device_error_proc_c.cc][LINE:521]\n       The extend info: errcode:(64, 65, 66, 67, 322, 327, 328, 330, 331, 334, 12) errorStr: NDDMA Cache ECC ERROR.NDDMA REQ Buffer ECC ERROR.ECC verification failed when L1 read/write.CFG REG PARIT ERROR.Data from the VEC is abnormal.c                                              cu payload undefine.ccu payload illegal congifuration.Commands not supported by the current VEC version.VEC supports illegal configurations in commands.The data returned by the BIU to the VEC is incorrect.A overflow error occurs in the                                               CUBE HSET counter. subErrType: 0x5.[FUNC:ProcessDavidStarsCoreErrorInfo][FILE:device_error_proc_c.cc][LINE:524]\n       The error from device(chipId:0, dieId:0), serial number is 177, there is an aivec error exception, core id is 17514485747846018479, error code = 256, 257, 258, 259, 260, 66, 74, dump info: pc start: 0x5e60ACL_NN_OP_MULTI_THREAD:(                                              tid=[3456854],file=[acl_nn_op_case_base.cpp],line=[1225])after loop 0: free:79294M, total:110560M, used:31265M, ret:0\nACL_NN_OP_MULTI_THREAD:(tid=[3456854],file=[acl_nn_op_case_base.cpp],line=[1226])IO + tmp_var + weight cost memory: 28805M\n\n### Special notes for this issue/备注 (Optional / 选填)\n            \n\n",
+  "comments": 1,
+  "created_at": "2026-02-06T11:05:34+08:00",
+  "finished_at": "2026-02-07T15:11:17+08:00",
+  "html_url": "https://gitcode.com/cann/ops-nn/issues/869",
+  "id": 3754773,
+  "issue_priority_detail": {
+    "id": 116,
+    "title": "无优先级"
+  },
+  "issue_state": "已完成",
+  "issue_state_detail": {
+    "id": 287,
+    "serial": 0,
+    "title": "已完成"
+  },
+  "issue_type": "任务",
+  "issue_type_detail": {
+    "id": 255,
+    "is_system": false,
+    "title": "任务"
+  },
+  "labels": [
+    {
+      "color": "#2469f5",
+      "created_at": "2025-10-09T20:53:07+08:00",
+      "id": 14930,
+      "name": "Accepted",
+      "updated_at": "2026-02-07T15:13:01+08:00"
+    },
+    {
+      "color": "#35e029",
+      "created_at": "2026-03-20T11:25:13+08:00",
+      "id": 38861,
+      "name": "resolved",
+      "updated_at": "2026-03-20T11:27:47+08:00"
+    }
+  ],
+  "number": "869",
+  "priority": 0,
+  "repository": {
+    "assigner": {},
+    "created_at": "2025-09-27T17:40:34+08:00",
+    "description": "本项目是CANN提供的神经网络类计算算子库，实现网络在NPU上加速计算。",
+    "full_name": "cann/ops-nn",
+    "id": 7665709,
+    "name": "ops-nn",
+    "paas": "",
+    "path": "ops-nn",
+    "updated_at": "2025-09-27T18:09:31+08:00"
+  },
+  "state": "closed",
+  "title": "[Bug-Report|缺陷反馈]: repeat_interleave算子数据类型溢出问题",
+  "updated_at": "2026-03-20T11:27:47+08:00",
+  "user": {
+    "html_url": "https://gitcode.com/yourealize",
+    "id": "684598ba4229be333029be60",
+    "login": "yourealize",
+    "name": "陈展熹",
+    "object_id": "684598ba4229be333029be60"
+  },
+  "visibility_reason": "public"
+}

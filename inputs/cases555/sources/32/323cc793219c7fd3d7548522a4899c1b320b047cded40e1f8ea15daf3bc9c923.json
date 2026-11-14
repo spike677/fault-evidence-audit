@@ -1,0 +1,32 @@
+[
+  {
+    "additions": 7,
+    "blob_id": "b3db50710de8563338677ce1260e276965cd3ffc",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/fb636d9bf1a7b2e3dacc1234c37e1697664e0c1c/conv/conv2d_v2/op_kernel/arch35/conv2d_v2_instr_impl.h",
+    "deletions": 0,
+    "filename": "conv/conv2d_v2/op_kernel/arch35/conv2d_v2_instr_impl.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 7,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -236,6 +236,8 @@ public:\n         UpdateHiWiAL1();\n         if constexpr (!Intf::groupOptPreloadFlag) {\n             this->SetLoad3dFMatrix(this->padLeftL1, this->padRightL1, this->padTopL1, this->hiLoadL1, this->wiLoadL1);\n+            // In non-groupOptPreload scenarios, groupOptIter has been adapted on the operator side\n+            groupOptIter = 0;\n         }\n \n         if (this->allPadFlag) {\n@@ -297,6 +299,11 @@ public:\n             return;\n         }\n \n+        // In non-groupOptPreload scenarios, groupOptIter has been adapted on the operator side\n+        if constexpr (!Intf::groupOptPreloadFlag) {\n+            groupOptIter = 0;\n+        }\n+\n         if constexpr (Intf::disContinuousFlag) {\n             LoadAL1InputHWNC(kAL1Iter, mAL1Iter, batchIter);\n         } else if constexpr (Intf::formatFmap == ConvFormat::NCHW) {\n",
+      "new_file": false,
+      "new_path": "conv/conv2d_v2/op_kernel/arch35/conv2d_v2_instr_impl.h",
+      "old_path": "conv/conv2d_v2/op_kernel/arch35/conv2d_v2_instr_impl.h",
+      "removed_lines": 0,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/fb636d9bf1a7b2e3dacc1234c37e1697664e0c1c/conv/conv2d_v2/op_kernel/arch35/conv2d_v2_instr_impl.h",
+    "sha": "fb636d9bf1a7b2e3dacc1234c37e1697664e0c1c",
+    "source_branch": "cherry-pick-mr-2522-1773322959307-auto",
+    "target_branch": "9.0.0",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  }
+]

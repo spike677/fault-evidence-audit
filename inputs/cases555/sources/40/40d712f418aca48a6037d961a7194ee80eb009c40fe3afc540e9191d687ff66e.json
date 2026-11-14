@@ -1,0 +1,110 @@
+[
+  {
+    "additions": 19,
+    "blob_id": "63a32d5579626683e83aa78390bf2ca75c90befd",
+    "blob_url": "https://gitcode.com/cann/ops-math/blob/1f7a7310e53727309c480830d5830eb2353f01e7/math/reduce_std_v2_update/examples/arch35/test_geir_reduce_std_v2_update.cpp",
+    "deletions": 11,
+    "filename": "math/reduce_std_v2_update/examples/arch35/test_geir_reduce_std_v2_update.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 19,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -29,6 +29,7 @@\n  * 覆盖：\n  *   Test 1 - FP32, if_std=false（方差）, unbiased=true, dim=[1], keepdim=false\n  *   Test 2 - FP32, if_std=true（标准差）, correction=1, dim=[1], keepdim=true\n+ *   输入共 128 个元素，覆盖 Arch35 寄存器 API 多轮 mask 计算路径。\n  *\n  * 编译：参见 CMakeLists.txt   运行：参见 run.sh\n  *   ⚠ GE IR 执行触发 TBE 动态编译，需系统 Python 3.9（见 run.sh 环境设置）。\n@@ -72,13 +73,20 @@ string GetTime()\n     return tmp;\n }\n \n-// ---- 测试数据：x shape [4,8]\n-static const int64_t M = 4;\n-static const int64_t N = 8;\n-static const float xData[M * N] = {\n-    1.f, 2.f, 3.f, 4.f, 5.f, 6.f, 7.f, 8.f, 2.f, 3.f, 4.f, 5.f, 6.f, 7.f, 8.f, 9.f,\n-    0.f, 1.f, 2.f, 3.f, 4.f, 5.f, 6.f, 7.f, 1.f, 1.f, 1.f, 1.f, 1.f, 1.f, 1.f, 1.f,\n-};\n+// ---- 测试数据：x shape [8,16]，总元素数 128 > 单轮 FP32 mask 容量 64\n+static const int64_t M = 8;\n+static const int64_t N = 16;\n+\n+static std::vector<float> MakeInputData()\n+{\n+    std::vector<float> data(static_cast<size_t>(M * N));\n+    for (int64_t i = 0; i < M; ++i) {\n+        for (int64_t j = 0; j < N; ++j) {\n+            data[static_cast<size_t>(i * N + j)] = static_cast<float>((i * 7 + j * 3) % 17 - 8) * 0.25f;\n+        }\n+    }\n+    return data;\n+}\n \n // ---- 计算 mean 并广播到 x 的 shape（dim=1，沿列归约）\n static void ComputeMeanBroadcast(const float* x, float* mean, int64_t rows, int64_t cols, int64_t dim)\n@@ -151,7 +159,7 @@ int CreateGraph(DataType inDtype, bool if_std, bool unbiased, bool keepdim, int6\n     dataX.update_input_desc_x(xDesc);\n     dataX.update_output_desc_y(xDesc);\n \n-    std::vector<float> hX(xData, xData + n);\n+    std::vector<float> hX = MakeInputData();\n     uint32_t dataLen = static_cast<uint32_t>(n) * sizeof(float);\n     Tensor xTensor(xDesc, reinterpret_cast<uint8_t*>(hX.data()), dataLen);\n     input.push_back(xTensor);\n@@ -259,7 +267,7 @@ int RunTestCase(const char* testName, bool if_std, bool unbiased, bool keepdim,\n         passed = false;\n     } else {\n         int64_t n = M * N;\n-        std::vector<float> hX(xData, xData + n);\n+        std::vector<float> hX = MakeInputData();\n         std::vector<float> hMean(n, 0.f);\n         ComputeMeanBroadcast(hX.data(), hMean.data(), M, N, dimArr[0]);\n \n@@ -310,12 +318,12 @@ int main(int argc, char* argv[])\n     std::vector<int64_t> dimArr = {1};\n \n     // Test 1: if_std=false（方差）, unbiased=true (correction=1), keepdim=false, dim=[1]\n-    //   output shape = [4], expected var = [6.0, 6.0, 6.0, 0.0]\n+    //   output shape = [8]\n     std::vector<int64_t> outShape1 = {M};\n     int r1 = RunTestCase(\"GEIR_Test1_var\", false, true, false, 1, dimArr, tensorShape, outShape1, M, 0);\n \n     // Test 2: if_std=true（标准差）, unbiased=true (correction=1), keepdim=true, dim=[1]\n-    //   output shape = [4,1], expected std = [2.44949, 2.44949, 2.44949, 0.0]\n+    //   output shape = [8,1]\n     //   注：tiling 中 unbiased=false 会强制 correction=0，故 unbiased=true 与 correction=1 配合使用\n     std::vector<int64_t> outShape2 = {M, 1};\n     int r2 = RunTestCase(\"GEIR_Test2_std\", true, true, true, 1, dimArr, tensorShape, outShape2, M, 1);\n",
+      "new_file": false,
+      "new_path": "math/reduce_std_v2_update/examples/arch35/test_geir_reduce_std_v2_update.cpp",
+      "old_path": "math/reduce_std_v2_update/examples/arch35/test_geir_reduce_std_v2_update.cpp",
+      "removed_lines": 11,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-math/raw/1f7a7310e53727309c480830d5830eb2353f01e7/math/reduce_std_v2_update/examples/arch35/test_geir_reduce_std_v2_update.cpp",
+    "sha": "1f7a7310e53727309c480830d5830eb2353f01e7",
+    "source_branch": "codex/reduce-std-v2-update-kernel-mask-fix",
+    "source_project": {
+      "full_name": "zhongheng/ops-math_ReduceStdV2Update",
+      "human_name": "zhongheng / ops-math_ReduceStdV2Update",
+      "id": 10423537,
+      "path": "ops-math_ReduceStdV2Update"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-math",
+      "human_name": "CANN / ops-math",
+      "id": 7649531,
+      "path": "ops-math"
+    }
+  },
+  {
+    "additions": 3,
+    "blob_id": "112ff3e8eb0c3b872950f1dc72494a5739ea579e",
+    "blob_url": "https://gitcode.com/cann/ops-math/blob/1f7a7310e53727309c480830d5830eb2353f01e7/math/reduce_std_v2_update/op_kernel/arch35/reduce_std_v2_update.h",
+    "deletions": 10,
+    "filename": "math/reduce_std_v2_update/op_kernel/arch35/reduce_std_v2_update.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 3,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -57,6 +57,7 @@ constexpr uint32_t kRepF32 = kVlBytes / sizeof(float); // = 64\n constexpr uint16_t kRepF32U = static_cast<uint16_t>(kRepF32);\n constexpr uint32_t kBlockBytes = 32;                        // 32B\n constexpr uint32_t kBlockF32 = kBlockBytes / sizeof(float); // = 8\n+// UpdateMask updates its scalar argument by reference; callers must not decrement the remaining count again.\n \n // UB 内一根轴的描述（innermost-first 排列）\n struct UBAxisDesc {\n@@ -741,7 +742,6 @@ __aicore__ inline void ReduceStdV2UpdateKernel<DType, isTailR>::PreElewiseSubSqu\n             AscendC::Reg::Sub(diff, xF32, mF32, mask); // diff = x - mean\n             AscendC::Reg::Mul(sq, diff, diff, mask);   // sq  = diff × diff（square）\n             AscendC::Reg::StoreAlign(dstPtr + off, sq, mask);\n-            remaining = (remaining > kRepF32) ? (remaining - kRepF32) : 0;\n         }\n     }\n }\n@@ -787,7 +787,6 @@ __aicore__ inline void ReduceStdV2UpdateKernel<DType, isTailR>::ClearChunkExtens\n                                   static_cast<int32_t>(r) * static_cast<int32_t>(kRepF32);\n                     auto mask = AscendC::Reg::UpdateMask<float>(remaining);\n                     AscendC::Reg::StoreAlign(base + off, idReg, mask);\n-                    remaining = (remaining > kRepF32) ? (remaining - kRepF32) : 0;\n                 }\n             }\n         }\n@@ -807,7 +806,6 @@ __aicore__ inline void ReduceStdV2UpdateKernel<DType, isTailR>::ClearChunkExtens\n                 int32_t off = static_cast<int32_t>(startElem) + static_cast<int32_t>(i) * static_cast<int32_t>(kRepF32);\n                 mask = AscendC::Reg::UpdateMask<float>(remaining);\n                 AscendC::Reg::StoreAlign(base + off, idReg, mask);\n-                remaining = (remaining > kRepF32) ? (remaining - kRepF32) : 0;\n             }\n         }\n     }\n@@ -839,7 +837,6 @@ __aicore__ inline void ReduceStdV2UpdateKernel<DType, isTailR>::MergeTmpBufVf()\n             AscendC::Reg::LoadAlign(bReg, p1 + off);\n             AscendC::Reg::Add(aReg, aReg, bReg, mask);\n             AscendC::Reg::StoreAlign(p0 + off, aReg, mask);\n-            remaining = (remaining > kRepF32) ? (remaining - kRepF32) : 0;\n         }\n     }\n }\n@@ -889,7 +886,6 @@ __aicore__ inline void ReduceStdV2UpdateKernel<DType, isTailR>::ClearCacheTreeVf\n             int32_t off = static_cast<int32_t>(i) * static_cast<int32_t>(kRepF32);\n             mask = AscendC::Reg::UpdateMask<float>(remaining);\n             AscendC::Reg::StoreAlign(base + off, zReg, mask);\n-            remaining = (remaining > kRepF32) ? (remaining - kRepF32) : 0;\n         }\n     }\n }\n@@ -929,7 +925,6 @@ __aicore__ inline void ReduceStdV2UpdateKernel<DType, isTailR>::DoCachingVf(uint\n                 AscendC::Reg::Add(aReg, aReg, bReg, mask);\n             }\n             AscendC::Reg::StoreAlign(cachePtr + levelOff + off, aReg, mask);\n-            remaining = (remaining > kRepF32) ? (remaining - kRepF32) : 0;\n         }\n     }\n }\n@@ -971,7 +966,6 @@ __aicore__ inline void ReduceStdV2UpdateKernel<DType, isTailR>::PostElewiseVar(i\n                 AscendC::Reg::Cast<D_T, float, kCastTraitFromFp32>(b16Reg, f32Reg, mask);\n                 AscendC::Reg::StoreAlign<D_T, AscendC::Reg::StoreDist::DIST_PACK_B32>(outPtr + off, b16Reg, mask);\n             }\n-            remaining = (remaining > kRepF32) ? (remaining - kRepF32) : 0;\n         }\n     }\n     outQue_.EnQue(outLocal);\n@@ -1017,7 +1011,6 @@ __aicore__ inline void ReduceStdV2UpdateKernel<DType, isTailR>::PostElewiseStd(i\n                 AscendC::Reg::Cast<D_T, float, kCastTraitFromFp32>(b16Reg, f32Reg, mask);\n                 AscendC::Reg::StoreAlign<D_T, AscendC::Reg::StoreDist::DIST_PACK_B32>(outPtr + off, b16Reg, mask);\n             }\n-            remaining = (remaining > kRepF32) ? (remaining - kRepF32) : 0;\n         }\n     }\n     outQue_.EnQue(outLocal);\n@@ -1249,7 +1242,8 @@ __aicore__ inline void ReduceStdV2UpdateKernel<DType, isTailR>::Phase1OutputToWo\n             ext.blockCount = 1;\n             ext.srcStride = 0;\n         } else {\n-            int64_t bsElem = kBlockBytes / static_cast<int64_t>(sizeof(float));\n+            // The cache's tail-A pitch inherits the input tile alignment, even though its elements are fp32.\n+            int64_t bsElem = kBlockBytes / static_cast<int64_t>(sizeof(D_T));\n             int64_t lastASizeAlign = ((lastASize + bsElem - 1) / bsElem) * bsElem;\n             ext.blockLen = static_cast<uint32_t>(lastASize * static_cast<int64_t>(sizeof(float)));\n             ext.blockCount = static_cast<uint16_t>(aLen * innerAProd_ / lastASize);\n@@ -1372,7 +1366,6 @@ __aicore__ inline void ReduceStdV2UpdateKernel<DType, isTailR>::Phase2Process()\n                         AscendC::Reg::StoreAlign<D_T, AscendC::Reg::StoreDist::DIST_PACK_B32>(dstPtr + off, b16Reg,\n                                                                                               mask);\n                     }\n-                    remaining = (remaining > kRepF32) ? (remaining - kRepF32) : 0;\n                 }\n             }\n             outQue_.EnQue(outLocal);\n",
+      "new_file": false,
+      "new_path": "math/reduce_std_v2_update/op_kernel/arch35/reduce_std_v2_update.h",
+      "old_path": "math/reduce_std_v2_update/op_kernel/arch35/reduce_std_v2_update.h",
+      "removed_lines": 10,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-math/raw/1f7a7310e53727309c480830d5830eb2353f01e7/math/reduce_std_v2_update/op_kernel/arch35/reduce_std_v2_update.h",
+    "sha": "1f7a7310e53727309c480830d5830eb2353f01e7",
+    "source_branch": "codex/reduce-std-v2-update-kernel-mask-fix",
+    "source_project": {
+      "full_name": "zhongheng/ops-math_ReduceStdV2Update",
+      "human_name": "zhongheng / ops-math_ReduceStdV2Update",
+      "id": 10423537,
+      "path": "ops-math_ReduceStdV2Update"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-math",
+      "human_name": "CANN / ops-math",
+      "id": 7649531,
+      "path": "ops-math"
+    }
+  },
+  {
+    "additions": 1,
+    "blob_id": "e836817ebb0825f5c169957c8ad1977b59a7a743",
+    "blob_url": "https://gitcode.com/cann/ops-math/blob/1f7a7310e53727309c480830d5830eb2353f01e7/math/reduce_std_v2_update/op_kernel/arch35/reduce_std_v2_update_empty.h",
+    "deletions": 2,
+    "filename": "math/reduce_std_v2_update/op_kernel/arch35/reduce_std_v2_update_empty.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 1,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -57,6 +57,7 @@ public:\n     static constexpr uint32_t kVlBytes = 256;\n     static constexpr uint32_t kRepF32 = kVlBytes / sizeof(float); // = 64\n     static constexpr uint16_t kRepF32U = static_cast<uint16_t>(kRepF32);\n+    // UpdateMask updates its scalar argument by reference; do not decrement it again.\n \n     __aicore__ inline ReduceStdV2UpdateEmptyKernel() {}\n \n@@ -134,7 +135,6 @@ private:\n                 const int32_t off = static_cast<int32_t>(i) * static_cast<int32_t>(kRepF32);\n                 mask = AscendC::Reg::UpdateMask<float>(remaining);\n                 AscendC::Reg::StoreAlign(tmpPtr + off, f32Reg, mask);\n-                remaining = (remaining > kRepF32) ? (remaining - kRepF32) : 0;\n             }\n         }\n \n@@ -160,7 +160,6 @@ private:\n                     AscendC::Reg::Cast<D_T, float, kCastTraitFromFp32>(b16Reg, f32Reg, mask);\n                     AscendC::Reg::StoreAlign<D_T, AscendC::Reg::StoreDist::DIST_PACK_B32>(outPtr + off, b16Reg, mask);\n                 }\n-                remaining = (remaining > kRepF32) ? (remaining - kRepF32) : 0;\n             }\n         }\n         outQue_.EnQue(outLocal);\n",
+      "new_file": false,
+      "new_path": "math/reduce_std_v2_update/op_kernel/arch35/reduce_std_v2_update_empty.h",
+      "old_path": "math/reduce_std_v2_update/op_kernel/arch35/reduce_std_v2_update_empty.h",
+      "removed_lines": 2,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-math/raw/1f7a7310e53727309c480830d5830eb2353f01e7/math/reduce_std_v2_update/op_kernel/arch35/reduce_std_v2_update_empty.h",
+    "sha": "1f7a7310e53727309c480830d5830eb2353f01e7",
+    "source_branch": "codex/reduce-std-v2-update-kernel-mask-fix",
+    "source_project": {
+      "full_name": "zhongheng/ops-math_ReduceStdV2Update",
+      "human_name": "zhongheng / ops-math_ReduceStdV2Update",
+      "id": 10423537,
+      "path": "ops-math_ReduceStdV2Update"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-math",
+      "human_name": "CANN / ops-math",
+      "id": 7649531,
+      "path": "ops-math"
+    }
+  }
+]

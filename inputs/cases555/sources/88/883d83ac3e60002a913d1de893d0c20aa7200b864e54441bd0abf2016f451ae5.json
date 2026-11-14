@@ -1,0 +1,146 @@
+[
+  {
+    "additions": 18,
+    "blob_id": "da66355963cd863e744105c3babf0ce907371e0c",
+    "blob_url": "https://gitcode.com/cann/opbase/blob/96c613db2a24dd7fca7acb439096042e5ac18a5f/pkg_inc/op_common/atvoss/reduce/reduce_sch_aux.h",
+    "deletions": 0,
+    "filename": "pkg_inc/op_common/atvoss/reduce/reduce_sch_aux.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 18,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -386,6 +386,24 @@ public:\n         }\n     }\n \n+    __aicore__ inline uint64_t CalculateCopyOutGroupAddr(int32_t axis, int32_t innerA)\n+    {\n+        int32_t blockId = GetBlockIdx();\n+        uint64_t addrOffset = 0;\n+        if constexpr (LoopInfo->loopInnerACount > 0) {\n+            for (int32_t i = axis; i < Dim; i += CONST2) {\n+                addrOffset += iterAddr_[i].start * this->tiling_->dstStride[i];\n+            }\n+        }\n+\n+        uint64_t axisStep = LoopInfo->loopACount > 0 ? this->loopAAxisStep_ : 1;\n+        return (blockId % this->tiling_->groupR) *\n+                   Ops::Base::CeilAlign(this->tiling_->outSize, static_cast<uint64_t>(AuxBase::VL_ELEMS)) +\n+               (blockId / this->tiling_->groupR % axisStep) * this->ubFactorA_ * innerA +\n+               (blockId / (this->tiling_->groupR * axisStep)) * this->tiling_->shape[axis] * innerA +\n+               addrOffset;\n+    }\n+\n     template <class T, class V>\n     __aicore__ inline void CalculateInView(V& view)\n     {\n",
+      "new_file": false,
+      "new_path": "pkg_inc/op_common/atvoss/reduce/reduce_sch_aux.h",
+      "old_path": "pkg_inc/op_common/atvoss/reduce/reduce_sch_aux.h",
+      "removed_lines": 0,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/opbase/raw/96c613db2a24dd7fca7acb439096042e5ac18a5f/pkg_inc/op_common/atvoss/reduce/reduce_sch_aux.h",
+    "sha": "96c613db2a24dd7fca7acb439096042e5ac18a5f",
+    "source_branch": "fix/noncontiguous",
+    "source_project": {
+      "full_name": "Sunee/opbase",
+      "human_name": "Sunee / opbase",
+      "id": 9093765,
+      "path": "opbase"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/opbase",
+      "human_name": "CANN / opbase",
+      "id": 7649482,
+      "path": "opbase"
+    }
+  },
+  {
+    "additions": 1,
+    "blob_id": "2680e5e0bef53b5d4883d955c9941290fca16bbf",
+    "blob_url": "https://gitcode.com/cann/opbase/blob/96c613db2a24dd7fca7acb439096042e5ac18a5f/pkg_inc/op_common/atvoss/reduce/reduce_sch_aux_base.h",
+    "deletions": 15,
+    "filename": "pkg_inc/op_common/atvoss/reduce/reduce_sch_aux_base.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 1,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -675,7 +675,6 @@ public:\n         static_assert(IsSameType<PromoteDType, DataType>::value, \"group copy out dtype must be same with pre dag out.\");\n         // CopyOut As RA Pattern\n         SliceView<CONST2> newView;\n-        int32_t blockId = GetBlockIdx();\n         int32_t innerA = CaculateInnerA<LoopInfo, Pattern::TailA, Pattern::Dim>(static_cast<Derived*>(this)->iterAddr_);\n         uint64_t outLen = 1;\n         uint64_t outRepeat = 1;\n@@ -691,20 +690,7 @@ public:\n         if constexpr (LoopInfo->loopACount > 0) {\n             axis = LoopInfo->loopAAxis[LoopInfo->loopACount - 1];\n         }\n-\n-        uint64_t addrOffset = 0;\n-        if constexpr (LoopInfo->loopInnerACount > 0) {\n-            for (int32_t i = axis; i < Dim; i += CONST2) {\n-                addrOffset += static_cast<Derived*>(this)->iterAddr_[i].start * tiling_->dstStride[i];\n-            }\n-        }\n-\n-        uint64_t axisStep = LoopInfo->loopACount > 0 ? loopAAxisStep_ : 1;\n-        newView.addr = (blockId % tiling_->groupR) *\n-                           Ops::Base::CeilAlign(tiling_->outSize, static_cast<uint64_t>(VL_ELEMS)) +   // group offset\n-                       (blockId / (tiling_->groupR * axisStep)) * tiling_->sliceShape[axis] * innerA + // AAxis offset\n-                       (blockId / tiling_->groupR % axisStep) * ubFactorA_ * innerA +                  // main offset\n-                       addrOffset;                                                                     // innerA offset\n+        newView.addr = static_cast<Derived*>(this)->CalculateCopyOutGroupAddr(axis, innerA);\n \n         SetEvent<HardEvent::V_MTE3>(HardEvent::V_MTE3);\n         LocalTensor<PromoteDType> outTensor;\n",
+      "new_file": false,
+      "new_path": "pkg_inc/op_common/atvoss/reduce/reduce_sch_aux_base.h",
+      "old_path": "pkg_inc/op_common/atvoss/reduce/reduce_sch_aux_base.h",
+      "removed_lines": 15,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/opbase/raw/96c613db2a24dd7fca7acb439096042e5ac18a5f/pkg_inc/op_common/atvoss/reduce/reduce_sch_aux_base.h",
+    "sha": "96c613db2a24dd7fca7acb439096042e5ac18a5f",
+    "source_branch": "fix/noncontiguous",
+    "source_project": {
+      "full_name": "Sunee/opbase",
+      "human_name": "Sunee / opbase",
+      "id": 9093765,
+      "path": "opbase"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/opbase",
+      "human_name": "CANN / opbase",
+      "id": 7649482,
+      "path": "opbase"
+    }
+  },
+  {
+    "additions": 37,
+    "blob_id": "8d93208c72bc42d8695e439b19cd1e99e541e520",
+    "blob_url": "https://gitcode.com/cann/opbase/blob/96c613db2a24dd7fca7acb439096042e5ac18a5f/pkg_inc/op_common/atvoss/reduce/reduce_sch_aux_non_contiguous.h",
+    "deletions": 9,
+    "filename": "pkg_inc/op_common/atvoss/reduce/reduce_sch_aux_non_contiguous.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 37,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -71,16 +71,18 @@ public:\n             axisStep = Ops::Base::CeilDiv(sliceShape, ubFactor);\n             axisSliceStep = 1;\n         } else { // ub切在sliceNum\n-            axisStep = sliceShape;\n+            axisStep = 1;\n             axisSliceStep = Ops::Base::CeilDiv(sliceNum, Ops::Base::CeilDiv(ubFactor, sliceShape));\n         }\n     }\n \n-    __aicore__ inline void ComputeIterAddress(int32_t axis, uint64_t step, uint64_t stepSize, uint64_t sliceShapeFactor,\n-                                              uint64_t sliceNumFactor)\n+    __aicore__ inline void ComputeIterAddress(int32_t axis, uint64_t step, uint64_t stepSize, uint64_t sliceStepSize,\n+                                              uint64_t sliceShapeFactor, uint64_t sliceNumFactor)\n     {\n-        auto curInSliceShape = step % stepSize;\n-        auto curInSliceNum = step / stepSize;\n+        auto temp = step;\n+        auto curInSliceShape = temp % stepSize;\n+        temp = temp / stepSize;\n+        auto curInSliceNum = temp % sliceStepSize;\n         iterAddr_[axis].start = curInSliceShape * sliceShapeFactor;\n         iterAddr_[axis].sliceStart = curInSliceNum * sliceNumFactor;\n         iterAddr_[axis].stride = this->tiling_->sliceShape[axis] - iterAddr_[axis].start;\n@@ -199,7 +201,8 @@ public:\n         if constexpr (LoopAIdx != 0) {\n             constexpr auto axis = LoopInfo->loopAAxis[LoopAIdx - 1];\n             if constexpr (LoopAIdx == LoopInfo->loopACount) {\n-                ComputeIterAddress(axis, step, this->loopAAxisStep_, sliceShapeFactorA_, sliceNumFactorA_);\n+                ComputeIterAddress(axis, step, this->loopAAxisStep_, this->loopAAxisSliceStep_,\n+                                   sliceShapeFactorA_, sliceNumFactorA_);\n                 if constexpr (LoopAIdx > 0) {\n                     CalculateIterA<LoopAIdx - 1>(step / this->loopAAxisStep_);\n                 }\n@@ -330,7 +333,8 @@ public:\n         if constexpr (LoopInnerRIdx != 0) {\n             constexpr auto axis = LoopInfo->loopInnerRAxis[LoopInnerRIdx - 1];\n             if constexpr (LoopInnerRIdx == LoopInfo->loopInnerRCount) {\n-                ComputeIterAddress(axis, basicBlockIdx, this->loopRAxisStep_, sliceShapeFactorR_, sliceNumFactorR_);\n+                ComputeIterAddress(axis, basicBlockIdx, this->loopRAxisStep_, this->loopRAxisSliceStep_,\n+                                   sliceShapeFactorR_, sliceNumFactorR_);\n                 CalculateInnerIterR<LoopInnerRIdx - 1>(basicBlockIdx / this->loopRAxisStep_);\n             } else {\n                 iterAddr_[axis].start = basicBlockIdx % this->tiling_->shape[axis];\n@@ -348,14 +352,18 @@ public:\n             for (auto idx = LoopInfo->loopRCount - 1; idx > -1; --idx) {\n                 if (idx == LoopInfo->loopRCount - 1) {\n                     constexpr auto axis = LoopInfo->loopRAxis[LoopInfo->loopRCount - 1];\n-                    ComputeIterAddress(axis, temp, this->loopRAxisStep_, sliceShapeFactorR_, sliceNumFactorR_);\n+                    ComputeIterAddress(axis, temp, this->loopRAxisStep_, this->loopRAxisSliceStep_,\n+                                       sliceShapeFactorR_, sliceNumFactorR_);\n                     temp = temp / this->loopRAxisStep_;\n+                    temp = temp / this->loopRAxisSliceStep_;\n                 } else {\n                     auto axis = LoopInfo->loopRAxis[idx];\n                     if (IsLoopSpliteAAxis<LoopInfo>(axis)) {\n                         // axis both in AAxis and RAxis\n-                        ComputeIterAddress(axis, temp, this->loopAAxisStep_, sliceShapeFactorA_, sliceNumFactorA_);\n+                        ComputeIterAddress(axis, temp, this->loopAAxisStep_, this->loopAAxisSliceStep_,\n+                                           sliceShapeFactorA_, sliceNumFactorA_);\n                         temp = temp / this->loopAAxisStep_;\n+                        temp = temp / this->loopAAxisSliceStep_;\n                     } else {\n                         iterAddr_[axis].start = temp % this->tiling_->shape[axis];\n                         iterAddr_[axis].stride = 1;\n@@ -535,6 +543,26 @@ public:\n         }\n     }\n \n+    __aicore__ inline uint64_t CalculateCopyOutGroupAddr(int32_t axis, int32_t innerA)\n+    {\n+        int32_t blockId = GetBlockIdx();\n+        uint64_t addrOffset = 0;\n+        if constexpr (LoopInfo->loopInnerACount > 0) {\n+            for (int32_t i = axis; i < Dim; i += CONST2) {\n+                addrOffset += iterAddr_[i].start * this->tiling_->dstStride[i];\n+            }\n+        }\n+\n+        uint64_t axisStep = LoopInfo->loopACount > 0 ? this->loopAAxisStep_ : 1;\n+        uint64_t axisSliceStep = LoopInfo->loopACount > 0 ? this->loopAAxisSliceStep_ : 1;\n+        uint64_t step = axisStep * axisSliceStep;\n+        return (blockId % this->tiling_->groupR) *\n+                   Ops::Base::CeilAlign(this->tiling_->outSize, static_cast<uint64_t>(AuxBase::VL_ELEMS)) +\n+               (blockId / this->tiling_->groupR % step) * this->ubFactorA_ * innerA +\n+               (blockId / (this->tiling_->groupR * step)) * this->tiling_->shape[axis] * innerA +\n+               addrOffset;\n+    }\n+\n     template <class T, class V>\n     __aicore__ inline void CalculateInView(V& view)\n     {\n",
+      "new_file": false,
+      "new_path": "pkg_inc/op_common/atvoss/reduce/reduce_sch_aux_non_contiguous.h",
+      "old_path": "pkg_inc/op_common/atvoss/reduce/reduce_sch_aux_non_contiguous.h",
+      "removed_lines": 9,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/opbase/raw/96c613db2a24dd7fca7acb439096042e5ac18a5f/pkg_inc/op_common/atvoss/reduce/reduce_sch_aux_non_contiguous.h",
+    "sha": "96c613db2a24dd7fca7acb439096042e5ac18a5f",
+    "source_branch": "fix/noncontiguous",
+    "source_project": {
+      "full_name": "Sunee/opbase",
+      "human_name": "Sunee / opbase",
+      "id": 9093765,
+      "path": "opbase"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/opbase",
+      "human_name": "CANN / opbase",
+      "id": 7649482,
+      "path": "opbase"
+    }
+  },
+  {
+    "additions": 1,
+    "blob_id": "51a0c897453b10d70405ae6f6a968bed3d85547b",
+    "blob_url": "https://gitcode.com/cann/opbase/blob/96c613db2a24dd7fca7acb439096042e5ac18a5f/src/op_common/atvoss/reduce/reduce_tiling.cpp",
+    "deletions": 1,
+    "filename": "src/op_common/atvoss/reduce/reduce_tiling.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 1,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -688,7 +688,7 @@ void ReduceOpTiling::ComputeUnitA(const uint64_t* shape)\n         double maxRate = 0.0f;\n         for (; step <= axisLen; step = step + stepLen) {\n             uint64_t s = step > sliceShape_[iA] ? FloorAlign(step, sliceShape_[iA]) : step; // 非连续与sliceShape对齐\n-            if (iA == Pattern::Dim - 1 && s != sliceShape_[iA]) {\n+            if (iA == Pattern::Dim - 1 && s <= sliceShape_[iA]) {\n                 s = FloorAlign(s, ubBlockSize);\n             }\n             uint64_t tmpInnerA = innerA * s;\n",
+      "new_file": false,
+      "new_path": "src/op_common/atvoss/reduce/reduce_tiling.cpp",
+      "old_path": "src/op_common/atvoss/reduce/reduce_tiling.cpp",
+      "removed_lines": 1,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/opbase/raw/96c613db2a24dd7fca7acb439096042e5ac18a5f/src/op_common/atvoss/reduce/reduce_tiling.cpp",
+    "sha": "96c613db2a24dd7fca7acb439096042e5ac18a5f",
+    "source_branch": "fix/noncontiguous",
+    "source_project": {
+      "full_name": "Sunee/opbase",
+      "human_name": "Sunee / opbase",
+      "id": 9093765,
+      "path": "opbase"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/opbase",
+      "human_name": "CANN / opbase",
+      "id": 7649482,
+      "path": "opbase"
+    }
+  }
+]

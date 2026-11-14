@@ -1,0 +1,506 @@
+[
+  {
+    "additions": 3,
+    "blob_id": "4562111290eb9ed599c9925f7d5427b6dae9c644",
+    "blob_url": "https://gitcode.com/cann/ops-cv/blob/cf0e781b6194103a295306326f5707d67215e53e/image/grid_sample/op_api/aclnn_grid_sampler2d.cpp",
+    "deletions": 3,
+    "filename": "image/grid_sample/op_api/aclnn_grid_sampler2d.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 3,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -62,7 +62,7 @@ static bool CheckNotNull(const aclTensor *input, const aclTensor *grid, const ac\n     return true;\n }\n \n-static bool CheckDavidSuppport(const aclTensor *input, int64_t interpolationMode)\n+static bool CheckRegBaseSuppport(const aclTensor *input, int64_t interpolationMode)\n {\n     if (input->GetDataType() != op::DataType::DT_FLOAT && input->GetDataType() != op::DataType::DT_FLOAT16 &&\n         input->GetDataType() != op::DataType::DT_BF16) {\n@@ -303,7 +303,7 @@ aclnnStatus aclnnGridSampler2DGetWorkspaceSize(const aclTensor *input, const acl\n     CHECK_RET(gridContiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);\n \n     const aclTensor *gridSampler2DOut = nullptr;\n-    bool isDavid = CheckDavidSuppport(input, interpolationMode);\n+    bool regBase = CheckRegBaseSuppport(input, interpolationMode);\n     if (CheckAiCoreSuppport(input, interpolationMode, paddingMode)) {\n         // 310p支持fp16/bf16数据类型, Cast为fp32进行计算\n         bool dtypeNeedCast = input->GetDataType() == op::DataType::DT_FLOAT16;\n@@ -339,7 +339,7 @@ aclnnStatus aclnnGridSampler2DGetWorkspaceSize(const aclTensor *input, const acl\n                 gridSampler2DOut = l0op::Cast(gridSampler2DOut, op::DataType::DT_FLOAT16, uniqueExecutor.get());\n             }\n         }\n-    } else if (isDavid) {\n+    } else if (regBase) {\n         gridSampler2DOut = l0op::GridSample(inputContiguous,\n             gridContiguous,\n             interpolationMode,\n",
+      "new_file": false,
+      "new_path": "image/grid_sample/op_api/aclnn_grid_sampler2d.cpp",
+      "old_path": "image/grid_sample/op_api/aclnn_grid_sampler2d.cpp",
+      "removed_lines": 3,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-cv/raw/cf0e781b6194103a295306326f5707d67215e53e/image/grid_sample/op_api/aclnn_grid_sampler2d.cpp",
+    "sha": "cf0e781b6194103a295306326f5707d67215e53e",
+    "source_branch": "9.0.0",
+    "source_project": {
+      "full_name": "qy3311888/ops-cv",
+      "human_name": "qy3311888 / ops-cv",
+      "id": 8491431,
+      "path": "ops-cv"
+    },
+    "target_branch": "9.0.0",
+    "target_project": {
+      "full_name": "cann/ops-cv",
+      "human_name": "CANN / ops-cv",
+      "id": 7657293,
+      "path": "ops-cv"
+    }
+  },
+  {
+    "additions": 3,
+    "blob_id": "07100ee7d04451242a77f410fb9a03d1ca531fa8",
+    "blob_url": "https://gitcode.com/cann/ops-cv/blob/cf0e781b6194103a295306326f5707d67215e53e/image/grid_sample/op_api/aclnn_grid_sampler3d.cpp",
+    "deletions": 3,
+    "filename": "image/grid_sample/op_api/aclnn_grid_sampler3d.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 3,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -65,7 +65,7 @@ static bool CheckNotNull(const aclTensor *input, const aclTensor *grid, const ac\n     return true;\n }\n \n-static bool CheckDavidSuppport(const aclTensor *input, int64_t interpolationMode)\n+static bool CheckRegBaseSuppport(const aclTensor *input, int64_t interpolationMode)\n {\n     if (input->GetDataType() != op::DataType::DT_FLOAT && input->GetDataType() != op::DataType::DT_FLOAT16 && input->GetDataType() != op::DataType::DT_BF16) {\n         OP_LOGD(\"Only support float16, float32 or bfloat16 on AICore, but got data type is %s\", op::ToString(input->GetDataType()).GetString());\n@@ -346,7 +346,7 @@ aclnnStatus aclnnGridSampler3DGetWorkspaceSize(const aclTensor *input, const acl\n     bool supportAiCpu = CheckAiCpuSuppport(input);\n     const op::Format inputFormat = input->GetStorageFormat();\n     bool isSpecialcase = interpolationMode == 0 && CheckSpecialCase(input, grid);\n-    bool isDavid = CheckDavidSuppport(input, interpolationMode);\n+    bool regBase = CheckRegBaseSuppport(input, interpolationMode);\n     const aclTensor *gridSampler3DOut = nullptr;\n     if (supportAiCore) {\n         inputTensor = CheckAndTranspose(inputTensor, inputFormat, true, isSpecialcase, uniqueExecutor.get());\n@@ -357,7 +357,7 @@ aclnnStatus aclnnGridSampler3DGetWorkspaceSize(const aclTensor *input, const acl\n             alignCorners,\n             !isSpecialcase,\n             uniqueExecutor.get());\n-    } else if (isDavid) {\n+    } else if (regBase) {\n         gridSampler3DOut = l0op::GridSample3D(inputTensor,\n             gridTensor,\n             interpolationMode,\n",
+      "new_file": false,
+      "new_path": "image/grid_sample/op_api/aclnn_grid_sampler3d.cpp",
+      "old_path": "image/grid_sample/op_api/aclnn_grid_sampler3d.cpp",
+      "removed_lines": 3,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-cv/raw/cf0e781b6194103a295306326f5707d67215e53e/image/grid_sample/op_api/aclnn_grid_sampler3d.cpp",
+    "sha": "cf0e781b6194103a295306326f5707d67215e53e",
+    "source_branch": "9.0.0",
+    "source_project": {
+      "full_name": "qy3311888/ops-cv",
+      "human_name": "qy3311888 / ops-cv",
+      "id": 8491431,
+      "path": "ops-cv"
+    },
+    "target_branch": "9.0.0",
+    "target_project": {
+      "full_name": "cann/ops-cv",
+      "human_name": "CANN / ops-cv",
+      "id": 7657293,
+      "path": "ops-cv"
+    }
+  },
+  {
+    "additions": 8,
+    "blob_id": "1342de237ee2bb42790cff5b9c656fcb78061f69",
+    "blob_url": "https://gitcode.com/cann/ops-cv/blob/cf0e781b6194103a295306326f5707d67215e53e/image/grid_sample/op_host/grid_sample_tiling.cpp",
+    "deletions": 8,
+    "filename": "image/grid_sample/op_host/grid_sample_tiling.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 8,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -83,18 +83,18 @@ ge::graphStatus GridSampleTiling::GetShapeAttrsInfo()\n \n     auto compileInfo = reinterpret_cast<const GridSampleCompileInfo *>(context_->GetCompileInfo());\n     OP_CHECK_NULL_WITH_CONTEXT(context_, compileInfo);\n-    isDavid = compileInfo->isDavid;\n+    regBase = compileInfo->regBase;\n \n-    OP_CHECK_IF((!isDavid && dimension == 0 && xDtype != ge::DT_FLOAT && xDtype != ge::DT_FLOAT16),\n+    OP_CHECK_IF((!regBase && dimension == 0 && xDtype != ge::DT_FLOAT && xDtype != ge::DT_FLOAT16),\n         OP_LOGE(context_->GetNodeName(), \"x datatype only support FLOAT32 or FLOAT16\"),\n         return ge::GRAPH_FAILED);\n-    OP_CHECK_IF((!isDavid && dimension == 0 && gridDtype != ge::DT_FLOAT && gridDtype != ge::DT_FLOAT16),\n+    OP_CHECK_IF((!regBase && dimension == 0 && gridDtype != ge::DT_FLOAT && gridDtype != ge::DT_FLOAT16),\n         OP_LOGE(context_->GetNodeName(), \"grid datatype only support FLOAT32 or FLOAT16\"),\n         return ge::GRAPH_FAILED);\n-    OP_CHECK_IF((isDavid && dimension == 0 && xDtype != ge::DT_FLOAT && xDtype != ge::DT_FLOAT16 && xDtype != ge::DT_BF16),\n+    OP_CHECK_IF((regBase && dimension == 0 && xDtype != ge::DT_FLOAT && xDtype != ge::DT_FLOAT16 && xDtype != ge::DT_BF16),\n         OP_LOGE(context_->GetNodeName(), \"x datatype only support FLOAT32, FLOAT16, BFLOAT16\"),\n         return ge::GRAPH_FAILED);\n-    OP_CHECK_IF((isDavid && dimension == 0 && gridDtype != ge::DT_FLOAT && gridDtype != ge::DT_FLOAT16 && gridDtype != ge::DT_BF16),\n+    OP_CHECK_IF((regBase && dimension == 0 && gridDtype != ge::DT_FLOAT && gridDtype != ge::DT_FLOAT16 && gridDtype != ge::DT_BF16),\n         OP_LOGE(context_->GetNodeName(), \"grid datatype only support FLOAT32, FLOAT16, BFLOAT16\"),\n         return ge::GRAPH_FAILED);\n     OP_CHECK_IF((dimension == 1 && xDtype != ge::DT_FLOAT && xDtype != ge::DT_FLOAT16 && xDtype != ge::DT_BF16),\n@@ -240,13 +240,13 @@ ge::graphStatus GridSampleTiling::GetPlatformInfo()\n     auto compileInfo = reinterpret_cast<const GridSampleCompileInfo *>(context_->GetCompileInfo());\n     OP_CHECK_NULL_WITH_CONTEXT(context_, compileInfo);\n     coreNumVar = compileInfo->coreNum;\n-    isDavid = compileInfo->isDavid;\n+    regBase = compileInfo->regBase;\n     return ge::GRAPH_SUCCESS;\n }\n \n bool GridSampleTiling::IsCapable()\n {\n-    if (isDavid && interpolationMode == INTERPOLATION_MODE_BILINEAR && channelLast == 0) {\n+    if (regBase && interpolationMode == INTERPOLATION_MODE_BILINEAR && channelLast == 0) {\n         OP_LOGD(context_->GetNodeName(),\"GridSampleTiling template is not capabled, enter next template.\");\n         return false;\n     }\n@@ -343,7 +343,7 @@ static ge::graphStatus TilingPrepare4GridSample(gert::TilingParseContext *contex\n     OP_CHECK_NULL_WITH_CONTEXT(context, platformInfo);\n     auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfo);\n     compileInfo->coreNum = ascendcPlatform.GetCoreNumAiv();\n-    compileInfo->isDavid = Ops::Cv::OpTiling::IsRegbaseSocVersion(context);\n+    compileInfo->regBase = Ops::Cv::OpTiling::IsRegbaseSocVersion(context);\n     OP_CHECK_IF((compileInfo->coreNum <= 0),\n         OP_LOGE(\n             context->GetNodeName(), \"Get core num failed, core num: %u\", static_cast<uint32_t>(compileInfo->coreNum)),\n",
+      "new_file": false,
+      "new_path": "image/grid_sample/op_host/grid_sample_tiling.cpp",
+      "old_path": "image/grid_sample/op_host/grid_sample_tiling.cpp",
+      "removed_lines": 8,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-cv/raw/cf0e781b6194103a295306326f5707d67215e53e/image/grid_sample/op_host/grid_sample_tiling.cpp",
+    "sha": "cf0e781b6194103a295306326f5707d67215e53e",
+    "source_branch": "9.0.0",
+    "source_project": {
+      "full_name": "qy3311888/ops-cv",
+      "human_name": "qy3311888 / ops-cv",
+      "id": 8491431,
+      "path": "ops-cv"
+    },
+    "target_branch": "9.0.0",
+    "target_project": {
+      "full_name": "cann/ops-cv",
+      "human_name": "CANN / ops-cv",
+      "id": 7657293,
+      "path": "ops-cv"
+    }
+  },
+  {
+    "additions": 2,
+    "blob_id": "d4dd7a4f04a8e3bec6ead3776a9cc5aabda3047c",
+    "blob_url": "https://gitcode.com/cann/ops-cv/blob/cf0e781b6194103a295306326f5707d67215e53e/image/grid_sample/op_host/grid_sample_tiling.h",
+    "deletions": 2,
+    "filename": "image/grid_sample/op_host/grid_sample_tiling.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 2,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -33,7 +33,7 @@ namespace optiling {\n struct GridSampleCompileInfo {\n     int64_t coreNum = 0;\n     uint64_t ubSizePlatForm = 0;\n-    bool isDavid {false};\n+    bool regBase {false};\n };\n \n BEGIN_TILING_DATA_DEF(GridSampleTilingData)\n@@ -139,7 +139,7 @@ protected:\n     int64_t templateCNum{0};\n     int64_t hwFactor{512};\n     int64_t dimension{0};\n-    bool isDavid {false};\n+    bool regBase {false};\n     int64_t outputSize;\n \n private:\n",
+      "new_file": false,
+      "new_path": "image/grid_sample/op_host/grid_sample_tiling.h",
+      "old_path": "image/grid_sample/op_host/grid_sample_tiling.h",
+      "removed_lines": 2,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-cv/raw/cf0e781b6194103a295306326f5707d67215e53e/image/grid_sample/op_host/grid_sample_tiling.h",
+    "sha": "cf0e781b6194103a295306326f5707d67215e53e",
+    "source_branch": "9.0.0",
+    "source_project": {
+      "full_name": "qy3311888/ops-cv",
+      "human_name": "qy3311888 / ops-cv",
+      "id": 8491431,
+      "path": "ops-cv"
+    },
+    "target_branch": "9.0.0",
+    "target_project": {
+      "full_name": "cann/ops-cv",
+      "human_name": "CANN / ops-cv",
+      "id": 7657293,
+      "path": "ops-cv"
+    }
+  },
+  {
+    "additions": 3,
+    "blob_id": "d7840c9f61b3bd20f918ed2c7c671d1463cbd116",
+    "blob_url": "https://gitcode.com/cann/ops-cv/blob/cf0e781b6194103a295306326f5707d67215e53e/image/grid_sample/tests/ut/op_host/test_grid_sample_tiling.cpp",
+    "deletions": 3,
+    "filename": "image/grid_sample/tests/ut/op_host/test_grid_sample_tiling.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 3,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -35,7 +35,7 @@ protected:\n struct GridSampleCompileInfo {\n     int64_t coreNum = 0;\n     uint64_t ubSizePlatForm = 0;\n-    bool isDavid = false;\n+    bool regBase = false;\n };\n \n TEST_F(GridSampleTiling, grid_sample_tiling_test_float32_1)\n@@ -504,7 +504,7 @@ TEST_F(GridSampleTiling, grid_sample_3d_tiling_test_float32_bilinear_te)\n     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);\n }\n \n-TEST_F(GridSampleTiling, grid_sample_tiling_david_test_1)\n+TEST_F(GridSampleTiling, grid_sample_tiling_regbase_test_1)\n {\n     GridSampleCompileInfo compileInfo = {56, 196608, true};\n     gert::TilingContextPara tilingContextPara(\"GridSample\",\n@@ -523,7 +523,7 @@ TEST_F(GridSampleTiling, grid_sample_tiling_david_test_1)\n     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);\n }\n \n-TEST_F(GridSampleTiling, grid_sample_tiling_david_test_2)\n+TEST_F(GridSampleTiling, grid_sample_tiling_regbase_test_2)\n {\n     GridSampleCompileInfo compileInfo = {56, 196608, true};\n     gert::TilingContextPara tilingContextPara(\"GridSample\",\n",
+      "new_file": false,
+      "new_path": "image/grid_sample/tests/ut/op_host/test_grid_sample_tiling.cpp",
+      "old_path": "image/grid_sample/tests/ut/op_host/test_grid_sample_tiling.cpp",
+      "removed_lines": 3,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-cv/raw/cf0e781b6194103a295306326f5707d67215e53e/image/grid_sample/tests/ut/op_host/test_grid_sample_tiling.cpp",
+    "sha": "cf0e781b6194103a295306326f5707d67215e53e",
+    "source_branch": "9.0.0",
+    "source_project": {
+      "full_name": "qy3311888/ops-cv",
+      "human_name": "qy3311888 / ops-cv",
+      "id": 8491431,
+      "path": "ops-cv"
+    },
+    "target_branch": "9.0.0",
+    "target_project": {
+      "full_name": "cann/ops-cv",
+      "human_name": "CANN / ops-cv",
+      "id": 7657293,
+      "path": "ops-cv"
+    }
+  },
+  {
+    "additions": 2,
+    "blob_id": "e9694a8e997000e4e4da81afcff6267c46b2b58e",
+    "blob_url": "https://gitcode.com/cann/ops-cv/blob/cf0e781b6194103a295306326f5707d67215e53e/image/grid_sample/tests/ut/op_kernel/test_grid_sample_950.cpp",
+    "deletions": 2,
+    "filename": "image/grid_sample/tests/ut/op_kernel/test_grid_sample_950.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 2,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -52,7 +52,7 @@ TEST_F(grid_sample_950_test, test_case_fp32_test01)\n     size_t outputByteSize = N * grid_h * grid_w * C * sizeof(int32_t);\n     struct GridSampleCompileInfo {\n         int64_t coreNum = 48;\n-        bool isDavid = true;\n+        bool regBase = true;\n     }compileInfo;\n     string socVersion = \"Ascend950\";\n     gert::TilingContextPara tilingContextPara(\"GridSample\",\n@@ -110,7 +110,7 @@ TEST_F(grid_sample_950_test, test_case_fp32_test02)\n     size_t outputByteSize = N * grid_d * grid_h * grid_w * C * sizeof(int32_t);\n     struct GridSampleCompileInfo {\n         int64_t coreNum = 48;\n-        bool isDavid = true;\n+        bool regBase = true;\n     }compileInfo;\n     string socVersion = \"Ascend950\";\n     gert::TilingContextPara tilingContextPara(\"GridSample\",\n",
+      "new_file": false,
+      "new_path": "image/grid_sample/tests/ut/op_kernel/test_grid_sample_950.cpp",
+      "old_path": "image/grid_sample/tests/ut/op_kernel/test_grid_sample_950.cpp",
+      "removed_lines": 2,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-cv/raw/cf0e781b6194103a295306326f5707d67215e53e/image/grid_sample/tests/ut/op_kernel/test_grid_sample_950.cpp",
+    "sha": "cf0e781b6194103a295306326f5707d67215e53e",
+    "source_branch": "9.0.0",
+    "source_project": {
+      "full_name": "qy3311888/ops-cv",
+      "human_name": "qy3311888 / ops-cv",
+      "id": 8491431,
+      "path": "ops-cv"
+    },
+    "target_branch": "9.0.0",
+    "target_project": {
+      "full_name": "cann/ops-cv",
+      "human_name": "CANN / ops-cv",
+      "id": 7657293,
+      "path": "ops-cv"
+    }
+  },
+  {
+    "additions": 12,
+    "blob_id": "fc8c4d3adc735a3316c84d2ac866a3ec0adccf9f",
+    "blob_url": "https://gitcode.com/cann/ops-cv/blob/cf0e781b6194103a295306326f5707d67215e53e/image/grid_sampler2_d_grad/op_host/grid_sampler2_d_grad_tiling.cpp",
+    "deletions": 12,
+    "filename": "image/grid_sampler2_d_grad/op_host/grid_sampler2_d_grad_tiling.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 12,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -69,7 +69,7 @@ constexpr uint8_t SCHEDULE_MODE = 1;\n constexpr uint32_t GRID_LAST_NUM = 2;\n constexpr uint32_t VF_MAX_THREAD_NUM = 1024;\n constexpr uint32_t VF_MAX_THREAD_NUM_DET = 256;\n-constexpr uint32_t DAVID_MAX_CORE_NUM = 56;\n+constexpr uint32_t REGBASE_MAX_CORE_NUM = 56;\n constexpr uint32_t WORKSPACE_SIZE = 16 * 1024 * 1024;\n constexpr uint32_t DETERMINISTIC_BATCH_NORM = 1;\n \n@@ -99,7 +99,7 @@ public:\n         this->dataTypeSize = dataTypeLen;\n         this->elementsPerBlock = BYTE_BLOCK / dataTypeSize;\n         this->isDeterministic = deterministic;\n-        this->isDavid = param.isDavid;\n+        this->regBase = param.regBase;\n         return;\n     }\n \n@@ -180,21 +180,21 @@ private:\n     uint32_t extraUbSize = 0;\n     uint32_t isDeterministic = 0;\n     uint32_t tailBNum = 0;\n-    bool isDavid = false;\n+    bool regBase = false;\n };\n \n template <typename TilingData, int32_t dataTypeLen>\n void GridSampler2DGradTiling<TilingData, dataTypeLen>::GetUsedCore()\n {\n-    if (isDavid) {\n+    if (regBase) {\n         uint32_t mulNCHW = static_cast<uint32_t>(batch * gridH * gridW * GRID_LAST_NUM);\n         uint32_t tmpCoreNum = Ceil(mulNCHW, VF_MAX_THREAD_NUM);\n-        usedCoreNum = tmpCoreNum <= DAVID_MAX_CORE_NUM ? tmpCoreNum : DAVID_MAX_CORE_NUM;\n+        usedCoreNum = tmpCoreNum <= REGBASE_MAX_CORE_NUM ? tmpCoreNum : REGBASE_MAX_CORE_NUM;\n         pNumPerCore = 0;\n         tailPNum = 0;\n         if (isDeterministic == 1){\n             tmpCoreNum = Ceil(mulNCHW, VF_MAX_THREAD_NUM_DET);\n-            usedCoreNum = tmpCoreNum <= DAVID_MAX_CORE_NUM ? tmpCoreNum : DAVID_MAX_CORE_NUM;\n+            usedCoreNum = tmpCoreNum <= REGBASE_MAX_CORE_NUM ? tmpCoreNum : REGBASE_MAX_CORE_NUM;\n             if (batch > coreNum) {\n                 usedCoreNum = coreNum;\n                 pNumPerCore = Ceil(batch, usedCoreNum);\n@@ -369,7 +369,7 @@ static ge::graphStatus GetNCHWInfo(gert::TilingContext* tilingContext, InputPara\n         return ge::GRAPH_FAILED;\n     }\n     auto compileInfo = reinterpret_cast<const Tiling4GridSampler2DGradCompileInfo*>(tilingContext->GetCompileInfo());\n-    params.isDavid = compileInfo->isDavid;\n+    params.regBase = compileInfo->regBase;\n     uint32_t outH = gradShape->GetStorageShape().GetDim(DIM_INDEX1);\n     uint32_t outW = gradShape->GetStorageShape().GetDim(DIM_INDEX2);\n     params.batch = xShape->GetStorageShape().GetDim(DIM_INDEX0);\n@@ -378,7 +378,7 @@ static ge::graphStatus GetNCHWInfo(gert::TilingContext* tilingContext, InputPara\n     params.width = xShape->GetStorageShape().GetDim(DIM_INDEX2);\n     params.gridH = gridShape->GetStorageShape().GetDim(DIM_INDEX1);\n     params.gridW = gridShape->GetStorageShape().GetDim(DIM_INDEX2);\n-    if (params.isDavid) {\n+    if (params.regBase) {\n         outH = gradShape->GetStorageShape().GetDim(DIM_INDEX2);\n         outW = gradShape->GetStorageShape().GetDim(DIM_INDEX3);\n         params.channel = xShape->GetStorageShape().GetDim(DIM_INDEX1);\n@@ -456,11 +456,11 @@ static ge::graphStatus GetInputInfo(gert::TilingContext* tilingContext, InputPar\n         (currentWorkspace == nullptr), OP_LOGE(tilingContext->GetNodeName(), \"Get currentWorkspace Failed.\"),\n         return false);\n     currentWorkspace[0] = sysWorkspaceSize;\n-    if (params.isDavid) {\n+    if (params.regBase) {\n         uint32_t isDeterministic = tilingContext->GetDeterministic();\n         if (isDeterministic == 1) {\n             params.tilingKey += 6;\n-            uint32_t batchNumPerCore = params.batch > DAVID_MAX_CORE_NUM ? (params.batch / DAVID_MAX_CORE_NUM) : 1;\n+            uint32_t batchNumPerCore = params.batch > REGBASE_MAX_CORE_NUM ? (params.batch / REGBASE_MAX_CORE_NUM) : 1;\n             currentWorkspace[0] = WORKSPACE_SIZE + VF_MAX_THREAD_NUM_DET * sizeof(int32_t) * 2 * 4 * params.batch * batchNumPerCore;\n         } else {\n             currentWorkspace[0] = 0;\n@@ -488,7 +488,7 @@ static ge::graphStatus Tiling4GridSampler2DGrad(gert::TilingContext* tilingConte\n \n     OP_LOGI(tilingContext->GetNodeName(), \"ubSizePlatForm:%lu, coreNum:%u\", ubSizePlatForm, coreNum);\n     ge::DataType inputDatatype = tilingContext->GetInputDesc(0)->GetDataType();\n-    if (inputDatatype != ge::DT_FLOAT && !compileInfo->isDavid) {\n+    if (inputDatatype != ge::DT_FLOAT && !compileInfo->regBase) {\n         coreNum = 1;\n     } else { \n          coreNum = compileInfo->coreNum; \n@@ -531,7 +531,7 @@ static ge::graphStatus TilingPrepare4GridSampler2DGrad(gert::TilingParseContext*\n     OP_CHECK_NULL_WITH_CONTEXT(context, platformInfo);\n     auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfo);\n     compileInfo->coreNum = ascendcPlatform.GetCoreNumAiv();\n-    compileInfo->isDavid = Ops::Cv::OpTiling::IsRegbaseSocVersion(context);\n+    compileInfo->regBase = Ops::Cv::OpTiling::IsRegbaseSocVersion(context);\n     OP_CHECK_IF(\n         (compileInfo->coreNum <= 0), OP_LOGE(context->GetNodeName(), \"Failed to get core num.\"),\n         return ge::GRAPH_FAILED);\n",
+      "new_file": false,
+      "new_path": "image/grid_sampler2_d_grad/op_host/grid_sampler2_d_grad_tiling.cpp",
+      "old_path": "image/grid_sampler2_d_grad/op_host/grid_sampler2_d_grad_tiling.cpp",
+      "removed_lines": 12,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-cv/raw/cf0e781b6194103a295306326f5707d67215e53e/image/grid_sampler2_d_grad/op_host/grid_sampler2_d_grad_tiling.cpp",
+    "sha": "cf0e781b6194103a295306326f5707d67215e53e",
+    "source_branch": "9.0.0",
+    "source_project": {
+      "full_name": "qy3311888/ops-cv",
+      "human_name": "qy3311888 / ops-cv",
+      "id": 8491431,
+      "path": "ops-cv"
+    },
+    "target_branch": "9.0.0",
+    "target_project": {
+      "full_name": "cann/ops-cv",
+      "human_name": "CANN / ops-cv",
+      "id": 7657293,
+      "path": "ops-cv"
+    }
+  },
+  {
+    "additions": 2,
+    "blob_id": "03a67738aca2c004efa73dce91b4f8dbe1c7b6b7",
+    "blob_url": "https://gitcode.com/cann/ops-cv/blob/cf0e781b6194103a295306326f5707d67215e53e/image/grid_sampler2_d_grad/op_host/grid_sampler_2d_grad_tiling_data.h",
+    "deletions": 2,
+    "filename": "image/grid_sampler2_d_grad/op_host/grid_sampler_2d_grad_tiling_data.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 2,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -55,7 +55,7 @@ REGISTER_TILING_DATA_CLASS(GridSampler2DGrad, GridSampler2DGradTilingData)\n struct Tiling4GridSampler2DGradCompileInfo {\n     uint32_t coreNum;\n     uint64_t ubSizePlatForm;\n-    bool isDavid{false};\n+    bool regBase{false};\n };\n \n struct InputParamsInfo {\n@@ -69,7 +69,7 @@ struct InputParamsInfo {\n     int interpolation = 0;\n     int padding = 0;\n     int alignCorners = 0;\n-    bool isDavid = false;\n+    bool regBase = false;\n };\n } // namespace optiling\n #endif // __GRID_SAMPLER_2D_GRAD_TILINGDATA_H__\n\\ No newline at end of file\n",
+      "new_file": false,
+      "new_path": "image/grid_sampler2_d_grad/op_host/grid_sampler_2d_grad_tiling_data.h",
+      "old_path": "image/grid_sampler2_d_grad/op_host/grid_sampler_2d_grad_tiling_data.h",
+      "removed_lines": 2,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-cv/raw/cf0e781b6194103a295306326f5707d67215e53e/image/grid_sampler2_d_grad/op_host/grid_sampler_2d_grad_tiling_data.h",
+    "sha": "cf0e781b6194103a295306326f5707d67215e53e",
+    "source_branch": "9.0.0",
+    "source_project": {
+      "full_name": "qy3311888/ops-cv",
+      "human_name": "qy3311888 / ops-cv",
+      "id": 8491431,
+      "path": "ops-cv"
+    },
+    "target_branch": "9.0.0",
+    "target_project": {
+      "full_name": "cann/ops-cv",
+      "human_name": "CANN / ops-cv",
+      "id": 7657293,
+      "path": "ops-cv"
+    }
+  },
+  {
+    "additions": 1,
+    "blob_id": "92c0f7cdf53da1e75a86a1f9578218a291df4ca4",
+    "blob_url": "https://gitcode.com/cann/ops-cv/blob/cf0e781b6194103a295306326f5707d67215e53e/image/grid_sampler2_d_grad/tests/ut/op_host/test_grid_sampler2_d_grad_tiling.cpp",
+    "deletions": 1,
+    "filename": "image/grid_sampler2_d_grad/tests/ut/op_host/test_grid_sampler2_d_grad_tiling.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 1,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -31,7 +31,7 @@ protected:\n struct GridSampler2DGradCompileInfo {\n     uint32_t coreNum = 0;\n     uint64_t ubSizePlatForm = 0;\n-    bool isDavid{false};\n+    bool regBase{false};\n };\n \n TEST_F(GridSampler2DGradTiling, grid_sampler_grad_tiling_test_float32_case1)\n",
+      "new_file": false,
+      "new_path": "image/grid_sampler2_d_grad/tests/ut/op_host/test_grid_sampler2_d_grad_tiling.cpp",
+      "old_path": "image/grid_sampler2_d_grad/tests/ut/op_host/test_grid_sampler2_d_grad_tiling.cpp",
+      "removed_lines": 1,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-cv/raw/cf0e781b6194103a295306326f5707d67215e53e/image/grid_sampler2_d_grad/tests/ut/op_host/test_grid_sampler2_d_grad_tiling.cpp",
+    "sha": "cf0e781b6194103a295306326f5707d67215e53e",
+    "source_branch": "9.0.0",
+    "source_project": {
+      "full_name": "qy3311888/ops-cv",
+      "human_name": "qy3311888 / ops-cv",
+      "id": 8491431,
+      "path": "ops-cv"
+    },
+    "target_branch": "9.0.0",
+    "target_project": {
+      "full_name": "cann/ops-cv",
+      "human_name": "CANN / ops-cv",
+      "id": 7657293,
+      "path": "ops-cv"
+    }
+  },
+  {
+    "additions": 13,
+    "blob_id": "45bd81a68f4a9b27e2cae36fdd979f61997e3c4d",
+    "blob_url": "https://gitcode.com/cann/ops-cv/blob/cf0e781b6194103a295306326f5707d67215e53e/image/grid_sampler3_d_grad/op_host/grid_sampler3_d_grad_tiling.cpp",
+    "deletions": 13,
+    "filename": "image/grid_sampler3_d_grad/op_host/grid_sampler3_d_grad_tiling.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 13,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -61,7 +61,7 @@ constexpr uint32_t ALIGN_CORNERS_FALSE = 0;\n constexpr uint32_t ALIGN_CORNERS_TRUE = 1;\n constexpr uint32_t VF_MAX_THREAD_NUM = 256;\n constexpr uint32_t GRID_LAST_NUM = 3;\n-constexpr uint32_t DAVID_MAX_CORE_NUM = 56;\n+constexpr uint32_t REGBASE_MAX_CORE_NUM = 56;\n constexpr uint32_t DETERMINISTIC_BATCH_NUM = 1;\n constexpr uint32_t DETERMINISTIC_COMPUTE_NUM = 16;\n \n@@ -86,7 +86,7 @@ public:\n         this->tilingKey = param.tilingKey;\n         this->ubSize = FloorAlign(inputUbSize, BYTE_BLOCK);\n         this->isDeterministic = deterministic;\n-        this->isDavid = param.isDavid;\n+        this->regBase = param.regBase;\n         return;\n     }\n \n@@ -158,16 +158,16 @@ private:\n     uint32_t ubFactorElement = 0;\n     uint32_t isDeterministic = 0;\n     uint32_t tailBNum = 0;\n-    bool isDavid = false;\n+    bool regBase = false;\n };\n \n template <typename TilingData>\n void GridSampler3DGradTiling<TilingData>::GetUsedCore()\n {\n-    if (isDavid) {\n+    if (regBase) {\n         uint32_t mulNCDHW = static_cast<uint32_t>(batch * gridD * gridH * gridW * GRID_LAST_NUM);\n         uint32_t tmpCoreNum = Ceil(mulNCDHW, VF_MAX_THREAD_NUM);\n-        usedCoreNum = tmpCoreNum <= DAVID_MAX_CORE_NUM ? tmpCoreNum : DAVID_MAX_CORE_NUM;\n+        usedCoreNum = tmpCoreNum <= REGBASE_MAX_CORE_NUM ? tmpCoreNum : REGBASE_MAX_CORE_NUM;\n         pNumPerCore = 0;\n         tailPNum = 0;\n         if (isDeterministic == 1) {\n@@ -294,7 +294,7 @@ static ge::graphStatus CheckShapes(\n     uint32_t outD = gradShape->GetStorageShape().GetDim(DIM_INDEX1);\n     uint32_t outH = gradShape->GetStorageShape().GetDim(DIM_INDEX2);\n     uint32_t outW = gradShape->GetStorageShape().GetDim(DIM_INDEX3);\n-    if (params.isDavid) {\n+    if (params.regBase) {\n         outD = gradShape->GetStorageShape().GetDim(DIM_INDEX2);\n         outH = gradShape->GetStorageShape().GetDim(DIM_INDEX3);\n         outW = gradShape->GetStorageShape().GetDim(DIM_INDEX4);\n@@ -315,9 +315,9 @@ static ge::graphStatus GetInputInfo(gert::TilingContext* tilingContext, InputPar\n     const gert::StorageShape* gridShape = tilingContext->GetInputShape(GRID_INPUT_INDEX);\n \n     auto compileInfo = reinterpret_cast<const Tiling4GridSampler3DGradCompileInfo*>(tilingContext->GetCompileInfo());\n-    params.isDavid = compileInfo->isDavid;\n+    params.regBase = compileInfo->regBase;\n     params.batch = xShape->GetStorageShape().GetDim(DIM_INDEX0);\n-    if (params.isDavid) {\n+    if (params.regBase) {\n         params.channel = xShape->GetStorageShape().GetDim(DIM_INDEX1);\n         params.xD = xShape->GetStorageShape().GetDim(DIM_INDEX2);\n         params.xH = xShape->GetStorageShape().GetDim(DIM_INDEX3);\n@@ -368,12 +368,12 @@ static ge::graphStatus GetInputInfo(gert::TilingContext* tilingContext, InputPar\n \n     size_t* currentWorkspace = tilingContext->GetWorkspaceSizes(1);\n     size_t sysWorkspaceSize = WORKSPACE_SIZE;\n-    if (params.isDavid) {\n+    if (params.regBase) {\n         uint32_t deterministic = tilingContext->GetDeterministic();\n         if (deterministic == 1) {\n-            uint32_t batchNumPerCore = params.batch > DAVID_MAX_CORE_NUM ? (params.batch / DAVID_MAX_CORE_NUM) : 1;\n+            uint32_t batchNumPerCore = params.batch > REGBASE_MAX_CORE_NUM ? (params.batch / REGBASE_MAX_CORE_NUM) : 1;\n             sysWorkspaceSize = WORKSPACE_SIZE + VF_MAX_THREAD_NUM * sizeof(int32_t) * DETERMINISTIC_COMPUTE_NUM *\n-                                                    DAVID_MAX_CORE_NUM * params.batch;\n+                                                    REGBASE_MAX_CORE_NUM * params.batch;\n         } else {\n             sysWorkspaceSize = 0;\n         }\n@@ -417,7 +417,7 @@ static ge::graphStatus tiling4GridSampler3DGradTiling(gert::TilingContext* tilin\n \n     if (inputDatatype == ge::DT_FLOAT) {\n         tilingContext->SetTilingKey(1);\n-        if (deterministic == 1) {\n+        if (deterministic == 1 && compileInfo->regBase) {\n             tilingContext->SetTilingKey(4);\n         }\n     } else if (inputDatatype == ge::DT_FLOAT16) {\n@@ -450,7 +450,7 @@ static ge::graphStatus tilingPrepare4GridSampler3DGrad(gert::TilingParseContext*\n     OP_CHECK_NULL_WITH_CONTEXT(context, platformInfo);\n     auto ascendCPlatform = platform_ascendc::PlatformAscendC(platformInfo);\n     compileInfo->coreNum = ascendCPlatform.GetCoreNumAiv();\n-    compileInfo->isDavid = Ops::Cv::OpTiling::IsRegbaseSocVersion(context);\n+    compileInfo->regBase = Ops::Cv::OpTiling::IsRegbaseSocVersion(context);\n     OP_CHECK_IF(\n         (compileInfo->coreNum <= 0), OP_LOGE(context->GetNodeName(), \"Failed to get core num.\"),\n         return ge::GRAPH_FAILED);\n",
+      "new_file": false,
+      "new_path": "image/grid_sampler3_d_grad/op_host/grid_sampler3_d_grad_tiling.cpp",
+      "old_path": "image/grid_sampler3_d_grad/op_host/grid_sampler3_d_grad_tiling.cpp",
+      "removed_lines": 13,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-cv/raw/cf0e781b6194103a295306326f5707d67215e53e/image/grid_sampler3_d_grad/op_host/grid_sampler3_d_grad_tiling.cpp",
+    "sha": "cf0e781b6194103a295306326f5707d67215e53e",
+    "source_branch": "9.0.0",
+    "source_project": {
+      "full_name": "qy3311888/ops-cv",
+      "human_name": "qy3311888 / ops-cv",
+      "id": 8491431,
+      "path": "ops-cv"
+    },
+    "target_branch": "9.0.0",
+    "target_project": {
+      "full_name": "cann/ops-cv",
+      "human_name": "CANN / ops-cv",
+      "id": 7657293,
+      "path": "ops-cv"
+    }
+  },
+  {
+    "additions": 2,
+    "blob_id": "294cfd89990b3c2253566a427ac342ee96066ad3",
+    "blob_url": "https://gitcode.com/cann/ops-cv/blob/cf0e781b6194103a295306326f5707d67215e53e/image/grid_sampler3_d_grad/op_host/grid_sampler3_d_grad_tiling.h",
+    "deletions": 2,
+    "filename": "image/grid_sampler3_d_grad/op_host/grid_sampler3_d_grad_tiling.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 2,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -31,7 +31,7 @@ namespace optiling {\n struct Tiling4GridSampler3DGradCompileInfo {\n     uint32_t coreNum;\n     uint64_t ubSizePlatForm;\n-    bool isDavid{false};\n+    bool regBase{false};\n };\n \n struct InputParamsInfo {\n@@ -47,7 +47,7 @@ struct InputParamsInfo {\n     uint32_t interpolation = 0;\n     uint32_t padding = 0;\n     uint32_t alignCorners = 0;\n-    bool isDavid = false;\n+    bool regBase = false;\n };\n \n constexpr uint16_t MAX_CORE_CONT = 50;\n",
+      "new_file": false,
+      "new_path": "image/grid_sampler3_d_grad/op_host/grid_sampler3_d_grad_tiling.h",
+      "old_path": "image/grid_sampler3_d_grad/op_host/grid_sampler3_d_grad_tiling.h",
+      "removed_lines": 2,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-cv/raw/cf0e781b6194103a295306326f5707d67215e53e/image/grid_sampler3_d_grad/op_host/grid_sampler3_d_grad_tiling.h",
+    "sha": "cf0e781b6194103a295306326f5707d67215e53e",
+    "source_branch": "9.0.0",
+    "source_project": {
+      "full_name": "qy3311888/ops-cv",
+      "human_name": "qy3311888 / ops-cv",
+      "id": 8491431,
+      "path": "ops-cv"
+    },
+    "target_branch": "9.0.0",
+    "target_project": {
+      "full_name": "cann/ops-cv",
+      "human_name": "CANN / ops-cv",
+      "id": 7657293,
+      "path": "ops-cv"
+    }
+  },
+  {
+    "additions": 1,
+    "blob_id": "5af993e83ab7756c4c6f83dc6a8f6de09aab4a77",
+    "blob_url": "https://gitcode.com/cann/ops-cv/blob/cf0e781b6194103a295306326f5707d67215e53e/image/grid_sampler3_d_grad/tests/ut/op_host/test_grid_sampler3_d_grad_tiling.cpp",
+    "deletions": 1,
+    "filename": "image/grid_sampler3_d_grad/tests/ut/op_host/test_grid_sampler3_d_grad_tiling.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 1,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -31,7 +31,7 @@ protected:\n struct GridSampler3DGradCompileInfo {\n     uint32_t coreNum = 0;\n     uint64_t ubSizePlatForm = 0;\n-    bool isDavid{false};\n+    bool regBase{false};\n };\n \n TEST_F(GridSampler3DGradTiling, grid_sampler3_d_grad_tiling_test_float32_case1)\n",
+      "new_file": false,
+      "new_path": "image/grid_sampler3_d_grad/tests/ut/op_host/test_grid_sampler3_d_grad_tiling.cpp",
+      "old_path": "image/grid_sampler3_d_grad/tests/ut/op_host/test_grid_sampler3_d_grad_tiling.cpp",
+      "removed_lines": 1,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-cv/raw/cf0e781b6194103a295306326f5707d67215e53e/image/grid_sampler3_d_grad/tests/ut/op_host/test_grid_sampler3_d_grad_tiling.cpp",
+    "sha": "cf0e781b6194103a295306326f5707d67215e53e",
+    "source_branch": "9.0.0",
+    "source_project": {
+      "full_name": "qy3311888/ops-cv",
+      "human_name": "qy3311888 / ops-cv",
+      "id": 8491431,
+      "path": "ops-cv"
+    },
+    "target_branch": "9.0.0",
+    "target_project": {
+      "full_name": "cann/ops-cv",
+      "human_name": "CANN / ops-cv",
+      "id": 7657293,
+      "path": "ops-cv"
+    }
+  },
+  {
+    "additions": 21,
+    "blob_id": "a21b2e51eeda2be536b94ea21c8885a9052808cf",
+    "blob_url": "https://gitcode.com/cann/ops-cv/blob/cf0e781b6194103a295306326f5707d67215e53e/image/resize_bilinear_v2/tests/ut/op_host/arch35/test_resize_bilinear_v2_tiling.cpp",
+    "deletions": 21,
+    "filename": "image/resize_bilinear_v2/tests/ut/op_host/arch35/test_resize_bilinear_v2_tiling.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 21,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -35,7 +35,7 @@ protected:\n     }\n };\n \n-TEST_F(ResizeBilinearV2Tiling, resize_bilinear_v2_david_tiling_case01)\n+TEST_F(ResizeBilinearV2Tiling, resize_bilinear_v2_regbase_tiling_case01)\n {\n     optiling::ResizeBilinearV2CompileInfo compileInfo = {64, 245760};\n     gert::TilingContextPara tilingContextPara(\n@@ -61,7 +61,7 @@ TEST_F(ResizeBilinearV2Tiling, resize_bilinear_v2_david_tiling_case01)\n     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);\n }\n \n-TEST_F(ResizeBilinearV2Tiling, resize_bilinear_v2_david_tiling_case02)\n+TEST_F(ResizeBilinearV2Tiling, resize_bilinear_v2_regbase_tiling_case02)\n {\n     optiling::ResizeBilinearV2CompileInfo compileInfo = {64, 245760};\n     gert::TilingContextPara tilingContextPara(\n@@ -88,7 +88,7 @@ TEST_F(ResizeBilinearV2Tiling, resize_bilinear_v2_david_tiling_case02)\n     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);\n }\n \n-TEST_F(ResizeBilinearV2Tiling, resize_bilinear_v2_david_tiling_case03)\n+TEST_F(ResizeBilinearV2Tiling, resize_bilinear_v2_regbase_tiling_case03)\n {\n     optiling::ResizeBilinearV2CompileInfo compileInfo = {64, 245760};\n     gert::TilingContextPara tilingContextPara(\n@@ -114,7 +114,7 @@ TEST_F(ResizeBilinearV2Tiling, resize_bilinear_v2_david_tiling_case03)\n     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);\n }\n \n-TEST_F(ResizeBilinearV2Tiling, resize_bilinear_v2_david_tiling_case04)\n+TEST_F(ResizeBilinearV2Tiling, resize_bilinear_v2_regbase_tiling_case04)\n {\n     optiling::ResizeBilinearV2CompileInfo compileInfo = {64, 245760};\n     gert::TilingContextPara tilingContextPara(\n@@ -141,7 +141,7 @@ TEST_F(ResizeBilinearV2Tiling, resize_bilinear_v2_david_tiling_case04)\n     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);\n }\n \n-TEST_F(ResizeBilinearV2Tiling, resize_bilinear_v2_david_tiling_case05)\n+TEST_F(ResizeBilinearV2Tiling, resize_bilinear_v2_regbase_tiling_case05)\n {\n     optiling::ResizeBilinearV2CompileInfo compileInfo = {64, 245760};\n     gert::TilingContextPara tilingContextPara(\n@@ -167,7 +167,7 @@ TEST_F(ResizeBilinearV2Tiling, resize_bilinear_v2_david_tiling_case05)\n     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);\n }\n \n-TEST_F(ResizeBilinearV2Tiling, resize_bilinear_v2_david_tiling_case06)\n+TEST_F(ResizeBilinearV2Tiling, resize_bilinear_v2_regbase_tiling_case06)\n {\n     optiling::ResizeBilinearV2CompileInfo compileInfo = {64, 245760};\n     gert::TilingContextPara tilingContextPara(\n@@ -193,7 +193,7 @@ TEST_F(ResizeBilinearV2Tiling, resize_bilinear_v2_david_tiling_case06)\n     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);\n }\n \n-TEST_F(ResizeBilinearV2Tiling, resize_bilinear_v2_david_tiling_case07)\n+TEST_F(ResizeBilinearV2Tiling, resize_bilinear_v2_regbase_tiling_case07)\n {\n     optiling::ResizeBilinearV2CompileInfo compileInfo = {64, 245760};\n     gert::TilingContextPara tilingContextPara(\n@@ -219,7 +219,7 @@ TEST_F(ResizeBilinearV2Tiling, resize_bilinear_v2_david_tiling_case07)\n     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);\n }\n \n-TEST_F(ResizeBilinearV2Tiling, resize_bilinear_v2_david_tiling_case08)\n+TEST_F(ResizeBilinearV2Tiling, resize_bilinear_v2_regbase_tiling_case08)\n {\n     optiling::ResizeBilinearV2CompileInfo compileInfo = {64, 245760};\n     gert::TilingContextPara tilingContextPara(\n@@ -245,7 +245,7 @@ TEST_F(ResizeBilinearV2Tiling, resize_bilinear_v2_david_tiling_case08)\n     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);\n }\n \n-TEST_F(ResizeBilinearV2Tiling, resize_bilinear_v2_david_tiling_case09)\n+TEST_F(ResizeBilinearV2Tiling, resize_bilinear_v2_regbase_tiling_case09)\n {\n     optiling::ResizeBilinearV2CompileInfo compileInfo = {64, 245760};\n     gert::TilingContextPara tilingContextPara(\n@@ -271,7 +271,7 @@ TEST_F(ResizeBilinearV2Tiling, resize_bilinear_v2_david_tiling_case09)\n     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);\n }\n \n-TEST_F(ResizeBilinearV2Tiling, resize_bilinear_v2_david_tiling_case10)\n+TEST_F(ResizeBilinearV2Tiling, resize_bilinear_v2_regbase_tiling_case10)\n {\n     optiling::ResizeBilinearV2CompileInfo compileInfo = {64, 245760};\n     gert::TilingContextPara tilingContextPara(\n@@ -299,7 +299,7 @@ TEST_F(ResizeBilinearV2Tiling, resize_bilinear_v2_david_tiling_case10)\n     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);\n }\n \n-TEST_F(ResizeBilinearV2Tiling, resize_bilinear_v2_david_tiling_case11)\n+TEST_F(ResizeBilinearV2Tiling, resize_bilinear_v2_regbase_tiling_case11)\n {\n     optiling::ResizeBilinearV2CompileInfo compileInfo = {64, 245760};\n     gert::TilingContextPara tilingContextPara(\n@@ -323,7 +323,7 @@ TEST_F(ResizeBilinearV2Tiling, resize_bilinear_v2_david_tiling_case11)\n     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);\n }\n \n-TEST_F(ResizeBilinearV2Tiling, resize_bilinear_v2_david_tiling_case12)\n+TEST_F(ResizeBilinearV2Tiling, resize_bilinear_v2_regbase_tiling_case12)\n {\n     optiling::ResizeBilinearV2CompileInfo compileInfo = {64, 245760};\n     gert::TilingContextPara tilingContextPara(\n@@ -347,7 +347,7 @@ TEST_F(ResizeBilinearV2Tiling, resize_bilinear_v2_david_tiling_case12)\n     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);\n }\n \n-TEST_F(ResizeBilinearV2Tiling, resize_bilinear_v2_david_tiling_case13)\n+TEST_F(ResizeBilinearV2Tiling, resize_bilinear_v2_regbase_tiling_case13)\n {\n     optiling::ResizeBilinearV2CompileInfo compileInfo = {64, 245760};\n     gert::TilingContextPara tilingContextPara(\n@@ -371,7 +371,7 @@ TEST_F(ResizeBilinearV2Tiling, resize_bilinear_v2_david_tiling_case13)\n     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);\n }\n \n-TEST_F(ResizeBilinearV2Tiling, resize_bilinear_v2_david_tiling_case14)\n+TEST_F(ResizeBilinearV2Tiling, resize_bilinear_v2_regbase_tiling_case14)\n {\n     optiling::ResizeBilinearV2CompileInfo compileInfo = {64, 245760};\n     gert::TilingContextPara tilingContextPara(\n@@ -398,7 +398,7 @@ TEST_F(ResizeBilinearV2Tiling, resize_bilinear_v2_david_tiling_case14)\n     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);\n }\n \n-TEST_F(ResizeBilinearV2Tiling, resize_bilinear_v2_david_tiling_case15)\n+TEST_F(ResizeBilinearV2Tiling, resize_bilinear_v2_regbase_tiling_case15)\n {\n     optiling::ResizeBilinearV2CompileInfo compileInfo = {64, 245760};\n     gert::TilingContextPara tilingContextPara(\n@@ -425,7 +425,7 @@ TEST_F(ResizeBilinearV2Tiling, resize_bilinear_v2_david_tiling_case15)\n     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);\n }\n \n-TEST_F(ResizeBilinearV2Tiling, resize_bilinear_v2_david_tiling_case16)\n+TEST_F(ResizeBilinearV2Tiling, resize_bilinear_v2_regbase_tiling_case16)\n {\n     optiling::ResizeBilinearV2CompileInfo compileInfo = {64, 245760};\n     gert::TilingContextPara tilingContextPara(\n@@ -450,7 +450,7 @@ TEST_F(ResizeBilinearV2Tiling, resize_bilinear_v2_david_tiling_case16)\n     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);\n }\n \n-TEST_F(ResizeBilinearV2Tiling, resize_bilinear_v2_david_tiling_case17)\n+TEST_F(ResizeBilinearV2Tiling, resize_bilinear_v2_regbase_tiling_case17)\n {\n     optiling::ResizeBilinearV2CompileInfo compileInfo = {64, 245760};\n     gert::TilingContextPara tilingContextPara(\n@@ -477,7 +477,7 @@ TEST_F(ResizeBilinearV2Tiling, resize_bilinear_v2_david_tiling_case17)\n     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);\n }\n \n-TEST_F(ResizeBilinearV2Tiling, resize_bilinear_v2_david_fail_tiling_case01)\n+TEST_F(ResizeBilinearV2Tiling, resize_bilinear_v2_regbase_fail_tiling_case01)\n {\n     optiling::ResizeBilinearV2CompileInfo compileInfo = {64, 245760};\n     gert::TilingContextPara tilingContextPara(\n@@ -502,7 +502,7 @@ TEST_F(ResizeBilinearV2Tiling, resize_bilinear_v2_david_fail_tiling_case01)\n     ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED, expectTilingKey, expectTilingData, expectWorkspaces);\n }\n \n-TEST_F(ResizeBilinearV2Tiling, resize_bilinear_v2_david_fail_tiling_case02)\n+TEST_F(ResizeBilinearV2Tiling, resize_bilinear_v2_regbase_fail_tiling_case02)\n {\n     optiling::ResizeBilinearV2CompileInfo compileInfo = {64, 245760};\n     gert::TilingContextPara tilingContextPara(\n@@ -527,7 +527,7 @@ TEST_F(ResizeBilinearV2Tiling, resize_bilinear_v2_david_fail_tiling_case02)\n     ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED, expectTilingKey, expectTilingData, expectWorkspaces);\n }\n \n-TEST_F(ResizeBilinearV2Tiling, resize_bilinear_v2_david_fail_tiling_case03)\n+TEST_F(ResizeBilinearV2Tiling, resize_bilinear_v2_regbase_fail_tiling_case03)\n {\n     optiling::ResizeBilinearV2CompileInfo compileInfo = {64, 245760};\n     gert::TilingContextPara tilingContextPara(\n@@ -552,7 +552,7 @@ TEST_F(ResizeBilinearV2Tiling, resize_bilinear_v2_david_fail_tiling_case03)\n     ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED, expectTilingKey, expectTilingData, expectWorkspaces);\n }\n \n-TEST_F(ResizeBilinearV2Tiling, resize_bilinear_v2_david_fail_tiling_case04)\n+TEST_F(ResizeBilinearV2Tiling, resize_bilinear_v2_regbase_fail_tiling_case04)\n {\n     optiling::ResizeBilinearV2CompileInfo compileInfo = {64, 245760};\n     gert::TilingContextPara tilingContextPara(\n",
+      "new_file": false,
+      "new_path": "image/resize_bilinear_v2/tests/ut/op_host/arch35/test_resize_bilinear_v2_tiling.cpp",
+      "old_path": "image/resize_bilinear_v2/tests/ut/op_host/arch35/test_resize_bilinear_v2_tiling.cpp",
+      "removed_lines": 21,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-cv/raw/cf0e781b6194103a295306326f5707d67215e53e/image/resize_bilinear_v2/tests/ut/op_host/arch35/test_resize_bilinear_v2_tiling.cpp",
+    "sha": "cf0e781b6194103a295306326f5707d67215e53e",
+    "source_branch": "9.0.0",
+    "source_project": {
+      "full_name": "qy3311888/ops-cv",
+      "human_name": "qy3311888 / ops-cv",
+      "id": 8491431,
+      "path": "ops-cv"
+    },
+    "target_branch": "9.0.0",
+    "target_project": {
+      "full_name": "cann/ops-cv",
+      "human_name": "CANN / ops-cv",
+      "id": 7657293,
+      "path": "ops-cv"
+    }
+  },
+  {
+    "additions": 10,
+    "blob_id": "8af89aef3ca0a771fc344f576a0a42edef478b96",
+    "blob_url": "https://gitcode.com/cann/ops-cv/blob/cf0e781b6194103a295306326f5707d67215e53e/image/resize_bilinear_v2_grad/tests/ut/op_host/arch35/test_resize_bilinear_v2_grad_tiling.cpp",
+    "deletions": 10,
+    "filename": "image/resize_bilinear_v2_grad/tests/ut/op_host/arch35/test_resize_bilinear_v2_grad_tiling.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 10,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -36,7 +36,7 @@ protected:\n     }\n };\n \n-TEST_F(ResizeBilinearV2GradTiling, resize_bilinear_v2_grad_david_tiling_case01)\n+TEST_F(ResizeBilinearV2GradTiling, resize_bilinear_v2_grad_regbase_tiling_case01)\n {\n     optiling::ResizeBilinearV2GradCompileInfo compileInfo = {64, 245760};\n     gert::TilingContextPara tilingContextPara(\n@@ -61,7 +61,7 @@ TEST_F(ResizeBilinearV2GradTiling, resize_bilinear_v2_grad_david_tiling_case01)\n     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);\n }\n \n-TEST_F(ResizeBilinearV2GradTiling, resize_bilinear_v2_grad_david_tiling_case02)\n+TEST_F(ResizeBilinearV2GradTiling, resize_bilinear_v2_grad_regbase_tiling_case02)\n {\n     optiling::ResizeBilinearV2GradCompileInfo compileInfo = {64, 245760};\n     gert::TilingContextPara tilingContextPara(\n@@ -86,7 +86,7 @@ TEST_F(ResizeBilinearV2GradTiling, resize_bilinear_v2_grad_david_tiling_case02)\n     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);\n }\n \n-TEST_F(ResizeBilinearV2GradTiling, resize_bilinear_v2_grad_david_tiling_case03)\n+TEST_F(ResizeBilinearV2GradTiling, resize_bilinear_v2_grad_regbase_tiling_case03)\n {\n     optiling::ResizeBilinearV2GradCompileInfo compileInfo = {64, 245760};\n     gert::TilingContextPara tilingContextPara(\n@@ -111,7 +111,7 @@ TEST_F(ResizeBilinearV2GradTiling, resize_bilinear_v2_grad_david_tiling_case03)\n     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);\n }\n \n-TEST_F(ResizeBilinearV2GradTiling, resize_bilinear_v2_grad_david_tiling_case04)\n+TEST_F(ResizeBilinearV2GradTiling, resize_bilinear_v2_grad_regbase_tiling_case04)\n {\n     optiling::ResizeBilinearV2GradCompileInfo compileInfo = {64, 245760};\n     gert::TilingContextPara tilingContextPara(\n@@ -136,7 +136,7 @@ TEST_F(ResizeBilinearV2GradTiling, resize_bilinear_v2_grad_david_tiling_case04)\n     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);\n }\n \n-TEST_F(ResizeBilinearV2GradTiling, resize_bilinear_v2_grad_david_tiling_case05)\n+TEST_F(ResizeBilinearV2GradTiling, resize_bilinear_v2_grad_regbase_tiling_case05)\n {\n     optiling::ResizeBilinearV2GradCompileInfo compileInfo = {64, 245760};\n     gert::TilingContextPara tilingContextPara(\n@@ -161,7 +161,7 @@ TEST_F(ResizeBilinearV2GradTiling, resize_bilinear_v2_grad_david_tiling_case05)\n     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);\n }\n \n-TEST_F(ResizeBilinearV2GradTiling, resize_bilinear_v2_grad_david_tiling_case06)\n+TEST_F(ResizeBilinearV2GradTiling, resize_bilinear_v2_grad_regbase_tiling_case06)\n {\n     optiling::ResizeBilinearV2GradCompileInfo compileInfo = {64, 245760};\n     gert::TilingContextPara tilingContextPara(\n@@ -186,7 +186,7 @@ TEST_F(ResizeBilinearV2GradTiling, resize_bilinear_v2_grad_david_tiling_case06)\n     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);\n }\n \n-TEST_F(ResizeBilinearV2GradTiling, resize_bilinear_v2_grad_david_tiling_case07)\n+TEST_F(ResizeBilinearV2GradTiling, resize_bilinear_v2_grad_regbase_tiling_case07)\n {\n     optiling::ResizeBilinearV2GradCompileInfo compileInfo = {64, 245760};\n     gert::TilingContextPara tilingContextPara(\n@@ -211,7 +211,7 @@ TEST_F(ResizeBilinearV2GradTiling, resize_bilinear_v2_grad_david_tiling_case07)\n     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);\n }\n \n-TEST_F(ResizeBilinearV2GradTiling, resize_bilinear_v2_grad_david_tiling_case08)\n+TEST_F(ResizeBilinearV2GradTiling, resize_bilinear_v2_grad_regbase_tiling_case08)\n {\n     optiling::ResizeBilinearV2GradCompileInfo compileInfo = {64, 245760};\n     gert::TilingContextPara tilingContextPara(\n@@ -236,7 +236,7 @@ TEST_F(ResizeBilinearV2GradTiling, resize_bilinear_v2_grad_david_tiling_case08)\n     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);\n }\n \n-TEST_F(ResizeBilinearV2GradTiling, resize_bilinear_v2_grad_david_tiling_case09)\n+TEST_F(ResizeBilinearV2GradTiling, resize_bilinear_v2_grad_regbase_tiling_case09)\n {\n     optiling::ResizeBilinearV2GradCompileInfo compileInfo = {64, 245760};\n     gert::TilingContextPara tilingContextPara(\n@@ -260,7 +260,7 @@ TEST_F(ResizeBilinearV2GradTiling, resize_bilinear_v2_grad_david_tiling_case09)\n     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);\n }\n \n-TEST_F(ResizeBilinearV2GradTiling, resize_bilinear_v2_grad_david_tiling_case10)\n+TEST_F(ResizeBilinearV2GradTiling, resize_bilinear_v2_grad_regbase_tiling_case10)\n {\n     optiling::ResizeBilinearV2GradCompileInfo compileInfo = {64, 245760};\n     gert::TilingContextPara tilingContextPara(\n",
+      "new_file": false,
+      "new_path": "image/resize_bilinear_v2_grad/tests/ut/op_host/arch35/test_resize_bilinear_v2_grad_tiling.cpp",
+      "old_path": "image/resize_bilinear_v2_grad/tests/ut/op_host/arch35/test_resize_bilinear_v2_grad_tiling.cpp",
+      "removed_lines": 10,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-cv/raw/cf0e781b6194103a295306326f5707d67215e53e/image/resize_bilinear_v2_grad/tests/ut/op_host/arch35/test_resize_bilinear_v2_grad_tiling.cpp",
+    "sha": "cf0e781b6194103a295306326f5707d67215e53e",
+    "source_branch": "9.0.0",
+    "source_project": {
+      "full_name": "qy3311888/ops-cv",
+      "human_name": "qy3311888 / ops-cv",
+      "id": 8491431,
+      "path": "ops-cv"
+    },
+    "target_branch": "9.0.0",
+    "target_project": {
+      "full_name": "cann/ops-cv",
+      "human_name": "CANN / ops-cv",
+      "id": 7657293,
+      "path": "ops-cv"
+    }
+  }
+]

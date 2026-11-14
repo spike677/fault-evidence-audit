@@ -1,0 +1,73 @@
+{
+  "assignee": {
+    "html_url": "https://gitcode.com/kangjiaming",
+    "id": "68d526e13ea9c30418185fd9",
+    "login": "kangjiaming",
+    "name": "kangjiaming",
+    "object_id": "68d526e13ea9c30418185fd9"
+  },
+  "assignees": [
+    {
+      "html_url": "https://gitcode.com/kangjiaming",
+      "id": "68d526e13ea9c30418185fd9",
+      "login": "kangjiaming",
+      "name": "kangjiaming",
+      "object_id": "68d526e13ea9c30418185fd9"
+    }
+  ],
+  "body": "\n\nThanks for sending an issue! Please fill in the following template to help quickly solve your problem.\n\n\n\n####  一、问题描述 （必填）\n\n`expint`（指数积分 Ei(x)）算子在 Ascend950（arch35）上对部分输入输出结果异常，表现为出现 `inf`/`NaN` 或精度明显偏差。根因有以下几个方面：\n\n1. **大输入 `x` 时 `exp(x)` 浮点上溢**\n   `Compute` 中调用 `Exp(tmp2, xFp32, n)` 计算 e^x，当 `x > 88` 时 `exp(x)` 超过 FP32 最大值（`exp(89) > FLT_MAX`），结果变为 `inf`，进而污染后续 `e^x/x`、乘法等运算，最终输出 `inf`/`NaN`。原实现未对 `x` 做上界钳位。\n\n2. **FP16/BF16 输出 Cast 溢出**\n   `ProcessFp16Bf16` 中将 FP32 计算结果直接 `Cast` 到 FP16/BF16。当 FP32 结果超过目标 dtype 表示范围（FP16 上限 65504.0，BF16 上限约 3.39e38）时，Cast 产出 `inf`，导致输出错误。原实现未在 Cast 前对 FP32 结果做范围钳位。\n\n3. **`resultBuf` 在 Ascend950 上异常**\n   `Compute` 原使用 `resultBuf` 作为结果缓冲，在 Ascend950 上存在异常（数据错误），需改用 `yLocal` 作为结果缓冲。\n\n4. **近零阈值过严导致小值精度损失**\n   `ApplyBoundaries` 中原使用 `NEAR_ZERO_THRESHOLD = 1e-10f` 配合 `Abs(x) <= 1e-10` 判定零点并置结果为 `-inf`。该阈值过严，会把 `1e-9` 等合法小值误判为零，导致这些点结果错误地变成 `-inf`。应改为精确判等 `x == 0.0f`。\n\n5. **对齐填充区未初始化导致 NaN 污染**\n   `CopyIn` 中 `DataCopy` 仅搬运 `currentNum` 个有效元素，但 UB 对齐到 `CMP_ALIGN`(64) 后尾部填充区为未初始化内存，参与向量运算后会引入 `NaN`/随机值，污染有效结果。需在 `DataCopy` 前用合法值（如 1.0f）填充整个对齐区间。\n\n6. **算子注册符号可见性缺失**\n   `IMPL_OP_OPTILING(Expint)` 注册缺少 `__attribute__((visibility(\"default\")))`，可能导致动态链接时符号不可见。\n\n####  二、环境信息 （可选）\n- 昇腾硬件型号：Ascend950（arch35）\n- 算子路径：`math/expint`\n- 涉及文件：`op_kernel/expint_kernel.h`、`op_host/arch35/expint_tiling_arch35.cpp`\n\n####  三、重现步骤 （可选）\n1. 在 Ascend950 上以 FP32 dtype 调用 `expint`，输入包含 `x > 88` 的大值（如 90、100），观察输出是否为 `inf`/`NaN`。\n2. 以 FP16 dtype 调用 `expint`，输入使结果超过 65504 的较大 `x`，观察 Cast 后输出是否溢出为 `inf`。\n3. 以 FP32 调用，输入 `x` 取较小但大于 1e-10 的值（如 1e-9、1e-8），观察结果是否被错误置为 `-inf`。\n4. 以非 64 整数倍长度的输入调用，观察对齐尾部是否引入 `NaN` 污染有效结果。\n\n####  四、预期结果 （可选）\n1. 大输入 `x`（`x > 88`）时，`expint` 应对 `x` 钳位至 88.0 后计算，输出有限值而非 `inf`/`NaN`。\n2. FP16/BF16 输出时，FP32 结果应在 Cast 前钳位到目标 dtype 范围，避免溢出为 `inf`。\n3. `x` 为合法小值（如 1e-9）时应正常计算，仅 `x == 0` 精确判定时置为 `-inf`。\n4. 非 64 对齐长度的输入不应因填充区未初始化而产生 `NaN` 污染。\n5. `Compute` 应使用 `yLocal` 作为结果缓冲，规避 `resultBuf` 在 Ascend950 上的异常。\n\n💡 备注（选填）\n对应修复 PR：https://gitcode.com/cann/ops-math/pull/4165 （`fix expint bug`）。修复要点：引入 `EXP_CLAMP=88.0f` 钳位 x；`CopyIn` 中以 1.0f 预填充对齐区；`ApplyBoundaries` 改为 `x==0.0f` 精确判等；`Compute` 改用 `yLocal` 并内联各区间 Select 合并逻辑；`ProcessFp16Bf16` 在 Cast 前按目标 dtype 上限钳位；`BUFFER_NUM_FP32` 由 8 调整为 9（新增 `initBuf`）；注册补 `visibility(\"default\")`。\n\n",
+  "comments": 1,
+  "created_at": "2026-07-27T15:56:45+08:00",
+  "finished_at": "2026-08-03T16:20:35+08:00",
+  "html_url": "https://gitcode.com/cann/ops-math/issues/2383",
+  "id": 4197458,
+  "issue_priority_detail": {
+    "id": 116,
+    "title": "无优先级"
+  },
+  "issue_state": "进行中",
+  "issue_state_detail": {
+    "id": 285,
+    "serial": 0,
+    "title": "进行中"
+  },
+  "issue_type": "任务",
+  "issue_type_detail": {
+    "id": 255,
+    "is_system": false,
+    "title": "任务"
+  },
+  "labels": [
+    {
+      "color": "#35e029",
+      "created_at": "2026-03-20T11:25:13+08:00",
+      "id": 38861,
+      "name": "resolved",
+      "updated_at": "2026-08-03T18:32:53+08:00"
+    }
+  ],
+  "number": "2383",
+  "priority": 0,
+  "repository": {
+    "assigner": {},
+    "created_at": "2025-09-25T16:01:52+08:00",
+    "description": "本项目是CANN提供的数学类基础计算算子库，实现网络在NPU上加速计算。",
+    "full_name": "cann/ops-math",
+    "id": 7649531,
+    "name": "ops-math",
+    "paas": "",
+    "path": "ops-math",
+    "updated_at": "2025-09-25T16:05:53+08:00"
+  },
+  "state": "closed",
+  "title": "[Bug-Report|缺陷反馈]: expint算子在 Ascend950（arch35）上对部分输入输出结果异常，表现为出现 inf`/NaN或精度明显偏差问题",
+  "updated_at": "2026-08-03T16:20:35+08:00",
+  "user": {
+    "html_url": "https://gitcode.com/kangjiaming",
+    "id": "68d526e13ea9c30418185fd9",
+    "login": "kangjiaming",
+    "name": "kangjiaming",
+    "object_id": "68d526e13ea9c30418185fd9"
+  },
+  "visibility_reason": "public"
+}

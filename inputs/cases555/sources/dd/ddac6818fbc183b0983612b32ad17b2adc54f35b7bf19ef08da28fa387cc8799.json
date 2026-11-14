@@ -1,0 +1,38 @@
+[
+  {
+    "additions": 5,
+    "blob_id": "0a293b476bd83029805ed7b5c10fc7f55f5dfb12",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/13b7632c49069a73a2f01f7ee8539311bba2596d/attention/common/op_kernel/load_balance/section_stream_k/section_stream_k_impl.h",
+    "deletions": 0,
+    "filename": "attention/common/op_kernel/load_balance/section_stream_k/section_stream_k_impl.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 5,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -484,6 +484,11 @@ inline Range<uint32_t> SectionStreamKImpl::CalcS2Range(uint32_t s1GIdx, const IB\n     s2Start = static_cast<uint32_t>(s2FirstToken) / m_param.s2BaseSize;\r\n     s2End = ToOpenInterval(static_cast<uint32_t>(s2LastToken) / m_param.s2BaseSize); // end of block index\r\n \r\n+    // Mask line passed through the left down point of the last block, the last block is actually all masked\r\n+    if (s2LastToken % m_param.s2BaseSize == 0) {\r\n+        s2End--;\r\n+    }\r\n+\r\n     return std::make_pair(s2Start, s2End);\r\n }\r\n \r\n",
+      "new_file": false,
+      "new_path": "attention/common/op_kernel/load_balance/section_stream_k/section_stream_k_impl.h",
+      "old_path": "attention/common/op_kernel/load_balance/section_stream_k/section_stream_k_impl.h",
+      "removed_lines": 0,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/13b7632c49069a73a2f01f7ee8539311bba2596d/attention/common/op_kernel/load_balance/section_stream_k/section_stream_k_impl.h",
+    "sha": "13b7632c49069a73a2f01f7ee8539311bba2596d",
+    "source_branch": "master",
+    "source_project": {
+      "full_name": "ChengjiaWu/ops-transformer",
+      "human_name": "ChengjiaWu / ops-transformer",
+      "id": 7869312,
+      "path": "ops-transformer"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  }
+]

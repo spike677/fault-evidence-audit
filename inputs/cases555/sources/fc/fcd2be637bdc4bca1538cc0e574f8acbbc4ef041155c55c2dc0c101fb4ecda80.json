@@ -1,0 +1,74 @@
+[
+  {
+    "additions": 46,
+    "blob_id": "3c409bbfcd672b2d80f66ba00d138ccc58659414",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/a4f5a0eaa55f77648d3dc698c1e0653167e3e83b/attention/common/op_kernel/arch35/flash_attention_noquant_block_vec_infer.h",
+    "deletions": 8,
+    "filename": "attention/common/op_kernel/arch35/flash_attention_noquant_block_vec_infer.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 46,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -414,7 +414,7 @@ __aicore__ inline void FANoQuantBlockVecInfer<TEMPLATE_ARGS>::SoftmaxDataCopyOut\n         return;\n     }\n     if (constInfo.learnableSinkFlag) {\n-        if (constInfo.isGqa) {\n+        if (constInfo.isGqa && constInfo.gSize > 1) {\n             this->Vec1SinkComputeGSFused(runInfo, constInfo, sumUb, maxUb);\n         } else {\n             this->Vec1SinkCompute(runInfo, constInfo, sumUb, maxUb);\n@@ -450,15 +450,53 @@ TEMPLATES_DEF_NO_DEFAULT\n __aicore__ inline void FANoQuantBlockVecInfer<TEMPLATE_ARGS>::CopySinkIn(RunInfo<isInfer> &runInfo, ConstInfo<isInfer, hasRope> &constInfo)\n {\n     LocalTensor<INPUT_T> sinkUbBf16 = sinkQue.AllocTensor<INPUT_T>();\n-    int64_t sinkOffset = runInfo.n2oIdx * constInfo.gSize + constInfo.subBlockIdx * runInfo.halfS1RealSize;\n     DataCopyExtParams sinkCopyParams;\n-    sinkCopyParams.blockCount = 1; // 进行一次连续拷贝\n-    sinkCopyParams.blockLen = runInfo.halfS1RealSize * sizeof(INPUT_T); // 实际需要拷贝的字节数\n-    sinkCopyParams.srcStride = 0; // 源地址连续\n-    sinkCopyParams.dstStride = 0; // 目的地址连续\n-\n     DataCopyPadExtParams<INPUT_T> sinkCopyPadParams{};\n-    DataCopyPad(sinkUbBf16, this->sinkGm[sinkOffset], sinkCopyParams, sinkCopyPadParams);\n+    uint32_t copyOffset = 0;\n+    uint32_t dealCount = runInfo.halfS1RealSize;\n+    int64_t sinkBaseOffset = runInfo.n2oIdx * constInfo.gSize;\n+\n+    sinkCopyParams.blockCount = 1;\n+    sinkCopyParams.srcStride = 0;\n+    sinkCopyParams.dstStride = 0;\n+\n+    if constexpr (layout == LayOutTypeEnum::LAYOUT_TND || layout == LayOutTypeEnum::LAYOUT_BSH ||\n+                  layout == LayOutTypeEnum::LAYOUT_SBH) {\n+        uint32_t gOffset = static_cast<uint32_t>(runInfo.sOuterOffset % constInfo.gSize);\n+        while (copyOffset < dealCount) {\n+            uint32_t copyLen = dealCount - copyOffset;\n+            uint32_t gRemain = constInfo.gSize - gOffset;\n+            copyLen = copyLen < gRemain ? copyLen : gRemain;\n+            sinkCopyParams.blockLen = copyLen * sizeof(INPUT_T);\n+            DataCopyPad(sinkUbBf16[copyOffset], this->sinkGm[sinkBaseOffset + gOffset], sinkCopyParams,\n+                        sinkCopyPadParams);\n+            copyOffset += copyLen;\n+            gOffset = 0;\n+        }\n+    } else if (runInfo.actualS1Size == 1) {\n+        uint32_t gOffset = static_cast<uint32_t>(runInfo.sOuterOffset % constInfo.gSize);\n+        while (copyOffset < dealCount) {\n+            uint32_t copyLen = dealCount - copyOffset;\n+            uint32_t gRemain = constInfo.gSize - gOffset;\n+            copyLen = copyLen < gRemain ? copyLen : gRemain;\n+            sinkCopyParams.blockLen = copyLen * sizeof(INPUT_T);\n+            DataCopyPad(sinkUbBf16[copyOffset], this->sinkGm[sinkBaseOffset + gOffset], sinkCopyParams,\n+                        sinkCopyPadParams);\n+            copyOffset += copyLen;\n+            gOffset = 0;\n+        }\n+    } else {\n+        while (copyOffset < dealCount) {\n+            int64_t gs1Offset = runInfo.sOuterOffset + copyOffset;\n+            uint32_t gOffset = static_cast<uint32_t>((gs1Offset / runInfo.actualS1Size) % constInfo.gSize);\n+            uint32_t s1Remain = static_cast<uint32_t>(runInfo.actualS1Size - gs1Offset % runInfo.actualS1Size);\n+            uint32_t copyLen = dealCount - copyOffset;\n+            copyLen = copyLen < s1Remain ? copyLen : s1Remain;\n+            auto sinkRaw = this->sinkGm.GetValue(sinkBaseOffset + gOffset);\n+            Duplicate(sinkUbBf16[copyOffset], sinkRaw, copyLen);\n+            copyOffset += copyLen;\n+        }\n+    }\n     sinkQue.EnQue(sinkUbBf16);\n }\n \n",
+      "new_file": false,
+      "new_path": "attention/common/op_kernel/arch35/flash_attention_noquant_block_vec_infer.h",
+      "old_path": "attention/common/op_kernel/arch35/flash_attention_noquant_block_vec_infer.h",
+      "removed_lines": 8,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/a4f5a0eaa55f77648d3dc698c1e0653167e3e83b/attention/common/op_kernel/arch35/flash_attention_noquant_block_vec_infer.h",
+    "sha": "a4f5a0eaa55f77648d3dc698c1e0653167e3e83b",
+    "source_branch": "9.1.0-beta.2",
+    "source_project": {
+      "full_name": "mayday773/ops-transformer_3083",
+      "human_name": "mayday773 / ops-transformer_3083",
+      "id": 9925284,
+      "path": "ops-transformer_3083"
+    },
+    "target_branch": "9.1.0-beta.2",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  },
+  {
+    "additions": 2,
+    "blob_id": "97ab11a52b3815520c7352afa4678e6c4416e0a2",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/a4f5a0eaa55f77648d3dc698c1e0653167e3e83b/attention/common/op_kernel/arch35/util_regbase.h",
+    "deletions": 1,
+    "filename": "attention/common/op_kernel/arch35/util_regbase.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 2,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -24,6 +24,7 @@ using AscendC::QuePosition;\n namespace regbaseutil {\n constexpr uint16_t regBytes = 256;\n constexpr int64_t MAX_PRE_NEXT_TOKENS = 0x7FFFFFFF;\n+constexpr float SINK_MIN_INF = -3.40E+38;\n enum class VselrIndexEnum {GT_64_AND_LTE_128_INDEX = 0, GT_0_AND_LTE_64_INDEX = 1, DN_INDEX = 2, NZ_INDEX = 3};\n enum class DTemplateType {\n     Aligned16 = 16,\n@@ -296,7 +297,7 @@ struct RunInfo<false> {\n     int64_t matmulMSize;     /* 在matmul运算中，左矩阵的M轴大小需要区分GS1合轴与不合轴的情况 */ \\\n     bool learnableSinkFlag = false; /* attentionsink */ \\\n     float pScale;\\\n-    float sinkValue = 0.0f;\n+    float sinkValue = SINK_MIN_INF;\n \n \n #define ROPE_INFO \\\n",
+      "new_file": false,
+      "new_path": "attention/common/op_kernel/arch35/util_regbase.h",
+      "old_path": "attention/common/op_kernel/arch35/util_regbase.h",
+      "removed_lines": 1,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/a4f5a0eaa55f77648d3dc698c1e0653167e3e83b/attention/common/op_kernel/arch35/util_regbase.h",
+    "sha": "a4f5a0eaa55f77648d3dc698c1e0653167e3e83b",
+    "source_branch": "9.1.0-beta.2",
+    "source_project": {
+      "full_name": "mayday773/ops-transformer_3083",
+      "human_name": "mayday773 / ops-transformer_3083",
+      "id": 9925284,
+      "path": "ops-transformer_3083"
+    },
+    "target_branch": "9.1.0-beta.2",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  }
+]

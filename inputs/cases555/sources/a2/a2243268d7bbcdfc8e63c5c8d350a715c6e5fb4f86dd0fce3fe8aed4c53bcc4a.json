@@ -1,0 +1,74 @@
+[
+  {
+    "additions": 5,
+    "blob_id": "128a762738a5e418cb6174a6c35d23d635b7797a",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/aa5ab681fb8a5313316ae84d079d58ac3f3f890e/attention/fused_infer_attention_score/op_host/arch35/fused_infer_attention_score_tiling_impl.cpp",
+    "deletions": 0,
+    "filename": "attention/fused_infer_attention_score/op_host/arch35/fused_infer_attention_score_tiling_impl.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 5,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -103,6 +103,11 @@ void FusedInferAttentionScoreTilingImpl::SetIsIFA(const FiaTilingInfo &fiaInfo)\n \n void FusedInferAttentionScoreTilingImpl::SetGSMerge(const FiaTilingInfo &fiaInfo)\n {\n+    // 非量化场景且存在公共前缀时，禁用gs1合轴\n+    if (fiaInfo.quantMode == FiaQuantMode::NO_QUANT && fiaInfo.sysPrefixFlag) {\n+        gsMergeFlag_ = false;\n+        return;\n+    }\n     if (fiaInfo.mlaMode == MlaMode::ROPE_SPLIT_D512) {\n         gsMergeFlag_ = true;\n         return;\n",
+      "new_file": false,
+      "new_path": "attention/fused_infer_attention_score/op_host/arch35/fused_infer_attention_score_tiling_impl.cpp",
+      "old_path": "attention/fused_infer_attention_score/op_host/arch35/fused_infer_attention_score_tiling_impl.cpp",
+      "removed_lines": 0,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/aa5ab681fb8a5313316ae84d079d58ac3f3f890e/attention/fused_infer_attention_score/op_host/arch35/fused_infer_attention_score_tiling_impl.cpp",
+    "sha": "aa5ab681fb8a5313316ae84d079d58ac3f3f890e",
+    "source_branch": "fix/disable-gsmerge-prefix-9.1.0",
+    "source_project": {
+      "full_name": "haijie_699874/ops-transformer",
+      "human_name": "haijie_699874 / ops-transformer",
+      "id": 8094623,
+      "path": "ops-transformer"
+    },
+    "target_branch": "9.1.0",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  },
+  {
+    "additions": 2,
+    "blob_id": "bbe31c39c3df354d85afab67ebc5f264f0d3067e",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/aa5ab681fb8a5313316ae84d079d58ac3f3f890e/torch_extension/cann_ops_transformer/docs/zh/flash_attn.md",
+    "deletions": 2,
+    "filename": "torch_extension/cann_ops_transformer/docs/zh/flash_attn.md",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 2,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -152,8 +152,8 @@ flash_attn(\n | 参数名 | 参数类型 | 可选/必选 | 描述 | 数据类型 | 数据格式 | 维度 |\n | :--- | :--- | :--- | :--- | :--- | :--- | :--- |\n | q | Tensor | 必选 | 公式中的q | bfloat16/float16 | ND | <ul><li>(B, Q_S, Q_N, D)</li><li>(B, Q_N, Q_S, D)</li><li>(Q_T, Q_N, D)</li></ul>\n-| k | Tensor | 必选 | 公式中的k | bfloat16/float16 | ND | <ul><li>(B, KV_S, KV_N, D)</li><li>(B, KV_N, KV_S, D)</li><li>(KV_T, KV_N, D)</li><li>(num_blocks, block_size, KV_N, D)</li><li>(num_blocks, KV_N, block_size, D)</li></ul>\n-| v | Tensor | 必选 | 公式中的v | bfloat16/float16 | ND | <ul><li>(B, KV_S, KV_N, D)</li><li>(B, KV_N, KV_S, D)</li><li>(KV_T, KV_N, D)</li><li>(num_blocks, block_size, KV_N, D)</li><li>(num_blocks, KV_N, block_size, D)</li></ul>\n+| k | Tensor | 必选 | 公式中的k | bfloat16/float16 | ND | <ul><li>(B, KV_S, KV_N, D)</li><li>(B, KV_N, KV_S, D)</li><li>(KV_T, KV_N, D)</li><li>(num_blocks, block_size, KV_N, D)</li><li>(num_blocks, KV_N, block_size, D)</li><li>(num_blocks, KV_N, D//16, block_size, 16)</li></ul>\n+| v | Tensor | 必选 | 公式中的v | bfloat16/float16 | ND | <ul><li>(B, KV_S, KV_N, D)</li><li>(B, KV_N, KV_S, D)</li><li>(KV_T, KV_N, D)</li><li>(num_blocks, block_size, KV_N, D)</li><li>(num_blocks, KV_N, block_size, D)</li><li>(num_blocks, KV_N, D//16, block_size, 16)</li></ul>\n | block_table | Tensor | 可选 | 用于分块注意力计算中的块索引映射 | int32 | ND | (B, max_num_blocks_per_seq)\n | cu_seqlens_q | Tensor | 可选 | 累积序列长度，用于处理变长序列，第一个元素必须为0 | int32 | ND | (B+1,)\n | cu_seqlens_kv | Tensor | 可选 | 累积序列长度，用于处理变长序列，第一个元素必须为0 | int32 | ND | (B+1,)\n",
+      "new_file": false,
+      "new_path": "torch_extension/cann_ops_transformer/docs/zh/flash_attn.md",
+      "old_path": "torch_extension/cann_ops_transformer/docs/zh/flash_attn.md",
+      "removed_lines": 2,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/aa5ab681fb8a5313316ae84d079d58ac3f3f890e/torch_extension/cann_ops_transformer/docs/zh/flash_attn.md",
+    "sha": "aa5ab681fb8a5313316ae84d079d58ac3f3f890e",
+    "source_branch": "fix/disable-gsmerge-prefix-9.1.0",
+    "source_project": {
+      "full_name": "haijie_699874/ops-transformer",
+      "human_name": "haijie_699874 / ops-transformer",
+      "id": 8094623,
+      "path": "ops-transformer"
+    },
+    "target_branch": "9.1.0",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  }
+]

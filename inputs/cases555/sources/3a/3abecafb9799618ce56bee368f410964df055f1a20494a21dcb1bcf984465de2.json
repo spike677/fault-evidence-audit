@@ -1,0 +1,50 @@
+[
+  {
+    "author": {
+      "html_url": "https://gitcode.com/wuxiyuan",
+      "id": "68ca5a04d94db731d1dc6287",
+      "login": "wuxiyuan",
+      "name": "wuxiyuan",
+      "object_id": "68ca5a04d94db731d1dc6287"
+    },
+    "co_authors": [
+      {
+        "email": "wuxiyuan@huawei.com",
+        "html_url": "https://gitcode.com/wuxiyuan",
+        "id": "68ca5a04d94db731d1dc6287",
+        "login": "wuxiyuan",
+        "name": "wuxiyuan",
+        "object_id": "68ca5a04d94db731d1dc6287"
+      }
+    ],
+    "commit": {
+      "author": {
+        "date": "2026-07-04T10:29:03+08:00",
+        "email": "wuxiyuan@huawei.com",
+        "login": "wuxiyuan",
+        "name": "wuxiyuan"
+      },
+      "committer": {
+        "email": "huangxiaobin1@huawei.com",
+        "login": "ConanHuang",
+        "name": "ConanHuang"
+      },
+      "message": "修复MoeInitRoutingV3算子部分场景精度失败问题\n\nCo-authored-by: wuxiyuan<wuxiyuan@huawei.com>\n\n\n\n# message auto-generated for no-merge-commit merge:\n!8173 merge master into master\n\n修复MoeInitRoutingV3算子部分场景精度失败问题\n\nCreated-by: wuxiyuan\nCommit-by: wuxiyuan\nMerged-by: cann-robot\nDescription: ## 描述\n<!--在这里详细描述你的改动，包括改动的原因和所采取的方法。-->\n修复MoeInitRoutingV3算子部分场景精度失败问题\n\n### 根因分析\n`moe_v3_gather_static_quant.h` 中 `floatQueue_` 的 Buffer 初始化大小计算存在缺陷：\n\n- 原逻辑：`AlignBytes(perLoopCols_, sizeof(float))` 直接按 `perLoopCols_` 计算，未考虑数据类型 T 的对齐\n- 当 `perLoopCols_` 未按 T 类型大小对齐时，分配的 Buffer 空间不足，导致后续计算精度异常\n\n### 修复方案\n在 `AlignBytes` 之前增加 `Align(perLoopCols_, sizeof(T))`，确保先按数据类型 T 对齐，再按 float 字节要求对齐：\n\n```cpp\n// 修复前\npipe_->InitBuffer(floatQueue_, 1, AlignBytes(perLoopCols_, sizeof(float)));\n\n// 修复后\npipe_->InitBuffer(floatQueue_, 1, AlignBytes(Align(perLoopCols_, sizeof(T)), sizeof(float)));\n```\n\n## 关联的Issue\n<!-- 如果这个PR是为了解决特定的Issue，请在这里提供Issue链接。例如：关联Issue #000-->\n<!-- 如果这个PR是为了解决特定的问题单，请在这里描述问题单单号。-->\nhttps://gitcode.com/cann/ops-transformer/issues/3554\n\n## 测试\n<!--描述进行了哪些测试来验证你的改动。包括但不限于二级冒烟、算子泛化等。-->\n完成自验证\n\n## 文档更新\n<!--如果这个PR包含文档的更新，请在这里指出。例如：更新了README.md文件。-->\n无\n\n## 类型标签\n<!--  [x] 表示选中 -->\n- [x] 🐛 Bug修复\n- [ ] ✨ 新特性\n- [ ] ⚡ 性能优化\n- [ ] ♻️ 重构\n- [ ] 🧪 测试\n- [ ] 📦 构建/CI\n- [ ] 🔧 配置变更\n- [ ] 📝 文档更新\n- [ ] ⬆️ 依赖升级\n- [ ] 🔒 安全修复\n- [ ] 🧹 代码清理\n- [ ] ❓ 其他，请描述：\n\n\n\nSee merge request: cann/ops-transformer!8173"
+    },
+    "committer": {
+      "html_url": "https://gitcode.com/ConanHuang",
+      "id": "64f822575e2b21580f84e6f1",
+      "login": "ConanHuang",
+      "name": "黄晓彬",
+      "object_id": "64f822575e2b21580f84e6f1"
+    },
+    "html_url": "https://gitcode.com/cann/ops-transformer/commit/c843eb90851de0d5f1c320d8295f37ffb86d1d8e",
+    "parents": {
+      "sha": "659666fc04267cee2c2378a78001f06ca8c95ae0",
+      "shas": [
+        "659666fc04267cee2c2378a78001f06ca8c95ae0"
+      ]
+    },
+    "sha": "c843eb90851de0d5f1c320d8295f37ffb86d1d8e"
+  }
+]

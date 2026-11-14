@@ -1,0 +1,80 @@
+{
+  "assignee": {
+    "html_url": "https://gitcode.com/huang-wei-chen",
+    "id": "6822d7c960184036954b1709",
+    "login": "huang-wei-chen",
+    "name": "huang-wei-chen",
+    "object_id": "6822d7c960184036954b1709"
+  },
+  "assignees": [
+    {
+      "html_url": "https://gitcode.com/huang-wei-chen",
+      "id": "6822d7c960184036954b1709",
+      "login": "huang-wei-chen",
+      "name": "huang-wei-chen",
+      "object_id": "6822d7c960184036954b1709"
+    }
+  ],
+  "body": "\n\nThanks for sending an issue! Please fill in the following template to help quickly solve your problem.\n\n### Describe the current behavior / 问题描述 (Mandatory / 必填)\n            \nGatherElementsV2算子非尾轴场景\t，且除收集轴外其余轴shape不一致的部分用例精度失败\n典型失败case：x(8192, 128), index(8192, 8)\n### Environment / 环境信息 (Mandatory / 必填)\n            \nAscend910B1\nCANN 9.0.0\n### Steps to reproduce the issue / 重现步骤 (Mandatory / 必填)\n            \n复现脚本：\n```python\nimport torch, torch_npu\nx = torch.randn(8192, 128, dtype=torch.float32)\nindex = torch.randint(0, 8192, size=(8192, 8,)).to(torch.int32)\nout_npu = torch.gather(x.npu(), 0, index.npu())\nout_cpu = torch.gather(x, 0, index.to(torch.int64))\nprint(f\"结果是否一致：{torch.equal(out_cpu, out_npu.cpu())}\")\n```\n\n### Describe the expected behavior / 预期结果 (Mandatory / 必填)\n            \n期望精度正确\n### Related log / screenshot / 日志 / 截图 (Mandatory / 必填)\n            \n![image.png](https://raw.gitcode.com/user-images/assets/7665709/3276337d-d6ed-4623-9866-3fcbc1faa27d/image.png 'image.png')\n### Special notes for this issue/备注 (Optional / 选填)\n            \n\n",
+  "comments": 2,
+  "created_at": "2026-03-17T19:24:11+08:00",
+  "finished_at": "2026-03-19T12:32:10+08:00",
+  "html_url": "https://gitcode.com/cann/ops-nn/issues/1542",
+  "id": 3807780,
+  "issue_priority_detail": {
+    "id": 116,
+    "title": "无优先级"
+  },
+  "issue_state": "已完成",
+  "issue_state_detail": {
+    "id": 287,
+    "serial": 0,
+    "title": "已完成"
+  },
+  "issue_type": "任务",
+  "issue_type_detail": {
+    "id": 255,
+    "is_system": false,
+    "title": "任务"
+  },
+  "labels": [
+    {
+      "color": "#2469f5",
+      "created_at": "2025-10-09T20:53:07+08:00",
+      "id": 14930,
+      "name": "Accepted",
+      "updated_at": "2026-03-19T12:33:47+08:00"
+    },
+    {
+      "color": "#35e029",
+      "created_at": "2026-03-20T11:25:13+08:00",
+      "id": 38861,
+      "name": "resolved",
+      "updated_at": "2026-03-20T13:35:18+08:00"
+    }
+  ],
+  "number": "1542",
+  "priority": 0,
+  "repository": {
+    "assigner": {},
+    "created_at": "2025-09-27T17:40:34+08:00",
+    "description": "本项目是CANN提供的神经网络类计算算子库，实现网络在NPU上加速计算。",
+    "full_name": "cann/ops-nn",
+    "id": 7665709,
+    "name": "ops-nn",
+    "paas": "",
+    "path": "ops-nn",
+    "updated_at": "2025-09-27T18:09:31+08:00"
+  },
+  "state": "closed",
+  "title": "[Bug-Report|缺陷反馈]: GatherElementsV2非尾轴场景部分用例精度失败",
+  "updated_at": "2026-03-20T13:35:18+08:00",
+  "user": {
+    "html_url": "https://gitcode.com/huang-wei-chen",
+    "id": "6822d7c960184036954b1709",
+    "login": "huang-wei-chen",
+    "name": "huang-wei-chen",
+    "object_id": "6822d7c960184036954b1709"
+  },
+  "visibility_reason": "public"
+}

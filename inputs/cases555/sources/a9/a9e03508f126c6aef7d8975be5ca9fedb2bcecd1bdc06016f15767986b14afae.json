@@ -1,0 +1,491 @@
+[
+  {
+    "body": "Thanks for your pull-request.\nThe full list of commands accepted by me can be found at [**here**](https://gitcode.com/cann/infrastructure/blob/main/docs/robot/robot%E4%BD%BF%E7%94%A8%E6%8C%87%E5%8D%97.md#-%E5%A6%82%E9%9C%80%E4%BA%86%E8%A7%A3%E8%AF%A6%E7%BB%86%E7%9A%84%E5%91%BD%E4%BB%A4%E5%8F%AF%E5%8F%82%E8%80%83%E4%B8%8B%E6%96%B9%E8%AF%A6%E7%BB%86%E8%A1%A8%E6%A0%BC)。\nYou can get sig-info at [**here**](https://gitcode.com/cann/community/blob/master/CANN/sigs/ops-transformer/sig-info.yaml)\n\n\n---\n\n## PR Approval Progress\n\n✅ **Congratulations! All modules have met the lgtm and approve requirements.**\n\n### Module Approval Details\n\n| module | lgtm status | approve status |\n|------|-----------|--------------|\n| mc2 | ✅ [*chenjunjian11*](https://gitcode.com/chenjunjian11), [*wang-minbo*](https://gitcode.com/wang-minbo) (2/2) | ✅ [*wang-minbo*](https://gitcode.com/wang-minbo) (1/1) |\n\n> 💡 Tip:\n> - **Committer** can comment `/approve` or `/lgtm`\n> - Commenting `/approve` implies both code review (lgtm) and intent to merge (approve)\n\n------\n\n## CLA Signature Pass  \n liumingxuan9, thanks for your pull request. All authors of the commits have signed the CLA. :+1:",
+    "comment_type": "pr_comment",
+    "created_at": "2026-03-31T12:16:55+08:00",
+    "discussion_id": "b2fb34635c9e520e068cd79653d56e3e311c07ed",
+    "id": 166952990,
+    "updated_at": "2026-04-13T11:57:13+08:00",
+    "user": {
+      "avatar_url": "https://cdn-img.gitcode.com/bf/ad/b7f29486a040d7b2f52bf6c78414692d7d585eb1ec628cea3eb01c9d63f68618.png?time=1755691472703",
+      "html_url": "https://gitcode.com/cann-robot",
+      "id": "673c1552584fe8295cfd4a13",
+      "login": "cann-robot",
+      "name": "CANN-robot",
+      "object_id": "673c1552584fe8295cfd4a13"
+    }
+  },
+  {
+    "body": ":large_blue_circle: source code change are detected, tasks labels is removed in this pull request!",
+    "comment_type": "pr_comment",
+    "created_at": "2026-03-31T12:17:05+08:00",
+    "discussion_id": "e99d91617d2c20c0074c968e91341f5502daf671",
+    "id": 166953004,
+    "updated_at": "2026-03-31T12:17:05+08:00",
+    "user": {
+      "avatar_url": "https://cdn-img.gitcode.com/bf/ad/b7f29486a040d7b2f52bf6c78414692d7d585eb1ec628cea3eb01c9d63f68618.png?time=1755691472703",
+      "html_url": "https://gitcode.com/cann-robot",
+      "id": "673c1552584fe8295cfd4a13",
+      "login": "cann-robot",
+      "name": "CANN-robot",
+      "object_id": "673c1552584fe8295cfd4a13"
+    }
+  },
+  {
+    "body": "compile",
+    "comment_type": "pr_comment",
+    "created_at": "2026-03-31T12:17:06+08:00",
+    "discussion_id": "5111f3ffb3d355892e9d59b515c33600640a35b7",
+    "id": 166953005,
+    "updated_at": "2026-03-31T12:17:06+08:00",
+    "user": {
+      "avatar_url": "https://cdn-img.gitcode.com/fb/ed/23f26b7919e5d295f92af7c09e1e21564b80e6d4470baa6c7ccadef50a60fcd1.png",
+      "html_url": "https://gitcode.com/liumingxuan9",
+      "id": "6708927010b64c6292ebed70",
+      "login": "liumingxuan9",
+      "name": "GoodMorning",
+      "object_id": "6708927010b64c6292ebed70"
+    }
+  },
+  {
+    "body": "## 问题/功能描述\n\n修复在特定硬件架构（NPU 3510）下，使用BF16或FP16数据类型执行MoE（Mixture of Experts）分发与组合操作时，浮点溢出控制寄存器未正确保存与恢复的问题。该问题可能导致内核执行后，硬件浮点溢出行为配置被意外更改，影响后续计算结果的正确性或稳定性。\n\n## 修改方案描述\n\n针对NPU 3510架构，在MoE分发与组合内核的关键代码路径中增加了对浮点溢出控制寄存器（`FLOAT_OVERFLOW_MODE_CTRL`）的状态管理。具体包括：1）在执行核心操作前保存当前寄存器值；2）在操作执行后恢复原值，确保硬件状态隔离。同时，在初始化阶段，通过条件编译针对该架构设置寄存器以启用饱和模式，防止MX量化操作中的潜在溢出。修改仅作用于目标架构，通过调用`GetCtrlSpr`和`SetCtrlSpr`等标准API实现。",
+    "comment_type": "pr_comment",
+    "created_at": "2026-03-31T12:17:44+08:00",
+    "discussion_id": "6139d45f837ea47c5cd87732eb8eb5e83431bded",
+    "id": 166953037,
+    "updated_at": "2026-03-31T12:17:44+08:00",
+    "user": {
+      "avatar_url": "https://cdn-img.gitcode.com/bf/ad/b7f29486a040d7b2f52bf6c78414692d7d585eb1ec628cea3eb01c9d63f68618.png?time=1755691472703",
+      "html_url": "https://gitcode.com/cann-robot",
+      "id": "673c1552584fe8295cfd4a13",
+      "login": "cann-robot",
+      "name": "CANN-robot",
+      "object_id": "673c1552584fe8295cfd4a13"
+    }
+  },
+  {
+    "body": "流水线任务触发成功\n任务链接 [<b><a href='https://www.openlibing.com/apps/pipelineDetail?pipelineId=0d4f52bd3a494432a028df25bc3297f8&pipelineRunId=6abbfce9badc4dfbaa0d2d636f9cc934&projectName=CANN'>6abbfce9badc4dfbaa0d2d636f9cc934</a></b>][<b><a href='https://gitcode.com/cann/infrastructure/blob/main/docs/ci/ci_guide.md'>流水线指导</a></b>]\n<table style=\"border-collapse: collapse\"><tr><th>任务名称</th><th>状态</th><th>日志</th><th>下载链接</th></tr>\n                    <tr>\n                        <td><strong>Check_Pr</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/pipelineDetail?pipelineId=0d4f52bd3a494432a028df25bc3297f8&pipelineRunId=6abbfce9badc4dfbaa0d2d636f9cc934&projectName=CANN>>>>>></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>Compile_Ascend_X86</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/pipelineDetail?pipelineId=0d4f52bd3a494432a028df25bc3297f8&pipelineRunId=6abbfce9badc4dfbaa0d2d636f9cc934&projectName=CANN>>>>>></a></td>\n                        <td><a href=https://ascend-ci.obs.cn-north-4.myhuaweicloud.com/ops-transformer/package/3558/cann-ops-transformer-experimental_linux-x86_64.run>>>>>></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>Compile_Ascend_ARM</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/pipelineDetail?pipelineId=0d4f52bd3a494432a028df25bc3297f8&pipelineRunId=6abbfce9badc4dfbaa0d2d636f9cc934&projectName=CANN>>>>>></a></td>\n                        <td><a href=https://ascend-ci.obs.cn-north-4.myhuaweicloud.com/ops-transformer/package/3558/cann-ops-transformer_linux-aarch64.run>>>>>></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>Compile_Ascend_X86_mobile_station</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/pipelineDetail?pipelineId=0d4f52bd3a494432a028df25bc3297f8&pipelineRunId=6abbfce9badc4dfbaa0d2d636f9cc934&projectName=CANN>>>>>></a></td>\n                        <td><a href=https://ascend-ci.obs.cn-north-4.myhuaweicloud.com/ops-transformer/package/3558/cann-ops-transformer-kirinx90_linux-x86_64.run>>>>>></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>Compile_Ascend_X86_experimental</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/pipelineDetail?pipelineId=0d4f52bd3a494432a028df25bc3297f8&pipelineRunId=6abbfce9badc4dfbaa0d2d636f9cc934&projectName=CANN>>>>>></a></td>\n                        <td><a href=https://ascend-ci.obs.cn-north-4.myhuaweicloud.com/ops-transformer/package/3558/cann-ops-transformer-experimental_linux-x86_64.run>>>>>></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>Compile_Ascend_ARM_experimental</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/pipelineDetail?pipelineId=0d4f52bd3a494432a028df25bc3297f8&pipelineRunId=6abbfce9badc4dfbaa0d2d636f9cc934&projectName=CANN>>>>>></a></td>\n                        <td><a href=https://ascend-ci.obs.cn-north-4.myhuaweicloud.com/ops-transformer/package/3558/cann-ops-transformer-experimental_linux-aarch64.run>>>>>></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>Pre_Compile</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=></a></td>\n                        <td><a href=https://ascend-ci.obs.cn-north-4.myhuaweicloud.com/ops-transformer/package/3558/cann-ops-transformer-custom_linux-aarch64.run>>>>>></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>pre_comment</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/pipelineDetail?pipelineId=0d4f52bd3a494432a028df25bc3297f8&pipelineRunId=6abbfce9badc4dfbaa0d2d636f9cc934&projectName=CANN>>>>>></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>Compile_Ascend_X86_ubuntu24</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/pipelineDetail?pipelineId=0d4f52bd3a494432a028df25bc3297f8&pipelineRunId=6abbfce9badc4dfbaa0d2d636f9cc934&projectName=CANN>>>>>></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>Compile_Ascend_X86_mobile_station_ubuntu24</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/pipelineDetail?pipelineId=0d4f52bd3a494432a028df25bc3297f8&pipelineRunId=6abbfce9badc4dfbaa0d2d636f9cc934&projectName=CANN>>>>>></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>Compile_Ascend_ARM_ubuntu24</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/pipelineDetail?pipelineId=0d4f52bd3a494432a028df25bc3297f8&pipelineRunId=6abbfce9badc4dfbaa0d2d636f9cc934&projectName=CANN>>>>>></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>StaticCheck_codespell_check</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>StaticCheck_link_validity_check</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>StaticCheck_resource_existence_check</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>StaticCheck_tag_closed_check</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>StaticCheck_markdownlint</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>Compile_Ascend_X86_experimental_ubuntu24</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/pipelineDetail?pipelineId=0d4f52bd3a494432a028df25bc3297f8&pipelineRunId=6abbfce9badc4dfbaa0d2d636f9cc934&projectName=CANN>>>>>></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>Compile_Ascend_ARM_experimental_ubuntu24</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/pipelineDetail?pipelineId=0d4f52bd3a494432a028df25bc3297f8&pipelineRunId=6abbfce9badc4dfbaa0d2d636f9cc934&projectName=CANN>>>>>></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>UT_Test</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>Smoke_A900_npupool</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=></a></td>\n                        <td><a href=https://ascend-ci.obs.cn-north-4.myhuaweicloud.com/ops-transformer/package/3558/slog.tar.gz>>>>>></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>codecheck</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/entryCheckDashCode/MR_c5069f572ee04d38becf2fde519d77f6/3f863957960771855384b53b187e1d7c?projectId=300033&codeHostingPlatformFlag=gitcode>>>>>></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>SCA</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/personalScandTaskInfor/person/6a18bbe1-f84a-4616-9ebd-b14a046be36c?projectId=300033&codeHostingPlatformFlag=gitcode>>>>>></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>anti_virus</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/entryCheckNew/poisoningresult/e41a82e0-2a78-472a-8da6-66a9f197a3a1/CANN/ops-transformer?projectName=CANN&codeHostingPlatformFlag=gitcode>>>>>></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>API_Check</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/pipelineDetail?pipelineId=0d4f52bd3a494432a028df25bc3297f8&pipelineRunId=6abbfce9badc4dfbaa0d2d636f9cc934&projectName=CANN>>>>>></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>ATK_Test_A2</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=></a></td>\n                        <td><a href=></a></td>\n                    </tr> </table><p>[2026-03-31 12:24:53] &nbsp;&nbsp;&nbsp;CI执行结束 </p>",
+    "comment_type": "pr_comment",
+    "created_at": "2026-03-31T12:18:02+08:00",
+    "discussion_id": "cc182834d2fd65c5ce5b01fab16ef4a228862a81",
+    "id": 166953067,
+    "updated_at": "2026-03-31T12:24:54+08:00",
+    "user": {
+      "avatar_url": "https://cdn-img.gitcode.com/bf/ad/b7f29486a040d7b2f52bf6c78414692d7d585eb1ec628cea3eb01c9d63f68618.png?time=1755691472703",
+      "html_url": "https://gitcode.com/cann-robot",
+      "id": "673c1552584fe8295cfd4a13",
+      "login": "cann-robot",
+      "name": "CANN-robot",
+      "object_id": "673c1552584fe8295cfd4a13"
+    }
+  },
+  {
+    "body": "### Notification  \nThis pull request source branch has changed, so removes the following label(s): ci-pipeline-passed.",
+    "comment_type": "pr_comment",
+    "created_at": "2026-03-31T14:29:38+08:00",
+    "discussion_id": "f90d0942e77b8eb4b24e48bab3f433ff51e2624d",
+    "id": 166961957,
+    "updated_at": "2026-03-31T14:29:38+08:00",
+    "user": {
+      "avatar_url": "https://cdn-img.gitcode.com/bf/ad/b7f29486a040d7b2f52bf6c78414692d7d585eb1ec628cea3eb01c9d63f68618.png?time=1755691472703",
+      "html_url": "https://gitcode.com/cann-robot",
+      "id": "673c1552584fe8295cfd4a13",
+      "login": "cann-robot",
+      "name": "CANN-robot",
+      "object_id": "673c1552584fe8295cfd4a13"
+    }
+  },
+  {
+    "body": ":large_blue_circle: source code change are detected, tasks labels is removed in this pull request!",
+    "comment_type": "pr_comment",
+    "created_at": "2026-03-31T14:29:41+08:00",
+    "discussion_id": "991d2e7ddf6cafcae621aa141b96d7d5d17edab2",
+    "id": 166961970,
+    "updated_at": "2026-03-31T14:29:41+08:00",
+    "user": {
+      "avatar_url": "https://cdn-img.gitcode.com/bf/ad/b7f29486a040d7b2f52bf6c78414692d7d585eb1ec628cea3eb01c9d63f68618.png?time=1755691472703",
+      "html_url": "https://gitcode.com/cann-robot",
+      "id": "673c1552584fe8295cfd4a13",
+      "login": "cann-robot",
+      "name": "CANN-robot",
+      "object_id": "673c1552584fe8295cfd4a13"
+    }
+  },
+  {
+    "body": ":large_blue_circle: source code change are detected, tasks labels is removed in this pull request!",
+    "comment_type": "pr_comment",
+    "created_at": "2026-03-31T14:32:05+08:00",
+    "discussion_id": "ccd52a56fcfe2a8e92202530ac745d1b851fd325",
+    "id": 166962427,
+    "updated_at": "2026-03-31T14:32:05+08:00",
+    "user": {
+      "avatar_url": "https://cdn-img.gitcode.com/bf/ad/b7f29486a040d7b2f52bf6c78414692d7d585eb1ec628cea3eb01c9d63f68618.png?time=1755691472703",
+      "html_url": "https://gitcode.com/cann-robot",
+      "id": "673c1552584fe8295cfd4a13",
+      "login": "cann-robot",
+      "name": "CANN-robot",
+      "object_id": "673c1552584fe8295cfd4a13"
+    }
+  },
+  {
+    "body": "compile",
+    "comment_type": "pr_comment",
+    "created_at": "2026-04-01T21:03:20+08:00",
+    "discussion_id": "3762eddedae05636d7332ea3a86abb12fa3e5de3",
+    "id": 167147335,
+    "updated_at": "2026-04-01T21:03:20+08:00",
+    "user": {
+      "html_url": "https://gitcode.com/l00858142",
+      "id": "68352790cfaee65d71bf16d4",
+      "login": "l00858142",
+      "name": "jvjvzhilian",
+      "object_id": "68352790cfaee65d71bf16d4"
+    }
+  },
+  {
+    "body": "流水线任务触发成功\n任务链接 [<b><a href='https://www.openlibing.com/apps/pipelineDetail?pipelineId=0d4f52bd3a494432a028df25bc3297f8&pipelineRunId=031cbf2d52944f7f8e54134122b48f6c&projectName=CANN'>031cbf2d52944f7f8e54134122b48f6c</a></b>][<b><a href='https://gitcode.com/cann/infrastructure/blob/main/docs/ci/ci_guide.md'>流水线指导</a></b>]\n<table style=\"border-collapse: collapse\"><tr><th>任务名称</th><th>状态</th><th>日志</th><th>下载链接</th></tr>\n                    <tr>\n                        <td><strong>Check_Pr</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/pipelineDetail?pipelineId=0d4f52bd3a494432a028df25bc3297f8&pipelineRunId=031cbf2d52944f7f8e54134122b48f6c&projectName=CANN>>>>>></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>Compile_Ascend_X86</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/pipelineDetail?pipelineId=0d4f52bd3a494432a028df25bc3297f8&pipelineRunId=031cbf2d52944f7f8e54134122b48f6c&projectName=CANN>>>>>></a></td>\n                        <td><a href=https://ascend-ci.obs.cn-north-4.myhuaweicloud.com/ops-transformer/package/3558/cann-ops-transformer-experimental_linux-x86_64.run>>>>>></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>Compile_Ascend_ARM</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/pipelineDetail?pipelineId=0d4f52bd3a494432a028df25bc3297f8&pipelineRunId=031cbf2d52944f7f8e54134122b48f6c&projectName=CANN>>>>>></a></td>\n                        <td><a href=https://ascend-ci.obs.cn-north-4.myhuaweicloud.com/ops-transformer/package/3558/cann-ops-transformer_linux-aarch64.run>>>>>></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>Compile_Ascend_X86_mobile_station</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/pipelineDetail?pipelineId=0d4f52bd3a494432a028df25bc3297f8&pipelineRunId=031cbf2d52944f7f8e54134122b48f6c&projectName=CANN>>>>>></a></td>\n                        <td><a href=https://ascend-ci.obs.cn-north-4.myhuaweicloud.com/ops-transformer/package/3558/cann-ops-transformer-kirinx90_linux-x86_64.run>>>>>></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>Compile_Ascend_X86_experimental</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/pipelineDetail?pipelineId=0d4f52bd3a494432a028df25bc3297f8&pipelineRunId=031cbf2d52944f7f8e54134122b48f6c&projectName=CANN>>>>>></a></td>\n                        <td><a href=https://ascend-ci.obs.cn-north-4.myhuaweicloud.com/ops-transformer/package/3558/cann-ops-transformer-experimental_linux-x86_64.run>>>>>></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>Compile_Ascend_ARM_experimental</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/pipelineDetail?pipelineId=0d4f52bd3a494432a028df25bc3297f8&pipelineRunId=031cbf2d52944f7f8e54134122b48f6c&projectName=CANN>>>>>></a></td>\n                        <td><a href=https://ascend-ci.obs.cn-north-4.myhuaweicloud.com/ops-transformer/package/3558/cann-ops-transformer-experimental_linux-aarch64.run>>>>>></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>Pre_Compile</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=></a></td>\n                        <td><a href=https://ascend-ci.obs.cn-north-4.myhuaweicloud.com/ops-transformer/package/3558/cann-ops-transformer-custom_linux-aarch64.run>>>>>></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>pre_comment</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/pipelineDetail?pipelineId=0d4f52bd3a494432a028df25bc3297f8&pipelineRunId=031cbf2d52944f7f8e54134122b48f6c&projectName=CANN>>>>>></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>Compile_Ascend_X86_ubuntu24</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/pipelineDetail?pipelineId=0d4f52bd3a494432a028df25bc3297f8&pipelineRunId=031cbf2d52944f7f8e54134122b48f6c&projectName=CANN>>>>>></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>Compile_Ascend_X86_mobile_station_ubuntu24</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/pipelineDetail?pipelineId=0d4f52bd3a494432a028df25bc3297f8&pipelineRunId=031cbf2d52944f7f8e54134122b48f6c&projectName=CANN>>>>>></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>Compile_Ascend_ARM_ubuntu24</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/pipelineDetail?pipelineId=0d4f52bd3a494432a028df25bc3297f8&pipelineRunId=031cbf2d52944f7f8e54134122b48f6c&projectName=CANN>>>>>></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>StaticCheck_codespell_check</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>StaticCheck_link_validity_check</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>StaticCheck_resource_existence_check</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>StaticCheck_tag_closed_check</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>StaticCheck_markdownlint</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>Compile_Ascend_X86_experimental_ubuntu24</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/pipelineDetail?pipelineId=0d4f52bd3a494432a028df25bc3297f8&pipelineRunId=031cbf2d52944f7f8e54134122b48f6c&projectName=CANN>>>>>></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>Compile_Ascend_ARM_experimental_ubuntu24</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/pipelineDetail?pipelineId=0d4f52bd3a494432a028df25bc3297f8&pipelineRunId=031cbf2d52944f7f8e54134122b48f6c&projectName=CANN>>>>>></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>UT_Test</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>Smoke_A900_npupool</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=></a></td>\n                        <td><a href=https://ascend-ci.obs.cn-north-4.myhuaweicloud.com/ops-transformer/package/3558/slog.tar.gz>>>>>></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>codecheck</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/entryCheckDashCode/MR_6ce22b35be9f409eb041c0816d0c2624/9e6350707731de93e4c201371fbeb17c?projectId=300033&codeHostingPlatformFlag=gitcode>>>>>></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>SCA</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/personalScandTaskInfor/person/4227ab46-0af8-4640-9b90-fbf535aaa79d?projectId=300033&codeHostingPlatformFlag=gitcode>>>>>></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>anti_virus</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/entryCheckNew/poisoningresult/a796ad88-7fae-445a-961d-01c9f13ff698/CANN/ops-transformer?projectName=CANN&codeHostingPlatformFlag=gitcode>>>>>></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>API_Check</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/pipelineDetail?pipelineId=0d4f52bd3a494432a028df25bc3297f8&pipelineRunId=031cbf2d52944f7f8e54134122b48f6c&projectName=CANN>>>>>></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>ATK_Test_A2</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>codecheck_style</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=></a></td>\n                        <td><a href=></a></td>\n                    </tr> </table><p>[2026-04-01 21:13:55] &nbsp;&nbsp;&nbsp;CI执行结束 </p>",
+    "comment_type": "pr_comment",
+    "created_at": "2026-04-01T21:04:23+08:00",
+    "discussion_id": "c4a602c6ea2daa6e54db0204ae318aed9cb1c895",
+    "id": 167147402,
+    "updated_at": "2026-04-01T21:13:55+08:00",
+    "user": {
+      "avatar_url": "https://cdn-img.gitcode.com/bf/ad/b7f29486a040d7b2f52bf6c78414692d7d585eb1ec628cea3eb01c9d63f68618.png?time=1755691472703",
+      "html_url": "https://gitcode.com/cann-robot",
+      "id": "673c1552584fe8295cfd4a13",
+      "login": "cann-robot",
+      "name": "CANN-robot",
+      "object_id": "673c1552584fe8295cfd4a13"
+    }
+  },
+  {
+    "body": "### Notification  \nThis pull request source branch has changed, so removes the following label(s): ci-pipeline-passed.",
+    "comment_type": "pr_comment",
+    "created_at": "2026-04-10T09:54:11+08:00",
+    "discussion_id": "feecc95126bdd76f7674f1b53894eb545eb8ec5c",
+    "id": 167882647,
+    "updated_at": "2026-04-10T09:54:11+08:00",
+    "user": {
+      "avatar_url": "https://cdn-img.gitcode.com/bf/ad/b7f29486a040d7b2f52bf6c78414692d7d585eb1ec628cea3eb01c9d63f68618.png?time=1755691472703",
+      "html_url": "https://gitcode.com/cann-robot",
+      "id": "673c1552584fe8295cfd4a13",
+      "login": "cann-robot",
+      "name": "CANN-robot",
+      "object_id": "673c1552584fe8295cfd4a13"
+    }
+  },
+  {
+    "body": "compile",
+    "comment_type": "pr_comment",
+    "created_at": "2026-04-10T09:55:12+08:00",
+    "discussion_id": "a708af43adbebc2dc9eaf071dae3b353915912ad",
+    "id": 167882838,
+    "updated_at": "2026-04-10T09:55:12+08:00",
+    "user": {
+      "avatar_url": "https://cdn-img.gitcode.com/fb/ed/23f26b7919e5d295f92af7c09e1e21564b80e6d4470baa6c7ccadef50a60fcd1.png",
+      "html_url": "https://gitcode.com/liumingxuan9",
+      "id": "6708927010b64c6292ebed70",
+      "login": "liumingxuan9",
+      "name": "GoodMorning",
+      "object_id": "6708927010b64c6292ebed70"
+    }
+  },
+  {
+    "body": "流水线任务触发成功\n任务链接 [<b><a href='https://www.openlibing.com/apps/pipelineDetail?pipelineId=3537b826c3c54622a4fd365051123f9e&pipelineRunId=13de7c1f202243b6b7240e503523b1ee&projectName=CANN'>13de7c1f202243b6b7240e503523b1ee</a></b>][<b><a href='https://gitcode.com/cann/infrastructure/blob/main/docs/ci/ci_guide.md'>流水线指导</a></b>]\n<table style=\"border-collapse: collapse\"><tr><th>任务名称</th><th>状态</th><th>日志</th><th>下载链接</th></tr>\n                    <tr>\n                        <td><strong>Compile_Ascend_X86</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/pipelineDetail?pipelineId=3537b826c3c54622a4fd365051123f9e&pipelineRunId=13de7c1f202243b6b7240e503523b1ee&projectName=CANN>>>>>></a></td>\n                        <td><a href=https://ascend-ci.obs.cn-north-4.myhuaweicloud.com/ops-transformer/package/3558/cann-ops-transformer-experimental_linux-x86_64.run>>>>>></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>Compile_Ascend_ARM</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/pipelineDetail?pipelineId=3537b826c3c54622a4fd365051123f9e&pipelineRunId=13de7c1f202243b6b7240e503523b1ee&projectName=CANN>>>>>></a></td>\n                        <td><a href=https://ascend-ci.obs.cn-north-4.myhuaweicloud.com/ops-transformer/package/3558/cann-ops-transformer_linux-aarch64.run>>>>>></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>Compile_Ascend_X86_mobile_station</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/pipelineDetail?pipelineId=3537b826c3c54622a4fd365051123f9e&pipelineRunId=13de7c1f202243b6b7240e503523b1ee&projectName=CANN>>>>>></a></td>\n                        <td><a href=https://ascend-ci.obs.cn-north-4.myhuaweicloud.com/ops-transformer/package/3558/cann-ops-transformer-kirinx90_linux-x86_64.run>>>>>></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>Compile_Ascend_X86_experimental</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/pipelineDetail?pipelineId=3537b826c3c54622a4fd365051123f9e&pipelineRunId=13de7c1f202243b6b7240e503523b1ee&projectName=CANN>>>>>></a></td>\n                        <td><a href=https://ascend-ci.obs.cn-north-4.myhuaweicloud.com/ops-transformer/package/3558/cann-ops-transformer-experimental_linux-x86_64.run>>>>>></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>Compile_Ascend_ARM_experimental</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/pipelineDetail?pipelineId=3537b826c3c54622a4fd365051123f9e&pipelineRunId=13de7c1f202243b6b7240e503523b1ee&projectName=CANN>>>>>></a></td>\n                        <td><a href=https://ascend-ci.obs.cn-north-4.myhuaweicloud.com/ops-transformer/package/3558/cann-ops-transformer-experimental_linux-aarch64.run>>>>>></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>Pre_Compile</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=></a></td>\n                        <td><a href=https://ascend-ci.obs.cn-north-4.myhuaweicloud.com/ops-transformer/package/3558/cann-ops-transformer-custom_linux-aarch64.run>>>>>></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>pre_comment</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/pipelineDetail?pipelineId=3537b826c3c54622a4fd365051123f9e&pipelineRunId=13de7c1f202243b6b7240e503523b1ee&projectName=CANN>>>>>></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>Compile_Ascend_X86_ubuntu24</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/pipelineDetail?pipelineId=3537b826c3c54622a4fd365051123f9e&pipelineRunId=13de7c1f202243b6b7240e503523b1ee&projectName=CANN>>>>>></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>Compile_Ascend_X86_mobile_station_ubuntu24</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/pipelineDetail?pipelineId=3537b826c3c54622a4fd365051123f9e&pipelineRunId=13de7c1f202243b6b7240e503523b1ee&projectName=CANN>>>>>></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>Compile_Ascend_ARM_ubuntu24</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/pipelineDetail?pipelineId=3537b826c3c54622a4fd365051123f9e&pipelineRunId=13de7c1f202243b6b7240e503523b1ee&projectName=CANN>>>>>></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>Compile_Ascend_X86_experimental_ubuntu24</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/pipelineDetail?pipelineId=3537b826c3c54622a4fd365051123f9e&pipelineRunId=13de7c1f202243b6b7240e503523b1ee&projectName=CANN>>>>>></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>Compile_Ascend_ARM_experimental_ubuntu24</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/pipelineDetail?pipelineId=3537b826c3c54622a4fd365051123f9e&pipelineRunId=13de7c1f202243b6b7240e503523b1ee&projectName=CANN>>>>>></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>UT_Test</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>Smoke_A900_npupool</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=></a></td>\n                        <td><a href=https://ascend-ci.obs.cn-north-4.myhuaweicloud.com/ops-transformer/package/3558/slog.tar.gz>>>>>></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>API_Check</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/pipelineDetail?pipelineId=3537b826c3c54622a4fd365051123f9e&pipelineRunId=13de7c1f202243b6b7240e503523b1ee&projectName=CANN>>>>>></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>ATK_Test_A2</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=></a></td>\n                        <td><a href=></a></td>\n                    </tr> </table><p>[2026-04-10 10:07:10] &nbsp;&nbsp;&nbsp;CI执行结束 </p>",
+    "comment_type": "pr_comment",
+    "created_at": "2026-04-10T09:56:21+08:00",
+    "discussion_id": "4b7ebdd7025a322d15449e5dff01cbfc73c924cf",
+    "id": 167883066,
+    "updated_at": "2026-04-10T10:07:10+08:00",
+    "user": {
+      "avatar_url": "https://cdn-img.gitcode.com/bf/ad/b7f29486a040d7b2f52bf6c78414692d7d585eb1ec628cea3eb01c9d63f68618.png?time=1755691472703",
+      "html_url": "https://gitcode.com/cann-robot",
+      "id": "673c1552584fe8295cfd4a13",
+      "login": "cann-robot",
+      "name": "CANN-robot",
+      "object_id": "673c1552584fe8295cfd4a13"
+    }
+  },
+  {
+    "body": "AscendC::SetCtrlSpr<FLOAT_OVERFLOW_MODE_CTRL, FLOAT_OVERFLOW_MODE_CTRL>(0);  这个操作是干嘛的 后面写点注释",
+    "comment_type": "diff_comment",
+    "created_at": "2026-04-10T10:00:16+08:00",
+    "diff_position": {
+      "end_new_line": 557,
+      "position_type": "text",
+      "start_new_line": 557
+    },
+    "discussion_id": "bda0d7bbe0794c2c12a0813669cf2d17e3b29911",
+    "id": 167883712,
+    "reply": [
+      {
+        "body": "changed this line on [5b4be6a9](https://gitcode.com/cann/ops-transformer/commits/detail/5b4be6a905d053addf1beaf02656c7fccc888ab2?ref=master_lmx&prId=3558) view [diff detail](https://gitcode.com/cann/ops-transformer/merge_requests/3558/diffs?diffId=5808737&start_sha=b01d95987ffdfc01caec3eed911e1a5b7234a034&filePath=mc2/moe_distribute_combine_v2/op_kernel/moe_distribute_combine_v2.h#46ec7ce221eb23d833a59390c3d996c00a326e91_555_557)",
+        "created_at": "2026-04-10T10:04:03+08:00",
+        "id": 167884572,
+        "updated_at": "2026-04-10T10:04:03+08:00",
+        "user": {
+          "avatar_url": "https://cdn-img.gitcode.com/fb/ed/23f26b7919e5d295f92af7c09e1e21564b80e6d4470baa6c7ccadef50a60fcd1.png",
+          "html_url": "https://gitcode.com/liumingxuan9",
+          "id": "6708927010b64c6292ebed70",
+          "login": "liumingxuan9",
+          "name": "GoodMorning",
+          "object_id": "6708927010b64c6292ebed70"
+        }
+      }
+    ],
+    "resolved": true,
+    "resolved_by": {
+      "html_url": "https://gitcode.com/l00858142",
+      "id": "68352790cfaee65d71bf16d4",
+      "login": "l00858142",
+      "name": "jvjvzhilian",
+      "object_id": "68352790cfaee65d71bf16d4"
+    },
+    "updated_at": "2026-04-13T11:55:18+08:00",
+    "user": {
+      "html_url": "https://gitcode.com/l00858142",
+      "id": "68352790cfaee65d71bf16d4",
+      "login": "l00858142",
+      "name": "jvjvzhilian",
+      "object_id": "68352790cfaee65d71bf16d4"
+    }
+  },
+  {
+    "body": "流水线任务触发成功\n任务链接 [<b><a href='https://www.openlibing.com/apps/pipelineDetail?pipelineId=3dd7f759b16146a08dcb8b11e5426b56&pipelineRunId=9c311233b38c44cf8c9a7447e2858db1&projectName=CANN'>9c311233b38c44cf8c9a7447e2858db1</a></b>][<b><a href='https://gitcode.com/cann/infrastructure/blob/main/docs/ci/ci_guide.md'>流水线指导</a></b>]\n<table style=\"border-collapse: collapse\"><tr><th>任务名称</th><th>状态</th><th>日志</th><th>下载链接</th></tr>\n                    <tr>\n                        <td><strong>codecheck</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/entryCheckDashCode/MR_6ce22b35be9f409eb041c0816d0c2624/9e6350707731de93e4c201371fbeb17c?projectId=300033&codeHostingPlatformFlag=gitcode>>>>>></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>SCA</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/personalScandTaskInfor/person/be86a58b-796a-4ba0-ad86-f09213d12076?projectId=300033&codeHostingPlatformFlag=gitcode>>>>>></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>anti_virus</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/entryCheckNew/poisoningresult/2ecdce72-3e26-4be3-92ac-efda9c0f6060/CANN/ops-transformer?projectName=CANN&codeHostingPlatformFlag=gitcode>>>>>></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>codecheck_style</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>StaticCheck_codespell_check</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>StaticCheck_link_validity_check</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>StaticCheck_resource_existence_check</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>StaticCheck_tag_closed_check</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>StaticCheck_markdownlint</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>Check_Pr</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/pipelineDetail?pipelineId=3dd7f759b16146a08dcb8b11e5426b56&pipelineRunId=9c311233b38c44cf8c9a7447e2858db1&projectName=CANN>>>>>></a></td>\n                        <td><a href=></a></td>\n                    </tr> </table><p>[2026-04-10 10:05:24] &nbsp;&nbsp;&nbsp;CI执行结束 </p>",
+    "comment_type": "pr_comment",
+    "created_at": "2026-04-10T10:05:21+08:00",
+    "discussion_id": "3342011e2bf34cb00a9a8f7ba5b8ac9a108cd9a8",
+    "id": 167884909,
+    "updated_at": "2026-04-10T10:05:24+08:00",
+    "user": {
+      "avatar_url": "https://cdn-img.gitcode.com/bf/ad/b7f29486a040d7b2f52bf6c78414692d7d585eb1ec628cea3eb01c9d63f68618.png?time=1755691472703",
+      "html_url": "https://gitcode.com/cann-robot",
+      "id": "673c1552584fe8295cfd4a13",
+      "login": "cann-robot",
+      "name": "CANN-robot",
+      "object_id": "673c1552584fe8295cfd4a13"
+    }
+  },
+  {
+    "body": "### Notification  \nThis pull request source branch has changed, so removes the following label(s): ci-pipeline-passed.",
+    "comment_type": "pr_comment",
+    "created_at": "2026-04-10T14:47:22+08:00",
+    "discussion_id": "cd7a498f8d3770170add9baf50b1f389b9a158c8",
+    "id": 167926449,
+    "updated_at": "2026-04-10T14:47:22+08:00",
+    "user": {
+      "avatar_url": "https://cdn-img.gitcode.com/bf/ad/b7f29486a040d7b2f52bf6c78414692d7d585eb1ec628cea3eb01c9d63f68618.png?time=1755691472703",
+      "html_url": "https://gitcode.com/cann-robot",
+      "id": "673c1552584fe8295cfd4a13",
+      "login": "cann-robot",
+      "name": "CANN-robot",
+      "object_id": "673c1552584fe8295cfd4a13"
+    }
+  },
+  {
+    "body": "compile",
+    "comment_type": "pr_comment",
+    "created_at": "2026-04-10T14:49:05+08:00",
+    "discussion_id": "bfba18a45fb91c9ae667675fe68bf707b420f2dc",
+    "id": 167926869,
+    "updated_at": "2026-04-10T14:49:05+08:00",
+    "user": {
+      "avatar_url": "https://cdn-img.gitcode.com/fb/ed/23f26b7919e5d295f92af7c09e1e21564b80e6d4470baa6c7ccadef50a60fcd1.png",
+      "html_url": "https://gitcode.com/liumingxuan9",
+      "id": "6708927010b64c6292ebed70",
+      "login": "liumingxuan9",
+      "name": "GoodMorning",
+      "object_id": "6708927010b64c6292ebed70"
+    }
+  },
+  {
+    "body": "流水线任务触发成功\n任务链接 [<b><a href='https://www.openlibing.com/apps/pipelineDetail?pipelineId=3537b826c3c54622a4fd365051123f9e&pipelineRunId=1a4a15c93b9d46128d2ec9c7ec70606d&projectName=CANN'>1a4a15c93b9d46128d2ec9c7ec70606d</a></b>][<b><a href='https://gitcode.com/cann/infrastructure/blob/main/docs/ci/ci_guide.md'>流水线指导</a></b>]\n<table style=\"border-collapse: collapse\"><tr><th>任务名称</th><th>状态</th><th>日志</th><th>下载链接</th></tr>\n                    <tr>\n                        <td><strong>Compile_Ascend_X86</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/pipelineDetail?pipelineId=3537b826c3c54622a4fd365051123f9e&pipelineRunId=1a4a15c93b9d46128d2ec9c7ec70606d&projectName=CANN>>>>>></a></td>\n                        <td><a href=https://ascend-ci.obs.cn-north-4.myhuaweicloud.com/ops-transformer/package/3558/cann-ops-transformer-experimental_linux-x86_64.run>>>>>></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>Compile_Ascend_ARM</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/pipelineDetail?pipelineId=3537b826c3c54622a4fd365051123f9e&pipelineRunId=1a4a15c93b9d46128d2ec9c7ec70606d&projectName=CANN>>>>>></a></td>\n                        <td><a href=https://ascend-ci.obs.cn-north-4.myhuaweicloud.com/ops-transformer/package/3558/cann-ops-transformer_linux-aarch64.run>>>>>></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>Compile_Ascend_X86_mobile_station</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/pipelineDetail?pipelineId=3537b826c3c54622a4fd365051123f9e&pipelineRunId=1a4a15c93b9d46128d2ec9c7ec70606d&projectName=CANN>>>>>></a></td>\n                        <td><a href=https://ascend-ci.obs.cn-north-4.myhuaweicloud.com/ops-transformer/package/3558/cann-ops-transformer-kirinx90_linux-x86_64.run>>>>>></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>Compile_Ascend_X86_experimental</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/pipelineDetail?pipelineId=3537b826c3c54622a4fd365051123f9e&pipelineRunId=1a4a15c93b9d46128d2ec9c7ec70606d&projectName=CANN>>>>>></a></td>\n                        <td><a href=https://ascend-ci.obs.cn-north-4.myhuaweicloud.com/ops-transformer/package/3558/cann-ops-transformer-experimental_linux-x86_64.run>>>>>></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>Compile_Ascend_ARM_experimental</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/pipelineDetail?pipelineId=3537b826c3c54622a4fd365051123f9e&pipelineRunId=1a4a15c93b9d46128d2ec9c7ec70606d&projectName=CANN>>>>>></a></td>\n                        <td><a href=https://ascend-ci.obs.cn-north-4.myhuaweicloud.com/ops-transformer/package/3558/cann-ops-transformer-experimental_linux-aarch64.run>>>>>></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>Pre_Compile</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=></a></td>\n                        <td><a href=https://ascend-ci.obs.cn-north-4.myhuaweicloud.com/ops-transformer/package/3558/cann-ops-transformer-custom_linux-aarch64.run>>>>>></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>pre_comment</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/pipelineDetail?pipelineId=3537b826c3c54622a4fd365051123f9e&pipelineRunId=1a4a15c93b9d46128d2ec9c7ec70606d&projectName=CANN>>>>>></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>Compile_Ascend_X86_ubuntu24</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/pipelineDetail?pipelineId=3537b826c3c54622a4fd365051123f9e&pipelineRunId=1a4a15c93b9d46128d2ec9c7ec70606d&projectName=CANN>>>>>></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>Compile_Ascend_X86_mobile_station_ubuntu24</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/pipelineDetail?pipelineId=3537b826c3c54622a4fd365051123f9e&pipelineRunId=1a4a15c93b9d46128d2ec9c7ec70606d&projectName=CANN>>>>>></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>Compile_Ascend_ARM_ubuntu24</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/pipelineDetail?pipelineId=3537b826c3c54622a4fd365051123f9e&pipelineRunId=1a4a15c93b9d46128d2ec9c7ec70606d&projectName=CANN>>>>>></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>Compile_Ascend_X86_experimental_ubuntu24</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/pipelineDetail?pipelineId=3537b826c3c54622a4fd365051123f9e&pipelineRunId=1a4a15c93b9d46128d2ec9c7ec70606d&projectName=CANN>>>>>></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>Compile_Ascend_ARM_experimental_ubuntu24</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/pipelineDetail?pipelineId=3537b826c3c54622a4fd365051123f9e&pipelineRunId=1a4a15c93b9d46128d2ec9c7ec70606d&projectName=CANN>>>>>></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>UT_Test</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>Smoke_A900_npupool</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=></a></td>\n                        <td><a href=https://ascend-ci.obs.cn-north-4.myhuaweicloud.com/ops-transformer/package/3558/slog.tar.gz>>>>>></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>API_Check</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/pipelineDetail?pipelineId=3537b826c3c54622a4fd365051123f9e&pipelineRunId=1a4a15c93b9d46128d2ec9c7ec70606d&projectName=CANN>>>>>></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>ATK_Test_A2</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=></a></td>\n                        <td><a href=></a></td>\n                    </tr> </table><p>[2026-04-10 14:58:08] &nbsp;&nbsp;&nbsp;CI执行结束 </p>",
+    "comment_type": "pr_comment",
+    "created_at": "2026-04-10T14:50:06+08:00",
+    "discussion_id": "b00a2106486c1135650e2ea97e0f6cc352f9ff01",
+    "id": 167927087,
+    "updated_at": "2026-04-10T14:58:08+08:00",
+    "user": {
+      "avatar_url": "https://cdn-img.gitcode.com/bf/ad/b7f29486a040d7b2f52bf6c78414692d7d585eb1ec628cea3eb01c9d63f68618.png?time=1755691472703",
+      "html_url": "https://gitcode.com/cann-robot",
+      "id": "673c1552584fe8295cfd4a13",
+      "login": "cann-robot",
+      "name": "CANN-robot",
+      "object_id": "673c1552584fe8295cfd4a13"
+    }
+  },
+  {
+    "body": "流水线任务触发成功\n任务链接 [<b><a href='https://www.openlibing.com/apps/pipelineDetail?pipelineId=3dd7f759b16146a08dcb8b11e5426b56&pipelineRunId=3dae521a37c54c25ae14b91377ce9b24&projectName=CANN'>3dae521a37c54c25ae14b91377ce9b24</a></b>][<b><a href='https://gitcode.com/cann/infrastructure/blob/main/docs/ci/ci_guide.md'>流水线指导</a></b>]\n<table style=\"border-collapse: collapse\"><tr><th>任务名称</th><th>状态</th><th>日志</th><th>下载链接</th></tr>\n                    <tr>\n                        <td><strong>codecheck</strong></td>\n                        <td>❌ FAILED</td>\n                        <td><a href=https://www.openlibing.com/apps/entryCheckDashCode/MR_1fc3c8db25e1464fb629ecb1843dd9c0/b56d4cc611e8056115381ffaa8d751a3?projectId=300033&codeHostingPlatformFlag=gitcode>>>>>></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>SCA</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/personalScandTaskInfor/person/be86a58b-796a-4ba0-ad86-f09213d12076?projectId=300033&codeHostingPlatformFlag=gitcode>>>>>></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>anti_virus</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/entryCheckNew/poisoningresult/e2abe98c-5559-456c-9198-b2765e265996/CANN/ops-transformer?projectName=CANN&codeHostingPlatformFlag=gitcode>>>>>></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>codecheck_style</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>StaticCheck_codespell_check</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>StaticCheck_link_validity_check</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>StaticCheck_resource_existence_check</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>StaticCheck_tag_closed_check</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>StaticCheck_markdownlint</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>Check_Pr</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/pipelineDetail?pipelineId=3dd7f759b16146a08dcb8b11e5426b56&pipelineRunId=3dae521a37c54c25ae14b91377ce9b24&projectName=CANN>>>>>></a></td>\n                        <td><a href=></a></td>\n                    </tr> </table>",
+    "comment_type": "pr_comment",
+    "created_at": "2026-04-10T14:52:02+08:00",
+    "discussion_id": "0599d0e6eae95524cbec119833e07eb874637162",
+    "id": 167927528,
+    "updated_at": "2026-04-10T14:52:05+08:00",
+    "user": {
+      "avatar_url": "https://cdn-img.gitcode.com/bf/ad/b7f29486a040d7b2f52bf6c78414692d7d585eb1ec628cea3eb01c9d63f68618.png?time=1755691472703",
+      "html_url": "https://gitcode.com/cann-robot",
+      "id": "673c1552584fe8295cfd4a13",
+      "login": "cann-robot",
+      "name": "CANN-robot",
+      "object_id": "673c1552584fe8295cfd4a13"
+    }
+  },
+  {
+    "body": "compile",
+    "comment_type": "pr_comment",
+    "created_at": "2026-04-10T16:33:54+08:00",
+    "discussion_id": "516a1b025ea698c6b0a99535201bd48c73860fe1",
+    "id": 167953031,
+    "updated_at": "2026-04-10T16:33:54+08:00",
+    "user": {
+      "avatar_url": "https://cdn-img.gitcode.com/fb/ed/23f26b7919e5d295f92af7c09e1e21564b80e6d4470baa6c7ccadef50a60fcd1.png",
+      "html_url": "https://gitcode.com/liumingxuan9",
+      "id": "6708927010b64c6292ebed70",
+      "login": "liumingxuan9",
+      "name": "GoodMorning",
+      "object_id": "6708927010b64c6292ebed70"
+    }
+  },
+  {
+    "body": "流水线任务触发成功\n任务链接 [<b><a href='https://www.openlibing.com/apps/pipelineDetail?pipelineId=3537b826c3c54622a4fd365051123f9e&pipelineRunId=9c83ca3b84734c6ebcd791eb75c1ef21&projectName=CANN'>9c83ca3b84734c6ebcd791eb75c1ef21</a></b>][<b><a href='https://gitcode.com/cann/infrastructure/blob/main/docs/ci/ci_guide.md'>流水线指导</a></b>]\n<table style=\"border-collapse: collapse\"><tr><th>任务名称</th><th>状态</th><th>日志</th><th>下载链接</th></tr>\n                    <tr>\n                        <td><strong>Compile_Ascend_X86</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/pipelineDetail?pipelineId=3537b826c3c54622a4fd365051123f9e&pipelineRunId=9c83ca3b84734c6ebcd791eb75c1ef21&projectName=CANN>>>>>></a></td>\n                        <td><a href=https://ascend-ci.obs.cn-north-4.myhuaweicloud.com/ops-transformer/package/3558/cann-ops-transformer-experimental_linux-x86_64.run>>>>>></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>Compile_Ascend_ARM</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/pipelineDetail?pipelineId=3537b826c3c54622a4fd365051123f9e&pipelineRunId=9c83ca3b84734c6ebcd791eb75c1ef21&projectName=CANN>>>>>></a></td>\n                        <td><a href=https://ascend-ci.obs.cn-north-4.myhuaweicloud.com/ops-transformer/package/3558/cann-ops-transformer_linux-aarch64.run>>>>>></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>Compile_Ascend_X86_mobile_station</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/pipelineDetail?pipelineId=3537b826c3c54622a4fd365051123f9e&pipelineRunId=9c83ca3b84734c6ebcd791eb75c1ef21&projectName=CANN>>>>>></a></td>\n                        <td><a href=https://ascend-ci.obs.cn-north-4.myhuaweicloud.com/ops-transformer/package/3558/cann-ops-transformer-kirinx90_linux-x86_64.run>>>>>></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>Compile_Ascend_X86_experimental</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/pipelineDetail?pipelineId=3537b826c3c54622a4fd365051123f9e&pipelineRunId=9c83ca3b84734c6ebcd791eb75c1ef21&projectName=CANN>>>>>></a></td>\n                        <td><a href=https://ascend-ci.obs.cn-north-4.myhuaweicloud.com/ops-transformer/package/3558/cann-ops-transformer-experimental_linux-x86_64.run>>>>>></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>Compile_Ascend_ARM_experimental</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/pipelineDetail?pipelineId=3537b826c3c54622a4fd365051123f9e&pipelineRunId=9c83ca3b84734c6ebcd791eb75c1ef21&projectName=CANN>>>>>></a></td>\n                        <td><a href=https://ascend-ci.obs.cn-north-4.myhuaweicloud.com/ops-transformer/package/3558/cann-ops-transformer-experimental_linux-aarch64.run>>>>>></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>Pre_Compile</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=></a></td>\n                        <td><a href=https://ascend-ci.obs.cn-north-4.myhuaweicloud.com/ops-transformer/package/3558/cann-ops-transformer-custom_linux-aarch64.run>>>>>></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>pre_comment</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/pipelineDetail?pipelineId=3537b826c3c54622a4fd365051123f9e&pipelineRunId=9c83ca3b84734c6ebcd791eb75c1ef21&projectName=CANN>>>>>></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>Compile_Ascend_X86_ubuntu24</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/pipelineDetail?pipelineId=3537b826c3c54622a4fd365051123f9e&pipelineRunId=9c83ca3b84734c6ebcd791eb75c1ef21&projectName=CANN>>>>>></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>Compile_Ascend_X86_mobile_station_ubuntu24</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/pipelineDetail?pipelineId=3537b826c3c54622a4fd365051123f9e&pipelineRunId=9c83ca3b84734c6ebcd791eb75c1ef21&projectName=CANN>>>>>></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>Compile_Ascend_ARM_ubuntu24</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/pipelineDetail?pipelineId=3537b826c3c54622a4fd365051123f9e&pipelineRunId=9c83ca3b84734c6ebcd791eb75c1ef21&projectName=CANN>>>>>></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>Compile_Ascend_X86_experimental_ubuntu24</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/pipelineDetail?pipelineId=3537b826c3c54622a4fd365051123f9e&pipelineRunId=9c83ca3b84734c6ebcd791eb75c1ef21&projectName=CANN>>>>>></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>Compile_Ascend_ARM_experimental_ubuntu24</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/pipelineDetail?pipelineId=3537b826c3c54622a4fd365051123f9e&pipelineRunId=9c83ca3b84734c6ebcd791eb75c1ef21&projectName=CANN>>>>>></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>UT_Test</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>Smoke_A900_npupool</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=></a></td>\n                        <td><a href=https://ascend-ci.obs.cn-north-4.myhuaweicloud.com/ops-transformer/package/3558/slog.tar.gz>>>>>></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>API_Check</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/pipelineDetail?pipelineId=3537b826c3c54622a4fd365051123f9e&pipelineRunId=9c83ca3b84734c6ebcd791eb75c1ef21&projectName=CANN>>>>>></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>ATK_Test_A2</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=></a></td>\n                        <td><a href=></a></td>\n                    </tr> </table><p>[2026-04-10 16:42:16] &nbsp;&nbsp;&nbsp;CI执行结束 </p>",
+    "comment_type": "pr_comment",
+    "created_at": "2026-04-10T16:35:05+08:00",
+    "discussion_id": "da747fd10d35a52136c65ca3ccb4c4b125f1e6e4",
+    "id": 167953341,
+    "updated_at": "2026-04-10T16:42:16+08:00",
+    "user": {
+      "avatar_url": "https://cdn-img.gitcode.com/bf/ad/b7f29486a040d7b2f52bf6c78414692d7d585eb1ec628cea3eb01c9d63f68618.png?time=1755691472703",
+      "html_url": "https://gitcode.com/cann-robot",
+      "id": "673c1552584fe8295cfd4a13",
+      "login": "cann-robot",
+      "name": "CANN-robot",
+      "object_id": "673c1552584fe8295cfd4a13"
+    }
+  },
+  {
+    "body": "流水线任务触发成功\n任务链接 [<b><a href='https://www.openlibing.com/apps/pipelineDetail?pipelineId=3dd7f759b16146a08dcb8b11e5426b56&pipelineRunId=89364d8f7357438dae939554a497ac1d&projectName=CANN'>89364d8f7357438dae939554a497ac1d</a></b>][<b><a href='https://gitcode.com/cann/infrastructure/blob/main/docs/ci/ci_guide.md'>流水线指导</a></b>]\n<table style=\"border-collapse: collapse\"><tr><th>任务名称</th><th>状态</th><th>日志</th><th>下载链接</th></tr>\n                    <tr>\n                        <td><strong>codecheck</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/entryCheckDashCode/MR_1feb590270e743c3a148f3ae06c0c3a0/5b6173afbf373543887dbb4f3fd9caf8?projectId=300033&codeHostingPlatformFlag=gitcode>>>>>></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>SCA</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/personalScandTaskInfor/person/8437ba53-7a09-494d-981e-391096c5511a?projectId=300033&codeHostingPlatformFlag=gitcode>>>>>></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>anti_virus</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/entryCheckNew/poisoningresult/f1e55114-ec9c-40c7-b71e-8e50bed305a9/CANN/ops-transformer?projectName=CANN&codeHostingPlatformFlag=gitcode>>>>>></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>codecheck_style</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>StaticCheck_codespell_check</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>StaticCheck_link_validity_check</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>StaticCheck_resource_existence_check</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>StaticCheck_tag_closed_check</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>StaticCheck_markdownlint</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>Check_Pr</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/pipelineDetail?pipelineId=3dd7f759b16146a08dcb8b11e5426b56&pipelineRunId=89364d8f7357438dae939554a497ac1d&projectName=CANN>>>>>></a></td>\n                        <td><a href=></a></td>\n                    </tr> </table><p>[2026-04-10 16:36:58] &nbsp;&nbsp;&nbsp;CI执行结束 </p>",
+    "comment_type": "pr_comment",
+    "created_at": "2026-04-10T16:36:55+08:00",
+    "discussion_id": "1001df970af7444e2ae5b121291a81ba029ffdee",
+    "id": 167953851,
+    "updated_at": "2026-04-10T16:36:59+08:00",
+    "user": {
+      "avatar_url": "https://cdn-img.gitcode.com/bf/ad/b7f29486a040d7b2f52bf6c78414692d7d585eb1ec628cea3eb01c9d63f68618.png?time=1755691472703",
+      "html_url": "https://gitcode.com/cann-robot",
+      "id": "673c1552584fe8295cfd4a13",
+      "login": "cann-robot",
+      "name": "CANN-robot",
+      "object_id": "673c1552584fe8295cfd4a13"
+    }
+  },
+  {
+    "body": "### Notification  \nThis pull request source branch has changed, so removes the following label(s): ci-pipeline-passed.",
+    "comment_type": "pr_comment",
+    "created_at": "2026-04-10T16:57:20+08:00",
+    "discussion_id": "2b2537e761c857e725280f2c58843ce16493e6f1",
+    "id": 167959192,
+    "updated_at": "2026-04-10T16:57:20+08:00",
+    "user": {
+      "avatar_url": "https://cdn-img.gitcode.com/bf/ad/b7f29486a040d7b2f52bf6c78414692d7d585eb1ec628cea3eb01c9d63f68618.png?time=1755691472703",
+      "html_url": "https://gitcode.com/cann-robot",
+      "id": "673c1552584fe8295cfd4a13",
+      "login": "cann-robot",
+      "name": "CANN-robot",
+      "object_id": "673c1552584fe8295cfd4a13"
+    }
+  },
+  {
+    "body": "compile",
+    "comment_type": "pr_comment",
+    "created_at": "2026-04-10T16:58:03+08:00",
+    "discussion_id": "0f9c2f5aa058f58034665c5538d2081c773faa07",
+    "id": 167959369,
+    "updated_at": "2026-04-10T16:58:03+08:00",
+    "user": {
+      "avatar_url": "https://cdn-img.gitcode.com/fb/ed/23f26b7919e5d295f92af7c09e1e21564b80e6d4470baa6c7ccadef50a60fcd1.png",
+      "html_url": "https://gitcode.com/liumingxuan9",
+      "id": "6708927010b64c6292ebed70",
+      "login": "liumingxuan9",
+      "name": "GoodMorning",
+      "object_id": "6708927010b64c6292ebed70"
+    }
+  },
+  {
+    "body": "流水线任务触发成功\n任务链接 [<b><a href='https://www.openlibing.com/apps/pipelineDetail?pipelineId=3537b826c3c54622a4fd365051123f9e&pipelineRunId=5ddf181806f14593984cd435ba5061d3&projectName=CANN'>5ddf181806f14593984cd435ba5061d3</a></b>][<b><a href='https://gitcode.com/cann/infrastructure/blob/main/docs/ci/ci_guide.md'>流水线指导</a></b>]\n<table style=\"border-collapse: collapse\"><tr><th>任务名称</th><th>状态</th><th>日志</th><th>下载链接</th></tr>\n                    <tr>\n                        <td><strong>Compile_Ascend_X86</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/pipelineDetail?pipelineId=3537b826c3c54622a4fd365051123f9e&pipelineRunId=5ddf181806f14593984cd435ba5061d3&projectName=CANN>>>>>></a></td>\n                        <td><a href=https://ascend-ci.obs.cn-north-4.myhuaweicloud.com/ops-transformer/package/3558/cann-ops-transformer-experimental_linux-x86_64.run>>>>>></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>Compile_Ascend_ARM</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/pipelineDetail?pipelineId=3537b826c3c54622a4fd365051123f9e&pipelineRunId=5ddf181806f14593984cd435ba5061d3&projectName=CANN>>>>>></a></td>\n                        <td><a href=https://ascend-ci.obs.cn-north-4.myhuaweicloud.com/ops-transformer/package/3558/cann-ops-transformer_linux-aarch64.run>>>>>></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>Compile_Ascend_X86_mobile_station</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/pipelineDetail?pipelineId=3537b826c3c54622a4fd365051123f9e&pipelineRunId=5ddf181806f14593984cd435ba5061d3&projectName=CANN>>>>>></a></td>\n                        <td><a href=https://ascend-ci.obs.cn-north-4.myhuaweicloud.com/ops-transformer/package/3558/cann-ops-transformer-kirinx90_linux-x86_64.run>>>>>></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>Compile_Ascend_X86_experimental</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/pipelineDetail?pipelineId=3537b826c3c54622a4fd365051123f9e&pipelineRunId=5ddf181806f14593984cd435ba5061d3&projectName=CANN>>>>>></a></td>\n                        <td><a href=https://ascend-ci.obs.cn-north-4.myhuaweicloud.com/ops-transformer/package/3558/cann-ops-transformer-experimental_linux-x86_64.run>>>>>></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>Compile_Ascend_ARM_experimental</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/pipelineDetail?pipelineId=3537b826c3c54622a4fd365051123f9e&pipelineRunId=5ddf181806f14593984cd435ba5061d3&projectName=CANN>>>>>></a></td>\n                        <td><a href=https://ascend-ci.obs.cn-north-4.myhuaweicloud.com/ops-transformer/package/3558/cann-ops-transformer-experimental_linux-aarch64.run>>>>>></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>Pre_Compile</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=></a></td>\n                        <td><a href=https://ascend-ci.obs.cn-north-4.myhuaweicloud.com/ops-transformer/package/3558/cann-ops-transformer-custom_linux-aarch64.run>>>>>></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>pre_comment</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/pipelineDetail?pipelineId=3537b826c3c54622a4fd365051123f9e&pipelineRunId=5ddf181806f14593984cd435ba5061d3&projectName=CANN>>>>>></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>Compile_Ascend_X86_ubuntu24</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/pipelineDetail?pipelineId=3537b826c3c54622a4fd365051123f9e&pipelineRunId=5ddf181806f14593984cd435ba5061d3&projectName=CANN>>>>>></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>Compile_Ascend_X86_mobile_station_ubuntu24</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/pipelineDetail?pipelineId=3537b826c3c54622a4fd365051123f9e&pipelineRunId=5ddf181806f14593984cd435ba5061d3&projectName=CANN>>>>>></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>Compile_Ascend_ARM_ubuntu24</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/pipelineDetail?pipelineId=3537b826c3c54622a4fd365051123f9e&pipelineRunId=5ddf181806f14593984cd435ba5061d3&projectName=CANN>>>>>></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>Compile_Ascend_X86_experimental_ubuntu24</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/pipelineDetail?pipelineId=3537b826c3c54622a4fd365051123f9e&pipelineRunId=5ddf181806f14593984cd435ba5061d3&projectName=CANN>>>>>></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>Compile_Ascend_ARM_experimental_ubuntu24</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/pipelineDetail?pipelineId=3537b826c3c54622a4fd365051123f9e&pipelineRunId=5ddf181806f14593984cd435ba5061d3&projectName=CANN>>>>>></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>UT_Test</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>Smoke_A900_npupool</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=></a></td>\n                        <td><a href=https://ascend-ci.obs.cn-north-4.myhuaweicloud.com/ops-transformer/package/3558/slog.tar.gz>>>>>></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>API_Check</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/pipelineDetail?pipelineId=3537b826c3c54622a4fd365051123f9e&pipelineRunId=5ddf181806f14593984cd435ba5061d3&projectName=CANN>>>>>></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>ATK_Test_A2</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=></a></td>\n                        <td><a href=></a></td>\n                    </tr> </table><p>[2026-04-10 17:17:04] &nbsp;&nbsp;&nbsp;CI执行结束 </p>",
+    "comment_type": "pr_comment",
+    "created_at": "2026-04-10T16:59:15+08:00",
+    "discussion_id": "d0743c108086ec23b5a32e1f30914c65625e2f67",
+    "id": 167959653,
+    "updated_at": "2026-04-10T17:17:05+08:00",
+    "user": {
+      "avatar_url": "https://cdn-img.gitcode.com/bf/ad/b7f29486a040d7b2f52bf6c78414692d7d585eb1ec628cea3eb01c9d63f68618.png?time=1755691472703",
+      "html_url": "https://gitcode.com/cann-robot",
+      "id": "673c1552584fe8295cfd4a13",
+      "login": "cann-robot",
+      "name": "CANN-robot",
+      "object_id": "673c1552584fe8295cfd4a13"
+    }
+  },
+  {
+    "body": "流水线任务触发成功\n任务链接 [<b><a href='https://www.openlibing.com/apps/pipelineDetail?pipelineId=3dd7f759b16146a08dcb8b11e5426b56&pipelineRunId=56511944353f4f55b85a66b0b29e1a73&projectName=CANN'>56511944353f4f55b85a66b0b29e1a73</a></b>][<b><a href='https://gitcode.com/cann/infrastructure/blob/main/docs/ci/ci_guide.md'>流水线指导</a></b>]\n<table style=\"border-collapse: collapse\"><tr><th>任务名称</th><th>状态</th><th>日志</th><th>下载链接</th></tr>\n                    <tr>\n                        <td><strong>codecheck</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/entryCheckDashCode/MR_54714e98bb4f40d3a47262808916b6fe/9a305569c258472f1b8393b97086cc61?projectId=300033&codeHostingPlatformFlag=gitcode>>>>>></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>SCA</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/personalScandTaskInfor/person/1c17edd2-0037-4351-bda5-f08339563352?projectId=300033&codeHostingPlatformFlag=gitcode>>>>>></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>anti_virus</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/entryCheckNew/poisoningresult/fd647f9a-84dd-467f-84fe-34ca85dd948e/CANN/ops-transformer?projectName=CANN&codeHostingPlatformFlag=gitcode>>>>>></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>codecheck_style</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>StaticCheck_codespell_check</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>StaticCheck_link_validity_check</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>StaticCheck_resource_existence_check</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>StaticCheck_tag_closed_check</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>StaticCheck_markdownlint</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>Check_Pr</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/pipelineDetail?pipelineId=3dd7f759b16146a08dcb8b11e5426b56&pipelineRunId=56511944353f4f55b85a66b0b29e1a73&projectName=CANN>>>>>></a></td>\n                        <td><a href=></a></td>\n                    </tr> </table><p>[2026-04-10 17:01:04] &nbsp;&nbsp;&nbsp;CI执行结束 </p>",
+    "comment_type": "pr_comment",
+    "created_at": "2026-04-10T17:01:00+08:00",
+    "discussion_id": "1bcd377c04470edeb24586361aeb6e9f64ef6ab6",
+    "id": 167960071,
+    "updated_at": "2026-04-10T17:01:04+08:00",
+    "user": {
+      "avatar_url": "https://cdn-img.gitcode.com/bf/ad/b7f29486a040d7b2f52bf6c78414692d7d585eb1ec628cea3eb01c9d63f68618.png?time=1755691472703",
+      "html_url": "https://gitcode.com/cann-robot",
+      "id": "673c1552584fe8295cfd4a13",
+      "login": "cann-robot",
+      "name": "CANN-robot",
+      "object_id": "673c1552584fe8295cfd4a13"
+    }
+  },
+  {
+    "body": "/lgtm\n/approve",
+    "comment_type": "pr_comment",
+    "created_at": "2026-04-13T11:35:52+08:00",
+    "discussion_id": "490af8cf7613c2d2462b487c992043a3234a0758",
+    "id": 168107378,
+    "updated_at": "2026-04-13T11:35:52+08:00",
+    "user": {
+      "html_url": "https://gitcode.com/wang-minbo",
+      "id": "6822d30360184036954b14d5",
+      "login": "wang-minbo",
+      "name": "wang-minbo",
+      "object_id": "6822d30360184036954b14d5"
+    }
+  },
+  {
+    "body": "/lgtm",
+    "comment_type": "pr_comment",
+    "created_at": "2026-04-13T11:57:07+08:00",
+    "discussion_id": "afc138ac6951554720c03641785b275b798a7de8",
+    "id": 168111312,
+    "updated_at": "2026-04-13T11:57:07+08:00",
+    "user": {
+      "html_url": "https://gitcode.com/chenjunjian11",
+      "id": "687772a430980b376fba4afd",
+      "login": "chenjunjian11",
+      "name": "chenjianjun11",
+      "object_id": "687772a430980b376fba4afd"
+    }
+  },
+  {
+    "body": "### Review Guide\n\n This pull-request **passes review**.\n Committers who wrote a comment of `/approve` are: [*wang-minbo*](https://gitcode.com/wang-minbo).\nReviewers who wrote a comment of `/lgtm` are: [*wang-minbo*](https://gitcode.com/wang-minbo), [*chenjunjian11*](https://gitcode.com/chenjunjian11).\n",
+    "comment_type": "pr_comment",
+    "created_at": "2026-04-13T11:57:18+08:00",
+    "discussion_id": "7b30ff2740a2494aa047910843e4b9220db7bcf2",
+    "id": 168111334,
+    "updated_at": "2026-04-13T11:57:18+08:00",
+    "user": {
+      "avatar_url": "https://cdn-img.gitcode.com/bf/ad/b7f29486a040d7b2f52bf6c78414692d7d585eb1ec628cea3eb01c9d63f68618.png?time=1755691472703",
+      "html_url": "https://gitcode.com/cann-robot",
+      "id": "673c1552584fe8295cfd4a13",
+      "login": "cann-robot",
+      "name": "CANN-robot",
+      "object_id": "673c1552584fe8295cfd4a13"
+    }
+  }
+]

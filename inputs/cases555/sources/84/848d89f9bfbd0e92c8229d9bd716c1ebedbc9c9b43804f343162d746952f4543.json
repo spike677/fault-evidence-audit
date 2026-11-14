@@ -1,0 +1,74 @@
+[
+  {
+    "additions": 6,
+    "blob_id": "223f4611af43ae5be83912975320b3b6166542b7",
+    "blob_url": "https://gitcode.com/cann/ops-cv/blob/f2f7a40e9cdf24be1170f4caed5f6cbd12b4890c/image/resize_bilinear_v2/op_kernel/arch35/resize_bilinear_v2_simt_nchw.h",
+    "deletions": 0,
+    "filename": "image/resize_bilinear_v2/op_kernel/arch35/resize_bilinear_v2_simt_nchw.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 6,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -113,6 +113,12 @@ __simt_callee__ __aicore__ __attribute__((always_inline)) inline void SimtComput\n             origHeight_ = static_cast<float>(H * scaleH);\n             origWidth_ = static_cast<float>(W * scaleW);\n         }\n+        if (origHeight_ < 0.0f) {\n+            origHeight_ = 0.0;\n+        }\n+        if (origWidth_ < 0.0f) {\n+            origWidth_ = 0.0;\n+        }\n \n         // 计算原图坐标点附近四点的横坐标以及权重值\n         leftX = (origWidth_ > 0.0f) ? floorf(origWidth_) : 0.0f;\n",
+      "new_file": false,
+      "new_path": "image/resize_bilinear_v2/op_kernel/arch35/resize_bilinear_v2_simt_nchw.h",
+      "old_path": "image/resize_bilinear_v2/op_kernel/arch35/resize_bilinear_v2_simt_nchw.h",
+      "removed_lines": 0,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-cv/raw/f2f7a40e9cdf24be1170f4caed5f6cbd12b4890c/image/resize_bilinear_v2/op_kernel/arch35/resize_bilinear_v2_simt_nchw.h",
+    "sha": "f2f7a40e9cdf24be1170f4caed5f6cbd12b4890c",
+    "source_branch": "resize_bilinear",
+    "source_project": {
+      "full_name": "zhengyuchuan2024/ops-cv",
+      "human_name": "zhengyuchuan2024 / ops-cv",
+      "id": 9308960,
+      "path": "ops-cv"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-cv",
+      "human_name": "CANN / ops-cv",
+      "id": 7657293,
+      "path": "ops-cv"
+    }
+  },
+  {
+    "additions": 6,
+    "blob_id": "5d59076d926b1c6bd6f708e6e12d6a859ab69c2d",
+    "blob_url": "https://gitcode.com/cann/ops-cv/blob/f2f7a40e9cdf24be1170f4caed5f6cbd12b4890c/image/resize_bilinear_v2/op_kernel/arch35/resize_bilinear_v2_simt_nhwc.h",
+    "deletions": 0,
+    "filename": "image/resize_bilinear_v2/op_kernel/arch35/resize_bilinear_v2_simt_nhwc.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 6,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -117,6 +117,12 @@ __simt_callee__ __aicore__ __attribute__((always_inline)) inline void SimtComput\n             origHeight_ = static_cast<float>(H * scaleH_);\n             origWidth_ = static_cast<float>(W * scaleW_);\n         }\n+        if (origHeight_ < 0.0f) {\n+            origHeight_ = 0.0;\n+        }\n+        if (origWidth_ < 0.0f) {\n+            origWidth_ = 0.0;\n+        }\n \n         // 计算原图坐标点附近四点的横坐标以及权重值\n         leftX = (origWidth_ > 0.0f) ? floorf(origWidth_) : 0.0f;\n",
+      "new_file": false,
+      "new_path": "image/resize_bilinear_v2/op_kernel/arch35/resize_bilinear_v2_simt_nhwc.h",
+      "old_path": "image/resize_bilinear_v2/op_kernel/arch35/resize_bilinear_v2_simt_nhwc.h",
+      "removed_lines": 0,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-cv/raw/f2f7a40e9cdf24be1170f4caed5f6cbd12b4890c/image/resize_bilinear_v2/op_kernel/arch35/resize_bilinear_v2_simt_nhwc.h",
+    "sha": "f2f7a40e9cdf24be1170f4caed5f6cbd12b4890c",
+    "source_branch": "resize_bilinear",
+    "source_project": {
+      "full_name": "zhengyuchuan2024/ops-cv",
+      "human_name": "zhengyuchuan2024 / ops-cv",
+      "id": 9308960,
+      "path": "ops-cv"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-cv",
+      "human_name": "CANN / ops-cv",
+      "id": 7657293,
+      "path": "ops-cv"
+    }
+  }
+]

@@ -1,0 +1,38 @@
+[
+  {
+    "additions": 5,
+    "blob_id": "0ab2c7931e9c3048ddd442bad966cdf7a3220565",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/19e14848538a95168d3f17afbbb13837fe4919b5/loss/ctc_loss_v2_grad/op_host/arch35/ctc_loss_v2_grad_tiling_arch35.cpp",
+    "deletions": 3,
+    "filename": "loss/ctc_loss_v2_grad/op_host/arch35/ctc_loss_v2_grad_tiling_arch35.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 5,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -40,6 +40,8 @@ constexpr int64_t INPUT_LOSS_IDX = 5;\n constexpr int64_t INPUT_LOG_ALPHA_IDX = 6;\n constexpr int64_t LOSS_DIM_NUM = 1;\n constexpr int64_t GRAD_DIM_NUM = 3;\n+constexpr int64_t ATTR_BLANK_IDX = 0;\n+constexpr int64_t ATTR_ZERO_INFINITY_IDX = 2;\n \n constexpr int64_t FLOAT_DSIZE = 4;\n \n@@ -318,16 +320,16 @@ ge::graphStatus CTCLossV2GradTiling4AscendC::Init()\n \n     auto* attrs = context_->GetAttrs();\n     OP_CHECK_NULL_WITH_CONTEXT(context_, attrs);\n-    const auto* blankPtr = attrs->GetAttrPointer<int64_t>(0);\n+    const auto* blankPtr = attrs->GetAttrPointer<int64_t>(ATTR_BLANK_IDX);\n     OP_CHECK_NULL_WITH_CONTEXT(context_, blankPtr);\n     BLANK = *blankPtr;\n     OP_CHECK_IF(\n         BLANK < 0 || BLANK >= symbolSet,\n         OP_LOGE(context_->GetNodeName(), \"BLANK is out of the range, please input the right value.\"),\n         return ge::GRAPH_FAILED);\n-    const auto* zeroInfinityPtr = attrs->GetAttrPointer<int64_t>(2);\n+    const auto* zeroInfinityPtr = attrs->GetAttrPointer<bool>(ATTR_ZERO_INFINITY_IDX);\n     OP_CHECK_NULL_WITH_CONTEXT(context_, zeroInfinityPtr);\n-    zeroInfinity = *zeroInfinityPtr;\n+    zeroInfinity = (*zeroInfinityPtr) ? 1 : 0;\n     return InitSimtParams();\n }\n \n",
+      "new_file": false,
+      "new_path": "loss/ctc_loss_v2_grad/op_host/arch35/ctc_loss_v2_grad_tiling_arch35.cpp",
+      "old_path": "loss/ctc_loss_v2_grad/op_host/arch35/ctc_loss_v2_grad_tiling_arch35.cpp",
+      "removed_lines": 3,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/19e14848538a95168d3f17afbbb13837fe4919b5/loss/ctc_loss_v2_grad/op_host/arch35/ctc_loss_v2_grad_tiling_arch35.cpp",
+    "sha": "19e14848538a95168d3f17afbbb13837fe4919b5",
+    "source_branch": "cherry-pick-mr-2613-1773814347357-auto",
+    "source_project": {
+      "full_name": "wkx12138/ops-nn",
+      "human_name": "wkx12138 / ops-nn",
+      "id": 9080263,
+      "path": "ops-nn"
+    },
+    "target_branch": "9.0.0",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  }
+]

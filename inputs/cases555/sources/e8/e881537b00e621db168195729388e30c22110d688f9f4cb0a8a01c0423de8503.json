@@ -1,0 +1,218 @@
+[
+  {
+    "additions": 8,
+    "blob_id": "e97d7b2ca24473a24fbd25cc1884ec865bd70a31",
+    "blob_url": "https://gitcode.com/cann/ops-cv/blob/9f6e4f1acd4efcbfdd02b490b0dee1242fb63a18/image/grid_sampler2_d_grad/op_kernel/arch35/grid_sampler2_d_grad_simt.h",
+    "deletions": 8,
+    "filename": "image/grid_sampler2_d_grad/op_kernel/arch35/grid_sampler2_d_grad_simt.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 8,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -117,8 +117,8 @@ __simt_callee__ __aicore__ __attribute__((always_inline)) inline void ComputeBil\n \tfloat iy, float ix, uint32_t gridH, uint32_t gridW, uint32_t batchNum, uint32_t heightCol, uint32_t widthCol, uint32_t newInputIndex, uint32_t offsetBaseAddr, \n \tuint32_t xH, uint32_t xW, uint32_t channel, float* ixGradMultValue, float* iyGradMultValue)\n {\n-    int32_t ix_tnw = GetFloorValue(ix);\n-    int32_t iy_tnw = GetFloorValue(iy);\n+    int32_t ix_tnw = static_cast<int32_t>(floorf(ix));\n+    int32_t iy_tnw = static_cast<int32_t>(floorf(iy));\n \n     // get surfaces to each neighbor:\n     float tnw = (ix_tnw + 1 - ix) * (iy_tnw + 1 - iy);\n@@ -148,8 +148,8 @@ __simt_callee__ __aicore__ __attribute__((always_inline)) inline void ComputeNea\n     uint32_t widthCol, uint32_t newInputIndex, uint32_t offsetBaseAddr, uint32_t xH, uint32_t xW,\n     uint32_t channel)\n {\n-    int32_t ix_nearest = rintf(ix);\n-    int32_t iy_nearest = rintf(iy);\n+    int32_t ix_nearest = static_cast<int32_t>(rintf(ix));\n+    int32_t iy_nearest = static_cast<int32_t>(rintf(iy));\n \n     for (uint32_t channelIndex = 0; channelIndex < channel; channelIndex++) {\n         float gradOutValue = static_cast<float>(0.0);\n@@ -182,14 +182,14 @@ __simt_callee__ __aicore__ __attribute__((always_inline)) inline void ComputeBic\n     // Compute forward cubic coefficients (for grad_input)\n     float x_coeffs[4];\n     float y_coeffs[4];\n-    GetCubicUpsampleCoefficients(x_coeffs, tx, sizeof(x_coeffs));\n-    GetCubicUpsampleCoefficients(y_coeffs, ty, sizeof(y_coeffs));\n+    GetCubicUpsampleCoefficients(x_coeffs, tx, sizeof(x_coeffs) / sizeof(float));\n+    GetCubicUpsampleCoefficients(y_coeffs, ty, sizeof(y_coeffs) / sizeof(float));\n \n     // Compute gradient cubic coefficients (for grad_grid)\n     float x_coeffs_grad[4];\n     float y_coeffs_grad[4];\n-    GetCubicCoefficientsGrad(x_coeffs_grad, tx, sizeof(x_coeffs_grad));\n-    GetCubicCoefficientsGrad(y_coeffs_grad, ty, sizeof(y_coeffs_grad));\n+    GetCubicCoefficientsGrad(x_coeffs_grad, tx, sizeof(x_coeffs_grad) / sizeof(float));\n+    GetCubicCoefficientsGrad(y_coeffs_grad, ty, sizeof(y_coeffs_grad) / sizeof(float));\n \n     float gix = static_cast<float>(0);\n     float giy = static_cast<float>(0);\n",
+      "new_file": false,
+      "new_path": "image/grid_sampler2_d_grad/op_kernel/arch35/grid_sampler2_d_grad_simt.h",
+      "old_path": "image/grid_sampler2_d_grad/op_kernel/arch35/grid_sampler2_d_grad_simt.h",
+      "removed_lines": 8,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-cv/raw/9f6e4f1acd4efcbfdd02b490b0dee1242fb63a18/image/grid_sampler2_d_grad/op_kernel/arch35/grid_sampler2_d_grad_simt.h",
+    "sha": "9f6e4f1acd4efcbfdd02b490b0dee1242fb63a18",
+    "source_branch": "9.1.0",
+    "source_project": {
+      "full_name": "qy3311888/ops-cv",
+      "human_name": "qy3311888 / ops-cv",
+      "id": 8491431,
+      "path": "ops-cv"
+    },
+    "target_branch": "9.1.0",
+    "target_project": {
+      "full_name": "cann/ops-cv",
+      "human_name": "CANN / ops-cv",
+      "id": 7657293,
+      "path": "ops-cv"
+    }
+  },
+  {
+    "additions": 8,
+    "blob_id": "5d350a7cd833e11874d89e0d13fb25569459b714",
+    "blob_url": "https://gitcode.com/cann/ops-cv/blob/9f6e4f1acd4efcbfdd02b490b0dee1242fb63a18/image/grid_sampler2_d_grad/op_kernel/arch35/grid_sampler2_d_grad_simt_det.h",
+    "deletions": 8,
+    "filename": "image/grid_sampler2_d_grad/op_kernel/arch35/grid_sampler2_d_grad_simt_det.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 8,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -154,8 +154,8 @@ __simt_callee__ __aicore__ __attribute__((always_inline)) inline void ComputeBil\n float iy, float ix, uint32_t gridH, uint32_t gridW, uint32_t batchNum, uint32_t heightCol, uint32_t widthCol, uint32_t newInputIndex, uint32_t offsetBaseAddr, \r\n uint32_t xH, uint32_t xW, uint32_t channel, float* ixGradMultValue, float* iyGradMultValue, uint32_t pNumPerCore, uint32_t blockNum, uint32_t blockId)\r\n {\r\n-    int32_t ix_tnw = GetFloorValue(ix);\r\n-    int32_t iy_tnw = GetFloorValue(iy);\r\n+    int32_t ix_tnw = static_cast<int32_t>(floorf(ix));\r\n+    int32_t iy_tnw = static_cast<int32_t>(floorf(iy));\r\n \r\n     // get surfaces to each neighbor:\r\n     float tnw = (ix_tnw + 1 - ix) * (iy_tnw + 1 - iy);\r\n@@ -184,8 +184,8 @@ __simt_callee__ __aicore__ __attribute__((always_inline)) inline void ComputeNea\n     uint32_t channel, uint32_t pNumPerCore, uint32_t blockNum, uint32_t blockId)\r\n {\r\n     uint32_t gridSize = gridH * gridW;\r\n-    int32_t ix_nearest = rintf(ix);\r\n-    int32_t iy_nearest = rintf(iy);\r\n+    int32_t ix_nearest = static_cast<int32_t>(rintf(ix));\r\n+    int32_t iy_nearest = static_cast<int32_t>(rintf(iy));\r\n \r\n     for (uint32_t channelIndex = 0; channelIndex < channel; channelIndex++) {\r\n         float gradOutValue = static_cast<float>(0.0);\r\n@@ -259,14 +259,14 @@ __simt_callee__ __aicore__ __attribute__((always_inline)) inline void ComputeBic\n     // Compute forward cubic coefficients (for grad_input)\r\n     float y_coeffs[4];\r\n     float x_coeffs[4];\r\n-    GetCubicUpsampleCoefficients(y_coeffs, ty, sizeof(y_coeffs));\r\n-    GetCubicUpsampleCoefficients(x_coeffs, tx, sizeof(x_coeffs));\r\n+    GetCubicUpsampleCoefficients(y_coeffs, ty, sizeof(y_coeffs) / sizeof(float));\r\n+    GetCubicUpsampleCoefficients(x_coeffs, tx, sizeof(x_coeffs) / sizeof(float));\r\n \r\n     // Compute gradient cubic coefficients (for grad_grid)\r\n     float y_coeffs_grad[4];\r\n     float x_coeffs_grad[4];\r\n-    GetCubicCoefficientsGrad(y_coeffs_grad, ty, sizeof(y_coeffs_grad));\r\n-    GetCubicCoefficientsGrad(x_coeffs_grad, tx, sizeof(x_coeffs_grad));\r\n+    GetCubicCoefficientsGrad(y_coeffs_grad, ty, sizeof(y_coeffs_grad) / sizeof(float));\r\n+    GetCubicCoefficientsGrad(x_coeffs_grad, tx, sizeof(x_coeffs_grad) / sizeof(float));\r\n \r\n     float giy = static_cast<float>(0);\r\n     float gix = static_cast<float>(0);\r\n",
+      "new_file": false,
+      "new_path": "image/grid_sampler2_d_grad/op_kernel/arch35/grid_sampler2_d_grad_simt_det.h",
+      "old_path": "image/grid_sampler2_d_grad/op_kernel/arch35/grid_sampler2_d_grad_simt_det.h",
+      "removed_lines": 8,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-cv/raw/9f6e4f1acd4efcbfdd02b490b0dee1242fb63a18/image/grid_sampler2_d_grad/op_kernel/arch35/grid_sampler2_d_grad_simt_det.h",
+    "sha": "9f6e4f1acd4efcbfdd02b490b0dee1242fb63a18",
+    "source_branch": "9.1.0",
+    "source_project": {
+      "full_name": "qy3311888/ops-cv",
+      "human_name": "qy3311888 / ops-cv",
+      "id": 8491431,
+      "path": "ops-cv"
+    },
+    "target_branch": "9.1.0",
+    "target_project": {
+      "full_name": "cann/ops-cv",
+      "human_name": "CANN / ops-cv",
+      "id": 7657293,
+      "path": "ops-cv"
+    }
+  },
+  {
+    "additions": 0,
+    "blob_id": "d9388a5276a915cf90186c963ad0e017aed8ac3d",
+    "blob_url": "https://gitcode.com/cann/ops-cv/blob/9f6e4f1acd4efcbfdd02b490b0dee1242fb63a18/image/grid_sampler2_d_grad/tests/ut/op_kernel/CMakeLists.txt",
+    "deletions": 18,
+    "filename": "image/grid_sampler2_d_grad/tests/ut/op_kernel/CMakeLists.txt",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 0,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -7,21 +7,3 @@\n # INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.\n # See LICENSE in the root of the software repository for the full text of the License.\n # -----------------------------------------------------------------------------------------------------------\n-\n-if (UT_TEST_ALL OR OP_KERNEL_UT)\n-    # 需要将Tiling依赖的文件添加到CMakeLists.txt中\n-    # set(elewise_common_tiling_files\n-    #         ${CANN_ROOT}/ops/built-in/op_tiling/runtime/elewise_tiling.cc\n-    #         )\n-    # 算子自己的tiling文件路径\n-    set(grid_sampler2_d_grad_tiling_files\n-        ${CMAKE_CURRENT_SOURCE_DIR}/../../../op_host/grid_sampler2_d_grad_tiling.cpp\n-        # ${elewise_common_tiling_files}\n-        )\n-    # 使用AddOpTestCase\n-    # param1：算子名称，以kernel方式命名\n-    # param2：soc版本，多个以分号分隔，例如：\"ascend950PR_9599;AscendB1\"\n-    # param3：自定义编译选项，一般填写测试的一种典型数据类型组合，不需要则传入空字符串，例如：\"-DDTYPE_X=float\"，多个使用空格分隔，例如：\"-DDTYPE_X=float -DDTYPE_Y=float\"\n-    # param4：该算子依赖的所有tiling源码文件\n-    AddOpTestCase(grid_sampler2_d_grad \"ascend910B1\" \"\" \"${grid_sampler2_d_grad_tiling_files}\")\n-endif()\n",
+      "new_file": false,
+      "new_path": "image/grid_sampler2_d_grad/tests/ut/op_kernel/CMakeLists.txt",
+      "old_path": "image/grid_sampler2_d_grad/tests/ut/op_kernel/CMakeLists.txt",
+      "removed_lines": 18,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-cv/raw/9f6e4f1acd4efcbfdd02b490b0dee1242fb63a18/image/grid_sampler2_d_grad/tests/ut/op_kernel/CMakeLists.txt",
+    "sha": "9f6e4f1acd4efcbfdd02b490b0dee1242fb63a18",
+    "source_branch": "9.1.0",
+    "source_project": {
+      "full_name": "qy3311888/ops-cv",
+      "human_name": "qy3311888 / ops-cv",
+      "id": 8491431,
+      "path": "ops-cv"
+    },
+    "target_branch": "9.1.0",
+    "target_project": {
+      "full_name": "cann/ops-cv",
+      "human_name": "CANN / ops-cv",
+      "id": 7657293,
+      "path": "ops-cv"
+    }
+  },
+  {
+    "additions": 6,
+    "blob_id": "8a85c6def32c8481291fccf1d8f7ae118d56359d",
+    "blob_url": "https://gitcode.com/cann/ops-cv/blob/9f6e4f1acd4efcbfdd02b490b0dee1242fb63a18/image/grid_sampler3_d_grad/op_kernel/arch35/grid_sampler3_d_grad_simt.h",
+    "deletions": 6,
+    "filename": "image/grid_sampler3_d_grad/op_kernel/arch35/grid_sampler3_d_grad_simt.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 6,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -191,9 +191,9 @@ __simt_callee__ __aicore__ __attribute__((always_inline)) inline void ComputeBil\n     uint32_t widthCol, uint32_t newInputIndex, uint32_t offsetBaseAddr, uint32_t xD, uint32_t xH, uint32_t xW,\n     uint32_t channel, float* ixGradMultValue, float* iyGradMultValue, float* izGradMultValue)\n {\n-    int32_t ix_tnw = GetFloorValue(ix);\n-    int32_t iy_tnw = GetFloorValue(iy);\n-    int32_t iz_tnw = GetFloorValue(iz);\n+    int32_t ix_tnw = static_cast<int32_t>(floorf(ix));\n+    int32_t iy_tnw = static_cast<int32_t>(floorf(iy));\n+    int32_t iz_tnw = static_cast<int32_t>(floorf(iz));\n \n     int32_t ix_t1 = ix_tnw + 1;\n     int32_t iy_t1 = iy_tnw + 1;\n@@ -237,9 +237,9 @@ __simt_callee__ __aicore__ __attribute__((always_inline)) inline void ComputeNea\n     uint32_t widthCol, uint32_t newInputIndex, uint32_t offsetBaseAddr, uint32_t xD, uint32_t xH, uint32_t xW,\n     uint32_t channel)\n {\n-    int32_t ix_nearest = rintf(ix);\n-    int32_t iy_nearest = rintf(iy);\n-    int32_t iz_nearest = rintf(iz);\n+    int32_t ix_nearest = static_cast<int32_t>(rintf(ix));\n+    int32_t iy_nearest = static_cast<int32_t>(rintf(iy));\n+    int32_t iz_nearest = static_cast<int32_t>(rintf(iz));\n \n     for (uint32_t channelIndex = 0; channelIndex < channel; channelIndex++) {\n         float gradOutValue = static_cast<float>(0.0);\n",
+      "new_file": false,
+      "new_path": "image/grid_sampler3_d_grad/op_kernel/arch35/grid_sampler3_d_grad_simt.h",
+      "old_path": "image/grid_sampler3_d_grad/op_kernel/arch35/grid_sampler3_d_grad_simt.h",
+      "removed_lines": 6,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-cv/raw/9f6e4f1acd4efcbfdd02b490b0dee1242fb63a18/image/grid_sampler3_d_grad/op_kernel/arch35/grid_sampler3_d_grad_simt.h",
+    "sha": "9f6e4f1acd4efcbfdd02b490b0dee1242fb63a18",
+    "source_branch": "9.1.0",
+    "source_project": {
+      "full_name": "qy3311888/ops-cv",
+      "human_name": "qy3311888 / ops-cv",
+      "id": 8491431,
+      "path": "ops-cv"
+    },
+    "target_branch": "9.1.0",
+    "target_project": {
+      "full_name": "cann/ops-cv",
+      "human_name": "CANN / ops-cv",
+      "id": 7657293,
+      "path": "ops-cv"
+    }
+  },
+  {
+    "additions": 1,
+    "blob_id": "4967926ca9bf25d31b4ff001c744ee6050d1054d",
+    "blob_url": "https://gitcode.com/cann/ops-cv/blob/9f6e4f1acd4efcbfdd02b490b0dee1242fb63a18/image/grid_sampler3_d_grad/op_kernel/arch35/grid_sampler3_d_grad_simt_base.h",
+    "deletions": 8,
+    "filename": "image/grid_sampler3_d_grad/op_kernel/arch35/grid_sampler3_d_grad_simt_base.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 1,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -117,13 +117,6 @@ __simt_callee__ __aicore__ __attribute__((always_inline)) inline float SafeDowng\n     return coord;\n }\n \n-__simt_callee__ __aicore__ __attribute__((always_inline)) inline int32_t GetFloorValue(float x)\n-{\n-    float negativeValue = static_cast<float>(0.0);\n-    float floorFactor = static_cast<float>(-1);\n-    return (x >= negativeValue ? static_cast<int32_t>(x) : static_cast<int32_t>(floorFactor + x));\n-}\n-\n template <typename T>\n __simt_callee__ __aicore__ __attribute__((always_inline)) inline void GetGradOutPointValueAndDxIndex(\n     __gm__ T* gradOutGmAddr, int32_t inputXDepth, int32_t inputXHeight, int32_t inputXWidth, uint32_t gridD,\n@@ -242,7 +235,7 @@ __simt_callee__ __aicore__ __attribute__((always_inline)) inline int32_t Compute\n     float coord, uint32_t size, uint32_t padding, uint32_t alignCorners)\n {\n     if (padding == ZEROS) { // zeros\n-        int32_t idx = GetFloorValue(coord);\n+        int32_t idx = static_cast<int32_t>(floorf(coord));\n         if (idx < 0 || idx >= static_cast<int32_t>(size)) {\n             return -1; // out of bounds\n         }\n",
+      "new_file": false,
+      "new_path": "image/grid_sampler3_d_grad/op_kernel/arch35/grid_sampler3_d_grad_simt_base.h",
+      "old_path": "image/grid_sampler3_d_grad/op_kernel/arch35/grid_sampler3_d_grad_simt_base.h",
+      "removed_lines": 8,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-cv/raw/9f6e4f1acd4efcbfdd02b490b0dee1242fb63a18/image/grid_sampler3_d_grad/op_kernel/arch35/grid_sampler3_d_grad_simt_base.h",
+    "sha": "9f6e4f1acd4efcbfdd02b490b0dee1242fb63a18",
+    "source_branch": "9.1.0",
+    "source_project": {
+      "full_name": "qy3311888/ops-cv",
+      "human_name": "qy3311888 / ops-cv",
+      "id": 8491431,
+      "path": "ops-cv"
+    },
+    "target_branch": "9.1.0",
+    "target_project": {
+      "full_name": "cann/ops-cv",
+      "human_name": "CANN / ops-cv",
+      "id": 7657293,
+      "path": "ops-cv"
+    }
+  },
+  {
+    "additions": 6,
+    "blob_id": "ebf0959e912be0be82ed47832996c8a3e24c019d",
+    "blob_url": "https://gitcode.com/cann/ops-cv/blob/9f6e4f1acd4efcbfdd02b490b0dee1242fb63a18/image/grid_sampler3_d_grad/op_kernel/arch35/grid_sampler3_d_grad_simt_det.h",
+    "deletions": 6,
+    "filename": "image/grid_sampler3_d_grad/op_kernel/arch35/grid_sampler3_d_grad_simt_det.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 6,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -273,9 +273,9 @@ __simt_callee__ __aicore__ __attribute__((always_inline)) inline void ComputeBil\n     uint32_t offsetBaseAddr, uint32_t xD, uint32_t xH, uint32_t xW, uint32_t channel, uint32_t pNumPerCore,\n     uint32_t blockNum, float* ixGradMultValue, float* iyGradMultValue, float* izGradMultValue, uint32_t blockId)\n {\n-    int32_t ix_tnw = GetFloorValue(ix);\n-    int32_t iy_tnw = GetFloorValue(iy);\n-    int32_t iz_tnw = GetFloorValue(iz);\n+    int32_t ix_tnw = static_cast<int32_t>(floorf(ix));\n+    int32_t iy_tnw = static_cast<int32_t>(floorf(iy));\n+    int32_t iz_tnw = static_cast<int32_t>(floorf(iz));\n \n     int32_t ix_t1 = ix_tnw + 1;\n     int32_t iy_t1 = iy_tnw + 1;\n@@ -332,9 +332,9 @@ __simt_callee__ __aicore__ __attribute__((always_inline)) inline void ComputeNea\n     uint32_t offsetBaseAddr, uint32_t xD, uint32_t xH, uint32_t xW, uint32_t channel, uint32_t pNumPerCore,\n     uint32_t blockNum, uint32_t blockId)\n {\n-    int32_t iz_nearest = rintf(iz);\n-    int32_t iy_nearest = rintf(iy);\n-    int32_t ix_nearest = rintf(ix);\n+    int32_t iz_nearest = static_cast<int32_t>(rintf(iz));\n+    int32_t iy_nearest = static_cast<int32_t>(rintf(iy));\n+    int32_t ix_nearest = static_cast<int32_t>(rintf(ix));\n \n     for (uint32_t channelIndex = 0; channelIndex < channel; channelIndex++) {\n         float gradOutValue = static_cast<float>(0.0);\n",
+      "new_file": false,
+      "new_path": "image/grid_sampler3_d_grad/op_kernel/arch35/grid_sampler3_d_grad_simt_det.h",
+      "old_path": "image/grid_sampler3_d_grad/op_kernel/arch35/grid_sampler3_d_grad_simt_det.h",
+      "removed_lines": 6,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-cv/raw/9f6e4f1acd4efcbfdd02b490b0dee1242fb63a18/image/grid_sampler3_d_grad/op_kernel/arch35/grid_sampler3_d_grad_simt_det.h",
+    "sha": "9f6e4f1acd4efcbfdd02b490b0dee1242fb63a18",
+    "source_branch": "9.1.0",
+    "source_project": {
+      "full_name": "qy3311888/ops-cv",
+      "human_name": "qy3311888 / ops-cv",
+      "id": 8491431,
+      "path": "ops-cv"
+    },
+    "target_branch": "9.1.0",
+    "target_project": {
+      "full_name": "cann/ops-cv",
+      "human_name": "CANN / ops-cv",
+      "id": 7657293,
+      "path": "ops-cv"
+    }
+  }
+]

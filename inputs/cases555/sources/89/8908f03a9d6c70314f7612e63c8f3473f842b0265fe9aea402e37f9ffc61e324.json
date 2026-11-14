@@ -1,0 +1,470 @@
+[
+  {
+    "additions": 3,
+    "blob_id": "45f60636aad0ddab9f2fc5ba060ed9fd7233378c",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/0a8fd72efa360efcc188e0406f0f7ebfe0e8c27e/mc2/moe_distribute_combine/docs/aclnnMoeDistributeCombine.md",
+    "deletions": 3,
+    "filename": "mc2/moe_distribute_combine/docs/aclnnMoeDistributeCombine.md",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 3,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -437,8 +437,8 @@ aclnnStatus aclnnMoeDistributeCombine(\n     #include <vector>\n     #include \"acl/acl.h\"\n     #include \"hccl/hccl.h\"\n-    #include \"../../moe_distribute_dispatch/op_host/op_api/aclnn_moe_distribute_dispatch.h\"\n-    #include \"../op_host/op_api/aclnn_moe_distribute_combine.h\"\n+    #include \"aclnnop/aclnn_moe_distribute_dispatch.h\"\n+    #include \"aclnnop/aclnn_moe_distribute_combine.h\"\n \n     #define CHECK_RET(cond, return_expr) \\\n         do {                             \\\n@@ -573,7 +573,7 @@ aclnnStatus aclnnMoeDistributeCombine(\n         std::vector<int64_t> expandIdxShape{BS * K};\n         std::vector<int64_t> expertTokenNumsShape{localExpertNum};\n         std::vector<int64_t> epRecvCountsShape{TP_WORLD_SIZE * localExpertNum * EP_WORLD_SIZE};\n-        std::vector<int64_t> tpRecvCountsShape{TP_WORLD_SIZE * localExpertNum};\n+        std::vector<int64_t> tpRecvCountsShape{TP_WORLD_SIZE};\n         std::vector<int64_t> expandScalesShape{A};\n \n         int64_t xShapeSize = GetShapeSize(xShape);\n",
+      "new_file": false,
+      "new_path": "mc2/moe_distribute_combine/docs/aclnnMoeDistributeCombine.md",
+      "old_path": "mc2/moe_distribute_combine/docs/aclnnMoeDistributeCombine.md",
+      "removed_lines": 3,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/0a8fd72efa360efcc188e0406f0f7ebfe0e8c27e/mc2/moe_distribute_combine/docs/aclnnMoeDistributeCombine.md",
+    "sha": "0a8fd72efa360efcc188e0406f0f7ebfe0e8c27e",
+    "source_branch": "master",
+    "source_project": {
+      "full_name": "OblivionZHU/ops-transformer",
+      "human_name": "OblivionZHU / ops-transformer",
+      "id": 7977959,
+      "path": "ops-transformer"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  },
+  {
+    "additions": 3,
+    "blob_id": "7400cebe0008e300555808581c6397504ed2a85f",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/0a8fd72efa360efcc188e0406f0f7ebfe0e8c27e/mc2/moe_distribute_combine/examples/test_aclnn_moe_distribute_combine.cpp",
+    "deletions": 3,
+    "filename": "mc2/moe_distribute_combine/examples/test_aclnn_moe_distribute_combine.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 3,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -19,8 +19,8 @@\n #include <vector>\n #include \"acl/acl.h\"\n #include \"hccl/hccl.h\"\n-#include \"../../moe_distribute_dispatch/op_host/op_api/aclnn_moe_distribute_dispatch.h\"\n-#include \"../op_host/op_api/aclnn_moe_distribute_combine.h\"\n+#include \"aclnnop/aclnn_moe_distribute_dispatch.h\"\n+#include \"aclnnop/aclnn_moe_distribute_combine.h\"\n \n #define CHECK_RET(cond, return_expr) \\\n     do {                             \\\n@@ -155,7 +155,7 @@ int launchOneThreadDispatchAndCombine(Args &args){\n     std::vector<int64_t> expandIdxShape{BS * K};\n     std::vector<int64_t> expertTokenNumsShape{localExpertNum};\n     std::vector<int64_t> epRecvCountsShape{TP_WORLD_SIZE * localExpertNum * EP_WORLD_SIZE};\n-    std::vector<int64_t> tpRecvCountsShape{TP_WORLD_SIZE * localExpertNum};\n+    std::vector<int64_t> tpRecvCountsShape{TP_WORLD_SIZE};\n     std::vector<int64_t> expandScalesShape{A};\n \n     int64_t xShapeSize = GetShapeSize(xShape);\n",
+      "new_file": false,
+      "new_path": "mc2/moe_distribute_combine/examples/test_aclnn_moe_distribute_combine.cpp",
+      "old_path": "mc2/moe_distribute_combine/examples/test_aclnn_moe_distribute_combine.cpp",
+      "removed_lines": 3,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/0a8fd72efa360efcc188e0406f0f7ebfe0e8c27e/mc2/moe_distribute_combine/examples/test_aclnn_moe_distribute_combine.cpp",
+    "sha": "0a8fd72efa360efcc188e0406f0f7ebfe0e8c27e",
+    "source_branch": "master",
+    "source_project": {
+      "full_name": "OblivionZHU/ops-transformer",
+      "human_name": "OblivionZHU / ops-transformer",
+      "id": 7977959,
+      "path": "ops-transformer"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  },
+  {
+    "additions": 3,
+    "blob_id": "644619db625a6c8b799a806529b571b65cb24337",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/0a8fd72efa360efcc188e0406f0f7ebfe0e8c27e/mc2/moe_distribute_combine_add_rms_norm/docs/aclnnMoeDistributeCombineAddRmsNorm.md",
+    "deletions": 3,
+    "filename": "mc2/moe_distribute_combine_add_rms_norm/docs/aclnnMoeDistributeCombineAddRmsNorm.md",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 3,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -459,8 +459,8 @@ aclnnStatus aclnnMoeDistributeCombineAddRmsNorm(\n     #include <vector>\n     #include \"acl/acl.h\"\n     #include \"hccl/hccl.h\"\n-    #include \"../../moe_distribute_dispatch_v2/op_host/op_api/aclnn_moe_distribute_dispatch_v2.h\"\n-    #include \"../op_host/op_api/aclnn_moe_distribute_combine_add_rms_norm.h\"\n+    #include \"aclnnop/aclnn_moe_distribute_dispatch_v2.h\"\n+    #include \"aclnnop/aclnn_moe_distribute_combine_add_rms_norm.h\"\n \n     #define CHECK_RET(cond, return_expr) \\\n         do {                             \\\n@@ -606,7 +606,7 @@ aclnnStatus aclnnMoeDistributeCombineAddRmsNorm(\n         std::vector<int64_t> expandIdxShape{A * 128};\n         std::vector<int64_t> expertTokenNumsShape{localExpertNum};\n         std::vector<int64_t> epRecvCountsShape{TP_WORLD_SIZE * localExpertNum * EP_WORLD_SIZE};\n-        std::vector<int64_t> tpRecvCountsShape{TP_WORLD_SIZE * localExpertNum};\n+        std::vector<int64_t> tpRecvCountsShape{TP_WORLD_SIZE};\n         std::vector<int64_t> expandScalesShape{A};\n         std::vector<int64_t> residualXShape{BS, 1, H};\n         std::vector<int64_t> sharedExpertXShape{BS, 1, H};\n",
+      "new_file": false,
+      "new_path": "mc2/moe_distribute_combine_add_rms_norm/docs/aclnnMoeDistributeCombineAddRmsNorm.md",
+      "old_path": "mc2/moe_distribute_combine_add_rms_norm/docs/aclnnMoeDistributeCombineAddRmsNorm.md",
+      "removed_lines": 3,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/0a8fd72efa360efcc188e0406f0f7ebfe0e8c27e/mc2/moe_distribute_combine_add_rms_norm/docs/aclnnMoeDistributeCombineAddRmsNorm.md",
+    "sha": "0a8fd72efa360efcc188e0406f0f7ebfe0e8c27e",
+    "source_branch": "master",
+    "source_project": {
+      "full_name": "OblivionZHU/ops-transformer",
+      "human_name": "OblivionZHU / ops-transformer",
+      "id": 7977959,
+      "path": "ops-transformer"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  },
+  {
+    "additions": 1,
+    "blob_id": "474626b4058cc9c57b290cc032292bf4f9e8f0ce",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/0a8fd72efa360efcc188e0406f0f7ebfe0e8c27e/mc2/moe_distribute_combine_add_rms_norm/docs/aclnnMoeDistributeCombineAddRmsNormV2.md",
+    "deletions": 1,
+    "filename": "mc2/moe_distribute_combine_add_rms_norm/docs/aclnnMoeDistributeCombineAddRmsNormV2.md",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 1,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -718,7 +718,7 @@ aclnnStatus aclnnMoeDistributeCombineAddRmsNormV2(\n         std::vector<int64_t> expandIdxShape{A * 128};\n         std::vector<int64_t> expertTokenNumsShape{localExpertNum};\n         std::vector<int64_t> epRecvCountsShape{TP_WORLD_SIZE * localExpertNum * EP_WORLD_SIZE};\n-        std::vector<int64_t> tpRecvCountsShape{TP_WORLD_SIZE * localExpertNum};\n+        std::vector<int64_t> tpRecvCountsShape{TP_WORLD_SIZE};\n         std::vector<int64_t> expandScalesShape{A};\n         std::vector<int64_t> residualXShape{BS, 1, H};\n         std::vector<int64_t> sharedExpertXShape{BS, 1, H};\n",
+      "new_file": false,
+      "new_path": "mc2/moe_distribute_combine_add_rms_norm/docs/aclnnMoeDistributeCombineAddRmsNormV2.md",
+      "old_path": "mc2/moe_distribute_combine_add_rms_norm/docs/aclnnMoeDistributeCombineAddRmsNormV2.md",
+      "removed_lines": 1,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/0a8fd72efa360efcc188e0406f0f7ebfe0e8c27e/mc2/moe_distribute_combine_add_rms_norm/docs/aclnnMoeDistributeCombineAddRmsNormV2.md",
+    "sha": "0a8fd72efa360efcc188e0406f0f7ebfe0e8c27e",
+    "source_branch": "master",
+    "source_project": {
+      "full_name": "OblivionZHU/ops-transformer",
+      "human_name": "OblivionZHU / ops-transformer",
+      "id": 7977959,
+      "path": "ops-transformer"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  },
+  {
+    "additions": 3,
+    "blob_id": "b761827c2ae84786c2d18b5f216ae4fdf8fc738c",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/0a8fd72efa360efcc188e0406f0f7ebfe0e8c27e/mc2/moe_distribute_combine_add_rms_norm/examples/test_aclnn_moe_distribute_combine_add_rms_norm.cpp",
+    "deletions": 3,
+    "filename": "mc2/moe_distribute_combine_add_rms_norm/examples/test_aclnn_moe_distribute_combine_add_rms_norm.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 3,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -19,8 +19,8 @@\n #include <vector>\n #include \"acl/acl.h\"\n #include \"hccl/hccl.h\"\n-#include \"../../moe_distribute_dispatch_v2/op_host/op_api/aclnn_moe_distribute_dispatch_v2.h\"\n-#include \"../op_host/op_api/aclnn_moe_distribute_combine_add_rms_norm.h\"\n+#include \"aclnnop/aclnn_moe_distribute_dispatch_v2.h\"\n+#include \"aclnnop/aclnn_moe_distribute_combine_add_rms_norm.h\"\n \n #define CHECK_RET(cond, return_expr) \\\n     do {                             \\\n@@ -166,7 +166,7 @@ int LaunchOneProcessDispatchAndCombine(Args &args)\n     std::vector<int64_t> expandIdxShape{A * 128};\n     std::vector<int64_t> expertTokenNumsShape{localExpertNum};\n     std::vector<int64_t> epRecvCountsShape{TP_WORLD_SIZE * localExpertNum * EP_WORLD_SIZE};\n-    std::vector<int64_t> tpRecvCountsShape{TP_WORLD_SIZE * localExpertNum};\n+    std::vector<int64_t> tpRecvCountsShape{TP_WORLD_SIZE};\n     std::vector<int64_t> expandScalesShape{A};\n     std::vector<int64_t> residualXShape{BS, 1, H};\n     std::vector<int64_t> sharedExpertXShape{BS, 1, H};\n",
+      "new_file": false,
+      "new_path": "mc2/moe_distribute_combine_add_rms_norm/examples/test_aclnn_moe_distribute_combine_add_rms_norm.cpp",
+      "old_path": "mc2/moe_distribute_combine_add_rms_norm/examples/test_aclnn_moe_distribute_combine_add_rms_norm.cpp",
+      "removed_lines": 3,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/0a8fd72efa360efcc188e0406f0f7ebfe0e8c27e/mc2/moe_distribute_combine_add_rms_norm/examples/test_aclnn_moe_distribute_combine_add_rms_norm.cpp",
+    "sha": "0a8fd72efa360efcc188e0406f0f7ebfe0e8c27e",
+    "source_branch": "master",
+    "source_project": {
+      "full_name": "OblivionZHU/ops-transformer",
+      "human_name": "OblivionZHU / ops-transformer",
+      "id": 7977959,
+      "path": "ops-transformer"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  },
+  {
+    "additions": 3,
+    "blob_id": "9dbc3939192140f0592364278968363fe5919adf",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/0a8fd72efa360efcc188e0406f0f7ebfe0e8c27e/mc2/moe_distribute_combine_v2/docs/aclnnMoeDistributeCombineV2.md",
+    "deletions": 3,
+    "filename": "mc2/moe_distribute_combine_v2/docs/aclnnMoeDistributeCombineV2.md",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 3,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -477,8 +477,8 @@ aclnnStatus aclnnMoeDistributeCombineV2(\n     #include <vector>\n     #include \"acl/acl.h\"\n     #include \"hccl/hccl.h\"\n-    #include \"../../moe_distribute_dispatch_v2/op_host/op_api/aclnn_moe_distribute_dispatch_v2.h\"\n-    #include \"../op_host/op_api/aclnn_moe_distribute_combine_v2.h\"\n+    #include \"aclnnop/aclnn_moe_distribute_dispatch_v2.h\"\n+    #include \"aclnnop/aclnn_moe_distribute_combine_v2.h\"\n     #include <unistd.h>\n \n     #define CHECK_RET(cond, return_expr) \\\n@@ -606,7 +606,7 @@ aclnnStatus aclnnMoeDistributeCombineV2(\n         std::vector<int64_t> expandIdxShape{A * 128};\n         std::vector<int64_t> expertTokenNumsShape{localExpertNum};\n         std::vector<int64_t> epRecvCountsShape{TP_WORLD_SIZE * localExpertNum * EP_WORLD_SIZE};\n-        std::vector<int64_t> tpRecvCountsShape{TP_WORLD_SIZE * localExpertNum};\n+        std::vector<int64_t> tpRecvCountsShape{TP_WORLD_SIZE};\n         std::vector<int64_t> expandScalesShape{A};\n \n         int64_t xShapeSize = GetShapeSize(xShape);\n",
+      "new_file": false,
+      "new_path": "mc2/moe_distribute_combine_v2/docs/aclnnMoeDistributeCombineV2.md",
+      "old_path": "mc2/moe_distribute_combine_v2/docs/aclnnMoeDistributeCombineV2.md",
+      "removed_lines": 3,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/0a8fd72efa360efcc188e0406f0f7ebfe0e8c27e/mc2/moe_distribute_combine_v2/docs/aclnnMoeDistributeCombineV2.md",
+    "sha": "0a8fd72efa360efcc188e0406f0f7ebfe0e8c27e",
+    "source_branch": "master",
+    "source_project": {
+      "full_name": "OblivionZHU/ops-transformer",
+      "human_name": "OblivionZHU / ops-transformer",
+      "id": 7977959,
+      "path": "ops-transformer"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  },
+  {
+    "additions": 1,
+    "blob_id": "efc4fafab6059e9f09030294f0b45e840e8419ff",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/0a8fd72efa360efcc188e0406f0f7ebfe0e8c27e/mc2/moe_distribute_combine_v2/docs/aclnnMoeDistributeCombineV3.md",
+    "deletions": 1,
+    "filename": "mc2/moe_distribute_combine_v2/docs/aclnnMoeDistributeCombineV3.md",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 1,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -705,7 +705,7 @@ aclnnStatus aclnnMoeDistributeCombineV3(\n         std::vector<int64_t> expandIdxShape{A * 128};\n         std::vector<int64_t> expertTokenNumsShape{localExpertNum};\n         std::vector<int64_t> epRecvCountsShape{TP_WORLD_SIZE * localExpertNum * EP_WORLD_SIZE};\n-        std::vector<int64_t> tpRecvCountsShape{TP_WORLD_SIZE * localExpertNum};\n+        std::vector<int64_t> tpRecvCountsShape{TP_WORLD_SIZE};\n         std::vector<int64_t> expandScalesShape{A};\n         std::vector<int64_t> sharedExpertXShape{Bs, 1, H};\n \n",
+      "new_file": false,
+      "new_path": "mc2/moe_distribute_combine_v2/docs/aclnnMoeDistributeCombineV3.md",
+      "old_path": "mc2/moe_distribute_combine_v2/docs/aclnnMoeDistributeCombineV3.md",
+      "removed_lines": 1,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/0a8fd72efa360efcc188e0406f0f7ebfe0e8c27e/mc2/moe_distribute_combine_v2/docs/aclnnMoeDistributeCombineV3.md",
+    "sha": "0a8fd72efa360efcc188e0406f0f7ebfe0e8c27e",
+    "source_branch": "master",
+    "source_project": {
+      "full_name": "OblivionZHU/ops-transformer",
+      "human_name": "OblivionZHU / ops-transformer",
+      "id": 7977959,
+      "path": "ops-transformer"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  },
+  {
+    "additions": 3,
+    "blob_id": "533f63e5fbabd1585bd1cb8487d2b0a023308b1c",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/0a8fd72efa360efcc188e0406f0f7ebfe0e8c27e/mc2/moe_distribute_combine_v2/examples/test_aclnn_moe_distribute_combine_v2.cpp",
+    "deletions": 3,
+    "filename": "mc2/moe_distribute_combine_v2/examples/test_aclnn_moe_distribute_combine_v2.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 3,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -19,8 +19,8 @@\n #include <vector>\n #include \"acl/acl.h\"\n #include \"hccl/hccl.h\"\n-#include \"../../moe_distribute_dispatch_v2/op_host/op_api/aclnn_moe_distribute_dispatch_v2.h\"\n-#include \"../op_host/op_api/aclnn_moe_distribute_combine_v2.h\"\n+#include \"aclnnop/aclnn_moe_distribute_dispatch_v2.h\"\n+#include \"aclnnop/aclnn_moe_distribute_combine_v2.h\"\n \n #define CHECK_RET(cond, return_expr) \\\n     do {                             \\\n@@ -147,7 +147,7 @@ int LaunchOneProcessDispatchAndCombine(Args &args)\n     std::vector<int64_t> expandIdxShape{A * 128};\n     std::vector<int64_t> expertTokenNumsShape{localExpertNum};\n     std::vector<int64_t> epRecvCountsShape{TP_WORLD_SIZE * localExpertNum * EP_WORLD_SIZE};\n-    std::vector<int64_t> tpRecvCountsShape{TP_WORLD_SIZE * localExpertNum};\n+    std::vector<int64_t> tpRecvCountsShape{TP_WORLD_SIZE};\n     std::vector<int64_t> expandScalesShape{A};\n \n     int64_t xShapeSize = GetShapeSize(xShape);\n",
+      "new_file": false,
+      "new_path": "mc2/moe_distribute_combine_v2/examples/test_aclnn_moe_distribute_combine_v2.cpp",
+      "old_path": "mc2/moe_distribute_combine_v2/examples/test_aclnn_moe_distribute_combine_v2.cpp",
+      "removed_lines": 3,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/0a8fd72efa360efcc188e0406f0f7ebfe0e8c27e/mc2/moe_distribute_combine_v2/examples/test_aclnn_moe_distribute_combine_v2.cpp",
+    "sha": "0a8fd72efa360efcc188e0406f0f7ebfe0e8c27e",
+    "source_branch": "master",
+    "source_project": {
+      "full_name": "OblivionZHU/ops-transformer",
+      "human_name": "OblivionZHU / ops-transformer",
+      "id": 7977959,
+      "path": "ops-transformer"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  },
+  {
+    "additions": 3,
+    "blob_id": "c4c38d01aeee89a599a7152d4e7c240b0e99c431",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/0a8fd72efa360efcc188e0406f0f7ebfe0e8c27e/mc2/moe_distribute_dispatch/docs/aclnnMoeDistributeDispatch.md",
+    "deletions": 3,
+    "filename": "mc2/moe_distribute_dispatch/docs/aclnnMoeDistributeDispatch.md",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 3,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -418,8 +418,8 @@ aclnnStatus aclnnMoeDistributeDispatch(\n     #include <vector>\n     #include \"acl/acl.h\"\n     #include \"hccl/hccl.h\"\n-    #include \"../../moe_distribute_dispatch/op_host/op_api/aclnn_moe_distribute_dispatch.h\"\n-    #include \"../op_host/op_api/aclnn_moe_distribute_combine.h\"\n+    #include \"aclnnop/aclnn_moe_distribute_dispatch.h\"\n+    #include \"aclnnop/aclnn_moe_distribute_combine.h\"\n \n     #define CHECK_RET(cond, return_expr) \\\n         do {                             \\\n@@ -554,7 +554,7 @@ aclnnStatus aclnnMoeDistributeDispatch(\n         std::vector<int64_t> expandIdxShape{BS * K};\n         std::vector<int64_t> expertTokenNumsShape{localExpertNum};\n         std::vector<int64_t> epRecvCountsShape{TP_WORLD_SIZE * localExpertNum * EP_WORLD_SIZE};\n-        std::vector<int64_t> tpRecvCountsShape{TP_WORLD_SIZE * localExpertNum};\n+        std::vector<int64_t> tpRecvCountsShape{TP_WORLD_SIZE};\n         std::vector<int64_t> expandScalesShape{A};\n \n         int64_t xShapeSize = GetShapeSize(xShape);\n",
+      "new_file": false,
+      "new_path": "mc2/moe_distribute_dispatch/docs/aclnnMoeDistributeDispatch.md",
+      "old_path": "mc2/moe_distribute_dispatch/docs/aclnnMoeDistributeDispatch.md",
+      "removed_lines": 3,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/0a8fd72efa360efcc188e0406f0f7ebfe0e8c27e/mc2/moe_distribute_dispatch/docs/aclnnMoeDistributeDispatch.md",
+    "sha": "0a8fd72efa360efcc188e0406f0f7ebfe0e8c27e",
+    "source_branch": "master",
+    "source_project": {
+      "full_name": "OblivionZHU/ops-transformer",
+      "human_name": "OblivionZHU / ops-transformer",
+      "id": 7977959,
+      "path": "ops-transformer"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  },
+  {
+    "additions": 3,
+    "blob_id": "482af76badcca13779c5250e9b9e355251d02fc0",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/0a8fd72efa360efcc188e0406f0f7ebfe0e8c27e/mc2/moe_distribute_dispatch/examples/test_aclnn_moe_distribute_dispatch.cpp",
+    "deletions": 3,
+    "filename": "mc2/moe_distribute_dispatch/examples/test_aclnn_moe_distribute_dispatch.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 3,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -19,8 +19,8 @@\n #include <vector>\n #include \"acl/acl.h\"\n #include \"hccl/hccl.h\"\n-#include \"../op_host/op_api/aclnn_moe_distribute_dispatch.h\"\n-#include \"../../moe_distribute_combine/op_host/op_api/aclnn_moe_distribute_combine.h\"\n+#include \"aclnnop/aclnn_moe_distribute_dispatch.h\"\n+#include \"aclnnop/aclnn_moe_distribute_combine.h\"\n \n #define CHECK_RET(cond, return_expr) \\\n     do {                             \\\n@@ -155,7 +155,7 @@ int launchOneThreadDispatchAndCombine(Args &args){\n     std::vector<int64_t> expandIdxShape{BS * K};\n     std::vector<int64_t> expertTokenNumsShape{localExpertNum};\n     std::vector<int64_t> epRecvCountsShape{TP_WORLD_SIZE * localExpertNum * EP_WORLD_SIZE};\n-    std::vector<int64_t> tpRecvCountsShape{TP_WORLD_SIZE * localExpertNum};\n+    std::vector<int64_t> tpRecvCountsShape{TP_WORLD_SIZE};\n     std::vector<int64_t> expandScalesShape{A};\n \n     int64_t xShapeSize = GetShapeSize(xShape);\n",
+      "new_file": false,
+      "new_path": "mc2/moe_distribute_dispatch/examples/test_aclnn_moe_distribute_dispatch.cpp",
+      "old_path": "mc2/moe_distribute_dispatch/examples/test_aclnn_moe_distribute_dispatch.cpp",
+      "removed_lines": 3,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/0a8fd72efa360efcc188e0406f0f7ebfe0e8c27e/mc2/moe_distribute_dispatch/examples/test_aclnn_moe_distribute_dispatch.cpp",
+    "sha": "0a8fd72efa360efcc188e0406f0f7ebfe0e8c27e",
+    "source_branch": "master",
+    "source_project": {
+      "full_name": "OblivionZHU/ops-transformer",
+      "human_name": "OblivionZHU / ops-transformer",
+      "id": 7977959,
+      "path": "ops-transformer"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  },
+  {
+    "additions": 3,
+    "blob_id": "dd96073a19dcfc7edb8aad0441652f869dbd768e",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/0a8fd72efa360efcc188e0406f0f7ebfe0e8c27e/mc2/moe_distribute_dispatch_v2/docs/aclnnMoeDistributeDispatchV2.md",
+    "deletions": 3,
+    "filename": "mc2/moe_distribute_dispatch_v2/docs/aclnnMoeDistributeDispatchV2.md",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 3,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -458,8 +458,8 @@ aclnnStatus aclnnMoeDistributeDispatchV2(\n     #include <vector>\n     #include \"acl/acl.h\"\n     #include \"hccl/hccl.h\"\n-    #include \"../op_host/op_api/aclnn_moe_distribute_dispatch_v2.h\"\n-    #include \"../../moe_distribute_combine_v2/op_host/op_api/aclnn_moe_distribute_combine_v2.h\"\n+    #include \"aclnnop/aclnn_moe_distribute_dispatch_v2.h\"\n+    #include \"aclnnop/aclnn_moe_distribute_combine_v2.h\"\n     #include <unistd.h>\n \n     #define CHECK_RET(cond, return_expr) \\\n@@ -587,7 +587,7 @@ aclnnStatus aclnnMoeDistributeDispatchV2(\n         std::vector<int64_t> expandIdxShape{A * 128};\n         std::vector<int64_t> expertTokenNumsShape{localExpertNum};\n         std::vector<int64_t> epRecvCountsShape{TP_WORLD_SIZE * localExpertNum * EP_WORLD_SIZE};\n-        std::vector<int64_t> tpRecvCountsShape{TP_WORLD_SIZE * localExpertNum};\n+        std::vector<int64_t> tpRecvCountsShape{TP_WORLD_SIZE};\n         std::vector<int64_t> expandScalesShape{A};\n \n         int64_t xShapeSize = GetShapeSize(xShape);\n",
+      "new_file": false,
+      "new_path": "mc2/moe_distribute_dispatch_v2/docs/aclnnMoeDistributeDispatchV2.md",
+      "old_path": "mc2/moe_distribute_dispatch_v2/docs/aclnnMoeDistributeDispatchV2.md",
+      "removed_lines": 3,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/0a8fd72efa360efcc188e0406f0f7ebfe0e8c27e/mc2/moe_distribute_dispatch_v2/docs/aclnnMoeDistributeDispatchV2.md",
+    "sha": "0a8fd72efa360efcc188e0406f0f7ebfe0e8c27e",
+    "source_branch": "master",
+    "source_project": {
+      "full_name": "OblivionZHU/ops-transformer",
+      "human_name": "OblivionZHU / ops-transformer",
+      "id": 7977959,
+      "path": "ops-transformer"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  },
+  {
+    "additions": 1,
+    "blob_id": "96eed8c7631bdeb63b8805a3a3a92388ac1f0547",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/0a8fd72efa360efcc188e0406f0f7ebfe0e8c27e/mc2/moe_distribute_dispatch_v2/docs/aclnnMoeDistributeDispatchV3.md",
+    "deletions": 1,
+    "filename": "mc2/moe_distribute_dispatch_v2/docs/aclnnMoeDistributeDispatchV3.md",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 1,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -659,7 +659,7 @@ aclnnStatus aclnnMoeDistributeDispatchV3(\n         std::vector<int64_t> expandIdxShape{A * 128};\n         std::vector<int64_t> expertTokenNumsShape{localExpertNum};\n         std::vector<int64_t> epRecvCountsShape{TP_WORLD_SIZE * localExpertNum * EP_WORLD_SIZE};\n-        std::vector<int64_t> tpRecvCountsShape{TP_WORLD_SIZE * localExpertNum};\n+        std::vector<int64_t> tpRecvCountsShape{TP_WORLD_SIZE};\n         std::vector<int64_t> expandScalesShape{A};\n         std::vector<int64_t> sharedExpertXShape{Bs, 1, H};\n \n",
+      "new_file": false,
+      "new_path": "mc2/moe_distribute_dispatch_v2/docs/aclnnMoeDistributeDispatchV3.md",
+      "old_path": "mc2/moe_distribute_dispatch_v2/docs/aclnnMoeDistributeDispatchV3.md",
+      "removed_lines": 1,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/0a8fd72efa360efcc188e0406f0f7ebfe0e8c27e/mc2/moe_distribute_dispatch_v2/docs/aclnnMoeDistributeDispatchV3.md",
+    "sha": "0a8fd72efa360efcc188e0406f0f7ebfe0e8c27e",
+    "source_branch": "master",
+    "source_project": {
+      "full_name": "OblivionZHU/ops-transformer",
+      "human_name": "OblivionZHU / ops-transformer",
+      "id": 7977959,
+      "path": "ops-transformer"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  },
+  {
+    "additions": 3,
+    "blob_id": "177bb3fc6f5ba8d11781303ef39d369f26260c0d",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/0a8fd72efa360efcc188e0406f0f7ebfe0e8c27e/mc2/moe_distribute_dispatch_v2/examples/test_aclnn_moe_distribute_dispatch_v2.cpp",
+    "deletions": 3,
+    "filename": "mc2/moe_distribute_dispatch_v2/examples/test_aclnn_moe_distribute_dispatch_v2.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 3,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -19,8 +19,8 @@\n #include <vector>\n #include \"acl/acl.h\"\n #include \"hccl/hccl.h\"\n-#include \"../op_host/op_api/aclnn_moe_distribute_dispatch_v2.h\"\n-#include \"../../moe_distribute_combine_v2/op_host/op_api/aclnn_moe_distribute_combine_v2.h\"\n+#include \"aclnnop/aclnn_moe_distribute_dispatch_v2.h\"\n+#include \"aclnnop/aclnn_moe_distribute_combine_v2.h\"\n \n #define CHECK_RET(cond, return_expr) \\\n     do {                             \\\n@@ -147,7 +147,7 @@ int LaunchOneProcessDispatchAndCombine(Args &args)\n     std::vector<int64_t> expandIdxShape{A * 128};\n     std::vector<int64_t> expertTokenNumsShape{localExpertNum};\n     std::vector<int64_t> epRecvCountsShape{TP_WORLD_SIZE * localExpertNum * EP_WORLD_SIZE};\n-    std::vector<int64_t> tpRecvCountsShape{TP_WORLD_SIZE * localExpertNum};\n+    std::vector<int64_t> tpRecvCountsShape{TP_WORLD_SIZE};\n     std::vector<int64_t> expandScalesShape{A};\n \n     int64_t xShapeSize = GetShapeSize(xShape);\n",
+      "new_file": false,
+      "new_path": "mc2/moe_distribute_dispatch_v2/examples/test_aclnn_moe_distribute_dispatch_v2.cpp",
+      "old_path": "mc2/moe_distribute_dispatch_v2/examples/test_aclnn_moe_distribute_dispatch_v2.cpp",
+      "removed_lines": 3,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/0a8fd72efa360efcc188e0406f0f7ebfe0e8c27e/mc2/moe_distribute_dispatch_v2/examples/test_aclnn_moe_distribute_dispatch_v2.cpp",
+    "sha": "0a8fd72efa360efcc188e0406f0f7ebfe0e8c27e",
+    "source_branch": "master",
+    "source_project": {
+      "full_name": "OblivionZHU/ops-transformer",
+      "human_name": "OblivionZHU / ops-transformer",
+      "id": 7977959,
+      "path": "ops-transformer"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  }
+]

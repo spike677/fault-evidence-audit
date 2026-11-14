@@ -1,0 +1,74 @@
+[
+  {
+    "additions": 1,
+    "blob_id": "2551a3d31de34eee322f8f711ea9232964a75e5c",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/ec9244059666a542f85fe61a710e33e25f3cc63f/cmake/third_party/opbase.cmake",
+    "deletions": 1,
+    "filename": "cmake/third_party/opbase.cmake",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 1,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -24,7 +24,7 @@ else()\n   FetchContent_Declare(\n     opbase\n     GIT_REPOSITORY https://gitcode.com/cann/opbase.git\n-    GIT_TAG 07383cb90f23b3c4e9b1e16eff40a048c888555f\n+    GIT_TAG c8d83f3e57a63a7375e89a2d6937452c0ae2e522\n     GIT_PROGRESS TRUE\n     SOURCE_DIR ${CANN_3RD_LIB_PATH}/opbase)\n \n",
+      "new_file": false,
+      "new_path": "cmake/third_party/opbase.cmake",
+      "old_path": "cmake/third_party/opbase.cmake",
+      "removed_lines": 1,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/ec9244059666a542f85fe61a710e33e25f3cc63f/cmake/third_party/opbase.cmake",
+    "sha": "ec9244059666a542f85fe61a710e33e25f3cc63f",
+    "source_branch": "feature/reduceTmpl",
+    "source_project": {
+      "full_name": "Sunee/ops-transformer",
+      "human_name": "Sunee / ops-transformer",
+      "id": 9342248,
+      "path": "ops-transformer"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  },
+  {
+    "additions": 10,
+    "blob_id": "2ac55ddef97c1860edee79633d38c02d081d7164",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/ec9244059666a542f85fe61a710e33e25f3cc63f/posembedding/rotary_position_embedding_grad/op_kernel/rotary_position_embedding_grad_apt.cpp",
+    "deletions": 9,
+    "filename": "posembedding/rotary_position_embedding_grad/op_kernel/rotary_position_embedding_grad_apt.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 10,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -115,26 +115,27 @@ __global__ __aicore__ void rotary_position_embedding_grad(\n             // 调用reduce模版，做reduce操作\n             using ReduceOp = ReduceSch<REDUCE_TPL_VALUE,\n                 RotaryPositionEmbeddingGrad::RotaryPositionEmbeddingGradDag<DTYPE_DY, float>::OpDag>;\n-            ReduceOp reduceOp(&tilingData.reduceTiling);\n+            ReduceOp reduceOp0(&tilingData.reduceTiling);\n+            ReduceOp reduceOp1(&tilingData.reduceTiling);\n             if (tilingData.rotaryXParams.rotaryMode ==\n                 static_cast<int64_t>(RotaryPositionEmbeddingGrad::RotaryPosEmbeddingMode::DEEPSEEK_INTERLEAVE)) {\n                 GM_ADDR reduceWorkSpace = usrWorkSpace + workSpaceSize * 2 * sizeof(DTYPE_DY);\n                 GM_ADDR dSinWorkSpace = usrWorkSpace + workSpaceSize * sizeof(DTYPE_DY);\n-                reduceOp.Init(&pipe, grad, usrWorkSpace, cosGrad, reduceWorkSpace);\n-                reduceOp.Process();\n+                reduceOp0.Init(&pipe, grad, usrWorkSpace, cosGrad, reduceWorkSpace);\n+                reduceOp0.Process();\n                 pipe.Reset();\n                 PipeBarrier<PIPE_ALL>();\n-                reduceOp.Init(&pipe, grad, dSinWorkSpace, sinGrad, reduceWorkSpace);\n-                reduceOp.Process();\n+                reduceOp1.Init(&pipe, grad, dSinWorkSpace, sinGrad, reduceWorkSpace);\n+                reduceOp1.Process();\n                 pipe.Reset();\n             } else {\n                 GM_ADDR reduceWorkSpace = usrWorkSpace + workSpaceSize * sizeof(DTYPE_DY);\n-                reduceOp.Init(&pipe, grad, x, cosGrad, reduceWorkSpace);\n-                reduceOp.Process();\n+                reduceOp0.Init(&pipe, grad, x, cosGrad, reduceWorkSpace);\n+                reduceOp0.Process();\n                 pipe.Reset();\n                 PipeBarrier<PIPE_ALL>();\n-                reduceOp.Init(&pipe, grad, usrWorkSpace, sinGrad, reduceWorkSpace);\n-                reduceOp.Process();\n+                reduceOp1.Init(&pipe, grad, usrWorkSpace, sinGrad, reduceWorkSpace);\n+                reduceOp1.Process();\n                 pipe.Reset();\n             }\n         }\n",
+      "new_file": false,
+      "new_path": "posembedding/rotary_position_embedding_grad/op_kernel/rotary_position_embedding_grad_apt.cpp",
+      "old_path": "posembedding/rotary_position_embedding_grad/op_kernel/rotary_position_embedding_grad_apt.cpp",
+      "removed_lines": 9,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/ec9244059666a542f85fe61a710e33e25f3cc63f/posembedding/rotary_position_embedding_grad/op_kernel/rotary_position_embedding_grad_apt.cpp",
+    "sha": "ec9244059666a542f85fe61a710e33e25f3cc63f",
+    "source_branch": "feature/reduceTmpl",
+    "source_project": {
+      "full_name": "Sunee/ops-transformer",
+      "human_name": "Sunee / ops-transformer",
+      "id": 9342248,
+      "path": "ops-transformer"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  }
+]

@@ -1,0 +1,74 @@
+[
+  {
+    "additions": 58,
+    "blob_id": "f4619682bbc45fef65b6915b85b9b62d6ed30ef3",
+    "blob_url": "https://gitcode.com/cann/ops-math/blob/99f0a892298eb729b9250c3902129960e45ead1f/math/add_lora/op_kernel/add_lora_base.h",
+    "deletions": 30,
+    "filename": "math/add_lora/op_kernel/add_lora_base.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 58,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -1,12 +1,12 @@\n /**\n- * Copyright (c) 2025 Huawei Technologies Co., Ltd.\n- * This program is free software, you can redistribute it and/or modify it under the terms and conditions of\n- * CANN Open Software License Agreement Version 2.0 (the \"License\").\n- * Please refer to the License for details. You may not use this file except in compliance with the License.\n- * THIS SOFTWARE IS PROVIDED ON AN \"AS IS\" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,\n- * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.\n- * See LICENSE in the root of the software repository for the full text of the License.\n- */\n+ * Copyright (c) 2025 Huawei Technologies Co., Ltd.\n+ * This program is free software, you can redistribute it and/or modify it under the terms and conditions of\n+ * CANN Open Software License Agreement Version 2.0 (the \"License\").\n+ * Please refer to the License for details. You may not use this file except in compliance with the License.\n+ * THIS SOFTWARE IS PROVIDED ON AN \"AS IS\" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,\n+ * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.\n+ * See LICENSE in the root of the software repository for the full text of the License.\n+ */\n \n /*!\n  * \\file add_lora_base.h\n@@ -49,6 +49,8 @@ protected:\n     uint32_t addLoraFlag;\n     uint32_t y_column;\n \n+    static constexpr uint32_t MAX_ND_NZ_STRIDE_SIZE = 65535;\n+    static constexpr uint32_t B32_BLOCK_ALIGN_NUM = 16;\n     static constexpr uint32_t CUBE_BLOCK = 16;\n     static constexpr uint32_t CUBE_BLOCK_SIZE = 16 * 16;\n     static constexpr uint32_t DOUBLE_BUFFER_NUM = 2;\n@@ -120,6 +122,8 @@ protected:\n     // L0C\n     TBuf<TPosition::CO1> l0CBuf_;\n     LocalTensor<float> matmull0C_;\n+    __aicore__ inline void DataCopyL1Nz(uint32_t rowNum, uint32_t colNum, uint32_t colSize,\n+        const GlobalTensor<half> &srcGm, const LocalTensor<half> &dstTensor);\n     __aicore__ inline void CopyIn(\n         uint32_t weightIdx, uint32_t kIdx_, uint32_t mInCore, uint32_t k, uint32_t mInCoreOffset, uint32_t kOffset,\n         uint32_t pingPongFlag);\n@@ -303,6 +307,21 @@ __aicore__ inline uint32_t AddLoraKernelBase::CeilCubeBlock(uint32_t len)\n     return (len + CUBE_BLOCK - 1) / CUBE_BLOCK;\n }\n \n+__aicore__ inline void AddLoraKernelBase::DataCopyL1Nz(uint32_t rowNum, uint32_t colNum, uint32_t colSize,\n+    const GlobalTensor<half> &srcGm, const LocalTensor<half> &dstTensor)\n+{\n+    uint32_t blockNum = CeilDiv(colNum, CUBE_BLOCK);\n+    for (uint32_t blockIdx = 0; blockIdx < blockNum; blockIdx++) {\n+        uint32_t copyLen = CUBE_BLOCK;\n+        uint64_t gmOffset = blockIdx * CUBE_BLOCK;\n+        AscendC::DataCopyParams dataCopyParams{static_cast<uint16_t>(rowNum),\n+            static_cast<uint16_t>(copyLen / B32_BLOCK_ALIGN_NUM),\n+            static_cast<uint16_t>((colSize - CUBE_BLOCK) / B32_BLOCK_ALIGN_NUM), 0};\n+        uint32_t rowNumAlign = CeilDiv(rowNum, CUBE_BLOCK) * CUBE_BLOCK;\n+        AscendC::DataCopy(dstTensor[CUBE_BLOCK * rowNumAlign * blockIdx], srcGm[gmOffset], dataCopyParams);\n+    }\n+}\n+\n __aicore__ inline void AddLoraKernelBase::CopyIn(\n     uint32_t weightIdx, uint32_t kIdx_, uint32_t mInCore, uint32_t k, uint32_t mInCoreOffset, uint32_t kOffset,\n     uint32_t pingPongFlag)\n@@ -312,32 +331,41 @@ __aicore__ inline void AddLoraKernelBase::CopyIn(\n     WaitFlag<HardEvent::S_MTE2>(eventId);\n     SetFlag<HardEvent::FIX_MTE2>(eventId);\n     WaitFlag<HardEvent::FIX_MTE2>(eventId);\n+    uint32_t xGmOffset = (mInCoreOffset) * H1 + kIdx_ * kOffset;\n     if (mInCore == 1) {\n-        DataCopy(queryL1_[pingPongFlag], xIndiceGm_[(mInCoreOffset)*H1 + kIdx_ * kOffset], k);\n+        DataCopy(queryL1_[pingPongFlag], xIndiceGm_[xGmOffset], k);\n     } else {\n-        Nd2NzParams copyinA1Params;\n-        copyinA1Params.ndNum = 1;\n-        copyinA1Params.nValue = mInCore;\n-        copyinA1Params.dValue = k;\n-        copyinA1Params.srcNdMatrixStride = 0;\n-        copyinA1Params.srcDValue = H1; // 源操作数同一个ND的相邻行起始地址偏移\n-        copyinA1Params.dstNzC0Stride = CeilCubeBlock(mInCore) * CUBE_BLOCK;\n-        copyinA1Params.dstNzNStride = 1;\n-        copyinA1Params.dstNzMatrixStride = 0;\n-        DataCopy(queryL1_[pingPongFlag], xIndiceGm_[(mInCoreOffset)*H1 + kIdx_ * kOffset], copyinA1Params); // nd -> nz\n+        if (H1 > MAX_ND_NZ_STRIDE_SIZE) {\n+            DataCopyL1Nz(mInCore, k, H1, xIndiceGm_[xGmOffset], queryL1_[pingPongFlag]);\n+        } else {\n+            Nd2NzParams copyinA1Params;\n+            copyinA1Params.ndNum = 1;\n+            copyinA1Params.nValue = mInCore;\n+            copyinA1Params.dValue = k;\n+            copyinA1Params.srcNdMatrixStride = 0;\n+            copyinA1Params.srcDValue = H1; // 源操作数同一个ND的相邻行起始地址偏移\n+            copyinA1Params.dstNzC0Stride = CeilCubeBlock(mInCore) * CUBE_BLOCK;\n+            copyinA1Params.dstNzNStride = 1;\n+            copyinA1Params.dstNzMatrixStride = 0;\n+            DataCopy(queryL1_[pingPongFlag], xIndiceGm_[xGmOffset], copyinA1Params); // nd -> nz\n+        }\n     }\n     AscendC::PipeBarrier<PIPE_MTE2>();\n-    Nd2NzParams nd2nzB1Params;\n-    nd2nzB1Params.ndNum = 1;\n-    nd2nzB1Params.nValue = R;\n-    nd2nzB1Params.dValue = k;\n-    nd2nzB1Params.srcNdMatrixStride = 0;\n-    nd2nzB1Params.srcDValue = H1;\n-    nd2nzB1Params.dstNzC0Stride = CeilCubeBlock(R) * CUBE_BLOCK;\n-    nd2nzB1Params.dstNzNStride = 1;\n-    nd2nzB1Params.dstNzMatrixStride = 0;\n-    uint32_t weightOffset = weightIdx * layer * H1 * R + layer_idx * H1 * R;\n-    DataCopy(keyL1_[pingPongFlag], waGm_[weightOffset + kIdx_ * kOffset], nd2nzB1Params);\n+    uint32_t weightOffset = weightIdx * layer * H1 * R + layer_idx * H1 * R + kIdx_ * kOffset;\n+    if (H1 > MAX_ND_NZ_STRIDE_SIZE) {\n+        DataCopyL1Nz(R, k, H1, waGm_[weightOffset], keyL1_[pingPongFlag]);\n+    } else {\n+        Nd2NzParams nd2nzB1Params;\n+        nd2nzB1Params.ndNum = 1;\n+        nd2nzB1Params.nValue = R;\n+        nd2nzB1Params.dValue = k;\n+        nd2nzB1Params.srcNdMatrixStride = 0;\n+        nd2nzB1Params.srcDValue = H1;\n+        nd2nzB1Params.dstNzC0Stride = CeilCubeBlock(R) * CUBE_BLOCK;\n+        nd2nzB1Params.dstNzNStride = 1;\n+        nd2nzB1Params.dstNzMatrixStride = 0;\n+        DataCopy(keyL1_[pingPongFlag], waGm_[weightOffset], nd2nzB1Params);\n+    }\n     SetFlag<HardEvent::MTE2_MTE1>(eventId);\n     WaitFlag<HardEvent::MTE2_MTE1>(eventId);\n }\n",
+      "new_file": false,
+      "new_path": "math/add_lora/op_kernel/add_lora_base.h",
+      "old_path": "math/add_lora/op_kernel/add_lora_base.h",
+      "removed_lines": 30,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-math/raw/99f0a892298eb729b9250c3902129960e45ead1f/math/add_lora/op_kernel/add_lora_base.h",
+    "sha": "99f0a892298eb729b9250c3902129960e45ead1f",
+    "source_branch": "master",
+    "source_project": {
+      "full_name": "shilulu/ops-math_1627",
+      "human_name": "shilulu / ops-math_1627",
+      "id": 8823257,
+      "path": "ops-math_1627"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-math",
+      "human_name": "CANN / ops-math",
+      "id": 7649531,
+      "path": "ops-math"
+    }
+  },
+  {
+    "additions": 40,
+    "blob_id": "cd5a92d3c9ca2beada905ce32732ab5a59de75ca",
+    "blob_url": "https://gitcode.com/cann/ops-math/blob/99f0a892298eb729b9250c3902129960e45ead1f/math/add_lora/op_kernel/add_lora_single_core.h",
+    "deletions": 31,
+    "filename": "math/add_lora/op_kernel/add_lora_single_core.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 40,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -1,12 +1,12 @@\n /**\n- * Copyright (c) 2025 Huawei Technologies Co., Ltd.\n- * This program is free software, you can redistribute it and/or modify it under the terms and conditions of\n- * CANN Open Software License Agreement Version 2.0 (the \"License\").\n- * Please refer to the License for details. You may not use this file except in compliance with the License.\n- * THIS SOFTWARE IS PROVIDED ON AN \"AS IS\" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,\n- * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.\n- * See LICENSE in the root of the software repository for the full text of the License.\n- */\n+ * Copyright (c) 2025 Huawei Technologies Co., Ltd.\n+ * This program is free software, you can redistribute it and/or modify it under the terms and conditions of\n+ * CANN Open Software License Agreement Version 2.0 (the \"License\").\n+ * Please refer to the License for details. You may not use this file except in compliance with the License.\n+ * THIS SOFTWARE IS PROVIDED ON AN \"AS IS\" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,\n+ * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.\n+ * See LICENSE in the root of the software repository for the full text of the License.\n+ */\n \n /*!\n  * \\file add_lora_single_core.h\n@@ -70,33 +70,42 @@ __aicore__ inline void AddLoraSingleCoreBatchKernel::CopyInA(\n     eventId = pingPongFlag ? EVENT_ID0 : EVENT_ID1;\n     SetFlag<HardEvent::S_MTE2>(eventId);\n     WaitFlag<HardEvent::S_MTE2>(eventId);\n-\n+    uint32_t xGmOffset = (mInCoreOffset) * H1 + kIdx_ * kOffset;\n     if (mInCore == 1) {\n-        DataCopy(queryL1_[pingPongFlag], xGm_[(mInCoreOffset)*H1 + kIdx_ * kOffset], k);\n+        DataCopy(queryL1_[pingPongFlag], xGm_[xGmOffset], k);\n     } else {\n-        Nd2NzParams copyinXGmParams;\n-        copyinXGmParams.ndNum = 1;\n-        copyinXGmParams.nValue = mInCore;\n-        copyinXGmParams.dValue = k;\n-        copyinXGmParams.srcNdMatrixStride = 0;\n-        copyinXGmParams.srcDValue = H1; // 源操作数同一nd矩阵的相邻行起始地址间的偏移\n-        copyinXGmParams.dstNzC0Stride = CeilCubeBlock(mInCore) * CUBE_BLOCK;\n-        copyinXGmParams.dstNzNStride = 1;\n-        copyinXGmParams.dstNzMatrixStride = 0;\n-        DataCopy(queryL1_[pingPongFlag], xGm_[(mInCoreOffset)*H1 + kIdx_ * kOffset], copyinXGmParams); // nd -> nz\n+        if (H1 > MAX_ND_NZ_STRIDE_SIZE) {\n+            DataCopyL1Nz(mInCore, k, H1, xGm_[xGmOffset], queryL1_[pingPongFlag]);\n+        } else {\n+            Nd2NzParams copyinXGmParams;\n+            copyinXGmParams.ndNum = 1;\n+            copyinXGmParams.nValue = mInCore;\n+            copyinXGmParams.dValue = k;\n+            copyinXGmParams.srcNdMatrixStride = 0;\n+            copyinXGmParams.srcDValue = H1; // 源操作数同一nd矩阵的相邻行起始地址间的偏移\n+            copyinXGmParams.dstNzC0Stride = CeilCubeBlock(mInCore) * CUBE_BLOCK;\n+            copyinXGmParams.dstNzNStride = 1;\n+            copyinXGmParams.dstNzMatrixStride = 0;\n+            DataCopy(queryL1_[pingPongFlag], xGm_[xGmOffset], copyinXGmParams); // nd -> nz\n+        }\n     }\n     AscendC::PipeBarrier<PIPE_MTE2>();\n-    Nd2NzParams copyinB1Params;\n-    copyinB1Params.ndNum = 1;\n-    copyinB1Params.nValue = R;\n-    copyinB1Params.dValue = k;\n-    copyinB1Params.srcNdMatrixStride = 0;\n-    copyinB1Params.srcDValue = H1;\n-    copyinB1Params.dstNzC0Stride = CeilCubeBlock(R) * CUBE_BLOCK;\n-    copyinB1Params.dstNzNStride = 1;\n-    copyinB1Params.dstNzMatrixStride = 0;\n-    uint32_t weightOffset = weightIdx * layer * H1 * R + layer_idx * H1 * R;\n-    DataCopy(keyL1_[pingPongFlag], waGm_[weightOffset + kIdx_ * kOffset], copyinB1Params);\n+    uint32_t weightOffset = weightIdx * layer * H1 * R + layer_idx * H1 * R + kIdx_ * kOffset;\n+    if (H1 > MAX_ND_NZ_STRIDE_SIZE) {\n+        DataCopyL1Nz(R, k, H1, waGm_[weightOffset], keyL1_[pingPongFlag]);\n+    } else {\n+        Nd2NzParams copyinB1Params;\n+        copyinB1Params.ndNum = 1;\n+        copyinB1Params.nValue = R;\n+        copyinB1Params.dValue = k;\n+        copyinB1Params.srcNdMatrixStride = 0;\n+        copyinB1Params.srcDValue = H1;\n+        copyinB1Params.dstNzC0Stride = CeilCubeBlock(R) * CUBE_BLOCK;\n+        copyinB1Params.dstNzNStride = 1;\n+        copyinB1Params.dstNzMatrixStride = 0;\n+        DataCopy(keyL1_[pingPongFlag], waGm_[weightOffset], copyinB1Params);\n+    }\n+\n     SetFlag<HardEvent::MTE2_MTE1>(eventId);\n     WaitFlag<HardEvent::MTE2_MTE1>(eventId);\n }\n",
+      "new_file": false,
+      "new_path": "math/add_lora/op_kernel/add_lora_single_core.h",
+      "old_path": "math/add_lora/op_kernel/add_lora_single_core.h",
+      "removed_lines": 31,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-math/raw/99f0a892298eb729b9250c3902129960e45ead1f/math/add_lora/op_kernel/add_lora_single_core.h",
+    "sha": "99f0a892298eb729b9250c3902129960e45ead1f",
+    "source_branch": "master",
+    "source_project": {
+      "full_name": "shilulu/ops-math_1627",
+      "human_name": "shilulu / ops-math_1627",
+      "id": 8823257,
+      "path": "ops-math_1627"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-math",
+      "human_name": "CANN / ops-math",
+      "id": 7649531,
+      "path": "ops-math"
+    }
+  }
+]

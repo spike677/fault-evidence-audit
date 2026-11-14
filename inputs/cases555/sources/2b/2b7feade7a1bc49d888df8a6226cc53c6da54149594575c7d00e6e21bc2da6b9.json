@@ -1,0 +1,76 @@
+{
+  "assignee": {
+    "avatar_url": "https://cdn-img.gitcode.com/ea/da/77e41a63d5a351ce8c720a5fd94f5b93848515db4e8750f987915ec2fbb06e1d.jpg",
+    "html_url": "https://gitcode.com/linengyao",
+    "id": "6657d5b2dc6c9821a17d6c9e",
+    "login": "linengyao",
+    "name": "linengyao",
+    "object_id": "6657d5b2dc6c9821a17d6c9e"
+  },
+  "assignees": [
+    {
+      "avatar_url": "https://cdn-img.gitcode.com/ea/da/77e41a63d5a351ce8c720a5fd94f5b93848515db4e8750f987915ec2fbb06e1d.jpg",
+      "html_url": "https://gitcode.com/linengyao",
+      "id": "6657d5b2dc6c9821a17d6c9e",
+      "login": "linengyao",
+      "name": "linengyao",
+      "object_id": "6657d5b2dc6c9821a17d6c9e"
+    }
+  ],
+  "body": "### Describe the current behavior / 问题描述 (Mandatory / 必填)\nInitKVBuffer 之前始终使用 constInfo.keyStrides 来计算 key 和 value 的 offset，导致 value tensor 在非对称 strides 场景下 offset 计算错误。\n\n### Environment / 环境信息 (Mandatory / 必填)\nascend910b\n\n### Steps to reproduce the issue / 重现步骤 (Mandatory / 必填)\n1. 使用非对称 key/value strides 参数调用 FIA attention 算子\n2. value tensor 的 offset 计算使用了错误的 strides\n\n### Describe the expected behavior / 预期结果 (Mandatory / 必填)\nInitKVBuffer 应使用各自 tensor 对应的 strides 参数\n\n### Related log / screenshot / 日志 / 截图 (Mandatory / 必填)\n无\n\n### Special notes for this issue/备注 (Optional / 选填)\n关联PR: !9022",
+  "comments": 3,
+  "created_at": "2026-07-22T11:24:30+08:00",
+  "finished_at": "2026-07-23T09:15:24+08:00",
+  "html_url": "https://gitcode.com/cann/ops-transformer/issues/3891",
+  "id": 4184330,
+  "issue_priority_detail": {
+    "id": 116,
+    "title": "无优先级"
+  },
+  "issue_state": "进行中",
+  "issue_state_detail": {
+    "id": 285,
+    "serial": 0,
+    "title": "进行中"
+  },
+  "issue_type": "任务",
+  "issue_type_detail": {
+    "id": 255,
+    "is_system": false,
+    "title": "任务"
+  },
+  "labels": [
+    {
+      "color": "#35e029",
+      "created_at": "2026-03-20T11:25:13+08:00",
+      "id": 38861,
+      "name": "resolved",
+      "updated_at": "2026-07-23T11:16:54+08:00"
+    }
+  ],
+  "number": "3891",
+  "priority": 0,
+  "repository": {
+    "assigner": {},
+    "created_at": "2025-09-28T17:54:46+08:00",
+    "description": "本项目是CANN提供的transformer类大模型算子库，实现网络在NPU上加速计算。",
+    "full_name": "cann/ops-transformer",
+    "id": 7673863,
+    "name": "ops-transformer",
+    "paas": "",
+    "path": "ops-transformer",
+    "updated_at": "2025-09-28T18:06:48+08:00"
+  },
+  "state": "closed",
+  "title": "[Bug-Report|缺陷反馈]: InitKVBuffer fix strides parameter for key/value tensors",
+  "updated_at": "2026-07-23T09:15:24+08:00",
+  "user": {
+    "avatar_url": "https://cdn-img.gitcode.com/ea/da/77e41a63d5a351ce8c720a5fd94f5b93848515db4e8750f987915ec2fbb06e1d.jpg",
+    "html_url": "https://gitcode.com/linengyao",
+    "id": "6657d5b2dc6c9821a17d6c9e",
+    "login": "linengyao",
+    "name": "linengyao",
+    "object_id": "6657d5b2dc6c9821a17d6c9e"
+  },
+  "visibility_reason": "public"
+}

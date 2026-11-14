@@ -1,0 +1,76 @@
+{
+  "assignee": {
+    "avatar_url": "https://cdn-img.gitcode.com/ec/dc/5ec16dc5328d92b1be5870ef073ec9cdf5fd248dde8f6ec9e79ae6549217011e.png",
+    "html_url": "https://gitcode.com/sunlesheng",
+    "id": "67cee105b470c9701d0470fc",
+    "login": "sunlesheng",
+    "name": "sunlesheng",
+    "object_id": "67cee105b470c9701d0470fc"
+  },
+  "assignees": [
+    {
+      "avatar_url": "https://cdn-img.gitcode.com/ec/dc/5ec16dc5328d92b1be5870ef073ec9cdf5fd248dde8f6ec9e79ae6549217011e.png",
+      "html_url": "https://gitcode.com/sunlesheng",
+      "id": "67cee105b470c9701d0470fc",
+      "login": "sunlesheng",
+      "name": "sunlesheng",
+      "object_id": "67cee105b470c9701d0470fc"
+    }
+  ],
+  "body": "\n\nThanks for sending an issue! Please fill in the following template to help quickly solve your problem.\n\n### Describe the current behavior / 问题描述 (Mandatory / 必填)\n            \nint8 分组量化（VECTOR_QUANT 模式）场景下存在精度问题。在分组量化场景下，`CalcScaleOffset` 函数计算 scale/offset 偏移量时未考虑分组索引 `groupIdx`，导致所有分组使用相同的量化参数，从而从错误的内存位置读取量化参数，引起计算结果精度不达标。\n### Environment / 环境信息 (Mandatory / 必填)\n            \n- 硬件平台：arch35\n- 算子：ExtendConvTranspose\n- 量化模式：int8 分组量化 (QuantMode::VECTOR_QUANT)\n- 数据类型：输入/输出为 Float16，权重为 INT8\n### Steps to reproduce the issue / 重现步骤 (Mandatory / 必填)\n            \nExtendConvTranspose算子，onnx通路，量化分组场景（int8类型 group>1），使用ATC和AMCT量化为离线om，验证功能输入\n### Describe the expected behavior / 预期结果 (Mandatory / 必填)\n            \n在 int8 分组量化场景下，每个分组应使用独立的 scale 和 offset 参数进行量化计算，计算结果应与预期精度一致。\n### Related log / screenshot / 日志 / 截图 (Mandatory / 必填)\n            \n无\n### Special notes for this issue/备注 (Optional / 选填)\n            \n\n",
+  "comments": 1,
+  "created_at": "2026-05-08T21:32:18+08:00",
+  "finished_at": "2026-05-12T10:05:07+08:00",
+  "html_url": "https://gitcode.com/cann/ops-nn/issues/2593",
+  "id": 3918866,
+  "issue_priority_detail": {
+    "id": 116,
+    "title": "无优先级"
+  },
+  "issue_state": "进行中",
+  "issue_state_detail": {
+    "id": 285,
+    "serial": 0,
+    "title": "进行中"
+  },
+  "issue_type": "任务",
+  "issue_type_detail": {
+    "id": 255,
+    "is_system": false,
+    "title": "任务"
+  },
+  "labels": [
+    {
+      "color": "#35e029",
+      "created_at": "2026-03-20T11:25:13+08:00",
+      "id": 38861,
+      "name": "resolved",
+      "updated_at": "2026-05-12T11:11:06+08:00"
+    }
+  ],
+  "number": "2593",
+  "priority": 0,
+  "repository": {
+    "assigner": {},
+    "created_at": "2025-09-27T17:40:34+08:00",
+    "description": "本项目是CANN提供的神经网络类计算算子库，实现网络在NPU上加速计算。",
+    "full_name": "cann/ops-nn",
+    "id": 7665709,
+    "name": "ops-nn",
+    "paas": "",
+    "path": "ops-nn",
+    "updated_at": "2025-09-27T18:09:31+08:00"
+  },
+  "state": "closed",
+  "title": "[Bug-Report|缺陷反馈]: ExtendConvTranspose分组量化场景精度问题修正",
+  "updated_at": "2026-05-12T10:05:07+08:00",
+  "user": {
+    "avatar_url": "https://cdn-img.gitcode.com/ec/dc/5ec16dc5328d92b1be5870ef073ec9cdf5fd248dde8f6ec9e79ae6549217011e.png",
+    "html_url": "https://gitcode.com/sunlesheng",
+    "id": "67cee105b470c9701d0470fc",
+    "login": "sunlesheng",
+    "name": "sunlesheng",
+    "object_id": "67cee105b470c9701d0470fc"
+  },
+  "visibility_reason": "public"
+}

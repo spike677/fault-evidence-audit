@@ -1,0 +1,38 @@
+[
+  {
+    "additions": 83,
+    "blob_id": "3fbc689ba150f9952db3c175d07e472ad000f22f",
+    "blob_url": "https://gitcode.com/cann/ops-cv/blob/c089df800a5a76cd4e240aa1c158b080a43399a7/objdetect/bounding_box_encode/op_kernel/arch35/bounding_box_encode.h",
+    "deletions": 4,
+    "filename": "objdetect/bounding_box_encode/op_kernel/arch35/bounding_box_encode.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 83,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -41,6 +41,77 @@ struct BoxDeltaCalc {\n         rw = gw / pw;\n         rh = gh / ph;\n     }\n+\n+    __aicore__ static inline float FixLnResult(float origInput, float npuLnResult)\n+    {\n+        if (origInput != origInput) {\n+            return MakeNan();\n+        }\n+        if (origInput == 0.0f) {\n+            return MakeNegInf();\n+        }\n+        if (origInput < 0.0f) {\n+            return MakeNan();\n+        }\n+        if (npuLnResult != npuLnResult) {\n+            return MakeNan();\n+        }\n+        float negInf = MakeNegInf();\n+        if (npuLnResult == negInf && origInput > 0.0f) {\n+            return SoftLnPositive(origInput);\n+        }\n+        return npuLnResult;\n+    }\n+\n+    __aicore__ static inline float SoftLnPositive(float x)\n+    {\n+        if (x <= 0.0f) {\n+            return MakeNegInf();\n+        }\n+        float m = x;\n+        int e = 0;\n+        if (m >= 2.0f) {\n+            while (m >= 2.0f) {\n+                m *= 0.5f;\n+                e++;\n+            }\n+        } else if (m < 1.0f) {\n+            while (m < 1.0f) {\n+                m *= 2.0f;\n+                e--;\n+            }\n+        }\n+        float z = (m - 1.0f) / (m + 1.0f);\n+        float z2 = z * z;\n+        float z4 = z2 * z2;\n+        float z6 = z4 * z2;\n+        float z8 = z4 * z4;\n+        float z10 = z6 * z4;\n+        float poly = 1.0f + z2 * 0.33333334f + z4 * 0.2f + z6 * 0.14285715f + z8 * 0.11111111f + z10 * 0.09090909f;\n+        float artanh_z = z * poly;\n+        float ln_m = 2.0f * artanh_z;\n+        return ln_m + static_cast<float>(e) * 0.69314718f;\n+    }\n+\n+    __aicore__ static inline float MakeNegInf()\n+    {\n+        union {\n+            uint32_t u;\n+            float f;\n+        } cvt;\n+        cvt.u = 0xFF800000u;\n+        return cvt.f;\n+    }\n+\n+    __aicore__ static inline float MakeNan()\n+    {\n+        union {\n+            uint32_t u;\n+            float f;\n+        } cvt;\n+        cvt.u = 0x7FC00000u;\n+        return cvt.f;\n+    }\n };\n \n template <typename T>\n@@ -226,8 +297,12 @@ __aicore__ inline void BoundingBoxEncode<T>::ComputeFp16Path(AscendC::LocalTenso\n         int64_t base = b * 4;\n         float v0 = (outFloat.GetValue(b * 2) - means0_) * invStds0_;\n         float v1 = (outFloat.GetValue(b * 2 + 1) - means1_) * invStds1_;\n-        float v2 = (buf2.GetValue(base + 2) - means2_) * invStds2_;\n-        float v3 = (buf2.GetValue(base + 3) - means3_) * invStds3_;\n+        float origRw = buf1.GetValue(base + 2);\n+        float origRh = buf1.GetValue(base + 3);\n+        float lnRw = BoxDeltaCalc::FixLnResult(origRw, buf2.GetValue(base + 2));\n+        float lnRh = BoxDeltaCalc::FixLnResult(origRh, buf2.GetValue(base + 3));\n+        float v2 = (lnRw - means2_) * invStds2_;\n+        float v3 = (lnRh - means3_) * invStds3_;\n         buf2.SetValue(base + 0, v0);\n         buf2.SetValue(base + 1, v1);\n         buf2.SetValue(base + 2, v2);\n@@ -292,8 +367,12 @@ __aicore__ inline void BoundingBoxEncode<T>::ComputeFp32Path(AscendC::LocalTenso\n         int64_t base = b * 4;\n         float v0 = (buf1.GetValue(b * 2) - means0_) * invStds0_;\n         float v1 = (buf1.GetValue(b * 2 + 1) - means1_) * invStds1_;\n-        float v2 = (buf2.GetValue(base + 2) - means2_) * invStds2_;\n-        float v3 = (buf2.GetValue(base + 3) - means3_) * invStds3_;\n+        float origRw = aFp32.GetValue(base + 2);\n+        float origRh = aFp32.GetValue(base + 3);\n+        float lnRw = BoxDeltaCalc::FixLnResult(origRw, buf2.GetValue(base + 2));\n+        float lnRh = BoxDeltaCalc::FixLnResult(origRh, buf2.GetValue(base + 3));\n+        float v2 = (lnRw - means2_) * invStds2_;\n+        float v3 = (lnRh - means3_) * invStds3_;\n         aFp32.SetValue(base + 0, v0);\n         aFp32.SetValue(base + 1, v1);\n         aFp32.SetValue(base + 2, v2);\n",
+      "new_file": false,
+      "new_path": "objdetect/bounding_box_encode/op_kernel/arch35/bounding_box_encode.h",
+      "old_path": "objdetect/bounding_box_encode/op_kernel/arch35/bounding_box_encode.h",
+      "removed_lines": 4,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-cv/raw/c089df800a5a76cd4e240aa1c158b080a43399a7/objdetect/bounding_box_encode/op_kernel/arch35/bounding_box_encode.h",
+    "sha": "c089df800a5a76cd4e240aa1c158b080a43399a7",
+    "source_branch": "bbe",
+    "source_project": {
+      "full_name": "ugzhangyiyi/ops-cv",
+      "human_name": "ugzhangyiyi / ops-cv",
+      "id": 10209789,
+      "path": "ops-cv"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-cv",
+      "human_name": "CANN / ops-cv",
+      "id": 7657293,
+      "path": "ops-cv"
+    }
+  }
+]

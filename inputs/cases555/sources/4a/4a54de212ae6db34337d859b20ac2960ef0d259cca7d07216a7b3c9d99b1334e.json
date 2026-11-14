@@ -1,0 +1,92 @@
+[
+  {
+    "additions": 14,
+    "blob_id": "dcedd5454baa6740fc01f70a64ce5da50662fdb5",
+    "blob_url": "https://gitcode.com/cann/ops-cv/blob/47ccc453105b65798082c0d34f13f791a9780fb4/image/upsample_bilinear2d_grad/op_host/upsample_bilinear2d_grad_tiling_arch35.cpp",
+    "deletions": 8,
+    "filename": "image/upsample_bilinear2d_grad/op_host/upsample_bilinear2d_grad_tiling_arch35.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 14,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -12,23 +12,26 @@\n \n /*!\n  * \\file upsample_bilinear2d_grad_tiling_arch35.cpp\n- * \\brief Tiling implementation for upsample_bilinear2d_grad (arch35)\n+ * \\brief SIMT Tiling implementation for upsample_bilinear2d_grad (arch35)\n  */\n \n-#include \"log/log.h\"\n+#include <climits>\n+#include <cmath>\n+#include <cstring>\n+\n #include \"register/op_impl_registry.h\"\n-#include \"platform/platform_ascendc.h\"\n+#include \"register/tilingdata_base.h\"\n+#include \"tiling/tiling_api.h\"\n+#include \"tiling/platform/platform_ascendc.h\"\n+#include \"log/log.h\"\n #include \"util/math_util.h\"\n-#include \"util/platform_util.h\"\n #include \"op_host/tiling_util.h\"\n #include \"op_host/tiling_templates_registry.h\"\n-#include \"image/upsample_bilinear2d_grad/op_kernel/arch35/upsample_bilinear2d_grad_tiling_data.h\"\n-#include \"image/upsample_bilinear2d_grad/op_kernel/arch35/upsample_bilinear2d_grad_tiling_key.h\"\n+#include \"../op_kernel/arch35/upsample_bilinear2d_grad_tiling_data.h\"\n+#include \"../op_kernel/arch35/upsample_bilinear2d_grad_tiling_key.h\"\n \n namespace optiling {\n \n-using namespace Ops::Cv::OpTiling;\n-\n constexpr uint32_t DCACHE_SIZE = 128 * 1024;\n constexpr uint32_t STATIC_UB_ESTIMATE = 0;\n constexpr int64_t PER_CORE_MIN = 1024;\n@@ -63,6 +66,9 @@ static ge::graphStatus GetShapeAttrsInfo(gert::TilingContext* context, int64_t&\n     auto attrs = context->GetAttrs();\n     OP_CHECK_NULL_WITH_CONTEXT(context, attrs);\n \n+    const auto* outputSizeVec = attrs->GetListInt(0);\n+    OP_CHECK_NULL_WITH_CONTEXT(context, outputSizeVec);\n+\n     const auto* inputSizeVec = attrs->GetListInt(1);\n     OP_CHECK_NULL_WITH_CONTEXT(context, inputSizeVec);\n     OP_CHECK_IF(inputSizeVec->GetSize() != 4,\n",
+      "new_file": false,
+      "new_path": "image/upsample_bilinear2d_grad/op_host/upsample_bilinear2d_grad_tiling_arch35.cpp",
+      "old_path": "image/upsample_bilinear2d_grad/op_host/upsample_bilinear2d_grad_tiling_arch35.cpp",
+      "removed_lines": 8,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-cv/raw/47ccc453105b65798082c0d34f13f791a9780fb4/image/upsample_bilinear2d_grad/op_host/upsample_bilinear2d_grad_tiling_arch35.cpp",
+    "sha": "47ccc453105b65798082c0d34f13f791a9780fb4",
+    "source_branch": "upsample",
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-cv",
+      "human_name": "CANN / ops-cv",
+      "id": 7657293,
+      "path": "ops-cv"
+    }
+  },
+  {
+    "additions": 36,
+    "blob_id": "7531c00bd6dc036a8d587ab45154c8dbfd0b20e3",
+    "blob_url": "https://gitcode.com/cann/ops-cv/blob/47ccc453105b65798082c0d34f13f791a9780fb4/image/upsample_bilinear2d_grad/op_kernel/arch35/upsample_bilinear2d_grad_simt.h",
+    "deletions": 8,
+    "filename": "image/upsample_bilinear2d_grad/op_kernel/arch35/upsample_bilinear2d_grad_simt.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 36,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -114,20 +114,38 @@ __simt_callee__ inline void ComputeRange(int32_t inCoord, float invScale, int32_\n \n // ============================================================\n // Get h-weight for a given hIn and hOut\n-// Returns 0 if hOut does not contribute to hIn\n+// When h1 >= inputHeight, h0 gets full weight 1.0 (matching PyTorch).\n+// Sets hasZeroWeight=true when h1w==0 at boundary (inf*0=nan case).\n // ============================================================\n template <int32_t AlignCorners>\n-__simt_callee__ inline float GetHWeight(int32_t hIn, int32_t hOut, float scalesH, int32_t inputHeight)\n+__simt_callee__ inline float GetHWeight(int32_t hIn, int32_t hOut, float scalesH, int32_t inputHeight, bool& isTarget,\n+                                        bool& hasZeroWeight)\n {\n     float hSrc = ComputeSrcCoord1D<AlignCorners>(hOut, scalesH);\n     int32_t h0 = static_cast<int32_t>(floorf(hSrc));\n     int32_t h1 = h0 + 1;\n     float h1w = hSrc - static_cast<float>(h0);\n     float h0w = 1.0f - h1w;\n+    isTarget = false;\n+    hasZeroWeight = false;\n     if (hIn == h0 && h0 >= 0 && h0 < inputHeight) {\n+        isTarget = true;\n+        if (h1 >= inputHeight) {\n+            if (h1w == 0.0f) {\n+                hasZeroWeight = true;\n+            }\n+            return 1.0f;\n+        }\n+        if (h0w == 0.0f) {\n+            hasZeroWeight = true;\n+        }\n         return h0w;\n     }\n     if (hIn == h1 && h1 >= 0 && h1 < inputHeight) {\n+        isTarget = true;\n+        if (h1w == 0.0f) {\n+            hasZeroWeight = true;\n+        }\n         return h1w;\n     }\n     return 0.0f;\n@@ -150,17 +168,26 @@ __simt_callee__ inline float GatherGradient(int32_t hIn, int32_t wIn, int32_t n,\n     int64_t ncBase = (static_cast<int64_t>(n) * channels + c) * static_cast<int64_t>(outputHeight) * outputWidth;\n     float sum = 0.0f;\n     for (int32_t hOut = hOutStart; hOut <= hOutEnd; hOut++) {\n-        float hWeight = GetHWeight<AlignCorners>(hIn, hOut, scalesH, inputHeight);\n-        if (hWeight == 0.0f) {\n+        bool hIsTarget = false;\n+        bool hHasZero = false;\n+        float hWeight = GetHWeight<AlignCorners>(hIn, hOut, scalesH, inputHeight, hIsTarget, hHasZero);\n+        if (!hIsTarget) {\n             continue;\n         }\n         int64_t hBase = ncBase + static_cast<int64_t>(hOut) * outputWidth;\n         for (int32_t wOut = wOutStart; wOut <= wOutEnd; wOut++) {\n-            float wWeight = GetHWeight<AlignCorners>(wIn, wOut, scalesW, inputWidth);\n-            if (wWeight == 0.0f) {\n+            bool wIsTarget = false;\n+            bool wHasZero = false;\n+            float wWeight = GetHWeight<AlignCorners>(wIn, wOut, scalesW, inputWidth, wIsTarget, wHasZero);\n+            if (!wIsTarget) {\n                 continue;\n             }\n-            sum += GradToFloat<T>(gradOutput[hBase + wOut]) * hWeight * wWeight;\n+            float gradVal = GradToFloat<T>(gradOutput[hBase + wOut]);\n+            if ((hHasZero || wHasZero) && (isinf(gradVal) || isnan(gradVal))) {\n+                sum += gradVal - gradVal;\n+            }\n+            float contrib = gradVal * hWeight * wWeight;\n+            sum += contrib;\n         }\n     }\n     return sum;\n@@ -229,4 +256,5 @@ __aicore__ inline void Process(GM_ADDR gradOutput, GM_ADDR gradInput,\n }\n \n } // namespace NsUpsampleBilinear2dGrad\n-#endif // UPSAMPLE_BILINEAR2D_GRAD_SIMT_H\n\\ No newline at end of file\n+\n+#endif // UPSAMPLE_BILINEAR2D_GRAD_SIMT_H\n",
+      "new_file": false,
+      "new_path": "image/upsample_bilinear2d_grad/op_kernel/arch35/upsample_bilinear2d_grad_simt.h",
+      "old_path": "image/upsample_bilinear2d_grad/op_kernel/arch35/upsample_bilinear2d_grad_simt.h",
+      "removed_lines": 8,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-cv/raw/47ccc453105b65798082c0d34f13f791a9780fb4/image/upsample_bilinear2d_grad/op_kernel/arch35/upsample_bilinear2d_grad_simt.h",
+    "sha": "47ccc453105b65798082c0d34f13f791a9780fb4",
+    "source_branch": "upsample",
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-cv",
+      "human_name": "CANN / ops-cv",
+      "id": 7657293,
+      "path": "ops-cv"
+    }
+  },
+  {
+    "additions": 76,
+    "blob_id": "16a2130c013af37c4682358743f1e3e527c71a55",
+    "blob_url": "https://gitcode.com/cann/ops-cv/blob/47ccc453105b65798082c0d34f13f791a9780fb4/image/upsample_bilinear2d_grad/tests/assets/golden.py",
+    "deletions": 86,
+    "filename": "image/upsample_bilinear2d_grad/tests/assets/golden.py",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 76,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -9,6 +9,8 @@\n # See LICENSE in the root of the software repository for the full text of the License.\n # ----------------------------------------------------------------------------\n \n+import torch\n+import torch.nn.functional as F\n import numpy as np\n \n __golden__ = {\n@@ -16,127 +18,115 @@ __golden__ = {\n     \"aclnn\": {\"aclnnUpsampleBilinear2dGrad\": \"aclnn_upsample_bilinear2d_grad_golden\"}\n }\n \n+_TORCH_DTYPE = {\n+    \"float16\": torch.float16,\n+    \"float32\": torch.float32,\n+    \"bfloat16\": torch.bfloat16,\n+    np.float16: torch.float16,\n+    np.float32: torch.float32,\n+}\n+\n+try:\n+    _TORCH_DTYPE[np.dtype(\"bfloat16\")] = torch.bfloat16\n+except TypeError:\n+    pass\n+\n+\n+def _to_torch_dtype(dtype):\n+    if isinstance(dtype, torch.dtype):\n+        return dtype\n+    return _TORCH_DTYPE.get(dtype, torch.float32)\n+\n+\n+def _to_numpy_dtype_name(dtype):\n+    if hasattr(dtype, 'name'):\n+        return dtype.name\n+    return str(dtype)\n+\n+\n+def _bilinear2d_backward_torch(grad_out_t, H_out, W_out, H_in, W_in,\n+                                align_corners, torch_dtype):\n+    N, C = grad_out_t.shape[0], grad_out_t.shape[1]\n+    x = torch.zeros(N, C, H_in, W_in, dtype=torch_dtype, requires_grad=True)\n+    y = F.interpolate(x, size=(H_out, W_out), mode='bilinear',\n+                      align_corners=align_corners)\n+    y.backward(grad_out_t)\n+    return x.grad.detach()\n+\n \n def upsample_bilinear2d_grad_golden(grad_output, *, output_size, input_size,\n                                      align_corners=False, scales_h=0.0, scales_w=0.0,\n                                      **kwargs):\n     '''\n-    Golden function for upsample_bilinear2d_grad.\n-    All the parameters (names and order) follow @upsample_bilinear2d_grad_def.cpp without outputs.\n-    All the input Tensors are numpy.ndarray.\n+    Golden function for upsample_bilinear2d_grad using PyTorch autograd.\n \n     Args:\n         grad_output: numpy array, shape [N, C, H_out, W_out]\n         output_size: list [H_out, W_out]\n         input_size: list [N, C, H_in, W_in]\n         align_corners: bool\n-        scales_h: float\n-        scales_w: float\n-        **kwargs: {input,output}_{dtypes,ori_shapes,formats,ori_formats},\n-                  full_soc_version, short_soc_version, testcase_name\n+        scales_h: float (unused, PyTorch computes from sizes)\n+        scales_w: float (unused, PyTorch computes from sizes)\n \n     Returns:\n-        Output tensor (grad_input)\n+        Output tensor (grad_input) as numpy array\n     '''\n     orig_dtype = grad_output.dtype\n-    if orig_dtype.name in ('bfloat16', 'float16'):\n-        grad_output = grad_output.astype(np.float32)\n+    torch_dtype = _to_torch_dtype(orig_dtype)\n \n     N, C, H_out, W_out = grad_output.shape\n     _, _, H_in, W_in = input_size\n \n-    # Compute scale factors\n-    if scales_h == 0.0:\n-        if align_corners:\n-            scales_h = (H_in - 1) / (H_out - 1) if H_out > 1 else 0.0\n-        else:\n-            scales_h = H_in / H_out if H_out > 0 else 0.0\n+    grad_out_t = torch.from_numpy(grad_output.astype(np.float32)).to(torch_dtype)\n+    grad = _bilinear2d_backward_torch(grad_out_t, H_out, W_out, H_in, W_in,\n+                                       align_corners, torch_dtype)\n+    result = grad.float().numpy()\n \n-    if scales_w == 0.0:\n-        if align_corners:\n-            scales_w = (W_in - 1) / (W_out - 1) if W_out > 1 else 0.0\n-        else:\n-            scales_w = W_in / W_out if W_out > 0 else 0.0\n+    dtype_name = _to_numpy_dtype_name(orig_dtype)\n+    if dtype_name == 'float16':\n+        result = result.astype(np.float16)\n+    elif dtype_name == 'bfloat16':\n+        try:\n+            result = result.astype(np.dtype(\"bfloat16\"))\n+        except TypeError:\n+            pass\n \n-    # Initialize grad_input\n-    grad_input = np.zeros((N, C, H_in, W_in), dtype=np.float32)\n-\n-    # Bilinear interpolation backward (scatter-add)\n-    for n in range(N):\n-        for c in range(C):\n-            for h_out in range(H_out):\n-                for w_out in range(W_out):\n-                    if align_corners:\n-                        h_src = scales_h * h_out\n-                        w_src = scales_w * w_out\n-                    else:\n-                        h_src = scales_h * (h_out + 0.5) - 0.5\n-                        w_src = scales_w * (w_out + 0.5) - 0.5\n-                        h_src = max(h_src, 0.0)\n-                        w_src = max(w_src, 0.0)\n-\n-                    h0 = int(np.floor(h_src))\n-                    h1 = h0 + 1\n-                    w0 = int(np.floor(w_src))\n-                    w1 = w0 + 1\n-\n-                    h1_weight = h_src - h0\n-                    h0_weight = 1.0 - h1_weight\n-                    w1_weight = w_src - w0\n-                    w0_weight = 1.0 - w1_weight\n-\n-                    grad_val = grad_output[n, c, h_out, w_out]\n-\n-                    hw00 = h0_weight * w0_weight\n-                    hw01 = h0_weight * w1_weight\n-                    hw10 = h1_weight * w0_weight\n-                    hw11 = h1_weight * w1_weight\n-                    if hw00 > 0.0 and 0 <= h0 < H_in and 0 <= w0 < W_in:\n-                        grad_input[n, c, h0, w0] += grad_val * hw00\n-                    if hw01 > 0.0 and 0 <= h0 < H_in and 0 <= w1 < W_in:\n-                        grad_input[n, c, h0, w1] += grad_val * hw01\n-                    if hw10 > 0.0 and 0 <= h1 < H_in and 0 <= w0 < W_in:\n-                        grad_input[n, c, h1, w0] += grad_val * hw10\n-                    if hw11 > 0.0 and 0 <= h1 < H_in and 0 <= w1 < W_in:\n-                        grad_input[n, c, h1, w1] += grad_val * hw11\n-\n-    if orig_dtype.name in ('bfloat16', 'float16'):\n-        grad_input = grad_input.astype(orig_dtype, copy=False)\n-\n-    return grad_input\n+    return result\n \n \n def aclnn_upsample_bilinear2d_grad_golden(gradOutput, outputSize, inputSize,\n                                            alignCorners, scalesH, scalesW,\n                                            gradInput, **kwargs):\n     '''\n-    Aclnn golden for aclnnUpsampleBilinear2dGrad.\n-    All the parameters (name & order) follow \\\n-        function `aclnnUpsampleBilinear2dGradGetWorkspaceSize` in @aclnn_upsample_bilinear2d_grad.h \\\n-        without `workspaceSize` & `executor`.\n-    When all dtypes are natively supported by torch, \\\n-        the Tensors in the parameters are all torch.Tensor. \\\n-        Conversely, when not, the Tensors in the parameters are all numpy.ndarray.\n+    Aclnn golden for aclnnUpsampleBilinear2dGrad using PyTorch autograd.\n \n     Args:\n-        kwargs: tensor_{dtypes, formats}, scalar_dtypes, short_soc_version, testcase_name\n+        gradOutput: torch.Tensor or numpy array, shape [N, C, H_out, W_out]\n+        outputSize: list or aclIntArray [H_out, W_out]\n+        inputSize: list or aclIntArray [N, C, H_in, W_in]\n+        alignCorners: bool\n+        scalesH: float/double (unused, PyTorch computes from sizes)\n+        scalesW: float/double (unused, PyTorch computes from sizes)\n+        gradInput: output tensor (unused, for signature compatibility)\n \n     Returns:\n-        Output tensors.\n+        Output tensor (grad_input) as torch.Tensor\n     '''\n     if isinstance(gradOutput, np.ndarray):\n-        go = gradOutput\n+        torch_dtype = _to_torch_dtype(gradOutput.dtype)\n+        grad_out_t = torch.from_numpy(gradOutput.astype(np.float32)).to(torch_dtype)\n+    elif isinstance(gradOutput, torch.Tensor):\n+        torch_dtype = gradOutput.dtype\n+        grad_out_t = gradOutput.detach().clone()\n     else:\n-        go = gradOutput.cpu().numpy() if hasattr(gradOutput, 'cpu') else np.array(gradOutput)\n+        torch_dtype = torch.float32\n+        grad_out_t = torch.tensor(gradOutput, dtype=torch_dtype)\n \n     output_size = list(outputSize) if not isinstance(outputSize, list) else outputSize\n     input_size = list(inputSize) if not isinstance(inputSize, list) else inputSize\n \n-    return upsample_bilinear2d_grad_golden(\n-        go,\n-        output_size=output_size,\n-        input_size=input_size,\n-        align_corners=bool(alignCorners),\n-        scales_h=float(scalesH),\n-        scales_w=float(scalesW)\n-    )\n+    H_out, W_out = output_size[0], output_size[1]\n+    H_in, W_in = input_size[2], input_size[3]\n+\n+    return _bilinear2d_backward_torch(grad_out_t, H_out, W_out, H_in, W_in,\n+                                       bool(alignCorners), torch_dtype)\n",
+      "new_file": false,
+      "new_path": "image/upsample_bilinear2d_grad/tests/assets/golden.py",
+      "old_path": "image/upsample_bilinear2d_grad/tests/assets/golden.py",
+      "removed_lines": 86,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-cv/raw/47ccc453105b65798082c0d34f13f791a9780fb4/image/upsample_bilinear2d_grad/tests/assets/golden.py",
+    "sha": "47ccc453105b65798082c0d34f13f791a9780fb4",
+    "source_branch": "upsample",
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-cv",
+      "human_name": "CANN / ops-cv",
+      "id": 7657293,
+      "path": "ops-cv"
+    }
+  }
+]

@@ -1,0 +1,80 @@
+{
+  "assignee": {
+    "html_url": "https://gitcode.com/su-yueming",
+    "id": "6822d32a6a68fa1fec6cc84b",
+    "login": "su-yueming",
+    "name": "su-yueming",
+    "object_id": "6822d32a6a68fa1fec6cc84b"
+  },
+  "assignees": [
+    {
+      "html_url": "https://gitcode.com/su-yueming",
+      "id": "6822d32a6a68fa1fec6cc84b",
+      "login": "su-yueming",
+      "name": "su-yueming",
+      "object_id": "6822d32a6a68fa1fec6cc84b"
+    },
+    {
+      "html_url": "https://gitcode.com/yourealize",
+      "id": "684598ba4229be333029be60",
+      "login": "yourealize",
+      "name": "陈展熹",
+      "object_id": "684598ba4229be333029be60"
+    }
+  ],
+  "body": "本Issue报告PR#3298检视发现的NaN处理行为差异问题。\n\n问题描述\n\nSoftshrink算子对NaN输入的处理与PyTorch行为不一致。\n\n问题位置\n\n文件：softshrink.h\n行号：Compute函数\n\n行为差异对比\n\nPyTorch验证结果（实际运行）：\nimport torch\nx = torch.tensor([float('nan'), 1.0, -1.0])\ny = F.softshrink(x, lambd=0.3)\nOutput: tensor([nan, 0.7, -0.7])\n\n结论：PyTorch对NaN输入输出NaN。\n\nAscend C当前实现：\nNaN比较结果为false，落入else分支，输出0。\n\n差异说明\n\n输入NaN时：\n- PyTorch输出：NaN（保留原值）\n- Ascend C输出：0（被抹掉）\n\n影响分析\n\n1. 数值敏感场景：NaN被抹掉可能掩盖数据异常\n2. 框架兼容性：与PyTorch行为不一致，迁移需注意\n3. 调试困难：用户可能不知道NaN已被处理\n\n建议修复\n\n在Compute函数添加NaN检测和保留逻辑：\nCompare(nanMask, xLocal, xLocal, CMPMODE::NEQ, count)\nSelect(resultLocal, nanMask, xLocal, resultLocal, SELMODE::VSEL_TENSOR_TENSOR_MODE, count)\n\n发现来源\n\nPR: #3298 (ops-nn/Softshrink)\n检视时间: 2026-04-14",
+  "comments": 0,
+  "created_at": "2026-04-14T18:43:09+08:00",
+  "finished_at": "2026-04-30T18:09:23+08:00",
+  "html_url": "https://gitcode.com/cann/ops-nn/issues/2053",
+  "id": 3852234,
+  "issue_priority_detail": {
+    "id": 116,
+    "title": "无优先级"
+  },
+  "issue_state": "进行中",
+  "issue_state_detail": {
+    "id": 285,
+    "serial": 0,
+    "title": "进行中"
+  },
+  "issue_type": "任务",
+  "issue_type_detail": {
+    "id": 255,
+    "is_system": false,
+    "title": "任务"
+  },
+  "labels": [
+    {
+      "color": "#35e029",
+      "created_at": "2026-03-20T11:25:13+08:00",
+      "id": 38861,
+      "name": "resolved",
+      "updated_at": "2026-04-30T19:02:24+08:00"
+    }
+  ],
+  "number": "2053",
+  "priority": 0,
+  "repository": {
+    "assigner": {},
+    "created_at": "2025-09-27T17:40:34+08:00",
+    "description": "本项目是CANN提供的神经网络类计算算子库，实现网络在NPU上加速计算。",
+    "full_name": "cann/ops-nn",
+    "id": 7665709,
+    "name": "ops-nn",
+    "paas": "",
+    "path": "ops-nn",
+    "updated_at": "2025-09-27T18:09:31+08:00"
+  },
+  "state": "closed",
+  "title": "[Bug-Report|缺陷反馈][PR#3298] Softshrink NaN处理与PyTorch行为不一致",
+  "updated_at": "2026-06-30T20:50:33+08:00",
+  "user": {
+    "html_url": "https://gitcode.com/su-yueming",
+    "id": "6822d32a6a68fa1fec6cc84b",
+    "login": "su-yueming",
+    "name": "su-yueming",
+    "object_id": "6822d32a6a68fa1fec6cc84b"
+  },
+  "visibility_reason": "public"
+}

@@ -1,0 +1,402 @@
+[
+  {
+    "additions": 4,
+    "blob_id": "84ec5057335c4a1aa49e4ff2925220c21a83a388",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/abef4e892b5b5ec104621441c59801bf93e01f9e/mc2/allto_allv_grouped_mat_mul/docs/aclnnAlltoAllvGroupedMatMul.md",
+    "deletions": 2,
+    "filename": "mc2/allto_allv_grouped_mat_mul/docs/aclnnAlltoAllvGroupedMatMul.md",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 4,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -310,7 +310,9 @@ aclnnStatus aclnnAlltoAllvGroupedMatMul(\n \n 示例代码如下，仅供参考，具体编译和执行过程请参考[编译与运行样例](../../../docs/zh/context/编译与运行样例.md)。\n \n-说明：本示例代码调用了部分HCCL集合通信库接口：HcclGetCommName、HcclCommInitAll、HcclCommDestroy, 请参考[ <<HCCL API (C)>>](https://hiascend.com/document/redirect/CannCommunityHcclCppApi)。\n+说明：\n+- 本示例代码调用了部分HCCL集合通信库接口：HcclGetCommName、HcclCommInitAll、HcclCommDestroy, 请参考[ <<HCCL API (C)>>](https://hiascend.com/document/redirect/CannCommunityHcclCppApi)。\n+- 本示例代码以8卡为例，请根据实际环境卡数修改 `EP_WORLD_SIZE`。\n \n - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>、<term>Ascend 950PR/Ascend 950DT</term>：\n \n@@ -377,7 +379,7 @@ aclnnStatus aclnnAlltoAllvGroupedMatMul(\n     };\n \n     // shape 基本信息\n-    constexpr int64_t EP_WORLD_SIZE = 2;\n+    constexpr int64_t EP_WORLD_SIZE = 8;\n     constexpr int64_t BS = 4096;\n     constexpr int64_t K = 2;\n     constexpr int64_t H = 7168;\n",
+      "new_file": false,
+      "new_path": "mc2/allto_allv_grouped_mat_mul/docs/aclnnAlltoAllvGroupedMatMul.md",
+      "old_path": "mc2/allto_allv_grouped_mat_mul/docs/aclnnAlltoAllvGroupedMatMul.md",
+      "removed_lines": 2,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/abef4e892b5b5ec104621441c59801bf93e01f9e/mc2/allto_allv_grouped_mat_mul/docs/aclnnAlltoAllvGroupedMatMul.md",
+    "sha": "abef4e892b5b5ec104621441c59801bf93e01f9e",
+    "source_branch": "master_0314",
+    "source_project": {
+      "full_name": "libohao6/ops-transformer",
+      "human_name": "libohao6 / ops-transformer",
+      "id": 9072246,
+      "path": "ops-transformer"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  },
+  {
+    "additions": 287,
+    "blob_id": "c11c824a44d3666b4b2da2ba1e21730059a3af44",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/abef4e892b5b5ec104621441c59801bf93e01f9e/mc2/allto_allv_grouped_mat_mul/examples/arch32/test_aclnn_allto_allv_grouped_mat_mul.cpp",
+    "deletions": 0,
+    "filename": "mc2/allto_allv_grouped_mat_mul/examples/arch32/test_aclnn_allto_allv_grouped_mat_mul.cpp",
+    "patch": {
+      "a_mode": "0",
+      "added_lines": 287,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -0,0 +1,287 @@\n+/**\n+ * Copyright (c) 2025 Huawei Technologies Co., Ltd.\n+ * This program is free software, you can redistribute it and/or modify it under the terms and conditions of\n+ * CANN Open Software License Agreement Version 2.0 (the \"License\").\n+ * Please refer to the License for details. You may not use this file except in compliance with the License.\n+ * THIS SOFTWARE IS PROVIDED ON AN \"AS IS\" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,\n+ * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.\n+ * See LICENSE in the root of the software repository for the full text of the License.\n+ */\n+\n+/*!\n+ * \\file test_aclnn_allto_allv_grouped_mat_mul.cpp\n+ * \\brief\n+ */\n+\n+#include <thread>\n+#include <iostream>\n+#include <string>\n+#include <cstring>\n+#include <vector>\n+#include \"acl/acl.h\"\n+#include \"hccl/hccl.h\"\n+#include \"aclnnop/aclnn_allto_allv_grouped_mat_mul.h\"\n+\n+#define CHECK_RET(cond, return_expr)                                                                                   \\\n+    do {                                                                                                               \\\n+        if (!(cond)) {                                                                                                 \\\n+            return_expr;                                                                                               \\\n+        }                                                                                                              \\\n+    } while (0)\n+\n+#define LOG_PRINT(message, ...)                                                                                        \\\n+    do {                                                                                                               \\\n+        printf(message, ##__VA_ARGS__);                                                                                \\\n+    } while (0)\n+\n+int64_t GetShapeSize(const std::vector<int64_t> &shape)\n+{\n+    int64_t shape_size = 1;\n+    for (auto i : shape) {\n+        shape_size *= i;\n+    }\n+    return shape_size;\n+}\n+\n+template <typename T>\n+int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &shape, void **deviceAddr,\n+                    aclDataType dataType, aclTensor **tensor)\n+{\n+    auto size = GetShapeSize(shape) * sizeof(T);\n+    auto ret = aclrtMalloc(deviceAddr, size, ACL_MEM_MALLOC_HUGE_FIRST);\n+    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT(\"[ERROR] aclrtMalloc failed. ret: %d\\n\", ret); return ret);\n+    ret = aclrtMemcpy(*deviceAddr, size, hostData.data(), size, ACL_MEMCPY_HOST_TO_DEVICE);\n+    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT(\"[ERROR] aclrtMemcpy failed. ret: %d\\n\", ret); return ret);\n+    std::vector<int64_t> strides(shape.size(), 1);\n+    for (int64_t i = shape.size() - 2; i >= 0; i--) {\n+        strides[i] = shape[i + 1] * strides[i + 1];\n+    }\n+    *tensor = aclCreateTensor(shape.data(), shape.size(), dataType, strides.data(), 0, aclFormat::ACL_FORMAT_ND,\n+                              shape.data(), shape.size(), *deviceAddr);\n+    return 0;\n+}\n+\n+struct Args {\n+    int rankId;\n+    HcclComm hcclComm;\n+    aclrtStream stream;\n+    aclrtContext context;\n+};\n+\n+// shape 基本信息\n+constexpr int64_t EP_WORLD_SIZE = 8;\n+constexpr int64_t BS = 4096;\n+constexpr int64_t K = 2;\n+constexpr int64_t H = 7168;\n+constexpr int64_t e = 4;\n+constexpr int64_t N1 = 4096;\n+constexpr int64_t N2 = 4096;\n+constexpr int64_t A = BS * K;\n+\n+std::vector<int16_t> pPermuteData(A *H, 0);\n+std::vector<int16_t> pGmmyData(A *N1, 0);\n+std::vector<int16_t> pmmXData(BS *H, 0);\n+std::vector<int16_t> pmmWData(H *N2, 0);\n+std::vector<int16_t> pmmYData(BS *N2, 0);\n+\n+int LaunchOneThreadAlltoAllvGmm(Args &args)\n+{\n+    int ret = aclrtSetCurrentContext(args.context);\n+    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT(\"[ERROR] aclrtSetCurrentContext failed. ret: %d\\n\", ret); return ret);\n+    char hcomName[128] = {0};\n+    ret = HcclGetCommName(args.hcclComm, hcomName);\n+    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT(\"[ERROR] HcclGetEpCommName failed. ret: %d\\n\", ret); return -1);\n+\n+    std::vector<int64_t> gmmXShape = {BS * K, H};\n+    std::vector<int64_t> gmmWShape = {e, H, N1};\n+    std::vector<int64_t> gmmYShape = {A, N1};\n+    std::vector<int64_t> permuteShape = {A, H};\n+    std::vector<int64_t> mmXShape = {BS, H};\n+    std::vector<int64_t> mmWShape = {H, N2};\n+    std::vector<int64_t> mmYShape = {BS, N2};\n+    std::vector<int64_t> sendCountsShape = {EP_WORLD_SIZE * e};\n+    std::vector<int64_t> recvCountsShape = {EP_WORLD_SIZE * e};\n+\n+    std::vector<int64_t> sendCountsList(EP_WORLD_SIZE * e, BS * K / (EP_WORLD_SIZE * e));\n+    std::vector<int64_t> recvCountsList(EP_WORLD_SIZE * e, BS * K / (EP_WORLD_SIZE * e));\n+\n+    void *gmmXDeviceAddr = nullptr;\n+    void *gmmWDeviceAddr = nullptr;\n+    void *gmmYDeviceAddr = nullptr;\n+    void *permuteDeviceAddr = nullptr;\n+    void *mmXDeviceAddr = nullptr;\n+    void *mmWDeviceAddr = nullptr;\n+    void *mmYDeviceAddr = nullptr;\n+\n+    aclTensor *gmmX = nullptr;\n+    aclTensor *gmmW = nullptr;\n+    aclTensor *gmmY = nullptr;\n+    aclTensor *mmX = nullptr;\n+    aclTensor *mmW = nullptr;\n+    aclTensor *mmY = nullptr;\n+    aclTensor *permute = nullptr;\n+    aclTensor *sendCountsTensor = nullptr;\n+    aclTensor *recvCountsTensor = nullptr;\n+\n+    uint64_t workspaceSize = 0;\n+    aclOpExecutor *executor = nullptr;\n+    void *workspaceAddr = nullptr;\n+\n+    long long gmmXShapeSize = GetShapeSize(gmmXShape);\n+    long long gmmWShapeSize = GetShapeSize(gmmWShape);\n+    long long gmmYShapeSize = GetShapeSize(gmmYShape);\n+    long long permuteShapeSize = GetShapeSize(permuteShape);\n+    long long mmXShapeSize = GetShapeSize(mmXShape);\n+    long long mmWShapeSize = GetShapeSize(mmWShape);\n+    long long mmYShapeSize = GetShapeSize(mmYShape);\n+\n+    std::vector<uint16_t> gmmXHostData(gmmXShapeSize, (args.rankId + 1) * 1024); // BF16, FP16\n+    std::vector<uint16_t> gmmWHostData(gmmWShapeSize, (args.rankId + 1) * 512);\n+    std::vector<uint16_t> gmmYHostData(gmmYShapeSize, 65535);\n+    std::vector<uint16_t> permuteHostData(permuteShapeSize, 65535);\n+    std::vector<uint16_t> mmXHostData(mmXShapeSize, (args.rankId + 1) * 1024); // BF16, FP16\n+    std::vector<uint16_t> mmWHostData(mmWShapeSize, (args.rankId + 1) * 512);\n+    std::vector<uint16_t> mmYHostData(mmYShapeSize, 0);\n+\n+    ret = CreateAclTensor(gmmXHostData, gmmXShape, &gmmXDeviceAddr, aclDataType::ACL_FLOAT16, &gmmX);\n+    CHECK_RET(ret == ACL_SUCCESS, return ret);\n+    ret = CreateAclTensor(gmmWHostData, gmmWShape, &gmmWDeviceAddr, aclDataType::ACL_FLOAT16, &gmmW);\n+    CHECK_RET(ret == ACL_SUCCESS, return ret);\n+    ret = CreateAclTensor(gmmYHostData, gmmYShape, &gmmYDeviceAddr, aclDataType::ACL_FLOAT16, &gmmY);\n+    CHECK_RET(ret == ACL_SUCCESS, return ret);\n+    ret = CreateAclTensor(mmXHostData, mmXShape, &mmXDeviceAddr, aclDataType::ACL_FLOAT16, &mmX);\n+    CHECK_RET(ret == ACL_SUCCESS, return ret);\n+    ret = CreateAclTensor(mmWHostData, mmWShape, &mmWDeviceAddr, aclDataType::ACL_FLOAT16, &mmW);\n+    CHECK_RET(ret == ACL_SUCCESS, return ret);\n+    ret = CreateAclTensor(mmYHostData, mmYShape, &mmYDeviceAddr, aclDataType::ACL_FLOAT16, &mmY);\n+    CHECK_RET(ret == ACL_SUCCESS, return ret);\n+\n+    ret = CreateAclTensor(permuteHostData, permuteShape, &permuteDeviceAddr, aclDataType::ACL_FLOAT16, &permute);\n+    CHECK_RET(ret == ACL_SUCCESS, return ret);\n+\n+    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());\n+    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());\n+\n+    // 调用第一阶段接口\n+    ret = aclnnAlltoAllvGroupedMatMulGetWorkspaceSize(gmmX, gmmW, sendCountsTensor, recvCountsTensor, mmX, mmW,\n+                                                      hcomName, EP_WORLD_SIZE, sendCounts, recvCounts, false, false,\n+                                                      true, gmmY, mmY, permute, &workspaceSize, &executor);\n+    CHECK_RET(ret == ACL_SUCCESS,\n+              LOG_PRINT(\"[ERROR] aclnnAlltoAllvGroupedMatMulGetWorkspaceSize failed. ret = %d \\n\", ret);\n+              return ret);\n+\n+    if (workspaceSize > 0) {\n+        ret = aclrtMalloc(&workspaceAddr, workspaceSize, ACL_MEM_MALLOC_HUGE_FIRST);\n+        CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT(\"[ERROR] aclrtMalloc workspace failed. ret = %d \\n\", ret); return ret);\n+    }\n+\n+    // 调用第二阶段接口\n+    ret = aclnnAlltoAllvGroupedMatMul(workspaceAddr, workspaceSize, executor, args.stream);\n+    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT(\"[ERROR] aclnnAlltoAllvGroupedMatMul failed. ret = %d \\n\", ret);\n+              return ret);\n+    // （固定写法）同步等待任务执行结束\n+    ret = aclrtSynchronizeStreamWithTimeout(args.stream, 10000000);\n+    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT(\"[ERROR] aclrtSynchronizeStreamWithTimeout failed. ret = %d \\n\", ret);\n+              return ret);\n+    LOG_PRINT(\"[INFO] device_%d aclnnAlltoAllvGroupedMatMul execute successfully.\\n\", args.rankId);\n+    // 释放device资源，需要根据具体API的接口定义修改\n+    if (args.rankId == 0) {\n+        size_t size = A * H * sizeof(int16_t);\n+        aclrtMemcpy(pPermuteData.data(), size, permuteDeviceAddr, size, ACL_MEMCPY_DEVICE_TO_HOST);\n+    }\n+    if (args.rankId == 0) {\n+        size_t size = A * N1 * sizeof(int16_t);\n+        aclrtMemcpy(pGmmyData.data(), size, gmmYDeviceAddr, size, ACL_MEMCPY_DEVICE_TO_HOST);\n+    }\n+    if (gmmX != nullptr) {\n+        aclDestroyTensor(gmmX);\n+    }\n+    if (gmmW != nullptr) {\n+        aclDestroyTensor(gmmW);\n+    }\n+    if (gmmY != nullptr) {\n+        aclDestroyTensor(gmmY);\n+    }\n+    if (mmX != nullptr) {\n+        aclDestroyTensor(mmX);\n+    }\n+    if (mmW != nullptr) {\n+        aclDestroyTensor(mmW);\n+    }\n+    if (mmY != nullptr) {\n+        aclDestroyTensor(mmY);\n+    }\n+    if (permute != nullptr) {\n+        aclDestroyTensor(permute);\n+    }\n+    if (gmmXDeviceAddr != nullptr) {\n+        aclrtFree(gmmXDeviceAddr);\n+    }\n+    if (gmmWDeviceAddr != nullptr) {\n+        aclrtFree(gmmWDeviceAddr);\n+    }\n+    if (gmmYDeviceAddr != nullptr) {\n+        aclrtFree(gmmYDeviceAddr);\n+    }\n+    if (mmXDeviceAddr != nullptr) {\n+        aclrtFree(mmXDeviceAddr);\n+    }\n+    if (mmWDeviceAddr != nullptr) {\n+        aclrtFree(mmWDeviceAddr);\n+    }\n+    if (mmYDeviceAddr != nullptr) {\n+        aclrtFree(mmYDeviceAddr);\n+    }\n+    if (permuteDeviceAddr != nullptr) {\n+        aclrtFree(permuteDeviceAddr);\n+    }\n+    if (workspaceSize > 0) {\n+        aclrtFree(workspaceAddr);\n+    }\n+    HcclCommDestroy(args.hcclComm);\n+    aclrtDestroyStream(args.stream);\n+    aclrtDestroyContext(args.context);\n+    aclrtResetDevice(args.rankId);\n+    return 0;\n+}\n+\n+int main(int argc, char *argv[])\n+{\n+    int ret = aclInit(nullptr);\n+    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT(\"[ERROR] aclInit failed. ret = %d \\n\", ret); return ret);\n+    aclrtStream stream[EP_WORLD_SIZE];\n+    aclrtContext context[EP_WORLD_SIZE];\n+    for (uint32_t rankId = 0; rankId < EP_WORLD_SIZE; rankId++) {\n+        ret = aclrtSetDevice(rankId);\n+        CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT(\"[ERROR] aclrtSetDevice failed. ret = %d \\n\", ret); return ret);\n+        ret = aclrtCreateContext(&context[rankId], rankId);\n+        CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT(\"[ERROR] aclrtCreateContext failed. ret = %d \\n\", ret); return ret);\n+        ret = aclrtCreateStream(&stream[rankId]);\n+        CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT(\"[ERROR] aclrtCreateStream failed. ret = %d \\n\", ret); return ret);\n+    }\n+\n+    int32_t devices[EP_WORLD_SIZE];\n+    for (int i = 0; i < EP_WORLD_SIZE; i++) {\n+        devices[i] = i;\n+    }\n+    // 初始化集合通信域\n+    HcclComm comms[EP_WORLD_SIZE];\n+    ret = HcclCommInitAll(EP_WORLD_SIZE, devices, comms);\n+    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT(\"[ERROR] HcclCommInitAll failed. ret = %d \\n\", ret); return ret);\n+\n+    Args args[EP_WORLD_SIZE];\n+    // 启动多线程\n+    std::vector<std::unique_ptr<std::thread>> threads(EP_WORLD_SIZE);\n+    for (uint32_t rankId = 0; rankId < EP_WORLD_SIZE; rankId++) {\n+        args[rankId].rankId = rankId;\n+        args[rankId].hcclComm = comms[rankId];\n+        args[rankId].stream = stream[rankId];\n+        args[rankId].context = context[rankId];\n+        threads[rankId].reset(new std::thread(&LaunchOneThreadAlltoAllvGmm, std::ref(args[rankId])));\n+    }\n+    for (uint32_t rankId = 0; rankId < EP_WORLD_SIZE; rankId++) {\n+        threads[rankId]->join();\n+    }\n+    aclFinalize();\n+    return 0;\n+}\n\\ No newline at end of file\n",
+      "new_file": true,
+      "new_path": "mc2/allto_allv_grouped_mat_mul/examples/arch32/test_aclnn_allto_allv_grouped_mat_mul.cpp",
+      "old_path": "mc2/allto_allv_grouped_mat_mul/examples/arch32/test_aclnn_allto_allv_grouped_mat_mul.cpp",
+      "removed_lines": 0,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/abef4e892b5b5ec104621441c59801bf93e01f9e/mc2/allto_allv_grouped_mat_mul/examples/arch32/test_aclnn_allto_allv_grouped_mat_mul.cpp",
+    "sha": "abef4e892b5b5ec104621441c59801bf93e01f9e",
+    "source_branch": "master_0314",
+    "source_project": {
+      "full_name": "libohao6/ops-transformer",
+      "human_name": "libohao6 / ops-transformer",
+      "id": 9072246,
+      "path": "ops-transformer"
+    },
+    "status": "added",
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  },
+  {
+    "additions": 0,
+    "blob_id": "bce285688da788c667dde3ac31b662ad48f0e737",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/abef4e892b5b5ec104621441c59801bf93e01f9e/mc2/allto_allv_grouped_mat_mul/examples/arch35/test_aclnn_allto_allv_grouped_mat_mul.cpp",
+    "deletions": 0,
+    "filename": "mc2/allto_allv_grouped_mat_mul/examples/arch35/test_aclnn_allto_allv_grouped_mat_mul.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 0,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "The file is empty",
+      "new_file": false,
+      "new_path": "mc2/allto_allv_grouped_mat_mul/examples/arch35/test_aclnn_allto_allv_grouped_mat_mul.cpp",
+      "old_path": "mc2/allto_allv_grouped_mat_mul/examples/test_aclnn_allto_allv_grouped_mat_mul.cpp",
+      "removed_lines": 0,
+      "renamed_file": true,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/abef4e892b5b5ec104621441c59801bf93e01f9e/mc2/allto_allv_grouped_mat_mul/examples/arch35/test_aclnn_allto_allv_grouped_mat_mul.cpp",
+    "sha": "abef4e892b5b5ec104621441c59801bf93e01f9e",
+    "source_branch": "master_0314",
+    "source_project": {
+      "full_name": "libohao6/ops-transformer",
+      "human_name": "libohao6 / ops-transformer",
+      "id": 9072246,
+      "path": "ops-transformer"
+    },
+    "status": "renamed",
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  },
+  {
+    "additions": 11,
+    "blob_id": "47bf46b282bd997c96f11b5f97ecdfaaeddd64be",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/abef4e892b5b5ec104621441c59801bf93e01f9e/mc2/allto_allv_grouped_mat_mul/op_host/op_tiling/allto_allv_grouped_mat_mul_tiling.cpp",
+    "deletions": 0,
+    "filename": "mc2/allto_allv_grouped_mat_mul/op_host/op_tiling/allto_allv_grouped_mat_mul_tiling.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 11,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -834,6 +834,17 @@ ge::graphStatus AlltoAllvGmmTiling::CheckDType(const gert::TilingContext* contex\n                 (context->GetOptionalInputDesc(MM_X_INDEX)->GetDataType() !=\n                  context->GetOutputDesc(OUTPUT_MM_Y_INDEX)->GetDataType()),\n             OP_LOGE(A_INNER_DEBUG, \"The dataType of mmWeight and mmY should be the same with mmX.\"), return ge::GRAPH_FAILED);\n+        // 校验mmdataType和gmmdataType一致\n+        OP_TILING_CHECK(context->GetOptionalInputDesc(MM_X_INDEX)->GetDataType() != context->GetInputDesc(GMM_X_INDEX)->GetDataType(),\n+ \t            OP_LOGE(context->GetNodeName(), \"mmX data type (%s) must be the same as gmmX data type (%s) when shared expert is enabled.\",\n+ \t                ge::TypeUtils::DataTypeToSerialString(context->GetOptionalInputDesc(MM_X_INDEX)->GetDataType()).c_str(),\n+ \t                ge::TypeUtils::DataTypeToSerialString(context->GetInputDesc(GMM_X_INDEX)->GetDataType()).c_str()),\n+ \t            return ge::GRAPH_FAILED);\n+ \t    OP_TILING_CHECK(context->GetOptionalInputDesc(MM_WEIGHT_INDEX)->GetDataType() != context->GetInputDesc(GMM_X_INDEX)->GetDataType(),\n+ \t        OP_LOGE(context->GetNodeName(), \"mmWeight data type (%s) must be the same as gmmX data type (%s) when shared expert is enabled.\",\n+ \t            ge::TypeUtils::DataTypeToSerialString(context->GetOptionalInputDesc(MM_WEIGHT_INDEX)->GetDataType()).c_str(),\n+ \t            ge::TypeUtils::DataTypeToSerialString(context->GetInputDesc(GMM_X_INDEX)->GetDataType()).c_str()),\n+ \t        return ge::GRAPH_FAILED);\n     }\n \n     return ge::GRAPH_SUCCESS;\n",
+      "new_file": false,
+      "new_path": "mc2/allto_allv_grouped_mat_mul/op_host/op_tiling/allto_allv_grouped_mat_mul_tiling.cpp",
+      "old_path": "mc2/allto_allv_grouped_mat_mul/op_host/op_tiling/allto_allv_grouped_mat_mul_tiling.cpp",
+      "removed_lines": 0,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/abef4e892b5b5ec104621441c59801bf93e01f9e/mc2/allto_allv_grouped_mat_mul/op_host/op_tiling/allto_allv_grouped_mat_mul_tiling.cpp",
+    "sha": "abef4e892b5b5ec104621441c59801bf93e01f9e",
+    "source_branch": "master_0314",
+    "source_project": {
+      "full_name": "libohao6/ops-transformer",
+      "human_name": "libohao6 / ops-transformer",
+      "id": 9072246,
+      "path": "ops-transformer"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  },
+  {
+    "additions": 13,
+    "blob_id": "a42fe4ef3567a08858b6727d7feaa8c6a62f1d39",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/abef4e892b5b5ec104621441c59801bf93e01f9e/mc2/allto_allv_quant_grouped_mat_mul/docs/aclnnAlltoAllvQuantGroupedMatMul.md",
+    "deletions": 13,
+    "filename": "mc2/allto_allv_quant_grouped_mat_mul/docs/aclnnAlltoAllvQuantGroupedMatMul.md",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 13,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -103,21 +103,21 @@ aclnnStatus aclnnAlltoAllvQuantGroupedMatMul(\n     <tr>\n     <td>gmmWeight</td>\n     <td>输入</td>\n-    <td>GroupedMatMul计算的右矩阵，数据类型为HIFLOAT8，支持3维，shape为(e, H1, N1)。</td>\n-    <td>HIFLOAT8</td>\n+    <td>GroupedMatMul计算的右矩阵，支持3维，shape为(e, H1, N1)。</td>\n+    <td>与gmmX保持一致</td>\n     <td>ND</td>\n     </tr>\n     <tr>\n     <td>gmmXScale</td>\n     <td>输入</td>\n-    <td>gmmX的量化系数，当gmmXQuantMode==1时，支持1维，shape为(1)。</td>\n+    <td>gmmX的量化系数，pertensor量化场景支持1维，shape为(1)。</td>\n     <td>FLOAT32</td>\n     <td>ND</td>\n     </tr>\n     <tr>\n     <td>gmmWeightScale</td>\n     <td>输入</td>\n-    <td>gmmWeight的量化系数，当gmmWeightQuantMode==1时必填，支持1维，shape为(1)。</td>\n+    <td>gmmWeight的量化系数，pertensor量化场景支持1维，shape为(1)。</td>\n     <td>FLOAT32</td>\n     <td>ND</td>\n     </tr>\n@@ -139,27 +139,27 @@ aclnnStatus aclnnAlltoAllvQuantGroupedMatMul(\n     <td>mmXOptional</td>\n     <td>输入</td>\n     <td>可选输入，共享专家MatMul计算中的左矩阵，需与mmWeightOptional同时传入或同为nullptr，支持2维，shape为(BS, H2)。</td>\n-    <td>HIFLOAT8</td>\n+    <td>与gmmX保持一致</td>\n     <td>ND</td>\n     </tr>\n     <tr>\n     <td>mmWeightOptional</td>\n     <td>输入</td>\n     <td>可选输入，共享专家MatMul计算中的右矩阵，需与mmXOptional同时传入或同为nullptr，支持2维，shape为(H2, N2)。</td>\n-    <td>HIFLOAT8</td>\n+    <td>与mmX保持一致</td>\n     <td>ND</td>\n     </tr>\n     <tr>\n     <td>mmXScaleOptional</td>\n     <td>输入</td>\n-    <td>mmX的量化系数，当mmXQuantMode==1时必填，1维，shape为(1)。</td>\n+    <td>mmX的量化系数，pertensor量化场景支持1维，shape为(1)。</td>\n     <td>FLOAT32</td>\n     <td>ND</td>\n     </tr>\n     <tr>\n     <td>mmWeightScaleOptional</td>\n     <td>输入</td>\n-    <td>mmWeight的量化系数，当mmWeightQuantMode==1时必填，1维，shape为(1)。</td>\n+    <td>mmWeight的量化系数，pertensor量化场景支持1维，shape为(1)。</td>\n     <td>FLOAT32</td>\n     <td>ND</td>\n     </tr>\n@@ -201,7 +201,7 @@ aclnnStatus aclnnAlltoAllvQuantGroupedMatMul(\n     <tr>\n     <td>epWorldSize</td>\n     <td>输入</td>\n-    <td>ep通信域size：Ascend 950PR/Ascend 950DT支持2、4、8、16、32、64。</td>\n+    <td>ep通信域大小：Ascend 950PR/Ascend 950DT支持2、4、8、16、32、64。</td>\n     <td>INT64</td>\n     <td>ND</td>\n     </tr>\n@@ -250,14 +250,14 @@ aclnnStatus aclnnAlltoAllvQuantGroupedMatMul(\n     <tr>\n     <td>gmmY</td>\n     <td>输出</td>\n-    <td>最终的计算结果，数据类型与输入gmmX保持一致，支持2维，shape为(A, N1)。</td>\n+    <td>路由专家计算的输出，数据类型与输入gmmX保持一致，支持2维，shape为(A, N1)。</td>\n     <td>FLOAT16、BFLOAT16</td>\n     <td>ND</td>\n     </tr>\n     <tr>\n     <td>mmYOptional</td>\n     <td>输出</td>\n-    <td>共享专家MatMul的输出，数据类型与mmXOptional保持一致，支持2维，shape为(BS, N2)，仅当传入mmXOptional与mmWeightOptional才输出。</td>\n+    <td>共享专家计算的输出，数据类型与mmXOptional保持一致，支持2维，shape为(BS, N2)，仅当传入mmXOptional与mmWeightOptional才输出。</td>\n     <td>FLOAT16、BFLOAT16</td>\n     <td>ND</td>\n     </tr>\n@@ -285,7 +285,7 @@ aclnnStatus aclnnAlltoAllvQuantGroupedMatMul(\n     </tbody></table>\n \n - gmmXQuantMode、gmmWeightQuantMode、mmXQuantMode、mmWeightQuantMode的枚举值跟量化模式关系如下:\n-  - 0: 不量化\n+  - 0: 非量化\n   - 1: pertensor\n   - 2: perchannel\n   - 3: pertoken\n@@ -387,7 +387,7 @@ aclnnStatus aclnnAlltoAllvQuantGroupedMatMul(\n ## 调用示例\n 示例代码如下，仅供参考，具体编译和执行过程请参考编译与运行样例。\n \n-注意：由于量化接口仅支持Ascend 950PR/Ascend 950DT系列，以下示例基于该系列实现。\n+注意：由于量化接口仅支持Ascend 950PR/Ascend 950DT系列，以下示例基于该系列实现。本示例代码以2卡为例，请根据实际环境卡数修改 `EP_WORLD_SIZE`。\n \n ```cpp\n #include <thread>\n",
+      "new_file": false,
+      "new_path": "mc2/allto_allv_quant_grouped_mat_mul/docs/aclnnAlltoAllvQuantGroupedMatMul.md",
+      "old_path": "mc2/allto_allv_quant_grouped_mat_mul/docs/aclnnAlltoAllvQuantGroupedMatMul.md",
+      "removed_lines": 13,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/abef4e892b5b5ec104621441c59801bf93e01f9e/mc2/allto_allv_quant_grouped_mat_mul/docs/aclnnAlltoAllvQuantGroupedMatMul.md",
+    "sha": "abef4e892b5b5ec104621441c59801bf93e01f9e",
+    "source_branch": "master_0314",
+    "source_project": {
+      "full_name": "libohao6/ops-transformer",
+      "human_name": "libohao6 / ops-transformer",
+      "id": 9072246,
+      "path": "ops-transformer"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  },
+  {
+    "additions": 299,
+    "blob_id": "d0352285fde52fa2252c151f921a13f51a5253f9",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/abef4e892b5b5ec104621441c59801bf93e01f9e/mc2/allto_allv_quant_grouped_mat_mul/examples/arch32/test_aclnn_allto_allv_quant_grouped_mat_mul.cpp",
+    "deletions": 0,
+    "filename": "mc2/allto_allv_quant_grouped_mat_mul/examples/arch32/test_aclnn_allto_allv_quant_grouped_mat_mul.cpp",
+    "patch": {
+      "a_mode": "0",
+      "added_lines": 299,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -0,0 +1,299 @@\n+#include <thread>\n+#include <iostream>\n+#include <string>\n+#include <vector>\n+#include \"acl/acl.h\"\n+#include \"hccl/hccl.h\"\n+#include \"aclnnop/aclnn_allto_allv_quant_grouped_mat_mul.h\"\n+\n+#define CHECK_RET(cond, return_expr) \\\n+    do {                             \\\n+        if (!(cond)) {               \\\n+            return_expr;             \\\n+        }                            \\\n+    } while (0)\n+\n+#define LOG_PRINT(message, ...)           \\\n+    do {                                  \\\n+        printf(message, ##__VA_ARGS__);   \\\n+    } while (0)\n+\n+int64_t GetShapeSize(const std::vector<int64_t> &shape)\n+{\n+    int64_t shape_size = 1;\n+    for (auto i : shape) {\n+        shape_size *= i;\n+    }\n+    return shape_size;\n+}\n+\n+template <typename T>\n+int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &shape, void **deviceAddr,\n+    aclDataType dataType, aclTensor **tensor)\n+{\n+    auto size = GetShapeSize(shape) * sizeof(T);\n+    auto ret = aclrtMalloc(deviceAddr, size, ACL_MEM_MALLOC_HUGE_FIRST);\n+    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT(\"[ERROR] aclrtMalloc failed. ret: %d\\n\", ret); return ret);\n+    ret = aclrtMemcpy(*deviceAddr, size, hostData.data(), size, ACL_MEMCPY_HOST_TO_DEVICE);\n+    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT(\"[ERROR] aclrtMemcpy failed. ret: %d\\n\", ret); return ret);\n+    std::vector<int64_t> strides(shape.size(), 1);\n+    for (int64_t i = shape.size() - 2; i >= 0; i--) {\n+        strides[i] = shape[i + 1] * strides[i + 1];\n+    }\n+    *tensor = aclCreateTensor(shape.data(),\n+        shape.size(),\n+        dataType,\n+        strides.data(),\n+        0,\n+        aclFormat::ACL_FORMAT_ND,\n+        shape.data(),\n+        shape.size(),\n+        *deviceAddr);\n+    return 0;\n+}\n+\n+struct Args {\n+    int rankId;\n+    HcclComm hcclComm;\n+    aclrtStream stream;\n+    aclrtContext context;\n+};\n+\n+// shape 基本信息\n+constexpr int64_t EP_WORLD_SIZE = 8;\n+constexpr int64_t BS = 4096;\n+constexpr int64_t K = 2;\n+constexpr int64_t H = 7168;\n+constexpr int64_t e = 4;\n+constexpr int64_t N1 = 4096;\n+constexpr int64_t N2 = 4096;\n+constexpr int64_t A = BS * K;\n+\n+int LaunchOneThreadAlltoAllvQuantGroupedMatMul(Args &args)\n+{\n+    int ret = aclrtSetCurrentContext(args.context);\n+    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT(\"[ERROR] aclrtSetCurrentContext failed. ret: %d\\n\", ret); return ret);\n+    char hcomName[128] = {0};\n+    ret = HcclGetCommName(args.hcclComm, hcomName);\n+    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT(\"[ERROR] HcclGetEpCommName failed. ret: %d\\n\", ret); return -1);\n+\n+    std::vector<int64_t> gmmXShape = {BS * K, H};\n+    std::vector<int64_t> gmmWShape = {e, H, N1};\n+    std::vector<int64_t> gmmYShape = {A, N1};\n+    std::vector<int64_t> permuteShape = {A, H};\n+    std::vector<int64_t> mmXShape = {BS, H};\n+    std::vector<int64_t> mmWShape = {H, N2};\n+    std::vector<int64_t> mmYShape = {BS, N2};\n+    std::vector<int64_t> scaleShape = {1}; // 缩放因子形状\n+\n+    std::vector<int64_t> sendCountsList(EP_WORLD_SIZE * e, BS * K / (EP_WORLD_SIZE * e));\n+    std::vector<int64_t> recvCountsList(EP_WORLD_SIZE * e, BS * K / (EP_WORLD_SIZE * e));\n+\n+    void *gmmXDeviceAddr = nullptr;\n+    void *gmmWDeviceAddr = nullptr;\n+    void *gmmYDeviceAddr = nullptr;\n+    void *permuteDeviceAddr = nullptr;\n+    void *mmXDeviceAddr = nullptr;\n+    void *mmWDeviceAddr = nullptr;\n+    void *mmYDeviceAddr = nullptr;\n+    void *gmmXScaleDeviceAddr = nullptr;\n+    void *gmmWScaleDeviceAddr = nullptr;\n+    void *mmXScaleDeviceAddr = nullptr;\n+    void *mmWScaleDeviceAddr = nullptr;\n+\n+    aclTensor *gmmX = nullptr;\n+    aclTensor *gmmW = nullptr;\n+    aclTensor *gmmY = nullptr;\n+    aclTensor *mmX = nullptr;\n+    aclTensor *mmW = nullptr;\n+    aclTensor *mmY = nullptr;\n+    aclTensor *permute = nullptr;\n+    aclTensor *gmmXScale = nullptr;\n+    aclTensor *gmmWScale = nullptr;\n+    aclTensor *mmXScale = nullptr;\n+    aclTensor *mmWScale = nullptr;\n+    int64_t groupSize = 0;\n+\n+    uint64_t workspaceSize = 0;\n+    aclOpExecutor *executor = nullptr;\n+    void *workspaceAddr = nullptr;\n+\n+    long long gmmXShapeSize = GetShapeSize(gmmXShape);\n+    long long gmmWShapeSize = GetShapeSize(gmmWShape);\n+    long long gmmYShapeSize = GetShapeSize(gmmYShape);\n+    long long permuteShapeSize = GetShapeSize(permuteShape);\n+    long long mmXShapeSize = GetShapeSize(mmXShape);\n+    long long mmWShapeSize = GetShapeSize(mmWShape);\n+    long long mmYShapeSize = GetShapeSize(mmYShape);\n+\n+    // HIFLOAT8数据 (使用uint8_t模拟)\n+    std::vector<uint8_t> gmmXHostData(gmmXShapeSize, (args.rankId + 1) * 10);\n+    std::vector<uint8_t> gmmWHostData(gmmWShapeSize, (args.rankId + 1) * 5);\n+    std::vector<uint8_t> mmXHostData(mmXShapeSize, (args.rankId + 1) * 10);\n+    std::vector<uint8_t> mmWHostData(mmWShapeSize, (args.rankId + 1) * 5);\n+    \n+    // 输出数据 (FLOAT16/BFLOAT16)\n+    std::vector<uint16_t> gmmYHostData(gmmYShapeSize, 65535);\n+    std::vector<uint16_t> mmYHostData(mmYShapeSize, 0);\n+    std::vector<uint8_t> permuteHostData(permuteShapeSize, 255);\n+    \n+    // 缩放因子数据 (FLOAT32)\n+    std::vector<float> gmmXScaleHostData(1, 1.0f);\n+    std::vector<float> gmmWScaleHostData(1, 1.0f);\n+    std::vector<float> mmXScaleHostData(1, 1.0f);\n+    std::vector<float> mmWScaleHostData(1, 1.0f);\n+\n+    // 创建张量\n+    ret = CreateAclTensor(gmmXHostData, gmmXShape, &gmmXDeviceAddr, ACL_HIFLOAT8, &gmmX);\n+    CHECK_RET(ret == ACL_SUCCESS, return ret);\n+    ret = CreateAclTensor(gmmWHostData, gmmWShape, &gmmWDeviceAddr, ACL_HIFLOAT8, &gmmW);\n+    CHECK_RET(ret == ACL_SUCCESS, return ret);\n+    ret = CreateAclTensor(gmmYHostData, gmmYShape, &gmmYDeviceAddr, ACL_FLOAT16, &gmmY);\n+    CHECK_RET(ret == ACL_SUCCESS, return ret);\n+    ret = CreateAclTensor(mmXHostData, mmXShape, &mmXDeviceAddr, ACL_HIFLOAT8, &mmX);\n+    CHECK_RET(ret == ACL_SUCCESS, return ret);\n+    ret = CreateAclTensor(mmWHostData, mmWShape, &mmWDeviceAddr, ACL_HIFLOAT8, &mmW);\n+    CHECK_RET(ret == ACL_SUCCESS, return ret);\n+    ret = CreateAclTensor(mmYHostData, mmYShape, &mmYDeviceAddr, ACL_FLOAT16, &mmY);\n+    CHECK_RET(ret == ACL_SUCCESS, return ret);\n+    ret = CreateAclTensor(permuteHostData, permuteShape, &permuteDeviceAddr, ACL_HIFLOAT8, &permute);\n+    CHECK_RET(ret == ACL_SUCCESS, return ret);\n+    ret = CreateAclTensor(gmmXScaleHostData, scaleShape, &gmmXScaleDeviceAddr, ACL_FLOAT, &gmmXScale);\n+    CHECK_RET(ret == ACL_SUCCESS, return ret);\n+    ret = CreateAclTensor(gmmWScaleHostData, scaleShape, &gmmWScaleDeviceAddr, ACL_FLOAT, &gmmWScale);\n+    CHECK_RET(ret == ACL_SUCCESS, return ret);\n+    ret = CreateAclTensor(mmXScaleHostData, scaleShape, &mmXScaleDeviceAddr, ACL_FLOAT, &mmXScale);\n+    CHECK_RET(ret == ACL_SUCCESS, return ret);\n+    ret = CreateAclTensor(mmWScaleHostData, scaleShape, &mmWScaleDeviceAddr, ACL_FLOAT, &mmWScale);\n+    CHECK_RET(ret == ACL_SUCCESS, return ret);\n+\n+    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());\n+    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());\n+\n+    // 调用第一阶段接口\n+    ret = aclnnAlltoAllvQuantGroupedMatMulGetWorkspaceSize(gmmX,\n+        gmmW,\n+        gmmXScale,\n+        gmmWScale,\n+        nullptr, // sendCountsTensorOptional\n+        nullptr, // recvCountsTensorOptional\n+        mmX,\n+        mmW,\n+        mmXScale,\n+        mmWScale,\n+        1, // gmmXQuantMode\n+        1, // gmmWeightQuantMode\n+        1, // mmXQuantMode\n+        1, // mmWeightQuantMode\n+        hcomName,\n+        EP_WORLD_SIZE,\n+        sendCounts,\n+        recvCounts,\n+        false, // transGmmWeight\n+        false, // transMmWeight\n+        groupSize,\n+        true,  // permuteOutFlag\n+        gmmY,\n+        mmY,\n+        permute,\n+        &workspaceSize,\n+        &executor);\n+    CHECK_RET(\n+        ret == ACL_SUCCESS, LOG_PRINT(\"[ERROR] aclnnAlltoAllvQuantGroupedMatMulGetWorkspaceSize failed. ret = %d \\n\", ret);\n+        return ret);\n+\n+    if (workspaceSize > 0) {\n+        ret = aclrtMalloc(&workspaceAddr, workspaceSize, ACL_MEM_MALLOC_HUGE_FIRST);\n+        CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT(\"[ERROR] aclrtMalloc workspace failed. ret = %d \\n\", ret); return ret);\n+    }\n+\n+    // 调用第二阶段接口\n+    ret = aclnnAlltoAllvQuantGroupedMatMul(workspaceAddr, workspaceSize, executor, args.stream);\n+    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT(\"[ERROR] aclnnAlltoAllvQuantGroupedMatMul failed. ret = %d \\n\", ret);\n+            return ret);\n+    \n+    // 同步等待任务执行结束\n+    ret = aclrtSynchronizeStreamWithTimeout(args.stream, 10000000);\n+    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT(\"[ERROR] aclrtSynchronizeStreamWithTimeout failed. ret = %d \\n\", ret); \n+            return ret);\n+\n+    // 释放device资源\n+    if (gmmX != nullptr) aclDestroyTensor(gmmX);\n+    if (gmmW != nullptr) aclDestroyTensor(gmmW);\n+    if (gmmY != nullptr) aclDestroyTensor(gmmY);\n+    if (mmX != nullptr) aclDestroyTensor(mmX);\n+    if (mmW != nullptr) aclDestroyTensor(mmW);\n+    if (mmY != nullptr) aclDestroyTensor(mmY);\n+    if (permute != nullptr) aclDestroyTensor(permute);\n+    if (gmmXScale != nullptr) aclDestroyTensor(gmmXScale);\n+    if (gmmWScale != nullptr) aclDestroyTensor(gmmWScale);\n+    if (mmXScale != nullptr) aclDestroyTensor(mmXScale);\n+    if (mmWScale != nullptr) aclDestroyTensor(mmWScale);\n+    \n+    if (gmmXDeviceAddr != nullptr) aclrtFree(gmmXDeviceAddr);\n+    if (gmmWDeviceAddr != nullptr) aclrtFree(gmmWDeviceAddr);\n+    if (gmmYDeviceAddr != nullptr) aclrtFree(gmmYDeviceAddr);\n+    if (mmXDeviceAddr != nullptr) aclrtFree(mmXDeviceAddr);\n+    if (mmWDeviceAddr != nullptr) aclrtFree(mmWDeviceAddr);\n+    if (mmYDeviceAddr != nullptr) aclrtFree(mmYDeviceAddr);\n+    if (permuteDeviceAddr != nullptr) aclrtFree(permuteDeviceAddr);\n+    if (gmmXScaleDeviceAddr != nullptr) aclrtFree(gmmXScaleDeviceAddr);\n+    if (gmmWScaleDeviceAddr != nullptr) aclrtFree(gmmWScaleDeviceAddr);\n+    if (mmXScaleDeviceAddr != nullptr) aclrtFree(mmXScaleDeviceAddr);\n+    if (mmWScaleDeviceAddr != nullptr) aclrtFree(mmWScaleDeviceAddr);\n+    if (workspaceSize > 0) aclrtFree(workspaceAddr);\n+    \n+    HcclCommDestroy(args.hcclComm);\n+    aclrtDestroyStream(args.stream);\n+    aclrtDestroyContext(args.context);\n+    aclrtResetDevice(args.rankId);\n+    return 0;\n+}\n+\n+int main(int argc, char *argv[])\n+{\n+    // 本样例基于Ascend 950PR/Ascend 950DT实现\n+    int ret = aclInit(nullptr);\n+    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT(\"[ERROR] aclInit failed. ret = %d \\n\", ret); return ret);\n+    \n+    constexpr uint32_t WORLD_SIZE = EP_WORLD_SIZE;\n+    aclrtStream stream[WORLD_SIZE];\n+    aclrtContext context[WORLD_SIZE];\n+    \n+    for (uint32_t rankId = 0; rankId < WORLD_SIZE; rankId++) {\n+        ret = aclrtSetDevice(rankId);\n+        CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT(\"[ERROR] aclrtSetDevice failed. ret = %d \\n\", ret); return ret);\n+        ret = aclrtCreateContext(&context[rankId], rankId);\n+        CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT(\"[ERROR] aclrtCreateContext failed. ret = %d \\n\", ret); return ret);\n+        ret = aclrtCreateStream(&stream[rankId]);\n+        CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT(\"[ERROR] aclrtCreateStream failed. ret = %d \\n\", ret); return ret);\n+    }\n+\n+    int32_t devices[WORLD_SIZE];\n+    for (int i = 0; i < WORLD_SIZE; i++) {\n+        devices[i] = i;\n+    }\n+    \n+    // 初始化集合通信域\n+    HcclComm comms[WORLD_SIZE];\n+    ret = HcclCommInitAll(WORLD_SIZE, devices, comms);\n+    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT(\"[ERROR] HcclCommInitAll failed. ret = %d \\n\", ret); return ret);\n+\n+    Args args[WORLD_SIZE];\n+    // 启动多线程\n+    std::vector<std::unique_ptr<std::thread>> threads(WORLD_SIZE);\n+    for (uint32_t rankId = 0; rankId < WORLD_SIZE; rankId++) {\n+        args[rankId].rankId = rankId;\n+        args[rankId].hcclComm = comms[rankId];\n+        args[rankId].stream = stream[rankId];\n+        args[rankId].context = context[rankId];\n+        threads[rankId].reset(new std::thread(&LaunchOneThreadAlltoAllvQuantGroupedMatMul, std::ref(args[rankId])));\n+    }\n+    \n+    for (uint32_t rankId = 0; rankId < WORLD_SIZE; rankId++) {\n+        threads[rankId]->join();\n+    }\n+    \n+    aclFinalize();\n+    return 0;\n+}\n\\ No newline at end of file\n",
+      "new_file": true,
+      "new_path": "mc2/allto_allv_quant_grouped_mat_mul/examples/arch32/test_aclnn_allto_allv_quant_grouped_mat_mul.cpp",
+      "old_path": "mc2/allto_allv_quant_grouped_mat_mul/examples/arch32/test_aclnn_allto_allv_quant_grouped_mat_mul.cpp",
+      "removed_lines": 0,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/abef4e892b5b5ec104621441c59801bf93e01f9e/mc2/allto_allv_quant_grouped_mat_mul/examples/arch32/test_aclnn_allto_allv_quant_grouped_mat_mul.cpp",
+    "sha": "abef4e892b5b5ec104621441c59801bf93e01f9e",
+    "source_branch": "master_0314",
+    "source_project": {
+      "full_name": "libohao6/ops-transformer",
+      "human_name": "libohao6 / ops-transformer",
+      "id": 9072246,
+      "path": "ops-transformer"
+    },
+    "status": "added",
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  },
+  {
+    "additions": 0,
+    "blob_id": "dc00e74a31a71230762120e7d77db0c3adbc45ef",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/abef4e892b5b5ec104621441c59801bf93e01f9e/mc2/allto_allv_quant_grouped_mat_mul/examples/arch35/test_aclnn_allto_allv_quant_grouped_mat_mul.cpp",
+    "deletions": 0,
+    "filename": "mc2/allto_allv_quant_grouped_mat_mul/examples/arch35/test_aclnn_allto_allv_quant_grouped_mat_mul.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 0,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "The file is empty",
+      "new_file": false,
+      "new_path": "mc2/allto_allv_quant_grouped_mat_mul/examples/arch35/test_aclnn_allto_allv_quant_grouped_mat_mul.cpp",
+      "old_path": "mc2/allto_allv_quant_grouped_mat_mul/examples/test_aclnn_allto_allv_quant_grouped_mat_mul.cpp",
+      "removed_lines": 0,
+      "renamed_file": true,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/abef4e892b5b5ec104621441c59801bf93e01f9e/mc2/allto_allv_quant_grouped_mat_mul/examples/arch35/test_aclnn_allto_allv_quant_grouped_mat_mul.cpp",
+    "sha": "abef4e892b5b5ec104621441c59801bf93e01f9e",
+    "source_branch": "master_0314",
+    "source_project": {
+      "full_name": "libohao6/ops-transformer",
+      "human_name": "libohao6 / ops-transformer",
+      "id": 9072246,
+      "path": "ops-transformer"
+    },
+    "status": "renamed",
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  },
+  {
+    "additions": 2,
+    "blob_id": "4895e5f84f0ca2ed2f973c8312a2a25bf8c45588",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/abef4e892b5b5ec104621441c59801bf93e01f9e/mc2/allto_allv_quant_grouped_mat_mul/op_api/aclnn_allto_allv_quant_grouped_mat_mul.cpp",
+    "deletions": 38,
+    "filename": "mc2/allto_allv_quant_grouped_mat_mul/op_api/aclnn_allto_allv_quant_grouped_mat_mul.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 2,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -117,11 +117,11 @@ static bool CheckNotNull(const aclTensor *gmmX, const aclTensor *gmmWeight, cons\n         return false;\n     }\n     if (gmmXQuantMode != static_cast<int64_t>(QuantModeType::PERTENSOR_QUANT)) {\n-        OP_LOGE(ACLNN_ERR_PARAM_INVALID, \"gmmXQuantMode should be 1.\");\n+        OP_LOGE(ACLNN_ERR_PARAM_INVALID, \"gmmXQuantMode should be 1, but actual is %lu.\", gmmXQuantMode);\n         return false;\n     }\n     if (gmmWeightQuantMode != static_cast<int64_t>(QuantModeType::PERTENSOR_QUANT)) {\n-        OP_LOGE(ACLNN_ERR_PARAM_INVALID, \"gmmWeightQuantMode should be 1.\");\n+        OP_LOGE(ACLNN_ERR_PARAM_INVALID, \"gmmWeightQuantMode should be 1, but actual is %lu.\", gmmWeightQuantMode);\n         return false;\n     }\n     return true;\n@@ -164,32 +164,6 @@ static bool CheckDtypesValid(const aclTensor *gmmX, const aclTensor *gmmWeight,\n     return true;\n }\n \n-// 检查是否有空tensor\n-static bool CheckEmptyTensor(const aclTensor *gmmX, const aclTensor *gmmWeight, const aclTensor *gmmY)\n-{\n-    if(gmmX->GetViewShape().GetDim(0) == ZERO) {\n-        OP_LOGE(ACLNN_ERR_PARAM_INVALID, \"gmmX is empty tensor with zero dimM, which is unsupported.\");\n-        return false;\n-    }\n-    if(gmmX->GetViewShape().GetDim(1) == ZERO) {\n-        OP_LOGE(ACLNN_ERR_PARAM_INVALID, \"gmmX is empty tensor with one dimK, which is unsupported.\");\n-        return false;\n-    }\n-    if(gmmWeight->GetViewShape().GetDim(0) == ZERO) {\n-        OP_LOGE(ACLNN_ERR_PARAM_INVALID, \"gmmWeight is empty tensor with zero dimE, which is unsupported.\");\n-        return false;\n-    }\n-    if(gmmWeight->GetViewShape().GetDim(1) == ZERO) {\n-        OP_LOGE(ACLNN_ERR_PARAM_INVALID, \"gmmWeight is empty tensor with one dimK, which is unsupported.\");\n-        return false;\n-    }\n-    if(gmmWeight->GetViewShape().GetDim(2) == ZERO) {\n-        OP_LOGE(ACLNN_ERR_PARAM_INVALID, \"gmmWeight is empty tensor with three dimN, which is unsupported.\");\n-        return false;\n-    }\n-    return true;\n-}\n-\n bool is_power_of_two(int64_t n)\n {\n     return n > 0 && (n & (n - 1)) == 0 && n >= 2 && n <= 128;\n@@ -256,10 +230,6 @@ static bool CheckGmmWeightValid(const aclTensor *gmmWeight) {\n         return false;\n     }\n     OP_CHECK_WRONG_DIMENSION(gmmWeight, THREE_DIMS, return false);\n-  \tif (gmmWeight->IsEmpty()) {\n-    \tOP_LOGE(ACLNN_ERR_PARAM_INVALID, \"In AlltoAllvQuantGroupedMatmul, input gmmWeight do not support empty tensor.\");\n-    \treturn false;\n-  \t}\n     return true;\n }\n \n@@ -268,10 +238,6 @@ static bool CheckMmWeightValid(const aclTensor *mmWeightOptional) {\n         return false;\n     }\n     OP_CHECK_WRONG_DIMENSION(mmWeightOptional, TWO_DIMS, return false);\n-  \tif (mmWeightOptional->IsEmpty()) {\n-    \tOP_LOGE(ACLNN_ERR_PARAM_INVALID, \"In AlltoAllvQuantGroupedMatmul, input mmWeightOptional is empty tensor.\");\n-    \treturn false;\n-  \t}\n     return true;\n }\n \n@@ -383,8 +349,6 @@ static aclnnStatus CheckParams(const aclTensor *gmmX, const aclTensor *gmmWeight\n     // 检查参数是否为空\n     CHECK_RET(CheckNotNull(gmmX, gmmWeight, gmmY, gmmXScale, gmmWeightScale, gmmXQuantMode, gmmWeightQuantMode),\n               ACLNN_ERR_PARAM_INVALID);\n-    // 检查空tensor\n-    CHECK_RET(CheckEmptyTensor(gmmX, gmmWeight, gmmY), ACLNN_ERR_PARAM_INVALID);\n     // 检查所有输入/量化数据类型\n     CHECK_RET(CheckDtypesValid(gmmX, gmmWeight, gmmXScale, gmmWeightScale, mmXOptional, mmWeightOptional,\n                                mmXScaleOptional, mmWeightScaleOptional, gmmY, mmYOptional, permuteOutOptional),\n",
+      "new_file": false,
+      "new_path": "mc2/allto_allv_quant_grouped_mat_mul/op_api/aclnn_allto_allv_quant_grouped_mat_mul.cpp",
+      "old_path": "mc2/allto_allv_quant_grouped_mat_mul/op_api/aclnn_allto_allv_quant_grouped_mat_mul.cpp",
+      "removed_lines": 38,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/abef4e892b5b5ec104621441c59801bf93e01f9e/mc2/allto_allv_quant_grouped_mat_mul/op_api/aclnn_allto_allv_quant_grouped_mat_mul.cpp",
+    "sha": "abef4e892b5b5ec104621441c59801bf93e01f9e",
+    "source_branch": "master_0314",
+    "source_project": {
+      "full_name": "libohao6/ops-transformer",
+      "human_name": "libohao6 / ops-transformer",
+      "id": 9072246,
+      "path": "ops-transformer"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  },
+  {
+    "additions": 6,
+    "blob_id": "d9cb2b490b8bc8bc64c75d0f35bce1ad26fff20e",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/abef4e892b5b5ec104621441c59801bf93e01f9e/mc2/allto_allv_quant_grouped_mat_mul/op_host/op_tiling/allto_allv_quant_grouped_mat_mul_tiling_base.cpp",
+    "deletions": 3,
+    "filename": "mc2/allto_allv_quant_grouped_mat_mul/op_host/op_tiling/allto_allv_quant_grouped_mat_mul_tiling_base.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 6,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -375,7 +375,7 @@ ge::graphStatus AlltoAllvGmmTilingBase::CheckGmmWeightShapeInfo()\n         OP_LOGE(context_->GetNodeName(), \"e should be in (%lu, %lu], but got %lu.\", E_MIN_VALUE, E_MAX_VALUE, e_),\n         return ge::GRAPH_FAILED);\n     // check N1 range\n-    OP_TILING_CHECK(n1_ <= N1_MIN_VALUE || n1_ >= N1_MAX_VALUE,\n+    OP_TILING_CHECK(n1_ <= N1_MIN_VALUE || n1_ > N1_MAX_VALUE,\n         OP_LOGE(context_->GetNodeName(), \"N1 should be in (%lu, %lu), but got %lu!\", N1_MIN_VALUE, N1_MAX_VALUE, n1_),\n         return ge::GRAPH_FAILED);\n     OP_LOGD(context_->GetNodeName(), \"end CheckGmmWeightShapeInfo.\");\n@@ -429,7 +429,7 @@ ge::graphStatus AlltoAllvGmmTilingBase::CheckMmxShapeInfo()\n         return ge::GRAPH_FAILED;\n     }\n     // check BS range\n-    OP_TILING_CHECK(bs_ < BS_MIN_VALUE,\n+    OP_TILING_CHECK(bs_ <= BS_MIN_VALUE,\n         OP_LOGE(context_->GetNodeName(), \"BS should be larger than %lu, but got %lu!\", BS_MIN_VALUE, bs_),\n         return ge::GRAPH_FAILED);\n     // check BSK divisible by BS\n@@ -442,7 +442,7 @@ ge::graphStatus AlltoAllvGmmTilingBase::CheckMmxShapeInfo()\n         OP_LOGE(context_->GetNodeName(), \"K should be in (%lu, %lu), but got %lu.\", K_MIN_VALUE, K_MAX_VALUE, k_),\n         return ge::GRAPH_FAILED);\n     // check H2 range\n-    OP_TILING_CHECK((h2_ <= H2_MIN_VALUE) || (h2_ >= H2_MAX_VALUE),\n+    OP_TILING_CHECK((h2_ <= H2_MIN_VALUE) || (h2_ > H2_MAX_VALUE),\n         OP_LOGE(context_->GetNodeName(), \"H2 should be in (%lu, %lu), but got %lu.\", H2_MIN_VALUE, H2_MAX_VALUE, h2_),\n         return ge::GRAPH_FAILED);\n     OP_LOGD(context_->GetNodeName(), \"end CheckMmxShapeInfo.\");\n@@ -455,6 +455,9 @@ ge::graphStatus AlltoAllvGmmTilingBase::GetMmWeightShapeInfo()\n     if (context_->GetOptionalInputShape(MM_WEIGHT_INDEX) != nullptr) {\n         n2_ = transMmWeight_ ? context_->GetOptionalInputShape(MM_WEIGHT_INDEX)->GetStorageShape().GetDim(DIM_ZERO) :\n                                context_->GetOptionalInputShape(MM_WEIGHT_INDEX)->GetStorageShape().GetDim(DIM_ONE);\n+        OP_TILING_CHECK(n2_ <= N2_MIN_VALUE || n2_ > N2_MAX_VALUE,\n+            OP_LOGE(context_->GetNodeName(), \"N2 should be in (%lu, %lu), but got %lu!\", N2_MIN_VALUE, N2_MAX_VALUE, n2_),\n+            return ge::GRAPH_FAILED);\n     } else {\n         OP_TILING_CHECK(transMmWeight_ == true,\n             OP_LOGE(context_->GetNodeName(), \"The transMmWeight should be false when mmWeight is null!\"), return ge::GRAPH_FAILED);\n",
+      "new_file": false,
+      "new_path": "mc2/allto_allv_quant_grouped_mat_mul/op_host/op_tiling/allto_allv_quant_grouped_mat_mul_tiling_base.cpp",
+      "old_path": "mc2/allto_allv_quant_grouped_mat_mul/op_host/op_tiling/allto_allv_quant_grouped_mat_mul_tiling_base.cpp",
+      "removed_lines": 3,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/abef4e892b5b5ec104621441c59801bf93e01f9e/mc2/allto_allv_quant_grouped_mat_mul/op_host/op_tiling/allto_allv_quant_grouped_mat_mul_tiling_base.cpp",
+    "sha": "abef4e892b5b5ec104621441c59801bf93e01f9e",
+    "source_branch": "master_0314",
+    "source_project": {
+      "full_name": "libohao6/ops-transformer",
+      "human_name": "libohao6 / ops-transformer",
+      "id": 9072246,
+      "path": "ops-transformer"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  },
+  {
+    "additions": 56,
+    "blob_id": "e7ea548507f3d67dfb16f3c26e392af0ad0723ae",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/abef4e892b5b5ec104621441c59801bf93e01f9e/mc2/allto_allv_quant_grouped_mat_mul/op_host/op_tiling/arch35/allto_allv_quant_grouped_mat_mul_tiling.cpp",
+    "deletions": 16,
+    "filename": "mc2/allto_allv_quant_grouped_mat_mul/op_host/op_tiling/arch35/allto_allv_quant_grouped_mat_mul_tiling.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 56,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -85,6 +85,9 @@ ge::graphStatus AlltoAllvGmmQuantTiling::DoOpTiling()\n     if (CheckCommonShapeAttrsInfo() != ge::GRAPH_SUCCESS) {\n         return ge::GRAPH_FAILED;\n     }\n+    if (CheckScaleShape() != ge::GRAPH_SUCCESS) {\n+        return ge::GRAPH_FAILED;\n+    }\n     auto platformInfo = context_->GetPlatformInfo();\n     auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfo);\n     context_->SetBlockDim(ascendcPlatform.CalcTschBlockDim(aivCoreNum_, aicCoreNum_, aivCoreNum_));\n@@ -414,39 +417,29 @@ ge::graphStatus AlltoAllvGmmQuantTiling::CheckQuantMode() const\n         OP_LOGE(context_->GetNodeName(), \"gmmXQuantMode attr can not be null.\"), return ge::GRAPH_FAILED);\n     auto gmmXQuantMode = *gmmXQuantModePtr_;\n     OP_TILING_CHECK(gmmXQuantMode != PERTENSOR_QUANT_MODE,\n-        OP_LOGE(context_->GetNodeName(), \"gmmXQuantMode only support 1(pertensor mode).\"), return ge::GRAPH_FAILED);\n+        OP_LOGE(context_->GetNodeName(), \"gmmXQuantMode should be 1(pertensor mode), but actual is %lu.\", gmmXQuantMode), \n+        return ge::GRAPH_FAILED);\n     // gmmWeightQuantMode\n     OP_TILING_CHECK(gmmWeightQuantModePtr_ == nullptr,\n         OP_LOGE(context_->GetNodeName(), \"gmmWeightQuantMode attr can not be null.\"), return ge::GRAPH_FAILED);\n     auto gmmWeightQuantMode = *gmmWeightQuantModePtr_;\n     OP_TILING_CHECK(gmmWeightQuantMode != PERTENSOR_QUANT_MODE,\n-        OP_LOGE(context_->GetNodeName(), \"gmmWeightQuantMode only support 1(pertensor mode).\"),\n+        OP_LOGE(context_->GetNodeName(), \"gmmWeightQuantMode should be 1(pertensor mode), but actual is %lu.\", gmmWeightQuantMode),\n         return ge::GRAPH_FAILED);\n-    // check gmmXScale shape\n-    OP_TILING_CHECK(context_->GetOptionalInputShape(GMM_X_SCALE_INDEX) == nullptr,\n-        OP_LOGE(context_->GetNodeName(), \"gmmXScale input shape can not be null.\"), return ge::GRAPH_FAILED);\n-    OP_TILING_CHECK(context_->GetOptionalInputShape(GMM_X_SCALE_INDEX)->GetStorageShape().GetDimNum() != DIM_ONE ||\n-        context_->GetOptionalInputShape(GMM_X_SCALE_INDEX)->GetStorageShape().GetDim(DIM_ZERO) != DIM_ONE,\n-        OP_LOGE(context_->GetNodeName(), \"gmmXScale input shape should be [1]\"), return ge::GRAPH_FAILED);\n-    // check gmmWeightScale shape\n-    OP_TILING_CHECK(context_->GetOptionalInputShape(GMM_WEIGHT_SCALE_INDEX) == nullptr,\n-        OP_LOGE(context_->GetNodeName(), \"gmmWeightScale input shape can not be null.\"), return ge::GRAPH_FAILED);\n-    OP_TILING_CHECK(context_->GetOptionalInputShape(GMM_WEIGHT_SCALE_INDEX)->GetStorageShape().GetDimNum() != DIM_ONE ||\n-        context_->GetOptionalInputShape(GMM_WEIGHT_SCALE_INDEX)->GetStorageShape().GetDim(DIM_ZERO) != DIM_ONE,\n-        OP_LOGE(context_->GetNodeName(), \"gmmWeightScale input shape should be [1].\"), return ge::GRAPH_FAILED);\n     if (hasSharedExpertFlag_) {\n         // mmXQuantMode\n         OP_TILING_CHECK(mmXQuantModePtr_ == nullptr,\n             OP_LOGE(context_->GetNodeName(), \"mmXQuantMode attr can not be null.\"), return ge::GRAPH_FAILED);\n         auto mmXQuantMode = *mmXQuantModePtr_;\n         OP_TILING_CHECK(mmXQuantMode != PERTENSOR_QUANT_MODE,\n-            OP_LOGE(context_->GetNodeName(), \"mmXQuantMode only support 1(pertensor mode).\"), return ge::GRAPH_FAILED);\n+            OP_LOGE(context_->GetNodeName(), \"mmXQuantMode should be 1(pertensor mode), but actual is %lu.\", mmXQuantMode), \n+            return ge::GRAPH_FAILED);\n         // mmWeightQuantMode\n         OP_TILING_CHECK(mmWeightQuantModePtr_ == nullptr,\n             OP_LOGE(context_->GetNodeName(), \"mmWeightQuantMode attr can not be null.\"), return ge::GRAPH_FAILED);\n         auto mmWeightQuantMode = *mmWeightQuantModePtr_;\n         OP_TILING_CHECK(mmWeightQuantMode != PERTENSOR_QUANT_MODE,\n-            OP_LOGE(context_->GetNodeName(), \"mmWeightQuantMode only support 1(pertensor mode).\"),\n+            OP_LOGE(context_->GetNodeName(), \"mmWeightQuantMode should be 1(pertensor mode), but actual is %lu.\", mmWeightQuantMode),\n             return ge::GRAPH_FAILED);\n         return ge::GRAPH_SUCCESS;\n     }\n@@ -454,6 +447,53 @@ ge::graphStatus AlltoAllvGmmQuantTiling::CheckQuantMode() const\n     return ge::GRAPH_SUCCESS;\n }\n \n+ge::graphStatus AlltoAllvGmmQuantTiling::CheckScaleShape() const\n+{\n+    \n+    OP_LOGD(context_->GetNodeName(), \"start CheckScaleShape.\");\n+    // check gmmXScale shape\n+    OP_TILING_CHECK(context_->GetOptionalInputShape(GMM_X_SCALE_INDEX) == nullptr,\n+        OP_LOGE(context_->GetNodeName(), \"gmmXScale input shape can not be null.\"), return ge::GRAPH_FAILED);\n+    auto gmmXScaleDimNum = context_->GetOptionalInputShape(GMM_X_SCALE_INDEX)->GetStorageShape().GetDimNum();\n+    OP_TILING_CHECK(gmmXScaleDimNum != DIM_ONE, OP_LOGE(context_->GetNodeName(), \"gmmXScale input dimNum should be 1, but actual dimNum is %lu\", gmmXScaleDimNum), \n+        return ge::GRAPH_FAILED);\n+    auto gmmXScaleShape = context_->GetOptionalInputShape(GMM_X_SCALE_INDEX)->GetStorageShape().GetDim(DIM_ZERO);\n+    OP_TILING_CHECK(gmmXScaleShape != DIM_ONE, OP_LOGE(context_->GetNodeName(), \"gmmXScale input shape should be [1], but actual shape is [%lu]\", gmmXScaleShape), \n+        return ge::GRAPH_FAILED);\n+    // check gmmWeightScale shape\n+    OP_TILING_CHECK(context_->GetOptionalInputShape(GMM_WEIGHT_SCALE_INDEX) == nullptr,\n+        OP_LOGE(context_->GetNodeName(), \"gmmWeightScale input shape can not be null.\"), return ge::GRAPH_FAILED);\n+    auto gmmWeightScaleDimNum = context_->GetOptionalInputShape(GMM_WEIGHT_SCALE_INDEX)->GetStorageShape().GetDimNum();\n+    OP_TILING_CHECK(gmmWeightScaleDimNum != DIM_ONE, OP_LOGE(context_->GetNodeName(), \"gmmWeightScale input dimNum should be 1, but actual dimNum is %lu\", gmmWeightScaleDimNum), \n+        return ge::GRAPH_FAILED);\n+    auto gmmWeightScaleShape = context_->GetOptionalInputShape(GMM_WEIGHT_SCALE_INDEX)->GetStorageShape().GetDim(DIM_ZERO);\n+    OP_TILING_CHECK(gmmWeightScaleShape != DIM_ONE, OP_LOGE(context_->GetNodeName(), \"gmmWeightScale input shape should be [1], but actual shape is [%lu]\", gmmWeightScaleShape), \n+        return ge::GRAPH_FAILED);\n+    if (hasSharedExpertFlag_) {\n+        // check mmXScale shape\n+        OP_TILING_CHECK(context_->GetOptionalInputShape(MM_X_SCALE_INDEX) == nullptr,\n+            OP_LOGE(context_->GetNodeName(), \"mmXScale input shape can not be null.\"), return ge::GRAPH_FAILED);\n+        auto mmXScaleDimNum = context_->GetOptionalInputShape(MM_X_SCALE_INDEX)->GetStorageShape().GetDimNum();\n+        OP_TILING_CHECK(mmXScaleDimNum != DIM_ONE, OP_LOGE(context_->GetNodeName(), \"mmXScaleDimNum input dimNum should be 1, but actual dimNum is %lu\", mmXScaleDimNum), \n+            return ge::GRAPH_FAILED);\n+        auto mmXScaleShape = context_->GetOptionalInputShape(MM_X_SCALE_INDEX)->GetStorageShape().GetDim(DIM_ZERO);\n+        OP_TILING_CHECK(mmXScaleShape != DIM_ONE, OP_LOGE(context_->GetNodeName(), \"mmXScaleDimNum input shape should be [1], but actual shape is [%lu]\", mmXScaleShape), \n+            return ge::GRAPH_FAILED);\n+        // check mmWeightScale shape\n+        OP_TILING_CHECK(context_->GetOptionalInputShape(MM_WEIGHT_SCALE_INDEX) == nullptr,\n+            OP_LOGE(context_->GetNodeName(), \"mmWeightScale input shape can not be null.\"), return ge::GRAPH_FAILED);\n+        auto mmWeightScaleDimNum = context_->GetOptionalInputShape(MM_WEIGHT_SCALE_INDEX)->GetStorageShape().GetDimNum();\n+        OP_TILING_CHECK(mmWeightScaleDimNum != DIM_ONE, OP_LOGE(context_->GetNodeName(), \"mmWeightScale input dimNum should be 1, but actual dimNum is %lu\", mmWeightScaleDimNum), \n+            return ge::GRAPH_FAILED);\n+        auto mmWeightScaleShape = context_->GetOptionalInputShape(MM_WEIGHT_SCALE_INDEX)->GetStorageShape().GetDim(DIM_ZERO);\n+        OP_TILING_CHECK(mmWeightScaleShape != DIM_ONE, OP_LOGE(context_->GetNodeName(), \"mmWeightScale input shape should be [1], but actual shape is [%lu]\", mmWeightScaleShape), \n+            return ge::GRAPH_FAILED);\n+        return ge::GRAPH_SUCCESS;\n+    }\n+    OP_LOGD(context_->GetNodeName(), \"end CheckScaleShape.\");\n+    return ge::GRAPH_SUCCESS;\n+}\n+\n ge::graphStatus AlltoAllvGmmQuantTiling::SetHcclTiling() const\n {\n     uint32_t alltoAllvCmd = 8U;\n",
+      "new_file": false,
+      "new_path": "mc2/allto_allv_quant_grouped_mat_mul/op_host/op_tiling/arch35/allto_allv_quant_grouped_mat_mul_tiling.cpp",
+      "old_path": "mc2/allto_allv_quant_grouped_mat_mul/op_host/op_tiling/arch35/allto_allv_quant_grouped_mat_mul_tiling.cpp",
+      "removed_lines": 16,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/abef4e892b5b5ec104621441c59801bf93e01f9e/mc2/allto_allv_quant_grouped_mat_mul/op_host/op_tiling/arch35/allto_allv_quant_grouped_mat_mul_tiling.cpp",
+    "sha": "abef4e892b5b5ec104621441c59801bf93e01f9e",
+    "source_branch": "master_0314",
+    "source_project": {
+      "full_name": "libohao6/ops-transformer",
+      "human_name": "libohao6 / ops-transformer",
+      "id": 9072246,
+      "path": "ops-transformer"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  },
+  {
+    "additions": 1,
+    "blob_id": "0755b2d3803533cdf41a03556aa3ff55fcd6ed75",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/abef4e892b5b5ec104621441c59801bf93e01f9e/mc2/allto_allv_quant_grouped_mat_mul/op_host/op_tiling/arch35/allto_allv_quant_grouped_mat_mul_tiling.h",
+    "deletions": 0,
+    "filename": "mc2/allto_allv_quant_grouped_mat_mul/op_host/op_tiling/arch35/allto_allv_quant_grouped_mat_mul_tiling.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 1,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -49,6 +49,7 @@ private:\n     ge::graphStatus CheckGmmDType() const;\n     ge::graphStatus CheckMmDType() const;\n     ge::graphStatus CheckQuantMode() const;\n+    ge::graphStatus CheckScaleShape() const;\n     ge::graphStatus SetHcclTiling() const;\n     void SetGMMQuantParams(Mc2GroupedMatmulTilingData::GMMQuantTilingData &gmmQuantTilingData) const;\n     void SetTilingArray(Mc2GroupedMatmulTilingData::GMMQuantTilingData &gmmQuantTilingData, uint64_t M, uint64_t N, uint64_t K) const;\n",
+      "new_file": false,
+      "new_path": "mc2/allto_allv_quant_grouped_mat_mul/op_host/op_tiling/arch35/allto_allv_quant_grouped_mat_mul_tiling.h",
+      "old_path": "mc2/allto_allv_quant_grouped_mat_mul/op_host/op_tiling/arch35/allto_allv_quant_grouped_mat_mul_tiling.h",
+      "removed_lines": 0,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/abef4e892b5b5ec104621441c59801bf93e01f9e/mc2/allto_allv_quant_grouped_mat_mul/op_host/op_tiling/arch35/allto_allv_quant_grouped_mat_mul_tiling.h",
+    "sha": "abef4e892b5b5ec104621441c59801bf93e01f9e",
+    "source_branch": "master_0314",
+    "source_project": {
+      "full_name": "libohao6/ops-transformer",
+      "human_name": "libohao6 / ops-transformer",
+      "id": 9072246,
+      "path": "ops-transformer"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  }
+]

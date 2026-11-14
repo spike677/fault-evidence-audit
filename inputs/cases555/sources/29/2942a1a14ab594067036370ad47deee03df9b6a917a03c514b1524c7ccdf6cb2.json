@@ -1,0 +1,38 @@
+[
+  {
+    "additions": 3,
+    "blob_id": "3bd47c3780bf412182f5a7f12b89c9a6db5be831",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/59d8560cd3b32956780e3e0dd3ce20ccfd314f53/matmul/common/cmct/epilogue/block_epilogue_cv.h",
+    "deletions": 2,
+    "filename": "matmul/common/cmct/epilogue/block_epilogue_cv.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 3,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -99,20 +99,21 @@ public:\n         int64_t loop = 0;\n         int64_t stageOffset = 0;\n         int64_t N = Get<MNK_N>(problemShape_);\n+        int64_t M = Get<MNK_M>(problemShape_);\n         while (stageOffset < inputSize) {\n             int64_t offset = dstOffset + loop * stageSize / blockShapeNAlign * N;\n             // aiv1需要多偏移aiv0所处理的数据\n             offset += AscendC::GetSubBlockIdx() * halfBlockShapeM * N;\n             stageSize = AscendC::Std::min(stageSize, inputSize - stageOffset);\n             // Do add or mul in ub: x3 + cLocal_[stageOffset] -> cLocal_  in stage 1\n-            fusionOp_(offset, stageSize / blockShapeNAlign, blockShapeN, N, blockShapeNAlign,\n+            fusionOp_(offset, stageSize / blockShapeNAlign, blockShapeN, N, M, blockShapeNAlign,\n                 stageSize, stageOffset, 1);\n             if (stageOffset + stageSize >= inputSize) {\n                 // Notify aic\n                 AscendC::CrossCoreSetFlag<AIC_SYNC_AIV_MODE_4, PIPE_V>(flagId);\n             }\n             // CopyOut in stage 2\n-            fusionOp_(offset, stageSize / blockShapeNAlign, blockShapeN, N, blockShapeNAlign,\n+            fusionOp_(offset, stageSize / blockShapeNAlign, blockShapeN, N, M, blockShapeNAlign,\n                 stageSize, stageOffset, 2);\n             stageOffset += stageSize;\n             loop++;\n",
+      "new_file": false,
+      "new_path": "matmul/common/cmct/epilogue/block_epilogue_cv.h",
+      "old_path": "matmul/common/cmct/epilogue/block_epilogue_cv.h",
+      "removed_lines": 2,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/59d8560cd3b32956780e3e0dd3ce20ccfd314f53/matmul/common/cmct/epilogue/block_epilogue_cv.h",
+    "sha": "59d8560cd3b32956780e3e0dd3ce20ccfd314f53",
+    "source_branch": "master",
+    "source_project": {
+      "full_name": "xuyafei/ops-nn",
+      "human_name": "xuyafei / ops-nn",
+      "id": 9279484,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  }
+]

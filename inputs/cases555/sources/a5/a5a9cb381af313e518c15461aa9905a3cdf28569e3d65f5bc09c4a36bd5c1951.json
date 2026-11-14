@@ -1,0 +1,362 @@
+[
+  {
+    "additions": 18,
+    "blob_id": "cc6d2b14273c62215613d587561e704c2fa1d764",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/d4c135ccd9e66ab113fc1ddd1ad1d32c6413393f/rnn/dynamic_rnn/examples/test_aclnn_dynamic_rnn.cpp",
+    "deletions": 2,
+    "filename": "rnn/dynamic_rnn/examples/test_aclnn_dynamic_rnn.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 18,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -128,6 +128,7 @@ int main()\n \n     std::vector<int64_t> inputShape = {time_step, batch_size, input_size};\n     std::vector<int64_t> outputShape = {time_step, batch_size, d_scale * hidden_size};\n+    std::vector<int64_t> hycyShape = {numLayers * d_scale, batch_size, hidden_size};\n     std::vector<std::vector<int64_t>> paramsListShape = {};\n \n     std::vector<std::vector<int64_t>> outIListShape = {};\n@@ -162,6 +163,8 @@ int main()\n     void* paramsListDeviceAddr[2 * numLayers];\n \n     void* outputDeviceAddr = nullptr;\n+    void* hyDeviceAddr = nullptr;\n+    void* cyDeviceAddr = nullptr;\n     void* outIListDeviceAddr[numLayers];\n     void* outJListDeviceAddr[numLayers];\n     void* outFListDeviceAddr[numLayers];\n@@ -174,6 +177,8 @@ int main()\n     aclTensorList* params = nullptr;\n \n     aclTensor* output = nullptr;\n+    aclTensor* hy = nullptr;\n+    aclTensor* cy = nullptr;\n     aclTensorList* outIList = nullptr;\n     aclTensorList* outJList = nullptr;\n     aclTensorList* outFList = nullptr;\n@@ -194,6 +199,13 @@ int main()\n     ret = CreateAclTensor<float>(outputHostData, outputShape, &outputDeviceAddr, aclDataType::ACL_FLOAT, &output);\n     CHECK_RET(ret == ACL_SUCCESS, return ret);\n \n+    std::vector<float> hycyHostData(GetShapeSize(hycyShape), 1);\n+    ret = CreateAclTensor<float>(hycyHostData, hycyShape, &hyDeviceAddr, aclDataType::ACL_FLOAT, &hy);\n+    CHECK_RET(ret == ACL_SUCCESS, return ret);\n+\n+    ret = CreateAclTensor<float>(hycyHostData, hycyShape, &cyDeviceAddr, aclDataType::ACL_FLOAT, &cy);\n+    CHECK_RET(ret == ACL_SUCCESS, return ret);\n+\n     ret = CreateAclTensorList<float>(outIListShape, outIListDeviceAddr, aclDataType::ACL_FLOAT, &outIList, 0.0);\n     CHECK_RET(ret == ACL_SUCCESS, return ret);\n \n@@ -222,8 +234,8 @@ int main()\n \n     // 调用aclnnLSTM第一段接口\n     ret = aclnnLSTMGetWorkspaceSize(\n-        input, params, nullptr, nullptr, isbias, numLayers, 0.0, isTraining, bidirection, batchFirst, output, outIList, outJList,\n-        outFList, outOList, outHList, outCList, outTanhCList, &workspaceSize, &executor);\n+        input, params, nullptr, nullptr, isbias, numLayers, 0.0, isTraining, bidirection, batchFirst, output, hy, cy,\n+        outIList, outJList, outFList, outOList, outHList, outCList, outTanhCList, &workspaceSize, &executor);\n \n     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT(\"aclnnLSTMGetWorkspaceSize failed. ERROR: %d\\n\", ret); return ret);\n \n@@ -250,6 +262,8 @@ int main()\n     aclDestroyTensor(input);\n     aclDestroyTensorList(params);\n     aclDestroyTensor(output);\n+    aclDestroyTensor(hy);\n+    aclDestroyTensor(cy);\n     aclDestroyTensorList(outIList);\n     aclDestroyTensorList(outJList);\n     aclDestroyTensorList(outFList);\n@@ -261,6 +275,8 @@ int main()\n     //   // 7. 释放device资源\n     aclrtFree(inputDeviceAddr);\n     aclrtFree(outputDeviceAddr);\n+    aclrtFree(hyDeviceAddr);\n+    aclrtFree(cyDeviceAddr);\n     for (int i = 0; i < numLayers; i++) {\n         aclrtFree(outIListDeviceAddr[i]);\n         aclrtFree(outJListDeviceAddr[i]);\n",
+      "new_file": false,
+      "new_path": "rnn/dynamic_rnn/examples/test_aclnn_dynamic_rnn.cpp",
+      "old_path": "rnn/dynamic_rnn/examples/test_aclnn_dynamic_rnn.cpp",
+      "removed_lines": 2,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/d4c135ccd9e66ab113fc1ddd1ad1d32c6413393f/rnn/dynamic_rnn/examples/test_aclnn_dynamic_rnn.cpp",
+    "sha": "d4c135ccd9e66ab113fc1ddd1ad1d32c6413393f",
+    "source_branch": "test",
+    "source_project": {
+      "full_name": "jisihuai/ops-nn",
+      "human_name": "jisihuai / ops-nn",
+      "id": 7892740,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 4,
+    "blob_id": "ac876dd0361edf70fbcd3563d8f003625fdf8202",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/d4c135ccd9e66ab113fc1ddd1ad1d32c6413393f/rnn/dynamic_rnn/op_host/dynamic_lstm_tiling.cpp",
+    "deletions": 1,
+    "filename": "rnn/dynamic_rnn/op_host/dynamic_lstm_tiling.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 4,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -13,6 +13,7 @@\n  * \\brief\n  */\n #include \"dynamic_lstm_tiling.h\"\n+#include \"tiling/platform/platform_ascendc.h\"\n \n using namespace AscendC;\n \n@@ -83,7 +84,9 @@ ge::graphStatus LstmBaseTiling::TilingWithAscendC(gert::TilingContext* context)\n                   VECTOR_INNER_ERR_REPORT_TILIING(context->GetNodeName(), \"set tiling data fail.\"),\n                   return ge::GRAPH_FAILED);\n \n-  int64_t workspaceSize = rnnParams.timeStep * rnnParams.batch * 4 * rnnParams.hiddenSize * 4 + 20 * 1024 * 1024;\n+  auto ascendcPlatform = platform_ascendc::PlatformAscendC(context->GetPlatformInfo());\n+  size_t sysWorkspaceByteSize = static_cast<size_t>(ascendcPlatform.GetLibApiWorkSpaceSize());\n+  int64_t workspaceSize = rnnParams.timeStep * rnnParams.batch * 4 * rnnParams.hiddenSize * 4 + sysWorkspaceByteSize;  // 4为门的数量\n   auto launchCore = (rnnParams.usedCoreNum + DEFAULT_INDEX_TWO - 1) / DEFAULT_INDEX_TWO;\n   context->SetBlockDim(launchCore);  // 24上限\n   context->SetTilingKey(rnnParams.tilingKey);\n",
+      "new_file": false,
+      "new_path": "rnn/dynamic_rnn/op_host/dynamic_lstm_tiling.cpp",
+      "old_path": "rnn/dynamic_rnn/op_host/dynamic_lstm_tiling.cpp",
+      "removed_lines": 1,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/d4c135ccd9e66ab113fc1ddd1ad1d32c6413393f/rnn/dynamic_rnn/op_host/dynamic_lstm_tiling.cpp",
+    "sha": "d4c135ccd9e66ab113fc1ddd1ad1d32c6413393f",
+    "source_branch": "test",
+    "source_project": {
+      "full_name": "jisihuai/ops-nn",
+      "human_name": "jisihuai / ops-nn",
+      "id": 7892740,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 119,
+    "blob_id": "84b9c130da6cfcc085cc230a5d84180d34763703",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/d4c135ccd9e66ab113fc1ddd1ad1d32c6413393f/rnn/dynamic_rnn/op_host/op_api/aclnn_lstm.cpp",
+    "deletions": 68,
+    "filename": "rnn/dynamic_rnn/op_host/op_api/aclnn_lstm.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 119,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -49,6 +49,8 @@ struct LstmDataParamsIn {\n \n struct LstmDataParamsOut {\n     aclTensor *output;\n+    aclTensor *hy;\n+    aclTensor *cy;\n     aclTensorList *iOut;\n     aclTensorList *jOut;\n     aclTensorList *fOut;\n@@ -111,6 +113,7 @@ static const int64_t INDEX_1 = 1;\n static const int64_t INDEX_2 = 2;\n static const int64_t INDEX_3 = 3;\n static const int64_t INDEX_4 = 4;\n+static const size_t CONCAT_MAX_NUM = 32;\n \n // 根据API定义，需要列出所能支持的所有dtype\n static const std::initializer_list<DataType> DTYPE_SUPPORT_LIST = {DataType::DT_FLOAT, DataType::DT_FLOAT16};\n@@ -552,10 +555,8 @@ static aclnnStatus CheckParamsNullptr(const LstmDataParamsIn& inputs, const Lstm\n     \n     // 输出校验\n     OP_CHECK_NULL(outputs.output, return ACLNN_ERR_PARAM_NULLPTR);\n-    ret = CheckTensorListNullptr(outputs.hOut);\n-    CHECK_RET(ret == ACLNN_SUCCESS, ret);\n-    ret = CheckTensorListNullptr(outputs.cOut);\n-    CHECK_RET(ret == ACLNN_SUCCESS, ret);\n+    OP_CHECK_NULL(outputs.hy, return ACLNN_ERR_PARAM_NULLPTR);\n+    OP_CHECK_NULL(outputs.cy, return ACLNN_ERR_PARAM_NULLPTR);\n     if (inputs.train) {\n         ret = CheckTensorListNullptr(outputs.iOut);\n         CHECK_RET(ret == ACLNN_SUCCESS, ret);\n@@ -565,6 +566,10 @@ static aclnnStatus CheckParamsNullptr(const LstmDataParamsIn& inputs, const Lstm\n         CHECK_RET(ret == ACLNN_SUCCESS, ret);\n         ret = CheckTensorListNullptr(outputs.oOut);\n         CHECK_RET(ret == ACLNN_SUCCESS, ret);\n+        ret = CheckTensorListNullptr(outputs.hOut);\n+        CHECK_RET(ret == ACLNN_SUCCESS, ret);\n+        ret = CheckTensorListNullptr(outputs.cOut);\n+        CHECK_RET(ret == ACLNN_SUCCESS, ret);\n         ret = CheckTensorListNullptr(outputs.tanhCOut);\n         CHECK_RET(ret == ACLNN_SUCCESS, ret);\n     }\n@@ -647,10 +652,8 @@ static aclnnStatus CheckDimsAndListLength(const LstmDataParamsIn& inputs, const\n     OP_CHECK_WRONG_DIMENSION(inputs.batchSizes, INDEX_1, return ACLNN_ERR_PARAM_INVALID);\n \n     OP_CHECK_WRONG_DIMENSION(outputs.output, INDEX_3, return ACLNN_ERR_PARAM_INVALID);\n-    ret = CheckTensorListLength(outputs.hOut, info.LD, \"hOut\");\n-    CHECK_RET(ret == ACLNN_SUCCESS, ret);\n-    ret = CheckTensorListLength(outputs.cOut, info.LD, \"cOut\");\n-    CHECK_RET(ret == ACLNN_SUCCESS, ret);\n+    OP_CHECK_WRONG_DIMENSION(outputs.hy, INDEX_3, return ACLNN_ERR_PARAM_INVALID);\n+    OP_CHECK_WRONG_DIMENSION(outputs.cy, INDEX_3, return ACLNN_ERR_PARAM_INVALID);\n     if (inputs.train) {\n         ret = CheckTensorListLength(outputs.iOut, info.LD, \"iOut\");\n         CHECK_RET(ret == ACLNN_SUCCESS, ret);\n@@ -660,6 +663,10 @@ static aclnnStatus CheckDimsAndListLength(const LstmDataParamsIn& inputs, const\n         CHECK_RET(ret == ACLNN_SUCCESS, ret);\n         ret = CheckTensorListLength(outputs.oOut, info.LD, \"oOut\");\n         CHECK_RET(ret == ACLNN_SUCCESS, ret);\n+        ret = CheckTensorListLength(outputs.hOut, info.LD, \"hOut\");\n+        CHECK_RET(ret == ACLNN_SUCCESS, ret);\n+        ret = CheckTensorListLength(outputs.cOut, info.LD, \"cOut\");\n+        CHECK_RET(ret == ACLNN_SUCCESS, ret);\n         ret = CheckTensorListLength(outputs.tanhCOut, info.LD, \"tanhCOut\");\n         CHECK_RET(ret == ACLNN_SUCCESS, ret);\n     }\n@@ -702,8 +709,8 @@ static aclnnStatus CheckShapes(const LstmDataParamsIn& inputs, const LstmDataPar\n     op::Shape biasShape = {INDEX_4 * info.H};\n     op::Shape hxShape = {info.D * info.L, info.B, info.H};\n     op::Shape outShape = {info.T, info.B, info.H};\n-    op::Shape outInferenceShape = {info.B, info.H};\n     op::Shape outputConcatShape = {info.T, info.B, info.H * info.D};\n+    op::Shape hycyShape = {info.LD, info.B, info.H};\n \n     for (int64_t group = INDEX_0; group < info.LD; group++) {\n         int64_t currOffset = group * info.groupLen;\n@@ -724,6 +731,8 @@ static aclnnStatus CheckShapes(const LstmDataParamsIn& inputs, const LstmDataPar\n     }\n \n     OP_CHECK_SHAPE_NOT_EQUAL_WITH_EXPECTED_SIZE(outputs.output, outputConcatShape, return ACLNN_ERR_PARAM_INVALID);\n+    OP_CHECK_SHAPE_NOT_EQUAL_WITH_EXPECTED_SIZE(outputs.hy, hycyShape, return ACLNN_ERR_PARAM_INVALID);\n+    OP_CHECK_SHAPE_NOT_EQUAL_WITH_EXPECTED_SIZE(outputs.cy, hycyShape, return ACLNN_ERR_PARAM_INVALID);\n     if (inputs.train) {\n         ret = CheckTensorListShape(outputs.iOut, outShape, \"iOut\");\n         CHECK_RET(ret == ACLNN_SUCCESS, ret);\n@@ -739,11 +748,6 @@ static aclnnStatus CheckShapes(const LstmDataParamsIn& inputs, const LstmDataPar\n         CHECK_RET(ret == ACLNN_SUCCESS, ret);\n         ret = CheckTensorListShape(outputs.tanhCOut, outShape, \"tanhCOut\");\n         CHECK_RET(ret == ACLNN_SUCCESS, ret);\n-    } else {\n-        ret = CheckTensorListShape(outputs.hOut, outInferenceShape, \"hOut\");\n-        CHECK_RET(ret == ACLNN_SUCCESS, ret);\n-        ret = CheckTensorListShape(outputs.cOut, outInferenceShape, \"cOut\");\n-        CHECK_RET(ret == ACLNN_SUCCESS, ret);\n     }\n \n     return ACLNN_SUCCESS;\n@@ -762,20 +766,24 @@ static aclnnStatus CheckDtypes(const LstmDataParamsIn& inputs, const LstmDataPar\n     OP_CHECK_DTYPE_NOT_SUPPORT(inputs.batchSizes, INT_DTYPE_SUPPORT_LIST, return ACLNN_ERR_PARAM_INVALID);\n \n     OP_CHECK_DTYPE_NOT_MATCH(outputs.output, info.dtype, return ACLNN_ERR_PARAM_INVALID);\n-    ret = CheckTensorListDtype(outputs.iOut, info.dtype, \"iOut\");\n-    CHECK_RET(ret == ACLNN_SUCCESS, ret);\n-    ret = CheckTensorListDtype(outputs.jOut, info.dtype, \"jOut\");\n-    CHECK_RET(ret == ACLNN_SUCCESS, ret);\n-    ret = CheckTensorListDtype(outputs.fOut, info.dtype, \"fOut\");\n-    CHECK_RET(ret == ACLNN_SUCCESS, ret);\n-    ret = CheckTensorListDtype(outputs.oOut, info.dtype, \"oOut\");\n-    CHECK_RET(ret == ACLNN_SUCCESS, ret);\n-    ret = CheckTensorListDtype(outputs.hOut, info.dtype, \"hOut\");\n-    CHECK_RET(ret == ACLNN_SUCCESS, ret);\n-    ret = CheckTensorListDtype(outputs.cOut, info.dtype, \"cOut\");\n-    CHECK_RET(ret == ACLNN_SUCCESS, ret);\n-    ret = CheckTensorListDtype(outputs.tanhCOut, info.dtype, \"tanhCOut\");\n-    CHECK_RET(ret == ACLNN_SUCCESS, ret);\n+    OP_CHECK_DTYPE_NOT_MATCH(outputs.hy, info.dtype, return ACLNN_ERR_PARAM_INVALID);\n+    OP_CHECK_DTYPE_NOT_MATCH(outputs.cy, info.dtype, return ACLNN_ERR_PARAM_INVALID);\n+    if (inputs.train) {\n+        ret = CheckTensorListDtype(outputs.iOut, info.dtype, \"iOut\");\n+        CHECK_RET(ret == ACLNN_SUCCESS, ret);\n+        ret = CheckTensorListDtype(outputs.jOut, info.dtype, \"jOut\");\n+        CHECK_RET(ret == ACLNN_SUCCESS, ret);\n+        ret = CheckTensorListDtype(outputs.fOut, info.dtype, \"fOut\");\n+        CHECK_RET(ret == ACLNN_SUCCESS, ret);\n+        ret = CheckTensorListDtype(outputs.oOut, info.dtype, \"oOut\");\n+        CHECK_RET(ret == ACLNN_SUCCESS, ret);\n+        ret = CheckTensorListDtype(outputs.hOut, info.dtype, \"hOut\");\n+        CHECK_RET(ret == ACLNN_SUCCESS, ret);\n+        ret = CheckTensorListDtype(outputs.cOut, info.dtype, \"cOut\");\n+        CHECK_RET(ret == ACLNN_SUCCESS, ret);\n+        ret = CheckTensorListDtype(outputs.tanhCOut, info.dtype, \"tanhCOut\");\n+        CHECK_RET(ret == ACLNN_SUCCESS, ret);\n+    }\n \n     return ACLNN_SUCCESS;\n }\n@@ -870,6 +878,43 @@ static const aclTensor* GetMask(\n     return mask;\n }\n \n+static const aclTensor* SplitToConcat(std::vector<const aclTensor*> tensorListA, int64_t dim, aclOpExecutor* executor)\n+{\n+    if (tensorListA.size() == 1) {\n+        return tensorListA[0];\n+    }\n+\n+    while (tensorListA.size() > 1) {\n+        std::vector<const aclTensor*> tensorListOnce;\n+        std::vector<const aclTensor*> tensorListB;\n+        for (auto tensor : tensorListA) {\n+            tensorListOnce.emplace_back(tensor);\n+            if (tensorListOnce.size() == CONCAT_MAX_NUM) {\n+                auto tensorList = executor->AllocTensorList(tensorListOnce.data(), tensorListOnce.size());\n+                auto concatTensor = l0op::ConcatD(tensorList, dim, executor);\n+                CHECK_RET(concatTensor != nullptr, nullptr);\n+                tensorListB.emplace_back(concatTensor);\n+                tensorListOnce.clear();\n+            }\n+        }\n+        if (!tensorListOnce.empty()) {\n+            if (tensorListOnce.size() == 1) {\n+                tensorListB.emplace_back(tensorListOnce.front());\n+            } else {\n+                auto aclTensorListTail = executor->AllocTensorList(tensorListOnce.data(), tensorListOnce.size());\n+                auto concatTensorTail = l0op::ConcatD(aclTensorListTail, dim, executor);\n+                CHECK_RET(concatTensorTail != nullptr, nullptr);\n+                tensorListB.emplace_back(concatTensorTail);\n+            }\n+            tensorListOnce.clear();\n+        }\n+        tensorListA = tensorListB;\n+    }\n+\n+    CHECK_RET (!tensorListA.empty(), nullptr);\n+    return tensorListA.front();\n+}\n+\n static aclnnStatus CallBaseOp(\n     const BaseOpInputs& baseIn,\n     const LstmDataInfo& info,\n@@ -906,7 +951,6 @@ static aclnnStatus LstmDataProcessParams(\n {\n     // h0、c0。slice\n     if (inputs.hx) {\n-        // 假设l0op::Slice元素共享内存\n         const int64_t offsetData[] = {\n             layerIdx * info.D + directIdx,\n             INDEX_0,\n@@ -997,7 +1041,49 @@ static aclnnStatus LstmDataGetParamsOut(\n     res = l0op::ViewCopy(info.lastResult, outputs.output, executor);\n     CHECK_RET(res != nullptr, ACLNN_ERR_INNER_NULLPTR);\n \n-    // 处理其他tensorList\n+    // 处理hy、cy\n+    // 准备取最后1个step，正序为T-1，反序为0\n+    const int64_t offsetUniDirectData[] = {info.T - INDEX_1, INDEX_0, INDEX_0};\n+    aclIntArray* offsetUniDirect = executor->AllocIntArray(offsetUniDirectData, INDEX_3);\n+    CHECK_RET(offsetUniDirect != nullptr, ACLNN_ERR_INNER_NULLPTR);\n+    const int64_t offsetReDirectData[] = {INDEX_0, INDEX_0, INDEX_0};\n+    aclIntArray* offsetReDirect = executor->AllocIntArray(offsetReDirectData, INDEX_3);\n+    CHECK_RET(offsetReDirect != nullptr, ACLNN_ERR_INNER_NULLPTR);\n+    const int64_t sizeData[] = {INDEX_1, info.B, info.H};\n+    aclIntArray* size = executor->AllocIntArray(sizeData, INDEX_3);\n+    CHECK_RET(size != nullptr, ACLNN_ERR_INNER_NULLPTR);\n+    std::vector<const aclTensor *> hyVec;\n+    std::vector<const aclTensor *> cyVec;\n+    // 取出并存放到Vector\n+    for (int64_t idx = INDEX_0; idx < info.LD; idx++) {\n+        res = l0op::Slice(\n+            baseOutVec.at(idx).l0_hOut,\n+            ((info.D == INDEX_2 and idx % INDEX_2 != INDEX_0) ? offsetReDirect : offsetUniDirect),\n+            size,\n+            executor\n+        );\n+        CHECK_RET(res != nullptr, ACLNN_ERR_INNER_NULLPTR);\n+        hyVec.push_back(res);\n+\n+        res = l0op::Slice(\n+            baseOutVec.at(idx).l0_cOut,\n+            ((info.D == INDEX_2 and idx % INDEX_2 != INDEX_0) ? offsetReDirect : offsetUniDirect),\n+            size,\n+            executor\n+        );\n+        CHECK_RET(res != nullptr, ACLNN_ERR_INNER_NULLPTR);\n+        cyVec.push_back(res);\n+    }\n+    auto hy = SplitToConcat(hyVec, INDEX_0, executor);\n+    CHECK_RET(res != nullptr, ACLNN_ERR_INNER_NULLPTR);\n+    auto cy = SplitToConcat(cyVec, INDEX_0, executor);\n+    CHECK_RET(res != nullptr, ACLNN_ERR_INNER_NULLPTR);\n+    res = l0op::ViewCopy(hy, outputs.hy, executor);\n+    CHECK_RET(res != nullptr, ACLNN_ERR_INNER_NULLPTR);\n+    res = l0op::ViewCopy(cy, outputs.cy, executor);\n+    CHECK_RET(res != nullptr, ACLNN_ERR_INNER_NULLPTR);\n+\n+    // 处理训练模式下其他tensorList\n     /* 由于输出也是先层后方向排布，因此可以直接按baseOutVec顺序拷贝\n      */\n     if (inputs.train) {\n@@ -1017,43 +1103,6 @@ static aclnnStatus LstmDataGetParamsOut(\n             res = l0op::ViewCopy(baseOutVec.at(idx).l0_tanhcOut, (*outputs.tanhCOut)[idx], executor);\n             CHECK_RET(res != nullptr, ACLNN_ERR_INNER_NULLPTR);\n         }\n-    } else {\n-        // 准备取最后1个step，正序为T-1，反序为0\n-        const int64_t offsetUniDirectData[] = {info.T - INDEX_1, INDEX_0, INDEX_0};\n-        aclIntArray* offsetUniDirect = executor->AllocIntArray(offsetUniDirectData, INDEX_3);\n-        CHECK_RET(offsetUniDirect != nullptr, ACLNN_ERR_INNER_NULLPTR);\n-        const int64_t offsetReDirectData[] = {INDEX_0, INDEX_0, INDEX_0};\n-        aclIntArray* offsetReDirect = executor->AllocIntArray(offsetReDirectData, INDEX_3);\n-        CHECK_RET(offsetReDirect != nullptr, ACLNN_ERR_INNER_NULLPTR);\n-        const int64_t sizeData[] = {INDEX_1, info.B, info.H};\n-        aclIntArray* size = executor->AllocIntArray(sizeData, INDEX_3);\n-        CHECK_RET(size != nullptr, ACLNN_ERR_INNER_NULLPTR);\n-\n-        for (int64_t idx = INDEX_0; idx < info.LD; idx++) {\n-            res = l0op::Slice(\n-                baseOutVec.at(idx).l0_hOut,\n-                ((info.D == INDEX_2 and idx % INDEX_2 != INDEX_0) ? offsetReDirect : offsetUniDirect),\n-                size,\n-                executor\n-            );\n-            CHECK_RET(res != nullptr, ACLNN_ERR_INNER_NULLPTR);\n-            res = l0op::SqueezeNd(res, INDEX_0, executor);\n-            CHECK_RET(res != nullptr, ACLNN_ERR_INNER_NULLPTR);\n-            res = l0op::ViewCopy(res, (*outputs.hOut)[idx], executor);\n-            CHECK_RET(res != nullptr, ACLNN_ERR_INNER_NULLPTR);\n-\n-            res = l0op::Slice(\n-                baseOutVec.at(idx).l0_cOut,\n-                ((info.D == INDEX_2 and idx % INDEX_2 != INDEX_0) ? offsetReDirect : offsetUniDirect),\n-                size,\n-                executor\n-            );\n-            CHECK_RET(res != nullptr, ACLNN_ERR_INNER_NULLPTR);\n-            res = l0op::SqueezeNd(res, INDEX_0, executor);\n-            CHECK_RET(res != nullptr, ACLNN_ERR_INNER_NULLPTR);\n-            res = l0op::ViewCopy(res, (*outputs.cOut)[idx], executor);\n-            CHECK_RET(res != nullptr, ACLNN_ERR_INNER_NULLPTR);\n-        }\n     }\n     \n     return ACLNN_SUCCESS;\n@@ -1163,6 +1212,8 @@ aclnnStatus aclnnLSTMGetWorkspaceSize(\n     bool bidirectional,\n     bool batch_first,\n     aclTensor *output,\n+    aclTensor *hy,\n+    aclTensor *cy,\n     aclTensorList *iOut,\n     aclTensorList *jOut,\n     aclTensorList *fOut,\n@@ -1179,7 +1230,7 @@ aclnnStatus aclnnLSTMGetWorkspaceSize(\n     // 判断是否进入data模式\n     if (batchSizes) {\n         LstmDataParamsIn inputs = {input, params, hx, batchSizes, numLayers, has_biases, train, bidirectional};\n-        LstmDataParamsOut outputs = {output, iOut, jOut, fOut, oOut, hOut, cOut, tanhCOut};\n+        LstmDataParamsOut outputs = {output, hy, cy, iOut, jOut, fOut, oOut, hOut, cOut, tanhCOut};\n         return LstmDataGetWorkspaceSize(inputs, outputs, workspaceSize, executor);\n     }\n \n",
+      "new_file": false,
+      "new_path": "rnn/dynamic_rnn/op_host/op_api/aclnn_lstm.cpp",
+      "old_path": "rnn/dynamic_rnn/op_host/op_api/aclnn_lstm.cpp",
+      "removed_lines": 68,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/d4c135ccd9e66ab113fc1ddd1ad1d32c6413393f/rnn/dynamic_rnn/op_host/op_api/aclnn_lstm.cpp",
+    "sha": "d4c135ccd9e66ab113fc1ddd1ad1d32c6413393f",
+    "source_branch": "test",
+    "source_project": {
+      "full_name": "jisihuai/ops-nn",
+      "human_name": "jisihuai / ops-nn",
+      "id": 7892740,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 2,
+    "blob_id": "9466a31064afe1f006f5db33145e86b54c349c7c",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/d4c135ccd9e66ab113fc1ddd1ad1d32c6413393f/rnn/dynamic_rnn/op_host/op_api/aclnn_lstm.h",
+    "deletions": 0,
+    "filename": "rnn/dynamic_rnn/op_host/op_api/aclnn_lstm.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 2,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -29,6 +29,8 @@ ACLNN_API aclnnStatus aclnnLSTMGetWorkspaceSize(\n     bool bidirectional,        \n     bool batch_first,\n     aclTensor *output,\n+    aclTensor *hy,\n+    aclTensor *cy,\n     aclTensorList *iOut,  \n     aclTensorList *jOut, \n     aclTensorList *fOut,\n",
+      "new_file": false,
+      "new_path": "rnn/dynamic_rnn/op_host/op_api/aclnn_lstm.h",
+      "old_path": "rnn/dynamic_rnn/op_host/op_api/aclnn_lstm.h",
+      "removed_lines": 0,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/d4c135ccd9e66ab113fc1ddd1ad1d32c6413393f/rnn/dynamic_rnn/op_host/op_api/aclnn_lstm.h",
+    "sha": "d4c135ccd9e66ab113fc1ddd1ad1d32c6413393f",
+    "source_branch": "test",
+    "source_project": {
+      "full_name": "jisihuai/ops-nn",
+      "human_name": "jisihuai / ops-nn",
+      "id": 7892740,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 38,
+    "blob_id": "913305a0ba90b12211a3dd1e1af6c1328a82b5c7",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/d4c135ccd9e66ab113fc1ddd1ad1d32c6413393f/rnn/dynamic_rnn/op_kernel/LstmFP16.cpp",
+    "deletions": 20,
+    "filename": "rnn/dynamic_rnn/op_kernel/LstmFP16.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 38,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -84,7 +84,7 @@ __aicore__ inline void LstmMmSplitNDNDFP16<T>::CopyOutput(GlobalTensor<T> &gm, L\n {\n     auto outLocal = this->qidVecOut.template AllocTensor<T>();\n     PipeBarrier<PIPE_V>();\n-    Cast(outLocal, ub, RoundMode::CAST_ROUND, this->calcSizeAlign);\n+    Cast(outLocal, ub, RoundMode::CAST_RINT, this->calcSizeAlign);\n     this->qidVecOut.EnQue(outLocal);\n \n     outLocal = this->qidVecOut.template DeQue<T>();\n@@ -237,12 +237,16 @@ __aicore__ inline void LstmMmSplitNDNDFP16<T>::CaliSigmoid(\n \n template <typename T>\n __aicore__ inline void LstmMmSplitNDNDFP16<T>::CaljTanh(\n-    LocalTensor<float> &jTanh, LocalTensor<float> &ubLocalIn, int64_t offset)\n+    LocalTensor<float> &jTanh, LocalTensor<float> &ubLocalIn, int64_t offset,\n+    LocalTensor<float> &temp1, LocalTensor<float> &temp2)\n {\n     ubLocalIn = this->qidVecIn.template DeQue<float>();\n     PipeBarrier<PIPE_V>();\n     Tanh(jTanh, ubLocalIn, this->calcSizeAlign);\n     this->qidVecIn.FreeTensor(ubLocalIn);\n+    PipeBarrier<PIPE_V>();\n+    this->TanhPartialHighPrecision(ubLocalIn, jTanh, temp1, temp2, this->calcSizeAlign);\n+    PipeBarrier<PIPE_V>();\n \n     if (this->tiling->isTraining == 1) {\n         this->CopyOutput(this->outputGm.outJGm, jTanh, offset);\n@@ -281,21 +285,25 @@ __aicore__ inline void LstmMmSplitNDNDFP16<T>::CopyOutYH(\n         auto updateY = this->ubLocal1;\n         auto initH = this->ubLocal2;\n         auto seqLength = this->ubLocal4;\n-        Mul(updateY, updateH, seqLength, this->calcSizeAlign);\n-        PipeBarrier<PIPE_V>();\n+        // 现在是反转的mask，先拿到增量initH\n         CopyInHCSeq(initH, this->inputGm.initHGm, initcOffset);\n         PipeBarrier<PIPE_V>();\n-        Sub(updateH, updateH, initH, this->calcSizeAlign);\n+        Mul(initH, initH, seqLength, this->calcSizeAlign);\n         PipeBarrier<PIPE_V>();\n-        Mul(updateH, updateH, seqLength, this->calcSizeAlign);\n+        // 反转恢复\n+        Muls(seqLength, seqLength, -1.0f, this->calcSizeAlign);\n         PipeBarrier<PIPE_V>();\n-        Add(updateH, updateH, initH, this->calcSizeAlign);\n+        Adds(seqLength, seqLength, 1.0f, this->calcSizeAlign);\n+        PipeBarrier<PIPE_V>();\n+        Mul(updateY, updateH, seqLength, this->calcSizeAlign);\n+        PipeBarrier<PIPE_V>();\n+        Add(updateH, updateY, initH, this->calcSizeAlign);\n         this->CopyOutput(this->outputGm.outYGm, updateY, offset);\n         this->CopyOutput(this->outputGm.outHGm, updateH, offset);\n     } else {\n         LocalTensor<T> outLocal = this->qidVecOut.template AllocTensor<T>();\n         PipeBarrier<PIPE_V>();\n-        Cast(outLocal, updateH, RoundMode::CAST_ROUND, this->calcSizeAlign);\n+        Cast(outLocal, updateH, RoundMode::CAST_RINT, this->calcSizeAlign);\n         this->qidVecOut.EnQue(outLocal);\n         outLocal = this->qidVecOut.template DeQue<T>();\n \n@@ -326,7 +334,7 @@ __aicore__ inline void LstmMmSplitNDNDFP16<T>::CopyOutYHt0(LocalTensor<float> &u\n \n     LocalTensor<T> outLocal = this->qidVecOut.template AllocTensor<T>();\n     PipeBarrier<PIPE_V>();\n-    Cast(outLocal, updateH, RoundMode::CAST_ROUND, this->calcSizeAlign);\n+    Cast(outLocal, updateH, RoundMode::CAST_RINT, this->calcSizeAlign);\n     this->qidVecOut.EnQue(outLocal);\n     outLocal = this->qidVecOut.template DeQue<T>();\n \n@@ -338,7 +346,7 @@ __aicore__ inline void LstmMmSplitNDNDFP16<T>::CopyOutYHt0(LocalTensor<float> &u\n \n template <typename T>\n __aicore__ inline void LstmMmSplitNDNDFP16<T>::CalAddTanh(LocalTensor<float> &cTanh, LocalTensor<float> &ubLocal2,\n-    LocalTensor<float> &cTmp2, int64_t offset, int64_t initcOffset)\n+    LocalTensor<float> &cTmp2, int64_t offset, int64_t initcOffset, LocalTensor<float> &temp1)\n {\n     PipeBarrier<PIPE_V>();\n \n@@ -351,12 +359,16 @@ __aicore__ inline void LstmMmSplitNDNDFP16<T>::CalAddTanh(LocalTensor<float> &cT\n         auto seqLength = this->ubLocal4;\n         this->CopyInHCSeq(initC, this->inputGm.initCGm, initcOffset);\n         PipeBarrier<PIPE_V>();\n-        Sub(updateC, updateC, initC, this->calcSizeAlign);\n-        PipeBarrier<PIPE_V>();\n         this->CopyInHCSeq(seqLength, this->inputGm.seqLengthGm, offset);\n         PipeBarrier<PIPE_V>();\n         Mul(updateC, updateC, seqLength, this->calcSizeAlign);\n         PipeBarrier<PIPE_V>();\n+        Muls(seqLength, seqLength, -1.0f, this->calcSizeAlign);  // 反转seq\n+        PipeBarrier<PIPE_V>();\n+        Adds(seqLength, seqLength, 1.0f, this->calcSizeAlign);\n+        PipeBarrier<PIPE_V>();\n+        Mul(initC, initC, seqLength, this->calcSizeAlign);  // 获取历史增量\n+        PipeBarrier<PIPE_V>();\n         Add(updateC, updateC, initC, this->calcSizeAlign);\n         PipeBarrier<PIPE_V>();\n     }\n@@ -367,7 +379,10 @@ __aicore__ inline void LstmMmSplitNDNDFP16<T>::CalAddTanh(LocalTensor<float> &cT\n     }\n     this->CopyOutput(this->outputGm.outCGm, updateC, offset);\n     PipeBarrier<PIPE_V>();\n-    Tanh(cTanh, updateC, this->calcSizeAlign);\n+    Tanh(cTanh, updateC, this->calcSizeAlign);  // u1是updateC，u2是cTanh，u4是seq且后面要复用。只有u3能用，附加一个qidVecIn即可\n+    LocalTensor<float> temp2 = this->qidVecIn.template AllocTensor<float>();\n+    this->TanhPartialHighPrecision(updateC, cTanh, temp1, temp2, this->calcSizeAlign);\n+    this->qidVecIn.FreeTensor(temp2);\n     if (this->tiling->isTraining == 1) {\n         this->CopyOutput(this->outputGm.outTanhCGm, cTanh, offset);\n     }\n@@ -375,7 +390,7 @@ __aicore__ inline void LstmMmSplitNDNDFP16<T>::CalAddTanh(LocalTensor<float> &cT\n \n template <typename T>\n __aicore__ inline void LstmMmSplitNDNDFP16<T>::CalAddTanht0(LocalTensor<float> &cTanh, LocalTensor<float> &ubLocal2,\n-    LocalTensor<float> &cTmp2, int64_t offset, int64_t initcOffset)\n+    LocalTensor<float> &cTmp2, int64_t offset, int64_t initcOffset, LocalTensor<float> &temp1)\n {\n     auto updateC = this->ubLocal4;\n \n@@ -395,7 +410,10 @@ __aicore__ inline void LstmMmSplitNDNDFP16<T>::CalAddTanht0(LocalTensor<float> &\n     this->CopyOutput(this->outputGm.outCGm, updateC, offset);\n \n     PipeBarrier<PIPE_V>();\n-    Tanh(cTanh, updateC, this->calcSizeAlign);\n+    Tanh(cTanh, updateC, this->calcSizeAlign);  // 分别对应u2u4。u3是seq。u1可用，附加qidVecIn\n+    LocalTensor<float> temp2 = this->qidVecIn.template AllocTensor<float>();\n+    this->TanhPartialHighPrecision(updateC, cTanh, temp1, temp2, this->calcSizeAlign);\n+    this->qidVecIn.FreeTensor(temp2);\n     if (this->tiling->isTraining == 1) {\n         this->CopyOutput(this->outputGm.outTanhCGm, cTanh, offset);\n     }\n@@ -441,16 +459,16 @@ __aicore__ inline void LstmMmSplitNDNDFP16<T>::ProcessVectorOnce(\n \n     this->InitCMulfSigmoid(this->ubLocal2, initCVec, fSigmoid);\n \n+    this->CaljTanh(jTanh, jInput, offset, this->ubLocal1, this->ubLocal4);  // u1、u4可用\n+\n     this->CaliSigmoid(iSigmoid, iInput, offset);\n \n     this->CopyInIO(oInput, mixGm, this->oOffset + ijfoBaseOffset);\n \n-    this->CaljTanh(jTanh, jInput, offset);\n-\n     PipeBarrier<PIPE_V>();\n     Mul(this->ubLocal4, jTanh, iSigmoid, this->calcSizeAlign);\n \n-    this->CalAddTanh(cTanh, this->ubLocal2, this->ubLocal4, offset, initcOffset);\n+    this->CalAddTanh(cTanh, this->ubLocal2, this->ubLocal4, offset, initcOffset, this->ubLocal3);  // u3可用\n \n     this->CaloSigmoid(oSigmoid, oInput, offset);\n \n@@ -499,12 +517,12 @@ __aicore__ inline void LstmMmSplitNDNDFP16<T>::ProcessVectorInitHC(\n \n     this->CopyInIO(oInput, mixGm, this->oOffset + ijfoBaseOffset);\n \n-    this->CaljTanh(jTanh, jInput, offset);\n+    this->CaljTanh(jTanh, jInput, offset, this->ubLocal2, this->ubLocal4);  // u2、u4可用\n \n     PipeBarrier<PIPE_V>();\n     Mul(this->ubLocal4, jTanh, iSigmoid, this->calcSizeAlign);\n \n-    this->CalAddTanht0(cTanh, this->ubLocal2, this->ubLocal4, offset, initcOffset);\n+    this->CalAddTanht0(cTanh, this->ubLocal2, this->ubLocal4, offset, initcOffset, this->ubLocal1);  // u1可用\n \n     this->CaloSigmoid(oSigmoid, oInput, offset);\n \n",
+      "new_file": false,
+      "new_path": "rnn/dynamic_rnn/op_kernel/LstmFP16.cpp",
+      "old_path": "rnn/dynamic_rnn/op_kernel/LstmFP16.cpp",
+      "removed_lines": 20,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/d4c135ccd9e66ab113fc1ddd1ad1d32c6413393f/rnn/dynamic_rnn/op_kernel/LstmFP16.cpp",
+    "sha": "d4c135ccd9e66ab113fc1ddd1ad1d32c6413393f",
+    "source_branch": "test",
+    "source_project": {
+      "full_name": "jisihuai/ops-nn",
+      "human_name": "jisihuai / ops-nn",
+      "id": 7892740,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 3,
+    "blob_id": "bf40e9d5ad4ded5884c07596bfd96ed5bf331823",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/d4c135ccd9e66ab113fc1ddd1ad1d32c6413393f/rnn/dynamic_rnn/op_kernel/LstmFP16.h",
+    "deletions": 3,
+    "filename": "rnn/dynamic_rnn/op_kernel/LstmFP16.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 3,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -51,14 +51,14 @@ public:\n     __aicore__ inline void CopyInC(AscendC::LocalTensor<T> &dst, AscendC::GlobalTensor<T> &mixGm, const int64_t off);\n     __aicore__ inline void AddfSigmoid(AscendC::LocalTensor<float> &dst, AscendC::LocalTensor<float> &src, int64_t off);\n     __aicore__ inline void CaliSigmoid(AscendC::LocalTensor<float> &dst, AscendC::LocalTensor<float> &src, int64_t off);\n-    __aicore__ inline void CaljTanh(AscendC::LocalTensor<float> &dst, AscendC::LocalTensor<float> &src, int64_t off);\n+    __aicore__ inline void CaljTanh(AscendC::LocalTensor<float> &dst, AscendC::LocalTensor<float> &src, int64_t off, LocalTensor<float> &temp1, LocalTensor<float> &temp2);\n     __aicore__ inline void CaloSigmoid(AscendC::LocalTensor<float> &dst, AscendC::LocalTensor<float> &src, int64_t off);\n     __aicore__ inline void InitCMulfSigmoid(\n         AscendC::LocalTensor<float> &dst, AscendC::LocalTensor<T> &src1, AscendC::LocalTensor<float> &src2);\n     __aicore__ inline void CalAddTanh(AscendC::LocalTensor<float> &dst, AscendC::LocalTensor<float> &src1,\n-        AscendC::LocalTensor<float> &src2, int64_t off1, int64_t off2);\n+        AscendC::LocalTensor<float> &src2, int64_t off1, int64_t off2, LocalTensor<float> &temp1);\n     __aicore__ inline void CalAddTanht0(AscendC::LocalTensor<float> &dst, AscendC::LocalTensor<float> &src1,\n-        AscendC::LocalTensor<float> &src2, int64_t off1, int64_t off2);\n+        AscendC::LocalTensor<float> &src2, int64_t off1, int64_t off2, LocalTensor<float> &temp1);\n     __aicore__ inline void CopyOutYH(AscendC::LocalTensor<float> &src, int64_t off1, int64_t off2);\n     __aicore__ inline void CopyOutYHt0(AscendC::LocalTensor<float> &src, int64_t off);\n \n",
+      "new_file": false,
+      "new_path": "rnn/dynamic_rnn/op_kernel/LstmFP16.h",
+      "old_path": "rnn/dynamic_rnn/op_kernel/LstmFP16.h",
+      "removed_lines": 3,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/d4c135ccd9e66ab113fc1ddd1ad1d32c6413393f/rnn/dynamic_rnn/op_kernel/LstmFP16.h",
+    "sha": "d4c135ccd9e66ab113fc1ddd1ad1d32c6413393f",
+    "source_branch": "test",
+    "source_project": {
+      "full_name": "jisihuai/ops-nn",
+      "human_name": "jisihuai / ops-nn",
+      "id": 7892740,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 49,
+    "blob_id": "9483241717952d61c5debdc99cc418e916bb13af",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/d4c135ccd9e66ab113fc1ddd1ad1d32c6413393f/rnn/dynamic_rnn/op_kernel/LstmFP32.cpp",
+    "deletions": 17,
+    "filename": "rnn/dynamic_rnn/op_kernel/LstmFP32.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 49,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -121,6 +121,21 @@ __aicore__ inline void LstmMmSplitNDNDFP32<T>::CopyWithTanh(\n     this->qidVecIn.FreeTensor(ubLocalIn);\n }\n \n+template <typename T>\n+__aicore__ inline void LstmMmSplitNDNDFP32<T>::CopyWithTanhHighPrecision(\n+    LocalTensor<T> &dstUb, GlobalTensor<T> &mixGm, int64_t mIdx, int64_t nIdx, int64_t gateOffset,\n+    LocalTensor<T> &temp1, LocalTensor<T> &temp2, int64_t calcSizeAlign)\n+{\n+    LocalTensor<T> ubLocalIn = this->qidVecIn.template AllocTensor<T>();\n+    this->CopyGate(ubLocalIn, mixGm, mIdx, nIdx, gateOffset);\n+    ubLocalIn = this->qidVecIn.template DeQue<T>();\n+    Tanh(dstUb, ubLocalIn, this->calcSizeAlign);\n+    PipeBarrier<PIPE_V>();\n+    this->TanhPartialHighPrecision(ubLocalIn, dstUb, temp1, temp2, calcSizeAlign);\n+    PipeBarrier<PIPE_V>();\n+    this->qidVecIn.FreeTensor(ubLocalIn);\n+}\n+\n template <typename T>\n __aicore__ inline void LstmMmSplitNDNDFP32<T>::CopyWithMul(\n     LocalTensor<T> &dstUb, LocalTensor<T> &other, GlobalTensor<T> &mixGm, int64_t mIdx, int64_t nIdx)\n@@ -297,6 +312,15 @@ __aicore__ inline void LstmMmSplitNDNDFP32<T>::ProcessVectorOnce(\n     auto cTmp1 = this->ubLocal2;\n     CopyWithMul(cTmp1, fSigmoid, this->inputGm.initCGm, mIdx, nIdx);\n     PipeBarrier<PIPE_V>();\n+\n+    // j [1] [2] 3 4 -> [1] [2] [3] 4\n+    auto jTanh = this->ubLocal3;\n+    CopyWithTanhHighPrecision(jTanh, mixGm, mIdx, nIdx, this->jOffset, this->ubLocal1, this->ubLocal4, this->calcSizeAlign);\n+    if (this->tiling->isTraining == 1) {\n+        CopyOutput(this->outputGm.outJGm, jTanh, tIdx, mIdx, nIdx);\n+    }\n+    PipeBarrier<PIPE_V>();\n+\n     // i 1 [2] 3 4 -> [1] [2] 3 4\n     auto iSigmoid = this->ubLocal1;\n     CopyWithSigmoid(iSigmoid, mixGm, mIdx, nIdx, this->iOffset);\n@@ -304,13 +328,7 @@ __aicore__ inline void LstmMmSplitNDNDFP32<T>::ProcessVectorOnce(\n         CopyOutput(this->outputGm.outIGm, iSigmoid, tIdx, mIdx, nIdx);\n     }\n     PipeBarrier<PIPE_V>();\n-    // j [1] [2] 3 4 -> [1] [2] [3] 4\n-    auto jTanh = this->ubLocal3;\n-    CopyWithTanh(jTanh, mixGm, mIdx, nIdx, this->jOffset);\n-    if (this->tiling->isTraining == 1) {\n-        CopyOutput(this->outputGm.outJGm, jTanh, tIdx, mIdx, nIdx);\n-    }\n-    PipeBarrier<PIPE_V>();\n+\n     // i * j [1] [2] [3] 4 -> 1 [2] 3 [4]\n     auto cTmp2 = this->ubLocal4;\n     Mul(cTmp2, jTanh, iSigmoid, this->calcSizeAlign);\n@@ -324,11 +342,15 @@ __aicore__ inline void LstmMmSplitNDNDFP32<T>::ProcessVectorOnce(\n         auto initC = this->ubLocal2;\n         auto seqLength = this->ubLocal4;\n         CopyInHC(initC, this->inputGm.initCGm, 0, mIdx, nIdx);\n-        Sub(updateC, updateC, initC, this->calcSizeAlign);\n-        PipeBarrier<PIPE_V>();\n         CopyInSeq(seqLength, this->inputGm.seqLengthGm, tIdx, mIdx, nIdx);\n         Mul(updateC, updateC, seqLength, this->calcSizeAlign);\n         PipeBarrier<PIPE_V>();\n+        Muls(seqLength, seqLength, (T)-1.0f, this->calcSizeAlign);\n+        PipeBarrier<PIPE_V>();\n+        Adds(seqLength, seqLength, (T)1.0f, this->calcSizeAlign);\n+        PipeBarrier<PIPE_V>();\n+        Mul(initC, initC, seqLength, this->calcSizeAlign);\n+        PipeBarrier<PIPE_V>();\n         Add(updateC, updateC, initC, this->calcSizeAlign);\n         PipeBarrier<PIPE_V>();\n     }\n@@ -343,7 +365,10 @@ __aicore__ inline void LstmMmSplitNDNDFP32<T>::ProcessVectorOnce(\n \n     // tanh(c) 1 [2] 3 4 -> 1 [2] 3 4\n     auto cTanh = this->ubLocal2;\n-    Tanh(cTanh, updateC, this->calcSizeAlign);\n+    Tanh(cTanh, updateC, this->calcSizeAlign);  // 这里只有u3可用，还差1块UB，暂且从qidVecIn中取\n+    LocalTensor<T> temp2Tensor = this->qidVecIn.template AllocTensor<T>();\n+    this->TanhPartialHighPrecision(updateC, cTanh, this->ubLocal3, temp2Tensor, this->calcSizeAlign);\n+    this->qidVecIn.FreeTensor(temp2Tensor);\n     if (this->tiling->isTraining == 1) {\n         CopyOutput(this->outputGm.outTanhCGm, cTanh, tIdx, mIdx, nIdx);\n     }\n@@ -365,14 +390,18 @@ __aicore__ inline void LstmMmSplitNDNDFP32<T>::ProcessVectorOnce(\n         auto updateY = this->ubLocal1;\n         auto initH = this->ubLocal2;\n         auto seqLength = this->ubLocal4;\n+        // 现在是反转的mask，先拿到增量initH\n+        CopyInHC(initH, this->inputGm.initHGm, 0, mIdx, nIdx);\n+        Mul(initH, initH, seqLength, this->calcSizeAlign);\n+        PipeBarrier<PIPE_V>();\n+        // 反转恢复\n+        Muls(seqLength, seqLength, (T)-1.0f, this->calcSizeAlign);\n+        PipeBarrier<PIPE_V>();\n+        Adds(seqLength, seqLength, (T)1.0f, this->calcSizeAlign);\n+        PipeBarrier<PIPE_V>();\n         Mul(updateY, updateH, seqLength, this->calcSizeAlign);\n         PipeBarrier<PIPE_V>();\n-        CopyInHC(initH, this->inputGm.initHGm, 0, mIdx, nIdx);\n-        Sub(updateH, updateH, initH, this->calcSizeAlign);\n-        PipeBarrier<PIPE_V>();\n-        Mul(updateH, updateH, seqLength, this->calcSizeAlign);\n-        PipeBarrier<PIPE_V>();\n-        Add(updateH, updateH, initH, this->calcSizeAlign);\n+        Add(updateH, updateY, initH, this->calcSizeAlign);\n         CopyOutput(this->outputGm.outYGm, updateY, tIdx, mIdx, nIdx);\n     } else {\n         CopyOutput(this->outputGm.outYGm, updateH, tIdx, mIdx, nIdx);\n@@ -430,7 +459,7 @@ __aicore__ inline void LstmMmSplitNDNDFP32<T>::ProcessVectorInitHC(int64_t mIdx,\n \n     // j [1] [2] 3 4 -> [1] [2] [3] 4\n     auto jTanh = this->ubLocal3;\n-    this->CopyWithTanh(jTanh, mixGm, mIdx, nIdx, this->jOffset);\n+    CopyWithTanhHighPrecision(jTanh, mixGm, mIdx, nIdx, this->jOffset, this->ubLocal2, this->ubLocal4, this->calcSizeAlign);\n     if (this->tiling->isTraining == 1) {\n         this->CopyOutput(this->outputGm.outJGm, jTanh, 0, mIdx, nIdx);\n     }\n@@ -462,6 +491,9 @@ __aicore__ inline void LstmMmSplitNDNDFP32<T>::ProcessVectorInitHC(int64_t mIdx,\n     // tanh(c) 1 [2] 3 4 -> 1 [2] 3 4\n     auto cTanh = this->ubLocal2;\n     Tanh(cTanh, updateC, this->calcSizeAlign);\n+    LocalTensor<T> temp2Tensor = this->qidVecIn.template AllocTensor<T>();\n+    this->TanhPartialHighPrecision(updateC, cTanh, this->ubLocal1, temp2Tensor, this->calcSizeAlign);  // u1 + qidVecIn\n+    this->qidVecIn.FreeTensor(temp2Tensor);\n     if (this->tiling->isTraining == 1) {\n         this->CopyOutput(this->outputGm.outTanhCGm, cTanh, 0, mIdx, nIdx);\n     }\n",
+      "new_file": false,
+      "new_path": "rnn/dynamic_rnn/op_kernel/LstmFP32.cpp",
+      "old_path": "rnn/dynamic_rnn/op_kernel/LstmFP32.cpp",
+      "removed_lines": 17,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/d4c135ccd9e66ab113fc1ddd1ad1d32c6413393f/rnn/dynamic_rnn/op_kernel/LstmFP32.cpp",
+    "sha": "d4c135ccd9e66ab113fc1ddd1ad1d32c6413393f",
+    "source_branch": "test",
+    "source_project": {
+      "full_name": "jisihuai/ops-nn",
+      "human_name": "jisihuai / ops-nn",
+      "id": 7892740,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 3,
+    "blob_id": "2c68bed292bc3910bbffc36ebe939d12d6d11094",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/d4c135ccd9e66ab113fc1ddd1ad1d32c6413393f/rnn/dynamic_rnn/op_kernel/LstmFP32.h",
+    "deletions": 0,
+    "filename": "rnn/dynamic_rnn/op_kernel/LstmFP32.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 3,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -46,6 +46,9 @@ protected:\n         AscendC::LocalTensor<T> &dstUb, AscendC::GlobalTensor<T> &mixGm, int64_t tIdx, int64_t mIdx, int64_t nIdx);\n     __aicore__ inline void CopyOutput(\n         AscendC::GlobalTensor<T> &gm, AscendC::LocalTensor<T> &ub, int64_t tIdx, int64_t mIdx, int64_t nIdx);\n+    __aicore__ inline void CopyWithTanhHighPrecision(\n+        LocalTensor<T> &dstUb, GlobalTensor<T> &mixGm, int64_t mIdx, int64_t nIdx, int64_t gateOffset,\n+        LocalTensor<T> &temp1, LocalTensor<T> &temp2, int64_t calcSizeAlign);\n \n public:\n     // describe Matmul input/output dtype&format\n",
+      "new_file": false,
+      "new_path": "rnn/dynamic_rnn/op_kernel/LstmFP32.h",
+      "old_path": "rnn/dynamic_rnn/op_kernel/LstmFP32.h",
+      "removed_lines": 0,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/d4c135ccd9e66ab113fc1ddd1ad1d32c6413393f/rnn/dynamic_rnn/op_kernel/LstmFP32.h",
+    "sha": "d4c135ccd9e66ab113fc1ddd1ad1d32c6413393f",
+    "source_branch": "test",
+    "source_project": {
+      "full_name": "jisihuai/ops-nn",
+      "human_name": "jisihuai / ops-nn",
+      "id": 7892740,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 48,
+    "blob_id": "b4cbf6dffe2f98ae2227506894433aad71d4dba7",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/d4c135ccd9e66ab113fc1ddd1ad1d32c6413393f/rnn/dynamic_rnn/op_kernel/dynamic_rnn_common.h",
+    "deletions": 0,
+    "filename": "rnn/dynamic_rnn/op_kernel/dynamic_rnn_common.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 48,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -20,6 +20,7 @@\n \n constexpr int64_t LSTM_GATE_SIZE = 4;\n constexpr int64_t DEFAULT_QUEUE_BUFFE_SIZE = 2;\n+constexpr int64_t SIZE_256 = 256;\n \n __aicore__ inline int Ceil(int a, int b) {\n   if (b == 0) {\n@@ -145,6 +146,12 @@ class LstmMmSplitNDNDBase {\n                         GM_ADDR outputJ, GM_ADDR outputF, GM_ADDR outputO, GM_ADDR outputTanhC,\n                         const DynamicRNNTilingData* __restrict rnnTiling, GM_ADDR workspace);\n   __aicore__ inline int64_t Ceil(int64_t x, int64_t y);\n+  __aicore__ inline void TanhPartialHighPrecision(\n+      LocalTensor<float>& inputTensor,\n+      LocalTensor<float>& tanhLowTensor,\n+      LocalTensor<float>& temp1Tensor,\n+      LocalTensor<float>& temp2Tensor,\n+      int64_t calcSizeAlign);\n   AscendC::TPipe pipe;\n   // output GlobalTensors\n   struct OutputGm {\n@@ -482,4 +489,45 @@ __aicore__ inline int64_t LstmMmSplitNDNDBase<T>::Ceil(int64_t x, int64_t y) {\n   }\n   return (x + y - 1) / y;\n }\n+\n+template <typename T>\n+__aicore__ inline void LstmMmSplitNDNDBase<T>::TanhPartialHighPrecision(\n+  LocalTensor<float>& inputTensor,\n+  LocalTensor<float>& tanhLowTensor,\n+  LocalTensor<float>& temp1Tensor,\n+  LocalTensor<float>& temp2Tensor,\n+  int64_t calcSizeAlign)\n+{\n+  // temp1Tensor: x^2, temp2Tensor: tanh(x)\n+  Mul(temp1Tensor, inputTensor, inputTensor, calcSizeAlign);\n+  PipeBarrier<PIPE_V>();\n+  Muls(temp2Tensor, temp1Tensor, 0.016090461204f, calcSizeAlign);  // Tanh多项式系数\n+  PipeBarrier<PIPE_V>();\n+  Adds(temp2Tensor, temp2Tensor, -0.052421370438f, calcSizeAlign);  // Tanh多项式系数\n+  PipeBarrier<PIPE_V>();\n+  Mul(temp2Tensor, temp2Tensor, temp1Tensor, calcSizeAlign);\n+  PipeBarrier<PIPE_V>();\n+  Adds(temp2Tensor, temp2Tensor, 0.133147126779f, calcSizeAlign);  // Tanh多项式系数\n+  PipeBarrier<PIPE_V>();\n+  Mul(temp2Tensor, temp2Tensor, temp1Tensor, calcSizeAlign);\n+  PipeBarrier<PIPE_V>();\n+  Adds(temp2Tensor, temp2Tensor, -0.333324134737f, calcSizeAlign);  // Tanh多项式系数\n+  PipeBarrier<PIPE_V>();\n+  Mul(temp2Tensor, temp2Tensor, temp1Tensor, calcSizeAlign);\n+  PipeBarrier<PIPE_V>();\n+  Adds(temp2Tensor, temp2Tensor, 0.999999873294f, calcSizeAlign);  // Tanh多项式系数\n+  PipeBarrier<PIPE_V>();\n+  Mul(temp2Tensor, temp2Tensor, inputTensor, calcSizeAlign);\n+  PipeBarrier<PIPE_V>();\n+  // temp1Tensor: abs(x)\n+  Abs(temp1Tensor, inputTensor, calcSizeAlign);\n+  PipeBarrier<PIPE_V>();\n+  // tanhMaskTensor: mask for abs(x) <= 0.55, inplace\n+  auto tanhMaskTensor = temp1Tensor.template ReinterpretCast<uint8_t>();\n+  int64_t cnt256B = SIZE_256 / sizeof(float);\n+  CompareScalar(tanhMaskTensor, temp1Tensor, 0.55f, CMPMODE::LE, Ceil(calcSizeAlign, cnt256B) * cnt256B);  // Tanh多项式实现范围\n+  PipeBarrier<PIPE_V>();\n+  // pick higher result into tanhLowTensor\n+  Select(tanhLowTensor, tanhMaskTensor, temp2Tensor, tanhLowTensor, SELMODE::VSEL_TENSOR_TENSOR_MODE, calcSizeAlign);\n+}\n #endif\n",
+      "new_file": false,
+      "new_path": "rnn/dynamic_rnn/op_kernel/dynamic_rnn_common.h",
+      "old_path": "rnn/dynamic_rnn/op_kernel/dynamic_rnn_common.h",
+      "removed_lines": 0,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/d4c135ccd9e66ab113fc1ddd1ad1d32c6413393f/rnn/dynamic_rnn/op_kernel/dynamic_rnn_common.h",
+    "sha": "d4c135ccd9e66ab113fc1ddd1ad1d32c6413393f",
+    "source_branch": "test",
+    "source_project": {
+      "full_name": "jisihuai/ops-nn",
+      "human_name": "jisihuai / ops-nn",
+      "id": 7892740,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 12,
+    "blob_id": "0684e7ee243abd15d4528c934f63004bbc48c8bf",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/d4c135ccd9e66ab113fc1ddd1ad1d32c6413393f/rnn/dynamic_rnn/tests/ut/op_host/test_aclnn_dynamic_rnn.cpp",
+    "deletions": 2,
+    "filename": "rnn/dynamic_rnn/tests/ut/op_host/test_aclnn_dynamic_rnn.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 12,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -60,6 +60,7 @@ TEST_F(l2_dynamic_rnn_test, ascend910B_test_dynamic_rnn_params_dim_invalid)\n     vector<int64_t> whDim = {4 * hidden_size, hidden_size};\n     vector<int64_t> bDim = {4 * hidden_size};\n     vector<int64_t> outDim = {time_step, batch_size, d_scale * hidden_size};\n+    vector<int64_t> hycyDim = {d_scale * numLayers, batch_size, hidden_size};\n     vector<int64_t> outHDim = {time_step, batch_size,  hidden_size};\n     \n \n@@ -72,6 +73,10 @@ TEST_F(l2_dynamic_rnn_test, ascend910B_test_dynamic_rnn_params_dim_invalid)\n \n     auto output = TensorDesc(outDim, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(-1, 1);\n \n+    auto hy = TensorDesc(hycyDim, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(-1, 1);\n+\n+    auto cy = TensorDesc(hycyDim, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(-1, 1);\n+\n     auto outIForward = TensorDesc(outHDim, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(-1, 1);\n     auto outIBackward = TensorDesc(outHDim, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(-1, 1);\n     auto outputI = TensorListDesc({outIForward, outIBackward});\n@@ -106,7 +111,7 @@ TEST_F(l2_dynamic_rnn_test, ascend910B_test_dynamic_rnn_params_dim_invalid)\n     auto ut = OP_API_UT(\n         aclnnLSTM, // host api第二段接口名称\n         INPUT( input, params, hx_desc, batchSizes, has_biases, numLayers, 0.0, isTraining, bidirectionl, batchFirst), // host api输入\n-        OUTPUT(output, outputI, outputJ, outputF, outputO, outputH, outputC, outputTanhC));\n+        OUTPUT(output, hy, cy, outputI, outputJ, outputF, outputO, outputH, outputC, outputTanhC));\n     // SAMPLE: only test GetWorkspaceSize\n     uint64_t workspace_size = 0;\n     aclnnStatus aclRet = ut.TestGetWorkspaceSize(&workspace_size); \n@@ -132,6 +137,7 @@ TEST_F(l2_dynamic_rnn_test, ascend910B_test_dynamic_rnn_params_shape_invalid)\n     vector<int64_t> whDim = {4 * hidden_size, hidden_size};\n     vector<int64_t> bDim = {3 * hidden_size};\n     vector<int64_t> outDim = {time_step, batch_size, d_scale * hidden_size};\n+    vector<int64_t> hycyDim = {d_scale * numLayers, batch_size, hidden_size};\n     vector<int64_t> outHDim = {time_step, batch_size,  hidden_size};\n     \n \n@@ -144,6 +150,10 @@ TEST_F(l2_dynamic_rnn_test, ascend910B_test_dynamic_rnn_params_shape_invalid)\n \n     auto output = TensorDesc(outDim, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(-1, 1);\n \n+    auto hy = TensorDesc(hycyDim, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(-1, 1);\n+\n+    auto cy = TensorDesc(hycyDim, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(-1, 1);\n+\n     auto outIForward = TensorDesc(outHDim, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(-1, 1);\n     auto outputI = TensorListDesc({outIForward});\n \n@@ -171,7 +181,7 @@ TEST_F(l2_dynamic_rnn_test, ascend910B_test_dynamic_rnn_params_shape_invalid)\n     auto ut = OP_API_UT(\n         aclnnLSTM, // host api第二段接口名称\n         INPUT( input, params, hx_desc, batchSizes, has_biases, numLayers, 0.0, isTraining, bidirectionl, batchFirst), // host api输入\n-        OUTPUT(output, outputI, outputJ, outputF, outputO, outputH, outputC, outputTanhC));\n+        OUTPUT(output, hy, cy, outputI, outputJ, outputF, outputO, outputH, outputC, outputTanhC));\n     // SAMPLE: only test GetWorkspaceSize\n     uint64_t workspace_size = 0;\n     aclnnStatus aclRet = ut.TestGetWorkspaceSize(&workspace_size); \n",
+      "new_file": false,
+      "new_path": "rnn/dynamic_rnn/tests/ut/op_host/test_aclnn_dynamic_rnn.cpp",
+      "old_path": "rnn/dynamic_rnn/tests/ut/op_host/test_aclnn_dynamic_rnn.cpp",
+      "removed_lines": 2,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/d4c135ccd9e66ab113fc1ddd1ad1d32c6413393f/rnn/dynamic_rnn/tests/ut/op_host/test_aclnn_dynamic_rnn.cpp",
+    "sha": "d4c135ccd9e66ab113fc1ddd1ad1d32c6413393f",
+    "source_branch": "test",
+    "source_project": {
+      "full_name": "jisihuai/ops-nn",
+      "human_name": "jisihuai / ops-nn",
+      "id": 7892740,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  }
+]

@@ -1,0 +1,80 @@
+{
+  "assignee": {
+    "html_url": "https://gitcode.com/xuchengyang",
+    "id": "68848b8fdea8931fab644a1b",
+    "login": "xuchengyang",
+    "name": "xuchengyang",
+    "object_id": "68848b8fdea8931fab644a1b"
+  },
+  "assignees": [
+    {
+      "html_url": "https://gitcode.com/xuchengyang",
+      "id": "68848b8fdea8931fab644a1b",
+      "login": "xuchengyang",
+      "name": "xuchengyang",
+      "object_id": "68848b8fdea8931fab644a1b"
+    }
+  ],
+  "body": "\n\nThanks for sending an issue! Please fill in the following template to help quickly solve your problem.\n\n### Describe the current behavior / 问题描述 (Mandatory / 必填)\n            \nBSAG算子精度出现精度问题。\n### Environment / 环境信息 (Mandatory / 必填)\n            \n950\n### Steps to reproduce the issue / 重现步骤 (Mandatory / 必填)\n            \nBNSD : 1, 1, 3571, 128\n### Describe the expected behavior / 预期结果 (Mandatory / 必填)\n            \n精度正常\n### Related log / screenshot / 日志 / 截图 (Mandatory / 必填)\n            \n在计算tail块时未考虑尾块为0的情况，出现该精度问题。\n\n```\n        uint32_t tail = info.len % max_process_size;\n        // 由于DataCopyPad最多处理65535，因此tail部分分成align_tail和pad_tail计算\n        info.align_tail = tail / 16 * 16;\n        info.pad_tail = tail - info.align_tail;\n        if (tail == 0) {\n            info.align_tail = max_process_size;\n            info.pad_tail = 0;\n        }\n```\n### Special notes for this issue/备注 (Optional / 选填)\n            \n\n",
+  "comments": 0,
+  "created_at": "2026-06-25T11:08:17+08:00",
+  "finished_at": "2026-06-27T14:21:17+08:00",
+  "html_url": "https://gitcode.com/cann/ops-transformer/issues/3308",
+  "id": 4115579,
+  "issue_priority_detail": {
+    "id": 116,
+    "title": "无优先级"
+  },
+  "issue_state": "进行中",
+  "issue_state_detail": {
+    "id": 285,
+    "serial": 0,
+    "title": "进行中"
+  },
+  "issue_type": "任务",
+  "issue_type_detail": {
+    "id": 255,
+    "is_system": false,
+    "title": "任务"
+  },
+  "labels": [
+    {
+      "color": "#DB2828",
+      "created_at": "2025-06-10T14:17:23+08:00",
+      "id": 3870,
+      "name": "bug-report",
+      "updated_at": "2026-06-25T11:08:18+08:00"
+    },
+    {
+      "color": "#35e029",
+      "created_at": "2026-03-20T11:25:13+08:00",
+      "id": 38861,
+      "name": "resolved",
+      "updated_at": "2026-06-27T14:25:24+08:00"
+    }
+  ],
+  "number": "3308",
+  "priority": 0,
+  "repository": {
+    "assigner": {},
+    "created_at": "2025-09-28T17:54:46+08:00",
+    "description": "本项目是CANN提供的transformer类大模型算子库，实现网络在NPU上加速计算。",
+    "full_name": "cann/ops-transformer",
+    "id": 7673863,
+    "name": "ops-transformer",
+    "paas": "",
+    "path": "ops-transformer",
+    "updated_at": "2025-09-28T18:06:48+08:00"
+  },
+  "state": "closed",
+  "title": "[Bug-Report|缺陷反馈]: 【BSAG算子】部分场景出现精度问题",
+  "updated_at": "2026-06-27T14:21:17+08:00",
+  "user": {
+    "html_url": "https://gitcode.com/xuchengyang",
+    "id": "68848b8fdea8931fab644a1b",
+    "login": "xuchengyang",
+    "name": "xuchengyang",
+    "object_id": "68848b8fdea8931fab644a1b"
+  },
+  "visibility_reason": "public"
+}

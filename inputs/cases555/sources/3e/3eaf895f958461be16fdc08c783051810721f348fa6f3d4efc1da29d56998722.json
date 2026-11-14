@@ -1,0 +1,218 @@
+[
+  {
+    "additions": 2,
+    "blob_id": "2a3e72e78fa049ce221bf50c684122bf3f36024a",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/87321c5282b334dfc85e012033c8425a327b8e7b/attention/lightning_indexer_grad/op_host/lightning_indexer_grad_tiling.cpp",
+    "deletions": 3,
+    "filename": "attention/lightning_indexer_grad/op_host/lightning_indexer_grad_tiling.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 2,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -107,7 +107,7 @@ ge::graphStatus LightningIndexerGradTiling::DoTiling()\n         OP_LOGE(context_, \"only support layout is BSND and TND.\\n\", opParamInfo.layout);\n         return ge::GRAPH_FAILED; \n     }\n-    uint32_t dkCoreSize =  seqlenK * headDim;\n+    uint32_t dkCoreSize = batch * seqlenK * headDim;\n \n     // check headDim, groupNum, headNumK\n     OP_CHECK_IF((headDim != MAX_HEADIM) || (groupNum != MAX_GROUPNUM) || (headNumK != LIMIT_HEADNUMK),\n@@ -127,7 +127,6 @@ ge::graphStatus LightningIndexerGradTiling::DoTiling()\n     tilingData_->set_topK(topK);\n     tilingData_->set_usedCoreNum(blockDim * 2);\n     tilingData_->set_dkSize(dkSize);\n-    tilingData_->set_dkCoreSize(dkCoreSize);\n     tilingData_->set_sparseMode(static_cast<uint64_t>(opParamInfo.sparseMode));\n     tilingData_->set_deterministic(static_cast<uint64_t>(opParamInfo.deterministic));\n \n@@ -136,7 +135,7 @@ ge::graphStatus LightningIndexerGradTiling::DoTiling()\n     workspaceOffset = (workspaceOffset + dkSize * sizeof(float) + GM_ALIGN) / GM_ALIGN * GM_ALIGN;\n \n     tilingData_->set_dkCoreWorkspaceOffset(workspaceOffset);\n-    workspaceOffset = (workspaceOffset + aicNum * dkCoreSize * sizeof(float) + GM_ALIGN) / GM_ALIGN * GM_ALIGN;\n+    workspaceOffset = (workspaceOffset + aivNum * dkCoreSize * sizeof(float) + GM_ALIGN) / GM_ALIGN * GM_ALIGN;\n \n     uint64_t keyGatherWorkspaceSize = MAX_HEADIM * MAX_TOPK * sizeof(uint16_t) * DOUBLE_BUFFER;\n     tilingData_->set_keyGatherWorkspaceOffset(workspaceOffset);\n",
+      "new_file": false,
+      "new_path": "attention/lightning_indexer_grad/op_host/lightning_indexer_grad_tiling.cpp",
+      "old_path": "attention/lightning_indexer_grad/op_host/lightning_indexer_grad_tiling.cpp",
+      "removed_lines": 3,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/87321c5282b334dfc85e012033c8425a327b8e7b/attention/lightning_indexer_grad/op_host/lightning_indexer_grad_tiling.cpp",
+    "sha": "87321c5282b334dfc85e012033c8425a327b8e7b",
+    "source_branch": "bugfix399",
+    "source_project": {
+      "full_name": "DaiHuina1/ops-transformer",
+      "human_name": "DaiHuina1 / ops-transformer",
+      "id": 7689569,
+      "path": "ops-transformer"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  },
+  {
+    "additions": 0,
+    "blob_id": "645c506e3d5ebc970b4b6d358d9b6395fc5b3bdb",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/87321c5282b334dfc85e012033c8425a327b8e7b/attention/lightning_indexer_grad/op_kernel/lightning_indexer_grad_common.h",
+    "deletions": 1,
+    "filename": "attention/lightning_indexer_grad/op_kernel/lightning_indexer_grad_common.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 0,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -48,7 +48,6 @@ struct ConstInfo {\n     uint32_t topK;\n     uint32_t usedCoreNum;\n     int64_t dkSize;\n-    int64_t dkCoreSize;\n     int64_t dkWorkSpaceOffset;\n     int64_t dkCoreWorkspaceOffset;\n     int64_t keyGatherWorkspaceOffset;\n",
+      "new_file": false,
+      "new_path": "attention/lightning_indexer_grad/op_kernel/lightning_indexer_grad_common.h",
+      "old_path": "attention/lightning_indexer_grad/op_kernel/lightning_indexer_grad_common.h",
+      "removed_lines": 1,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/87321c5282b334dfc85e012033c8425a327b8e7b/attention/lightning_indexer_grad/op_kernel/lightning_indexer_grad_common.h",
+    "sha": "87321c5282b334dfc85e012033c8425a327b8e7b",
+    "source_branch": "bugfix399",
+    "source_project": {
+      "full_name": "DaiHuina1/ops-transformer",
+      "human_name": "DaiHuina1 / ops-transformer",
+      "id": 7689569,
+      "path": "ops-transformer"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  },
+  {
+    "additions": 5,
+    "blob_id": "0617f10a0d4497cce6c29fdd8490bc5430fb4da1",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/87321c5282b334dfc85e012033c8425a327b8e7b/attention/lightning_indexer_grad/op_kernel/lightning_indexer_grad_kernel.h",
+    "deletions": 5,
+    "filename": "attention/lightning_indexer_grad/op_kernel/lightning_indexer_grad_kernel.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 5,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -147,7 +147,6 @@ __aicore__ inline void LIGKernel<LIGT>::InitTilingData(const LIGTilingData *__re\n     constInfo.topK = tilingData->topK;\n     constInfo.usedCoreNum = tilingData->usedCoreNum;\n     constInfo.dkSize = tilingData->dkSize;\n-    constInfo.dkCoreSize = tilingData->dkCoreSize;\n     constInfo.dkWorkSpaceOffset = tilingData->dkWorkSpaceOffset;\n     constInfo.dkCoreWorkspaceOffset = tilingData->dkCoreWorkspaceOffset;\n     constInfo.keyGatherWorkspaceOffset = tilingData->keyGatherWorkspaceOffset;\n@@ -214,6 +213,7 @@ __aicore__ inline void LIGKernel<LIGT>::InitRunInfo(uint64_t bIndex, const CoreS\n     if constexpr (LIGT::layout == LIG_LAYOUT::BSND) {\n         runInfo.n2Idx = split.beginPos % constInfo.headNumK;\n         runInfo.s1Idx = (split.beginPos / constInfo.headNumK) % constInfo.seqlenQ;\n+        // runInfo.bIdx = split.beginPos / (constInfo.seqlenQ * constInfo.headNumK);\n         runInfo.actualSeqQ = constInfo.seqlenQ;\n         runInfo.actualSeqK = constInfo.seqlenK;\n         runInfo.prefixSumS1 = 0;\n@@ -444,12 +444,12 @@ __aicore__ inline void LIGKernel<LIGT>::ProcessVec3(uint64_t taskId)\n     scatterAddGm = (taskId & 1) ? scatterAddPingGm : scatterAddPongGm;\n     AscendC::WaitEvent(SYNC_C2_V3_FLAG);\n     if (runInfoStore[taskId].realTopk > 0) {\n-        vectorService.ScatterAdd(sparseIndicesGm, scatterAddGm, dkCoreWorkspaceGM, constInfo, runInfoStore[taskId]);\n+        vectorService.ScatterAdd(sparseIndicesGm, scatterAddGm, dkCoreWorkspaceGM, constInfo, runInfoStore[taskId]); // AIV 1-47\n         if (unlikely(constInfo.deterministic)) {\n             SyncAll();\n-            vectorService.DeterministicMerge(dkCoreWorkspaceGM, dkWorkSpaceGm, constInfo, runInfoStore[taskId]);\n+            vectorService.DeterministicMerge(dkCoreWorkspaceGM,dkWorkSpaceGm, constInfo, runInfoStore[taskId]);\n             SyncAll();\n-            InitOutput(dkCoreWorkspaceGM[GetBlockIdx() * constInfo.dkCoreSize / 2], constInfo.dkCoreSize / 2, 0);\n+            InitOutput<float>(dkCoreWorkspaceGM[GetBlockIdx() / 2 * constInfo.dkSize], constInfo.dkSize, 0);\n         }\n     }\n }\n@@ -598,7 +598,7 @@ __aicore__ inline void LIGKernel<LIGT>::Process()\n                 SyncAll();\n                 vectorService.DeterministicMerge(dkCoreWorkspaceGM, dkWorkSpaceGm, constInfo, runInfoStore[(runInfo.loopTimes - 1) % 4]);\n                 SyncAll();\n-                InitOutput(dkCoreWorkspaceGM[GetBlockIdx() * constInfo.dkCoreSize / 2], constInfo.dkCoreSize / 2, 0);\n+                InitOutput<float>(dkCoreWorkspaceGM[GetBlockIdx() / 2 * constInfo.dkSize], constInfo.dkSize, 0);\n             }\n         }\n \n",
+      "new_file": false,
+      "new_path": "attention/lightning_indexer_grad/op_kernel/lightning_indexer_grad_kernel.h",
+      "old_path": "attention/lightning_indexer_grad/op_kernel/lightning_indexer_grad_kernel.h",
+      "removed_lines": 5,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/87321c5282b334dfc85e012033c8425a327b8e7b/attention/lightning_indexer_grad/op_kernel/lightning_indexer_grad_kernel.h",
+    "sha": "87321c5282b334dfc85e012033c8425a327b8e7b",
+    "source_branch": "bugfix399",
+    "source_project": {
+      "full_name": "DaiHuina1/ops-transformer",
+      "human_name": "DaiHuina1 / ops-transformer",
+      "id": 7689569,
+      "path": "ops-transformer"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  },
+  {
+    "additions": 1,
+    "blob_id": "392724422551baa205d34b2aca5647909f6d9ba2",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/87321c5282b334dfc85e012033c8425a327b8e7b/attention/lightning_indexer_grad/op_kernel/lightning_indexer_grad_kernel_pre.h",
+    "deletions": 1,
+    "filename": "attention/lightning_indexer_grad/op_kernel/lightning_indexer_grad_kernel_pre.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 1,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -83,7 +83,7 @@ __aicore__ inline void LIGVectorPre<LIGT>::Process()\n         InitOutput<float>(dkWorkSpaceGm[dkOffset], initdkSize, 0);\n     }\n     if (tilingData->deterministic && g_coreType == AIV && cBlockIdx < tilingData->usedCoreNum) {\n-        uint32_t perCoreSize = tilingData->dkCoreSize / 2;\n+        uint32_t perCoreSize = tilingData->dkSize / tilingData->batch;\n         uint64_t offset = (uint64_t)cBlockIdx * perCoreSize;\n         InitOutput<float>(dkCoreWorkspaceGM[offset], perCoreSize, 0);\n     }\n",
+      "new_file": false,
+      "new_path": "attention/lightning_indexer_grad/op_kernel/lightning_indexer_grad_kernel_pre.h",
+      "old_path": "attention/lightning_indexer_grad/op_kernel/lightning_indexer_grad_kernel_pre.h",
+      "removed_lines": 1,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/87321c5282b334dfc85e012033c8425a327b8e7b/attention/lightning_indexer_grad/op_kernel/lightning_indexer_grad_kernel_pre.h",
+    "sha": "87321c5282b334dfc85e012033c8425a327b8e7b",
+    "source_branch": "bugfix399",
+    "source_project": {
+      "full_name": "DaiHuina1/ops-transformer",
+      "human_name": "DaiHuina1 / ops-transformer",
+      "id": 7689569,
+      "path": "ops-transformer"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  },
+  {
+    "additions": 39,
+    "blob_id": "5d5d7f3cc1474c359980f6dc8ef453490f3a019c",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/87321c5282b334dfc85e012033c8425a327b8e7b/attention/lightning_indexer_grad/op_kernel/lightning_indexer_grad_service_vector.h",
+    "deletions": 48,
+    "filename": "attention/lightning_indexer_grad/op_kernel/lightning_indexer_grad_service_vector.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 39,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -102,8 +102,6 @@ protected:\n     constexpr static int64_t reduceUbOffset = reduceFloatUbOffset + reduceFloatUbSize;\n     constexpr static int64_t reduceUbSize = LIMIT_GROUPNUM * 2;\n \n-    constexpr static int64_t MAX_DETERMINISTIC_SIZE = TOTAL_SIZE / sizeof(float) / 2;\n-\n     TPipe *pipe;\n     TBuf<> unifiedBuffer;\n \n@@ -307,60 +305,53 @@ __aicore__ inline void LIGVector<LIGT>::ScatterAdd(GlobalTensor<int32_t> sparseI\n }\n \n template <typename LIGT>\n-__aicore__ inline void LIGVector<LIGT>::DeterministicMerge(GlobalTensor<float> dkCoreWorkspaceGM,GlobalTensor<float> dkWorkSpaceGm,\n-\tconst LIGCommon::ConstInfo &constInfo, const LIGCommon::RunInfo &runInfo)\n+__aicore__ inline void LIGVector<LIGT>::DeterministicMerge(GlobalTensor<float> dkCoreWorkspaceGM, GlobalTensor<float> dkWorkSpaceGm,\n+    const LIGCommon::ConstInfo &constInfo, const LIGCommon::RunInfo &runInfo)\n {\n     uint64_t determinLen = constInfo.determinLen;\n     uint64_t determinBeginPos = constInfo.determinBeginPos;\n     if (determinLen <= 0) {\n         return;\n     }\n-\n-    uint64_t TILE_ROWS = MAX_DETERMINISTIC_SIZE / constInfo.headDim;\n-    uint64_t stridePerRow = constInfo.headNumK * constInfo.headDim;\n-    uint64_t tileUbElements = TILE_ROWS * constInfo.headDim;\n-    LocalTensor<float> dkCoreWorkspaceUb = unifiedBuffer.GetWithOffset<float>(tileUbElements, reluInPingUbOffset);\n-\n+    int64_t dkCoreWorkspaceUbSize = determinLen * constInfo.headDim;\n+    LocalTensor<float> dkCoreWorkspaceUb = unifiedBuffer.GetWithOffset<float>(dkCoreWorkspaceUbSize, gatherPingUbOffset);\n     AscendC::SetFlag<HardEvent::MTE3_MTE2>(eventIdMte3ToMTE2);\n-    for (int core = 0; core < constInfo.splitCores; core++) {\n-        uint64_t processed = 0;\n-        while (processed < determinLen) {\n-            uint64_t tileRows = TILE_ROWS < (determinLen - processed) ? TILE_ROWS : (determinLen - processed);\n-            uint64_t tileSize = tileRows * constInfo.headDim;\n-            uint64_t dkCoreWorkspaceOffset;\n-            if constexpr (LIGT::layout == LIG_LAYOUT::BSND) {\n-                dkCoreWorkspaceOffset = core * constInfo.seqlenK * constInfo.headDim + (determinBeginPos + processed) * constInfo.headDim;\n-            } else {\n-                dkCoreWorkspaceOffset = core * runInfo.actualSeqK * constInfo.headDim + (determinBeginPos + processed) * constInfo.headDim;\n-            }\n-\n-            AscendC::WaitFlag<HardEvent::MTE3_MTE2>(eventIdMte3ToMTE2);\n-            DataCopy(dkCoreWorkspaceUb, dkCoreWorkspaceGM[dkCoreWorkspaceOffset], tileSize);\n-            AscendC::SetFlag<HardEvent::MTE2_MTE3>(eventIdMte2ToMTE3);\n-            AscendC::WaitFlag<HardEvent::MTE2_MTE3>(eventIdMte2ToMTE3);\n-\n-            uint64_t baseDkOffset;\n-            if constexpr (LIGT::layout == LIG_LAYOUT::BSND) {\n-                baseDkOffset = runInfo.bIdx * constInfo.seqlenK * constInfo.headNumK * constInfo.headDim;\n-            } else {\n-                // prefixSumS2 is number of previous tokens; target starts from prefixSumS2\n-                baseDkOffset = runInfo.prefixSumS2 * constInfo.headNumK * constInfo.headDim;\n-            }\n-\n-            baseDkOffset += runInfo.n2Idx * constInfo.headDim;\n-            uint64_t dkeyOffset = baseDkOffset + (determinBeginPos + processed) * stridePerRow;\n-            DataCopyParams dataCopyParams;\n-            dataCopyParams.blockCount = tileRows;\n-            dataCopyParams.blockLen = constInfo.headDim * sizeof(float) / 32;\n-            dataCopyParams.dstStride = (stridePerRow - constInfo.headDim) * sizeof(float) / 32;\n-            dataCopyParams.srcStride = 0;\n-\n-            AscendC::SetAtomicAdd<float>();\n-            DataCopy(dkWorkSpaceGm[dkeyOffset], dkCoreWorkspaceUb, dataCopyParams);\n-            AscendC::SetAtomicNone();\n-            AscendC::SetFlag<HardEvent::MTE3_MTE2>(eventIdMte3ToMTE2);\n-            processed += tileRows;\n+    for (int i = 0; i < constInfo.splitCores; i++) {\n+        AscendC::WaitFlag<HardEvent::MTE3_MTE2>(eventIdMte3ToMTE2);\n+        uint64_t dkCoreWorkspaceOffset;\n+        if constexpr (LIGT::layout == LIG_LAYOUT::BSND) {\n+            // layout: [B, S2, N2, D] flattened\n+            dkCoreWorkspaceOffset = i * constInfo.seqlenK * constInfo.headDim + determinBeginPos * constInfo.headDim;\n+        } else { // TND\n+            dkCoreWorkspaceOffset = i * runInfo.actualSeqK * constInfo.headDim + determinBeginPos * constInfo.headDim;\n         }\n+        DataCopy(dkCoreWorkspaceUb, dkCoreWorkspaceGM[dkCoreWorkspaceOffset], dkCoreWorkspaceUbSize);\n+\n+        AscendC::SetFlag<HardEvent::MTE2_MTE3>(eventIdMte2ToMTE3);\n+        AscendC::WaitFlag<HardEvent::MTE2_MTE3>(eventIdMte2ToMTE3);\n+\n+        uint64_t baseDkOffset = 0;\n+        if constexpr (LIGT::layout == LIG_LAYOUT::BSND) {\n+            // layout: [B, S2, N2, D] flattened\n+            baseDkOffset = runInfo.bIdx * constInfo.seqlenK * constInfo.headNumK * constInfo.headDim;\n+        } else { // TND\n+            // prefixSumS2 is number of previous tokens; target starts from prefixSumS2\n+            baseDkOffset = runInfo.prefixSumS2 * constInfo.headNumK * constInfo.headDim;\n+        }\n+        baseDkOffset += runInfo.n2Idx * constInfo.headDim;\n+        uint64_t dkeyOffset;\n+        const uint64_t stridePerRow = constInfo.headNumK * constInfo.headDim;\n+        DataCopyParams dataCopyParams;\n+        dataCopyParams.blockCount = determinLen;\n+        dataCopyParams.blockLen = constInfo.headDim * sizeof(float) / 32;\n+        dataCopyParams.dstStride = (stridePerRow - constInfo.headDim) * sizeof(float) / 32;\n+        dataCopyParams.srcStride = 0;\n+\n+        dkeyOffset = baseDkOffset + determinBeginPos * stridePerRow;\n+        AscendC::SetAtomicAdd<float>();\n+        DataCopy(dkWorkSpaceGm[dkeyOffset], dkCoreWorkspaceUb, dataCopyParams);\n+        AscendC::SetAtomicNone();\n+        AscendC::SetFlag<HardEvent::MTE3_MTE2>(eventIdMte3ToMTE2);\n     }\n     AscendC::WaitFlag<HardEvent::MTE3_MTE2>(eventIdMte3ToMTE2);\n }\n",
+      "new_file": false,
+      "new_path": "attention/lightning_indexer_grad/op_kernel/lightning_indexer_grad_service_vector.h",
+      "old_path": "attention/lightning_indexer_grad/op_kernel/lightning_indexer_grad_service_vector.h",
+      "removed_lines": 48,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/87321c5282b334dfc85e012033c8425a327b8e7b/attention/lightning_indexer_grad/op_kernel/lightning_indexer_grad_service_vector.h",
+    "sha": "87321c5282b334dfc85e012033c8425a327b8e7b",
+    "source_branch": "bugfix399",
+    "source_project": {
+      "full_name": "DaiHuina1/ops-transformer",
+      "human_name": "DaiHuina1 / ops-transformer",
+      "id": 7689569,
+      "path": "ops-transformer"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  },
+  {
+    "additions": 0,
+    "blob_id": "db484925ecde525942483a8aef63f9678f6d3e3e",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/87321c5282b334dfc85e012033c8425a327b8e7b/attention/lightning_indexer_grad/op_kernel/lightning_indexer_grad_tiling.h",
+    "deletions": 5,
+    "filename": "attention/lightning_indexer_grad/op_kernel/lightning_indexer_grad_tiling.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 0,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -30,7 +30,6 @@ public:\n     uint32_t headDim;\n     uint32_t usedCoreNum;\n     int64_t dkSize;\n-    int64_t dkCoreSize;\n     int64_t dkWorkSpaceOffset;\n     int64_t dkCoreWorkspaceOffset;\n     int64_t keyGatherWorkspaceOffset;\n@@ -73,9 +72,6 @@ public:\n     uint32_t get_dkSize() const { return dkSize; }\n     void set_dkSize(uint32_t dkSize) { this->dkSize = dkSize; }\n \n-    uint32_t get_dkCoreSize() const { return dkCoreSize; }\n-    void set_dkCoreSize(uint32_t dkCoreSize) { this->dkCoreSize = dkCoreSize; }\n-\n     uint32_t get_dkWorkSpaceOffset() const { return dkWorkSpaceOffset; }\n     void set_dkWorkSpaceOffset(uint32_t dkWorkSpaceOffset) { this->dkWorkSpaceOffset = dkWorkSpaceOffset; }\n \n@@ -107,7 +103,6 @@ public:\n         set_seqlenK(0);\n         set_topK(0);\n         set_headNumQ(0);\n-        set_dkCoreSize(0);\n         set_scatterAddWorkspaceOffset(0);\n         set_reluGradWorkspaceOffset(0);\n         set_reluInWorkspaceOffset(0);\n",
+      "new_file": false,
+      "new_path": "attention/lightning_indexer_grad/op_kernel/lightning_indexer_grad_tiling.h",
+      "old_path": "attention/lightning_indexer_grad/op_kernel/lightning_indexer_grad_tiling.h",
+      "removed_lines": 5,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/87321c5282b334dfc85e012033c8425a327b8e7b/attention/lightning_indexer_grad/op_kernel/lightning_indexer_grad_tiling.h",
+    "sha": "87321c5282b334dfc85e012033c8425a327b8e7b",
+    "source_branch": "bugfix399",
+    "source_project": {
+      "full_name": "DaiHuina1/ops-transformer",
+      "human_name": "DaiHuina1 / ops-transformer",
+      "id": 7689569,
+      "path": "ops-transformer"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  }
+]

@@ -1,0 +1,38 @@
+[
+  {
+    "additions": 1,
+    "blob_id": "18fb8c8afbfbcb3808fbe0a41a781cbc13b55fc2",
+    "blob_url": "https://gitcode.com/cann/opbase/blob/d8396819325bb1be4d58ca95e840988691d8df63/pkg_inc/op_common/atvoss/reduce/reduce_sch_aux_base.h",
+    "deletions": 1,
+    "filename": "pkg_inc/op_common/atvoss/reduce/reduce_sch_aux_base.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 1,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -634,7 +634,7 @@ public:\n         newView.axis[0].repeat = outLen;\n         newView.axis[1].repeat = outRepeat;\n         // 混合精度场景，MTE3搬出需要跳搬(lp_norm_v2存在此场景)\n-        uint64_t inDtypeBlockAlign = Ops::Base::CeilAlign(outLen, UB_BLOCK / sizeof(InDType));\n+        uint64_t inDtypeBlockAlign = Ops::Base::CeilAlign(outLen, UB_BLOCK / MIN_DTYPE_BYTES);\n         if (sizeof(InDType) != sizeof(OutDType)) {\n             newView.axis[1].srcStride = inDtypeBlockAlign;\n         } else {\n",
+      "new_file": false,
+      "new_path": "pkg_inc/op_common/atvoss/reduce/reduce_sch_aux_base.h",
+      "old_path": "pkg_inc/op_common/atvoss/reduce/reduce_sch_aux_base.h",
+      "removed_lines": 1,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/opbase/raw/d8396819325bb1be4d58ca95e840988691d8df63/pkg_inc/op_common/atvoss/reduce/reduce_sch_aux_base.h",
+    "sha": "d8396819325bb1be4d58ca95e840988691d8df63",
+    "source_branch": "bugfix/ReduceEmptyTensor",
+    "source_project": {
+      "full_name": "Sunee/opbase_1",
+      "human_name": "Sunee / opbase_1",
+      "id": 9184773,
+      "path": "opbase_1"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/opbase",
+      "human_name": "CANN / opbase",
+      "id": 7649482,
+      "path": "opbase"
+    }
+  }
+]

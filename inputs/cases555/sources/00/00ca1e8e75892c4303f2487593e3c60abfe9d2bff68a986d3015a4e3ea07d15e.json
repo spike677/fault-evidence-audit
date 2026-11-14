@@ -1,0 +1,38 @@
+[
+  {
+    "additions": 2,
+    "blob_id": "f9dd3c088b1cc6c54bad1215154187150c3168af",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/6151736e603354efde954b65bb385196605d2b25/vfusion/multi_scale_deformable_attn_function/op_kernel/arch35/ms_deform_attn_simt.h",
+    "deletions": 8,
+    "filename": "vfusion/multi_scale_deformable_attn_function/op_kernel/arch35/ms_deform_attn_simt.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 2,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -32,12 +32,6 @@ using namespace AscendC;\n \n constexpr uint32_t THREAD_DIM = 512;\n \n-__simt_callee__ __aicore__ __attribute__((always_inline)) inline static int64_t Floor(float x)\n-{\n-    int64_t i = static_cast<int64_t>(x);\n-    return (x < 0.0f && static_cast<float>(i) != x) ? i - 1 : i;\n-}\n-\n // SIMT context requires explicit conversion functions for half/bfloat16_t\n template <typename T>\n __simt_callee__ __aicore__ __attribute__((always_inline)) inline static float ToFloat(T val)\n@@ -76,8 +70,8 @@ __simt_callee__ __aicore__ __attribute__((always_inline)) inline static float Sa\n     float x = xNorm * static_cast<float>(wL) - 0.5f;\n     float y = yNorm * static_cast<float>(hL) - 0.5f;\n \n-    int64_t x0 = Floor(x);\n-    int64_t y0 = Floor(y);\n+    int64_t x0 = static_cast<int64_t>(floorf(x));\n+    int64_t y0 = static_cast<int64_t>(floorf(y));\n     int64_t x1 = x0 + 1;\n     int64_t y1 = y0 + 1;\n \n",
+      "new_file": false,
+      "new_path": "vfusion/multi_scale_deformable_attn_function/op_kernel/arch35/ms_deform_attn_simt.h",
+      "old_path": "vfusion/multi_scale_deformable_attn_function/op_kernel/arch35/ms_deform_attn_simt.h",
+      "removed_lines": 8,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/6151736e603354efde954b65bb385196605d2b25/vfusion/multi_scale_deformable_attn_function/op_kernel/arch35/ms_deform_attn_simt.h",
+    "sha": "6151736e603354efde954b65bb385196605d2b25",
+    "source_branch": "master",
+    "source_project": {
+      "full_name": "qy3311888/ops-nn",
+      "human_name": "qy3311888 / ops-nn",
+      "id": 8859026,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  }
+]

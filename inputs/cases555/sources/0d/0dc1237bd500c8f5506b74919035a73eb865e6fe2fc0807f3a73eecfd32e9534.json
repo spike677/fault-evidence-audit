@@ -1,0 +1,83 @@
+{
+  "assignee": {
+    "avatar_url": "https://cdn-img.gitcode.com/eb/ce/3e697bc2ed30f25d3c7adc6f9bcbfc859456ab95b95d286a2217bce26a464bd6.jpg",
+    "html_url": "https://gitcode.com/qq_52056150",
+    "id": "67dbf441948f890bb2aaf775",
+    "login": "qq_52056150",
+    "name": "小王！",
+    "object_id": "67dbf441948f890bb2aaf775"
+  },
+  "assignees": [
+    {
+      "avatar_url": "https://cdn-img.gitcode.com/eb/ce/3e697bc2ed30f25d3c7adc6f9bcbfc859456ab95b95d286a2217bce26a464bd6.jpg",
+      "html_url": "https://gitcode.com/qq_52056150",
+      "id": "67dbf441948f890bb2aaf775",
+      "login": "qq_52056150",
+      "name": "小王！",
+      "object_id": "67dbf441948f890bb2aaf775"
+    }
+  ],
+  "body": "\n\nThanks for sending an issue! Please fill in the following template to help quickly solve your problem.\n\n### Describe the current behavior / 问题描述 (Mandatory / 必填)\n            \nAdaptiveAvgPool3dGrad小kernel模板对于同一用例复跑多次出现精度不一致的问题\n### Environment / 环境信息 (Mandatory / 必填)\n            \n硬件型号：Ascend950\n环境信息：cann-9.0.0\n### Steps to reproduce the issue / 重现步骤 (Mandatory / 必填)\n            \nxrun设置NPU执行10次，复跑用例10次\n### Describe the expected behavior / 预期结果 (Mandatory / 必填)\n       \n多次复跑用例精度均100%\n### Related log / screenshot / 日志 / 截图 (Mandatory / 必填)\nload npu output from file: /home/w00938615/workspace/TuringAclnn/op/aclnn_fuzz/libs/../testcase/geir_case/AdaptiveAvgPool3dGrad/AdaptiveAvgPool3dGrad_AdaptiveAvgPool3dGrad_bf16_NCDHW_random_000021_output_0.bin with dtype:<class 'bfloat16'> real dtype:bf16\n*******\n输出数据类型： bf16 method为: 0\n*******\nload npu output from file: /home/w00938615/workspace/TuringAclnn/op/aclnn_fuzz/libs/../testcase/geir_case/AdaptiveAvgPool3dGrad/AdaptiveAvgPool3dGrad_AdaptiveAvgPool3dGrad_bf16_NCDHW_random_000021_cpu_output_0.bin with dtype:<class 'bfloat16'> real dtype:bf16\n[2026/04/13 14:49:43] [INFO]-tools.py:3946 - Touch file succeed: /home/w00938615/workspace/TuringAclnn/op/aclnn_fuzz/libs/../testcase/geir_case/AdaptiveAvgPool3dGrad/AdaptiveAvgPool3dGrad_AdaptiveAvgPool3dGrad_bf16_NCDHW_random_000021_cpu_output_0.bin\n[2026/04/13 14:49:43] [INFO]-tools.py:1958 - [data_compare_np]ouput flatten start!\n[2026/04/13 14:49:43] [INFO]-tools.py:1961 - [data_compare_np]ouput flatten end!\n[2026/04/13 14:49:43] [INFO]-tools.py:2075 - [data_compare_np]overflows_count start!\n[2026/04/13 14:49:43] [INFO]-tools.py:2079 - [data_compare_np]overflows_count end!\n[2026/04/13 14:49:43] [INFO]-tools.py:2082 - split_count:12531200.0; max_diff_hd:0.1;\n[2026/04/13 14:49:43] [INFO]-tools.py:2091 - [data_compare_np]diff_abs start!\n[2026/04/13 14:49:44] [INFO]-tools.py:2097 - [data_compare_np]diff_abs end!\n[2026/04/13 14:49:44] [INFO]-tools.py:1011 - ---------------------------------------------------------------------------------------\n[2026/04/13 14:49:44] [INFO]-tools.py:1017 - Loop \t ExpectOut \t RealOut \t FpDiff \t RateDiff\n[2026/04/13 14:49:44] [INFO]-tools.py:1018 - ---------------------------------------------------------------------------------------\n[2026/04/13 14:49:44] [INFO]-tools.py:1008 - 00000001 \t 0.4375000 \t 0.4375000 \t 0.0000000 \t 0.0000000\n[2026/04/13 14:49:44] [INFO]-tools.py:1008 - 00000002 \t 0.7812500 \t 0.7812500 \t 0.0000000 \t 0.0000000\n[2026/04/13 14:49:44] [INFO]-tools.py:1008 - 00000003 \t 0.6093750 \t 0.6093750 \t 0.0000000 \t 0.0000000\n[2026/04/13 14:49:44] [INFO]-tools.py:1008 - 00000004 \t 0.4843750 \t 0.4843750 \t 0.0000000 \t 0.0000000\n[2026/04/13 14:49:44] [INFO]-tools.py:1008 - 00000005 \t 0.2187500 \t 0.2187500 \t 0.0000000 \t 0.0000000\n[2026/04/13 14:49:44] [INFO]-tools.py:1008 - 00000006 \t 0.7031250 \t 0.7031250 \t 0.0000000 \t 0.0000000\n[2026/04/13 14:49:44] [INFO]-tools.py:1008 - 00000007 \t 0.9140625 \t 0.9140625 \t 0.0000000 \t 0.0000000\n[2026/04/13 14:49:44] [INFO]-tools.py:1008 - 00000008 \t 0.8437500 \t 0.8437500 \t 0.0000000 \t 0.0000000\n[2026/04/13 14:49:44] [INFO]-tools.py:1008 - 00000009 \t 0.7226562 \t 0.7226562 \t 0.0000000 \t 0.0000000\n[2026/04/13 14:49:44] [INFO]-tools.py:1008 - 00000010 \t 0.3066406 \t 0.3066406 \t 0.0000000 \t 0.0000000\n[2026/04/13 14:49:44] [INFO]-tools.py:1027 - ...   \t   ...   \t   ...   \t   ...    \t   ...\n[2026/04/13 14:49:44] [INFO]-tools.py:1008 - 12531191 \t 0.2314453 \t 0.2314453 \t 0.0000000 \t 0.0000000\n[2026/04/13 14:49:44] [INFO]-tools.py:1008 - 12531192 \t 0.5273438 \t 0.5273438 \t 0.0000000 \t 0.0000000\n[2026/04/13 14:49:44] [INFO]-tools.py:1008 - 12531193 \t 0.6171875 \t 0.6171875 \t 0.0000000 \t 0.0000000\n[2026/04/13 14:49:44] [INFO]-tools.py:1008 - 12531194 \t 0.6796875 \t 0.6796875 \t 0.0000000 \t 0.0000000\n[2026/04/13 14:49:44] [INFO]-tools.py:1008 - 12531195 \t 0.5859375 \t 0.5859375 \t 0.0000000 \t 0.0000000\n[2026/04/13 14:49:44] [INFO]-tools.py:1008 - 12531196 \t 0.2265625 \t 0.2265625 \t 0.0000000 \t 0.0000000\n[2026/04/13 14:49:44] [INFO]-tools.py:1008 - 12531197 \t 0.6484375 \t 0.6484375 \t 0.0000000 \t 0.0000000\n[2026/04/13 14:49:44] [INFO]-tools.py:1008 - 12531198 \t 0.9023438 \t 0.9023438 \t 0.0000000 \t 0.0000000\n[2026/04/13 14:49:44] [INFO]-tools.py:1008 - 12531199 \t 0.7812500 \t 0.7812500 \t 0.0000000 \t 0.0000000\n[2026/04/13 14:49:44] [INFO]-tools.py:1008 - 12531200 \t 0.3027344 \t 0.3027344 \t 0.0000000 \t 0.0000000\n[2026/04/13 14:49:44] [INFO]-tools.py:2127 - ---------------------------------------------------------------------------------------\n[2026/04/13 14:49:44] [INFO]-tools.py:2129 - DiffThd  \t PctThd   \t PctRlt   \t Result\n[2026/04/13 14:49:44] [INFO]-tools.py:2130 - ---------------------------------------------------------------------------------------\n[2026/04/13 14:49:44] [INFO]-tools.py:2132 - 0.0010     \t 99.90%   \t 100.000000%   \t Pass\n[2026/04/13 14:49:44] [INFO]-tools.py:4124 - AdaptiveAvgPool3dGrad:AdaptiveAvgPool3dGrad_AdaptiveAvgPool3dGrad_bf16_NCDHW_random_000021 End to compare result. Duration:0.70 second.\n['NA', 'Pass', 'NA'] result_total-------------------------------------result_total\n[2026/04/13 14:49:44] [INFO]-tools.py:4177 - Begin to check slog and its path is: ~/ascend/log/2268456/plog\n[2026/04/13 14:49:44] [INFO]-tools.py:4191 - Slog have been checked, everything works well.\n[2026/04/13 14:49:44] [INFO]-run_single.py:3717 - end execute geir case: AdaptiveAvgPool3dGrad_AdaptiveAvgPool3dGrad_bf16_NCDHW_random_000021\n[2026/04/13 14:49:44] [WARNING]-run_single.py:0095 - There not exist kernel file[kernel_name:AdaptiveAvgPool3dGrad] in kernel_meta.\n[2026/04/13 14:49:44] [/home/w00938615/workspace/TuringAclnn/op/aclnn_fuzz/libs/../golden/aclnn_golden/AdaptiveAvgPool3dGrad_golden.csv]-run_single.py:1719 - [WARNING]no golden file:\n[2026/04/13 14:49:44] [INFO]-run_single.py:1941 - Case report ->:\n[2026/04/13 14:49:44] [INFO]-run_single.py:1942 - AdaptiveAvgPool3dGrad,AdaptiveAvgPool3dGrad_AdaptiveAvgPool3dGrad_bf16_NCDHW_random_000021,1776062984,100.0,Pass,NA,Pass,NA,None,0.0,\"no_bound\",\"\",\"0.0\",\"[[2, 7832, 2, 1, 157], [2, 7832, 2, 2, 200]]\",\"['bf16', 'bf16']\",\"['NCDHW', 'NCDHW']\",\"[[1, 2], [1.1754943508e-38, 1.1754943508e-38]]\",\"{'data_format': 'NCDHW', 'dynamic_shape': [[2, 7832, 2, 1, -1], [-2]]}\",\"[[2, 7832, 2, 2, 200]]\",\"['bf16']\",\"None\",\"[]\",\"N/A\",\"None\",None,\"None\",\"None\",None,\"\",,\"\",\"\",,,,,,\"\",None,,\n[2026/04/13 14:49:44] [INFO]-run_single.py:3780 - -------------------------第1用例npu_off执行结束,共1条用例-----------------------------------\n[2026/04/13 14:49:44] [INFO]-run_single.py:3807 - Case execution(AdaptiveAvgPool3dGrad:1/0) have completed. Duration:39.04 second.\nLock 140572081897136 released on /home/w00938615/tmp/npu/0.lock\nEXIT CODE: 0\n\n### Special notes for this issue/备注 (Optional / 选填)\n            \n\n",
+  "comments": 1,
+  "created_at": "2026-04-17T11:29:07+08:00",
+  "finished_at": "2026-04-17T15:58:31+08:00",
+  "html_url": "https://gitcode.com/cann/ops-nn/issues/2143",
+  "id": 3857240,
+  "issue_priority_detail": {
+    "id": 116,
+    "title": "无优先级"
+  },
+  "issue_state": "进行中",
+  "issue_state_detail": {
+    "id": 285,
+    "serial": 0,
+    "title": "进行中"
+  },
+  "issue_type": "任务",
+  "issue_type_detail": {
+    "id": 255,
+    "is_system": false,
+    "title": "任务"
+  },
+  "labels": [
+    {
+      "color": "#DB2828",
+      "created_at": "2025-06-10T14:17:23+08:00",
+      "id": 3870,
+      "name": "bug-report",
+      "updated_at": "2026-04-17T11:29:07+08:00"
+    },
+    {
+      "color": "#35e029",
+      "created_at": "2026-03-20T11:25:13+08:00",
+      "id": 38861,
+      "name": "resolved",
+      "updated_at": "2026-04-17T16:20:45+08:00"
+    }
+  ],
+  "number": "2143",
+  "priority": 0,
+  "repository": {
+    "assigner": {},
+    "created_at": "2025-09-27T17:40:34+08:00",
+    "description": "本项目是CANN提供的神经网络类计算算子库，实现网络在NPU上加速计算。",
+    "full_name": "cann/ops-nn",
+    "id": 7665709,
+    "name": "ops-nn",
+    "paas": "",
+    "path": "ops-nn",
+    "updated_at": "2025-09-27T18:09:31+08:00"
+  },
+  "state": "closed",
+  "title": "[Bug-Report|缺陷反馈]: AdaptiveAvgpool3dGrad 小kernel模板多次执行用例精度不一致",
+  "updated_at": "2026-04-17T15:58:31+08:00",
+  "user": {
+    "avatar_url": "https://cdn-img.gitcode.com/eb/ce/3e697bc2ed30f25d3c7adc6f9bcbfc859456ab95b95d286a2217bce26a464bd6.jpg",
+    "html_url": "https://gitcode.com/qq_52056150",
+    "id": "67dbf441948f890bb2aaf775",
+    "login": "qq_52056150",
+    "name": "小王！",
+    "object_id": "67dbf441948f890bb2aaf775"
+  },
+  "visibility_reason": "public"
+}

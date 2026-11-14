@@ -1,0 +1,74 @@
+[
+  {
+    "additions": 13,
+    "blob_id": "9b3eeea1a47ed2bebaab36eff39246036fa1e12c",
+    "blob_url": "https://gitcode.com/cann/ops-cv/blob/5591f271cac9f117d9c9da8edf3eb984373d21e1/image/img_warp_resize/op_kernel/arch35/img_warp_resize_simt.h",
+    "deletions": 10,
+    "filename": "image/img_warp_resize/op_kernel/arch35/img_warp_resize_simt.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 13,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -53,11 +53,16 @@ __simt_callee__ inline void BilinearInterpolate(__gm__ T* img, uint64_t imgBase,\n         bottomLeft = img[imgBase + 2 * cornerStride + hw];\n         bottomRight = img[imgBase + 3 * cornerStride + hw];\n     }\n-    // Horizontal interpolation (float32 precision)\n-    float top = topLeft + (topRight - topLeft) * xLerp;\n-    float bottom = bottomLeft + (bottomRight - bottomLeft) * xLerp;\n-    // Vertical interpolation (float32 precision)\n-    float result = top + (bottom - top) * yLerp;\n+    // Keep the TBE sub -> mul -> add source order.\n+    float topDelta = topRight - topLeft;\n+    float topProduct = topDelta * xLerp;\n+    float top = topLeft + topProduct;\n+    float bottomDelta = bottomRight - bottomLeft;\n+    float bottomProduct = bottomDelta * xLerp;\n+    float bottom = bottomLeft + bottomProduct;\n+    float verticalDelta = bottom - top;\n+    float verticalProduct = verticalDelta * yLerp;\n+    float result = top + verticalProduct;\n     // Write back with dtype conversion\n     if constexpr (sizeof(T) == 2) {\n         warpImg[idx] = __float2half(result);\n@@ -93,11 +98,9 @@ __simt_vf__ __aicore__ __launch_bounds__(THREAD_NUM) inline void OpIMGWarpResize\n         uint64_t warpBase = static_cast<uint64_t>(n) * nStrideWarp;\n         float xFloat = warpIndex[warpBase + hw];\n         float yFloat = warpIndex[warpBase + static_cast<uint64_t>(imageArea) + hw];\n-        // floor via int32 truncation (matches Golden astype(np.int32))\n-        int32_t xInt = static_cast<int32_t>(xFloat);\n-        int32_t yInt = static_cast<int32_t>(yFloat);\n-        float xLerp = xFloat - static_cast<float>(xInt);\n-        float yLerp = yFloat - static_cast<float>(yInt);\n+        // Keep floor in float32 so negative and non-finite coordinates avoid int32 narrowing.\n+        float xLerp = xFloat - floorf(xFloat);\n+        float yLerp = yFloat - floorf(yFloat);\n \n         // Read corners, interpolate, and write back\n         uint64_t imgBase = static_cast<uint64_t>(n) * nStrideImg +\n",
+      "new_file": false,
+      "new_path": "image/img_warp_resize/op_kernel/arch35/img_warp_resize_simt.h",
+      "old_path": "image/img_warp_resize/op_kernel/arch35/img_warp_resize_simt.h",
+      "removed_lines": 10,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-cv/raw/5591f271cac9f117d9c9da8edf3eb984373d21e1/image/img_warp_resize/op_kernel/arch35/img_warp_resize_simt.h",
+    "sha": "5591f271cac9f117d9c9da8edf3eb984373d21e1",
+    "source_branch": "fix_imgwarpsize",
+    "source_project": {
+      "full_name": "u010470851/ops-cv",
+      "human_name": "u010470851 / ops-cv",
+      "id": 10128228,
+      "path": "ops-cv"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-cv",
+      "human_name": "CANN / ops-cv",
+      "id": 7657293,
+      "path": "ops-cv"
+    }
+  },
+  {
+    "additions": 13,
+    "blob_id": "e5077ec94fef3f23727fff972237dfb2b5da3dd8",
+    "blob_url": "https://gitcode.com/cann/ops-cv/blob/5591f271cac9f117d9c9da8edf3eb984373d21e1/image/img_warp_resize/tests/assets/golden.py",
+    "deletions": 11,
+    "filename": "image/img_warp_resize/tests/assets/golden.py",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 13,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -47,11 +47,9 @@ def img_warp_resize_golden(img, warp_index, **kwargs):\n         lerp_x_data = warp_flat[batch_idx, 0, :]  # x_float (w方向)\n         lerp_y_data = warp_flat[batch_idx, 1, :]  # y_float (h方向)\n \n-        # floor via int32 truncation (matches kernel static_cast<int32_t>)\n-        lerp_x_data_int = lerp_x_data.astype(np.int32)\n-        lerp_y_data_int = lerp_y_data.astype(np.int32)\n-        lerp_x = lerp_x_data - lerp_x_data_int.astype(np.float32)\n-        lerp_y = lerp_y_data - lerp_y_data_int.astype(np.float32)\n+        # Keep floor in float32 for negative and non-finite coordinates.\n+        lerp_x = lerp_x_data - np.floor(lerp_x_data)\n+        lerp_y = lerp_y_data - np.floor(lerp_y_data)\n \n         for batch_c in range(np_c):\n             top_left = img_flat[batch_idx, 0, batch_c, :]\n@@ -59,12 +57,16 @@ def img_warp_resize_golden(img, warp_index, **kwargs):\n             bottom_left = img_flat[batch_idx, 2, batch_c, :]\n             bottom_right = img_flat[batch_idx, 3, batch_c, :]\n \n-            # 水平方向双线性插值\n-            top = (top_right - top_left) * lerp_x + top_left\n-            bottom = (bottom_right - bottom_left) * lerp_x + bottom_left\n-\n-            # 垂直方向双线性插值\n-            out = (bottom - top) * lerp_y + top\n+            # Keep the TBE sub -> mul -> add order with float32 intermediates.\n+            top_delta = top_right - top_left\n+            top_product = top_delta * lerp_x\n+            top = top_left + top_product\n+            bottom_delta = bottom_right - bottom_left\n+            bottom_product = bottom_delta * lerp_x\n+            bottom = bottom_left + bottom_product\n+            vertical_delta = bottom - top\n+            vertical_product = vertical_delta * lerp_y\n+            out = top + vertical_product\n             output[batch_idx, batch_c, :] = out\n \n     output = output.reshape([np_batch, np_c, np_h, np_w]).astype(image_dtype)\n",
+      "new_file": false,
+      "new_path": "image/img_warp_resize/tests/assets/golden.py",
+      "old_path": "image/img_warp_resize/tests/assets/golden.py",
+      "removed_lines": 11,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-cv/raw/5591f271cac9f117d9c9da8edf3eb984373d21e1/image/img_warp_resize/tests/assets/golden.py",
+    "sha": "5591f271cac9f117d9c9da8edf3eb984373d21e1",
+    "source_branch": "fix_imgwarpsize",
+    "source_project": {
+      "full_name": "u010470851/ops-cv",
+      "human_name": "u010470851 / ops-cv",
+      "id": 10128228,
+      "path": "ops-cv"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-cv",
+      "human_name": "CANN / ops-cv",
+      "id": 7657293,
+      "path": "ops-cv"
+    }
+  }
+]

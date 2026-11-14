@@ -1,0 +1,38 @@
+[
+  {
+    "additions": 42,
+    "blob_id": "72a33202c901b5e6320d77f3512fac7d750efeb0",
+    "blob_url": "https://gitcode.com/cann/ops-math/blob/89e0c0b4d52cd5fec7c19e5fec881ec880264324/random/random_common/op_host/arch35/random_tiling_arch35.cpp",
+    "deletions": 7,
+    "filename": "random/random_common/op_host/arch35/random_tiling_arch35.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 42,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -88,20 +88,55 @@ void TensorSliceState::PartitionDim(int64_t dim, TensorSliceState& other)\n ge::graphStatus InitTensorSliceState(TensorSliceState& state, const gert::Shape& outputTensor, int64_t outputSize,\n                                      ge::DataType outputDtype)\n {\n-    state.ndim = static_cast<int64_t>(outputTensor.GetDimNum());\n     state.numel = outputSize;\n     state.gmOffset = 0;\n     state.elementSize = ge::GetSizeByDataType(outputDtype);\n \n-    for (int64_t dim = 0; dim < state.ndim && dim < MAX_TENSOR_DIMS; dim++) {\n-        state.shape[dim] = outputTensor.GetDim(static_cast<size_t>(dim));\n+    int64_t rawShape[MAX_TENSOR_DIMS] = {0};\n+    int64_t rawStrides[MAX_TENSOR_DIMS] = {0};\n+    int64_t rawNdim = static_cast<int64_t>(outputTensor.GetDimNum());\n+    for (int64_t dim = 0; dim < rawNdim && dim < MAX_TENSOR_DIMS; dim++) {\n+        rawShape[dim] = outputTensor.GetDim(static_cast<size_t>(dim));\n+    }\n+    if (rawNdim > 0) {\n+        rawStrides[rawNdim - 1] = 1;\n+        for (int64_t dim = rawNdim - 2; dim >= 0; dim--) {\n+            rawStrides[dim] = rawShape[dim + 1] * rawStrides[dim + 1];\n+        }\n     }\n \n-    if (state.ndim > 0) {\n-        state.strides[state.ndim - 1] = 1;\n-        for (int64_t dim = state.ndim - 2; dim >= 0; dim--) {\n-            state.strides[dim] = state.shape[dim + 1] * state.strides[dim + 1];\n+    int64_t coalescedShape[MAX_TENSOR_DIMS] = {0};\n+    int64_t coalescedStrides[MAX_TENSOR_DIMS] = {0};\n+    int64_t coalescedNdim = 0;\n+    for (int64_t dim = 0; dim < rawNdim; dim++) {\n+        if (rawShape[dim] == 1) {\n+            continue;\n         }\n+        coalescedShape[coalescedNdim] = rawShape[dim];\n+        coalescedStrides[coalescedNdim] = rawStrides[dim];\n+        coalescedNdim++;\n+    }\n+    if (coalescedNdim == 0) {\n+        coalescedShape[0] = 1;\n+        coalescedStrides[0] = 1;\n+        coalescedNdim = 1;\n+    }\n+    for (int64_t dim = coalescedNdim - 1; dim > 0; dim--) {\n+        if (coalescedShape[dim] * coalescedStrides[dim] == coalescedStrides[dim - 1]) {\n+            coalescedShape[dim - 1] *= coalescedShape[dim];\n+            coalescedStrides[dim - 1] = coalescedStrides[dim];\n+            for (int64_t d = dim; d < coalescedNdim - 1; d++) {\n+                coalescedShape[d] = coalescedShape[d + 1];\n+                coalescedStrides[d] = coalescedStrides[d + 1];\n+            }\n+            coalescedNdim--;\n+        }\n+    }\n+\n+    state.ndim = coalescedNdim;\n+    for (int64_t dim = 0; dim < coalescedNdim && dim < MAX_TENSOR_DIMS; dim++) {\n+        state.shape[dim] = coalescedShape[dim];\n+        state.strides[dim] = coalescedStrides[dim];\n     }\n \n     return ge::GRAPH_SUCCESS;\n",
+      "new_file": false,
+      "new_path": "random/random_common/op_host/arch35/random_tiling_arch35.cpp",
+      "old_path": "random/random_common/op_host/arch35/random_tiling_arch35.cpp",
+      "removed_lines": 7,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-math/raw/89e0c0b4d52cd5fec7c19e5fec881ec880264324/random/random_common/op_host/arch35/random_tiling_arch35.cpp",
+    "sha": "89e0c0b4d52cd5fec7c19e5fec881ec880264324",
+    "source_branch": "fix/coalesce-split-blocks",
+    "source_project": {
+      "full_name": "liangtongxue/ops-math",
+      "human_name": "liangtongxue / ops-math",
+      "id": 8677072,
+      "path": "ops-math"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-math",
+      "human_name": "CANN / ops-math",
+      "id": 7649531,
+      "path": "ops-math"
+    }
+  }
+]

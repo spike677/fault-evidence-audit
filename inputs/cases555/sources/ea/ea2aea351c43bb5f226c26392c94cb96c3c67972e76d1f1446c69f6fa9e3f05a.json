@@ -1,0 +1,73 @@
+{
+  "assignee": {
+    "html_url": "https://gitcode.com/east_yang",
+    "id": "68a47957d697575a68b6c793",
+    "login": "east_yang",
+    "name": "east_yang",
+    "object_id": "68a47957d697575a68b6c793"
+  },
+  "assignees": [
+    {
+      "html_url": "https://gitcode.com/east_yang",
+      "id": "68a47957d697575a68b6c793",
+      "login": "east_yang",
+      "name": "east_yang",
+      "object_id": "68a47957d697575a68b6c793"
+    }
+  ],
+  "body": "## 摘要\n\n`foreach_addcmul_scalar` 对 int32 路径经 float 往返导致大于 2^24 的整数低位丢失（16777217→16777216）。Ascend910B3 真机 exit 42。本地 draft，未远程提交。\n\n---\n\n## 环境\n\n| 项 | 值 |\n|------|-------|\n| 芯片 | Ascend910B3 |\n| CANN | 9.1.0-beta.3 |\n| ops-nn HEAD | `e16ef626bb3a` |\n| 编译命令 | 见下文「完整复现过程」 |\n| 安装方式 | `cann-ops-nn-cann_scan_repro_linux-*.run` → `$ASCEND_HOME_PATH/vendors/cann_scan_repro_nn` |\n| Track / Pattern | B / novel-float24-int32 |\n| Finding | FEACMS-INT32 |\n| 运行时证明 | 见下文「为何确认跑的是源码编译内核」 |\n\n---\n\n## 为什么认为这是问题：期望 vs 实际\n\n### 输入（与复现用例一致）\n\n```\nx/y/z: int32；关键值 16777217（>2^24）；走 foreach_addcmul_scalar 标量路径\n```\n\n### 期望行为\n\n| 用例 | 期望 |\n|------|------|\n| int32 含 16777217 | 结果精确为 **16777217**（主机 int32 语义） |\n\n### 实际行为（aclnn / 源码编译安装路径）\n\n| 用例 | API 返回 | 关键输出 | 说明 |\n|------|----------|----------|------|\n| 同上 | SUCCESS | **16777216** | float32 中间路径丢低位；exit 42 |\n\n### 对比结论\n\n| | 期望 | 实际 |\n|--|------|------|\n| 16777217 | 16777217 | 16777216 |\n\n---\n\n\n\n## 根因\n\nexit 42: expect 16777217 got 16777216 via float32 intermediate.\n远程未提交。\n\n（详细行号见同目录 FINDING.md 与算子源码；归档时已通过 aclnn exit 42 确认。）\n\n---\n\n## 为何确认跑的是源码编译内核（非 built-in）\n\n1. **环境**：安装自定义包后执行 `source $ASCEND_HOME_PATH/vendors/cann_scan_repro_nn/bin/set_env.bash`，`ASCEND_CUSTOM_OPP_PATH` 指向该 vendor。\n2. **二进制路径**：复现链接/加载 vendor 下 `op_api` / `op_impl`，而非仅依赖 CANN built-in 同名算子（见 `repro_manifest.json` 中 `built_from_source=true`）。\n3. **（推荐）排除 built-in**：临时移走 built-in 对应算子内核目录后仍能 exit 42。\n\n---\n\n## 完整复现过程\n\n占位符：`$ASCEND_HOME_PATH` / `$OPS_NN` / `$REPRO_ROOT`。\n\n### 步骤 1：环境使能\n\n```bash\nsource <CANN安装目录>/ascend-toolkit/set_env.sh\n```\n\n### 步骤 2：源码编译单算子包\n\n```bash\ncd \"$OPS_NN\"\nbash build.sh --pkg --soc=ascend910b --ops=foreach_addcmul_scalar \\\n  --vendor_name=cann_scan_repro --no_force -j8\n```\n\n成功标志：生成 `$OPS_NN/build_out/cann-ops-nn-cann_scan_repro_linux-*.run`\n\n### 步骤 3：安装并切换到自定义包\n\n```bash\nbash $OPS_NN/build_out/cann-ops-nn-cann_scan_repro_linux-*.run \\\n  --quiet --install-path=\"$ASCEND_HOME_PATH\"\nsource \"$ASCEND_HOME_PATH/vendors/cann_scan_repro_nn/bin/set_env.bash\"\necho \"ASCEND_CUSTOM_OPP_PATH=$ASCEND_CUSTOM_OPP_PATH\"\n```\n\n### 步骤 4：放置复现源码与执行脚本\n\n```text\n$REPRO_ROOT/\n  test_aclnn_foreach_addcmul_scalar_int32.cpp\n  build_and_run_repro.sh\n```\n\n（本 draft 目录内已含上述文件，可直接作为 `$REPRO_ROOT`。）\n\n### 步骤 5：编译并运行\n\n```bash\ncd \"$REPRO_ROOT\"\nchmod +x build_and_run_repro.sh\nbash build_and_run_repro.sh --vendor cann_scan_repro --src test_aclnn_foreach_addcmul_scalar_int32.cpp\n# 退出码 42 = BUG_REPRODUCED\n```\n\n**成功复现标志**：进程退出码 **42**。\n\n### 实际运行摘录\n\n```text\n（无 run.log；以 exit 42 与同目录 repro_manifest.json 为准。）\n```\n\n---\n\n## 复现用例源码\n\n文件名：`test_aclnn_foreach_addcmul_scalar_int32.cpp`\n\n```cpp\n/**\n * FEACMS-INT32 — foreach_addcmul_scalar int32 scalar float24 roundtrip.\n * out = x1 + scalar * x2 * x3\n * int32: x1=0, x2=1, x3=1; scalar=16777217 (=2^24+1)\n * expect exact 16777217; buggy float path → 16777216\n * N=1 (not TP-007 list-cap).\n */\n#include <cstdint>\n#include <cstdio>\n#include <vector>\n\n#include \"acl/acl.h\"\n#include \"aclnnop/aclnn_foreach_addcmul_scalar.h\"\n\n#define CHECK_RET(cond, return_expr) \\\n    do { if (!(cond)) { return_expr; } } while (0)\n#define LOG_PRINT(message, ...) do { printf(message, ##__VA_ARGS__); } while (0)\n\nstatic constexpr int32_t kScalar = 16777217;  // 2^24+1\nstatic constexpr int32_t kExpect = 16777217;\nstatic constexpr int32_t kBuggy = 16777216;   // float mantissa truncate\n\nstatic int Init(int32_t deviceId, aclrtStream* stream)\n{\n    auto ret = aclInit(nullptr);\n    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT(\"aclInit failed. ERROR: %d\\n\", ret); return ret);\n    ret = aclrtSetDevice(deviceId);\n    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT(\"aclrtSetDevice failed. ERROR: %d\\n\", ret); return ret);\n    ret = aclrtCreateStream(stream);\n    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT(\"aclrtCreateStream failed. ERROR: %d\\n\", ret); return ret);\n    return 0;\n}\n\nstatic int CreateInt32ScalarTensor(int32_t hostVal, void** deviceAddr, aclTensor** tensor)\n{\n    std::vector<int64_t> shape = {1};\n    std::vector<int64_t> strides = {1};\n    auto ret = aclrtMalloc(deviceAddr, sizeof(int32_t), ACL_MEM_MALLOC_HUGE_FIRST);\n    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT(\"aclrtMalloc failed. ERROR: %d\\n\", ret); return ret);\n    ret = aclrtMemcpy(*deviceAddr, sizeof(int32_t), &hostVal, sizeof(int32_t), ACL_MEMCPY_HOST_TO_DEVICE);\n    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT(\"aclrtMemcpy H2D failed. ERROR: %d\\n\", ret); return ret);\n    *tensor = aclCreateTensor(shape.data(), shape.size(), ACL_INT32, strides.data(), 0, ACL_FORMAT_ND,\n                              shape.data(), shape.size(), *deviceAddr);\n    CHECK_RET(*tensor != nullptr, LOG_PRINT(\"aclCreateTensor failed\\n\"); return 1);\n    return 0;\n}\n\nint main()\n{\n    int32_t deviceId = 0;\n    aclrtStream stream;\n    auto ret = Init(deviceId, &stream);\n    CHECK_RET(ret == ACL_SUCCESS, return 1);\n\n    LOG_PRINT(\"FEACMS-INT32: N=1 int32 addcmul; scalar=%d expect=%d buggy_float=%d\\n\",\n              kScalar, kExpect, kBuggy);\n    LOG_PRINT(\"formula: out = x1 + scalar * x2 * x3 = 0 + %d * 1 * 1\\n\", kScalar);\n\n    void *dX1 = nullptr, *dX2 = nullptr, *dX3 = nullptr, *dOut = nullptr, *dScalar = nullptr;\n    aclTensor *tX1 = nullptr, *tX2 = nullptr, *tX3 = nullptr, *tOut = nullptr, *tScalar = nullptr;\n\n    ret = CreateInt32ScalarTensor(0, &dX1, &tX1);\n    CHECK_RET(ret == 0, return 1);\n    ret = CreateInt32ScalarTensor(1, &dX2, &tX2);\n    CHECK_RET(ret == 0, return 1);\n    ret = CreateInt32ScalarTensor(1, &dX3, &tX3);\n    CHECK_RET(ret == 0, return 1);\n    ret = CreateInt32ScalarTensor(-999, &dOut, &tOut);\n    CHECK_RET(ret == 0, return 1);\n    ret = CreateInt32ScalarTensor(kScalar, &dScalar, &tScalar);\n    CHECK_RET(ret == 0, return 1);\n\n    aclTensor* arrX1[] = {tX1};\n    aclTensor* arrX2[] = {tX2};\n    aclTensor* arrX3[] = {tX3};\n    aclTensor* arrOut[] = {tOut};\n    aclTensorList* lX1 = aclCreateTensorList(arrX1, 1);\n    aclTensorList* lX2 = aclCreateTensorList(arrX2, 1);\n    aclTensorList* lX3 = aclCreateTensorList(arrX3, 1);\n    aclTensorList* lOut = aclCreateTensorList(arrOut, 1);\n    CHECK_RET(lX1 && lX2 && lX3 && lOut, LOG_PRINT(\"aclCreateTensorList failed\\n\"); return 1);\n\n    uint64_t workspaceSize = 0;\n    aclOpExecutor* executor = nullptr;\n    ret = aclnnForeachAddcmulScalarGetWorkspaceSize(lX1, lX2, lX3, tScalar, lOut, &workspaceSize, &executor);\n    LOG_PRINT(\"GetWorkspaceSize ret=%d wsSize=%llu\\n\", ret, (unsigned long long)workspaceSize);\n    if (ret != ACL_SUCCESS) {\n        LOG_PRINT(\"\\nVERDICT: NO_REPRO / blocked (GetWorkspaceSize ret=%d)\\n\", ret);\n        // cleanup abbreviated via finalize path\n        aclDestroyTensorList(lX1); aclDestroyTensorList(lX2); aclDestroyTensorList(lX3); aclDestroyTensorList(lOut);\n        aclDestroyTensor(tX1); aclDestroyTensor(tX2); aclDestroyTensor(tX3); aclDestroyTensor(tOut); aclDestroyTensor(tScalar);\n        aclrtFree(dX1); aclrtFree(dX2); aclrtFree(dX3); aclrtFree(dOut); aclrtFree(dScalar);\n        aclrtDestroyStream(stream); aclrtResetDevice(deviceId); aclFinalize();\n        return 0;\n    }\n\n    void* workspaceAddr = nullptr;\n    if (workspaceSize > 0) {\n        ret = aclrtMalloc(&workspaceAddr, workspaceSize, ACL_MEM_MALLOC_HUGE_FIRST);\n        CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT(\"workspace malloc failed %d\\n\", ret); return 1);\n    }\n\n    ret = aclnnForeachAddcmulScalar(workspaceAddr, workspaceSize, executor, stream);\n    LOG_PRINT(\"aclnnForeachAddcmulScalar ret=%d\\n\", ret);\n    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT(\"launch failed\\n\"); return 1);\n    ret = aclrtSynchronizeStream(stream);\n    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT(\"sync failed\\n\"); return 1);\n\n    int32_t actual = 0;\n    ret = aclrtMemcpy(&actual, sizeof(int32_t), dOut, sizeof(int32_t), ACL_MEMCPY_DEVICE_TO_HOST);\n    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT(\"D2H failed\\n\"); return 1);\n\n    LOG_PRINT(\"\\n| field | expected | actual |\\n|-------|----------|--------|\\n\");\n    LOG_PRINT(\"| out[0] | %d | %d |\\n\", kExpect, actual);\n    LOG_PRINT(\"| buggy_float24 | %d | (ref) |\\n\", kBuggy);\n\n    if (workspaceAddr) aclrtFree(workspaceAddr);\n    aclDestroyTensorList(lX1); aclDestroyTensorList(lX2); aclDestroyTensorList(lX3); aclDestroyTensorList(lOut);\n    aclDestroyTensor(tX1); aclDestroyTensor(tX2); aclDestroyTensor(tX3); aclDestroyTensor(tOut); aclDestroyTensor(tScalar);\n    aclrtFree(dX1); aclrtFree(dX2); aclrtFree(dX3); aclrtFree(dOut); aclrtFree(dScalar);\n    aclrtDestroyStream(stream); aclrtResetDevice(deviceId); aclFinalize();\n\n    if (actual == kBuggy && actual != kExpect) {\n        LOG_PRINT(\"\\nVERDICT: BUG_REPRODUCED (exit 42) float24 roundtrip\\n\");\n        return 42;\n    }\n    if (actual == kExpect) {\n        LOG_PRINT(\"\\nVERDICT: NO_REPRO (exact int32 result)\\n\");\n        return 0;\n    }\n    LOG_PRINT(\"\\nVERDICT: unexpected actual=%d → exit 1\\n\", actual);\n    return 1;\n}\n```\n\n---\n\n## 执行脚本\n\n文件名：`build_and_run_repro.sh`\n\n```bash\n#!/usr/bin/env bash\nset -euo pipefail\n: \"${ASCEND_HOME_PATH:?请先 source CANN set_env.sh}\"\nROOT=\"$(cd \"$(dirname \"$0\")\" && pwd)\"\nSRC=\"$ROOT/test_aclnn_foreach_addcmul_scalar_int32.cpp\"\nBIN=\"$ROOT/test_aclnn_foreach_addcmul_scalar_int32\"\n\nINC=\"${ASCEND_HOME_PATH}/aarch64-linux/include\"\nLIB=\"${ASCEND_HOME_PATH}/aarch64-linux/lib64\"\n[[ -d \"$INC\" ]] || INC=\"${ASCEND_HOME_PATH}/include\"\n[[ -d \"$LIB\" ]] || LIB=\"${ASCEND_HOME_PATH}/lib64\"\n\necho \"[build] g++ $SRC\"\ng++ -std=c++17 -O2 \"$SRC\" \\\n  -I\"$INC\" -I\"$INC/aclnnop\" \\\n  -L\"$LIB\" \\\n  -Wl,-rpath,\"$LIB\" \\\n  -lascendcl -lnnopbase -lopapi -lopapi_nn \\\n  -o \"$BIN\"\n\necho \"[run] $BIN\"\nset +e\n\"$BIN\"\nRC=$?\nset -e\necho \"[exit] $RC  (42=BUG_REPRODUCED, 0=NO_REPRO, 1=harness error)\"\nexit \"$RC\"\n```\n\n---\n\n## 修复建议\n\n按文档/torch 参考语义修正计算或 tiling；补充合法输入单测与期望对照。\n\n---\n\n## 人工复核说明\n\nAgent 复现结果供参考；语义边界（是否允许 wrap、文档是否声明调用方契约）以人工结论与产品规范为准。\n",
+  "comments": 1,
+  "created_at": "2026-08-03T17:09:11+08:00",
+  "finished_at": "2026-08-14T14:36:17+08:00",
+  "html_url": "https://gitcode.com/cann/ops-nn/issues/4519",
+  "id": 4215068,
+  "issue_priority_detail": {
+    "id": 116,
+    "title": "无优先级"
+  },
+  "issue_state": "进行中",
+  "issue_state_detail": {
+    "id": 285,
+    "serial": 0,
+    "title": "进行中"
+  },
+  "issue_type": "任务",
+  "issue_type_detail": {
+    "id": 255,
+    "is_system": false,
+    "title": "任务"
+  },
+  "labels": [
+    {
+      "color": "#35e029",
+      "created_at": "2026-03-20T11:25:13+08:00",
+      "id": 38861,
+      "name": "resolved",
+      "updated_at": "2026-08-14T16:36:47+08:00"
+    }
+  ],
+  "number": "4519",
+  "priority": 0,
+  "repository": {
+    "assigner": {},
+    "created_at": "2025-09-27T17:40:34+08:00",
+    "description": "本项目是CANN提供的神经网络类计算算子库，实现网络在NPU上加速计算。",
+    "full_name": "cann/ops-nn",
+    "id": 7665709,
+    "name": "ops-nn",
+    "paas": "",
+    "path": "ops-nn",
+    "updated_at": "2025-09-27T18:09:31+08:00"
+  },
+  "state": "closed",
+  "title": "[Bug] foreach_addcmul_scalar int32 经 float24 往返丢失低位（16777217→16777216）",
+  "updated_at": "2026-08-14T14:36:17+08:00",
+  "user": {
+    "html_url": "https://gitcode.com/Agent-Bug-Hunter",
+    "id": "6a703d4a2106067367a07b5b",
+    "login": "Agent-Bug-Hunter",
+    "name": "Agent-Bug-Hunter",
+    "object_id": "6a703d4a2106067367a07b5b"
+  },
+  "visibility_reason": "public"
+}

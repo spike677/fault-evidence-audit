@@ -1,0 +1,143 @@
+[
+  {
+    "assignees": [],
+    "base": {
+      "ref": "master",
+      "repo": {
+        "full_name": "cann/ops-transformer",
+        "name": "ops-transformer",
+        "path": "ops-transformer"
+      },
+      "sha": "f9b6b679b7a9582be399d6d7cbb919ef13cc645f"
+    },
+    "body": "## 描述\n<!--在这里详细描述你的改动，包括改动的原因和所采取的方法。-->\nMoeInitRoutingQuantV2 算子（arch35）在部分测试用例中出现精度失败。\n\n### 根因分析\n`moe_v2_gather_quant_simt.h` 中 `floatQueue_` 的 Buffer 初始化大小计算存在缺陷：\n\n- 原逻辑：`AlignBytes(perLoopCols_, sizeof(float))` 直接按 `perLoopCols_` 计算，未考虑数据类型 T 的对齐\n- 当 `perLoopCols_` 未按 T 类型大小对齐时，分配的 Buffer 空间不足，导致后续计算精度异常\n\n### 修复方案\n在 `AlignBytes` 之前增加 `Align(perLoopCols_, sizeof(T))`，确保先按数据类型 T 对齐，再按 float 字节要求对齐：\n\n```cpp\n// 修复前\npipe_->InitBuffer(floatQueue_, 1, AlignBytes(perLoopCols_, sizeof(float)));\n\n// 修复后\npipe_->InitBuffer(floatQueue_, 1, AlignBytes(Align(perLoopCols_, sizeof(T)), sizeof(float)));\n```\n\n## 关联的Issue\n<!-- 如果这个PR是为了解决特定的Issue，请在这里提供Issue链接。例如：关联Issue #000-->\n<!-- 如果这个PR是为了解决特定的问题单，请在这里描述问题单单号。-->\nhttps://gitcode.com/cann/ops-transformer/issues/3372\n\n## 测试\n<!--描述进行了哪些测试来验证你的改动。包括但不限于二级冒烟、算子泛化等。-->\n完成自验证\n\n## 文档更新\n<!--如果这个PR包含文档的更新，请在这里指出。例如：更新了README.md文件。-->\n无\n\n## 类型标签\n<!--  [x] 表示选中 -->\n- [x] 🐛 Bug修复\n- [ ] ✨ 新特性\n- [ ] ⚡ 性能优化\n- [ ] ♻️ 重构\n- [ ] 🧪 测试\n- [ ] 📦 构建/CI\n- [ ] 🔧 配置变更\n- [ ] 📝 文档更新\n- [ ] ⬆️ 依赖升级\n- [ ] 🔒 安全修复\n- [ ] 🧹 代码清理\n- [ ] ❓ 其他，请描述：\n\n",
+    "can_merge_check": true,
+    "created_at": "2026-06-27T16:24:23.160+08:00",
+    "diff_url": "https://gitcode.com/cann/ops-transformer/merge_requests/7722/diffs",
+    "head": {
+      "assigner": {
+        "login": "wuxiyuan",
+        "name": "wuxiyuan"
+      },
+      "ref": "master",
+      "repo": {
+        "full_name": "wuxiyuan/ops-transformer_7688",
+        "name": "ops-transformer_7688",
+        "path": "ops-transformer_7688"
+      },
+      "sha": "62da17caa64cdc80b732d2a9de9369189dc22bb7"
+    },
+    "html_url": "https://gitcode.com/cann/ops-transformer/merge_requests/7722",
+    "id": 8794390,
+    "labels": [
+      {
+        "color": "#2865E0",
+        "created_at": "2025-06-21T10:53:09+08:00",
+        "id": 4929,
+        "name": "cann-cla/yes",
+        "updated_at": "2026-06-27T16:24:33+08:00"
+      },
+      {
+        "color": "#3ee029",
+        "created_at": "2025-12-16T09:45:21+08:00",
+        "id": 22553,
+        "name": "api-check-pass",
+        "updated_at": "2026-06-27T16:45:33+08:00"
+      },
+      {
+        "color": "#21BA45",
+        "created_at": "2025-06-10T14:17:23+08:00",
+        "id": 3873,
+        "name": "ci-pipeline-passed",
+        "updated_at": "2026-06-27T16:46:17+08:00"
+      },
+      {
+        "color": "#22ed07",
+        "created_at": "2025-05-29T20:14:31+08:00",
+        "id": 2742,
+        "name": "approved",
+        "updated_at": "2026-06-27T18:30:13+08:00"
+      },
+      {
+        "color": "#17f207",
+        "created_at": "2025-05-29T20:14:01+08:00",
+        "id": 2741,
+        "name": "lgtm",
+        "updated_at": "2026-06-27T18:30:13+08:00"
+      }
+    ],
+    "merged_at": "2026-06-27T18:30:22.223+08:00",
+    "number": 7722,
+    "state": "merged",
+    "testers": [],
+    "title": "修复MoeInitRoutingQuantV2部分用例精度失败问题",
+    "updated_at": "2026-06-27T18:30:29.624+08:00"
+  },
+  {
+    "assignees": [],
+    "base": {
+      "ref": "9.1.0",
+      "repo": {
+        "full_name": "cann/ops-transformer",
+        "name": "ops-transformer",
+        "path": "ops-transformer"
+      },
+      "sha": "21f9728687a90327e87cead6194468e3b320e445"
+    },
+    "body": "## 描述\n<!--在这里详细描述你的改动，包括改动的原因和所采取的方法。-->\nMoeInitRoutingQuantV2 算子（arch35）在部分测试用例中出现精度失败。\n\n### 根因分析\n`moe_v2_gather_quant_simt.h` 中 `floatQueue_` 的 Buffer 初始化大小计算存在缺陷：\n\n- 原逻辑：`AlignBytes(perLoopCols_, sizeof(float))` 直接按 `perLoopCols_` 计算，未考虑数据类型 T 的对齐\n- 当 `perLoopCols_` 未按 T 类型大小对齐时，分配的 Buffer 空间不足，导致后续计算精度异常\n\n### 修复方案\n在 `AlignBytes` 之前增加 `Align(perLoopCols_, sizeof(T))`，确保先按数据类型 T 对齐，再按 float 字节要求对齐：\n\n```cpp\n// 修复前\npipe_->InitBuffer(floatQueue_, 1, AlignBytes(perLoopCols_, sizeof(float)));\n\n// 修复后\npipe_->InitBuffer(floatQueue_, 1, AlignBytes(Align(perLoopCols_, sizeof(T)), sizeof(float)));\n```\n\n## 关联的Issue\n<!-- 如果这个PR是为了解决特定的Issue，请在这里提供Issue链接。例如：关联Issue #000-->\n<!-- 如果这个PR是为了解决特定的问题单，请在这里描述问题单单号。-->\nhttps://gitcode.com/cann/ops-transformer/issues/3372\n\n## 测试\n<!--描述进行了哪些测试来验证你的改动。包括但不限于二级冒烟、算子泛化等。-->\n完成自验证\n\n## 文档更新\n<!--如果这个PR包含文档的更新，请在这里指出。例如：更新了README.md文件。-->\n无\n\n## 类型标签\n<!--  [x] 表示选中 -->\n- [x] 🐛 Bug修复\n- [ ] ✨ 新特性\n- [ ] ⚡ 性能优化\n- [ ] ♻️ 重构\n- [ ] 🧪 测试\n- [ ] 📦 构建/CI\n- [ ] 🔧 配置变更\n- [ ] 📝 文档更新\n- [ ] ⬆️ 依赖升级\n- [ ] 🔒 安全修复\n- [ ] 🧹 代码清理\n- [ ] ❓ 其他，请描述：\n\n",
+    "can_merge_check": true,
+    "created_at": "2026-06-27T17:17:20.332+08:00",
+    "diff_url": "https://gitcode.com/cann/ops-transformer/merge_requests/7728/diffs",
+    "head": {
+      "assigner": {
+        "login": "wuxiyuan",
+        "name": "wuxiyuan"
+      },
+      "ref": "wxy9.1.0",
+      "repo": {
+        "full_name": "wuxiyuan/ops-transformer_7688",
+        "name": "ops-transformer_7688",
+        "path": "ops-transformer_7688"
+      },
+      "sha": "72666fbc1e8cd9b66a550016b7bcb267fc819df3"
+    },
+    "html_url": "https://gitcode.com/cann/ops-transformer/merge_requests/7728",
+    "id": 8794755,
+    "labels": [
+      {
+        "color": "#2865E0",
+        "created_at": "2025-06-21T10:53:09+08:00",
+        "id": 4929,
+        "name": "cann-cla/yes",
+        "updated_at": "2026-06-27T17:17:29+08:00"
+      },
+      {
+        "color": "#21BA45",
+        "created_at": "2025-06-10T14:17:23+08:00",
+        "id": 3873,
+        "name": "ci-pipeline-passed",
+        "updated_at": "2026-06-27T17:34:25+08:00"
+      },
+      {
+        "color": "#22ed07",
+        "created_at": "2025-05-29T20:14:31+08:00",
+        "id": 2742,
+        "name": "approved",
+        "updated_at": "2026-06-27T18:24:58+08:00"
+      },
+      {
+        "color": "#17f207",
+        "created_at": "2025-05-29T20:14:01+08:00",
+        "id": 2741,
+        "name": "lgtm",
+        "updated_at": "2026-06-27T18:24:58+08:00"
+      }
+    ],
+    "merged_at": "2026-06-27T18:25:06.430+08:00",
+    "number": 7728,
+    "state": "merged",
+    "testers": [],
+    "title": "修复MoeInitRoutingQuantV2部分用例精度失败问题",
+    "updated_at": "2026-06-27T18:25:12.788+08:00"
+  }
+]

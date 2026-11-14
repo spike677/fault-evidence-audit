@@ -1,0 +1,110 @@
+[
+  {
+    "additions": 9,
+    "blob_id": "3855a320cc5a11b10aed80635fdd258dc77f9eb8",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/b73693a17e4909a71c6ca74d20486b975625705c/index/scatter_nd_update/op_kernel/arch35/scatter_nd_update_common.h",
+    "deletions": 2,
+    "filename": "index/scatter_nd_update/op_kernel/arch35/scatter_nd_update_common.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 9,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -50,6 +50,7 @@ public:\n     int64_t shiftOffset_ = UB_AGLIN_VALUE / sizeof(U);\n     uint32_t uniqueIdNum_ = 0;\n     float maxScore_ = 0;\n+    int64_t varInAxis_ = 0;\n \n     AscendC::GlobalTensor<U> indicesGm_;\n     AscendC::GlobalTensor<T> updatesGm_;\n@@ -280,7 +281,10 @@ public:\n         for (int64_t i = 0; i < rowLen; i++) {\n             int64_t rowOfset = outOfstLocal(i) * afterAxis_;\n             int64_t outOfset = rowOfset + GetBlockIdx() * eachCoreAfterAxisCount_ + colIdx * afterAxisFactor_;\n-            CopyOut<T>(yGm_[outOfset], dataLocal[i * colLenAlignSize], colLen);\n+            int64_t indicesValue = outOfstLocal(i);\n+ \t        if (indicesValue >= 0 && indicesValue < varInAxis_) {\n+ \t            CopyOut<T>(yGm_[outOfset], dataLocal[i * colLenAlignSize], colLen);\n+ \t        }\n         }\n         dataQueue_.FreeTensor(dataLocal);\n     }\n@@ -303,7 +307,10 @@ public:\n             int64_t inOfset = updatesOriginIdexLocal(uniqueIdx) * colLenAlignSize;\n             int64_t outOfset = shiftSortLocal(uniqueIdx) * afterAxis_;\n             outOfset += GetBlockIdx() * eachCoreAfterAxisCount_ + colIdx * afterAxisFactor_;\n-            CopyOut<T>(yGm_[outOfset], dataLocal[inOfset], colLen);\n+            int64_t indicesValue = shiftSortLocal(uniqueIdx);\n+ \t        if (indicesValue >= 0 && indicesValue < varInAxis_) {\n+ \t            CopyOut<T>(yGm_[outOfset], dataLocal[inOfset], colLen);\n+ \t        }\n         }\n \n         uniqueIdCountQue_.EnQue(uniqueIdCountLocal);\n",
+      "new_file": false,
+      "new_path": "index/scatter_nd_update/op_kernel/arch35/scatter_nd_update_common.h",
+      "old_path": "index/scatter_nd_update/op_kernel/arch35/scatter_nd_update_common.h",
+      "removed_lines": 2,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/b73693a17e4909a71c6ca74d20486b975625705c/index/scatter_nd_update/op_kernel/arch35/scatter_nd_update_common.h",
+    "sha": "b73693a17e4909a71c6ca74d20486b975625705c",
+    "source_branch": "fix_scatterndu",
+    "source_project": {
+      "full_name": "xingtaowu/ops-nn",
+      "human_name": "xingtaowu / ops-nn",
+      "id": 9081079,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 11,
+    "blob_id": "208ff4c501b4dd22115494643c3798c8749ccf6e",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/b73693a17e4909a71c6ca74d20486b975625705c/index/scatter_nd_update/op_kernel/arch35/scatter_nd_update_simd.h",
+    "deletions": 2,
+    "filename": "index/scatter_nd_update/op_kernel/arch35/scatter_nd_update_simd.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 11,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -65,6 +65,7 @@ __aicore__ inline void ScatterNdUpdateSimd<T, U>::Init(\n     this->afterAxisFactor_ = tilingData_.afterAxisFactor;\n     this->indexRankSize_ = tilingData_.indexRankSize;\n     this->eachCoreAfterAxisCount_ = tilingData_.eachCoreAfterAxisCount;\n+    this->varInAxis_ = tilingData_.varInAxis;\n     this->InitBaseBuffer(pipe_, tilingData_.indicesFactor, indices, updates, y);\n \n     curCoreIndexCount_ = (GetBlockIdx() != (tilingData_.usedCoreNumBefore - 1) ? tilingData_.eachCoreIndexCount :\n@@ -158,6 +159,7 @@ __aicore__ inline void ScatterNdUpdateSimd<T, U>::CopyOutSplitIndices(\n     LocalTensor<T> dataLocal = this->dataQueue_.template DeQue<T>();\n     LocalTensor<U> outOfstLocal = this->outOfstBuf_.template Get<U>();\n     int64_t colLenAlignSize = Ops::Base::CeilAlign(colLen * sizeof(T), UB_AGLIN_VALUE) / sizeof(T);\n+    int64_t varInAxis = tilingData_.varInAxis;\n \n     event_t eventIdVToS = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::V_S));\n     SetFlag<HardEvent::V_S>(eventIdVToS);\n@@ -165,7 +167,10 @@ __aicore__ inline void ScatterNdUpdateSimd<T, U>::CopyOutSplitIndices(\n     for (int64_t i = 0; i < rowLen; i++) {\n         int64_t rowOfset = outOfstLocal(i) * tilingData_.afterAxis;\n         int64_t outOfset = rowOfset + colIdx * tilingData_.afterAxisFactor;\n-        this->template CopyOut<T>(yGm_[outOfset], dataLocal[i * colLenAlignSize], colLen);\n+        int64_t indicesValue = outOfstLocal(i);\n+ \t    if (indicesValue >= 0 && indicesValue < varInAxis) {\n+ \t        this->template CopyOut<T>(yGm_[outOfset], dataLocal[i * colLenAlignSize], colLen);\n+ \t    }\n     }\n     this->dataQueue_.FreeTensor(dataLocal);\n }\n@@ -180,6 +185,7 @@ __aicore__ inline void ScatterNdUpdateSimd<T, U>::CopyOutSplitIndicesWithSort(\n     LocalTensor<uint32_t> updatesOriginIdexLocal = this->updatesOriginIdexQue_.template DeQue<uint32_t>();\n     LocalTensor<int32_t> uniqueIdCountLocal = this->uniqueIdCountQue_.template DeQue<int32_t>();\n     int64_t colLenAlignSize = Ops::Base::CeilAlign(colLen * sizeof(T), UB_AGLIN_VALUE) / sizeof(T);\n+    int64_t varInAxis = tilingData_.varInAxis;\n \n     event_t eventIdVToS = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::V_S));\n     SetFlag<HardEvent::V_S>(eventIdVToS);\n@@ -189,7 +195,10 @@ __aicore__ inline void ScatterNdUpdateSimd<T, U>::CopyOutSplitIndicesWithSort(\n         int64_t inOfset = updatesOriginIdexLocal(uniqueIdx) * colLenAlignSize;\n         int64_t outOfset = shiftSortLocal(uniqueIdx) * tilingData_.afterAxis;\n         outOfset += colIdx * tilingData_.afterAxisFactor;\n-        this->template CopyOut<T>(yGm_[outOfset], dataLocal[inOfset], colLen);\n+        int64_t indicesValue = shiftSortLocal(uniqueIdx);\n+ \t    if (indicesValue >= 0 && indicesValue < varInAxis) {\n+ \t        this->template CopyOut<T>(yGm_[outOfset], dataLocal[inOfset], colLen);\n+ \t    }\n     }\n \n     this->uniqueIdCountQue_.FreeTensor(uniqueIdCountLocal);\n",
+      "new_file": false,
+      "new_path": "index/scatter_nd_update/op_kernel/arch35/scatter_nd_update_simd.h",
+      "old_path": "index/scatter_nd_update/op_kernel/arch35/scatter_nd_update_simd.h",
+      "removed_lines": 2,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/b73693a17e4909a71c6ca74d20486b975625705c/index/scatter_nd_update/op_kernel/arch35/scatter_nd_update_simd.h",
+    "sha": "b73693a17e4909a71c6ca74d20486b975625705c",
+    "source_branch": "fix_scatterndu",
+    "source_project": {
+      "full_name": "xingtaowu/ops-nn",
+      "human_name": "xingtaowu / ops-nn",
+      "id": 9081079,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 13,
+    "blob_id": "04ad607128b566b90db371e91547997a82e0463c",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/b73693a17e4909a71c6ca74d20486b975625705c/index/scatter_nd_update/op_kernel/arch35/scatter_nd_update_simd_mask.h",
+    "deletions": 5,
+    "filename": "index/scatter_nd_update/op_kernel/arch35/scatter_nd_update_simd_mask.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 13,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -139,7 +139,11 @@ __aicore__ inline void ScatterNdUpdateSimdMask<T, U>::ProcessMaskOneLine()\n         event_t eventIdVToS = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::V_S));\n         SetFlag<HardEvent::V_S>(eventIdVToS);\n         WaitFlag<HardEvent::V_S>(eventIdVToS);\n-        if (maskLocal(outOfstLocal(0)) != 0) {\n+        int64_t outOfstVal = outOfstLocal(0);\n+ \t    if (outOfstVal < 0 || outOfstVal >= tilingData_.varInAxis) {\n+ \t        continue;\n+ \t    }\n+        if (maskLocal(outOfstVal) != 0) {\n             continue;\n         }\n \n@@ -149,7 +153,7 @@ __aicore__ inline void ScatterNdUpdateSimdMask<T, U>::ProcessMaskOneLine()\n             CopyUpdatesIn(rowIdx, colIdx, tilingData_.indicesFactor, colDataLen);\n             CopyOutOneLine(colDataLen, colIdx);\n         }\n-        maskLocal(outOfstLocal(0)) = 1;\n+        maskLocal(outOfstVal) = 1;\n     }\n }\n \n@@ -168,10 +172,14 @@ __aicore__ inline void ScatterNdUpdateSimdMask<T, U>::CopyOutMultiLine(int64_t r\n     WaitFlag<HardEvent::V_S>(eventIdVToS);\n     for (int64_t i = 0; i < rowLen; i++) {\n         int64_t srcOffset = i * colLenAlignSize;\n-        int64_t dstOffset = outOfstLocal(i) * tilingData_.afterAxis;\n-        if (maskLocal(outOfstLocal(i)) == 0) {\n+        int64_t outOfstVal = outOfstLocal(i);\n+ \t    if (outOfstVal < 0 || outOfstVal >= tilingData_.varInAxis) {\n+ \t        continue;\n+ \t    }\n+        int64_t dstOffset = outOfstVal * tilingData_.afterAxis;\n+        if (maskLocal(outOfstVal) == 0) {\n             this->template CopyOut<T>(yGm_[dstOffset], dataLocal[srcOffset], tilingData_.afterAxis);\n-            maskLocal(outOfstLocal(i)) = 1;\n+            maskLocal(outOfstVal) = 1;\n         }\n     }\n     this->dataQueue_.FreeTensor(dataLocal);\n",
+      "new_file": false,
+      "new_path": "index/scatter_nd_update/op_kernel/arch35/scatter_nd_update_simd_mask.h",
+      "old_path": "index/scatter_nd_update/op_kernel/arch35/scatter_nd_update_simd_mask.h",
+      "removed_lines": 5,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/b73693a17e4909a71c6ca74d20486b975625705c/index/scatter_nd_update/op_kernel/arch35/scatter_nd_update_simd_mask.h",
+    "sha": "b73693a17e4909a71c6ca74d20486b975625705c",
+    "source_branch": "fix_scatterndu",
+    "source_project": {
+      "full_name": "xingtaowu/ops-nn",
+      "human_name": "xingtaowu / ops-nn",
+      "id": 9081079,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  }
+]

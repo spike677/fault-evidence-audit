@@ -1,0 +1,146 @@
+[
+  {
+    "additions": 6,
+    "blob_id": "0b3aa6128ed06b114cf858f087760eaa8b13d0f5",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/9aeaf3782456413eb3f4b1fe8a3f05c619458a81/matmul/fused_mat_mul/docs/aclnnFusedMatmul.md",
+    "deletions": 3,
+    "filename": "matmul/fused_mat_mul/docs/aclnnFusedMatmul.md",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 6,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -249,8 +249,8 @@ aclnnStatus aclnnFusedMatmul(\n         <td>fusedOpType为gelu_tanh、gelu_erf，传入的bias不是空指针。</td>\n       </tr>\n       <tr>\n-        <td rowspan=\"6\">ACLNN_ERR_PARAM_INVALID</td>\n-        <td rowspan=\"6\">161002</td>\n+        <td rowspan=\"7\">ACLNN_ERR_PARAM_INVALID</td>\n+        <td rowspan=\"7\">161002</td>\n         <td>x1和x2的数据类型不在支持的范围之内。</td>\n       </tr>\n       <tr>\n@@ -268,6 +268,9 @@ aclnnStatus aclnnFusedMatmul(\n       <tr>\n         <td>x1和x2无法做数据类型推导。</td>\n       </tr>\n+      <tr>\n+        <td>当传入的fusedOpType属于\"\"、\"add\"、\"mul\"、\"relu\"中的一种, 且输入的数据类型为float32时, cubeMathType只支持3。</td>\n+      </tr>\n   </tbody></table>\n \n \n@@ -316,7 +319,7 @@ aclnnStatus aclnnFusedMatmul(\n - 确定性说明：\n   - <term>Atlas 训练系列产品</term>、<term>Atlas 推理系列产品</term>：aclnnFusedMatmul默认确定性实现。\n \n-- 当fusedOpType取值为\"gelu_erf\"、\"gelu_tanh\"时，x1、x2、x3的数据类型必须为BFLOAT16、FLOAT16;当fusedOpType为\"\"、\"relu\"、\"add\"、\"mul\"时, x1、x2、x3的数据类型必须为BFLOAT16、FLOAT16、FLOAT32。\n+- 当fusedOpType取值为\"gelu_erf\"、\"gelu_tanh\"时，x1、x2、x3的数据类型必须为BFLOAT16、FLOAT16;当fusedOpType为\"\"、\"relu\"、\"add\"、\"mul\"时, x1、x2、x3的数据类型必须为FLOAT32(cubeMathType只支持3)、BFLOAT16、FLOAT16。\n \n ## 调用示例\n \n",
+      "new_file": false,
+      "new_path": "matmul/fused_mat_mul/docs/aclnnFusedMatmul.md",
+      "old_path": "matmul/fused_mat_mul/docs/aclnnFusedMatmul.md",
+      "removed_lines": 3,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/9aeaf3782456413eb3f4b1fe8a3f05c619458a81/matmul/fused_mat_mul/docs/aclnnFusedMatmul.md",
+    "sha": "9aeaf3782456413eb3f4b1fe8a3f05c619458a81",
+    "source_branch": "fusedmatmul支持fp32拆成小算子",
+    "source_project": {
+      "full_name": "sxb154714/ops-nn",
+      "human_name": "sxb154714 / ops-nn",
+      "id": 9038874,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 11,
+    "blob_id": "0b064ff6995f8478b3c2faa923506a2944bca216",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/9aeaf3782456413eb3f4b1fe8a3f05c619458a81/matmul/fused_mat_mul/op_host/fused_mat_mul_infershape.cpp",
+    "deletions": 2,
+    "filename": "matmul/fused_mat_mul/op_host/fused_mat_mul_infershape.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 11,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -33,22 +33,31 @@ ge::graphStatus InferShapeForFusedMatMul(InferShapeContext* context)\n     OP_CHECK_IF(context == nullptr, CUBE_INNER_ERR_REPORT(\"FusedMatmul\", \"context is null\"), return ge::GRAPH_FAILED);\n     auto op_name = context->GetNodeName();\n     auto shape_a = context->GetInputShape(kMatMulX1Idx);\n+    auto tensor_a = context->GetInputDesc(kMatMulX1Idx);\n     auto shape_b = context->GetInputShape(kMatMulX2Idx);\n     auto shape_bias = context->GetOptionalInputShape(kMatMulX3Idx);\n     auto shape_c = context->GetOptionalInputShape(kFusedMatMulX3Idx);\n     auto shape_out = context->GetOutputShape(kOutputIdx);\n     auto attrs = context->GetAttrs();\n+\n     OP_CHECK_IF(\n-        shape_a == nullptr || shape_b == nullptr || shape_out == nullptr || attrs == nullptr,\n+        shape_a == nullptr || shape_b == nullptr || shape_out == nullptr || attrs == nullptr || tensor_a == nullptr,\n         CUBE_INNER_ERR_REPORT(op_name, \"shape or attrs is null\"), return ge::GRAPH_FAILED);\n \n     const bool* trans_a = attrs->GetAttrPointer<bool>(kMatMulX1Idx);\n     const bool* trans_b = attrs->GetAttrPointer<bool>(kMatMulX2Idx);\n+    const bool* enable_hf32 = attrs->GetAttrPointer<bool>(kMatMulX3Idx);\n     const char* fused_op_type = attrs->GetAttrPointer<char>(kFusedMatMulX3Idx);\n+\n     OP_CHECK_IF(\n-        trans_a == nullptr || trans_b == nullptr || fused_op_type == nullptr,\n+        trans_a == nullptr || trans_b == nullptr || enable_hf32 == nullptr  || fused_op_type == nullptr,\n         CUBE_INNER_ERR_REPORT(op_name, \"attribute is null\"), return ge::GRAPH_FAILED);\n \n+    ge::DataType dtype = tensor_a->GetDataType();\n+    OP_CHECK_IF(\n+        dtype == ge::DT_FLOAT && !(*enable_hf32),\n+        CUBE_INNER_ERR_REPORT(op_name, \"fusedmatmul is only supported bf16/fp16/hf32, do not surrport fp32.\"),\n+        return ge::GRAPH_FAILED);\n     OP_CHECK_IF(\n         (strcmp(fused_op_type, \"\") != 0 && strcmp(fused_op_type, \"add\") != 0 && strcmp(fused_op_type, \"mul\") != 0 &&\n          strcmp(fused_op_type, \"gelu_erf\") != 0 && strcmp(fused_op_type, \"gelu_tanh\") != 0 &&\n",
+      "new_file": false,
+      "new_path": "matmul/fused_mat_mul/op_host/fused_mat_mul_infershape.cpp",
+      "old_path": "matmul/fused_mat_mul/op_host/fused_mat_mul_infershape.cpp",
+      "removed_lines": 2,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/9aeaf3782456413eb3f4b1fe8a3f05c619458a81/matmul/fused_mat_mul/op_host/fused_mat_mul_infershape.cpp",
+    "sha": "9aeaf3782456413eb3f4b1fe8a3f05c619458a81",
+    "source_branch": "fusedmatmul支持fp32拆成小算子",
+    "source_project": {
+      "full_name": "sxb154714/ops-nn",
+      "human_name": "sxb154714 / ops-nn",
+      "id": 9038874,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 4,
+    "blob_id": "a30a9d370151e09fe889a2824ad3b0ef2d412534",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/9aeaf3782456413eb3f4b1fe8a3f05c619458a81/matmul/fused_mat_mul/op_host/op_api/aclnn_fused_matmul.cpp",
+    "deletions": 0,
+    "filename": "matmul/fused_mat_mul/op_host/op_api/aclnn_fused_matmul.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 4,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -75,6 +75,10 @@ static inline bool CheckMathType(const aclTensor* self, const aclTensor* mat2, i\n     bool selfFloat = self->GetDataType() == DataType::DT_FLOAT;\n     bool mat2Float = mat2->GetDataType() == DataType::DT_FLOAT;\n     auto promoteType = selfFloat || mat2Float ? DataType::DT_FLOAT : self->GetDataType();\n+    if (cubeMathType != USE_HF32 && promoteType == DataType::DT_FLOAT) {\n+        OP_LOGE(ACLNN_ERR_PARAM_INVALID, \"fusedmatmul is only supported bf16/fp16/hf32, do not surrport fp32.\");\n+        return false;\n+    }\n     return CheckCubeMathTypeForMm(promoteType, cubeMathType);\n }\n \n",
+      "new_file": false,
+      "new_path": "matmul/fused_mat_mul/op_host/op_api/aclnn_fused_matmul.cpp",
+      "old_path": "matmul/fused_mat_mul/op_host/op_api/aclnn_fused_matmul.cpp",
+      "removed_lines": 0,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/9aeaf3782456413eb3f4b1fe8a3f05c619458a81/matmul/fused_mat_mul/op_host/op_api/aclnn_fused_matmul.cpp",
+    "sha": "9aeaf3782456413eb3f4b1fe8a3f05c619458a81",
+    "source_branch": "fusedmatmul支持fp32拆成小算子",
+    "source_project": {
+      "full_name": "sxb154714/ops-nn",
+      "human_name": "sxb154714 / ops-nn",
+      "id": 9038874,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 15,
+    "blob_id": "a90db3f727127511979b206e8f40f56e36f69f7d",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/9aeaf3782456413eb3f4b1fe8a3f05c619458a81/matmul/fused_mat_mul/tests/ut/op_host/test_aclnn_fused_matmul.cpp",
+    "deletions": 1,
+    "filename": "matmul/fused_mat_mul/tests/ut/op_host/test_aclnn_fused_matmul.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 15,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -61,6 +61,20 @@ TEST_F(l2_fusedmatmul_test, ascend910_95_test_hf32_bias)\n     EXPECT_EQ(aclRet, ACLNN_SUCCESS);\n }\n \n+TEST_F(l2_fusedmatmul_test, ascend910_95_test_hf32_relu)\n+{\n+    TensorDesc x1_desc = TensorDesc({128, 512}, ACL_FLOAT, ACL_FORMAT_ND);\n+    TensorDesc x2_desc = TensorDesc({512, 512}, ACL_FLOAT, ACL_FORMAT_ND);\n+    TensorDesc bias_desc = TensorDesc({512}, ACL_FLOAT, ACL_FORMAT_ND);\n+    TensorDesc out_desc = TensorDesc({128, 512}, ACL_FLOAT, ACL_FORMAT_ND);\n+    int8_t cubeMathType = op::USE_HF32;\n+    auto ut = OP_API_UT(aclnnFusedMatmul, INPUT(x1_desc, x2_desc, bias_desc, (aclTensor*)nullptr, \"relu\", cubeMathType),\n+                        OUTPUT(out_desc));\n+    uint64_t workspace_size = 0;\n+    aclnnStatus aclRet = ut.TestGetWorkspaceSize(&workspace_size);\n+    EXPECT_EQ(aclRet, ACLNN_SUCCESS);\n+}\n+\n TEST_F(l2_fusedmatmul_test, ascend910_95_test_f32_relu)\n {\n     TensorDesc x1_desc = TensorDesc({128, 512}, ACL_FLOAT, ACL_FORMAT_ND);\n@@ -72,7 +86,7 @@ TEST_F(l2_fusedmatmul_test, ascend910_95_test_f32_relu)\n                         OUTPUT(out_desc));\n     uint64_t workspace_size = 0;\n     aclnnStatus aclRet = ut.TestGetWorkspaceSize(&workspace_size);\n-    EXPECT_EQ(aclRet, ACLNN_SUCCESS);\n+    EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_INVALID);\n }\n \n TEST_F(l2_fusedmatmul_test, ascend910_95_test_bias_f16_f32)\n",
+      "new_file": false,
+      "new_path": "matmul/fused_mat_mul/tests/ut/op_host/test_aclnn_fused_matmul.cpp",
+      "old_path": "matmul/fused_mat_mul/tests/ut/op_host/test_aclnn_fused_matmul.cpp",
+      "removed_lines": 1,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/9aeaf3782456413eb3f4b1fe8a3f05c619458a81/matmul/fused_mat_mul/tests/ut/op_host/test_aclnn_fused_matmul.cpp",
+    "sha": "9aeaf3782456413eb3f4b1fe8a3f05c619458a81",
+    "source_branch": "fusedmatmul支持fp32拆成小算子",
+    "source_project": {
+      "full_name": "sxb154714/ops-nn",
+      "human_name": "sxb154714 / ops-nn",
+      "id": 9038874,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  }
+]

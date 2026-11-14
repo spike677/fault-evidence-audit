@@ -1,0 +1,38 @@
+[
+  {
+    "additions": 2,
+    "blob_id": "f27df3d8782025ac6fa52e5831a32367b51a767c",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/e49c5266bee00faf388a391cdd382f00a5e7b6fd/index/repeat_interleave/op_kernel/arch35/repeat_interleave.h",
+    "deletions": 1,
+    "filename": "index/repeat_interleave/op_kernel/arch35/repeat_interleave.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 2,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -189,7 +189,7 @@ __aicore__ inline void RepeatInterleaveImpl<T, U>::CopyOneCpToRepeatOut(\n         }\n         AscendC::MicroAPI::DataCopyUnAlignPost(xOutLocalPtr, uOut, 0);\n     }\n-    copyFromXNum_ += dataCount;\n+\n     copyToMatchOutNum_ += repeatTimes * dataCount;\n     xOutQueue_.EnQue(xOutLocal);\n     return;\n@@ -226,6 +226,7 @@ __aicore__ inline void RepeatInterleaveImpl<T, U>::CopyXToMatchOut(int64_t start\n             xOutQueue_.EnQue(xOutLocal);\n         }\n         CopyOneCpToRepeatOut(xInLocal, tailRepeatTimes);\n+        copyFromXNum_ += tilingData_.mergedDims[2];\n     }\n     xInQueue_.FreeTensor(xInLocal);\n     return;\n",
+      "new_file": false,
+      "new_path": "index/repeat_interleave/op_kernel/arch35/repeat_interleave.h",
+      "old_path": "index/repeat_interleave/op_kernel/arch35/repeat_interleave.h",
+      "removed_lines": 1,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/e49c5266bee00faf388a391cdd382f00a5e7b6fd/index/repeat_interleave/op_kernel/arch35/repeat_interleave.h",
+    "sha": "e49c5266bee00faf388a391cdd382f00a5e7b6fd",
+    "source_branch": "repeat",
+    "source_project": {
+      "full_name": "yourealize/ops-nn",
+      "human_name": "yourealize / ops-nn",
+      "id": 8853379,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  }
+]

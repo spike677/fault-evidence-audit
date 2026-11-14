@@ -1,0 +1,110 @@
+[
+  {
+    "additions": 1,
+    "blob_id": "7901623967dd71637cccff9df94bd4872a95e055",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/43df9e2ee3bbac3df4a2e7dbe2ff33590a6a508b/build.sh",
+    "deletions": 0,
+    "filename": "build.sh",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 1,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -1021,6 +1021,7 @@ clean_build_out() {\n clean_build_binary() {\n   if [ -d \"${BUILD_PATH}/tbe\" ]; then\n     rm -rf ${BUILD_PATH}/tbe/\n+    find ${BUILD_PATH} -type f -name \"*.gcda\" -delete\n   fi\n   if [ -d \"${BUILD_PATH}/autogen\" ]; then\n     rm -rf ${BUILD_PATH}/autogen/\n",
+      "new_file": false,
+      "new_path": "build.sh",
+      "old_path": "build.sh",
+      "removed_lines": 0,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/43df9e2ee3bbac3df4a2e7dbe2ff33590a6a508b/build.sh",
+    "sha": "43df9e2ee3bbac3df4a2e7dbe2ff33590a6a508b",
+    "source_branch": "bmmv3",
+    "source_project": {
+      "full_name": "ww-blue/ops-nn",
+      "human_name": "ww-blue / ops-nn",
+      "id": 7682539,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 4,
+    "blob_id": "300807c6277e7a6f6794dee1a32109bd78469986",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/43df9e2ee3bbac3df4a2e7dbe2ff33590a6a508b/matmul/batch_mat_mul_v3/op_kernel/batch_mat_mul_v3.h",
+    "deletions": 4,
+    "filename": "matmul/batch_mat_mul_v3/op_kernel/batch_mat_mul_v3.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 4,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -724,21 +724,21 @@ BatchMatMulUnalignedMultiBatchKernel<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, BLOCK_TY\n     // ND2NZ\n     if (innerParams_.nd2nzFlag == ND2NZ_SELECT::ONLY_B) {\n         MatrixBtoNZV2<B_T>(innerParams_.workspaceGMNZ, innerParams_.bGMND, tilingPtr_->matmulTiling.matmulTiling,\n-            innerParams_.isTransposeB, ubBuf_, 0, 0, innerParams_.nd2nzBatchNum);\n+            innerParams_.isTransposeB, ubBuf_, 0, 0, innerParams_.nd2nzBatchNum, tilingPtr_->multiBatchInfo.cBatchDimAll);\n     } else if (innerParams_.nd2nzFlag == ND2NZ_SELECT::ONLY_A) {\n         MatrixAtoNZV2<A_T>(innerParams_.workspaceGMNZ, innerParams_.aGMND, tilingPtr_->matmulTiling.matmulTiling,\n-            innerParams_.isTransposeA, ubBuf_, 0, 0, innerParams_.nd2nzBatchNum);\n+            innerParams_.isTransposeA, ubBuf_, 0, 0, innerParams_.nd2nzBatchNum, tilingPtr_->multiBatchInfo.cBatchDimAll);\n     } else if (innerParams_.nd2nzFlag == ND2NZ_SELECT::BOTH_AB) {\n         if (!innerParams_.alignedA) {\n             MatrixAtoNZV2<A_T>(innerParams_.workspaceGMNZ, innerParams_.aGMND, tilingPtr_->matmulTiling.matmulTiling,\n-                innerParams_.isTransposeA, ubBuf_, 0, 0, innerParams_.nd2nzBatchNum);\n+                innerParams_.isTransposeA, ubBuf_, 0, 0, innerParams_.nd2nzBatchNum, tilingPtr_->multiBatchInfo.cBatchDimAll);\n         }\n         event_t eventMTE3MTE2 = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::MTE3_MTE2));\n         SetFlag<HardEvent::MTE3_MTE2>(eventMTE3MTE2);\n         WaitFlag<HardEvent::MTE3_MTE2>(eventMTE3MTE2);\n         if (!innerParams_.alignedB) {\n             MatrixBtoNZV2<B_T>(innerParams_.workspaceGMabNZ, innerParams_.bGMND, tilingPtr_->matmulTiling.matmulTiling,\n-                innerParams_.isTransposeB, ubBuf_, 0, 0, innerParams_.nd2nzBatchNum);\n+                innerParams_.isTransposeB, ubBuf_, 0, 0, innerParams_.nd2nzBatchNum, tilingPtr_->multiBatchInfo.cBatchDimAll);\n         }\n     }\n     SyncAll();\n",
+      "new_file": false,
+      "new_path": "matmul/batch_mat_mul_v3/op_kernel/batch_mat_mul_v3.h",
+      "old_path": "matmul/batch_mat_mul_v3/op_kernel/batch_mat_mul_v3.h",
+      "removed_lines": 4,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/43df9e2ee3bbac3df4a2e7dbe2ff33590a6a508b/matmul/batch_mat_mul_v3/op_kernel/batch_mat_mul_v3.h",
+    "sha": "43df9e2ee3bbac3df4a2e7dbe2ff33590a6a508b",
+    "source_branch": "bmmv3",
+    "source_project": {
+      "full_name": "ww-blue/ops-nn",
+      "human_name": "ww-blue / ops-nn",
+      "id": 7682539,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 24,
+    "blob_id": "95e9622e3debe591d15bf7acce6e431c48a51726",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/43df9e2ee3bbac3df4a2e7dbe2ff33590a6a508b/matmul/mat_mul_v3/op_kernel/mat_mul_nd2nz.h",
+    "deletions": 14,
+    "filename": "matmul/mat_mul_v3/op_kernel/mat_mul_nd2nz.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 24,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -82,17 +82,19 @@ __aicore__ inline void CopyPadNd2Nz(const GlobalTensor<T>& dstGlobal, const Glob\n                 {static_cast<uint16_t>(baseH), 1, 1, nRowBlock});\n         }\n     }\n-    for (uint32_t j = 0; j < numIterJ; j++) {\n-        Copy(ubLocal2[baseH * nRepeat * j + numIterI * REPEAT_TIMES_MAX * c0Size],\n-            ubLocal1[nRepeat * j + numIterI * REPEAT_TIMES_MAX * baseW], nRepeat, heightTail,\n-            {static_cast<uint16_t>(baseH), 1, 1, nRowBlock});\n+    if (heightTail){\n+        for (uint32_t j = 0; j < numIterJ; j++) {\n+            Copy(ubLocal2[baseH * nRepeat * j + numIterI * REPEAT_TIMES_MAX * c0Size],\n+                ubLocal1[nRepeat * j + numIterI * REPEAT_TIMES_MAX * baseW], nRepeat, heightTail,\n+                {static_cast<uint16_t>(baseH), 1, 1, nRowBlock});\n+        }\n+        if (widthTail) {\n+            Copy(ubLocal2[baseH * nRepeat * numIterJ + numIterI * REPEAT_TIMES_MAX * c0Size],\n+                ubLocal1[nRepeat * numIterJ + numIterI * REPEAT_TIMES_MAX * baseW], widthTail, heightTail,\n+                {static_cast<uint16_t>(baseH), 1, 1, nRowBlock});\n+        }\n     }\n-    if (widthTail) {\n-        Copy(ubLocal2[baseH * nRepeat * numIterJ + numIterI * REPEAT_TIMES_MAX * c0Size],\n-            ubLocal1[nRepeat * numIterJ + numIterI * REPEAT_TIMES_MAX * baseW], widthTail, heightTail,\n-            {static_cast<uint16_t>(baseH), 1, 1, nRowBlock});\n-    }\n-\n+    \n     SetFlag<HardEvent::V_MTE3>(static_cast<event_t>(0));\n     WaitFlag<HardEvent::V_MTE3>(static_cast<event_t>(0));\n \n@@ -225,7 +227,7 @@ __aicore__ inline void MatrixtoNZ(uint64_t oriN, uint64_t oriD, uint64_t nValue,\n \n template <class T>\n __aicore__ inline void MatrixAtoNZV2(GM_ADDR workspace, GM_ADDR src, const TCubeTiling &cfg, bool isTransposeA,\n-    TBuf<TPosition::VECCALC>& tmpBuf, uint32_t baseAN, uint32_t baseAD, uint32_t batch = 1) {\n+    TBuf<TPosition::VECCALC>& tmpBuf, uint32_t baseAN, uint32_t baseAD, uint32_t batch = 1, uint32_t originalBatch = 1) {\n     uint64_t c0Size = 16;\n     GetSizeC0<T>(c0Size);\n     uint32_t usedCoreNum = cfg.usedCoreNum * GetTaskRation();  // 使用最大的核数\n@@ -253,7 +255,11 @@ __aicore__ inline void MatrixAtoNZV2(GM_ADDR workspace, GM_ADDR src, const TCube\n             (oriD * sizeof(T) <= 512 && oriD % 4 == 0))) { // 32 is blocksize, 512 is cacheline\n             Nd2nzVnchwMM(tempDstGlobal, tempSrcGlobal, oriN, oriD, batch, tmpBuf, usedCoreNum);\n         } else {\n-            MatrixtoNZ(oriN, oriD, nValue, dValue, baseAN, baseAD, usedCoreNum, tempSrcGlobal, tempDstGlobal, tmpBuf);\n+            if (originalBatch > 1 && nValue * dValue * sizeof(T) * 2 > 192 * 1024){  // nd2nz cannot exceed the size of UB\n+                Nd2nzVnchwBMM(tempDstGlobal, tempSrcGlobal, oriN, oriD, batch, tmpBuf, usedCoreNum);\n+            } else {\n+                MatrixtoNZ(oriN, oriD, nValue, dValue, baseAN, baseAD, usedCoreNum, tempSrcGlobal, tempDstGlobal, tmpBuf);\n+            }\n         }\n     }\n #else\n@@ -263,7 +269,7 @@ __aicore__ inline void MatrixAtoNZV2(GM_ADDR workspace, GM_ADDR src, const TCube\n \n template <class T>\n __aicore__ inline void MatrixBtoNZV2(GM_ADDR workspace, GM_ADDR src, const TCubeTiling &cfg, bool isTransposeB,\n-    TBuf<TPosition::VECCALC> &tmpBuf, uint32_t baseBN, uint32_t baseBD, uint32_t batch = 1) {\n+    TBuf<TPosition::VECCALC> &tmpBuf, uint32_t baseBN, uint32_t baseBD, uint32_t batch = 1, uint32_t originalBatch = 1) {\n     uint64_t c0Size = 16;\n     GetSizeC0<T>(c0Size);\n     uint32_t usedCoreNum = cfg.usedCoreNum * GetTaskRation();  // 使用最大的核数\n@@ -289,7 +295,11 @@ __aicore__ inline void MatrixBtoNZV2(GM_ADDR workspace, GM_ADDR src, const TCube\n             (oriD * sizeof(T) <= 512 && oriD % 4 == 0))) { // 32 is blocksize, 512 is cacheline\n             Nd2nzVnchwMM(tempDstGlobal1, tempSrcGlobal1, oriN, oriD, batch, tmpBuf, usedCoreNum);\n         } else {\n-            MatrixtoNZ(oriN, oriD, nValue, dValue, baseBN, baseBD, usedCoreNum, tempSrcGlobal1, tempDstGlobal1, tmpBuf);\n+            if (originalBatch > 1 && nValue * dValue * sizeof(T) * 2 > 192 * 1024){  // nd2nz cannot exceed the size of UB\n+                Nd2nzVnchwBMM(tempDstGlobal1, tempSrcGlobal1, oriN, oriD, batch, tmpBuf, usedCoreNum);\n+            } else {\n+                MatrixtoNZ(oriN, oriD, nValue, dValue, baseBN, baseBD, usedCoreNum, tempSrcGlobal1, tempDstGlobal1, tmpBuf);\n+            }    \n         }\n     }\n #else\n",
+      "new_file": false,
+      "new_path": "matmul/mat_mul_v3/op_kernel/mat_mul_nd2nz.h",
+      "old_path": "matmul/mat_mul_v3/op_kernel/mat_mul_nd2nz.h",
+      "removed_lines": 14,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/43df9e2ee3bbac3df4a2e7dbe2ff33590a6a508b/matmul/mat_mul_v3/op_kernel/mat_mul_nd2nz.h",
+    "sha": "43df9e2ee3bbac3df4a2e7dbe2ff33590a6a508b",
+    "source_branch": "bmmv3",
+    "source_project": {
+      "full_name": "ww-blue/ops-nn",
+      "human_name": "ww-blue / ops-nn",
+      "id": 7682539,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  }
+]

@@ -1,0 +1,224 @@
+[
+  {
+    "assignees": [],
+    "base": {
+      "ref": "8.5.0",
+      "repo": {
+        "full_name": "cann/ops-transformer",
+        "name": "ops-transformer",
+        "path": "ops-transformer"
+      },
+      "sha": "cb0318f5127d5f3aeef639c11161095acabcc308"
+    },
+    "body": "## 描述\n<!--在这里详细描述你的改动，包括改动的原因和所采取的方法。-->\n问题/功能描述\n本次PR主要针对FlashAttention反向传播算子中Sinkhorn注意力机制（sink == 1）的实现进行了一系列优化和修复。核心解决了三个问题：1）工作空间内存分配逻辑存在重复计算和冗余，可能导致内存分配不准确；2）梯度后处理中的数据拷贝填充策略不精确，影响计算正确性和性能；3）内核代码中存在工作空间初始化条件错误、缓冲区访问越界以及尾部数据未清零等缺陷，可能导致计算错误或程序崩溃。\n\n修改方案描述\n修改方案从内存管理、计算逻辑和内核执行三个层面进行了系统性的重构与修复。首先，将Sinkhorn相关的工作空间大小计算和偏移设置整合到条件判断块中，确保仅在功能启用时分配内存，消除了冗余。其次，优化了数据拷贝填充逻辑，动态决定是否填充，提升了内存带宽利用率。最后，在内核层面，修正了工作空间初始化逻辑，确保仅由指定核心执行一次以避免竞态和越界；同时调整了缓冲区初始化顺序，并对计算缓冲区的无效尾部区域进行显式清零，杜绝了数据污染风险，保障了Sinkhorn梯度计算的正确性和健壮性。\n## 关联的Issue\n<!-- 如果这个PR是为了解决特定的Issue，请在这里提供Issue链接。例如：关联Issue #000-->\n<!-- 如果这个PR是为了解决特定的问题单，请在这里描述问题单单号。-->\nhttps://gitcode.com/cann/ops-transformer/issues/515\n## 测试\n<!--描述进行了哪些测试来验证你的改动。包括但不限于二级冒烟、算子泛化等。-->\n\n## 文档更新\n<!--如果这个PR包含文档的更新，请在这里指出。例如：更新了README.md文件。-->\n\n## 类型标签\n<!--  [x] 表示选中 -->\n- [ ] Bug修复\n- [ ] 新特性\n- [ ] 性能优化\n- [ ] 文档更新\n- [ ] 其他，请描述：\n\n",
+    "can_merge_check": true,
+    "created_at": "2026-01-21T15:04:42.000+08:00",
+    "diff_url": "https://gitcode.com/cann/ops-transformer/merge_requests/877/diffs",
+    "head": {
+      "assigner": {
+        "login": "ansen-changan",
+        "name": "hid71829882"
+      },
+      "ref": "8.5.0",
+      "repo": {
+        "full_name": "ansen-changan/ops-transformer-4433",
+        "name": "ops-transformer-4433",
+        "path": "ops-transformer-4433"
+      },
+      "sha": "38be2dd03433af034a92ba8ba007092c4f8589fa"
+    },
+    "html_url": "https://gitcode.com/cann/ops-transformer/merge_requests/877",
+    "id": 8264462,
+    "labels": [
+      {
+        "color": "#e01a1a",
+        "created_at": "2025-12-16T09:45:54+08:00",
+        "id": 22554,
+        "name": "api-check-failed",
+        "updated_at": "2026-01-21T15:59:24+08:00"
+      },
+      {
+        "color": "#21BA45",
+        "created_at": "2025-06-10T14:17:23+08:00",
+        "id": 3873,
+        "name": "ci-pipeline-passed",
+        "updated_at": "2026-01-21T15:59:57+08:00"
+      },
+      {
+        "color": "#2865E0",
+        "created_at": "2025-06-21T10:53:09+08:00",
+        "id": 4929,
+        "name": "cann-cla/yes",
+        "updated_at": "2026-01-21T15:04:49+08:00"
+      },
+      {
+        "color": "#22ed07",
+        "created_at": "2025-05-29T20:14:31+08:00",
+        "id": 2742,
+        "name": "approved",
+        "updated_at": "2026-01-21T17:32:35+08:00"
+      },
+      {
+        "color": "#17f207",
+        "created_at": "2025-05-29T20:14:01+08:00",
+        "id": 2741,
+        "name": "lgtm",
+        "updated_at": "2026-01-21T17:45:44+08:00"
+      }
+    ],
+    "merged_at": "2026-01-21T17:47:54.027+08:00",
+    "number": 877,
+    "state": "merged",
+    "testers": [],
+    "title": "FAG sink精度修复",
+    "updated_at": "2026-01-21T17:47:55.085+08:00"
+  },
+  {
+    "assignees": [],
+    "base": {
+      "ref": "master",
+      "repo": {
+        "full_name": "cann/ops-transformer",
+        "name": "ops-transformer",
+        "path": "ops-transformer"
+      },
+      "sha": "ab7c48a6c799bcdd365078c978f2112457042410"
+    },
+    "body": "## 描述\n<!--在这里详细描述你的改动，包括改动的原因和所采取的方法。-->\n\n## 关联的Issue\n<!-- 如果这个PR是为了解决特定的Issue，请在这里提供Issue链接。例如：关联Issue #000-->\n<!-- 如果这个PR是为了解决特定的问题单，请在这里描述问题单单号。-->\n\n## 测试\n<!--描述进行了哪些测试来验证你的改动。包括但不限于二级冒烟、算子泛化等。-->\n\n## 文档更新\n<!--如果这个PR包含文档的更新，请在这里指出。例如：更新了README.md文件。-->\n\n## 类型标签\n<!--  [x] 表示选中 -->\n- [ ] Bug修复\n- [ ] 新特性\n- [ ] 性能优化\n- [ ] 文档更新\n- [ ] 其他，请描述：\n\n",
+    "can_merge_check": true,
+    "created_at": "2026-01-21T16:06:42.730+08:00",
+    "diff_url": "https://gitcode.com/cann/ops-transformer/merge_requests/885/diffs",
+    "head": {
+      "assigner": {
+        "login": "ansen-changan",
+        "name": "hid71829882"
+      },
+      "ref": "master",
+      "repo": {
+        "full_name": "ansen-changan/ops-transformer-4433",
+        "name": "ops-transformer-4433",
+        "path": "ops-transformer-4433"
+      },
+      "sha": "e7d04d6606436ccb877419909f07626a9022ff2d"
+    },
+    "html_url": "https://gitcode.com/cann/ops-transformer/merge_requests/885",
+    "id": 8264805,
+    "labels": [
+      {
+        "color": "#2865E0",
+        "created_at": "2025-06-21T10:53:09+08:00",
+        "id": 4929,
+        "name": "cann-cla/yes",
+        "updated_at": "2026-01-21T16:06:51+08:00"
+      },
+      {
+        "color": "#e01a1a",
+        "created_at": "2025-12-16T09:45:54+08:00",
+        "id": 22554,
+        "name": "api-check-failed",
+        "updated_at": "2026-01-21T16:14:15+08:00"
+      },
+      {
+        "color": "#21BA45",
+        "created_at": "2025-06-10T14:17:23+08:00",
+        "id": 3873,
+        "name": "ci-pipeline-passed",
+        "updated_at": "2026-01-21T16:15:31+08:00"
+      },
+      {
+        "color": "#22ed07",
+        "created_at": "2025-05-29T20:14:31+08:00",
+        "id": 2742,
+        "name": "approved",
+        "updated_at": "2026-01-21T17:33:07+08:00"
+      },
+      {
+        "color": "#17f207",
+        "created_at": "2025-05-29T20:14:01+08:00",
+        "id": 2741,
+        "name": "lgtm",
+        "updated_at": "2026-01-21T17:45:50+08:00"
+      }
+    ],
+    "merged_at": "2026-01-21T17:47:29.937+08:00",
+    "number": 885,
+    "state": "merged",
+    "testers": [],
+    "title": "FAG sink精度修复",
+    "updated_at": "2026-01-21T17:47:30.708+08:00"
+  },
+  {
+    "assignees": [],
+    "base": {
+      "ref": "master",
+      "repo": {
+        "full_name": "cann/ops-transformer",
+        "name": "ops-transformer",
+        "path": "ops-transformer"
+      },
+      "sha": "ab7c48a6c799bcdd365078c978f2112457042410"
+    },
+    "body": "## 描述\n<!--在这里详细描述你的改动，包括改动的原因和所采取的方法。-->\n问题/功能描述\n本次PR对Flash Attention算子及其梯度计算内核中的参数结构体进行了内存布局优化。主要解决了两个结构体内部成员的对齐或填充问题：一是调整了InputParams结构体中needSinkOp字段的位置，二是将梯度计算内核中一个占位符数组的大小从7字节缩减为3字节。这些修改旨在优化数据结构的内存布局，减少不必要的内存占用，并确保在特定硬件架构下的数据对齐和访问效率。\n\n修改方案描述\n修改涉及两个关键结构体：1) 在InputParams类中，将needSinkOp字段移动到tndSoftmaxOut字段之后，并相应地将填充字节数组InputParamsPH的大小从7减少到6。2) 在FlashAttentionScoreGradS1S2BNGS1S2SABBaseParams类中，将占位符数组FlashAttentionScoreGradS1S2BNGS1S2SABBaseParamsPH的大小从[7]更改为[3]。这些调整均不改变核心算法逻辑，仅重构了数据结构的内存布局。\n## 关联的Issue\n<!-- 如果这个PR是为了解决特定的Issue，请在这里提供Issue链接。例如：关联Issue #000-->\n<!-- 如果这个PR是为了解决特定的问题单，请在这里描述问题单单号。-->\nhttps://gitcode.com/cann/ops-transformer/issues/516\n## 测试\n<!--描述进行了哪些测试来验证你的改动。包括但不限于二级冒烟、算子泛化等。-->\n\n## 文档更新\n<!--如果这个PR包含文档的更新，请在这里指出。例如：更新了README.md文件。-->\n\n## 类型标签\n<!--  [x] 表示选中 -->\n- [ ] Bug修复\n- [ ] 新特性\n- [ ] 性能优化\n- [ ] 文档更新\n- [ ] 其他，请描述：\n\n",
+    "can_merge_check": true,
+    "created_at": "2026-01-21T16:33:04.074+08:00",
+    "diff_url": "https://gitcode.com/cann/ops-transformer/merge_requests/889/diffs",
+    "head": {
+      "assigner": {
+        "login": "ansen-changan",
+        "name": "hid71829882"
+      },
+      "ref": "master",
+      "repo": {
+        "full_name": "ansen-changan/4505",
+        "name": "4505",
+        "path": "4505"
+      },
+      "sha": "5c3964c7d3feb184b085e50c311a1a9132f9675e"
+    },
+    "html_url": "https://gitcode.com/cann/ops-transformer/merge_requests/889",
+    "id": 8264954,
+    "labels": [
+      {
+        "color": "#2865E0",
+        "created_at": "2025-06-21T10:53:09+08:00",
+        "id": 4929,
+        "name": "cann-cla/yes",
+        "updated_at": "2026-01-21T16:33:12+08:00"
+      },
+      {
+        "color": "#22ed07",
+        "created_at": "2025-05-29T20:14:31+08:00",
+        "id": 2742,
+        "name": "approved",
+        "updated_at": "2026-01-21T17:34:32+08:00"
+      },
+      {
+        "color": "#3ee029",
+        "created_at": "2025-12-16T09:45:21+08:00",
+        "id": 22553,
+        "name": "api-check-pass",
+        "updated_at": "2026-01-21T17:46:04+08:00"
+      },
+      {
+        "color": "#17f207",
+        "created_at": "2025-05-29T20:14:01+08:00",
+        "id": 2741,
+        "name": "lgtm",
+        "updated_at": "2026-01-21T17:46:02+08:00"
+      },
+      {
+        "color": "#21BA45",
+        "created_at": "2025-06-10T14:17:23+08:00",
+        "id": 3873,
+        "name": "ci-pipeline-passed",
+        "updated_at": "2026-01-21T17:47:51+08:00"
+      }
+    ],
+    "merged_at": "2026-01-21T17:47:58.477+08:00",
+    "number": 889,
+    "state": "merged",
+    "testers": [],
+    "title": "sink tiling bug",
+    "updated_at": "2026-01-21T17:47:59.067+08:00"
+  }
+]

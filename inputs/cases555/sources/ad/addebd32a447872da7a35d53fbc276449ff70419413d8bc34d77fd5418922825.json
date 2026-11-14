@@ -1,0 +1,38 @@
+[
+  {
+    "additions": 5,
+    "blob_id": "502b09c4d75cd7aeb8a216681ee7130b3ba3a500",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/21c031d000ce3f16fe2cc6ea59c258b762bd9ce8/norm/add_rms_norm_quant/op_kernel/arch35/add_rms_norm_quant_regbase_split_reduce.h",
+    "deletions": 3,
+    "filename": "norm/add_rms_norm_quant/op_kernel/arch35/add_rms_norm_quant_regbase_split_reduce.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 5,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -287,9 +287,11 @@ private:\n             ComputeFormerHandle(tempLocal, offset, 1, tail, powerSplitHalf);\n             offset += tail;\n         }\n-        RmsNorm::ComputeSum(level1Local, tempLocal, level1, SUM_COUNT);\n-        level1 += 1;\n-        RmsNorm::ComputeMultiLevelReduce(level1Local, level2Local, level3Local, level1, level2, level3);\n+        if (tail > 0) {\n+            RmsNorm::ComputeSum(level1Local, tempLocal, level1, SUM_COUNT);\n+            level1 += 1;\n+            RmsNorm::ComputeMultiLevelReduce(level1Local, level2Local, level3Local, level1, level2, level3);\n+        }\n         // Stage3: Cal MasterLoop\n         for (uint32_t repeat = 0; repeat < masterLoop; repeat++) {\n             ComputeFormerHandle(level1Local, offset, level1, powerSplit_, powerSplit_);\n",
+      "new_file": false,
+      "new_path": "norm/add_rms_norm_quant/op_kernel/arch35/add_rms_norm_quant_regbase_split_reduce.h",
+      "old_path": "norm/add_rms_norm_quant/op_kernel/arch35/add_rms_norm_quant_regbase_split_reduce.h",
+      "removed_lines": 3,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/21c031d000ce3f16fe2cc6ea59c258b762bd9ce8/norm/add_rms_norm_quant/op_kernel/arch35/add_rms_norm_quant_regbase_split_reduce.h",
+    "sha": "21c031d000ce3f16fe2cc6ea59c258b762bd9ce8",
+    "source_branch": "revise_tail",
+    "source_project": {
+      "full_name": "raoliang_sac/ops-nn",
+      "human_name": "raoliang_sac / ops-nn",
+      "id": 8067274,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  }
+]

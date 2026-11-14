@@ -1,0 +1,92 @@
+[
+  {
+    "additions": 3,
+    "blob_id": "67d82912d963113fdc6ff03efc71eef906cf15b1",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/512f8ea4c3b5aab1cd6b7130a44a8947ff1ad41b/index/index/op_kernel/arch35/index.h",
+    "deletions": 1,
+    "filename": "index/index/op_kernel/arch35/index.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 3,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -100,7 +100,9 @@ struct IndexPutAdd {\n     __aicore__ inline void operator()(__gm__ T* output, __gm__ T* input, uint32_t i, uint32_t idx)\n     {\n         if constexpr (is_same<bool, T>::value) {\n-            Simt::AtomicAnd(output + idx, input[i]);\n+            if(input[i]){\n+                output[idx] = true;\n+            }\n         } else {\n             Simt::AtomicAdd(output + idx, input[i]);\n         }\n",
+      "new_file": false,
+      "new_path": "index/index/op_kernel/arch35/index.h",
+      "old_path": "index/index/op_kernel/arch35/index.h",
+      "removed_lines": 1,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/512f8ea4c3b5aab1cd6b7130a44a8947ff1ad41b/index/index/op_kernel/arch35/index.h",
+    "sha": "512f8ea4c3b5aab1cd6b7130a44a8947ff1ad41b",
+    "source_branch": "master",
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 2,
+    "blob_id": "904fbb873069cb1096ea4ef8eac69ab782046c94",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/512f8ea4c3b5aab1cd6b7130a44a8947ff1ad41b/index/index_put_v2/op_api/aclnn_index_put_impl.cpp",
+    "deletions": 2,
+    "filename": "index/index_put_v2/op_api/aclnn_index_put_impl.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 2,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -1021,7 +1021,7 @@ static const aclTensor* IndexPutProcessArch3510(aclTensor* selfRef, const aclTen\n         for (int i = 0; i < static_cast<int>(masks.size()); i++) {\n             OP_LOGD(\"Process arch3510 masks %d is %ld.\", i, masks[i]);\n         }\n-        if (deterministicValue == 0 && !(accumulate && selfRef->GetDataType() == op::DataType::DT_BOOL)) {\n+        if (deterministicValue == 0) {\n             OP_LOGD(\"Enter IndexPutV2 Process\");\n             return IndexPutV2Process(selfCast, valuesCast, indices, accumulate, masks, selfRef->GetViewShape().GetDimNum(), \n                                       isNonContiguous, allDefinedIndices, executor);\n@@ -1099,7 +1099,7 @@ static bool IsIndexPutV2Scene(const aclTensor *selfRef, const bool accumulate)\n       if (retRts != RT_ERROR_NONE) {\n           deterministicValue = 0;\n       }\n-      if (deterministicValue == 0 && !(accumulate && selfRef->GetDataType() == op::DataType::DT_BOOL)) {\n+      if (deterministicValue == 0) {\n           return true;\n       }\n   }\n",
+      "new_file": false,
+      "new_path": "index/index_put_v2/op_api/aclnn_index_put_impl.cpp",
+      "old_path": "index/index_put_v2/op_api/aclnn_index_put_impl.cpp",
+      "removed_lines": 2,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/512f8ea4c3b5aab1cd6b7130a44a8947ff1ad41b/index/index_put_v2/op_api/aclnn_index_put_impl.cpp",
+    "sha": "512f8ea4c3b5aab1cd6b7130a44a8947ff1ad41b",
+    "source_branch": "master",
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 20,
+    "blob_id": "40497bdaeb4764b0b0f8769fe121fb19175394b7",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/512f8ea4c3b5aab1cd6b7130a44a8947ff1ad41b/index/index_put_v2/op_kernel/index_put_v2_apt.cpp",
+    "deletions": 0,
+    "filename": "index/index_put_v2/op_kernel/index_put_v2_apt.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 20,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -57,6 +57,11 @@ extern \"C\" __global__ __aicore__ void index_put_v2(GM_ADDR inputX, GM_ADDR value\n         KernelIndexNoContiguous<int64_t, IndexPutAdd<int64_t>, int32_t, uint32_t> op;\n         op.Init(output, inputX, indexedSizes, indexedStrides, indices, tilingData, value);\n         op.Process(); \n+    } else if (TILING_KEY_IS(20011)) {\n+        GET_TILING_DATA_WITH_STRUCT(IndexNonContinuousTilingData, tilingData, tiling);\n+        KernelIndexNoContiguous<bool, IndexPutAdd<bool>, int32_t, uint32_t> op;\n+        op.Init(output, inputX, indexedSizes, indexedStrides, indices, tilingData, value);\n+        op.Process(); \n     } else if (TILING_KEY_IS(20102)) {\n         GET_TILING_DATA_WITH_STRUCT(IndexNonContinuousTilingData, tilingData, tiling);\n         KernelIndexNoContiguous<half, IndexPutAdd<half>, int64_t, uint32_t> op;\n@@ -82,6 +87,11 @@ extern \"C\" __global__ __aicore__ void index_put_v2(GM_ADDR inputX, GM_ADDR value\n         KernelIndexNoContiguous<int64_t, IndexPutAdd<int64_t>, int64_t, uint32_t> op;\n         op.Init(output, inputX, indexedSizes, indexedStrides, indices, tilingData, value);\n         op.Process(); \n+    } else if (TILING_KEY_IS(20111)) {\n+        GET_TILING_DATA_WITH_STRUCT(IndexNonContinuousTilingData, tilingData, tiling);\n+        KernelIndexNoContiguous<bool, IndexPutAdd<bool>, int64_t, uint32_t> op;\n+        op.Init(output, inputX, indexedSizes, indexedStrides, indices, tilingData, value);\n+        op.Process(); \n     } else if (TILING_KEY_IS(2)) {\n         GET_TILING_DATA_WITH_STRUCT(IndexSimtTilingData, tilingData, tiling);\n         KernelIndex<half, IndexPutAdd<half>, int32_t, uint32_t> op;\n@@ -117,6 +127,11 @@ extern \"C\" __global__ __aicore__ void index_put_v2(GM_ADDR inputX, GM_ADDR value\n         KernelIndex<int64_t, IndexPutAdd<int64_t>, int32_t, uint32_t> op;\n         op.Init(output, inputX, indexedSizes, indexedStrides, indices, tilingData, value);\n         op.Process();\n+    } else if (TILING_KEY_IS(11)) {\n+        GET_TILING_DATA_WITH_STRUCT(IndexSimtTilingData, tilingData, tiling);\n+        KernelIndex<bool, IndexPutAdd<bool>, int32_t, uint32_t> op;\n+        op.Init(output, inputX, indexedSizes, indexedStrides, indices, tilingData, value);\n+        op.Process();\n     } else if (TILING_KEY_IS(12)) {\n         GET_TILING_DATA_WITH_STRUCT(IndexSimtTilingData, tilingData, tiling);\n         KernelIndex<int64_t, IndexPutAdd<int64_t>, int32_t, uint32_t> op;\n@@ -157,6 +172,11 @@ extern \"C\" __global__ __aicore__ void index_put_v2(GM_ADDR inputX, GM_ADDR value\n         KernelIndex<int64_t, IndexPutAdd<int64_t>, int64_t, uint32_t> op;\n         op.Init(output, inputX, indexedSizes, indexedStrides, indices, tilingData, value);\n         op.Process();\n+    } else if (TILING_KEY_IS(111)) {\n+        GET_TILING_DATA_WITH_STRUCT(IndexSimtTilingData, tilingData, tiling);\n+        KernelIndex<bool, IndexPutAdd<bool>, int64_t, uint32_t> op;\n+        op.Init(output, inputX, indexedSizes, indexedStrides, indices, tilingData, value);\n+        op.Process();\n     } else if (TILING_KEY_IS(112)) {\n         GET_TILING_DATA_WITH_STRUCT(IndexSimtTilingData, tilingData, tiling);\n         KernelIndex<int64_t, IndexPutAdd<int64_t>, int64_t, uint32_t> op;\n",
+      "new_file": false,
+      "new_path": "index/index_put_v2/op_kernel/index_put_v2_apt.cpp",
+      "old_path": "index/index_put_v2/op_kernel/index_put_v2_apt.cpp",
+      "removed_lines": 0,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/512f8ea4c3b5aab1cd6b7130a44a8947ff1ad41b/index/index_put_v2/op_kernel/index_put_v2_apt.cpp",
+    "sha": "512f8ea4c3b5aab1cd6b7130a44a8947ff1ad41b",
+    "source_branch": "master",
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  }
+]

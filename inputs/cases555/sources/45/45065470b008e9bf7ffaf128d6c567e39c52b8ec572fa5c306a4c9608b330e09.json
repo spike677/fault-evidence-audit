@@ -1,0 +1,83 @@
+{
+  "assignee": {
+    "avatar_url": "https://cdn-img.gitcode.com/ca/ad/c833aa5d6dc524d19ab57c829b91a616bae128f83c49dbb9aef5a64f58b57c4e.jpg",
+    "html_url": "https://gitcode.com/wmg1",
+    "id": "67409af2bbb79f75221ca38c",
+    "login": "wmg1",
+    "name": "wmg1",
+    "object_id": "67409af2bbb79f75221ca38c"
+  },
+  "assignees": [
+    {
+      "avatar_url": "https://cdn-img.gitcode.com/ca/ad/c833aa5d6dc524d19ab57c829b91a616bae128f83c49dbb9aef5a64f58b57c4e.jpg",
+      "html_url": "https://gitcode.com/wmg1",
+      "id": "67409af2bbb79f75221ca38c",
+      "login": "wmg1",
+      "name": "wmg1",
+      "object_id": "67409af2bbb79f75221ca38c"
+    }
+  ],
+  "body": "\n\nThanks for sending an issue! Please fill in the following template to help quickly solve your problem.\n\n### Describe the current behavior / 问题描述 (Mandatory / 必填)\n            \nquantbatchmatmul a8w4kernel修复，baseM和baseN随shape发生变化，所以workspace偏移也要发生变化。申请ub的大小为 alignKSize_ * sizeof(int4b_t) sizeof(int4b_t)大小为1，多申请了一半的ub大小。导致quantbatchmatmul a8w4场景 m k n 为64\t8192\t29568, kernel申请的内存超出ub，导致报错。\n\n### Environment / 环境信息 (Mandatory / 必填)\n            \n910B\n### Steps to reproduce the issue / 重现步骤 (Mandatory / 必填)\n            \n代码走读。\n### Describe the expected behavior / 预期结果 (Mandatory / 必填)\n            \nworkspace的偏移随baseM和baseN变化。 ub上申请大小由alignKSize_ * sizeof(int4b_t)改为ops::CeilDiv(alignKSize_, INT4_SIZE)\n### Related log / screenshot / 日志 / 截图 (Mandatory / 必填)\n            \n无\n### Special notes for this issue/备注 (Optional / 选填)\n            \n\n",
+  "comments": 1,
+  "created_at": "2026-03-03T20:52:32+08:00",
+  "finished_at": "2026-03-04T18:59:52+08:00",
+  "html_url": "https://gitcode.com/cann/ops-nn/issues/1298",
+  "id": 3786189,
+  "issue_priority_detail": {
+    "id": 116,
+    "title": "无优先级"
+  },
+  "issue_state": "已完成",
+  "issue_state_detail": {
+    "id": 287,
+    "serial": 0,
+    "title": "已完成"
+  },
+  "issue_type": "缺陷",
+  "issue_type_detail": {
+    "id": 258,
+    "is_system": false,
+    "title": "缺陷"
+  },
+  "labels": [
+    {
+      "color": "#2469f5",
+      "created_at": "2025-10-09T20:53:07+08:00",
+      "id": 14930,
+      "name": "Accepted",
+      "updated_at": "2026-03-04T19:01:29+08:00"
+    },
+    {
+      "color": "#35e029",
+      "created_at": "2026-03-20T11:25:13+08:00",
+      "id": 38861,
+      "name": "resolved",
+      "updated_at": "2026-03-20T13:39:10+08:00"
+    }
+  ],
+  "number": "1298",
+  "priority": 0,
+  "repository": {
+    "assigner": {},
+    "created_at": "2025-09-27T17:40:34+08:00",
+    "description": "本项目是CANN提供的神经网络类计算算子库，实现网络在NPU上加速计算。",
+    "full_name": "cann/ops-nn",
+    "id": 7665709,
+    "name": "ops-nn",
+    "paas": "",
+    "path": "ops-nn",
+    "updated_at": "2025-09-27T18:09:31+08:00"
+  },
+  "state": "closed",
+  "title": "[Bug-Report|缺陷反馈]: quantbatchmatmul a8w4kernel修复，修复workspace偏移，修复ub多申请了大小",
+  "updated_at": "2026-03-20T13:39:10+08:00",
+  "user": {
+    "avatar_url": "https://cdn-img.gitcode.com/ca/ad/c833aa5d6dc524d19ab57c829b91a616bae128f83c49dbb9aef5a64f58b57c4e.jpg",
+    "html_url": "https://gitcode.com/wmg1",
+    "id": "67409af2bbb79f75221ca38c",
+    "login": "wmg1",
+    "name": "wmg1",
+    "object_id": "67409af2bbb79f75221ca38c"
+  },
+  "visibility_reason": "public"
+}

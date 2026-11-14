@@ -1,0 +1,146 @@
+[
+  {
+    "additions": 2,
+    "blob_id": "0a077939efea85070ea4336ecb6f5e22770a39e7",
+    "blob_url": "https://gitcode.com/cann/ops-math/blob/aca72018d0eb8bc13d5aa295c5b737a5b9860b63/conversion/pad_v3/op_kernel/arch35/pad_circular_gather.h",
+    "deletions": 0,
+    "filename": "conversion/pad_v3/op_kernel/arch35/pad_circular_gather.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 2,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -421,6 +421,7 @@ private:\n             MicroAPI::Arange(lineRange, 0);\r\n             // 先拷出去，防止索引尾部脏数据\r\n             MicroAPI::DataCopy(idxAddr, lineRange, maskIdx);\r\n+            MicroAPI::LocalMemBar<MicroAPI::MemType::VEC_STORE, MicroAPI::MemType::VEC_STORE>();\r\n \r\n             MicroAPI::Adds(lineRange, lineRange, ((RangeType)-1) * lastLeftPadNum, maskIdx);\r\n             MicroAPI::CompareScalar<RangeType, CMPMODE::LT>(leftMask, lineRange, 0, maskIdx);\r\n@@ -469,6 +470,7 @@ private:\n             MicroAPI::Arange(lineRange, 0);\r\n             // 先拷出去，防止索引尾部脏数据\r\n             MicroAPI::DataCopy(idxAddr, lineRange, maskIdx);\r\n+            MicroAPI::LocalMemBar<MicroAPI::MemType::VEC_STORE, MicroAPI::MemType::VEC_STORE>();\r\n \r\n             MicroAPI::Adds(lineRange, lineRange, ((RangeType)-1) * lastLeftPadNum, maskIdx);\r\n             MicroAPI::CompareScalar<RangeType, CMPMODE::LT>(leftMask, lineRange, 0, maskIdx);\r\n",
+      "new_file": false,
+      "new_path": "conversion/pad_v3/op_kernel/arch35/pad_circular_gather.h",
+      "old_path": "conversion/pad_v3/op_kernel/arch35/pad_circular_gather.h",
+      "removed_lines": 0,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-math/raw/aca72018d0eb8bc13d5aa295c5b737a5b9860b63/conversion/pad_v3/op_kernel/arch35/pad_circular_gather.h",
+    "sha": "aca72018d0eb8bc13d5aa295c5b737a5b9860b63",
+    "source_branch": "9.1.0-beta.2",
+    "source_project": {
+      "full_name": "andong_hw/ops-math",
+      "human_name": "andong_hw / ops-math",
+      "id": 9053305,
+      "path": "ops-math"
+    },
+    "target_branch": "9.1.0-beta.2",
+    "target_project": {
+      "full_name": "cann/ops-math",
+      "human_name": "CANN / ops-math",
+      "id": 7649531,
+      "path": "ops-math"
+    }
+  },
+  {
+    "additions": 1,
+    "blob_id": "0b62bc4d0b3e1a6219bf4133fd38c405bb67ca4d",
+    "blob_url": "https://gitcode.com/cann/ops-math/blob/aca72018d0eb8bc13d5aa295c5b737a5b9860b63/conversion/pad_v3/op_kernel/arch35/pad_edge_gather.h",
+    "deletions": 0,
+    "filename": "conversion/pad_v3/op_kernel/arch35/pad_edge_gather.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 1,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -355,6 +355,7 @@ private:\n             // 先拷出去，防止索引尾部脏数据\r\n             MicroAPI::DataCopy(idxAddr, lineRange, maskIdx);\r\n             MicroAPI::DataCopy(idxAddr2, lineRange, maskIdx);\r\n+            MicroAPI::LocalMemBar<MicroAPI::MemType::VEC_STORE, MicroAPI::MemType::VEC_STORE>();\r\n \r\n             MicroAPI::Adds(lineRange, lineRange, ((RangeType)-1)*lastLeftPadNum, maskIdx);\r\n             MicroAPI::CompareScalar<RangeType, CMPMODE::LT>(leftMask, lineRange, 0, maskIdx);\r\n",
+      "new_file": false,
+      "new_path": "conversion/pad_v3/op_kernel/arch35/pad_edge_gather.h",
+      "old_path": "conversion/pad_v3/op_kernel/arch35/pad_edge_gather.h",
+      "removed_lines": 0,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-math/raw/aca72018d0eb8bc13d5aa295c5b737a5b9860b63/conversion/pad_v3/op_kernel/arch35/pad_edge_gather.h",
+    "sha": "aca72018d0eb8bc13d5aa295c5b737a5b9860b63",
+    "source_branch": "9.1.0-beta.2",
+    "source_project": {
+      "full_name": "andong_hw/ops-math",
+      "human_name": "andong_hw / ops-math",
+      "id": 9053305,
+      "path": "ops-math"
+    },
+    "target_branch": "9.1.0-beta.2",
+    "target_project": {
+      "full_name": "cann/ops-math",
+      "human_name": "CANN / ops-math",
+      "id": 7649531,
+      "path": "ops-math"
+    }
+  },
+  {
+    "additions": 3,
+    "blob_id": "8fd40db3d099d661fdf5163c8bc201aeeb053b18",
+    "blob_url": "https://gitcode.com/cann/ops-math/blob/aca72018d0eb8bc13d5aa295c5b737a5b9860b63/conversion/pad_v3/op_kernel/arch35/pad_gather.h",
+    "deletions": 0,
+    "filename": "conversion/pad_v3/op_kernel/arch35/pad_gather.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 3,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -353,6 +353,7 @@ private:\n \n             MicroAPI::Arange(indexReg, 0); // 0-128\n             MicroAPI::DataCopy(idxAddr, indexReg, maskMain);\n+            MicroAPI::LocalMemBar<MicroAPI::MemType::VEC_STORE, MicroAPI::MemType::VEC_STORE>();\n \n             for (uint16_t i = 0; i < lastTwoDimLoops; i++) {\n                 for (uint16_t j = 0; j < lastSecInDimSize; j++) {\n@@ -396,6 +397,8 @@ private:\n             MicroAPI::RegTensor<RangeType> tmpScatIdxReg;\n             MicroAPI::Arange(indexReg, 0); // b16:0-128; b64:0-32\n             MicroAPI::DataCopy(idxAddr, indexReg, maskMain);\n+            MicroAPI::LocalMemBar<MicroAPI::MemType::VEC_STORE, MicroAPI::MemType::VEC_STORE>();\n+\n             MicroAPI::Arange(validReg, beginIdx); // 128 129 ..\n             MicroAPI::Arange(scatIdxReg, scatBeginIdx);\n             for (uint16_t i = 0; i < lastDimsLeft; i++) {\n",
+      "new_file": false,
+      "new_path": "conversion/pad_v3/op_kernel/arch35/pad_gather.h",
+      "old_path": "conversion/pad_v3/op_kernel/arch35/pad_gather.h",
+      "removed_lines": 0,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-math/raw/aca72018d0eb8bc13d5aa295c5b737a5b9860b63/conversion/pad_v3/op_kernel/arch35/pad_gather.h",
+    "sha": "aca72018d0eb8bc13d5aa295c5b737a5b9860b63",
+    "source_branch": "9.1.0-beta.2",
+    "source_project": {
+      "full_name": "andong_hw/ops-math",
+      "human_name": "andong_hw / ops-math",
+      "id": 9053305,
+      "path": "ops-math"
+    },
+    "target_branch": "9.1.0-beta.2",
+    "target_project": {
+      "full_name": "cann/ops-math",
+      "human_name": "CANN / ops-math",
+      "id": 7649531,
+      "path": "ops-math"
+    }
+  },
+  {
+    "additions": 1,
+    "blob_id": "2c7b175d79d0b691b7bc1559f46be511a268bb71",
+    "blob_url": "https://gitcode.com/cann/ops-math/blob/aca72018d0eb8bc13d5aa295c5b737a5b9860b63/conversion/pad_v3/op_kernel/arch35/pad_mirror_gather.h",
+    "deletions": 0,
+    "filename": "conversion/pad_v3/op_kernel/arch35/pad_mirror_gather.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 1,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -704,6 +704,7 @@ private:\n             // 先拷出去，防止索引尾部脏数据\n             MicroAPI::DataCopy(idxAddr, lineRange, maskIdx);\n             MicroAPI::DataCopy(idxAddr2, lineRange, maskIdx);\n+            MicroAPI::LocalMemBar<MicroAPI::MemType::VEC_STORE, MicroAPI::MemType::VEC_STORE>();\n \n             MicroAPI::Adds(lineRange, lineRange, ((RangeType)-1) * lastLeftPadNum, maskIdx);\n             MicroAPI::CompareScalar<RangeType, CMPMODE::LT>(leftMask, lineRange, 0, maskIdx);\n",
+      "new_file": false,
+      "new_path": "conversion/pad_v3/op_kernel/arch35/pad_mirror_gather.h",
+      "old_path": "conversion/pad_v3/op_kernel/arch35/pad_mirror_gather.h",
+      "removed_lines": 0,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-math/raw/aca72018d0eb8bc13d5aa295c5b737a5b9860b63/conversion/pad_v3/op_kernel/arch35/pad_mirror_gather.h",
+    "sha": "aca72018d0eb8bc13d5aa295c5b737a5b9860b63",
+    "source_branch": "9.1.0-beta.2",
+    "source_project": {
+      "full_name": "andong_hw/ops-math",
+      "human_name": "andong_hw / ops-math",
+      "id": 9053305,
+      "path": "ops-math"
+    },
+    "target_branch": "9.1.0-beta.2",
+    "target_project": {
+      "full_name": "cann/ops-math",
+      "human_name": "CANN / ops-math",
+      "id": 7649531,
+      "path": "ops-math"
+    }
+  }
+]

@@ -1,0 +1,74 @@
+[
+  {
+    "additions": 7,
+    "blob_id": "98d5700f5fc64c469b854f0037106211525cd799",
+    "blob_url": "https://gitcode.com/cann/ops-math/blob/582278e2f667bce15a4a581223284b36cc405de7/math/top_k_v2/op_host/arch35/top_k_v2_tiling_arch35.cpp",
+    "deletions": 2,
+    "filename": "math/top_k_v2/op_host/arch35/top_k_v2_tiling_arch35.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 7,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -22,6 +22,7 @@\n namespace optiling {\n namespace topkV2 {\n namespace topkV2DataInfo {\n+const uint32_t CONST_ZERO = 0;\n const uint32_t CONST_TWO = 2;\n const uint32_t CONST_THREE = 3;\n const uint32_t MAX_K_FOR_INT64 = 2000;\n@@ -1085,7 +1086,11 @@ ge::graphStatus SortCheckParams(gert::TilingContext *context, topkV2DataInfo::So\n void FillTilingDataSort(gert::TilingContext *context, topkV2DataInfo::SortTileInfo &sortTileInfo,\n     TopKV2TilingDataSimd &topkTilingData)\n {\n-    topkTilingData.set_isLargest(sortTileInfo.isDescend);\n+    if (sortTileInfo.isDescend) {\n+        topkTilingData.set_isLargest(topkV2DataInfo::CONST_TWO);\n+    } else {\n+        topkTilingData.set_isLargest(topkV2DataInfo::CONST_ZERO);\n+    }\n     topkTilingData.set_isInInt32Range(sortTileInfo.isInt32);\n     topkTilingData.set_numTileDataSize(sortTileInfo.numTileDataSize);\n     topkTilingData.set_unsortedDimParallel(sortTileInfo.unsortedDimParallel);\n@@ -1243,7 +1248,7 @@ ge::graphStatus TopKV2Tiling(gert::TilingContext* context, int32_t maxCoreNum)\n         OP_LOGI(\"[TopKV2Tiling]\", \"topkTilingData.set_modeType is: %u, SORT_AND_TOP_K_MODE: %u\",\n             topkTilingData.get_modeType() , topkV2DataInfo::SORT_AND_TOP_K_MODE);\n         sortTileInfo.maxCoreNum = static_cast<uint32_t>(maxCoreNum);\n-        sortTileInfo.isDescend = static_cast<bool>(isLargest);\n+        sortTileInfo.isDescend = static_cast<bool>(*isLargest);\n         sortTileInfo.isInt32 = static_cast<uint32_t>(lastAxisNum <= topkV2DataInfo::INT32_MAX_RANGE_VALUE_FOR_SORT);\n         sortTileInfo.topKRealValue = outLastAxisNum;\n         OP_CHECK_IF(GetRadixSortMoreCore(context, sortTileInfo) != ge::GRAPH_SUCCESS,\n",
+      "new_file": false,
+      "new_path": "math/top_k_v2/op_host/arch35/top_k_v2_tiling_arch35.cpp",
+      "old_path": "math/top_k_v2/op_host/arch35/top_k_v2_tiling_arch35.cpp",
+      "removed_lines": 2,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-math/raw/582278e2f667bce15a4a581223284b36cc405de7/math/top_k_v2/op_host/arch35/top_k_v2_tiling_arch35.cpp",
+    "sha": "582278e2f667bce15a4a581223284b36cc405de7",
+    "source_branch": "topk_sync",
+    "source_project": {
+      "full_name": "BruceLP/ops-math",
+      "human_name": "BruceLP / ops-math",
+      "id": 9088562,
+      "path": "ops-math"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-math",
+      "human_name": "CANN / ops-math",
+      "id": 7649531,
+      "path": "ops-math"
+    }
+  },
+  {
+    "additions": 5,
+    "blob_id": "b78ab6497fccb9034fc39847fbaebd5fc0454e81",
+    "blob_url": "https://gitcode.com/cann/ops-math/blob/582278e2f667bce15a4a581223284b36cc405de7/math/top_k_v2/op_kernel/arch35/sort_and_top_k_more_core.h",
+    "deletions": 5,
+    "filename": "math/top_k_v2/op_kernel/arch35/sort_and_top_k_more_core.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 5,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -174,8 +174,8 @@ __aicore__ inline void SortAndTopKMoreCore<T1, T2, UT, T3, isDescend>::GetValueR\n     int64_t sortOutValueGMOffset;\r\n     int64_t outValueGmOffset;\r\n     uint32_t tileDataSize = tileDataSize_;\r\n-    LocalTensor<T1> topkResTensor = topkResQueue_.AllocTensor<T1>();\r\n     for (uint32_t i = 0; i < dataCopyLoopTimes; i++) {\r\n+        LocalTensor<T1> topkResTensor = topkResQueue_.AllocTensor<T1>();\r\n         if (hasLastTile &&  i == dataCopyLoopTimes - 1) {\r\n             tileDataSize = topKRealValue_ % tileDataSize_;\r\n         }\r\n@@ -191,8 +191,8 @@ __aicore__ inline void SortAndTopKMoreCore<T1, T2, UT, T3, isDescend>::GetValueR\n         topkResQueue_.EnQue(topkResTensor);\r\n         topkResTensor = topkResQueue_.DeQue<T1>();\r\n         DataCopyPad(this->outValueGm_[outValueGmOffset], topkResTensor, dataCopyParam);\r\n+        topkResQueue_.FreeTensor(topkResTensor);\r\n     }\r\n-    topkResQueue_.FreeTensor(topkResTensor);\r\n }\r\n \r\n template <typename T1, typename T2, typename UT, typename T3, uint64_t isDescend>\r\n@@ -208,8 +208,8 @@ __aicore__ inline void SortAndTopKMoreCore<T1, T2, UT, T3, isDescend>::GetIndexR\n     int64_t sortOutIdxGMOffset;\r\n     int64_t outIdxTmpGmOffset;\r\n     uint32_t tileDataSize = tileDataSize_;\r\n-    LocalTensor<T2> topkResTensor = topkResQueue_.AllocTensor<T2>();\r\n-    for (uint32_t i = 0; i < dataCopyLoopTimes; i++) { \r\n+    for (uint32_t i = 0; i < dataCopyLoopTimes; i++) {\r\n+        LocalTensor<T2> topkResTensor = topkResQueue_.AllocTensor<T2>();\r\n         if (hasLastTile &&  i == dataCopyLoopTimes - 1) {\r\n             tileDataSize = topKRealValue_ % tileDataSize_;\r\n         }\r\n@@ -225,8 +225,8 @@ __aicore__ inline void SortAndTopKMoreCore<T1, T2, UT, T3, isDescend>::GetIndexR\n         topkResQueue_.EnQue(topkResTensor);\r\n         topkResTensor = topkResQueue_.DeQue<T2>();\r\n         DataCopyPad(outIdxTmpGm_[outIdxTmpGmOffset], topkResTensor, dataCopyParam);\r\n+        topkResQueue_.FreeTensor(topkResTensor);\r\n     }\r\n-    topkResQueue_.FreeTensor(topkResTensor);\r\n }\r\n \r\n template <typename T1, typename T2, typename UT, typename T3, uint64_t isDescend>\r\n",
+      "new_file": false,
+      "new_path": "math/top_k_v2/op_kernel/arch35/sort_and_top_k_more_core.h",
+      "old_path": "math/top_k_v2/op_kernel/arch35/sort_and_top_k_more_core.h",
+      "removed_lines": 5,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-math/raw/582278e2f667bce15a4a581223284b36cc405de7/math/top_k_v2/op_kernel/arch35/sort_and_top_k_more_core.h",
+    "sha": "582278e2f667bce15a4a581223284b36cc405de7",
+    "source_branch": "topk_sync",
+    "source_project": {
+      "full_name": "BruceLP/ops-math",
+      "human_name": "BruceLP / ops-math",
+      "id": 9088562,
+      "path": "ops-math"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-math",
+      "human_name": "CANN / ops-math",
+      "id": 7649531,
+      "path": "ops-math"
+    }
+  }
+]

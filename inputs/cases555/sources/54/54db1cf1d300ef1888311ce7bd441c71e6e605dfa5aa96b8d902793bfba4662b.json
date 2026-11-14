@@ -1,0 +1,83 @@
+{
+  "assignee": {
+    "avatar_url": "https://cdn-img.gitcode.com/de/dc/99d2e56dcedde1f13b59cd88078a93c0805bb16fb62f022920d793e09307dcba.jpg",
+    "html_url": "https://gitcode.com/bartonfang",
+    "id": "68d0fd7cb2e6f07065083dbe",
+    "login": "bartonfang",
+    "name": "BartonFang",
+    "object_id": "68d0fd7cb2e6f07065083dbe"
+  },
+  "assignees": [
+    {
+      "avatar_url": "https://cdn-img.gitcode.com/de/dc/99d2e56dcedde1f13b59cd88078a93c0805bb16fb62f022920d793e09307dcba.jpg",
+      "html_url": "https://gitcode.com/bartonfang",
+      "id": "68d0fd7cb2e6f07065083dbe",
+      "login": "bartonfang",
+      "name": "BartonFang",
+      "object_id": "68d0fd7cb2e6f07065083dbe"
+    }
+  ],
+  "body": "\n\nThanks for sending an issue! Please fill in the following template to help quickly solve your problem.\n\n### Describe the current behavior / 问题描述 (Mandatory / 必填)\n            \nmoe_token_unpermute_with_routing_map执行小算子拼接前未进行类型转换，BF16进行计算时易丢失精度\n### Environment / 环境信息 (Mandatory / 必填)\n            \nascend950\n### Steps to reproduce the issue / 重现步骤 (Mandatory / 必填)\n            \nBF16用例概率触发精度差异，可触发case:\n\t{\n        \"id\": 637,\n        \"default_seed\": null,\n        \"name\": \"aclnn_moe_token_unpermute_with_routing_map\",\n        \"aclnn_name\": \"MoeTokenUnpermuteWithRoutingMap\",\n        \"triton_name\": null,\n        \"kernel_name\": null,\n        \"version\": \"v2.1\",\n        \"expected_error_msg\": null,\n        \"api\": \"pytorch\",\n        \"api_type\": \"function_moe_token_unpermute_with_routing_map_padded\",\n        \"aclnn_api_type\": \"aclnn_function\",\n        \"triton_api_type\": \"triton_function\",\n        \"fusion_api_type\": \"fusion_function\",\n        \"fusion_mode\": null,\n        \"dist_api_type\": \"dist_function\",\n        \"kernel_api_type\": \"kernel_function\",\n        \"backward\": false,\n        \"standard\": {\n            \"acc\": {\"cv_fused_double_benchmark\": {\"max_re_ratio\": 5, \"avg_re_ratio\": 1.5, \"root_mean_squared_ratio\": 1.5}},\n            \"perf\": \"not_key\",\n            \"mem\": 1.1\n        },\n        \"outputs\": null,\n        \"inputs\": [\n            {\n                \"name\": \"permutedTokens\",\n                \"type\": \"tensor\",\n                \"required\": true,\n                \"dtype\": \"bf16\",\n                \"shape\": [\n                    280,\n                    1087\n                ],\n                \"range_values\": [\n                    -5,\n                    5\n                ],\n                \"backward\": true,\n                \"align_32B\": null,\n                \"outlier_values\": null\n            },\n            {\n                \"name\": \"sortedIndices\",\n                \"type\": \"tensor\",\n                \"required\": true,\n                \"dtype\": \"int32\",\n                \"shape\": [\n                    280\n                ],\n                \"range_values\": 0,\n                \"backward\": true,\n                \"align_32B\": null,\n                \"outlier_values\": null\n            },\n            {\n                \"name\": \"routingMapOptional\",\n                \"type\": \"tensor\",\n                \"required\": true,\n                \"dtype\": \"int8\",\n                \"shape\": [\n                    1,\n                    70\n                ],\n                \"range_values\": [\n                    -5,\n                    5\n                ],\n                \"backward\": true,\n                \"align_32B\": null,\n                \"outlier_values\": null\n            },\n            {\n                \"name\": \"probsOptional\",\n                \"type\": \"tensor\",\n                \"required\": false,\n                \"dtype\": \"bf16\",\n                \"shape\": [\n                    1,\n                    70\n                ],\n                \"range_values\": {\n                    \"name\": \"nd\",\n                    \"mean\": [\n                        -100.0,\n                        100.0\n                    ],\n                    \"std\": [\n                        1.0,\n                        25.0\n                    ]\n                },\n                \"backward\": true,\n                \"align_32B\": null,\n                \"outlier_values\": null\n            },\n            {\n                \"name\": \"paddedMode\",\n                \"type\": \"attr\",\n                \"required\": true,\n                \"dtype\": \"bool\",\n                \"shape\": null,\n                \"range_values\": true,\n                \"backward\": false,\n                \"align_32B\": null,\n                \"outlier_values\": null\n            },\n            [\n                {\n                    \"name\": \"restoreShapeOptional\",\n                    \"type\": \"attr_tuple\",\n                    \"required\": true,\n                    \"dtype\": \"int\",\n                    \"shape\": null,\n                    \"range_values\": 1,\n                    \"backward\": false,\n                    \"align_32B\": null,\n                    \"outlier_values\": null\n                },\n                {\n                    \"name\": \"restoreShapeOptional\",\n                    \"type\": \"attr_tuple\",\n                    \"required\": true,\n                    \"dtype\": \"int\",\n                    \"shape\": null,\n                    \"range_values\": 1087,\n                    \"backward\": false,\n                    \"align_32B\": null,\n                    \"outlier_values\": null\n                }\n            ]\n        ],\n        \"acl_json\": \"\",\n        \"method_inputs\": null,\n        \"tensor_input\": null,\n        \"compute_times\": null,\n        \"save_name\": null,\n        \"uuid\": null,\n        \"downloaded\": false,\n        \"is_boundary\": false,\n        \"xrun_cs_name\": null,\n        \"xrun_data\": null\n    }\n### Describe the expected behavior / 预期结果 (Mandatory / 必填)\n            \nBF16在执行时升精度到FP32进行计算，最终精度误差优于标杆\n### Related log / screenshot / 日志 / 截图 (Mandatory / 必填)\n            \n*\n### Special notes for this issue/备注 (Optional / 选填)\n            \n\n",
+  "comments": 1,
+  "created_at": "2026-04-02T15:33:25+08:00",
+  "finished_at": "2026-04-03T09:57:18+08:00",
+  "html_url": "https://gitcode.com/cann/ops-transformer/issues/1679",
+  "id": 3834171,
+  "issue_priority_detail": {
+    "id": 116,
+    "title": "无优先级"
+  },
+  "issue_state": "已完成",
+  "issue_state_detail": {
+    "id": 287,
+    "serial": 0,
+    "title": "已完成"
+  },
+  "issue_type": "任务",
+  "issue_type_detail": {
+    "id": 255,
+    "is_system": false,
+    "title": "任务"
+  },
+  "labels": [
+    {
+      "color": "#DB2828",
+      "created_at": "2025-06-10T14:17:23+08:00",
+      "id": 3870,
+      "name": "bug-report",
+      "updated_at": "2026-04-02T15:33:25+08:00"
+    },
+    {
+      "color": "#2469f5",
+      "created_at": "2025-10-09T20:53:07+08:00",
+      "id": 14930,
+      "name": "Accepted",
+      "updated_at": "2026-04-03T09:58:56+08:00"
+    }
+  ],
+  "number": "1679",
+  "priority": 0,
+  "repository": {
+    "assigner": {},
+    "created_at": "2025-09-28T17:54:46+08:00",
+    "description": "本项目是CANN提供的transformer类大模型算子库，实现网络在NPU上加速计算。",
+    "full_name": "cann/ops-transformer",
+    "id": 7673863,
+    "name": "ops-transformer",
+    "paas": "",
+    "path": "ops-transformer",
+    "updated_at": "2025-09-28T18:06:48+08:00"
+  },
+  "state": "closed",
+  "title": "[Bug-Report|缺陷反馈]: moe_token_unpermute_with_routing_map执行小算子拼接前未进行类型转换，BF16进行计算时易丢失精度",
+  "updated_at": "2026-04-03T09:57:18+08:00",
+  "user": {
+    "avatar_url": "https://cdn-img.gitcode.com/de/dc/99d2e56dcedde1f13b59cd88078a93c0805bb16fb62f022920d793e09307dcba.jpg",
+    "html_url": "https://gitcode.com/bartonfang",
+    "id": "68d0fd7cb2e6f07065083dbe",
+    "login": "bartonfang",
+    "name": "BartonFang",
+    "object_id": "68d0fd7cb2e6f07065083dbe"
+  },
+  "visibility_reason": "public"
+}

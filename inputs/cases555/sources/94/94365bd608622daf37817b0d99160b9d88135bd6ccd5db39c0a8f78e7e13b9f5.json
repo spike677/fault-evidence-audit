@@ -1,0 +1,572 @@
+[
+  {
+    "additions": 3,
+    "blob_id": "95d69276b9d9b1b9f032dc177b2df324e54da368",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/50c2e2e8c64d5b10acd39b00a3058b7c6d35e9a2/attention/nsa_compress/op_host/nsa_compress_tiling.h",
+    "deletions": 3,
+    "filename": "attention/nsa_compress/op_host/nsa_compress_tiling.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 3,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -24,9 +24,9 @@ const size_t MAX_CORE_NUM = 48; // 使用的CORE数\n \n BEGIN_TILING_DATA_DEF(NsaCompressTilingData)\n TILING_DATA_FIELD_DEF(uint32_t, InputDtype);        // 输入kv的总大小，初始化时指定kvGM的大小\n-TILING_DATA_FIELD_DEF(uint32_t, TotalKvSize);       // 输入kv的总大小，初始化时指定kvGM的大小\n-TILING_DATA_FIELD_DEF(uint32_t, TotalCompressSize); // 输出compress_kv的总大小，初始化时指定compressKvGM的大小\n-TILING_DATA_FIELD_DEF(uint32_t, WeightSize);        // 输入weight的总大小，初始化时指定weightGM的大小\n+TILING_DATA_FIELD_DEF(uint64_t, TotalKvSize);       // 输入kv的总大小，初始化时指定kvGM的大小\n+TILING_DATA_FIELD_DEF(uint64_t, TotalCompressSize); // 输出compress_kv的总大小，初始化时指定compressKvGM的大小\n+TILING_DATA_FIELD_DEF(uint64_t, WeightSize);        // 输入weight的总大小，初始化时指定weightGM的大小\n TILING_DATA_FIELD_DEF(uint32_t, BatchSize);         // 输入Kv的batch数，用于指定actseqlenGM的大小\n TILING_DATA_FIELD_DEF(uint32_t, CompressBlockSize); // 属性CompressBlockSize值\n TILING_DATA_FIELD_DEF(uint32_t, CompressStride);    // 属性CompressStride值\n",
+      "new_file": false,
+      "new_path": "attention/nsa_compress/op_host/nsa_compress_tiling.h",
+      "old_path": "attention/nsa_compress/op_host/nsa_compress_tiling.h",
+      "removed_lines": 3,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/50c2e2e8c64d5b10acd39b00a3058b7c6d35e9a2/attention/nsa_compress/op_host/nsa_compress_tiling.h",
+    "sha": "50c2e2e8c64d5b10acd39b00a3058b7c6d35e9a2",
+    "source_branch": "fix",
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  },
+  {
+    "additions": 10,
+    "blob_id": "953e41a82fdf21b3733bd1ac0923b9f312fc6a57",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/50c2e2e8c64d5b10acd39b00a3058b7c6d35e9a2/attention/nsa_compress/op_host/nsa_compress_tiling_general.cpp",
+    "deletions": 10,
+    "filename": "attention/nsa_compress/op_host/nsa_compress_tiling_general.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 10,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -65,8 +65,8 @@ protected:\n \n         headNum = inputShape->GetStorageShape().GetDim(One);\n         headDim = inputShape->GetStorageShape().GetDim(Two);\n-        headNumDim = headNum * headDim;\n-        totalKvSize = inputShape->GetStorageShape().GetDim(0) * headNumDim;\n+        headNumDim = static_cast<uint64_t>(headNum) * headDim;\n+        totalKvSize = static_cast<uint64_t>(inputShape->GetStorageShape().GetDim(0)) * headNumDim;\n         return true;\n     }\n \n@@ -84,7 +84,7 @@ protected:\n         compressStride = static_cast<uint32_t>(*compressStridePtr);\n         actSeqLenType = *actSeqLenTypePtr;\n \n-        weightSize = compressBlockSize * headNum;\n+        weightSize = static_cast<uint64_t>(compressBlockSize) * headNum;\n         maxOverlap = 2u * (compressBlockSize + compressStride - 1u) / compressStride - 1u;\n         return true;\n     }\n@@ -148,7 +148,7 @@ protected:\n             actualOutputSeqLen.push_back(totalOutSeqLen);\n             pre_seq_len += cur_seq_len;\n         }\n-        totalCompressSize = totalOutSeqLen * headNumDim;\n+        totalCompressSize = static_cast<uint64_t>(totalOutSeqLen) * headNumDim;\n         return true;\n     }\n \n@@ -406,12 +406,12 @@ protected:\n     uint32_t compressStride;\n     uint32_t headNum;\n     uint32_t headDim;\n-    uint32_t headNumDim;\n+    uint64_t headNumDim;\n \n-    uint32_t totalKvSize;       // 输入的总元素数量\n-    uint32_t weightSize;        // weight的总元素数量\n-    uint32_t totalOutSeqLen;    // 输出的总seq_len数量\n-    uint32_t totalCompressSize; // 输出的总元素数量\n+    uint64_t totalKvSize;       // 输入的总元素数量\n+    uint64_t weightSize;        // weight的总元素数量\n+    uint64_t totalOutSeqLen;    // 输出的总seq_len数量\n+    uint64_t totalCompressSize; // 输出的总元素数量\n \n     uint32_t maxOverlap;          // 当前compressBlockSize和compressStride下,中间结果overlap的数量\n     uint32_t maxCopyKVTokensNums; // 计算搬运至UB块的kv tokens数量\n@@ -435,7 +435,7 @@ protected:\n     uint32_t ubBlockFloatNum; // 当前计算的Dtype下(fp32),对齐32B所需的元素个数\n \n     std::vector<uint32_t> actualSeqLen;                    // 各batch的seq_len长度，前缀和方式\n-    std::vector<uint32_t> actualOutputSeqLen;              // 各batch可以输出的token数，前缀和方式\n+    std::vector<uint64_t> actualOutputSeqLen;              // 各batch可以输出的token数，前缀和方式\n     std::vector<uint32_t> divisorNums;                     // aivNum的因子\n     uint32_t PerCoreHeadIdx[MAX_CORE_NUM] = {0};           // 记录每个核处理的head索引\n     uint32_t PerCoreHeadNum[MAX_CORE_NUM] = {0};           // 记录每个核处理的head数量\n",
+      "new_file": false,
+      "new_path": "attention/nsa_compress/op_host/nsa_compress_tiling_general.cpp",
+      "old_path": "attention/nsa_compress/op_host/nsa_compress_tiling_general.cpp",
+      "removed_lines": 10,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/50c2e2e8c64d5b10acd39b00a3058b7c6d35e9a2/attention/nsa_compress/op_host/nsa_compress_tiling_general.cpp",
+    "sha": "50c2e2e8c64d5b10acd39b00a3058b7c6d35e9a2",
+    "source_branch": "fix",
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  },
+  {
+    "additions": 9,
+    "blob_id": "93d063747385df205a53b95f5b8dee8d05090ef0",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/50c2e2e8c64d5b10acd39b00a3058b7c6d35e9a2/attention/nsa_compress/op_kernel/nsa_compress.h",
+    "deletions": 7,
+    "filename": "attention/nsa_compress/op_kernel/nsa_compress.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 9,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -89,8 +89,8 @@ public:\n             subTiling.subSeqLen = tilingData.BlocksNums;\n             subTiling.subHeadDim = tiling.headDim;\n             subTiling.subHeadNum = coreInfo.coreHeadNums;\n-            subTiling.subKvSize = subTiling.subSeqLen * coreInfo.coreHeadNums * tiling.headDim;\n-            subTiling.subCompressKvSize = coreInfo.coreHeadNums * tiling.headDim;\n+            subTiling.subKvSize = static_cast<uint64_t>(subTiling.subSeqLen) * coreInfo.coreHeadNums * tiling.headDim;\n+            subTiling.subCompressKvSize = static_cast<uint64_t>(coreInfo.coreHeadNums) * tiling.headDim;\n         }\n     }\n \n@@ -347,11 +347,12 @@ __aicore__ inline void KernelNASCompress<T>::Init(__gm__ uint8_t *input, __gm__\n }\n \n \n-template <typename T> \n+template <typename T>\n __aicore__ inline void KernelNASCompress<T>::CopyIn()\n {\n-    uint32_t block_start =\n-        coreInfo.coreSeqIdx * tiling.headNum * tiling.headDim + coreInfo.coreHeadIdx * tiling.headDim;\n+    uint64_t block_start =\n+        static_cast<uint64_t>(coreInfo.coreSeqIdx) * tiling.headNum * tiling.headDim +\n+        static_cast<uint64_t>(coreInfo.coreHeadIdx) * tiling.headDim;\n \n     AscendC::LocalTensor<T> kvCacheLocal = inQueueKvFp16.AllocTensor<T>();\n \n@@ -499,8 +500,9 @@ __aicore__ inline void KernelNASCompress<T>::CopyOut()\n     // 成功压缩一个compress token. 数据UB->GM\n     AscendC::LocalTensor<T> compressKvCacheLocal = outQueCompressKv.DeQue<T>();\n     if (coreInfo.coreCompressIdx < coreInfo.coreCompressNum) {\n-        uint32_t compressOffset =\n-            coreInfo.coreCompressOffset + coreInfo.coreCompressIdx * tiling.headNum * tiling.headDim;\n+        uint64_t compressOffset =\n+            coreInfo.coreCompressOffset +\n+            static_cast<uint64_t>(coreInfo.coreCompressIdx) * tiling.headNum * tiling.headDim;\n         AscendC::PipeBarrier<PIPE_ALL>();\n         AscendC::DataCopy(compressKvGm[compressOffset], compressKvCacheLocal, coreInfo.coreCompressSize);\n         AscendC::PipeBarrier<PIPE_ALL>();\n",
+      "new_file": false,
+      "new_path": "attention/nsa_compress/op_kernel/nsa_compress.h",
+      "old_path": "attention/nsa_compress/op_kernel/nsa_compress.h",
+      "removed_lines": 7,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/50c2e2e8c64d5b10acd39b00a3058b7c6d35e9a2/attention/nsa_compress/op_kernel/nsa_compress.h",
+    "sha": "50c2e2e8c64d5b10acd39b00a3058b7c6d35e9a2",
+    "source_branch": "fix",
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  },
+  {
+    "additions": 3,
+    "blob_id": "2c4e42b2b3720c6415760c55dc8370a255344e47",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/50c2e2e8c64d5b10acd39b00a3058b7c6d35e9a2/attention/nsa_compress/op_kernel/nsa_compress_seq_manager.h",
+    "deletions": 3,
+    "filename": "attention/nsa_compress/op_kernel/nsa_compress_seq_manager.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 3,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -193,14 +193,14 @@ struct SingleCompressionTokenMetadata_st {\n         return;\n     }\n \n-    __aicore__ inline uint32_t _GetWeightOffset(WeightOffsetType type, SubTilingInfo *subtiling = nullptr)\n+    __aicore__ inline uint64_t _GetWeightOffset(WeightOffsetType type, SubTilingInfo *subtiling = nullptr)\n     {\n         if (type == WeightOffsetType::BUFFSET_OFFSET && subtiling == nullptr) {\n             return WEIGHT_OFFSET_INVALID;\n         }\n         if (type == WeightOffsetType::BUFFSET_OFFSET && subtiling) {\n             uint32_t weight_dim = 8;\n-            return weightOffset * subtiling->subHeadNum * weight_dim;\n+            return static_cast<uint64_t>(weightOffset) * subtiling->subHeadNum * weight_dim;\n         }\n         if (type == WeightOffsetType::TOKEN_OFFSET) {\n             return weightOffset;\n@@ -335,7 +335,7 @@ struct SequenceManager {\n \n     /// @brief\n     /// @return\n-    __aicore__ inline uint32_t GetWeightOffset(WeightOffsetType offsetType, SubTilingInfo *subtiling = nullptr)\n+    __aicore__ inline uint64_t GetWeightOffset(WeightOffsetType offsetType, SubTilingInfo *subtiling = nullptr)\n     {\n         return compressMeta._GetWeightOffset(offsetType, subtiling);\n     }\n",
+      "new_file": false,
+      "new_path": "attention/nsa_compress/op_kernel/nsa_compress_seq_manager.h",
+      "old_path": "attention/nsa_compress/op_kernel/nsa_compress_seq_manager.h",
+      "removed_lines": 3,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/50c2e2e8c64d5b10acd39b00a3058b7c6d35e9a2/attention/nsa_compress/op_kernel/nsa_compress_seq_manager.h",
+    "sha": "50c2e2e8c64d5b10acd39b00a3058b7c6d35e9a2",
+    "source_branch": "fix",
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  },
+  {
+    "additions": 13,
+    "blob_id": "be94308c58fabb05c672c29be5a646f1aa52e60f",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/50c2e2e8c64d5b10acd39b00a3058b7c6d35e9a2/attention/nsa_compress_attention/op_host/nsa_compress_attention_tiling_general.cpp",
+    "deletions": 4,
+    "filename": "attention/nsa_compress_attention/op_host/nsa_compress_attention_tiling_general.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 13,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -950,10 +950,19 @@ protected:\n     {\n         size_t *workspaces = context_->GetWorkspaceSizes(1);\n         int64_t mm1BaseCount = NSA_BASE_S1G_SIZE * alignedS2;\n-        size_t pWorkspaceSize = static_cast<size_t>(mm1BaseCount * sizeof(float) * NSA_DOUBLE_BUFFER * aicNum); //alignedS2是S2最大值\n-        size_t stage1ResWorkspaceSize = static_cast<size_t>(mm1BaseCount * sizeof(inputDtype) * aicNum);\n-        size_t impScoreWorkspaceSize = static_cast<size_t>((NSA_BASE_S1G_SIZE / gSize) * CeilDiv(static_cast<uint64_t>(alignedS2), tilingData.importanceScoreParams.get_isM()) * sizeof(float) * NSA_DOUBLE_BUFFER * aicNum);\n-        workspaces[0] = pWorkspaceSize + impScoreWorkspaceSize + stage1ResWorkspaceSize + WORK_SPACE_RESERVE_SIZE;\n+\n+        uint64_t pWorkspaceSize64 =\n+            static_cast<uint64_t>(mm1BaseCount) * sizeof(float) * NSA_DOUBLE_BUFFER * static_cast<uint64_t>(aicNum);\n+        uint64_t stage1ResWorkspaceSize64 =\n+            static_cast<uint64_t>(mm1BaseCount) * sizeof(inputDtype) * static_cast<uint64_t>(aicNum);\n+        uint64_t baseS1G = static_cast<uint64_t>(NSA_BASE_S1G_SIZE) / static_cast<uint64_t>(gSize);\n+        uint64_t alignedS2Div = CeilDiv(static_cast<uint64_t>(alignedS2), tilingData.importanceScoreParams.get_isM());\n+        uint64_t impScoreWorkspaceSize64 =\n+            baseS1G * alignedS2Div * sizeof(float) * NSA_DOUBLE_BUFFER * static_cast<uint64_t>(aicNum);\n+\n+        uint64_t totalWorkspace64 =\n+            pWorkspaceSize64 + impScoreWorkspaceSize64 + stage1ResWorkspaceSize64 + WORK_SPACE_RESERVE_SIZE;\n+        workspaces[0] = static_cast<size_t>(totalWorkspace64);\n         return ge::GRAPH_SUCCESS;\n     }\n \n",
+      "new_file": false,
+      "new_path": "attention/nsa_compress_attention/op_host/nsa_compress_attention_tiling_general.cpp",
+      "old_path": "attention/nsa_compress_attention/op_host/nsa_compress_attention_tiling_general.cpp",
+      "removed_lines": 4,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/50c2e2e8c64d5b10acd39b00a3058b7c6d35e9a2/attention/nsa_compress_attention/op_host/nsa_compress_attention_tiling_general.cpp",
+    "sha": "50c2e2e8c64d5b10acd39b00a3058b7c6d35e9a2",
+    "source_branch": "fix",
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  },
+  {
+    "additions": 50,
+    "blob_id": "cb2fbe1adfc6c65bbe96137bee50b34bb7682513",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/50c2e2e8c64d5b10acd39b00a3058b7c6d35e9a2/attention/nsa_compress_attention/op_kernel/nsa_compress_attention_s1s2_bn2gs1_sab.h",
+    "deletions": 19,
+    "filename": "attention/nsa_compress_attention/op_kernel/nsa_compress_attention_s1s2_bn2gs1_sab.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 50,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -281,14 +281,17 @@ NsaCompressAttentionS1s2Bn2gs1SameAB<layOutType, hasAtten, hasTopkMask, INPUT_T,\n \n     // impScore\n     int64_t totalAicNum = AscendC::GetBlockNum();\n-    int64_t impScoreOffset = totalOffset * totalAicNum;\n-    int64_t perCoreOffset = (NSA_BASE_S1G_SIZE / this->tilingData->inputParams.gSize)\n-                            * (this->tilingData->inputParams.alignedS2 / this->tilingData->importanceScoreParams.isM)\n-                            * sizeof(float) * GM_DOUBLE_BUFFER;\n+    uint64_t impScoreOffsetU64 = static_cast<uint64_t>(totalOffset) * static_cast<uint64_t>(totalAicNum);\n+    uint64_t baseS1G =\n+        static_cast<uint64_t>(NSA_BASE_S1G_SIZE) / static_cast<uint64_t>(this->tilingData->inputParams.gSize);\n+    uint64_t alignedS2Div = static_cast<uint64_t>(this->tilingData->inputParams.alignedS2) /\n+        static_cast<uint64_t>(this->tilingData->importanceScoreParams.isM);\n+    uint64_t perCoreOffsetU64 = baseS1G * alignedS2Div * sizeof(float) * GM_DOUBLE_BUFFER;\n     this->impScoreRes[0].SetGlobalBuffer(\n-        (__gm__ T *)(workspace + impScoreOffset + perCoreOffset * this->cubeBlockIdx));\n+        (__gm__ T *)(workspace + impScoreOffsetU64 + perCoreOffsetU64 * static_cast<uint64_t>(this->cubeBlockIdx)));\n     this->impScoreRes[1].SetGlobalBuffer(\n-        (__gm__ T *)(workspace + impScoreOffset + perCoreOffset * this->cubeBlockIdx + perCoreOffset / 2));\n+        (__gm__ T *)(workspace + impScoreOffsetU64 + perCoreOffsetU64 *\n+        static_cast<uint64_t>(this->cubeBlockIdx) + perCoreOffsetU64 / 2));\n \n     GetExtremeValue(this->negativeFloatScalar, this->positiveFloatScalar);\n }\n@@ -424,9 +427,16 @@ NsaCompressAttentionS1s2Bn2gs1SameAB<layOutType, hasAtten, hasTopkMask, INPUT_T,\n     int64_t n2Offset = 0;\n \n     if constexpr (layOutType == LayOutTypeEnum::LAYOUT_TND) {\n-        n2Offset = extraInfo.n2oIdx * this->s1TotalSize * this->gSize * this->dSize;\n-        bOffset = extraInfo.s1SizeAcc * this->gSize * this->dSize;\n-        s1gOffset = extraInfo.s1oIdx * this->tilingData->coreParams.s1BaseSize * this->gSize * this->dSize;\n+        uint64_t n2OffsetU64 = static_cast<uint64_t>(extraInfo.n2oIdx) * static_cast<uint64_t>(this->s1TotalSize);\n+        n2OffsetU64 = n2OffsetU64 * static_cast<uint64_t>(this->gSize) * static_cast<uint64_t>(this->dSize);\n+        uint64_t bOffsetU64 = static_cast<uint64_t>(extraInfo.s1SizeAcc) *\n+            static_cast<uint64_t>(this->gSize) * static_cast<uint64_t>(this->dSize);\n+        uint64_t s1gOffsetU64 =\n+            static_cast<uint64_t>(extraInfo.s1oIdx) * static_cast<uint64_t>(this->tilingData->coreParams.s1BaseSize);\n+        s1gOffsetU64 = s1gOffsetU64 * static_cast<uint64_t>(this->gSize) * static_cast<uint64_t>(this->dSize);\n+        n2Offset = static_cast<int64_t>(n2OffsetU64);\n+        bOffset = static_cast<int64_t>(bOffsetU64);\n+        s1gOffset = static_cast<int64_t>(s1gOffsetU64);\n     }\n     this->qCoreOffset = n2Offset + bOffset + s1gOffset;\n     extraInfo.qCoreOffset = this->qCoreOffset;\n@@ -626,8 +636,11 @@ NsaCompressAttentionS1s2Bn2gs1SameAB<layOutType, hasAtten, hasTopkMask, INPUT_T,\n         AscendC::SetFlag<HardEvent::MTE2_V>(eventIdMte2ToV);\n         if constexpr (hasTopkMask == true) {\n             uint64_t maskOffset = isInfo.outerLoop * loopIdx;\n-            uint64_t maskGmOffset = (extraInfo.s1oIdx * this->cubeS1BaseSize + extraInfo.vecCoreOffset / this->gSize)\n-                                    * CeilDiv(this->tilingData->inputParams.s2Size, isInfo.isM);\n+            uint64_t s1Offset = static_cast<uint64_t>(extraInfo.s1oIdx) * static_cast<uint64_t>(this->cubeS1BaseSize);\n+            uint64_t vecOffset = static_cast<uint64_t>(extraInfo.vecCoreOffset) / static_cast<uint64_t>(this->gSize);\n+            uint64_t totalSeqOffset = s1Offset + vecOffset;\n+            uint64_t s2Div = CeilDiv(static_cast<uint64_t>(this->tilingData->inputParams.s2Size), isInfo.isM);\n+            uint64_t maskGmOffset = totalSeqOffset * s2Div;\n             uint64_t maskPad = maskLenAligned32B - scoreLoop;\n             uint32_t maskSrcStride = static_cast<uint32_t>((this->s2Aligned64B - this->scoreLoop) / 32);\n             if (loopIdx == this->s2Loop - 1) {\n@@ -827,9 +840,17 @@ NsaCompressAttentionS1s2Bn2gs1SameAB<layOutType, hasAtten, hasTopkMask, INPUT_T,\n     int64_t s1gOffset = 0;\n \n     if constexpr (layOutType == LayOutTypeEnum::LAYOUT_TND) {\n-        n2Offset = extraInfo.n2oIdx * this->s1TotalSize * k;\n-        bOffset = extraInfo.s1SizeAcc * k;\n-        s1gOffset = (extraInfo.s1oIdx * this->tilingData->coreParams.s1BaseSize + this->cubeSubIdx * ((extraInfo.cubeS1RealSize + 1) / 2)) * k;\n+        uint64_t n2OffsetU64 = static_cast<uint64_t>(extraInfo.n2oIdx) *\n+            static_cast<uint64_t>(this->s1TotalSize) * static_cast<uint64_t>(k);\n+        uint64_t bOffsetU64 = static_cast<uint64_t>(extraInfo.s1SizeAcc) * static_cast<uint64_t>(k);\n+        uint64_t s1Base =\n+            static_cast<uint64_t>(extraInfo.s1oIdx) * static_cast<uint64_t>(this->tilingData->coreParams.s1BaseSize);\n+        uint64_t cubeOffset =\n+            static_cast<uint64_t>(this->cubeSubIdx) * ((static_cast<uint64_t>(extraInfo.cubeS1RealSize) + 1) / 2);\n+        uint64_t s1gOffsetU64 = (s1Base + cubeOffset) * static_cast<uint64_t>(k);\n+        n2Offset = static_cast<int64_t>(n2OffsetU64);\n+        bOffset = static_cast<int64_t>(bOffsetU64);\n+        s1gOffset = static_cast<int64_t>(s1gOffsetU64);\n     }\n     int64_t TopkOutCoreOffset = n2Offset + bOffset + s1gOffset;\n \n@@ -1036,8 +1057,11 @@ __aicore__ inline void NsaCompressAttentionS1s2Bn2gs1SameAB<layOutType, hasAtten\n \n     if constexpr (layOutType == LayOutTypeEnum::LAYOUT_TND) {\n         // b,s2,n2,d\n-        bOffset = extraInfo.s2SizeAcc * this->tilingData->inputParams.n2Size * this->d2Size;\n-        n2Offset = extraInfo.n2oIdx * this->d2Size;\n+        uint64_t bOffsetU64 = static_cast<uint64_t>(extraInfo.s2SizeAcc) *\n+            static_cast<uint64_t>(this->tilingData->inputParams.n2Size) * static_cast<uint64_t>(this->d2Size);\n+        uint64_t n2OffsetU64 = static_cast<uint64_t>(extraInfo.n2oIdx) * static_cast<uint64_t>(this->d2Size);\n+        bOffset = static_cast<int64_t>(bOffsetU64);\n+        n2Offset = static_cast<int64_t>(n2OffsetU64);\n     }\n \n     int64_t vCoreOffset = n2Offset + bOffset + s2Offset;\n@@ -1047,9 +1071,16 @@ __aicore__ inline void NsaCompressAttentionS1s2Bn2gs1SameAB<layOutType, hasAtten\n     bmm2.SetTensorB(this->valueGm[vCoreOffset]);\n \n     if constexpr (layOutType == LayOutTypeEnum::LAYOUT_TND) {\n-        n2Offset = extraInfo.n2oIdx * this->s1TotalSize * this->gSize * this->d2Size;\n-        bOffset = extraInfo.s1SizeAcc * this->gSize * this->d2Size;\n-        s1gOffset = extraInfo.s1oIdx * this->tilingData->coreParams.s1BaseSize * this->gSize * this->d2Size;\n+        uint64_t n2OffsetU64 = static_cast<uint64_t>(extraInfo.n2oIdx) * static_cast<uint64_t>(this->s1TotalSize);\n+        n2OffsetU64 = n2OffsetU64 * static_cast<uint64_t>(this->gSize) * static_cast<uint64_t>(this->d2Size);\n+        uint64_t bOffsetU64 = static_cast<uint64_t>(extraInfo.s1SizeAcc) *\n+            static_cast<uint64_t>(this->gSize) * static_cast<uint64_t>(this->d2Size);\n+        uint64_t s1gOffsetU64 =\n+            static_cast<uint64_t>(extraInfo.s1oIdx) * static_cast<uint64_t>(this->tilingData->coreParams.s1BaseSize);\n+        s1gOffsetU64 = s1gOffsetU64 * static_cast<uint64_t>(this->gSize) * static_cast<uint64_t>(this->d2Size);\n+        n2Offset = static_cast<int64_t>(n2OffsetU64);\n+        bOffset = static_cast<int64_t>(bOffsetU64);\n+        s1gOffset = static_cast<int64_t>(s1gOffsetU64);\n     }\n     int64_t outCoreOffset = n2Offset + bOffset + s1gOffset;\n \n",
+      "new_file": false,
+      "new_path": "attention/nsa_compress_attention/op_kernel/nsa_compress_attention_s1s2_bn2gs1_sab.h",
+      "old_path": "attention/nsa_compress_attention/op_kernel/nsa_compress_attention_s1s2_bn2gs1_sab.h",
+      "removed_lines": 19,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/50c2e2e8c64d5b10acd39b00a3058b7c6d35e9a2/attention/nsa_compress_attention/op_kernel/nsa_compress_attention_s1s2_bn2gs1_sab.h",
+    "sha": "50c2e2e8c64d5b10acd39b00a3058b7c6d35e9a2",
+    "source_branch": "fix",
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  },
+  {
+    "additions": 11,
+    "blob_id": "9b39d57610fda8732612834e5e2110c4c244cf3f",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/50c2e2e8c64d5b10acd39b00a3058b7c6d35e9a2/attention/nsa_compress_grad/op_host/nsa_compress_grad_tiling.cpp",
+    "deletions": 4,
+    "filename": "attention/nsa_compress_grad/op_host/nsa_compress_grad_tiling.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 11,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -97,8 +97,8 @@ ge::graphStatus NsaCompressGradTiling::DoOpTiling()\n \n     const auto& inputKvShape = GetShapeOfInput(INDEXONE);\n     tSeqLen_ = static_cast<uint32_t>(inputKvShape.GetDim(INDEXZERO));\n-    auto headToProcessPerCore = tSeqLen_ * nHeads / aivNum_;\n-    auto headRemainder = (tSeqLen_ * nHeads) % aivNum_;\n+    auto headToProcessPerCore = static_cast<uint64_t>(tSeqLen_) * nHeads / aivNum_;\n+    auto headRemainder = (static_cast<uint64_t>(tSeqLen_) * nHeads) % aivNum_;\n \n     auto batchSize = 1;\n     const auto& actSeqLenShape = context_->GetOptionalInputShape(INDEXTHREE);\n@@ -143,8 +143,15 @@ ge::graphStatus NsaCompressGradTiling::GetWorkspaceSize() {\n     size_t *workspaces = context_->GetWorkspaceSizes(1);\n     size_t sysWorkspaceSize = WORKSIZE;\n     /* usrWorkspaceSize = workspace for other gm */\n-    size_t usrWorkspaceSize = tilingData_.get_blockSize() * tilingData_.get_numOfHead() * sizeof(uint32_t) * aivNum_ +\n-    tSeqLen_ * tilingData_.get_numOfHead() * tilingData_.get_dimOfHead() * sizeof(uint32_t) + ONE_KILO * ONE_KILO;\n+    int64_t usrWorkspaceSizeTmp = static_cast<int64_t>(tilingData_.get_blockSize()) *\n+                                  static_cast<int64_t>(tilingData_.get_numOfHead()) *\n+                                  sizeof(uint32_t) * static_cast<int64_t>(aivNum_) +\n+                                  static_cast<int64_t>(tSeqLen_) *\n+                                  static_cast<int64_t>(tilingData_.get_numOfHead()) *\n+                                  static_cast<int64_t>(tilingData_.get_dimOfHead()) *\n+                                  sizeof(uint32_t) +\n+                                  static_cast<int64_t>(ONE_KILO) * ONE_KILO;\n+    size_t usrWorkspaceSize = static_cast<size_t>(usrWorkspaceSizeTmp);\n     workspaces[0] = sysWorkspaceSize + usrWorkspaceSize;\n     return ge::GRAPH_SUCCESS;\n }\n",
+      "new_file": false,
+      "new_path": "attention/nsa_compress_grad/op_host/nsa_compress_grad_tiling.cpp",
+      "old_path": "attention/nsa_compress_grad/op_host/nsa_compress_grad_tiling.cpp",
+      "removed_lines": 4,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/50c2e2e8c64d5b10acd39b00a3058b7c6d35e9a2/attention/nsa_compress_grad/op_host/nsa_compress_grad_tiling.cpp",
+    "sha": "50c2e2e8c64d5b10acd39b00a3058b7c6d35e9a2",
+    "source_branch": "fix",
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  },
+  {
+    "additions": 17,
+    "blob_id": "6e20f114036af8d4b79a916822334fae5c6a8c07",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/50c2e2e8c64d5b10acd39b00a3058b7c6d35e9a2/attention/nsa_compress_grad/op_kernel/nsa_compress_grad.h",
+    "deletions": 16,
+    "filename": "attention/nsa_compress_grad/op_kernel/nsa_compress_grad.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 17,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -109,7 +109,7 @@ __aicore__ inline void NsaCompressGradND<T>::InitWorkspace(GM_ADDR workspace) {\n \n     if (isOverLap_) {\n         // overLap场景需要使用workspace累加\n-        uint32_t inputGradOffset = blockSize_ * headNum_ * coreNum_ * sizeof(float);\n+        uint64_t inputGradOffset = static_cast<uint64_t>(blockSize_) * headNum_ * coreNum_ * sizeof(float);\n         inputGradAtomicWs_.SetGlobalBuffer(reinterpret_cast<__gm__ float*>(workspace + inputGradOffset));\n     }\n }\n@@ -196,8 +196,8 @@ __aicore__ inline void NsaCompressGradND<T>::SetWsToZero() {\n     }\n \n     // 清零wtGradAtomicWs_\n-    uint32_t wtGradNum = blockSize_ * headNum_;\n-    Duplicate<float>(cmpGrad, ZERO_FLOAT, wtGradNum);\n+    uint64_t wtGradNum = static_cast<uint64_t>(blockSize_) * headNum_;\n+    Duplicate<float>(cmpGrad, ZERO_FLOAT, static_cast<uint32_t>(wtGradNum));\n \n     SetFlag<HardEvent::V_MTE3>(EVENT_ID3);\n     WaitFlag<HardEvent::V_MTE3>(EVENT_ID3);\n@@ -243,10 +243,10 @@ __aicore__ inline void NsaCompressGradND<T>::Process() {\n     PresetFlag();\n \n     uint32_t curBIdx = startBatchIdx_;\n-    uint32_t offsetPerRow = headDim_ * headNum_;\n-    uint32_t offsetPerBlc = offsetPerRow * blockStride_;\n+    uint64_t offsetPerRow = static_cast<uint64_t>(headDim_) * headNum_;\n+    uint64_t offsetPerBlc = offsetPerRow * blockStride_;\n     // inptKv当前处理的第一个batch的偏移\n-    uint32_t batchOffset = batchOffsetCurCore_ * offsetPerRow;\n+    uint64_t batchOffset = static_cast<uint64_t>(batchOffsetCurCore_) * offsetPerRow;\n \n     uint32_t blcStartIdxCurBch = blcIdxOfStartBatch_;\n     uint32_t seqLenCurBch = GetSeqLenTarBch(curBIdx);\n@@ -265,20 +265,21 @@ __aicore__ inline void NsaCompressGradND<T>::Process() {\n             nBlcCurBch = CompressBlkNum(seqLenCurBch, blockSize_, blockStride_);\n         }\n         // inputKV当前处理的block的偏移\n-        auto blcOffset = batchOffset + (blcId - blcStartIdxCurBch) * offsetPerBlc;\n+        uint64_t blcOffset = batchOffset + static_cast<uint64_t>(blcId - blcStartIdxCurBch) * offsetPerBlc;\n \n         // deal with current block\n         for (auto headId = 0; headId < headNum_; headId += nHeadOnce_) {\n             // Block内按行处理\n             uint32_t headToProcess = (headId + nHeadOnce_ > headNum_) ? (headNum_ - headId) : nHeadOnce_;\n-            uint32_t cmpOffset = blcId * offsetPerRow + headId * headDim_;\n+            uint64_t cmpOffset = static_cast<uint64_t>(blcId) * offsetPerRow + static_cast<uint64_t>(headId) * headDim_;\n \n             WaitFlag<HardEvent::V_MTE2>(EVENT_ID6);\n             CopyInCmpGrad(cmpOffset, headToProcess * headDim_);\n             \n             for (auto rowId = 0; rowId < blockSize_; rowId+=nRowsOnce_) {\n-                uint32_t inputOffset = blcOffset + rowId * offsetPerRow + headId * headDim_;\n-                uint32_t weightOffset = rowId * headNum_ + headId;\n+                uint64_t inputOffset =\n+                    blcOffset + static_cast<uint64_t>(rowId) * offsetPerRow + static_cast<uint64_t>(headId) * headDim_;\n+                uint64_t weightOffset = static_cast<uint64_t>(rowId) * headNum_ + headId;\n                 uint32_t rowsToProcess = (rowId + nRowsOnce_ > blockSize_) ? (blockSize_ - rowId) : nRowsOnce_;\n \n                 // 拷贝inputKV\n@@ -442,10 +443,10 @@ __aicore__ inline void NsaCompressGradND<T>::DeterministicComputeSumWtGrad() {\n         return;\n     }\n \n-    auto totalWeightLength = blockSize_ * headNum_;\n-    auto minOffset = 16;\n-    auto nLengthBase = (blockSize_ * headNum_ / minOffset) / coreNum_;\n-    auto nLengthReminder = (blockSize_ * headNum_ / minOffset) % coreNum_;\n+    uint64_t totalWeightLength = static_cast<uint64_t>(blockSize_) * headNum_;\n+    uint64_t minOffset = 16;\n+    uint64_t nLengthBase = (static_cast<uint64_t>(blockSize_) * headNum_ / minOffset) / coreNum_;\n+    uint64_t nLengthReminder = (static_cast<uint64_t>(blockSize_) * headNum_ / minOffset) % coreNum_;\n     //当前core从第几个数据开始算\n     auto startLengthIdx = (nLengthBase * coreId_ + (coreId_ < nLengthReminder ? coreId_ : nLengthReminder)) * minOffset;\n     //当前core需要处理几个数据\n@@ -501,7 +502,7 @@ __aicore__ inline void NsaCompressGradND<T>::DeterministicComputeSumWtGrad() {\n \n template<typename T>\n __aicore__ inline void NsaCompressGradND<T>::MoveWtGrad() {\n-    uint32_t wtNum = blockSize_ * headNum_;\n+    uint64_t wtNum = static_cast<uint64_t>(blockSize_) * headNum_;\n     DataCopyExtParams dataCopyParams{1, static_cast<uint32_t>(wtNum * sizeof(float)), 0, 0, 0};\n     DataCopyPadExtParams<float> padParams{false, 0, 0, 0};\n     DataCopyPad(transWtGrad_, wtGradAtomicWs_, dataCopyParams, padParams);\n@@ -509,7 +510,7 @@ __aicore__ inline void NsaCompressGradND<T>::MoveWtGrad() {\n     SetFlag<HardEvent::MTE2_V>(EVENT_ID3);\n     WaitFlag<HardEvent::MTE2_V>(EVENT_ID3);\n \n-    CastByCondition(halfTransWtGrad_, transWtGrad_, wtNum, true);\n+    CastByCondition(halfTransWtGrad_, transWtGrad_, static_cast<uint32_t>(wtNum), true);\n \n     SetFlag<HardEvent::V_MTE3>(EVENT_ID3);\n     WaitFlag<HardEvent::V_MTE3>(EVENT_ID3);\n",
+      "new_file": false,
+      "new_path": "attention/nsa_compress_grad/op_kernel/nsa_compress_grad.h",
+      "old_path": "attention/nsa_compress_grad/op_kernel/nsa_compress_grad.h",
+      "removed_lines": 16,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/50c2e2e8c64d5b10acd39b00a3058b7c6d35e9a2/attention/nsa_compress_grad/op_kernel/nsa_compress_grad.h",
+    "sha": "50c2e2e8c64d5b10acd39b00a3058b7c6d35e9a2",
+    "source_branch": "fix",
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  },
+  {
+    "additions": 5,
+    "blob_id": "dda03b8621b857103cac6de1810d61382e53a175",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/50c2e2e8c64d5b10acd39b00a3058b7c6d35e9a2/attention/nsa_selected_attention/op_kernel/nsa_selected_attention.h",
+    "deletions": 5,
+    "filename": "attention/nsa_selected_attention/op_kernel/nsa_selected_attention.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 5,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -622,9 +622,9 @@ __aicore__ inline void NsaSelectedAttention<INPUT_T, ATTEN_ENABLE>::HandleMask(u\n {\n     event_t eventIdMte2ToV = static_cast<event_t>(GetTPipePtr()->AllocEventID<HardEvent::MTE2_V>());\n     event_t eventIdMte2ToS = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::MTE2_S));\n-    uint8_t dstStride = this->selectedLength / FP32_DATA_BLOCK;\n+    uint32_t dstStride = this->selectedLength / FP32_DATA_BLOCK;\n     // when block size > 64, total bytes in one block will exceed 256\n-    // when selectedLength >= 2048, dstStride will be >= 256, can not be saved in uint8_t\n+    // when selectedLength >= 2048, dstStride will be >= 256, useLoop branch avoids narrow stride param\n     bool useLoop = this->selectedBlockSize > UL_BIT_COUNT || (this->selectedLength >= FP32_DATA_BLOCK * NUM_256);\n     uint64_t diagBlockIdx = this->currentS1 / this->selectedBlockSize;\n     int32_t currentBlockIdx = 0;\n@@ -645,7 +645,7 @@ __aicore__ inline void NsaSelectedAttention<INPUT_T, ATTEN_ENABLE>::HandleMask(u\n             } else {\n                 GetShiftLeftMask(this->selectedBlockSize, saveNum, mask[0]);\n                 AscendC::Duplicate(this->bmm1ResUb[selectedBlockIdx * this->selectedBlockSize],\n-                                   this->negativeScalar, mask, currentProcessSize, 1, dstStride);\n+                                   this->negativeScalar, mask, currentProcessSize, 1, static_cast<uint8_t>(dstStride));\n             }\n             AscendC::PipeBarrier<PIPE_V>();\n         } else if (currentBlockIdx > diagBlockIdx) {\n@@ -655,8 +655,8 @@ __aicore__ inline void NsaSelectedAttention<INPUT_T, ATTEN_ENABLE>::HandleMask(u\n                     AscendC::Duplicate(this->bmm1ResUb[offset], this->negativeScalar, this->selectedBlockSize);\n                 }\n             } else {\n-                AscendC::Duplicate(this->bmm1ResUb[selectedBlockIdx * this->selectedBlockSize],\n-                                   this->negativeScalar, this->selectedBlockSize, currentProcessSize, 1, dstStride);\n+                AscendC::Duplicate(this->bmm1ResUb[selectedBlockIdx * this->selectedBlockSize], this->negativeScalar,\n+                    this->selectedBlockSize, currentProcessSize, 1, static_cast<uint8_t>(dstStride));\n             }\n             AscendC::PipeBarrier<PIPE_V>();\n         }\n",
+      "new_file": false,
+      "new_path": "attention/nsa_selected_attention/op_kernel/nsa_selected_attention.h",
+      "old_path": "attention/nsa_selected_attention/op_kernel/nsa_selected_attention.h",
+      "removed_lines": 5,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/50c2e2e8c64d5b10acd39b00a3058b7c6d35e9a2/attention/nsa_selected_attention/op_kernel/nsa_selected_attention.h",
+    "sha": "50c2e2e8c64d5b10acd39b00a3058b7c6d35e9a2",
+    "source_branch": "fix",
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  },
+  {
+    "additions": 1,
+    "blob_id": "323513ee402f6b9e271e6d8dd2587b834281eb68",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/50c2e2e8c64d5b10acd39b00a3058b7c6d35e9a2/attention/nsa_selected_attention_grad/basic_modules/vec_op.h",
+    "deletions": 1,
+    "filename": "attention/nsa_selected_attention_grad/basic_modules/vec_op.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 1,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -452,7 +452,7 @@ __aicore__ inline void VecOp<NSAGT>::CalSoftmax(const int32_t loopIdx, const int\n                                                 const int64_t mm345Addr, const uint64_t indicesGmOffset,\n                                                 const int64_t s1Index, const int32_t blkCntOffset)\n {\n-    int64_t dataSize = processM * params.sftBaseN;\n+    int64_t dataSize = static_cast<int64_t>(processM) * static_cast<int64_t>(params.sftBaseN);\n     int64_t maxOffset = loopIdx * params.sftBaseM * BLOCK_FP32;\n     auto tmpMaxTensor = maxTensor[maxOffset];\n     auto tmpSumTensor = sumTensor[maxOffset];\n",
+      "new_file": false,
+      "new_path": "attention/nsa_selected_attention_grad/basic_modules/vec_op.h",
+      "old_path": "attention/nsa_selected_attention_grad/basic_modules/vec_op.h",
+      "removed_lines": 1,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/50c2e2e8c64d5b10acd39b00a3058b7c6d35e9a2/attention/nsa_selected_attention_grad/basic_modules/vec_op.h",
+    "sha": "50c2e2e8c64d5b10acd39b00a3058b7c6d35e9a2",
+    "source_branch": "fix",
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  },
+  {
+    "additions": 3,
+    "blob_id": "265a9b00badd1d1753ef39ae48f53c5e794cc4f0",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/50c2e2e8c64d5b10acd39b00a3058b7c6d35e9a2/attention/nsa_selected_attention_grad/op_kernel/nsa_selected_attention_grad_bs1.h",
+    "deletions": 3,
+    "filename": "attention/nsa_selected_attention_grad/op_kernel/nsa_selected_attention_grad_bs1.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 3,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -775,7 +775,7 @@ template <typename NSAGT>\n __aicore__ inline void SelectedAttentionGrad<NSAGT>::CalSoftmax(const int32_t loopIdx, const int32_t processM,\n                                                                 const int64_t mm12Addr, const int64_t mm345Addr)\n {\n-    int64_t dataSize = processM * params.sftBaseN;\n+    int64_t dataSize = static_cast<int64_t>(processM) * static_cast<int64_t>(params.sftBaseN);\n     int64_t maxOffset = loopIdx * params.sftBaseM * BLOCK_FP32;\n     auto tmpMaxTensor = maxTensor[maxOffset];\n     auto tmpSumTensor = sumTensor[maxOffset];\n@@ -810,7 +810,7 @@ template <typename NSAGT>\n __aicore__ inline void SelectedAttentionGrad<NSAGT>::CalSoftmaxGrad(const int32_t loopIdx, const int32_t processM,\n                                                                     const int64_t mm12Addr, const int64_t mm345Addr)\n {\n-    int64_t dataSize = processM * params.sftBaseN;\n+    int64_t dataSize = static_cast<int64_t>(processM) * static_cast<int64_t>(params.sftBaseN);\n     int64_t rowsumOffset = loopIdx * params.sftBaseM * BLOCK_FP32;\n     auto tmpRowSumOutTensor = rowSumOutTensor[rowsumOffset];\n \n@@ -840,7 +840,7 @@ __aicore__ inline void SelectedAttentionGrad<NSAGT>::VectorProcess(int64_t mm12A\n     int32_t loop = (params.singleM + params.sftBaseM - 1) / params.sftBaseM;\n     int32_t processM = params.sftBaseM;\n     int32_t tailM = params.singleM % params.sftBaseM;\n-    int64_t dataSize = processM * params.sftBaseN;\n+    int64_t dataSize = static_cast<int64_t>(processM) * static_cast<int64_t>(params.sftBaseN);\n \n     for (int32_t i = 0; i < loop; i++) {\n         if (i == 0) {\n",
+      "new_file": false,
+      "new_path": "attention/nsa_selected_attention_grad/op_kernel/nsa_selected_attention_grad_bs1.h",
+      "old_path": "attention/nsa_selected_attention_grad/op_kernel/nsa_selected_attention_grad_bs1.h",
+      "removed_lines": 3,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/50c2e2e8c64d5b10acd39b00a3058b7c6d35e9a2/attention/nsa_selected_attention_grad/op_kernel/nsa_selected_attention_grad_bs1.h",
+    "sha": "50c2e2e8c64d5b10acd39b00a3058b7c6d35e9a2",
+    "source_branch": "fix",
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  },
+  {
+    "additions": 1,
+    "blob_id": "b6b0f14d5ef453c3abbb75b20f527a52aacef531",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/50c2e2e8c64d5b10acd39b00a3058b7c6d35e9a2/attention/sparse_flash_mla_grad/op_host/sparse_flash_mla_grad_tiling_general.cpp",
+    "deletions": 1,
+    "filename": "attention/sparse_flash_mla_grad/op_host/sparse_flash_mla_grad_tiling_general.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 1,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -19,7 +19,7 @@\n \n namespace optiling {\n namespace smlag {\n-constexpr uint32_t WORKSPACE_BASE_CAL = 32 * 1024 * 1024; // 100MB系统预留\n+constexpr uint32_t WORKSPACE_BASE_CAL = 32 * 1024 * 1024; // 32MB系统预留\n constexpr uint32_t BLOCK = 32;                            // 32B\n constexpr uint32_t B32 = 4;                               // 4B\n constexpr uint32_t B16 = 2;\n",
+      "new_file": false,
+      "new_path": "attention/sparse_flash_mla_grad/op_host/sparse_flash_mla_grad_tiling_general.cpp",
+      "old_path": "attention/sparse_flash_mla_grad/op_host/sparse_flash_mla_grad_tiling_general.cpp",
+      "removed_lines": 1,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/50c2e2e8c64d5b10acd39b00a3058b7c6d35e9a2/attention/sparse_flash_mla_grad/op_host/sparse_flash_mla_grad_tiling_general.cpp",
+    "sha": "50c2e2e8c64d5b10acd39b00a3058b7c6d35e9a2",
+    "source_branch": "fix",
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  },
+  {
+    "additions": 2,
+    "blob_id": "d975f5e78af075e9a32bca7ab716b0af09aab085",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/50c2e2e8c64d5b10acd39b00a3058b7c6d35e9a2/attention/sparse_flash_mla_grad/op_kernel/arch22/basic_modules/cube_modules/cube3.h",
+    "deletions": 1,
+    "filename": "attention/sparse_flash_mla_grad/op_kernel/arch22/basic_modules/cube_modules/cube3.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 2,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -48,7 +48,8 @@ CubeOp<T1>::cube3Process(const int64_t keyGmOffset,\n         dsL1CachedSize = 0;\n         // selectedBlockSize较小时，nIdx需要+2或者更多\n         for (int32_t nIdx = blkCntOffset; nIdx < blkCntOffset + selectedCntOffset; nIdx+=blockOffset) {\n-            int32_t l1Offset = (nIdx - blkCntOffset) * selectedBlockSize * AlignTo<int64_t>(mmParam.singleM, SIZE_16);\n+            int64_t l1Offset = static_cast<int64_t>(nIdx - blkCntOffset) *\n+                selectedBlockSize * AlignTo<int64_t>(mmParam.singleM, SIZE_16);\n             bool isFirstLoop = (nIdx == blkCntOffset);\n             bool isLastLoop = (nIdx + blockOffset >= blkCntOffset + selectedCntOffset);\n \n",
+      "new_file": false,
+      "new_path": "attention/sparse_flash_mla_grad/op_kernel/arch22/basic_modules/cube_modules/cube3.h",
+      "old_path": "attention/sparse_flash_mla_grad/op_kernel/arch22/basic_modules/cube_modules/cube3.h",
+      "removed_lines": 1,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/50c2e2e8c64d5b10acd39b00a3058b7c6d35e9a2/attention/sparse_flash_mla_grad/op_kernel/arch22/basic_modules/cube_modules/cube3.h",
+    "sha": "50c2e2e8c64d5b10acd39b00a3058b7c6d35e9a2",
+    "source_branch": "fix",
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  },
+  {
+    "additions": 2,
+    "blob_id": "7fe3faa15f377957ed139400688c017ec1113710",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/50c2e2e8c64d5b10acd39b00a3058b7c6d35e9a2/attention/sparse_flash_mla_grad/op_kernel/arch22/basic_modules/cube_modules/cube4.h",
+    "deletions": 1,
+    "filename": "attention/sparse_flash_mla_grad/op_kernel/arch22/basic_modules/cube_modules/cube4.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 2,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -50,7 +50,8 @@ CubeOp<T1>::cube4Process(const int64_t dsGmOffset, const int64_t queryGmOffset,\n         CopyGmToL1(l1_ds_tensor, dsWorkspaceGm[dsGmOffset], mmParam.singleK, selectedCntOffset * selectedBlockSize, singleN);\n     }\n     for (int32_t mIdx = blkCntOffset; mIdx < blkCntOffset + selectedCntOffset; mIdx+=blockOffset) {\n-        int32_t l1Offset = (mIdx - blkCntOffset) * selectedBlockSize * AlignTo<int64_t>(mmParam.singleK, SIZE_16);\n+        int64_t l1Offset =\n+            static_cast<int64_t>(mIdx - blkCntOffset) * selectedBlockSize * AlignTo<int64_t>(mmParam.singleK, SIZE_16);\n \n         mmParam.singleN = perLoopDSize;\n         mmParam.singleM = min(selectedBlockSize * blockOffset, selectedCntOffset * selectedBlockSize - (mIdx - blkCntOffset) * selectedBlockSize);\n",
+      "new_file": false,
+      "new_path": "attention/sparse_flash_mla_grad/op_kernel/arch22/basic_modules/cube_modules/cube4.h",
+      "old_path": "attention/sparse_flash_mla_grad/op_kernel/arch22/basic_modules/cube_modules/cube4.h",
+      "removed_lines": 1,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/50c2e2e8c64d5b10acd39b00a3058b7c6d35e9a2/attention/sparse_flash_mla_grad/op_kernel/arch22/basic_modules/cube_modules/cube4.h",
+    "sha": "50c2e2e8c64d5b10acd39b00a3058b7c6d35e9a2",
+    "source_branch": "fix",
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  },
+  {
+    "additions": 2,
+    "blob_id": "e989d6b0f3fdb7d65137dfacf423d9c5db0cbc31",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/50c2e2e8c64d5b10acd39b00a3058b7c6d35e9a2/attention/sparse_flash_mla_grad/op_kernel/arch22/sfag_basic.h",
+    "deletions": 2,
+    "filename": "attention/sparse_flash_mla_grad/op_kernel/arch22/sfag_basic.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 2,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -216,7 +216,7 @@ __aicore__ inline void SelectedAttentionGradBasic<SMLAGT>::Process(\n         bool changeS1 = false;\n         for (int32_t i = 0; i < processBS1ByCore; i++) {\n             scatterTaskId = i % 2;\n-            int32_t t1Index = cubeBlockIdx + usedCoreNum * i;\n+            int64_t t1Index = static_cast<int64_t>(cubeBlockIdx) + usedCoreNum * i;\n             GetTndSeqLen(cu_seqlens_q, cu_seqlens_ori_kv, cu_seqlens_cmp_kv, cmp_residual_kv, t1Index, bIndex);\n             changePingpong = false;\n             for (n2Index = 0; n2Index < dimN2; n2Index++) {\n@@ -255,7 +255,7 @@ __aicore__ inline void SelectedAttentionGradBasic<SMLAGT>::Process(\n         int64_t task = 0;\n         for (int32_t i = 0; i < processBS1ByCore; i++) {\n             scatterTaskId = i % 2;\n-            int32_t t1Index = cubeBlockIdx + usedCoreNum * i;\n+            int64_t t1Index = static_cast<int64_t>(cubeBlockIdx) + usedCoreNum * i;\n             GetTndSeqLen(cu_seqlens_q, cu_seqlens_ori_kv, cu_seqlens_cmp_kv, cmp_residual_kv, t1Index, bIndex);\n             changePingpong = false;\n             for (n2Index = 0; n2Index < dimN2; n2Index++) {\n",
+      "new_file": false,
+      "new_path": "attention/sparse_flash_mla_grad/op_kernel/arch22/sfag_basic.h",
+      "old_path": "attention/sparse_flash_mla_grad/op_kernel/arch22/sfag_basic.h",
+      "removed_lines": 2,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/50c2e2e8c64d5b10acd39b00a3058b7c6d35e9a2/attention/sparse_flash_mla_grad/op_kernel/arch22/sfag_basic.h",
+    "sha": "50c2e2e8c64d5b10acd39b00a3058b7c6d35e9a2",
+    "source_branch": "fix",
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  },
+  {
+    "additions": 2,
+    "blob_id": "46478fb28ad47ac5d9f5e7ae346b8d9a7d718f2e",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/50c2e2e8c64d5b10acd39b00a3058b7c6d35e9a2/attention/sparse_flash_mla_grad/op_kernel/arch22/smlag_basic.h",
+    "deletions": 2,
+    "filename": "attention/sparse_flash_mla_grad/op_kernel/arch22/smlag_basic.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 2,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -222,7 +222,7 @@ __aicore__ inline void SparseFlashMlaGrad<SMLAGT>::Process(\n         AllocEventID();\n         int64_t task = 0;\n         for (int32_t i = 0; i < processBS1ByCore; i++) {\n-            int32_t t1Index = (cubeBlockIdx + usedCoreNum * i) * s1BasicSize;\n+            int64_t t1Index = (static_cast<int64_t>(cubeBlockIdx) + usedCoreNum * i) * s1BasicSize;\n             GetTndSeqLen(t1Index, bIndex, s1Loop);\n             int32_t s1BasicAccum = 0;\n             for (int32_t j = 0; j < s1Loop; j++) {\n@@ -261,7 +261,7 @@ __aicore__ inline void SparseFlashMlaGrad<SMLAGT>::Process(\n         SyncAll();\n         int64_t task = 0;\n         for (int32_t i = 0; i < processBS1ByCore; i++) {\n-            int32_t t1Index = (cubeBlockIdx + usedCoreNum * i) * s1BasicSize;\n+            int64_t t1Index = (static_cast<int64_t>(cubeBlockIdx) + usedCoreNum * i) * s1BasicSize;\n             GetTndSeqLen(t1Index, bIndex, s1Loop);\n             int32_t s1BasicAccum = 0;\n             for (int32_t j = 0; j < s1Loop; j++) {\n",
+      "new_file": false,
+      "new_path": "attention/sparse_flash_mla_grad/op_kernel/arch22/smlag_basic.h",
+      "old_path": "attention/sparse_flash_mla_grad/op_kernel/arch22/smlag_basic.h",
+      "removed_lines": 2,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/50c2e2e8c64d5b10acd39b00a3058b7c6d35e9a2/attention/sparse_flash_mla_grad/op_kernel/arch22/smlag_basic.h",
+    "sha": "50c2e2e8c64d5b10acd39b00a3058b7c6d35e9a2",
+    "source_branch": "fix",
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  },
+  {
+    "additions": 17,
+    "blob_id": "ede5a156a003469433ec0364ab54f0cef8e36b40",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/50c2e2e8c64d5b10acd39b00a3058b7c6d35e9a2/attention/sparse_lightning_indexer_kl_loss_grad/op_host/sparse_lightning_indexer_kl_loss_grad_tiling_general.cpp",
+    "deletions": 3,
+    "filename": "attention/sparse_lightning_indexer_kl_loss_grad/op_host/sparse_lightning_indexer_kl_loss_grad_tiling_general.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 17,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -328,7 +328,7 @@ void SparseLightningIndexerKLLossGradTilingBase::SetMultiCoreParamsRegbase(int64\n     }\n }\n \n-void SparseLightningIndexerKLLossGradTilingBase::InitOutputSplit()\n+ge::graphStatus SparseLightningIndexerKLLossGradTilingBase::InitOutputSplit()\n {\n     SLIKLLossGradInitOutputParams *initoutput = &tilingData->initOutputParams;\n     auto &dKeyShape = context_->GetOutputShape(D_KEY_OUTPUT_INDEX)->GetStorageShape();\n@@ -338,8 +338,19 @@ void SparseLightningIndexerKLLossGradTilingBase::InitOutputSplit()\n     } else if (tilingKeyLayout == LayoutType::LAYOUT_BSND) {\n         totalSize = static_cast<int64_t>(bSize) * dKeyShape.GetDim(1) * dKeyShape.GetDim(3);\n     }\n-    initoutput->set_singleCoreSize(static_cast<uint32_t>(CeilDivision(totalSize, static_cast<int64_t>(aivNum))));\n+    int64_t singleCoreSize = CeilDivision(totalSize, static_cast<int64_t>(aivNum));\n+    if (singleCoreSize > UINT32_MAX) {\n+        OP_LOGE(context_, \"singleCoreSize(%ld) exceeds UINT32_MAX limit.\", singleCoreSize);\n+        return ge::GRAPH_FAILED;\n+    }\n+    initoutput->set_singleCoreSize(static_cast<uint32_t>(singleCoreSize));\n+\n+    if (totalSize > INT64_MAX / 2) {\n+        OP_LOGE(context_, \"totalOutputSize(%ld) exceeds safe limit.\", totalSize);\n+        return ge::GRAPH_FAILED;\n+    }\n     initoutput->set_totalOutputSize(totalSize);\n+    return ge::GRAPH_SUCCESS;\n }\n \n ge::graphStatus SparseLightningIndexerKLLossGradTilingBase::DoOpTiling()\n@@ -357,7 +368,10 @@ ge::graphStatus SparseLightningIndexerKLLossGradTilingBase::DoOpTiling()\n     SoftMaxTilingFunc(srcShape, sizeof(float), softmaxTmpBufferSize, tilingData->vectorParams.softmaxYTilingData);\n     SoftMaxTilingFunc(srcShape, sizeof(float), softmaxTmpBufferSize, tilingData->vectorParams.simpleSoftmaxPTilingData);\n \n-    InitOutputSplit();\n+    auto ret = InitOutputSplit();\n+    if (ret != ge::GRAPH_SUCCESS) {\n+        return ret;\n+    }\n     OP_LOGD(context_, \"ending template[%s]\", templateName);\n     return ge::GRAPH_SUCCESS;\n }\n",
+      "new_file": false,
+      "new_path": "attention/sparse_lightning_indexer_kl_loss_grad/op_host/sparse_lightning_indexer_kl_loss_grad_tiling_general.cpp",
+      "old_path": "attention/sparse_lightning_indexer_kl_loss_grad/op_host/sparse_lightning_indexer_kl_loss_grad_tiling_general.cpp",
+      "removed_lines": 3,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/50c2e2e8c64d5b10acd39b00a3058b7c6d35e9a2/attention/sparse_lightning_indexer_kl_loss_grad/op_host/sparse_lightning_indexer_kl_loss_grad_tiling_general.cpp",
+    "sha": "50c2e2e8c64d5b10acd39b00a3058b7c6d35e9a2",
+    "source_branch": "fix",
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  },
+  {
+    "additions": 1,
+    "blob_id": "fd4f1d653eb605c830abc737eaba86e9f6c9adf7",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/50c2e2e8c64d5b10acd39b00a3058b7c6d35e9a2/attention/sparse_lightning_indexer_kl_loss_grad/op_host/sparse_lightning_indexer_kl_loss_grad_tiling_general.h",
+    "deletions": 1,
+    "filename": "attention/sparse_lightning_indexer_kl_loss_grad/op_host/sparse_lightning_indexer_kl_loss_grad_tiling_general.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 1,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -287,7 +287,7 @@ protected:\n     bool AnalyzeLayout();\n     int64_t CalcTotalSize();\n     void SetMultiCoreParamsRegbase(int64_t totalSize, int64_t coreNum);\n-    void InitOutputSplit();\n+    ge::graphStatus InitOutputSplit();\n \n     // 基础输入参数\n     int32_t bSize;\n",
+      "new_file": false,
+      "new_path": "attention/sparse_lightning_indexer_kl_loss_grad/op_host/sparse_lightning_indexer_kl_loss_grad_tiling_general.h",
+      "old_path": "attention/sparse_lightning_indexer_kl_loss_grad/op_host/sparse_lightning_indexer_kl_loss_grad_tiling_general.h",
+      "removed_lines": 1,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/50c2e2e8c64d5b10acd39b00a3058b7c6d35e9a2/attention/sparse_lightning_indexer_kl_loss_grad/op_host/sparse_lightning_indexer_kl_loss_grad_tiling_general.h",
+    "sha": "50c2e2e8c64d5b10acd39b00a3058b7c6d35e9a2",
+    "source_branch": "fix",
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  },
+  {
+    "additions": 3,
+    "blob_id": "bea962c46c8922369889a420aa9faf7274cbcb1c",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/50c2e2e8c64d5b10acd39b00a3058b7c6d35e9a2/attention/sparse_lightning_indexer_kl_loss_grad/op_kernel/arch22/sparse_lightning_indexer_kl_loss_grad_vector.h",
+    "deletions": 3,
+    "filename": "attention/sparse_lightning_indexer_kl_loss_grad/op_kernel/arch22/sparse_lightning_indexer_kl_loss_grad_vector.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 3,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -607,7 +607,7 @@ __aicore__ inline void SLIKLLossVectorService<SLIT>::MergeKv(const SLIKLLossGrad\n     if (s2GmLimit > gatherParams.s2ProcessSize) {\n         s2GmLimit = gatherParams.s2ProcessSize;\n     }\n-    int64_t s2IdxOffset = runInfo.s2Idx * constInfo.s2BaseSize;\n+    int64_t s2IdxOffset = static_cast<int64_t>(runInfo.s2Idx) * constInfo.s2BaseSize;\n     for (int64_t s2GmOffsetArray = s2GmStartOffset; s2GmOffsetArray < s2GmLimit; s2GmOffsetArray += 2 * constInfo.sparseBlockSize) {\n         if (needWaitMte3ToMte2) {\n             WaitFlag<AscendC::HardEvent::MTE3_MTE2>(mergeMte3Idx + IdStart);\n@@ -875,7 +875,7 @@ __aicore__ inline void SLIKLLossVectorService<SLIT>::ProcessDeterVector2(SLIKLLo\n         int64_t realS2Idx1, realS2Idx2, s2GmOffset;\n         event_t eventIdArr[2] = {eventIdScatterAdd, eventIdScatterAddPong};\n         runInfo.s2Idx = 0;\n-        int64_t s2IdxOffset = runInfo.s2Idx * constInfo.s2BaseSize;\n+        int64_t s2IdxOffset = static_cast<int64_t>(runInfo.s2Idx) * constInfo.s2BaseSize;\n \n         CrossCoreWaitFlag<0, PIPE_MTE3>(SYNC_V2_TO_V2_DETER_SA_FLAG_MOD0);\n         SetAtomicAdd<T>();\n@@ -979,7 +979,7 @@ __aicore__ inline void SLIKLLossVectorService<SLIT>::ProcessVector2(SLIKLLossGra\n     int64_t realS2Idx1, realS2Idx2, s2GmOffset;\n     event_t eventIdArr[2] = {eventIdScatterAdd, eventIdScatterAddPong};\n     runInfo.s2Idx = 0;\n-    int64_t s2IdxOffset = runInfo.s2Idx * constInfo.s2BaseSize;\n+    int64_t s2IdxOffset = static_cast<int64_t>(runInfo.s2Idx) * constInfo.s2BaseSize;\n \n     SetAtomicAdd<T>();\n     for (int32_t kLoopIdx = 0; kLoopIdx < kLoopTimes; ++kLoopIdx) {\n",
+      "new_file": false,
+      "new_path": "attention/sparse_lightning_indexer_kl_loss_grad/op_kernel/arch22/sparse_lightning_indexer_kl_loss_grad_vector.h",
+      "old_path": "attention/sparse_lightning_indexer_kl_loss_grad/op_kernel/arch22/sparse_lightning_indexer_kl_loss_grad_vector.h",
+      "removed_lines": 3,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/50c2e2e8c64d5b10acd39b00a3058b7c6d35e9a2/attention/sparse_lightning_indexer_kl_loss_grad/op_kernel/arch22/sparse_lightning_indexer_kl_loss_grad_vector.h",
+    "sha": "50c2e2e8c64d5b10acd39b00a3058b7c6d35e9a2",
+    "source_branch": "fix",
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  }
+]

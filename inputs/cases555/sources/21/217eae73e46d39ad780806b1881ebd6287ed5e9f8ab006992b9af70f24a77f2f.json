@@ -1,0 +1,76 @@
+{
+  "assignee": {
+    "avatar_url": "https://cdn-img.gitcode.com/ac/ae/1ac30a43e7e5c7ebf6339c15d1b51a15c9d96b23e7e2ea2816fcd63c2e92394d.jpg",
+    "html_url": "https://gitcode.com/PerrySkywalker",
+    "id": "682abf2a709a492cad560617",
+    "login": "PerrySkywalker",
+    "name": "PerrySkywalker",
+    "object_id": "682abf2a709a492cad560617"
+  },
+  "assignees": [
+    {
+      "avatar_url": "https://cdn-img.gitcode.com/ac/ae/1ac30a43e7e5c7ebf6339c15d1b51a15c9d96b23e7e2ea2816fcd63c2e92394d.jpg",
+      "html_url": "https://gitcode.com/PerrySkywalker",
+      "id": "682abf2a709a492cad560617",
+      "login": "PerrySkywalker",
+      "name": "PerrySkywalker",
+      "object_id": "682abf2a709a492cad560617"
+    }
+  ],
+  "body": "### Describe the current behavior / 问题描述 (Mandatory / 必填)\nFlashAttn GS 布局 mask 拷贝在 gs1dealNum > s1Size 且 midGCount == 0 时，buffer 内模板写入超出 UB 边界，导致相邻 ping-pong slot 的 mask 数据被破坏，精度失败。\n\n### Environment / 环境信息 (Mandatory / 必填)\nascend950 (arch35)\n\n### Steps to reproduce the issue / 重现步骤 (Mandatory / 必填)\n1. 使用 BNSD + PA_BBND 布局，mask_mode=4 (BAND)，S1 < actVecMSize 且 gS1Cur 使 s1StartIdx != 0\n2. gs1dealNum > s1Size 且 remainRowCount < s1Size (即 midGCount == 0)\n3. 运行精度测试，FailRatio 超过阈值\n\n### Describe the expected behavior / 预期结果 (Mandatory / 必填)\nmask 拷贝不应越界，精度测试通过 (FailRatio <= 0.5%)\n\n### Related log / screenshot / 日志 / 截图 (Mandatory / 必填)\n越界量最大 4736 bytes，精度 FailRatio 最高 25.7%\n\n### Special notes for this issue/备注 (Optional / 选填)\n修复方案：midGCount == 0 时走 if 分支直接从 GM 两段拷贝，避免 buffer 内模板存储。同时修复 midGCount 计算 uint32_t 下溢问题。\n\n关联PR: #9012 (master), #9018 (9.1.0)",
+  "comments": 1,
+  "created_at": "2026-07-22T10:33:18+08:00",
+  "finished_at": "2026-07-24T15:04:05+08:00",
+  "html_url": "https://gitcode.com/cann/ops-transformer/issues/3886",
+  "id": 4184090,
+  "issue_priority_detail": {
+    "id": 116,
+    "title": "无优先级"
+  },
+  "issue_state": "进行中",
+  "issue_state_detail": {
+    "id": 285,
+    "serial": 0,
+    "title": "进行中"
+  },
+  "issue_type": "任务",
+  "issue_type_detail": {
+    "id": 255,
+    "is_system": false,
+    "title": "任务"
+  },
+  "labels": [
+    {
+      "color": "#35e029",
+      "created_at": "2026-03-20T11:25:13+08:00",
+      "id": 38861,
+      "name": "resolved",
+      "updated_at": "2026-07-24T16:07:05+08:00"
+    }
+  ],
+  "number": "3886",
+  "priority": 0,
+  "repository": {
+    "assigner": {},
+    "created_at": "2025-09-28T17:54:46+08:00",
+    "description": "本项目是CANN提供的transformer类大模型算子库，实现网络在NPU上加速计算。",
+    "full_name": "cann/ops-transformer",
+    "id": 7673863,
+    "name": "ops-transformer",
+    "paas": "",
+    "path": "ops-transformer",
+    "updated_at": "2025-09-28T18:06:48+08:00"
+  },
+  "state": "closed",
+  "title": "[Bug-Report|缺陷反馈]: FlashAttn GS布局mask拷贝UB越界导致精度失败",
+  "updated_at": "2026-07-24T15:04:05+08:00",
+  "user": {
+    "avatar_url": "https://cdn-img.gitcode.com/ac/ae/1ac30a43e7e5c7ebf6339c15d1b51a15c9d96b23e7e2ea2816fcd63c2e92394d.jpg",
+    "html_url": "https://gitcode.com/PerrySkywalker",
+    "id": "682abf2a709a492cad560617",
+    "login": "PerrySkywalker",
+    "name": "PerrySkywalker",
+    "object_id": "682abf2a709a492cad560617"
+  },
+  "visibility_reason": "public"
+}

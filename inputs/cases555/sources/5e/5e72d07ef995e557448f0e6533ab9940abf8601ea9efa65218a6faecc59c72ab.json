@@ -1,0 +1,74 @@
+{
+  "assignee": {
+    "html_url": "https://gitcode.com/Wei_NaChuan",
+    "id": "687e1fcd0b80e6291e89dbf4",
+    "login": "Wei_NaChuan",
+    "name": "weinachuan",
+    "object_id": "687e1fcd0b80e6291e89dbf4"
+  },
+  "assignees": [
+    {
+      "html_url": "https://gitcode.com/Wei_NaChuan",
+      "id": "687e1fcd0b80e6291e89dbf4",
+      "login": "Wei_NaChuan",
+      "name": "weinachuan",
+      "object_id": "687e1fcd0b80e6291e89dbf4"
+    }
+  ],
+  "body": "\n\nThanks for sending an issue! Please fill in the following template to help quickly solve your problem.\n\n### Describe the current behavior / 问题描述 (Mandatory / 必填)\n            \ngrouped_matmul_swiglu_quant/grouped_matmul_swiglu_quant_a8w4_msd_post.h\n中mmOutQueue定义为TQue VECIN，但中间又当作TBuf来用，每次用都使用EnQue/DeQue来加信号，是错误的。\n出现多个精度错误问题。\n\nTQue<QuePosition::VECIN, 1> mmOutQueue;\n\n例如，下面的Add-》Muls，没有PipeBarrier<PIPE_V>()进行同步\n\n__aicore__ inline void GMMA8W4PostProcess::VectorCompute(uint32_t loopIdx, VecConfig &vecConfig,\n                                                         WorkSpaceSplitConfig &workspaceSplitConfig)\n{\n    // 1.辅助矩阵加回\n    MergeAuxiliaryMatrix(loopIdx, vecConfig);\n    // 2.perToken反量化\n    MulPertokenScale(loopIdx, vecConfig, workspaceSplitConfig);\n    // 3.Swiglu\n    Swiglu(loopIdx, vecConfig);\n    // 4.Quant\n    Quant(loopIdx, vecConfig);\n}\n__aicore__ inline void GMMA8W4PostProcess::MergeAuxiliaryMatrix(uint32_t loopIdx, VecConfig &vecConfig)\n{\n    // perChanelScale * perTokenScale\n    LocalTensor<float> mmLocal = mmOutQueue.DeQue<float>();\n    LocalTensor<float> weightAuxiliaryMatrixLocal = weightAuxiliaryMatrixInQueue.DeQue<float>();\n    Add(mmLocal[loopIdx * gmmSwiglu->tokenLen], mmLocal[loopIdx * gmmSwiglu->tokenLen], weightAuxiliaryMatrixLocal,\n        gmmSwiglu->tokenLen);\n    vecConfig.nextUpadteInterVal--;\n    mmOutQueue.EnQue(mmLocal);\n    weightAuxiliaryMatrixInQueue.EnQue(weightAuxiliaryMatrixLocal);\n}\n\n__aicore__ inline void GMMA8W4PostProcess::MulPertokenScale(uint32_t loopIdx, VecConfig &vecConfig,\n                                                            WorkSpaceSplitConfig &workspaceSplitConfig)\n{\n    LocalTensor<float> mmLocal = mmOutQueue.DeQue<float>();\n    int32_t eventIdSToV = static_cast<int32_t>(GetTPipePtr()->FetchEventID(HardEvent::S_V));\n    SetFlag<HardEvent::S_V>(eventIdSToV);\n    WaitFlag<HardEvent::S_V>(eventIdSToV);\n    float scale = perTokenScaleGM.GetValue(loopIdx + workspaceSplitConfig.leftMatrixStartIndex + vecConfig.startIdx);\n    SetFlag<HardEvent::S_V>(eventIdSToV);\n    WaitFlag<HardEvent::S_V>(eventIdSToV);\n    Muls(mmLocal[loopIdx * gmmSwiglu->tokenLen], mmLocal[loopIdx * gmmSwiglu->tokenLen], scale, gmmSwiglu->tokenLen);\n    SetFlag<HardEvent::S_V>(eventIdSToV);\n    WaitFlag<HardEvent::S_V>(eventIdSToV);\n}\n### Environment / 环境信息 (Mandatory / 必填)\n            \n/\n### Steps to reproduce the issue / 重现步骤 (Mandatory / 必填)\n            \n多测试一些case，会出现精度错误\n### Describe the expected behavior / 预期结果 (Mandatory / 必填)\n            \n/\n### Related log / screenshot / 日志 / 截图 (Mandatory / 必填)\n            \n/\n### Special notes for this issue/备注 (Optional / 选填)\n            \n\n",
+  "comments": 3,
+  "created_at": "2026-01-29T20:16:58+08:00",
+  "finished_at": "2026-02-05T15:51:52+08:00",
+  "html_url": "https://gitcode.com/cann/ops-transformer/issues/630",
+  "id": 3743634,
+  "issue_priority_detail": {
+    "id": 116,
+    "title": "无优先级"
+  },
+  "issue_state": "进行中",
+  "issue_state_detail": {
+    "id": 285,
+    "serial": 0,
+    "title": "进行中"
+  },
+  "issue_type": "任务",
+  "issue_type_detail": {
+    "id": 255,
+    "is_system": false,
+    "title": "任务"
+  },
+  "labels": [
+    {
+      "color": "#35e029",
+      "created_at": "2026-03-20T11:25:13+08:00",
+      "id": 38861,
+      "name": "resolved",
+      "updated_at": "2026-03-20T13:23:54+08:00"
+    }
+  ],
+  "number": "630",
+  "priority": 0,
+  "repository": {
+    "assigner": {},
+    "created_at": "2025-09-28T17:54:46+08:00",
+    "description": "本项目是CANN提供的transformer类大模型算子库，实现网络在NPU上加速计算。",
+    "full_name": "cann/ops-transformer",
+    "id": 7673863,
+    "name": "ops-transformer",
+    "paas": "",
+    "path": "ops-transformer",
+    "updated_at": "2025-09-28T18:06:48+08:00"
+  },
+  "state": "closed",
+  "title": "[Bug-Report|缺陷反馈]: grouped_matmul_swiglu_quant存在信号同步问题",
+  "updated_at": "2026-03-20T13:23:54+08:00",
+  "user": {
+    "avatar_url": "",
+    "html_url": "https://gitcode.com/gcw_xe6QyzGC",
+    "id": "68d531a170301153ced4e1f4",
+    "login": "gcw_xe6QyzGC",
+    "name": "奇顺23",
+    "object_id": "68d531a170301153ced4e1f4"
+  },
+  "visibility_reason": "public"
+}

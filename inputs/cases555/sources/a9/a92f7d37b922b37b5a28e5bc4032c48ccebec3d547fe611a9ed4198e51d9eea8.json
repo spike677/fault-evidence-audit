@@ -1,0 +1,74 @@
+[
+  {
+    "additions": 40,
+    "blob_id": "765281a6663e9664fecedfb51c7276f598f6d8a7",
+    "blob_url": "https://gitcode.com/cann/ops-math/blob/23cf84c8f7af7d5949b42b2d328a31181985d8cc/math/log_add_exp/op_api/aclnn_logaddexp.cpp",
+    "deletions": 9,
+    "filename": "math/log_add_exp/op_api/aclnn_logaddexp.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 40,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -108,6 +108,39 @@ static bool CheckShape(const aclTensor* self, const aclTensor* other) {\n     return true;\n }\n \n+static bool CheckFormat(const aclTensor* self, const aclTensor* other, const aclTensor* out)\n+{\n+    if (self->GetStorageFormat() != out->GetStorageFormat()) {\n+        OP_LOGE(\n+            ACLNN_ERR_PARAM_INVALID, \"Format of self and output should be equal. self [%s], out [%s].\",\n+            ToString(self->GetStorageFormat()).GetString(), ToString(out->GetStorageFormat()).GetString());\n+        return false;\n+    }\n+\n+    if (other->GetStorageFormat() != out->GetStorageFormat()) {\n+        OP_LOGE(\n+            ACLNN_ERR_PARAM_INVALID, \"Format of other and output should be equal. other [%s], out [%s].\",\n+            ToString(other->GetStorageFormat()).GetString(), ToString(out->GetStorageFormat()).GetString());\n+        return false;\n+    }\n+\n+    if (IsPrivateFormat(self->GetStorageFormat())) {\n+        OP_LOGE(ACLNN_ERR_PARAM_INVALID, \"Format only support ND、NCHW、NHWC、HWCN、NDHWC、NCDHW.\");\n+        return false;\n+    }\n+\n+    return true;\n+}\n+\n+static void WarnFormat(const aclTensor* self, const aclTensor* target)\n+{\n+    ge::Format selfStorageFormat = self->GetStorageFormat();\n+    ge::Format targetStorageFormat = target->GetStorageFormat();\n+    if (selfStorageFormat != ge::Format::FORMAT_ND || targetStorageFormat != ge::Format::FORMAT_ND) {\n+        OP_LOGW(\"aclnnLogAddExp only support format ND.\");\n+    }\n+}\n+\n static aclnnStatus CheckParams(const aclTensor* self, const aclTensor* other, const aclTensor* out) {\n     // 1. 检查参数是否为空指针\n     CHECK_RET(CheckNotNull3Tensor(self, other, out), ACLNN_ERR_PARAM_NULLPTR);\n@@ -121,15 +154,11 @@ static aclnnStatus CheckParams(const aclTensor* self, const aclTensor* other, co\n     // 4. 检查self和other是否broadcast，如可以求broadcast之后的shape\n     CHECK_RET(CheckBroadcastLogAddExp(self, other, out), ACLNN_ERR_PARAM_INVALID);\n \n-    return ACLNN_SUCCESS;\n-}\n+    if (IsRegBase()) {\n+        CHECK_RET(CheckFormat(self, other, out), ACLNN_ERR_PARAM_INVALID);\n+    }\n \n-static void CheckFormat(const aclTensor* self, const aclTensor* target){\n-  ge::Format selfStorageFormat = self->GetStorageFormat();\n-  ge::Format targetStorageFormat = target->GetStorageFormat();\n-  if (selfStorageFormat != ge::Format::FORMAT_ND || targetStorageFormat != ge::Format::FORMAT_ND){\n-    OP_LOGW(\"aclnnLogAddExp only support format ND.\");\n-  }\n+    return ACLNN_SUCCESS;\n }\n \n aclnnStatus aclnnLogAddExpGetWorkspaceSize(const aclTensor* self, const aclTensor* other, aclTensor* out,\n@@ -145,7 +174,9 @@ aclnnStatus aclnnLogAddExpGetWorkspaceSize(const aclTensor* self, const aclTenso\n     auto ret = CheckParams(self, other, out);\n     CHECK_RET(ret == ACLNN_SUCCESS, ret);\n \n-    CheckFormat(self, other);\n+    if (!IsRegBase()) {\n+        WarnFormat(self, other);\n+    }\n \n     // 算子的空tensor在kernel中支持，对标竞品根据算子实际情况补充\n     if (self->IsEmpty() || other->IsEmpty()) {\n",
+      "new_file": false,
+      "new_path": "math/log_add_exp/op_api/aclnn_logaddexp.cpp",
+      "old_path": "math/log_add_exp/op_api/aclnn_logaddexp.cpp",
+      "removed_lines": 9,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-math/raw/23cf84c8f7af7d5949b42b2d328a31181985d8cc/math/log_add_exp/op_api/aclnn_logaddexp.cpp",
+    "sha": "23cf84c8f7af7d5949b42b2d328a31181985d8cc",
+    "source_branch": "fix_log_add_exp",
+    "source_project": {
+      "full_name": "gcw_SUaZx3UQ/ops-math",
+      "human_name": "gcw_SUaZx3UQ / ops-math",
+      "id": 7649644,
+      "path": "ops-math"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-math",
+      "human_name": "CANN / ops-math",
+      "id": 7649531,
+      "path": "ops-math"
+    }
+  },
+  {
+    "additions": 23,
+    "blob_id": "6d31e1150969b41e2271f2f709cc47726d5792e1",
+    "blob_url": "https://gitcode.com/cann/ops-math/blob/23cf84c8f7af7d5949b42b2d328a31181985d8cc/math/log_add_exp/op_kernel/arch35/log_add_exp_dag.h",
+    "deletions": 12,
+    "filename": "math/log_add_exp/op_kernel/arch35/log_add_exp_dag.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 23,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -38,6 +38,7 @@ namespace LogAddExpOp {\n constexpr int CAST_NONE_MODE = 0;\n constexpr int CAST_RINT_MODE = 1;\n constexpr int CMP_EQ_MODE = 2;   // AscendC::CMPMODE::EQ\n+constexpr int CMP_NE_MODE = 5;   // AscendC::CMPMODE::NE\n constexpr int SEL_TT_MODE = 2;   // AscendC::SELMODE::VSEL_TENSOR_TENSOR_MODE\n constexpr float POS_INF = INFINITY;\n constexpr float NEG_INF = -INFINITY;\n@@ -58,6 +59,24 @@ struct InfGuardedSub {\n     using SubFixed = Bind<Vec::Select<uint8_t, CT, SEL_TT_MODE>, MaskBothNeg, DupZero, SubFixPos>;\n };\n \n+// 稳定计算 log1p(x)，避免 x 很小时 1+x 舍入为 1 导致结果变 0。\n+template <typename CT, typename In>\n+struct StableLog1p {\n+    using ConstOne = MAKE_CONST(CT, 1);\n+    using ConstNegOne = MAKE_CONST(CT, -1);\n+    using OpAddOne = Bind<Vec::Adds<CT>, In, ConstOne>;\n+    using OpMid = Bind<Vec::Adds<CT>, OpAddOne, ConstNegOne>;\n+    using OpRatio = Bind<Vec::Div<CT>, In, OpMid>;\n+    using OpLog = Bind<Vec::Log<CT>, OpAddOne>;\n+    using OpMul = Bind<Vec::Mul<CT>, OpLog, OpRatio>;\n+    using MaskNotOne = Bind<Vec::Compare<uint8_t, CT, CMP_NE_MODE>, OpAddOne, ConstOne>;\n+    using FixSmall = Bind<Vec::Select<uint8_t, CT, SEL_TT_MODE>, MaskNotOne, OpMul, In>;\n+    using ConstPosInf = MAKE_CONST(CT, POS_INF);\n+    using DupPosInf = Bind<Vec::Duplicate<CT>, ConstPosInf>;\n+    using MaskNotInf = Bind<Vec::Compare<uint8_t, CT, CMP_NE_MODE>, OpAddOne, ConstPosInf>;\n+    using OpOut = Bind<Vec::Select<uint8_t, CT, SEL_TT_MODE>, MaskNotInf, FixSmall, DupPosInf>;\n+};\n+\n // ==================== Simplified (base=-1, scale=1.0, shift=0.0) ====================\n \n template <typename T>\n@@ -71,9 +90,7 @@ struct LogAddExpSimplifiedCompute {\n     using ConstNegOne = MAKE_CONST(T, -1);\n     using OpNeg = Bind<Vec::Muls<T>, OpAbs, ConstNegOne>;\n     using OpExp = Bind<Vec::Exp<T>, OpNeg>;\n-    using ConstOne = MAKE_CONST(T, 1);\n-    using OpAdds = Bind<Vec::Adds<T>, OpExp, ConstOne>;\n-    using OpLog = Bind<Vec::Log<T>, OpAdds>;\n+    using OpLog = typename StableLog1p<T, OpExp>::OpOut;\n     using OpAdd = Bind<Vec::Add<T>, OpMax, OpLog>;\n \n     using OpCopyOut = Bind<Vec::CopyOut<T>, Placeholder::Out0<T>, OpAdd>;\n@@ -97,9 +114,7 @@ struct LogAddExpSimplifiedWithCastCompute {\n     using ConstNegOne = MAKE_CONST(float, -1);\n     using OpNeg = Bind<Vec::Muls<float>, OpAbs, ConstNegOne>;\n     using OpExp = Bind<Vec::Exp<float>, OpNeg>;\n-    using ConstOne = MAKE_CONST(float, 1);\n-    using OpAdds = Bind<Vec::Adds<float>, OpExp, ConstOne>;\n-    using OpLog = Bind<Vec::Log<float>, OpAdds>;\n+    using OpLog = typename StableLog1p<float, OpExp>::OpOut;\n     using OpAdd = Bind<Vec::Add<float>, OpMax, OpLog>;\n \n     using OpCastRes = Bind<Vec::Cast<T, float, CAST_RINT_MODE>, OpAdd>;\n@@ -128,9 +143,7 @@ struct LogAddExpFullCompute {\n     using VarLnBase = Placeholder::Var<float, 2>;\n     using OpMulLnBase = Bind<Vec::Muls<T>, OpShift, VarLnBase>;\n     using OpExp = Bind<Vec::Exp<T>, OpMulLnBase>;\n-    using ConstOne = MAKE_CONST(T, 1);\n-    using OpAdds = Bind<Vec::Adds<T>, OpExp, ConstOne>;\n-    using OpLog = Bind<Vec::Log<T>, OpAdds>;\n+    using OpLog = typename StableLog1p<T, OpExp>::OpOut;\n     using VarInvLnBase = Placeholder::Var<float, 3>;\n     using OpMulInvLnBase = Bind<Vec::Muls<T>, OpLog, VarInvLnBase>;\n     using OpAdd = Bind<Vec::Add<T>, OpMax, OpMulInvLnBase>;\n@@ -160,9 +173,7 @@ struct LogAddExpFullWithCastCompute {\n     using VarLnBase = Placeholder::Var<float, 2>;\n     using OpMulLnBase = Bind<Vec::Muls<float>, OpShift, VarLnBase>;\n     using OpExp = Bind<Vec::Exp<float>, OpMulLnBase>;\n-    using ConstOne = MAKE_CONST(float, 1);\n-    using OpAdds = Bind<Vec::Adds<float>, OpExp, ConstOne>;\n-    using OpLog = Bind<Vec::Log<float>, OpAdds>;\n+    using OpLog = typename StableLog1p<float, OpExp>::OpOut;\n     using VarInvLnBase = Placeholder::Var<float, 3>;\n     using OpMulInvLnBase = Bind<Vec::Muls<float>, OpLog, VarInvLnBase>;\n     using OpAdd = Bind<Vec::Add<float>, OpMax, OpMulInvLnBase>;\n",
+      "new_file": false,
+      "new_path": "math/log_add_exp/op_kernel/arch35/log_add_exp_dag.h",
+      "old_path": "math/log_add_exp/op_kernel/arch35/log_add_exp_dag.h",
+      "removed_lines": 12,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-math/raw/23cf84c8f7af7d5949b42b2d328a31181985d8cc/math/log_add_exp/op_kernel/arch35/log_add_exp_dag.h",
+    "sha": "23cf84c8f7af7d5949b42b2d328a31181985d8cc",
+    "source_branch": "fix_log_add_exp",
+    "source_project": {
+      "full_name": "gcw_SUaZx3UQ/ops-math",
+      "human_name": "gcw_SUaZx3UQ / ops-math",
+      "id": 7649644,
+      "path": "ops-math"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-math",
+      "human_name": "CANN / ops-math",
+      "id": 7649531,
+      "path": "ops-math"
+    }
+  }
+]

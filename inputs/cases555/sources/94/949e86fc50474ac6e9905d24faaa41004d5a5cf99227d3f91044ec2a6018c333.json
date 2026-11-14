@@ -1,0 +1,74 @@
+[
+  {
+    "additions": 2,
+    "blob_id": "3efe93fb83691491c117aec01c6358ff3be75f3d",
+    "blob_url": "https://gitcode.com/cann/ops-math/blob/61e2f5c65fec2c5453037638c2df38562790f69f/math/one_hot/op_host/arch35/one_hot_tiling_arch35.cpp",
+    "deletions": 2,
+    "filename": "math/one_hot/op_host/arch35/one_hot_tiling_arch35.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 2,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -118,8 +118,8 @@ ge::graphStatus OneHotTilingBase::MergeDims()\n         return ge::GRAPH_FAILED;\n     }\n     // Merge to 2D Shape(prefixdim, suffixdim)\n-    int32_t prefixDim = 1;\n-    int32_t suffixDim = 1;\n+    int64_t prefixDim = 1;\n+    int64_t suffixDim = 1;\n     int32_t idx = 0;\n     while (idx < tmpAbsAxis) {\n         if (inputOriginShape[idx] != 0) {\n",
+      "new_file": false,
+      "new_path": "math/one_hot/op_host/arch35/one_hot_tiling_arch35.cpp",
+      "old_path": "math/one_hot/op_host/arch35/one_hot_tiling_arch35.cpp",
+      "removed_lines": 2,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-math/raw/61e2f5c65fec2c5453037638c2df38562790f69f/math/one_hot/op_host/arch35/one_hot_tiling_arch35.cpp",
+    "sha": "61e2f5c65fec2c5453037638c2df38562790f69f",
+    "source_branch": "master",
+    "source_project": {
+      "full_name": "xieshengwei1024/ops-math",
+      "human_name": "xieshengwei1024 / ops-math",
+      "id": 9214141,
+      "path": "ops-math"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-math",
+      "human_name": "CANN / ops-math",
+      "id": 7649531,
+      "path": "ops-math"
+    }
+  },
+  {
+    "additions": 32,
+    "blob_id": "89e181baeaa7ae996725aff5d7cbe3bf7a5d3f20",
+    "blob_url": "https://gitcode.com/cann/ops-math/blob/61e2f5c65fec2c5453037638c2df38562790f69f/math/one_hot/tests/ut/op_host/arch35/test_one_hot_tiling_arch35.cpp",
+    "deletions": 2,
+    "filename": "math/one_hot/tests/ut/op_host/arch35/test_one_hot_tiling_arch35.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 32,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -94,7 +94,7 @@ TEST_F(OneHotTilingTest, test0_tiling)\n             {{{1}, {1}}, ge::DT_FLOAT, ge::FORMAT_ND, true, nullptr},\n         },\n         {\n-            {{{4, 3, 4, 10}, {4, 3, 4, 10}}, ge::DT_FLOAT, ge::FORMAT_ND},\n+            {{{4, 1024, 4, 10}, {4, 1024, 4, 10}}, ge::DT_FLOAT, ge::FORMAT_ND},\n         },\n         {\n             MakeAxisAttr(-1),\n@@ -126,7 +126,7 @@ TEST_F(OneHotTilingTest, test1_tiling)\n             {{{1}, {1}}, ge::DT_FLOAT, ge::FORMAT_ND, true, nullptr},\n         },\n         {\n-            {{{4, 3, 4, 10}, {4, 3, 4, 10}}, ge::DT_FLOAT, ge::FORMAT_ND},\n+            {{{4, 1024, 4, 10}, {4, 1024, 4, 10}}, ge::DT_FLOAT, ge::FORMAT_ND},\n         },\n         {\n             MakeAxisAttr(-1),\n@@ -199,4 +199,34 @@ TEST_F(OneHotTilingTest, test3_tiling)\n     string expectTilingData = \"65536 7 0 0 0 7 1 64 202752 \";\n     std::vector<size_t> expectWorkspaces = {16777216};\n     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);\n+}\n+\n+TEST_F(OneHotTilingTest, test4_tiling)\n+{\n+    optiling::OneHotCompileInfo compileInfo = {64, 262144, true};\n+    compileInfo.is_regbase_soc_version = false;\n+\n+    int32_t depth = 4;\n+\n+    // Use the test framework's ExecuteTiling function\n+    gert::TilingContextPara tilingContextPara(\n+        \"OneHot\",\n+        {\n+            {{{2147483649, 1, 1}, {2147483649, 1, 1}}, ge::DT_INT32, ge::FORMAT_ND, true, nullptr},\n+            {{{1}, {1}}, ge::DT_INT64, ge::FORMAT_ND, true, &depth},\n+            {{{1}, {1}}, ge::DT_INT64, ge::FORMAT_ND, true, nullptr},\n+            {{{1}, {1}}, ge::DT_INT64, ge::FORMAT_ND, true, nullptr},\n+        },\n+        {\n+            {{{4, 2147483649, 1, 1}, {4, 2147483649, 1, 1}}, ge::DT_INT64, ge::FORMAT_ND},\n+        },\n+        {\n+            {\"axis\", Ops::Math::AnyValue::CreateFrom<int64_t>(0)},\n+        },\n+        &compileInfo);\n+\n+    uint64_t expectTilingKey = 1001;\n+    string expectTilingData = \"18014402808643585 33554432 134217728 0 0 1 2147483649 64 202752 \";\n+    std::vector<size_t> expectWorkspaces = {16777216};\n+    ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);\n }\n\\ No newline at end of file\n",
+      "new_file": false,
+      "new_path": "math/one_hot/tests/ut/op_host/arch35/test_one_hot_tiling_arch35.cpp",
+      "old_path": "math/one_hot/tests/ut/op_host/arch35/test_one_hot_tiling_arch35.cpp",
+      "removed_lines": 2,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-math/raw/61e2f5c65fec2c5453037638c2df38562790f69f/math/one_hot/tests/ut/op_host/arch35/test_one_hot_tiling_arch35.cpp",
+    "sha": "61e2f5c65fec2c5453037638c2df38562790f69f",
+    "source_branch": "master",
+    "source_project": {
+      "full_name": "xieshengwei1024/ops-math",
+      "human_name": "xieshengwei1024 / ops-math",
+      "id": 9214141,
+      "path": "ops-math"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-math",
+      "human_name": "CANN / ops-math",
+      "id": 7649531,
+      "path": "ops-math"
+    }
+  }
+]

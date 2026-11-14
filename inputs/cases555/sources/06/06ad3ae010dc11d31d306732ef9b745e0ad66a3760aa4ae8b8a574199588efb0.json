@@ -1,0 +1,38 @@
+[
+  {
+    "additions": 7,
+    "blob_id": "6474ed6011d0928e7593d1b18cae89f8cb089e35",
+    "blob_url": "https://gitcode.com/cann/opbase/blob/a94bf8cbf264246b1cb849068b1abb98d2fbed36/pkg_inc/op_common/atvoss/reduce/reduce_sch_aux_base.h",
+    "deletions": 11,
+    "filename": "pkg_inc/op_common/atvoss/reduce/reduce_sch_aux_base.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 7,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -624,25 +624,21 @@ public:\n \n         SliceView<CONST2> newView;\n         newView.addr = addrOffset;\n-\n+        S newShape;\n+        newShape.value[0] = 1;\n         uint64_t outLen = 1;\n         uint64_t outRepeat = 1;\n         CalculateOutView(view, shape, outLen, outRepeat);\n         newView.axis[0].repeat = outLen;\n         newView.axis[1].repeat = outRepeat;\n         // 混合精度场景，MTE3搬出需要跳搬(lp_norm_v2存在此场景)\n-        uint64_t inDtypeBlockAlign = Ops::Base::CeilAlign(outLen, UB_BLOCK / MIN_DTYPE_BYTES);\n-        if (sizeof(InDType) != sizeof(OutDType)) {\n-            newView.axis[1].srcStride = inDtypeBlockAlign;\n+        uint64_t minDtypeBlockAlign = Ops::Base::CeilAlign(outLen, UB_BLOCK / MIN_DTYPE_BYTES);\n+        if constexpr (Pattern::TailA) {\n+            newView.axis[1].srcStride = minDtypeBlockAlign;\n+            newShape.value[1] = outRepeat * minDtypeBlockAlign;\n         } else {\n             newView.axis[1].srcStride = outLen;\n-        }\n-        S newShape;\n-        newShape.value[0] = 1;\n-        if constexpr (Pattern::TailA) {\n-            newShape.value[1] = outRepeat * Ops::Base::CeilAlign(outLen, UB_BLOCK / MIN_DTYPE_BYTES);\n-        } else {\n-            newShape.value[1] = outRepeat * inDtypeBlockAlign;\n+            newShape.value[1] = outRepeat * outLen;\n         }\n         RunPostOp<OpDag::ReduceOpPos>(aIndex, newView, newShape);\n     }\n",
+      "new_file": false,
+      "new_path": "pkg_inc/op_common/atvoss/reduce/reduce_sch_aux_base.h",
+      "old_path": "pkg_inc/op_common/atvoss/reduce/reduce_sch_aux_base.h",
+      "removed_lines": 11,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/opbase/raw/a94bf8cbf264246b1cb849068b1abb98d2fbed36/pkg_inc/op_common/atvoss/reduce/reduce_sch_aux_base.h",
+    "sha": "a94bf8cbf264246b1cb849068b1abb98d2fbed36",
+    "source_branch": "bugfix/ReduceEmptyTensor",
+    "source_project": {
+      "full_name": "Sunee/opbase_1",
+      "human_name": "Sunee / opbase_1",
+      "id": 9184773,
+      "path": "opbase_1"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/opbase",
+      "human_name": "CANN / opbase",
+      "id": 7649482,
+      "path": "opbase"
+    }
+  }
+]

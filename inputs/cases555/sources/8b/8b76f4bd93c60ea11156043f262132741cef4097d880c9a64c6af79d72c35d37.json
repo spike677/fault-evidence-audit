@@ -1,0 +1,1086 @@
+[
+  {
+    "body": "Thanks for your pull-request.\nThe full list of commands accepted by me can be found at [**here**](https://gitcode.com/cann/infrastructure/blob/main/docs/robot/robot%E4%BD%BF%E7%94%A8%E6%8C%87%E5%8D%97.md#-%E5%A6%82%E9%9C%80%E4%BA%86%E8%A7%A3%E8%AF%A6%E7%BB%86%E7%9A%84%E5%91%BD%E4%BB%A4%E5%8F%AF%E5%8F%82%E8%80%83%E4%B8%8B%E6%96%B9%E8%AF%A6%E7%BB%86%E8%A1%A8%E6%A0%BC)。\nYou can get sig-info at [**here**](https://gitcode.com/cann/community/blob/master/CANN/sigs/ops-nn/sig-info.yaml)\n\n\n---\n\n## PR Approval Progress\n\n✅ **Congratulations! All modules have met the lgtm and approve requirements.**\n\n### Module Approval Details\n\n| module | lgtm status | approve status |\n|------|-----------|--------------|\n| matmul | ✅ [*sxb154714*](https://gitcode.com/sxb154714), [*chenqi317*](https://gitcode.com/chenqi317) (2/2) | ✅ [*sxb154714*](https://gitcode.com/sxb154714), [*chenqi317*](https://gitcode.com/chenqi317) (2/1) |\n\n> 💡 Tip:\n> - **Committer** can comment `/approve` or `/lgtm`\n> - Commenting `/approve` implies both code review (lgtm) and intent to merge (approve)",
+    "comment_type": "pr_comment",
+    "created_at": "2026-02-24T10:32:13+08:00",
+    "discussion_id": "b6cbb70091386170d03fd82bafe73cbeade5f0ab",
+    "id": 163376416,
+    "updated_at": "2026-03-13T16:46:22+08:00",
+    "user": {
+      "avatar_url": "https://cdn-img.gitcode.com/bf/ad/b7f29486a040d7b2f52bf6c78414692d7d585eb1ec628cea3eb01c9d63f68618.png?time=1755691472703",
+      "html_url": "https://gitcode.com/cann-robot",
+      "id": "673c1552584fe8295cfd4a13",
+      "login": "cann-robot",
+      "name": "CANN-robot",
+      "object_id": "673c1552584fe8295cfd4a13"
+    }
+  },
+  {
+    "body": ":large_blue_circle: source code change are detected, tasks labels is removed in this pull request!",
+    "comment_type": "pr_comment",
+    "created_at": "2026-02-24T10:32:21+08:00",
+    "discussion_id": "00db7966952b67c81c536357289fe4e48e01f14a",
+    "id": 163376433,
+    "updated_at": "2026-02-24T10:32:21+08:00",
+    "user": {
+      "avatar_url": "https://cdn-img.gitcode.com/bf/ad/b7f29486a040d7b2f52bf6c78414692d7d585eb1ec628cea3eb01c9d63f68618.png?time=1755691472703",
+      "html_url": "https://gitcode.com/cann-robot",
+      "id": "673c1552584fe8295cfd4a13",
+      "login": "cann-robot",
+      "name": "CANN-robot",
+      "object_id": "673c1552584fe8295cfd4a13"
+    }
+  },
+  {
+    "body": "### 代码风格不一致: 新增代码使用 'context->' 运算符，而同一函数内其他代码（第42-58行）均使用 'context.' 运算符（参数为 const gert::TilingContext &context）。这造成了代码风格不一致，可能引发混淆。\n\n**问题类型**: 代码风格不一致\n**文件路径**: `matmul/mat_mul_v3/op_host/op_tiling/arch35/matmul_v3_tiling_advanced.cpp`\n**行号**: 59\n**问题代码**:\n```cpp\nif (context->GetInputShape(0)->GetOriginShape()[0] == 1)\n```\n**修改建议**:\n```\n统一使用 '.' 运算符访问 context 的方法，与函数内其他代码保持一致。应修改为：\nif (context.GetInputShape(0)->GetOriginShape()[0] == 1)\n```\n\n---\n*此评论由代码审查工具自动生成*",
+    "comment_type": "diff_comment",
+    "created_at": "2026-02-24T10:33:37+08:00",
+    "diff_position": {
+      "end_new_line": 59,
+      "end_old_line": 59,
+      "position_type": "text",
+      "start_new_line": 59,
+      "start_old_line": 59
+    },
+    "discussion_id": "48482bb8b060f47ac15dcecf19194a3d0ae5553b",
+    "id": 163376565,
+    "reply": [
+      {
+        "body": "changed this line on [f942156b](https://gitcode.com/cann/ops-nn/commits/detail/f942156b8ad3f57bc1a07b62adddc9d4e0c5899d?ref=mnEqual1&prId=1989) view [diff detail](https://gitcode.com/cann/ops-nn/merge_requests/1989/diffs?diffId=5424331&start_sha=e63588a18c6d778f19133b82f55825b25abdd5f1&filePath=matmul/mat_mul_v3/op_host/op_tiling/arch35/matmul_v3_tiling_advanced.cpp#a96c1002c58e400fec88d9abc25645cc6d646f65_59_59)",
+        "created_at": "2026-02-24T10:51:07+08:00",
+        "id": 163378396,
+        "updated_at": "2026-02-24T10:51:07+08:00",
+        "user": {
+          "html_url": "https://gitcode.com/wuyufei",
+          "id": "68a27e1fe6740e25e8668b54",
+          "login": "wuyufei",
+          "name": "wuyufei",
+          "object_id": "68a27e1fe6740e25e8668b54"
+        }
+      }
+    ],
+    "resolved": true,
+    "resolved_by": {
+      "html_url": "https://gitcode.com/wuyufei",
+      "id": "68a27e1fe6740e25e8668b54",
+      "login": "wuyufei",
+      "name": "wuyufei",
+      "object_id": "68a27e1fe6740e25e8668b54"
+    },
+    "updated_at": "2026-03-12T14:35:46+08:00",
+    "user": {
+      "avatar_url": "https://cdn-img.gitcode.com/bf/ad/b7f29486a040d7b2f52bf6c78414692d7d585eb1ec628cea3eb01c9d63f68618.png?time=1755691472703",
+      "html_url": "https://gitcode.com/cann-robot",
+      "id": "673c1552584fe8295cfd4a13",
+      "login": "cann-robot",
+      "name": "CANN-robot",
+      "object_id": "673c1552584fe8295cfd4a13"
+    }
+  },
+  {
+    "body": "## 问题/功能描述\n\n本次PR旨在优化矩阵乘法（MatMul）算子在特定场景下的精度模式处理逻辑。核心功能是当输入矩阵的第一个维度（M）为1时，自动禁用高精度浮点模式（HF32），以确保计算正确性或提升性能。同时，PR中包含了为未来可能针对特定数据类型和形状组合（float、M=1、HF32）的性能优化预留的逻辑入口。\n\n## 修改方案描述\n\n修改主要涉及两个部分。首先，在算子参数解析的`GetDtype`函数中，增加了对输入张量形状的判断：当检测到张量A的原始形状第一维（M）等于1时，强制将`args.isHf32`标志设置为`false`，从而禁用HF32执行模式。其次，在`MatMulDimNum2And2Graph`类的实现中添加了一段注释代码，作为未来在满足特定条件（数据类型为float、M=1、且使用HF32）时执行特殊处理的逻辑占位符，当前并未引入实际的功能变更。",
+    "comment_type": "pr_comment",
+    "created_at": "2026-02-24T10:33:42+08:00",
+    "discussion_id": "d9f6478af4a2123b104110dec51a176921aefa74",
+    "id": 163376586,
+    "updated_at": "2026-02-24T10:33:42+08:00",
+    "user": {
+      "avatar_url": "https://cdn-img.gitcode.com/bf/ad/b7f29486a040d7b2f52bf6c78414692d7d585eb1ec628cea3eb01c9d63f68618.png?time=1755691472703",
+      "html_url": "https://gitcode.com/cann-robot",
+      "id": "673c1552584fe8295cfd4a13",
+      "login": "cann-robot",
+      "name": "CANN-robot",
+      "object_id": "673c1552584fe8295cfd4a13"
+    }
+  },
+  {
+    "body": ":large_blue_circle: source code change are detected, tasks labels is removed in this pull request!",
+    "comment_type": "pr_comment",
+    "created_at": "2026-02-24T10:51:21+08:00",
+    "discussion_id": "b91fad6ac439927fcc8162de4bc311b4e77e27b0",
+    "id": 163378424,
+    "updated_at": "2026-02-24T10:51:21+08:00",
+    "user": {
+      "avatar_url": "https://cdn-img.gitcode.com/bf/ad/b7f29486a040d7b2f52bf6c78414692d7d585eb1ec628cea3eb01c9d63f68618.png?time=1755691472703",
+      "html_url": "https://gitcode.com/cann-robot",
+      "id": "673c1552584fe8295cfd4a13",
+      "login": "cann-robot",
+      "name": "CANN-robot",
+      "object_id": "673c1552584fe8295cfd4a13"
+    }
+  },
+  {
+    "body": ":large_blue_circle: source code change are detected, tasks labels is removed in this pull request!",
+    "comment_type": "pr_comment",
+    "created_at": "2026-02-24T17:19:26+08:00",
+    "discussion_id": "ea27fac5d632ebf197e47e15b3250016ac46051e",
+    "id": 163417178,
+    "updated_at": "2026-02-24T17:19:26+08:00",
+    "user": {
+      "avatar_url": "https://cdn-img.gitcode.com/bf/ad/b7f29486a040d7b2f52bf6c78414692d7d585eb1ec628cea3eb01c9d63f68618.png?time=1755691472703",
+      "html_url": "https://gitcode.com/cann-robot",
+      "id": "673c1552584fe8295cfd4a13",
+      "login": "cann-robot",
+      "name": "CANN-robot",
+      "object_id": "673c1552584fe8295cfd4a13"
+    }
+  },
+  {
+    "body": ":large_blue_circle: source code change are detected, tasks labels is removed in this pull request!",
+    "comment_type": "pr_comment",
+    "created_at": "2026-02-27T15:59:02+08:00",
+    "discussion_id": "5bca591402699c1d286675f04c47f6b9e9c29896",
+    "id": 163756295,
+    "updated_at": "2026-02-27T15:59:02+08:00",
+    "user": {
+      "avatar_url": "https://cdn-img.gitcode.com/bf/ad/b7f29486a040d7b2f52bf6c78414692d7d585eb1ec628cea3eb01c9d63f68618.png?time=1755691472703",
+      "html_url": "https://gitcode.com/cann-robot",
+      "id": "673c1552584fe8295cfd4a13",
+      "login": "cann-robot",
+      "name": "CANN-robot",
+      "object_id": "673c1552584fe8295cfd4a13"
+    }
+  },
+  {
+    "body": ":large_blue_circle: source code change are detected, tasks labels is removed in this pull request!",
+    "comment_type": "pr_comment",
+    "created_at": "2026-02-27T17:47:02+08:00",
+    "discussion_id": "e77ef10b33aebd08f02118b50b053056fb1dab1b",
+    "id": 163782415,
+    "updated_at": "2026-02-27T17:47:02+08:00",
+    "user": {
+      "avatar_url": "https://cdn-img.gitcode.com/bf/ad/b7f29486a040d7b2f52bf6c78414692d7d585eb1ec628cea3eb01c9d63f68618.png?time=1755691472703",
+      "html_url": "https://gitcode.com/cann-robot",
+      "id": "673c1552584fe8295cfd4a13",
+      "login": "cann-robot",
+      "name": "CANN-robot",
+      "object_id": "673c1552584fe8295cfd4a13"
+    }
+  },
+  {
+    "body": ":large_blue_circle: source code change are detected, tasks labels is removed in this pull request!",
+    "comment_type": "pr_comment",
+    "created_at": "2026-02-27T20:00:16+08:00",
+    "discussion_id": "4e153ccc2453d8d397f14c2c1d45dc185a5032c0",
+    "id": 163797405,
+    "updated_at": "2026-02-27T20:00:16+08:00",
+    "user": {
+      "avatar_url": "https://cdn-img.gitcode.com/bf/ad/b7f29486a040d7b2f52bf6c78414692d7d585eb1ec628cea3eb01c9d63f68618.png?time=1755691472703",
+      "html_url": "https://gitcode.com/cann-robot",
+      "id": "673c1552584fe8295cfd4a13",
+      "login": "cann-robot",
+      "name": "CANN-robot",
+      "object_id": "673c1552584fe8295cfd4a13"
+    }
+  },
+  {
+    "body": ":large_blue_circle: source code change are detected, tasks labels is removed in this pull request!",
+    "comment_type": "pr_comment",
+    "created_at": "2026-02-27T20:31:27+08:00",
+    "discussion_id": "0526f961553f90fc0013283f2967d0c5d1dc71c0",
+    "id": 163800131,
+    "updated_at": "2026-02-27T20:31:27+08:00",
+    "user": {
+      "avatar_url": "https://cdn-img.gitcode.com/bf/ad/b7f29486a040d7b2f52bf6c78414692d7d585eb1ec628cea3eb01c9d63f68618.png?time=1755691472703",
+      "html_url": "https://gitcode.com/cann-robot",
+      "id": "673c1552584fe8295cfd4a13",
+      "login": "cann-robot",
+      "name": "CANN-robot",
+      "object_id": "673c1552584fe8295cfd4a13"
+    }
+  },
+  {
+    "body": ":large_blue_circle: source code change are detected, tasks labels is removed in this pull request!",
+    "comment_type": "pr_comment",
+    "created_at": "2026-02-27T20:33:48+08:00",
+    "discussion_id": "15c229ff3455626eaf5958a8e6fecb81a9d02dd0",
+    "id": 163800313,
+    "updated_at": "2026-02-27T20:33:48+08:00",
+    "user": {
+      "avatar_url": "https://cdn-img.gitcode.com/bf/ad/b7f29486a040d7b2f52bf6c78414692d7d585eb1ec628cea3eb01c9d63f68618.png?time=1755691472703",
+      "html_url": "https://gitcode.com/cann-robot",
+      "id": "673c1552584fe8295cfd4a13",
+      "login": "cann-robot",
+      "name": "CANN-robot",
+      "object_id": "673c1552584fe8295cfd4a13"
+    }
+  },
+  {
+    "body": ":large_blue_circle: source code change are detected, tasks labels is removed in this pull request!",
+    "comment_type": "pr_comment",
+    "created_at": "2026-02-28T11:59:54+08:00",
+    "discussion_id": "c9eec4aa7efa0c25daeba3052ddc27044d698006",
+    "id": 163853475,
+    "updated_at": "2026-02-28T11:59:54+08:00",
+    "user": {
+      "avatar_url": "https://cdn-img.gitcode.com/bf/ad/b7f29486a040d7b2f52bf6c78414692d7d585eb1ec628cea3eb01c9d63f68618.png?time=1755691472703",
+      "html_url": "https://gitcode.com/cann-robot",
+      "id": "673c1552584fe8295cfd4a13",
+      "login": "cann-robot",
+      "name": "CANN-robot",
+      "object_id": "673c1552584fe8295cfd4a13"
+    }
+  },
+  {
+    "body": ":large_blue_circle: source code change are detected, tasks labels is removed in this pull request!",
+    "comment_type": "pr_comment",
+    "created_at": "2026-02-28T18:59:55+08:00",
+    "discussion_id": "6e947dc5cd4a637a03de71a2a8fcf103ba7893f0",
+    "id": 163916549,
+    "updated_at": "2026-02-28T18:59:55+08:00",
+    "user": {
+      "avatar_url": "https://cdn-img.gitcode.com/bf/ad/b7f29486a040d7b2f52bf6c78414692d7d585eb1ec628cea3eb01c9d63f68618.png?time=1755691472703",
+      "html_url": "https://gitcode.com/cann-robot",
+      "id": "673c1552584fe8295cfd4a13",
+      "login": "cann-robot",
+      "name": "CANN-robot",
+      "object_id": "673c1552584fe8295cfd4a13"
+    }
+  },
+  {
+    "body": ":large_blue_circle: source code change are detected, tasks labels is removed in this pull request!",
+    "comment_type": "pr_comment",
+    "created_at": "2026-03-02T11:48:59+08:00",
+    "discussion_id": "a21b241f7a10dd15b5bf615a333240a61329e1b1",
+    "id": 163973556,
+    "updated_at": "2026-03-02T11:48:59+08:00",
+    "user": {
+      "avatar_url": "https://cdn-img.gitcode.com/bf/ad/b7f29486a040d7b2f52bf6c78414692d7d585eb1ec628cea3eb01c9d63f68618.png?time=1755691472703",
+      "html_url": "https://gitcode.com/cann-robot",
+      "id": "673c1552584fe8295cfd4a13",
+      "login": "cann-robot",
+      "name": "CANN-robot",
+      "object_id": "673c1552584fe8295cfd4a13"
+    }
+  },
+  {
+    "body": ":large_blue_circle: source code change are detected, tasks labels is removed in this pull request!",
+    "comment_type": "pr_comment",
+    "created_at": "2026-03-02T16:48:48+08:00",
+    "discussion_id": "464032c75c5bf9889526875b4a937393641b9208",
+    "id": 164011529,
+    "updated_at": "2026-03-02T16:48:48+08:00",
+    "user": {
+      "avatar_url": "https://cdn-img.gitcode.com/bf/ad/b7f29486a040d7b2f52bf6c78414692d7d585eb1ec628cea3eb01c9d63f68618.png?time=1755691472703",
+      "html_url": "https://gitcode.com/cann-robot",
+      "id": "673c1552584fe8295cfd4a13",
+      "login": "cann-robot",
+      "name": "CANN-robot",
+      "object_id": "673c1552584fe8295cfd4a13"
+    }
+  },
+  {
+    "body": ":large_blue_circle: source code change are detected, tasks labels is removed in this pull request!",
+    "comment_type": "pr_comment",
+    "created_at": "2026-03-02T19:51:04+08:00",
+    "discussion_id": "7a5ae18a1c32de8656a23746c8c229278d4d80ae",
+    "id": 164037733,
+    "updated_at": "2026-03-02T19:51:04+08:00",
+    "user": {
+      "avatar_url": "https://cdn-img.gitcode.com/bf/ad/b7f29486a040d7b2f52bf6c78414692d7d585eb1ec628cea3eb01c9d63f68618.png?time=1755691472703",
+      "html_url": "https://gitcode.com/cann-robot",
+      "id": "673c1552584fe8295cfd4a13",
+      "login": "cann-robot",
+      "name": "CANN-robot",
+      "object_id": "673c1552584fe8295cfd4a13"
+    }
+  },
+  {
+    "body": ":large_blue_circle: source code change are detected, tasks labels is removed in this pull request!",
+    "comment_type": "pr_comment",
+    "created_at": "2026-03-03T19:29:27+08:00",
+    "discussion_id": "a60f8f5c129911567ad4cdd12c7f603015ed7fa3",
+    "id": 164166685,
+    "updated_at": "2026-03-03T19:29:27+08:00",
+    "user": {
+      "avatar_url": "https://cdn-img.gitcode.com/bf/ad/b7f29486a040d7b2f52bf6c78414692d7d585eb1ec628cea3eb01c9d63f68618.png?time=1755691472703",
+      "html_url": "https://gitcode.com/cann-robot",
+      "id": "673c1552584fe8295cfd4a13",
+      "login": "cann-robot",
+      "name": "CANN-robot",
+      "object_id": "673c1552584fe8295cfd4a13"
+    }
+  },
+  {
+    "body": ":large_blue_circle: source code change are detected, tasks labels is removed in this pull request!",
+    "comment_type": "pr_comment",
+    "created_at": "2026-03-03T20:53:21+08:00",
+    "discussion_id": "adb18f1e6df85422454cd24d6247d0f1e35d0368",
+    "id": 164177349,
+    "updated_at": "2026-03-03T20:53:21+08:00",
+    "user": {
+      "avatar_url": "https://cdn-img.gitcode.com/bf/ad/b7f29486a040d7b2f52bf6c78414692d7d585eb1ec628cea3eb01c9d63f68618.png?time=1755691472703",
+      "html_url": "https://gitcode.com/cann-robot",
+      "id": "673c1552584fe8295cfd4a13",
+      "login": "cann-robot",
+      "name": "CANN-robot",
+      "object_id": "673c1552584fe8295cfd4a13"
+    }
+  },
+  {
+    "body": ":large_blue_circle: source code change are detected, tasks labels is removed in this pull request!",
+    "comment_type": "pr_comment",
+    "created_at": "2026-03-03T20:56:52+08:00",
+    "discussion_id": "a30de7ab0e13c37aaf429947f50544990ac2b774",
+    "id": 164177723,
+    "updated_at": "2026-03-03T20:56:52+08:00",
+    "user": {
+      "avatar_url": "https://cdn-img.gitcode.com/bf/ad/b7f29486a040d7b2f52bf6c78414692d7d585eb1ec628cea3eb01c9d63f68618.png?time=1755691472703",
+      "html_url": "https://gitcode.com/cann-robot",
+      "id": "673c1552584fe8295cfd4a13",
+      "login": "cann-robot",
+      "name": "CANN-robot",
+      "object_id": "673c1552584fe8295cfd4a13"
+    }
+  },
+  {
+    "body": ":large_blue_circle: source code change are detected, tasks labels is removed in this pull request!",
+    "comment_type": "pr_comment",
+    "created_at": "2026-03-03T21:01:07+08:00",
+    "discussion_id": "eb00c97331f3f05b23c4983bbb2e208224f0b7c9",
+    "id": 164178218,
+    "updated_at": "2026-03-03T21:01:07+08:00",
+    "user": {
+      "avatar_url": "https://cdn-img.gitcode.com/bf/ad/b7f29486a040d7b2f52bf6c78414692d7d585eb1ec628cea3eb01c9d63f68618.png?time=1755691472703",
+      "html_url": "https://gitcode.com/cann-robot",
+      "id": "673c1552584fe8295cfd4a13",
+      "login": "cann-robot",
+      "name": "CANN-robot",
+      "object_id": "673c1552584fe8295cfd4a13"
+    }
+  },
+  {
+    "body": ":large_blue_circle: source code change are detected, tasks labels is removed in this pull request!",
+    "comment_type": "pr_comment",
+    "created_at": "2026-03-04T09:14:17+08:00",
+    "discussion_id": "a1b194460a656a626be55e3b17d63382a5da28d4",
+    "id": 164194863,
+    "updated_at": "2026-03-04T09:14:17+08:00",
+    "user": {
+      "avatar_url": "https://cdn-img.gitcode.com/bf/ad/b7f29486a040d7b2f52bf6c78414692d7d585eb1ec628cea3eb01c9d63f68618.png?time=1755691472703",
+      "html_url": "https://gitcode.com/cann-robot",
+      "id": "673c1552584fe8295cfd4a13",
+      "login": "cann-robot",
+      "name": "CANN-robot",
+      "object_id": "673c1552584fe8295cfd4a13"
+    }
+  },
+  {
+    "body": ":large_blue_circle: source code change are detected, tasks labels is removed in this pull request!",
+    "comment_type": "pr_comment",
+    "created_at": "2026-03-04T11:41:21+08:00",
+    "discussion_id": "9103bb11bb4bdad2e1cfc069acbffc77931fa05c",
+    "id": 164231512,
+    "updated_at": "2026-03-04T11:41:21+08:00",
+    "user": {
+      "avatar_url": "https://cdn-img.gitcode.com/bf/ad/b7f29486a040d7b2f52bf6c78414692d7d585eb1ec628cea3eb01c9d63f68618.png?time=1755691472703",
+      "html_url": "https://gitcode.com/cann-robot",
+      "id": "673c1552584fe8295cfd4a13",
+      "login": "cann-robot",
+      "name": "CANN-robot",
+      "object_id": "673c1552584fe8295cfd4a13"
+    }
+  },
+  {
+    "body": ":large_blue_circle: source code change are detected, tasks labels is removed in this pull request!",
+    "comment_type": "pr_comment",
+    "created_at": "2026-03-05T19:26:01+08:00",
+    "discussion_id": "87c007935712feb7879e9c8ccb4bc4eedd5646a4",
+    "id": 164410586,
+    "updated_at": "2026-03-05T19:26:01+08:00",
+    "user": {
+      "avatar_url": "https://cdn-img.gitcode.com/bf/ad/b7f29486a040d7b2f52bf6c78414692d7d585eb1ec628cea3eb01c9d63f68618.png?time=1755691472703",
+      "html_url": "https://gitcode.com/cann-robot",
+      "id": "673c1552584fe8295cfd4a13",
+      "login": "cann-robot",
+      "name": "CANN-robot",
+      "object_id": "673c1552584fe8295cfd4a13"
+    }
+  },
+  {
+    "body": ":large_blue_circle: source code change are detected, tasks labels is removed in this pull request!",
+    "comment_type": "pr_comment",
+    "created_at": "2026-03-05T20:45:15+08:00",
+    "discussion_id": "cbe032c991ed03093b0a49889f7f826db926ef5d",
+    "id": 164424276,
+    "updated_at": "2026-03-05T20:45:15+08:00",
+    "user": {
+      "avatar_url": "https://cdn-img.gitcode.com/bf/ad/b7f29486a040d7b2f52bf6c78414692d7d585eb1ec628cea3eb01c9d63f68618.png?time=1755691472703",
+      "html_url": "https://gitcode.com/cann-robot",
+      "id": "673c1552584fe8295cfd4a13",
+      "login": "cann-robot",
+      "name": "CANN-robot",
+      "object_id": "673c1552584fe8295cfd4a13"
+    }
+  },
+  {
+    "body": ":large_blue_circle: source code change are detected, tasks labels is removed in this pull request!",
+    "comment_type": "pr_comment",
+    "created_at": "2026-03-05T21:15:59+08:00",
+    "discussion_id": "5a08551cb30cee1a82a128662e78d4d6bf3db280",
+    "id": 164428784,
+    "updated_at": "2026-03-05T21:15:59+08:00",
+    "user": {
+      "avatar_url": "https://cdn-img.gitcode.com/bf/ad/b7f29486a040d7b2f52bf6c78414692d7d585eb1ec628cea3eb01c9d63f68618.png?time=1755691472703",
+      "html_url": "https://gitcode.com/cann-robot",
+      "id": "673c1552584fe8295cfd4a13",
+      "login": "cann-robot",
+      "name": "CANN-robot",
+      "object_id": "673c1552584fe8295cfd4a13"
+    }
+  },
+  {
+    "body": ":large_blue_circle: source code change are detected, tasks labels is removed in this pull request!",
+    "comment_type": "pr_comment",
+    "created_at": "2026-03-05T21:23:01+08:00",
+    "discussion_id": "74595b24a058a9f98dd8c1b0f9e0217bcf2e7c83",
+    "id": 164429647,
+    "updated_at": "2026-03-05T21:23:01+08:00",
+    "user": {
+      "avatar_url": "https://cdn-img.gitcode.com/bf/ad/b7f29486a040d7b2f52bf6c78414692d7d585eb1ec628cea3eb01c9d63f68618.png?time=1755691472703",
+      "html_url": "https://gitcode.com/cann-robot",
+      "id": "673c1552584fe8295cfd4a13",
+      "login": "cann-robot",
+      "name": "CANN-robot",
+      "object_id": "673c1552584fe8295cfd4a13"
+    }
+  },
+  {
+    "body": ":large_blue_circle: source code change are detected, tasks labels is removed in this pull request!",
+    "comment_type": "pr_comment",
+    "created_at": "2026-03-05T21:30:31+08:00",
+    "discussion_id": "7f815c92cd03e561bf3ac9010528b21d363636a4",
+    "id": 164430585,
+    "updated_at": "2026-03-05T21:30:31+08:00",
+    "user": {
+      "avatar_url": "https://cdn-img.gitcode.com/bf/ad/b7f29486a040d7b2f52bf6c78414692d7d585eb1ec628cea3eb01c9d63f68618.png?time=1755691472703",
+      "html_url": "https://gitcode.com/cann-robot",
+      "id": "673c1552584fe8295cfd4a13",
+      "login": "cann-robot",
+      "name": "CANN-robot",
+      "object_id": "673c1552584fe8295cfd4a13"
+    }
+  },
+  {
+    "body": ":large_blue_circle: source code change are detected, tasks labels is removed in this pull request!",
+    "comment_type": "pr_comment",
+    "created_at": "2026-03-05T21:47:49+08:00",
+    "discussion_id": "81144c8e9eef75af7ea52d17e3eaf1304f910bf3",
+    "id": 164432676,
+    "updated_at": "2026-03-05T21:47:49+08:00",
+    "user": {
+      "avatar_url": "https://cdn-img.gitcode.com/bf/ad/b7f29486a040d7b2f52bf6c78414692d7d585eb1ec628cea3eb01c9d63f68618.png?time=1755691472703",
+      "html_url": "https://gitcode.com/cann-robot",
+      "id": "673c1552584fe8295cfd4a13",
+      "login": "cann-robot",
+      "name": "CANN-robot",
+      "object_id": "673c1552584fe8295cfd4a13"
+    }
+  },
+  {
+    "body": ":large_blue_circle: source code change are detected, tasks labels is removed in this pull request!",
+    "comment_type": "pr_comment",
+    "created_at": "2026-03-06T09:31:16+08:00",
+    "discussion_id": "d8ff8a95e9d8391013d74f0ce8ccef95d49d9fcc",
+    "id": 164448873,
+    "updated_at": "2026-03-06T09:31:16+08:00",
+    "user": {
+      "avatar_url": "https://cdn-img.gitcode.com/bf/ad/b7f29486a040d7b2f52bf6c78414692d7d585eb1ec628cea3eb01c9d63f68618.png?time=1755691472703",
+      "html_url": "https://gitcode.com/cann-robot",
+      "id": "673c1552584fe8295cfd4a13",
+      "login": "cann-robot",
+      "name": "CANN-robot",
+      "object_id": "673c1552584fe8295cfd4a13"
+    }
+  },
+  {
+    "body": ":large_blue_circle: source code change are detected, tasks labels is removed in this pull request!",
+    "comment_type": "pr_comment",
+    "created_at": "2026-03-07T14:47:54+08:00",
+    "discussion_id": "9b7e2ea3e5fb0bfc3a249492689b2c9f078fbf03",
+    "id": 164570578,
+    "updated_at": "2026-03-07T14:47:54+08:00",
+    "user": {
+      "avatar_url": "https://cdn-img.gitcode.com/bf/ad/b7f29486a040d7b2f52bf6c78414692d7d585eb1ec628cea3eb01c9d63f68618.png?time=1755691472703",
+      "html_url": "https://gitcode.com/cann-robot",
+      "id": "673c1552584fe8295cfd4a13",
+      "login": "cann-robot",
+      "name": "CANN-robot",
+      "object_id": "673c1552584fe8295cfd4a13"
+    }
+  },
+  {
+    "body": ":large_blue_circle: source code change are detected, tasks labels is removed in this pull request!",
+    "comment_type": "pr_comment",
+    "created_at": "2026-03-07T14:50:58+08:00",
+    "discussion_id": "0d37d451418e2950c56f92057153dc7ecc6e6537",
+    "id": 164570859,
+    "updated_at": "2026-03-07T14:50:58+08:00",
+    "user": {
+      "avatar_url": "https://cdn-img.gitcode.com/bf/ad/b7f29486a040d7b2f52bf6c78414692d7d585eb1ec628cea3eb01c9d63f68618.png?time=1755691472703",
+      "html_url": "https://gitcode.com/cann-robot",
+      "id": "673c1552584fe8295cfd4a13",
+      "login": "cann-robot",
+      "name": "CANN-robot",
+      "object_id": "673c1552584fe8295cfd4a13"
+    }
+  },
+  {
+    "body": ":large_blue_circle: source code change are detected, tasks labels is removed in this pull request!",
+    "comment_type": "pr_comment",
+    "created_at": "2026-03-07T15:45:30+08:00",
+    "discussion_id": "fbe72acbfdf1da1324fd03dce1fdc134c12f992d",
+    "id": 164576410,
+    "updated_at": "2026-03-07T15:45:30+08:00",
+    "user": {
+      "avatar_url": "https://cdn-img.gitcode.com/bf/ad/b7f29486a040d7b2f52bf6c78414692d7d585eb1ec628cea3eb01c9d63f68618.png?time=1755691472703",
+      "html_url": "https://gitcode.com/cann-robot",
+      "id": "673c1552584fe8295cfd4a13",
+      "login": "cann-robot",
+      "name": "CANN-robot",
+      "object_id": "673c1552584fe8295cfd4a13"
+    }
+  },
+  {
+    "body": ":large_blue_circle: source code change are detected, tasks labels is removed in this pull request!",
+    "comment_type": "pr_comment",
+    "created_at": "2026-03-07T17:13:37+08:00",
+    "discussion_id": "81c45747e12290c864ee361351d80b9af8719c12",
+    "id": 164584965,
+    "updated_at": "2026-03-07T17:13:37+08:00",
+    "user": {
+      "avatar_url": "https://cdn-img.gitcode.com/bf/ad/b7f29486a040d7b2f52bf6c78414692d7d585eb1ec628cea3eb01c9d63f68618.png?time=1755691472703",
+      "html_url": "https://gitcode.com/cann-robot",
+      "id": "673c1552584fe8295cfd4a13",
+      "login": "cann-robot",
+      "name": "CANN-robot",
+      "object_id": "673c1552584fe8295cfd4a13"
+    }
+  },
+  {
+    "body": ":large_blue_circle: source code change are detected, tasks labels is removed in this pull request!",
+    "comment_type": "pr_comment",
+    "created_at": "2026-03-07T17:20:38+08:00",
+    "discussion_id": "ba86a2bd348ef1382cb892c40bfcbded2bff84fd",
+    "id": 164585651,
+    "updated_at": "2026-03-07T17:20:38+08:00",
+    "user": {
+      "avatar_url": "https://cdn-img.gitcode.com/bf/ad/b7f29486a040d7b2f52bf6c78414692d7d585eb1ec628cea3eb01c9d63f68618.png?time=1755691472703",
+      "html_url": "https://gitcode.com/cann-robot",
+      "id": "673c1552584fe8295cfd4a13",
+      "login": "cann-robot",
+      "name": "CANN-robot",
+      "object_id": "673c1552584fe8295cfd4a13"
+    }
+  },
+  {
+    "body": ":large_blue_circle: source code change are detected, tasks labels is removed in this pull request!",
+    "comment_type": "pr_comment",
+    "created_at": "2026-03-07T17:34:29+08:00",
+    "discussion_id": "4c18e6a50e00256f5d3c1d71dd3de6c76c2babd0",
+    "id": 164586803,
+    "updated_at": "2026-03-07T17:34:29+08:00",
+    "user": {
+      "avatar_url": "https://cdn-img.gitcode.com/bf/ad/b7f29486a040d7b2f52bf6c78414692d7d585eb1ec628cea3eb01c9d63f68618.png?time=1755691472703",
+      "html_url": "https://gitcode.com/cann-robot",
+      "id": "673c1552584fe8295cfd4a13",
+      "login": "cann-robot",
+      "name": "CANN-robot",
+      "object_id": "673c1552584fe8295cfd4a13"
+    }
+  },
+  {
+    "body": ":large_blue_circle: source code change are detected, tasks labels is removed in this pull request!",
+    "comment_type": "pr_comment",
+    "created_at": "2026-03-08T08:57:05+08:00",
+    "discussion_id": "45d685e5706cbbd5b03089b2dde7d91c1d5d9d20",
+    "id": 164603595,
+    "updated_at": "2026-03-08T08:57:05+08:00",
+    "user": {
+      "avatar_url": "https://cdn-img.gitcode.com/bf/ad/b7f29486a040d7b2f52bf6c78414692d7d585eb1ec628cea3eb01c9d63f68618.png?time=1755691472703",
+      "html_url": "https://gitcode.com/cann-robot",
+      "id": "673c1552584fe8295cfd4a13",
+      "login": "cann-robot",
+      "name": "CANN-robot",
+      "object_id": "673c1552584fe8295cfd4a13"
+    }
+  },
+  {
+    "body": ":large_blue_circle: source code change are detected, tasks labels is removed in this pull request!",
+    "comment_type": "pr_comment",
+    "created_at": "2026-03-08T09:27:05+08:00",
+    "discussion_id": "ebb98a434b0992343921059c8893354692ccc15e",
+    "id": 164603890,
+    "updated_at": "2026-03-08T09:27:05+08:00",
+    "user": {
+      "avatar_url": "https://cdn-img.gitcode.com/bf/ad/b7f29486a040d7b2f52bf6c78414692d7d585eb1ec628cea3eb01c9d63f68618.png?time=1755691472703",
+      "html_url": "https://gitcode.com/cann-robot",
+      "id": "673c1552584fe8295cfd4a13",
+      "login": "cann-robot",
+      "name": "CANN-robot",
+      "object_id": "673c1552584fe8295cfd4a13"
+    }
+  },
+  {
+    "body": ":large_blue_circle: source code change are detected, tasks labels is removed in this pull request!",
+    "comment_type": "pr_comment",
+    "created_at": "2026-03-08T15:12:22+08:00",
+    "discussion_id": "812eff381a05219e7c7300a8a8454d90483c84f3",
+    "id": 164607739,
+    "updated_at": "2026-03-08T15:12:22+08:00",
+    "user": {
+      "avatar_url": "https://cdn-img.gitcode.com/bf/ad/b7f29486a040d7b2f52bf6c78414692d7d585eb1ec628cea3eb01c9d63f68618.png?time=1755691472703",
+      "html_url": "https://gitcode.com/cann-robot",
+      "id": "673c1552584fe8295cfd4a13",
+      "login": "cann-robot",
+      "name": "CANN-robot",
+      "object_id": "673c1552584fe8295cfd4a13"
+    }
+  },
+  {
+    "body": ":large_blue_circle: source code change are detected, tasks labels is removed in this pull request!",
+    "comment_type": "pr_comment",
+    "created_at": "2026-03-08T15:47:44+08:00",
+    "discussion_id": "14a7500264cd356bdab45ebb16d1c311ac01966c",
+    "id": 164608362,
+    "updated_at": "2026-03-08T15:47:44+08:00",
+    "user": {
+      "avatar_url": "https://cdn-img.gitcode.com/bf/ad/b7f29486a040d7b2f52bf6c78414692d7d585eb1ec628cea3eb01c9d63f68618.png?time=1755691472703",
+      "html_url": "https://gitcode.com/cann-robot",
+      "id": "673c1552584fe8295cfd4a13",
+      "login": "cann-robot",
+      "name": "CANN-robot",
+      "object_id": "673c1552584fe8295cfd4a13"
+    }
+  },
+  {
+    "body": ":large_blue_circle: source code change are detected, tasks labels is removed in this pull request!",
+    "comment_type": "pr_comment",
+    "created_at": "2026-03-08T16:12:28+08:00",
+    "discussion_id": "2917bc3b40736db57eb6c7ef0f2b5df27a4d7622",
+    "id": 164608786,
+    "updated_at": "2026-03-08T16:12:28+08:00",
+    "user": {
+      "avatar_url": "https://cdn-img.gitcode.com/bf/ad/b7f29486a040d7b2f52bf6c78414692d7d585eb1ec628cea3eb01c9d63f68618.png?time=1755691472703",
+      "html_url": "https://gitcode.com/cann-robot",
+      "id": "673c1552584fe8295cfd4a13",
+      "login": "cann-robot",
+      "name": "CANN-robot",
+      "object_id": "673c1552584fe8295cfd4a13"
+    }
+  },
+  {
+    "body": ":large_blue_circle: source code change are detected, tasks labels is removed in this pull request!",
+    "comment_type": "pr_comment",
+    "created_at": "2026-03-09T15:32:08+08:00",
+    "discussion_id": "bfdef433e7b3a6492864b8d97398adcf6c2cddaf",
+    "id": 164671089,
+    "updated_at": "2026-03-09T15:32:08+08:00",
+    "user": {
+      "avatar_url": "https://cdn-img.gitcode.com/bf/ad/b7f29486a040d7b2f52bf6c78414692d7d585eb1ec628cea3eb01c9d63f68618.png?time=1755691472703",
+      "html_url": "https://gitcode.com/cann-robot",
+      "id": "673c1552584fe8295cfd4a13",
+      "login": "cann-robot",
+      "name": "CANN-robot",
+      "object_id": "673c1552584fe8295cfd4a13"
+    }
+  },
+  {
+    "body": ":large_blue_circle: source code change are detected, tasks labels is removed in this pull request!",
+    "comment_type": "pr_comment",
+    "created_at": "2026-03-09T16:04:18+08:00",
+    "discussion_id": "43f4cc0dcf0436a8fd8da59cb70ea7664f536581",
+    "id": 164677504,
+    "updated_at": "2026-03-09T16:04:18+08:00",
+    "user": {
+      "avatar_url": "https://cdn-img.gitcode.com/bf/ad/b7f29486a040d7b2f52bf6c78414692d7d585eb1ec628cea3eb01c9d63f68618.png?time=1755691472703",
+      "html_url": "https://gitcode.com/cann-robot",
+      "id": "673c1552584fe8295cfd4a13",
+      "login": "cann-robot",
+      "name": "CANN-robot",
+      "object_id": "673c1552584fe8295cfd4a13"
+    }
+  },
+  {
+    "body": ":large_blue_circle: source code change are detected, tasks labels is removed in this pull request!",
+    "comment_type": "pr_comment",
+    "created_at": "2026-03-09T16:43:08+08:00",
+    "discussion_id": "302d733005f2307a3ac6c1eb5c74d40e59b7b8de",
+    "id": 164685873,
+    "updated_at": "2026-03-09T16:43:08+08:00",
+    "user": {
+      "avatar_url": "https://cdn-img.gitcode.com/bf/ad/b7f29486a040d7b2f52bf6c78414692d7d585eb1ec628cea3eb01c9d63f68618.png?time=1755691472703",
+      "html_url": "https://gitcode.com/cann-robot",
+      "id": "673c1552584fe8295cfd4a13",
+      "login": "cann-robot",
+      "name": "CANN-robot",
+      "object_id": "673c1552584fe8295cfd4a13"
+    }
+  },
+  {
+    "body": ":large_blue_circle: source code change are detected, tasks labels is removed in this pull request!",
+    "comment_type": "pr_comment",
+    "created_at": "2026-03-09T20:59:29+08:00",
+    "discussion_id": "518337eda5ef49211f6a0ebba0a3a29b558d53b9",
+    "id": 164725967,
+    "updated_at": "2026-03-09T20:59:29+08:00",
+    "user": {
+      "avatar_url": "https://cdn-img.gitcode.com/bf/ad/b7f29486a040d7b2f52bf6c78414692d7d585eb1ec628cea3eb01c9d63f68618.png?time=1755691472703",
+      "html_url": "https://gitcode.com/cann-robot",
+      "id": "673c1552584fe8295cfd4a13",
+      "login": "cann-robot",
+      "name": "CANN-robot",
+      "object_id": "673c1552584fe8295cfd4a13"
+    }
+  },
+  {
+    "body": ":large_blue_circle: source code change are detected, tasks labels is removed in this pull request!",
+    "comment_type": "pr_comment",
+    "created_at": "2026-03-09T22:05:48+08:00",
+    "discussion_id": "778457579ec04d779e88609562dafcc23f976c45",
+    "id": 164733700,
+    "updated_at": "2026-03-09T22:05:48+08:00",
+    "user": {
+      "avatar_url": "https://cdn-img.gitcode.com/bf/ad/b7f29486a040d7b2f52bf6c78414692d7d585eb1ec628cea3eb01c9d63f68618.png?time=1755691472703",
+      "html_url": "https://gitcode.com/cann-robot",
+      "id": "673c1552584fe8295cfd4a13",
+      "login": "cann-robot",
+      "name": "CANN-robot",
+      "object_id": "673c1552584fe8295cfd4a13"
+    }
+  },
+  {
+    "body": ":large_blue_circle: source code change are detected, tasks labels is removed in this pull request!",
+    "comment_type": "pr_comment",
+    "created_at": "2026-03-10T11:50:47+08:00",
+    "discussion_id": "06f6ba284e1f3e0965934204a29cec92126f5859",
+    "id": 164776400,
+    "updated_at": "2026-03-10T11:50:47+08:00",
+    "user": {
+      "avatar_url": "https://cdn-img.gitcode.com/bf/ad/b7f29486a040d7b2f52bf6c78414692d7d585eb1ec628cea3eb01c9d63f68618.png?time=1755691472703",
+      "html_url": "https://gitcode.com/cann-robot",
+      "id": "673c1552584fe8295cfd4a13",
+      "login": "cann-robot",
+      "name": "CANN-robot",
+      "object_id": "673c1552584fe8295cfd4a13"
+    }
+  },
+  {
+    "body": ":large_blue_circle: source code change are detected, tasks labels is removed in this pull request!",
+    "comment_type": "pr_comment",
+    "created_at": "2026-03-10T11:57:05+08:00",
+    "discussion_id": "290a5eb5a5dbde23d0fb69bea8f7c60ec6c410a4",
+    "id": 164777580,
+    "updated_at": "2026-03-10T11:57:05+08:00",
+    "user": {
+      "avatar_url": "https://cdn-img.gitcode.com/bf/ad/b7f29486a040d7b2f52bf6c78414692d7d585eb1ec628cea3eb01c9d63f68618.png?time=1755691472703",
+      "html_url": "https://gitcode.com/cann-robot",
+      "id": "673c1552584fe8295cfd4a13",
+      "login": "cann-robot",
+      "name": "CANN-robot",
+      "object_id": "673c1552584fe8295cfd4a13"
+    }
+  },
+  {
+    "body": ":large_blue_circle: source code change are detected, tasks labels is removed in this pull request!",
+    "comment_type": "pr_comment",
+    "created_at": "2026-03-10T19:48:43+08:00",
+    "discussion_id": "792d068abde422146a56c7e2af6d207fb216da1f",
+    "id": 164844705,
+    "updated_at": "2026-03-10T19:48:43+08:00",
+    "user": {
+      "avatar_url": "https://cdn-img.gitcode.com/bf/ad/b7f29486a040d7b2f52bf6c78414692d7d585eb1ec628cea3eb01c9d63f68618.png?time=1755691472703",
+      "html_url": "https://gitcode.com/cann-robot",
+      "id": "673c1552584fe8295cfd4a13",
+      "login": "cann-robot",
+      "name": "CANN-robot",
+      "object_id": "673c1552584fe8295cfd4a13"
+    }
+  },
+  {
+    "body": ":large_blue_circle: source code change are detected, tasks labels is removed in this pull request!",
+    "comment_type": "pr_comment",
+    "created_at": "2026-03-10T20:00:40+08:00",
+    "discussion_id": "c342bc432615c853d42309efbbc6c19818918f1f",
+    "id": 164847049,
+    "updated_at": "2026-03-10T20:00:40+08:00",
+    "user": {
+      "avatar_url": "https://cdn-img.gitcode.com/bf/ad/b7f29486a040d7b2f52bf6c78414692d7d585eb1ec628cea3eb01c9d63f68618.png?time=1755691472703",
+      "html_url": "https://gitcode.com/cann-robot",
+      "id": "673c1552584fe8295cfd4a13",
+      "login": "cann-robot",
+      "name": "CANN-robot",
+      "object_id": "673c1552584fe8295cfd4a13"
+    }
+  },
+  {
+    "body": ":large_blue_circle: source code change are detected, tasks labels is removed in this pull request!",
+    "comment_type": "pr_comment",
+    "created_at": "2026-03-10T20:05:27+08:00",
+    "discussion_id": "2475ffadd3528896d0446f77eb3acd2d23cb2988",
+    "id": 164847821,
+    "updated_at": "2026-03-10T20:05:27+08:00",
+    "user": {
+      "avatar_url": "https://cdn-img.gitcode.com/bf/ad/b7f29486a040d7b2f52bf6c78414692d7d585eb1ec628cea3eb01c9d63f68618.png?time=1755691472703",
+      "html_url": "https://gitcode.com/cann-robot",
+      "id": "673c1552584fe8295cfd4a13",
+      "login": "cann-robot",
+      "name": "CANN-robot",
+      "object_id": "673c1552584fe8295cfd4a13"
+    }
+  },
+  {
+    "body": ":large_blue_circle: source code change are detected, tasks labels is removed in this pull request!",
+    "comment_type": "pr_comment",
+    "created_at": "2026-03-11T15:48:38+08:00",
+    "discussion_id": "60775018c58a82e6672a3cec7c721a48e4f585e7",
+    "id": 164934141,
+    "updated_at": "2026-03-11T15:48:38+08:00",
+    "user": {
+      "avatar_url": "https://cdn-img.gitcode.com/bf/ad/b7f29486a040d7b2f52bf6c78414692d7d585eb1ec628cea3eb01c9d63f68618.png?time=1755691472703",
+      "html_url": "https://gitcode.com/cann-robot",
+      "id": "673c1552584fe8295cfd4a13",
+      "login": "cann-robot",
+      "name": "CANN-robot",
+      "object_id": "673c1552584fe8295cfd4a13"
+    }
+  },
+  {
+    "body": ":large_blue_circle: source code change are detected, tasks labels is removed in this pull request!",
+    "comment_type": "pr_comment",
+    "created_at": "2026-03-11T16:22:28+08:00",
+    "discussion_id": "a4af929a4abfde6e0b9db4aa1d6426f3bc0ff17b",
+    "id": 164941911,
+    "updated_at": "2026-03-11T16:22:28+08:00",
+    "user": {
+      "avatar_url": "https://cdn-img.gitcode.com/bf/ad/b7f29486a040d7b2f52bf6c78414692d7d585eb1ec628cea3eb01c9d63f68618.png?time=1755691472703",
+      "html_url": "https://gitcode.com/cann-robot",
+      "id": "673c1552584fe8295cfd4a13",
+      "login": "cann-robot",
+      "name": "CANN-robot",
+      "object_id": "673c1552584fe8295cfd4a13"
+    }
+  },
+  {
+    "body": ":large_blue_circle: source code change are detected, tasks labels is removed in this pull request!",
+    "comment_type": "pr_comment",
+    "created_at": "2026-03-11T18:22:38+08:00",
+    "discussion_id": "3a19717b0f5b88f4b8b6a2f76283409387718fe0",
+    "id": 164967146,
+    "updated_at": "2026-03-11T18:22:38+08:00",
+    "user": {
+      "avatar_url": "https://cdn-img.gitcode.com/bf/ad/b7f29486a040d7b2f52bf6c78414692d7d585eb1ec628cea3eb01c9d63f68618.png?time=1755691472703",
+      "html_url": "https://gitcode.com/cann-robot",
+      "id": "673c1552584fe8295cfd4a13",
+      "login": "cann-robot",
+      "name": "CANN-robot",
+      "object_id": "673c1552584fe8295cfd4a13"
+    }
+  },
+  {
+    "body": ":large_blue_circle: source code change are detected, tasks labels is removed in this pull request!",
+    "comment_type": "pr_comment",
+    "created_at": "2026-03-12T10:26:12+08:00",
+    "discussion_id": "95b747682637b138367db7f3b380f499e072c3f8",
+    "id": 165006824,
+    "updated_at": "2026-03-12T10:26:12+08:00",
+    "user": {
+      "avatar_url": "https://cdn-img.gitcode.com/bf/ad/b7f29486a040d7b2f52bf6c78414692d7d585eb1ec628cea3eb01c9d63f68618.png?time=1755691472703",
+      "html_url": "https://gitcode.com/cann-robot",
+      "id": "673c1552584fe8295cfd4a13",
+      "login": "cann-robot",
+      "name": "CANN-robot",
+      "object_id": "673c1552584fe8295cfd4a13"
+    }
+  },
+  {
+    "body": ":large_blue_circle: source code change are detected, tasks labels is removed in this pull request!",
+    "comment_type": "pr_comment",
+    "created_at": "2026-03-12T10:58:58+08:00",
+    "discussion_id": "1973faa42d8ec0408810612bfc8941911df12ce2",
+    "id": 165014283,
+    "updated_at": "2026-03-12T10:58:58+08:00",
+    "user": {
+      "avatar_url": "https://cdn-img.gitcode.com/bf/ad/b7f29486a040d7b2f52bf6c78414692d7d585eb1ec628cea3eb01c9d63f68618.png?time=1755691472703",
+      "html_url": "https://gitcode.com/cann-robot",
+      "id": "673c1552584fe8295cfd4a13",
+      "login": "cann-robot",
+      "name": "CANN-robot",
+      "object_id": "673c1552584fe8295cfd4a13"
+    }
+  },
+  {
+    "body": ":large_blue_circle: source code change are detected, tasks labels is removed in this pull request!",
+    "comment_type": "pr_comment",
+    "created_at": "2026-03-12T14:28:23+08:00",
+    "discussion_id": "0ee3d5fce0732c8fd523bb06ed1f8711311b0f6b",
+    "id": 165036765,
+    "updated_at": "2026-03-12T14:28:23+08:00",
+    "user": {
+      "avatar_url": "https://cdn-img.gitcode.com/bf/ad/b7f29486a040d7b2f52bf6c78414692d7d585eb1ec628cea3eb01c9d63f68618.png?time=1755691472703",
+      "html_url": "https://gitcode.com/cann-robot",
+      "id": "673c1552584fe8295cfd4a13",
+      "login": "cann-robot",
+      "name": "CANN-robot",
+      "object_id": "673c1552584fe8295cfd4a13"
+    }
+  },
+  {
+    "body": ":large_blue_circle: source code change are detected, tasks labels is removed in this pull request!",
+    "comment_type": "pr_comment",
+    "created_at": "2026-03-12T14:46:56+08:00",
+    "discussion_id": "e854be662273ddb291c020fedb7a7cc66e44fde4",
+    "id": 165040933,
+    "updated_at": "2026-03-12T14:46:56+08:00",
+    "user": {
+      "avatar_url": "https://cdn-img.gitcode.com/bf/ad/b7f29486a040d7b2f52bf6c78414692d7d585eb1ec628cea3eb01c9d63f68618.png?time=1755691472703",
+      "html_url": "https://gitcode.com/cann-robot",
+      "id": "673c1552584fe8295cfd4a13",
+      "login": "cann-robot",
+      "name": "CANN-robot",
+      "object_id": "673c1552584fe8295cfd4a13"
+    }
+  },
+  {
+    "body": "compile",
+    "comment_type": "pr_comment",
+    "created_at": "2026-03-12T14:48:44+08:00",
+    "discussion_id": "0c1fa75f673099c9c3610cdac9f11153b25e32ce",
+    "id": 165041392,
+    "updated_at": "2026-03-12T14:48:44+08:00",
+    "user": {
+      "html_url": "https://gitcode.com/wuyufei",
+      "id": "68a27e1fe6740e25e8668b54",
+      "login": "wuyufei",
+      "name": "wuyufei",
+      "object_id": "68a27e1fe6740e25e8668b54"
+    }
+  },
+  {
+    "body": "流水线任务触发成功\n任务链接 [<b><a href='https://www.openlibing.com/apps/pipelineDetail?pipelineId=b582e6c0e2c54a3f8168601c5b292c24&pipelineRunId=e69d684900bb4d7380c5bea8883e4740&projectName=CANN'>e69d684900bb4d7380c5bea8883e4740</a></b>][<b><a href='https://gitcode.com/cann/infrastructure/blob/main/docs/ci/ci_guide.md'>流水线指导</a></b>]\n<table style=\"border-collapse: collapse\"><tr><th>任务名称</th><th>状态</th><th>日志</th><th>下载链接</th></tr>\n                    <tr>\n                        <td><strong>解析CI分支</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>codecheck</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/entryCheckDashCode/MR_1ea9a0aaa8c94773aebc3506343fa640/ef74701e391182c2549e78afef99caed?projectId=300033&codeHostingPlatformFlag=gitcode>>>>>></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>anti_virus</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/entryCheckNew/poisoningresult/c15106d0-9a99-4790-a95a-9573c0231d8b/CANN/ops-nn?projectName=CANN&codeHostingPlatformFlag=gitcode>>>>>></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>Check_Pr</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/pipelineDetail?pipelineId=b582e6c0e2c54a3f8168601c5b292c24&pipelineRunId=e69d684900bb4d7380c5bea8883e4740&projectName=CANN>>>>>></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>Compile_Ascend_X86_ubuntu24</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/pipelineDetail?pipelineId=b582e6c0e2c54a3f8168601c5b292c24&pipelineRunId=e69d684900bb4d7380c5bea8883e4740&projectName=CANN>>>>>></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>Compile_Ascend_X86_mobile_station</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/pipelineDetail?pipelineId=b582e6c0e2c54a3f8168601c5b292c24&pipelineRunId=e69d684900bb4d7380c5bea8883e4740&projectName=CANN>>>>>></a></td>\n                        <td><a href=https://ascend-ci.obs.cn-north-4.myhuaweicloud.com/ops-nn/package/1989/cann-ops-nn-kirinx90_linux-x86_64.run>>>>>></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>Compile_Ascend_ARM</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/pipelineDetail?pipelineId=b582e6c0e2c54a3f8168601c5b292c24&pipelineRunId=e69d684900bb4d7380c5bea8883e4740&projectName=CANN>>>>>></a></td>\n                        <td><a href=https://ascend-ci.obs.cn-north-4.myhuaweicloud.com/ops-nn/package/1989/cann-ops-nn_linux-aarch64.run>>>>>></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>Compile_Ascend_single</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/pipelineDetail?pipelineId=b582e6c0e2c54a3f8168601c5b292c24&pipelineRunId=e69d684900bb4d7380c5bea8883e4740&projectName=CANN>>>>>></a></td>\n                        <td><a href=https://ascend-ci.obs.cn-north-4.myhuaweicloud.com/ops-nn/package/1989/single.tar.gz>>>>>></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>Compile_Ascend_experimental</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/pipelineDetail?pipelineId=b582e6c0e2c54a3f8168601c5b292c24&pipelineRunId=e69d684900bb4d7380c5bea8883e4740&projectName=CANN>>>>>></a></td>\n                        <td><a href=https://ascend-ci.obs.cn-north-4.myhuaweicloud.com/ops-nn/package/1989/cann-ops-nn-experimental_linux-aarch64.run>>>>>></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>Compile_Ascend_X86_950</strong></td>\n                        <td>❌ FAILED</td>\n                        <td><a href=https://www.openlibing.com/apps/pipelineDetail?pipelineId=b582e6c0e2c54a3f8168601c5b292c24&pipelineRunId=e69d684900bb4d7380c5bea8883e4740&projectName=CANN>>>>>></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>Compile_Ascend_ARM_950</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/pipelineDetail?pipelineId=b582e6c0e2c54a3f8168601c5b292c24&pipelineRunId=e69d684900bb4d7380c5bea8883e4740&projectName=CANN>>>>>></a></td>\n                        <td><a href=https://ascend-ci.obs.cn-north-4.myhuaweicloud.com/ops-nn/package/1989/950_ARM.tar.gz>>>>>></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>API_Check</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/pipelineDetail?pipelineId=b582e6c0e2c54a3f8168601c5b292c24&pipelineRunId=e69d684900bb4d7380c5bea8883e4740&projectName=CANN>>>>>></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>Pre_Compile</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>pre_comment</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/pipelineDetail?pipelineId=b582e6c0e2c54a3f8168601c5b292c24&pipelineRunId=e69d684900bb4d7380c5bea8883e4740&projectName=CANN>>>>>></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>Compile_Ascend_X86</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/pipelineDetail?pipelineId=b582e6c0e2c54a3f8168601c5b292c24&pipelineRunId=e69d684900bb4d7380c5bea8883e4740&projectName=CANN>>>>>></a></td>\n                        <td><a href=https://ascend-ci.obs.cn-north-4.myhuaweicloud.com/ops-nn/package/1989/cann-ops-nn_linux-x86_64.run>>>>>></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>Compile_Ascend_X86_mobile_station_ubuntu24</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/pipelineDetail?pipelineId=b582e6c0e2c54a3f8168601c5b292c24&pipelineRunId=e69d684900bb4d7380c5bea8883e4740&projectName=CANN>>>>>></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>Compile_Ascend_X86_950_ubuntu24</strong></td>\n                        <td>❌ FAILED</td>\n                        <td><a href=https://www.openlibing.com/apps/pipelineDetail?pipelineId=b582e6c0e2c54a3f8168601c5b292c24&pipelineRunId=e69d684900bb4d7380c5bea8883e4740&projectName=CANN>>>>>></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>UT_Test_ophost</strong></td>\n                        <td>⚪ ABORTED</td>\n                        <td><a href=></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>UT_Test_opapi</strong></td>\n                        <td>⚪ ABORTED</td>\n                        <td><a href=></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>UT_Test_kernel</strong></td>\n                        <td>⚪ ABORTED</td>\n                        <td><a href=></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>UT_Test_opgraph</strong></td>\n                        <td>⚪ ABORTED</td>\n                        <td><a href=></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>Smoke_A900_npupool</strong></td>\n                        <td>⚪ ABORTED</td>\n                        <td><a href=></a></td>\n                        <td><a href=></a></td>\n                    </tr> </table><p>[2026-03-12 14:59:36] &nbsp;&nbsp;&nbsp;CI执行失败 </p>",
+    "comment_type": "pr_comment",
+    "created_at": "2026-03-12T14:49:49+08:00",
+    "discussion_id": "773b833473bfc1f5e93b79393abd9675fe7141ac",
+    "id": 165041618,
+    "updated_at": "2026-03-12T14:59:36+08:00",
+    "user": {
+      "avatar_url": "https://cdn-img.gitcode.com/bf/ad/b7f29486a040d7b2f52bf6c78414692d7d585eb1ec628cea3eb01c9d63f68618.png?time=1755691472703",
+      "html_url": "https://gitcode.com/cann-robot",
+      "id": "673c1552584fe8295cfd4a13",
+      "login": "cann-robot",
+      "name": "CANN-robot",
+      "object_id": "673c1552584fe8295cfd4a13"
+    }
+  },
+  {
+    "body": ":large_blue_circle: source code change are detected, tasks labels is removed in this pull request!",
+    "comment_type": "pr_comment",
+    "created_at": "2026-03-12T15:19:48+08:00",
+    "discussion_id": "e7b388d03bd8fa8e6150ccb7690795eed9f3a6fc",
+    "id": 165049215,
+    "updated_at": "2026-03-12T15:19:48+08:00",
+    "user": {
+      "avatar_url": "https://cdn-img.gitcode.com/bf/ad/b7f29486a040d7b2f52bf6c78414692d7d585eb1ec628cea3eb01c9d63f68618.png?time=1755691472703",
+      "html_url": "https://gitcode.com/cann-robot",
+      "id": "673c1552584fe8295cfd4a13",
+      "login": "cann-robot",
+      "name": "CANN-robot",
+      "object_id": "673c1552584fe8295cfd4a13"
+    }
+  },
+  {
+    "body": "### CLA Signature Pass  \n wuyufei, thanks for your pull request. All authors of the commits have signed the CLA. :+1: ",
+    "comment_type": "pr_comment",
+    "created_at": "2026-03-12T15:19:50+08:00",
+    "discussion_id": "d0ccbfd11912f6a302f60f113689385e5ceecb62",
+    "id": 165049220,
+    "updated_at": "2026-03-12T15:19:50+08:00",
+    "user": {
+      "avatar_url": "https://cdn-img.gitcode.com/bf/ad/b7f29486a040d7b2f52bf6c78414692d7d585eb1ec628cea3eb01c9d63f68618.png?time=1755691472703",
+      "html_url": "https://gitcode.com/cann-robot",
+      "id": "673c1552584fe8295cfd4a13",
+      "login": "cann-robot",
+      "name": "CANN-robot",
+      "object_id": "673c1552584fe8295cfd4a13"
+    }
+  },
+  {
+    "body": "compile",
+    "comment_type": "pr_comment",
+    "created_at": "2026-03-12T15:21:09+08:00",
+    "discussion_id": "8cb0ef3d6ae738963af6ad7a3ec505b751b67a1d",
+    "id": 165049525,
+    "updated_at": "2026-03-12T15:21:09+08:00",
+    "user": {
+      "html_url": "https://gitcode.com/wuyufei",
+      "id": "68a27e1fe6740e25e8668b54",
+      "login": "wuyufei",
+      "name": "wuyufei",
+      "object_id": "68a27e1fe6740e25e8668b54"
+    }
+  },
+  {
+    "body": "流水线任务触发成功\n任务链接 [<b><a href='https://www.openlibing.com/apps/pipelineDetail?pipelineId=b582e6c0e2c54a3f8168601c5b292c24&pipelineRunId=f635c5385c3642d783afb764afb71cd9&projectName=CANN'>f635c5385c3642d783afb764afb71cd9</a></b>][<b><a href='https://gitcode.com/cann/infrastructure/blob/main/docs/ci/ci_guide.md'>流水线指导</a></b>]\n<table style=\"border-collapse: collapse\"><tr><th>任务名称</th><th>状态</th><th>日志</th><th>下载链接</th></tr>\n                    <tr>\n                        <td><strong>解析CI分支</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>codecheck</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/entryCheckDashCode/MR_5071af3cc2a94cae9dbbba2e7814668b/e15d15aba88c4e035a24e665d21d759b?projectId=300033&codeHostingPlatformFlag=gitcode>>>>>></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>anti_virus</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/entryCheckNew/poisoningresult/0b2599f7-6224-4a35-8d1f-c846e6bfb3ff/CANN/ops-nn?projectName=CANN&codeHostingPlatformFlag=gitcode>>>>>></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>Check_Pr</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/pipelineDetail?pipelineId=b582e6c0e2c54a3f8168601c5b292c24&pipelineRunId=f635c5385c3642d783afb764afb71cd9&projectName=CANN>>>>>></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>Compile_Ascend_X86_ubuntu24</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/pipelineDetail?pipelineId=b582e6c0e2c54a3f8168601c5b292c24&pipelineRunId=f635c5385c3642d783afb764afb71cd9&projectName=CANN>>>>>></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>Compile_Ascend_X86_mobile_station</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/pipelineDetail?pipelineId=b582e6c0e2c54a3f8168601c5b292c24&pipelineRunId=f635c5385c3642d783afb764afb71cd9&projectName=CANN>>>>>></a></td>\n                        <td><a href=https://ascend-ci.obs.cn-north-4.myhuaweicloud.com/ops-nn/package/1989/cann-ops-nn-kirinx90_linux-x86_64.run>>>>>></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>Compile_Ascend_ARM</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/pipelineDetail?pipelineId=b582e6c0e2c54a3f8168601c5b292c24&pipelineRunId=f635c5385c3642d783afb764afb71cd9&projectName=CANN>>>>>></a></td>\n                        <td><a href=https://ascend-ci.obs.cn-north-4.myhuaweicloud.com/ops-nn/package/1989/cann-ops-nn_linux-aarch64.run>>>>>></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>Compile_Ascend_single</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/pipelineDetail?pipelineId=b582e6c0e2c54a3f8168601c5b292c24&pipelineRunId=f635c5385c3642d783afb764afb71cd9&projectName=CANN>>>>>></a></td>\n                        <td><a href=https://ascend-ci.obs.cn-north-4.myhuaweicloud.com/ops-nn/package/1989/single.tar.gz>>>>>></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>Compile_Ascend_experimental</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/pipelineDetail?pipelineId=b582e6c0e2c54a3f8168601c5b292c24&pipelineRunId=f635c5385c3642d783afb764afb71cd9&projectName=CANN>>>>>></a></td>\n                        <td><a href=https://ascend-ci.obs.cn-north-4.myhuaweicloud.com/ops-nn/package/1989/cann-ops-nn-experimental_linux-aarch64.run>>>>>></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>Compile_Ascend_X86_950</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/pipelineDetail?pipelineId=b582e6c0e2c54a3f8168601c5b292c24&pipelineRunId=f635c5385c3642d783afb764afb71cd9&projectName=CANN>>>>>></a></td>\n                        <td><a href=https://ascend-ci.obs.cn-north-4.myhuaweicloud.com/ops-nn/package/1989/950_X86.tar.gz>>>>>></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>Compile_Ascend_ARM_950</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/pipelineDetail?pipelineId=b582e6c0e2c54a3f8168601c5b292c24&pipelineRunId=f635c5385c3642d783afb764afb71cd9&projectName=CANN>>>>>></a></td>\n                        <td><a href=https://ascend-ci.obs.cn-north-4.myhuaweicloud.com/ops-nn/package/1989/950_ARM.tar.gz>>>>>></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>API_Check</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/pipelineDetail?pipelineId=b582e6c0e2c54a3f8168601c5b292c24&pipelineRunId=f635c5385c3642d783afb764afb71cd9&projectName=CANN>>>>>></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>Pre_Compile</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>pre_comment</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/pipelineDetail?pipelineId=b582e6c0e2c54a3f8168601c5b292c24&pipelineRunId=f635c5385c3642d783afb764afb71cd9&projectName=CANN>>>>>></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>Compile_Ascend_X86</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/pipelineDetail?pipelineId=b582e6c0e2c54a3f8168601c5b292c24&pipelineRunId=f635c5385c3642d783afb764afb71cd9&projectName=CANN>>>>>></a></td>\n                        <td><a href=https://ascend-ci.obs.cn-north-4.myhuaweicloud.com/ops-nn/package/1989/cann-ops-nn_linux-x86_64.run>>>>>></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>Compile_Ascend_X86_mobile_station_ubuntu24</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/pipelineDetail?pipelineId=b582e6c0e2c54a3f8168601c5b292c24&pipelineRunId=f635c5385c3642d783afb764afb71cd9&projectName=CANN>>>>>></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>Compile_Ascend_X86_950_ubuntu24</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=https://www.openlibing.com/apps/pipelineDetail?pipelineId=b582e6c0e2c54a3f8168601c5b292c24&pipelineRunId=f635c5385c3642d783afb764afb71cd9&projectName=CANN>>>>>></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>UT_Test_ophost</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>UT_Test_opapi</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>UT_Test_kernel</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>UT_Test_opgraph</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=></a></td>\n                        <td><a href=></a></td>\n                    </tr> \n                    <tr>\n                        <td><strong>Smoke_A900_npupool</strong></td>\n                        <td>✅ SUCCESS</td>\n                        <td><a href=></a></td>\n                        <td><a href=https://ascend-ci.obs.cn-north-4.myhuaweicloud.com/ops-nn/package/1989/slog.tar.gz>>>>>></a></td>\n                    </tr> </table><p>[2026-03-12 15:44:36] &nbsp;&nbsp;&nbsp;CI执行结束 </p>",
+    "comment_type": "pr_comment",
+    "created_at": "2026-03-12T15:22:05+08:00",
+    "discussion_id": "5d46f1805913171a32e258c2f4e6618739d54082",
+    "id": 165049719,
+    "updated_at": "2026-03-12T15:44:36+08:00",
+    "user": {
+      "avatar_url": "https://cdn-img.gitcode.com/bf/ad/b7f29486a040d7b2f52bf6c78414692d7d585eb1ec628cea3eb01c9d63f68618.png?time=1755691472703",
+      "html_url": "https://gitcode.com/cann-robot",
+      "id": "673c1552584fe8295cfd4a13",
+      "login": "cann-robot",
+      "name": "CANN-robot",
+      "object_id": "673c1552584fe8295cfd4a13"
+    }
+  },
+  {
+    "body": "/lgtm\n/approve",
+    "comment_type": "pr_comment",
+    "created_at": "2026-03-13T11:48:24+08:00",
+    "discussion_id": "6d38f263a00112e315718e7881d9b9712ca97c69",
+    "id": 165162382,
+    "updated_at": "2026-03-13T11:48:24+08:00",
+    "user": {
+      "avatar_url": "https://cdn-img.gitcode.com/ee/be/575e1e8076be411c5002aa4400569525777aaeeb4f9ee19c332213194abb5489.png",
+      "html_url": "https://gitcode.com/sxb154714",
+      "id": "675270e63397591218ac535b",
+      "login": "sxb154714",
+      "name": "sxb154714",
+      "object_id": "675270e63397591218ac535b"
+    }
+  },
+  {
+    "body": "/lgtm\n/approve",
+    "comment_type": "pr_comment",
+    "created_at": "2026-03-13T16:46:14+08:00",
+    "discussion_id": "cda1c8bb939b2acdd9ffa3842f26b08d131265ec",
+    "id": 165206743,
+    "updated_at": "2026-03-13T16:46:14+08:00",
+    "user": {
+      "avatar_url": "",
+      "html_url": "https://gitcode.com/chenqi317",
+      "id": "6861e48dadc5e31e4da8818d",
+      "login": "chenqi317",
+      "name": "chenqi317",
+      "object_id": "6861e48dadc5e31e4da8818d"
+    }
+  },
+  {
+    "body": "### Review Guide\n\n This pull-request **passes review**.\n Committers who wrote a comment of `/approve` are: [*sxb154714*](https://gitcode.com/sxb154714), [*chenqi317*](https://gitcode.com/chenqi317).\nReviewers who wrote a comment of `/lgtm` are: [*sxb154714*](https://gitcode.com/sxb154714), [*chenqi317*](https://gitcode.com/chenqi317).\n",
+    "comment_type": "pr_comment",
+    "created_at": "2026-03-13T16:46:29+08:00",
+    "discussion_id": "e1e168a5b667ddcd6565b2c5f37bbab61c80f436",
+    "id": 165206823,
+    "updated_at": "2026-03-13T16:46:29+08:00",
+    "user": {
+      "avatar_url": "https://cdn-img.gitcode.com/bf/ad/b7f29486a040d7b2f52bf6c78414692d7d585eb1ec628cea3eb01c9d63f68618.png?time=1755691472703",
+      "html_url": "https://gitcode.com/cann-robot",
+      "id": "673c1552584fe8295cfd4a13",
+      "login": "cann-robot",
+      "name": "CANN-robot",
+      "object_id": "673c1552584fe8295cfd4a13"
+    }
+  }
+]

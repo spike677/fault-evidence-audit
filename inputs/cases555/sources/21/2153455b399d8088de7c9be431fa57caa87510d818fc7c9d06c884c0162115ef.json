@@ -1,0 +1,146 @@
+[
+  {
+    "additions": 134,
+    "blob_id": "77f8f0e2d5413bb762b715194cc6d90a59c58dff",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/2a687c05a8a3c4f8e898e18df40e501b672517b6/index/embedding_bag/op_host/embedding_bag_infershape.cpp",
+    "deletions": 9,
+    "filename": "index/embedding_bag/op_host/embedding_bag_infershape.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 134,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -166,7 +166,130 @@ inline ge::graphStatus InferShape4MaxIndices(\n     return ge::GRAPH_SUCCESS;\n }\n \n-static ge::graphStatus InferShapeForEmbeddingBagSupport(gert::InferShapeContext* context)\n+inline ge::graphStatus InferShape4OutputSupport(\n+    gert::InferShapeContext* context, int64_t batch, int64_t embedding_dim, int64_t dimension,\n+    bool is_unknown_weight, bool is_unknown_indices, bool is_unknown_offset)\n+{\n+    auto output_shape = context->GetOutputShape(Y_IDX);\n+    OP_CHECK_NULL_WITH_CONTEXT(context, output_shape);\n+    output_shape->SetDimNum(OUTPUT_DIMS);\n+    \n+    if (dimension == DIM_NUM_ONE) {\n+        if (is_unknown_offset) {\n+            output_shape->SetDim(BATCH_DIM, -1);\n+        } else {\n+            output_shape->SetDim(BATCH_DIM, batch);\n+        }\n+    } else {\n+        if (is_unknown_indices) {\n+            output_shape->SetDim(BATCH_DIM, -1);\n+        } else {\n+            output_shape->SetDim(BATCH_DIM, batch);\n+        }\n+    }\n+\n+    if (is_unknown_weight) {\n+        output_shape->SetDim(EMBEDDING_DIM_IDX, -1);\n+    } else {\n+        output_shape->SetDim(EMBEDDING_DIM_IDX, embedding_dim);\n+    }\n+    return ge::GRAPH_SUCCESS;\n+}\n+\n+inline ge::graphStatus InferShape4Offset2BagSupport(\n+    gert::InferShapeContext* context, int64_t indices_num, bool is_unknown_indices)\n+{\n+    auto offset_2_bag_shape = context->GetOutputShape(OFFSET_2_BAG_IDX);\n+    OP_CHECK_NULL_WITH_CONTEXT(context, offset_2_bag_shape);\n+\n+    offset_2_bag_shape->SetDimNum(INDICES_ONE_DIM);\n+    if (is_unknown_indices) {\n+        offset_2_bag_shape->SetDim(INDICES_ZERO_DIM, -1);\n+    } else {\n+        offset_2_bag_shape->SetDim(INDICES_ZERO_DIM, indices_num);\n+    }\n+    return ge::GRAPH_SUCCESS;\n+}\n+\n+inline ge::graphStatus InferShape4BagSizeSupport(\n+    gert::InferShapeContext* context, int64_t offsets_lens, int64_t dimension, bool is_unknown_indices, bool is_unknown_offset)\n+{\n+    auto bag_size_shape = context->GetOutputShape(BAG_SIZE_IDX);\n+    OP_CHECK_NULL_WITH_CONTEXT(context, bag_size_shape);\n+    bag_size_shape->SetDimNum(BAG_SIZE_DIM);\n+\n+    if (dimension == DIM_NUM_ONE) {\n+        if (is_unknown_offset) {\n+            bag_size_shape->SetDim(BAG_SIZE_ZERO_DIM, -1);\n+        } else {\n+            bag_size_shape->SetDim(BAG_SIZE_ZERO_DIM, offsets_lens);\n+        }\n+    } else {\n+        if (is_unknown_indices) {\n+            bag_size_shape->SetDim(BAG_SIZE_ZERO_DIM, -1);\n+        } else {\n+            bag_size_shape->SetDim(BAG_SIZE_ZERO_DIM, offsets_lens);\n+        }\n+    }\n+    \n+    return ge::GRAPH_SUCCESS;\n+}\n+\n+inline ge::graphStatus InferShape4MaxIndicesSupport(\n+    gert::InferShapeContext* context, int64_t batch, int64_t embedding_dim, int64_t dimension,\n+    bool is_unknown_weight, bool is_unknown_indices, bool is_unknown_offset)\n+{\n+    auto max_indices_shape = context->GetOutputShape(MAX_INDICES_IDX);\n+    if (max_indices_shape == nullptr) {\n+        return ge::GRAPH_FAILED;\n+    }\n+\n+    auto* attrs = context->GetAttrs();\n+    if (attrs == nullptr) {\n+        return ge::GRAPH_FAILED;\n+    }\n+    const char* mode = attrs->GetAttrPointer<char>(MODE_IDX);\n+    if (mode == nullptr) {\n+        return ge::GRAPH_FAILED;\n+    }\n+\n+    if (strcmp(mode, ATTR_MODE_MAX) == 0) {\n+        max_indices_shape->SetDimNum(MAX_INDICES_DIM_TWO);\n+        if (dimension == DIM_NUM_ONE) {\n+            if (is_unknown_offset) {\n+                max_indices_shape->SetDim(MAX_INDICES_ZERO_DIM, -1);\n+            } else {\n+                max_indices_shape->SetDim(MAX_INDICES_ZERO_DIM, batch);\n+            }\n+        } else {\n+            if (is_unknown_indices) {\n+                max_indices_shape->SetDim(MAX_INDICES_ZERO_DIM, -1);\n+            } else {\n+                max_indices_shape->SetDim(MAX_INDICES_ZERO_DIM, batch);\n+            }\n+        }\n+        if (is_unknown_weight) {\n+            max_indices_shape->SetDim(MAX_INDICES_ONE_DIM, -1);\n+        } else {\n+            max_indices_shape->SetDim(MAX_INDICES_ONE_DIM, embedding_dim);\n+        }\n+    } else {\n+        max_indices_shape->SetDimNum(MAX_INDICES_DIM);\n+        max_indices_shape->SetDim(MAX_INDICES_ZERO_DIM, 0);\n+    }\n+    return ge::GRAPH_SUCCESS;\n+}\n+\n+static ge::graphStatus CheckIsUnknown(const gert::Shape* check_shape){\n+    bool is_unknown_rank = Ops::Base::IsUnknownRank(*check_shape);\n+    bool is_unknown_shape = Ops::Base::IsUnknownShape(*check_shape);\n+    if (is_unknown_rank || is_unknown_shape) {\n+        return true;\n+    }\n+    return false;\n+}\n+\n+static bool InferShapeForEmbeddingBagSupport(gert::InferShapeContext* context)\n {\n     OP_LOGD(context->GetNodeName(), \"runtime2.0 EmbeddingBagSupport infershape running.\");\n     auto const offsets_shape = context->GetInputShape(OFFSETS_IDX);\n@@ -189,28 +312,30 @@ static ge::graphStatus InferShapeForEmbeddingBagSupport(gert::InferShapeContext*\n     int64_t batch = get_batch(*include_last_offset, offsets_lens);\n     int64_t bag_size = offsets_lens;\n \n+    int64_t dimension = DIM_NUM_ONE;\n     if (indices_shape->GetDimNum() >= DIM_NUM_TWO) {\n         batch = indices_shape->GetDim(INDICES_ZERO_DIM);\n         indices_num = indices_shape->GetDim(INDICES_ZERO_DIM) * indices_shape->GetDim(INDICES_ONE_DIM);\n         bag_size = batch;\n+        dimension = DIM_NUM_TWO;\n     }\n-    \n-    int64_t weight_dim_num = weight_shape->GetDimNum();\n-    bool is_unknown_rank = Ops::Base::IsUnknownRank(*weight_shape);\n-    bool is_unknown_shape = Ops::Base::IsUnknownShape(*weight_shape);\n+\n+    bool is_unknown_weight = CheckIsUnknown(weight_shape);\n+    bool is_unknown_indices = CheckIsUnknown(indices_shape);\n+    bool is_unknown_offsets = CheckIsUnknown(offsets_shape);\n \n     OP_CHECK_IF(\n-        InferShape4Output(context, batch, embedding_dim, weight_dim_num, is_unknown_rank, is_unknown_shape) !=\n+        InferShape4OutputSupport(context, batch, embedding_dim, dimension, is_unknown_weight, is_unknown_indices, is_unknown_offsets) !=\n             ge::GRAPH_SUCCESS,\n         OP_LOGE(context, \"EmbeddingBagSupport failed to infer shape for output.\"), return GRAPH_FAILED);\n     OP_CHECK_IF(\n-        InferShape4Offset2Bag(context, indices_num, is_unknown_rank, is_unknown_shape) != ge::GRAPH_SUCCESS,\n+        InferShape4Offset2BagSupport(context, indices_num, is_unknown_indices) != ge::GRAPH_SUCCESS,\n         OP_LOGE(context, \"EmbeddingBagSupport failed to infer shape for offset2bag.\"), return GRAPH_FAILED);\n     OP_CHECK_IF(\n-        InferShape4BagSize(context, bag_size, is_unknown_rank, is_unknown_shape) != ge::GRAPH_SUCCESS,\n+        InferShape4BagSizeSupport(context, bag_size, dimension, is_unknown_indices, is_unknown_offsets) != ge::GRAPH_SUCCESS,\n         OP_LOGE(context, \"EmbeddingBagSupport failed to infer shape for bag_size.\"), return GRAPH_FAILED);\n     OP_CHECK_IF(\n-        InferShape4MaxIndices(context, batch, embedding_dim, is_unknown_rank, is_unknown_shape, true) != ge::GRAPH_SUCCESS,\n+        InferShape4MaxIndicesSupport(context, batch, embedding_dim, dimension, is_unknown_weight, is_unknown_indices, is_unknown_offsets) != ge::GRAPH_SUCCESS,\n         OP_LOGE(context, \"EmbeddingBagSupport failed to infer shape for max_indices.\"), return GRAPH_FAILED);\n     OP_LOGD(context->GetNodeName(), \"runtime2.0 EmbeddingBagSupport infershape running success.\");\n     \n",
+      "new_file": false,
+      "new_path": "index/embedding_bag/op_host/embedding_bag_infershape.cpp",
+      "old_path": "index/embedding_bag/op_host/embedding_bag_infershape.cpp",
+      "removed_lines": 9,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/2a687c05a8a3c4f8e898e18df40e501b672517b6/index/embedding_bag/op_host/embedding_bag_infershape.cpp",
+    "sha": "2a687c05a8a3c4f8e898e18df40e501b672517b6",
+    "source_branch": "dev_bag_0206",
+    "source_project": {
+      "full_name": "dong-yanrong/ops-nn",
+      "human_name": "dong-yanrong / ops-nn",
+      "id": 9091461,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 5,
+    "blob_id": "bc423dbf5569946e3fed0f33e9203243712ce704",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/2a687c05a8a3c4f8e898e18df40e501b672517b6/index/embedding_bag/op_host/embedding_bag_regbase_tiling.cpp",
+    "deletions": 2,
+    "filename": "index/embedding_bag/op_host/embedding_bag_regbase_tiling.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 5,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -149,10 +149,10 @@ ge::graphStatus EmbeddingBagRegBaseTiling::GetShapeAttrsInfo()\n     OP_CHECK_NULL_WITH_CONTEXT(context_, inclueLastOfstPtr);\n     inclueLastOfst_ = *inclueLastOfstPtr;\n \n-    auto paddingIdxPtr = attrs->GetAttrPointer<bool>(ATTR_INCLUDE_LAST_OFFSET);\n+    auto paddingIdxPtr = attrs->GetAttrPointer<int64_t>(ATTR_PADD_INDEX);\n     OP_CHECK_NULL_WITH_CONTEXT(context_, paddingIdxPtr);\n     paddingIdx_ = *paddingIdxPtr;\n-\n+    \n     if (embeddingDim_ * weightTypeSize_ <= MAX_SIMT_EMBDDING_BYTES) {\n         usedCoreNum_ = totalCoreNum_;\n         isSimt_ = 1;\n@@ -164,6 +164,9 @@ ge::graphStatus EmbeddingBagRegBaseTiling::GetShapeAttrsInfo()\n         numBags_ = indiceShape.GetDim(0);\n         indiceSize_ = indiceShape.GetDim(1);\n     }\n+    if (paddingIdx_ < 0) {\n+        paddingIdx_ = paddingIdx_ + numEmbeddings_;\n+    }\n     return ge::GRAPH_SUCCESS;\n }\n \n",
+      "new_file": false,
+      "new_path": "index/embedding_bag/op_host/embedding_bag_regbase_tiling.cpp",
+      "old_path": "index/embedding_bag/op_host/embedding_bag_regbase_tiling.cpp",
+      "removed_lines": 2,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/2a687c05a8a3c4f8e898e18df40e501b672517b6/index/embedding_bag/op_host/embedding_bag_regbase_tiling.cpp",
+    "sha": "2a687c05a8a3c4f8e898e18df40e501b672517b6",
+    "source_branch": "dev_bag_0206",
+    "source_project": {
+      "full_name": "dong-yanrong/ops-nn",
+      "human_name": "dong-yanrong / ops-nn",
+      "id": 9091461,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 1,
+    "blob_id": "61e1fef3cc41fd9b9f7c2d3ad7a6abe42b9b0215",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/2a687c05a8a3c4f8e898e18df40e501b672517b6/index/embedding_bag/op_kernel/arch35/embedding_bag_regbase_1d_mean.h",
+    "deletions": 0,
+    "filename": "index/embedding_bag/op_kernel/arch35/embedding_bag_regbase_1d_mean.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 1,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -66,6 +66,7 @@ public:\n         pipe_.InitBuffer(this->outQueueY_, 1, tiling_.weightDimFactor * sizeof(T));\n         pipe_.InitBuffer(this->outQueueOffset2bag_, tiling_.weightRowFactor * sizeof(I));\n         pipe_.InitBuffer(this->outQueueBagSize_, 1, (tiling_.offsetsFactor + 1) * sizeof(I));\n+        pipe_.InitBuffer(this->maxIndicesCalcBuf_, (tiling_.weightRowFactor) * sizeof(I));\n         SyncAll();\n     }\n \n",
+      "new_file": false,
+      "new_path": "index/embedding_bag/op_kernel/arch35/embedding_bag_regbase_1d_mean.h",
+      "old_path": "index/embedding_bag/op_kernel/arch35/embedding_bag_regbase_1d_mean.h",
+      "removed_lines": 0,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/2a687c05a8a3c4f8e898e18df40e501b672517b6/index/embedding_bag/op_kernel/arch35/embedding_bag_regbase_1d_mean.h",
+    "sha": "2a687c05a8a3c4f8e898e18df40e501b672517b6",
+    "source_branch": "dev_bag_0206",
+    "source_project": {
+      "full_name": "dong-yanrong/ops-nn",
+      "human_name": "dong-yanrong / ops-nn",
+      "id": 9091461,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 1,
+    "blob_id": "28e198017366528fdc0993032e934fb83a407af8",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/2a687c05a8a3c4f8e898e18df40e501b672517b6/index/embedding_bag/op_kernel/arch35/embedding_bag_regbase_1d_sum.h",
+    "deletions": 0,
+    "filename": "index/embedding_bag/op_kernel/arch35/embedding_bag_regbase_1d_sum.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 1,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -69,6 +69,7 @@ public:\n         pipe_.InitBuffer(this->outQueueY_, 1, tiling_.weightDimFactor * sizeof(T));\n         pipe_.InitBuffer(this->outQueueBagSize_, 1, (tiling_.offsetsFactor + 1) * sizeof(I));\n         pipe_.InitBuffer(this->outQueueOffset2bag_, tiling_.weightRowFactor * sizeof(I));\n+        pipe_.InitBuffer(this->maxIndicesCalcBuf_, (tiling_.weightRowFactor) * sizeof(I));\n         SyncAll();\n     }\n \n",
+      "new_file": false,
+      "new_path": "index/embedding_bag/op_kernel/arch35/embedding_bag_regbase_1d_sum.h",
+      "old_path": "index/embedding_bag/op_kernel/arch35/embedding_bag_regbase_1d_sum.h",
+      "removed_lines": 0,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/2a687c05a8a3c4f8e898e18df40e501b672517b6/index/embedding_bag/op_kernel/arch35/embedding_bag_regbase_1d_sum.h",
+    "sha": "2a687c05a8a3c4f8e898e18df40e501b672517b6",
+    "source_branch": "dev_bag_0206",
+    "source_project": {
+      "full_name": "dong-yanrong/ops-nn",
+      "human_name": "dong-yanrong / ops-nn",
+      "id": 9091461,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  }
+]

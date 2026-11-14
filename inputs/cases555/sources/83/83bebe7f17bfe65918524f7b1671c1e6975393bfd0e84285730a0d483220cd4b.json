@@ -1,0 +1,73 @@
+{
+  "assignee": {
+    "html_url": "https://gitcode.com/zhou-qilong",
+    "id": "6822cc0d6a68fa1fec6cc502",
+    "login": "zhou-qilong",
+    "name": "sunday",
+    "object_id": "6822cc0d6a68fa1fec6cc502"
+  },
+  "assignees": [
+    {
+      "html_url": "https://gitcode.com/zhou-qilong",
+      "id": "6822cc0d6a68fa1fec6cc502",
+      "login": "zhou-qilong",
+      "name": "sunday",
+      "object_id": "6822cc0d6a68fa1fec6cc502"
+    }
+  ],
+  "body": "\n\nThanks for sending an issue! Please fill in the following template to help quickly solve your problem.\n\n\n\n####  一、问题描述 （必填）\n<!-- 可粘贴错误日志或描述截图 -->\nexperimental/math/sqrt/op_kernel/sqrt.h 第 115 行，在将 float32 中间计算结果 Cast 回目标低精度类型（float16/bfloat16）时，使用了 CAST_CEIL（向正无穷取整），而项目中所有其他数学算子在相同场景下均使用 CAST_RINT（就近取整/银行家舍入）。这导致 Sqrt 算子在非 float32 类型上的计算结果系统性偏大。\n文件： experimental/math/sqrt/op_kernel/sqrt.h 第 109-118 行\n\nif constexpr (!std::is_same_v<TYPE_X, float32_t>) {\n    AscendC::LocalTensor<float> p1 = tmp1.Get<float>();\n    AscendC::Cast(p1, xLocal, AscendC::RoundMode::CAST_NONE, this->processDataNum);\n    AscendC::PipeBarrier<PIPE_V>();\n    AscendC::Sqrt(p1, p1, this->processDataNum);\n    AscendC::PipeBarrier<PIPE_V>();\n    AscendC::Cast(yLocal, p1, AscendC::RoundMode::CAST_CEIL, this->processDataNum);  // <-- 此处应为 CAST_RINT\n} else {\n    AscendC::Sqrt(yLocal, xLocal, this->processDataNum);\n}\n\n\n####  二、环境信息 （可选）\n<!--\n• 昇腾硬件型号：\n• CANN版本:\n• 操作系统：\n• 其他相关软件版本：\n -->\n\n####  三、重现步骤 （可选）\n<!-- 提供尽可能多的信息描述如何重现该缺陷 -->\n使用 float16 或 bfloat16 类型的输入张量调用 experimental/math/sqrt 算子\n将结果与 float32 类型的 Sqrt 计算结果（作为基准真值）进行对比\n观察到低精度结果始终偏大于最近可表示值\n示例：\nsqrt(2.0) 在 float32 中精确值为 1.41421356...\nfloat16 最接近可表示值为 1.4140625（CASTRINT 应返回此值）\n使用 CAST_CEIL 时返回 1.4150390625（向上取整到下一个 float16 值，偏大）\n####  四、预期结果 （可选）\n<!-- 描述预期的行为应该是什么样子的 -->\n应使用 CAST_RINT（Round to Nearest, ties to Even），与项目中所有其他数学算子保持一致：\nAscendC::Cast(yLocal, p1, AscendC::RoundMode::CAST_RINT, this->processDataNum);\n实际使用了 CAST_CEIL（向正无穷方向取整），导致所有非精确表示的 sqrt 结果系统性偏大。\n\n💡 备注（选填）\n\n",
+  "comments": 2,
+  "created_at": "2026-05-10T11:46:52+08:00",
+  "finished_at": "2026-05-28T21:44:40+08:00",
+  "html_url": "https://gitcode.com/cann/ops-math/issues/1505",
+  "id": 3925154,
+  "issue_priority_detail": {
+    "id": 116,
+    "title": "无优先级"
+  },
+  "issue_state": "进行中",
+  "issue_state_detail": {
+    "id": 285,
+    "serial": 0,
+    "title": "进行中"
+  },
+  "issue_type": "任务",
+  "issue_type_detail": {
+    "id": 255,
+    "is_system": false,
+    "title": "任务"
+  },
+  "labels": [
+    {
+      "color": "#35e029",
+      "created_at": "2026-03-20T11:25:13+08:00",
+      "id": 38861,
+      "name": "resolved",
+      "updated_at": "2026-05-28T22:34:33+08:00"
+    }
+  ],
+  "number": "1505",
+  "priority": 0,
+  "repository": {
+    "assigner": {},
+    "created_at": "2025-09-25T16:01:52+08:00",
+    "description": "本项目是CANN提供的数学类基础计算算子库，实现网络在NPU上加速计算。",
+    "full_name": "cann/ops-math",
+    "id": 7649531,
+    "name": "ops-math",
+    "paas": "",
+    "path": "ops-math",
+    "updated_at": "2025-09-25T16:05:53+08:00"
+  },
+  "state": "closed",
+  "title": "[Bug-Report|缺陷反馈]: experimental/math/sqrt 算子内核对非float32类型使用了错误的Cast舍入模式(CAST_CEIL应为CAST_RINT)",
+  "updated_at": "2026-05-28T21:44:40+08:00",
+  "user": {
+    "html_url": "https://gitcode.com/yufengnian",
+    "id": "68b82f68b52e41757280461a",
+    "login": "yufengnian",
+    "name": "yufengnian",
+    "object_id": "68b82f68b52e41757280461a"
+  },
+  "visibility_reason": "public"
+}

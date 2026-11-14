@@ -1,0 +1,764 @@
+[
+  {
+    "additions": 11,
+    "blob_id": "d40d476375b52b510f3ea88f35bf8218dac0c0d3",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/5133d31c66a66b9cdba30f0073afc7fdf039c28c/matmul/batch_mat_mul_v3/op_host/op_tiling/arch35/batch_matmul_v3_matmul2mul_tiling.cpp",
+    "deletions": 11,
+    "filename": "matmul/batch_mat_mul_v3/op_host/op_tiling/arch35/batch_matmul_v3_matmul2mul_tiling.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 11,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -50,16 +50,16 @@ ge::graphStatus BatchMatMulV3ToMulTiling::DoOpTiling()\n         lastCoreNum -= 1UL;\n     }\n \n-    runInfo_.toMulInfo.m = m;\n-    runInfo_.toMulInfo.n = n;\n-    runInfo_.toMulInfo.b = b;\n-    runInfo_.toMulInfo.usedCoreNum = usedCoreNum;\n-    runInfo_.toMulInfo.singleCoreBatch = singleCoreBatch;\n-    runInfo_.toMulInfo.batchNum = batchNum;\n-    runInfo_.toMulInfo.batchNumLastRound = batchNumLastRound;\n-    runInfo_.toMulInfo.batchNumLastRoundTail = batchNumLastRoundTail;\n-    runInfo_.toMulInfo.lastCoreNum = lastCoreNum;\n-    runInfo_.toMulInfo.alignNum = alignNum_;\n+    runInfo_.bmmToMulInfo.m = m;\n+    runInfo_.bmmToMulInfo.n = n;\n+    runInfo_.bmmToMulInfo.b = b;\n+    runInfo_.bmmToMulInfo.usedCoreNum = usedCoreNum;\n+    runInfo_.bmmToMulInfo.singleCoreBatch = singleCoreBatch;\n+    runInfo_.bmmToMulInfo.batchNum = batchNum;\n+    runInfo_.bmmToMulInfo.batchNumLastRound = batchNumLastRound;\n+    runInfo_.bmmToMulInfo.batchNumLastRoundTail = batchNumLastRoundTail;\n+    runInfo_.bmmToMulInfo.lastCoreNum = lastCoreNum;\n+    runInfo_.bmmToMulInfo.alignNum = alignNum_;\n     return ge::GRAPH_SUCCESS;\n }\n \n@@ -117,7 +117,7 @@ uint64_t BatchMatMulV3ToMulTiling::GetTilingKey() const\n \n uint64_t BatchMatMulV3ToMulTiling::GetNumBlocks() const\n {\n-    return runInfo_.toMulInfo.usedCoreNum;\n+    return runInfo_.bmmToMulInfo.usedCoreNum;\n }\n \n ge::graphStatus BatchMatMulV3ToMulTiling::GetTilingData(TilingResult& tiling) const\n",
+      "new_file": false,
+      "new_path": "matmul/batch_mat_mul_v3/op_host/op_tiling/arch35/batch_matmul_v3_matmul2mul_tiling.cpp",
+      "old_path": "matmul/batch_mat_mul_v3/op_host/op_tiling/arch35/batch_matmul_v3_matmul2mul_tiling.cpp",
+      "removed_lines": 11,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/5133d31c66a66b9cdba30f0073afc7fdf039c28c/matmul/batch_mat_mul_v3/op_host/op_tiling/arch35/batch_matmul_v3_matmul2mul_tiling.cpp",
+    "sha": "5133d31c66a66b9cdba30f0073afc7fdf039c28c",
+    "source_branch": "9.0.0",
+    "source_project": {
+      "full_name": "wuyufei/ops-nn",
+      "human_name": "wuyufei / ops-nn",
+      "id": 9016749,
+      "path": "ops-nn"
+    },
+    "target_branch": "9.0.0",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 1,
+    "blob_id": "0324f2155e407c614c94c1427e59b300fafc5265",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/5133d31c66a66b9cdba30f0073afc7fdf039c28c/matmul/common/cmct/block/block_mmad_builder.h",
+    "deletions": 1,
+    "filename": "matmul/common/cmct/block/block_mmad_builder.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 1,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -86,7 +86,7 @@ class BlockMmadBuilder<\n         AscendC::Std::is_base_of_v<\n             MatmulMultiBlockWithStreamK<MatMulL0C2Out::ND_FIXPIPE_1_2, OP_TYPE_RELU>, BlockMatmulPolicy_> ||\n         AscendC::Std::is_base_of_v<BatchMatmulToMul<>, BlockMatmulPolicy_> || \n-        AscendC::Std::is_base_of_v<MatmulMNEqualOne<>, BlockMatmulPolicy_>>> {\n+        AscendC::Std::is_base_of_v<MatmulToMul<>, BlockMatmulPolicy_>>> {\n public:\n     using AType = AType_;\n     using BType = BType_;\n",
+      "new_file": false,
+      "new_path": "matmul/common/cmct/block/block_mmad_builder.h",
+      "old_path": "matmul/common/cmct/block/block_mmad_builder.h",
+      "removed_lines": 1,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/5133d31c66a66b9cdba30f0073afc7fdf039c28c/matmul/common/cmct/block/block_mmad_builder.h",
+    "sha": "5133d31c66a66b9cdba30f0073afc7fdf039c28c",
+    "source_branch": "9.0.0",
+    "source_project": {
+      "full_name": "wuyufei/ops-nn",
+      "human_name": "wuyufei / ops-nn",
+      "id": 9016749,
+      "path": "ops-nn"
+    },
+    "target_branch": "9.0.0",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 96,
+    "blob_id": "b2177086d47d94d6e87328816a10ae4c46988517",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/5133d31c66a66b9cdba30f0073afc7fdf039c28c/matmul/common/cmct/block/block_mmad_to_mul.h",
+    "deletions": 29,
+    "filename": "matmul/common/cmct/block/block_mmad_to_mul.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 96,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -9,12 +9,12 @@\n  */\n \n /*!\n- * \\file block_mmad_mn_equal_one.h\n+ * \\file block_mmad_to_mul.h\n  * \\brief\n  */\n \n-#ifndef MATMUL_BLOCK_BLOCK_MN_EQUAL_ONE_H\n-#define MATMUL_BLOCK_BLOCK_MN_EQUAL_ONE_H\n+#ifndef MATMUL_BLOCK_BLOCK_TO_MUL_H\n+#define MATMUL_BLOCK_BLOCK_TO_MUL_H\n #include \"./block_mmad.h\"\n #include \"../utils/layout_utils.h\"\n #include \"../utils/tuple_utils.h\"\n@@ -26,7 +26,7 @@ namespace Gemm {\n namespace Block {\n template <\n     class L1TileShape_, class L0TileShape_, class AType_, class BType_, class CType_, class BiasType_, class TileCopy_>\n-class BlockMmad<MatmulMNEqualOne<>, L1TileShape_, L0TileShape_, AType_, BType_, CType_, BiasType_, TileCopy_> {\n+class BlockMmad<MatmulToMul<>, L1TileShape_, L0TileShape_, AType_, BType_, CType_, BiasType_, TileCopy_> {\n public:\n     using AType = AType_;\n     using BType = BType_;\n@@ -38,11 +38,14 @@ public:\n     uint64_t m_;\n     uint64_t n_;\n     uint64_t k_;\n-    uint64_t baseK_{256};\n-    uint64_t baseMN_{32};\n+    uint64_t baseMN_{0};\n+    uint64_t tailMN_{0};\n+    uint64_t baseK_{0};\n+    uint64_t currentK_{0};\n+    uint64_t tailK_{0};\n+    uint64_t alignK_{0};\n     uint64_t loopK_{1};\n-    uint64_t loopMN_{1};\n-    uint64_t shapeMN_{n_};\n+    uint64_t shapeMN_{0};\n     bool hasBias_{false};\n     bool dataCopyMode_{false};\n \n@@ -52,10 +55,12 @@ public:\n         AscendC::SetFlag<AscendC::HardEvent::V_MTE2>(0x1);\n         AscendC::SetFlag<AscendC::HardEvent::MTE3_V>(0x0);\n         AscendC::SetFlag<AscendC::HardEvent::MTE3_V>(0x1);\n+        AscendC::SetFlag<AscendC::HardEvent::V_MTE2>(SYNC_FLAG2);\n     }\n \n     __aicore__ inline ~BlockMmad()\n     {\n+        AscendC::WaitFlag<AscendC::HardEvent::V_MTE2>(SYNC_FLAG2);\n         AscendC::WaitFlag<AscendC::HardEvent::V_MTE2>(0x0);\n         AscendC::WaitFlag<AscendC::HardEvent::V_MTE2>(0x1);\n         AscendC::WaitFlag<AscendC::HardEvent::MTE3_V>(0x0);\n@@ -63,41 +68,53 @@ public:\n     }\n \n public:\n-    __aicore__ inline void Init(const TupleShape& shape, int64_t loopK, bool hasBias, bool dataCopyMode)\n+    __aicore__ inline void Init(\n+        const TupleShape& shape, const TupleShape& blockInfo, int64_t loopK, bool hasBias, bool dataCopyMode)\n     {\n         m_ = Get<DIMENSION_M>(shape);\n         n_ = Get<DIMENSION_N>(shape);\n         k_ = Get<DIMENSION_K>(shape);\n-        loopK_ = loopK * 2;\n+        baseMN_ = Get<DIMENSION_BASE_MN>(blockInfo);\n+        tailMN_ = baseMN_;\n+        baseK_ = Get<DIMENSION_BASE_K>(blockInfo);\n+        currentK_ = baseK_;\n+        tailK_ = Get<DIMENSION_TAIL_K>(blockInfo) == 0 ? baseK_ : Get<DIMENSION_TAIL_K>(blockInfo);\n+        loopK_ = loopK;\n         hasBias_ = hasBias;\n         dataCopyMode_ = dataCopyMode;\n-        shapeMN_ = m_ == 1 ? n_ : m_;\n+        shapeMN_ = n_ * m_;\n     }\n \n+    __aicore__ inline void SetTailMN(int64_t tailMN)\n+    {\n+        tailMN_ = tailMN;\n+    }\n+\n+    // 用于搬运维度为1矩阵\n     __aicore__ inline void CopyInA(\n         const AscendC::GlobalTensor<float>& aGlobal, const AscendC::LocalTensor<float>& aubLocal)\n     {\n         if (dataCopyMode_) {\n-            AscendC::MultiCopyParams<float, 2> ndDmaParams;\n+            AscendC::MultiCopyParams<float, DIMENSION> ndDmaParams;\n             ndDmaParams.loopInfo.loopSrcStride[0] = 0;\n             ndDmaParams.loopInfo.loopSrcStride[1] = 1;\n             ndDmaParams.loopInfo.loopDstStride[0] = 1;\n             ndDmaParams.loopInfo.loopDstStride[1] = static_cast<uint32_t>(baseMN_);\n-            ndDmaParams.loopInfo.loopSize[0] = static_cast<uint32_t>(baseMN_);\n-            ndDmaParams.loopInfo.loopSize[1] = static_cast<uint32_t>(baseK_);\n+            ndDmaParams.loopInfo.loopSize[0] = static_cast<uint32_t>(tailMN_);\n+            ndDmaParams.loopInfo.loopSize[1] = static_cast<uint32_t>(currentK_);\n             ndDmaParams.loopInfo.loopLpSize[0] = 0;\n             ndDmaParams.loopInfo.loopLpSize[1] = 0;\n             ndDmaParams.loopInfo.loopRpSize[0] = 0;\n             ndDmaParams.loopInfo.loopRpSize[1] = 0;\n             AscendC::DataCopy(aubLocal, aGlobal, ndDmaParams);\n         } else {\n-            AscendC::MultiCopyParams<float, 2> ndDmaParams;\n+            AscendC::MultiCopyParams<float, DIMENSION> ndDmaParams;\n             ndDmaParams.loopInfo.loopSrcStride[0] = 1;\n             ndDmaParams.loopInfo.loopSrcStride[1] = 0;\n             ndDmaParams.loopInfo.loopDstStride[0] = 1;\n             ndDmaParams.loopInfo.loopDstStride[1] = static_cast<uint32_t>(baseK_);\n-            ndDmaParams.loopInfo.loopSize[0] = static_cast<uint32_t>(baseK_);\n-            ndDmaParams.loopInfo.loopSize[1] = static_cast<uint32_t>(baseMN_);\n+            ndDmaParams.loopInfo.loopSize[0] = static_cast<uint32_t>(currentK_);\n+            ndDmaParams.loopInfo.loopSize[1] = static_cast<uint32_t>(tailMN_);\n             ndDmaParams.loopInfo.loopLpSize[0] = 0;\n             ndDmaParams.loopInfo.loopLpSize[1] = 0;\n             ndDmaParams.loopInfo.loopRpSize[0] = 0;\n@@ -106,24 +123,47 @@ public:\n         }\n     }\n \n+    // 用于搬运维度不为1矩阵\n     __aicore__ inline void CopyInB(\n         const AscendC::GlobalTensor<float>& bGlobal, const AscendC::LocalTensor<float>& bubLocal)\n     {\n         if (dataCopyMode_) {\n-            AscendC::DataCopyPadExtParams<float> copyPadParams{false, 0, 0, 0};\n-            uint32_t srcStride = static_cast<uint32_t>((shapeMN_ - baseMN_) * sizeof(float));\n+            uint32_t alignMN = AscendC::CeilAlign(tailMN_, ALIGN_NUM);\n+            uint8_t rightPadding = static_cast<uint8_t>(alignMN - tailMN_);\n+            AscendC::DataCopyPadExtParams<float> copyPadParams{true, 0, rightPadding, 0};\n+            uint32_t srcStride = static_cast<uint32_t>((shapeMN_ - tailMN_) * sizeof(float));\n+            uint32_t dstStride = static_cast<uint32_t>((baseMN_ - alignMN) / ALIGN_NUM);\n             AscendC::DataCopyExtParams copyParams{\n-                static_cast<uint16_t>(baseK_), static_cast<uint32_t>(baseMN_ * sizeof(float)), srcStride, 0, 0};\n+                static_cast<uint16_t>(currentK_), static_cast<uint32_t>(tailMN_ * sizeof(float)), srcStride, dstStride,\n+                0};\n             AscendC::DataCopyPad(bubLocal, bGlobal, copyParams, copyPadParams);\n         } else {\n-            AscendC::DataCopyPadExtParams<float> copyPadParams{false, 0, 0, 0};\n-            uint32_t srcStride = static_cast<uint32_t>((k_ - baseK_) * sizeof(float));\n+            uint32_t alignK = AscendC::CeilAlign(currentK_, ALIGN_NUM);\n+            uint8_t rightPadding = static_cast<uint8_t>(alignK - currentK_);\n+            AscendC::DataCopyPadExtParams<float> copyPadParams{true, 0, rightPadding, 0};\n+            uint32_t srcStride = static_cast<uint32_t>((k_ - currentK_) * sizeof(float));\n+            uint32_t dstStride = static_cast<uint32_t>((baseK_ - alignK) / ALIGN_NUM);\n             AscendC::DataCopyExtParams copyParams{\n-                static_cast<uint16_t>(baseMN_), static_cast<uint32_t>(baseK_ * sizeof(float)), srcStride, 0, 0};\n+                static_cast<uint16_t>(tailMN_), static_cast<uint32_t>(currentK_ * sizeof(float)), srcStride, dstStride,\n+                0};\n             AscendC::DataCopyPad(bubLocal, bGlobal, copyParams, copyPadParams);\n         }\n     }\n \n+    __aicore__ inline void CopyInBias(\n+        const AscendC::GlobalTensor<float>& biasGlobal, const AscendC::LocalTensor<float>& biasubLocal)\n+    {\n+        if (n_ == 1) {\n+            AscendC::DataCopyPadExtParams<float> copyPadParams{false, 0, 0, 0};\n+            AscendC::DataCopyExtParams copyParams{1, static_cast<uint32_t>(sizeof(float)), 0, 0, 0};\n+            AscendC::DataCopyPad(biasubLocal, biasGlobal, copyParams, copyPadParams);\n+        } else {\n+            AscendC::DataCopyPadExtParams<float> copyPadParams{false, 0, 0, 0};\n+            AscendC::DataCopyExtParams copyParams{1, static_cast<uint32_t>(tailMN_ * sizeof(float)), 0, 0, 0};\n+            AscendC::DataCopyPad(biasubLocal, biasGlobal, copyParams, copyPadParams);\n+        }\n+    }\n+\n     __aicore__ inline void AivProcess(uint64_t ubOffsetA, uint64_t ubOffsetB, uint64_t ubOffsetC)\n     {\n         AscendC::LocalTensor<float> aubLocal = ubLocal_[ubOffsetA];\n@@ -136,22 +176,22 @@ public:\n     __aicore__ inline void CopyOut(\n         const AscendC::GlobalTensor<float>& cGlobal, const AscendC::LocalTensor<float>& outubLocal)\n     {\n-        uint32_t blockLen = static_cast<uint32_t>(baseMN_ * sizeof(float));\n+        uint32_t blockLen = static_cast<uint32_t>(tailMN_ * sizeof(float));\n         AscendC::DataCopyExtParams copyParams{1, blockLen, 0, 0, 0};\n         AscendC::DataCopyPad(cGlobal, outubLocal, copyParams);\n     }\n \n     __aicore__ inline void operator()(\n         const AscendC::GlobalTensor<float>& cGlobal, const AscendC::GlobalTensor<float>& aGlobal,\n-        const AscendC::GlobalTensor<float>& bGlobal)\n+        const AscendC::GlobalTensor<float>& bGlobal, const AscendC::GlobalTensor<float>& biasGlobal)\n     {\n-        // 这些地址偏移可以在tiling侧算好\n         uint64_t ubOffsetAPing = 0;\n         uint64_t ubOffsetBPing = baseMN_ * baseK_ + ubOffsetAPing;\n         uint64_t ubOffsetAPong = baseMN_ * baseK_ + ubOffsetBPing;\n         uint64_t ubOffsetBPong = baseMN_ * baseK_ + ubOffsetAPong;\n         uint64_t ubOffsetC = baseMN_ * baseK_ + ubOffsetBPong;\n         uint64_t ubOffsetOut = baseMN_ * baseK_ + ubOffsetC;\n+        uint64_t ubOffsetBias = CeilAlign(baseMN_, ALIGN_NUM) + ubOffsetOut;\n         uint64_t ubOffsetA[] = {ubOffsetAPing, ubOffsetAPong};\n         uint64_t ubOffsetB[] = {ubOffsetBPing, ubOffsetBPong};\n         constexpr bool isReuse = true;\n@@ -159,6 +199,13 @@ public:\n         // k累加地址 ubOffsetC 需要清0\n         AscendC::Duplicate<float>(ubLocal_[ubOffsetC], 0, static_cast<int32_t>(baseMN_ * baseK_));\n         for (uint64_t j = 0; j < loopK_; ++j) {\n+            currentK_ = (j + 1 == loopK_) ? tailK_ : baseK_;\n+            if (j == loopK_ - 1) {\n+                // 尾轮不允许脏数据污染\n+                AscendC::Duplicate<float>(ubLocal_[ubOffsetB[j & 0x1]], 0, static_cast<int32_t>(baseMN_ * baseK_));\n+                AscendC::SetFlag<AscendC::HardEvent::V_MTE2>(SYNC_FLAG1);\n+                AscendC::WaitFlag<AscendC::HardEvent::V_MTE2>(SYNC_FLAG1);\n+            }\n             AscendC::WaitFlag<AscendC::HardEvent::V_MTE2>(j & 0x1);\n             if (m_ == 1) {\n                 CopyInA(aGlobal[j * baseK_], ubLocal_[ubOffsetA[j & 0x1]]);\n@@ -186,6 +233,22 @@ public:\n             AscendC::ReduceSum<float, AscendC::Pattern::Reduce::AR, isReuse>(\n                 ubLocal_[ubOffsetOut], ubLocal_[ubOffsetC], shape, true);\n         }\n+        if (hasBias_) {\n+            AscendC::WaitFlag<AscendC::HardEvent::V_MTE2>(SYNC_FLAG2);\n+            CopyInBias(biasGlobal, ubLocal_[ubOffsetBias]);\n+            AscendC::SetFlag<AscendC::HardEvent::MTE2_V>(SYNC_FLAG1);\n+            AscendC::WaitFlag<AscendC::HardEvent::MTE2_V>(SYNC_FLAG1);\n+            if (m_ == 1) {\n+                AscendC::Add(\n+                    ubLocal_[ubOffsetOut], ubLocal_[ubOffsetOut], ubLocal_[ubOffsetBias],\n+                    static_cast<int32_t>(tailMN_));\n+            } else {\n+                AscendC::Adds(\n+                    ubLocal_[ubOffsetOut], ubLocal_[ubOffsetOut], ubLocal_[ubOffsetBias][0],\n+                    static_cast<int32_t>(tailMN_));\n+            }\n+            AscendC::SetFlag<AscendC::HardEvent::V_MTE2>(SYNC_FLAG2);\n+        }\n         AscendC::SetFlag<AscendC::HardEvent::V_MTE3>(0x0);\n         AscendC::WaitFlag<AscendC::HardEvent::V_MTE3>(0x0);\n         CopyOut(cGlobal, ubLocal_[ubOffsetOut]);\n@@ -196,10 +259,14 @@ private:\n     constexpr static uint16_t DIMENSION_M = 0;\n     constexpr static uint16_t DIMENSION_N = 1;\n     constexpr static uint16_t DIMENSION_K = 2;\n-    constexpr static uint16_t DIMENSION_BLOCK_K = 0;\n-    constexpr static uint16_t DIMENSION_BLOCK_MN = 1;\n+    constexpr static uint16_t DIMENSION_BASE_MN = 0;\n+    constexpr static uint16_t DIMENSION_TAIL_MN = 1;\n     constexpr static uint16_t DIMENSION_BASE_K = 2;\n-    constexpr static uint16_t DIMENSION_BASE_MN = 3;\n+    constexpr static uint16_t DIMENSION_TAIL_K = 3;\n+    constexpr static uint64_t ALIGN_NUM = 8;\n+    constexpr static uint16_t SYNC_FLAG1 = 2;\n+    constexpr static uint16_t SYNC_FLAG2 = 3;\n+    constexpr static uint8_t DIMENSION = 2;\n     AscendC::LocalTensor<float> ubLocal_{AscendC::TPosition::VECIN, 0, AscendC::TOTAL_UB_SIZE};\n };\n } // namespace Block\n",
+      "new_file": false,
+      "new_path": "matmul/common/cmct/block/block_mmad_to_mul.h",
+      "old_path": "matmul/common/cmct/block/block_mmad_mn_equal_one.h",
+      "removed_lines": 29,
+      "renamed_file": true,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/5133d31c66a66b9cdba30f0073afc7fdf039c28c/matmul/common/cmct/block/block_mmad_to_mul.h",
+    "sha": "5133d31c66a66b9cdba30f0073afc7fdf039c28c",
+    "source_branch": "9.0.0",
+    "source_project": {
+      "full_name": "wuyufei/ops-nn",
+      "human_name": "wuyufei / ops-nn",
+      "id": 9016749,
+      "path": "ops-nn"
+    },
+    "status": "renamed",
+    "target_branch": "9.0.0",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 1,
+    "blob_id": "4153bec3ed21538e25f8b22cfd240d4f8af42d31",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/5133d31c66a66b9cdba30f0073afc7fdf039c28c/matmul/common/cmct/block/block_scheduler_policy.h",
+    "deletions": 1,
+    "filename": "matmul/common/cmct/block/block_scheduler_policy.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 1,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -31,7 +31,7 @@ struct BuiltInBatchMatmulToMulScheduler {};\n struct IterateKScheduler {};\n struct QuantIterateKScheduler {};\n struct QuantBatchMatmulV3Scheduler {};\n-struct BuiltInOneScheduler {};\n+struct BuiltInMulScheduler {};\n } // namespace Gemm\n } // namespace Cmct\n #endif\n\\ No newline at end of file\n",
+      "new_file": false,
+      "new_path": "matmul/common/cmct/block/block_scheduler_policy.h",
+      "old_path": "matmul/common/cmct/block/block_scheduler_policy.h",
+      "removed_lines": 1,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/5133d31c66a66b9cdba30f0073afc7fdf039c28c/matmul/common/cmct/block/block_scheduler_policy.h",
+    "sha": "5133d31c66a66b9cdba30f0073afc7fdf039c28c",
+    "source_branch": "9.0.0",
+    "source_project": {
+      "full_name": "wuyufei/ops-nn",
+      "human_name": "wuyufei / ops-nn",
+      "id": 9016749,
+      "path": "ops-nn"
+    },
+    "target_branch": "9.0.0",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 24,
+    "blob_id": "624858822a1225b9467738ee631549c45db350b0",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/5133d31c66a66b9cdba30f0073afc7fdf039c28c/matmul/common/cmct/kernel/kernel_matmul_to_mul.h",
+    "deletions": 18,
+    "filename": "matmul/common/cmct/kernel/kernel_matmul_to_mul.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 24,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -29,7 +29,7 @@\n #include \"../utils/coord_utils.h\"\n #include \"../utils/tensor_utils.h\"\n #include \"../utils/status_utils.h\"\n-#include \"../block/block_mmad_mn_equal_one.h\"\n+#include \"../block/block_mmad_to_mul.h\"\n #include \"../block/block_mmad_builder.h\"\n #include \"../block/block_scheduler_utils.h\"\n #include \"../block/block_scheduler_policy.h\"\n@@ -41,17 +41,17 @@ namespace Kernel {\n \n template <class ProblemShape_, class BlockMmadBuilder_, class BlockEpilogue_, class BlockScheduler_,\n           typename Enable_ = void>\n-class KernelMatmulMNEqualOne {\n+class KernelMatmulToMul {\n     static_assert(AscendC::Std::always_false_v<BlockEpilogue_>,\n-                  \"KernelMatmulMNEqualOne is not implemented for this BlockEpilogue\");\n+                  \"KernelMatmulToMul is not implemented for this BlockEpilogue\");\n };\n \n template <class ProblemShape_, class BlockMmadBuilder_, class BlockEpilogue_, class BlockScheduler_>\n-class KernelMatmulMNEqualOne<ProblemShape_, BlockMmadBuilder_, BlockEpilogue_, BlockScheduler_,\n+class KernelMatmulToMul<ProblemShape_, BlockMmadBuilder_, BlockEpilogue_, BlockScheduler_,\n                              std::enable_if_t<std::is_same_v<BlockEpilogue_, Block::BlockEpilogueEmpty>>> {\n public:\n-    __aicore__ inline KernelMatmulMNEqualOne() {}\n-    __aicore__ inline ~KernelMatmulMNEqualOne() {}\n+    __aicore__ inline KernelMatmulToMul() {}\n+    __aicore__ inline ~KernelMatmulToMul() {}\n \n     using BlockMmadBuilder = BlockMmadBuilder_;\n     using ProblemShape = ProblemShape_;\n@@ -78,7 +78,6 @@ public:\n     using AType = typename BlockMmadBuilder::AType;\n     using BType = typename BlockMmadBuilder::BType;\n     using CType = typename BlockMmadBuilder::CType;\n-    using BlockInfo = Shape<bool, bool, bool>;\n     using TupleShape = Shape<int64_t, int64_t, int64_t, int64_t>;\n     using ParamsShape = Shape<uint64_t, uint64_t, uint64_t>;\n \n@@ -89,6 +88,7 @@ public:\n     AscendC::GlobalTensor<float> aGlobal_;\n     AscendC::GlobalTensor<float> bGlobal_;\n     AscendC::GlobalTensor<float> cGlobal_;\n+    AscendC::GlobalTensor<float> biasGlobal_;\n \n     // Shape\n     TupleShape problemShape_{};\n@@ -96,6 +96,7 @@ public:\n     uint64_t n_{0};\n     uint64_t k_{0};\n     uint64_t b_{0};\n+    bool hasBias_ = false;\n \n     struct Arguments {\n         ProblemShape problemShape;\n@@ -131,6 +132,10 @@ public:\n         aGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ float*>(blockMmadParams_.aGmAddr));\n         bGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ float*>(blockMmadParams_.bGmAddr));\n         cGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ float*>(blockMmadParams_.cGmAddr));\n+        if (blockMmadParams_.biasGmAddr != nullptr) {\n+            hasBias_ = true;\n+            biasGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ float*>(blockMmadParams_.biasGmAddr));\n+        }\n     }\n \n     __aicore__ inline void Run(const Params& params)\n@@ -152,18 +157,15 @@ public:\n         if (curBlockIdx >= realBlockNum) {\n             return;\n         }\n+        TupleShape blockInfo = bs.GetBlockInfo();\n+        int64_t baseMN = Get<MNK_M>(blockInfo);\n+        int64_t tailMN = Get<MNK_N>(blockInfo) == 0 ? baseMN : Get<MNK_N>(blockInfo);\n+        int64_t baseK = Get<MNK_K>(blockInfo);\n+        int64_t tailK = Get<MNK_B>(blockInfo);\n         int64_t tileNum = bs.GetTileNum();\n         int64_t loopK = bs.GetLoopK();\n-        int64_t tileMN = bs.GetTailMN();\n-        bool hasBias = bs.GetBias();\n-        int64_t baseMN = 32;\n-        int64_t baseK = 512;\n-        bool dataCopyMode = false;\n-        if ((m_ == 1 && !transB) || (n_ == 1 && transA)) {\n-            dataCopyMode = true;\n-        }\n-        blockMmadOp.Init(problemShape_, loopK, hasBias, dataCopyMode);\n-        // todo:尾快剩余n的处理\n+        bool dataCopyMode = bs.GetDataCopyMode();\n+        blockMmadOp.Init(problemShape_, blockInfo, loopK, hasBias_, dataCopyMode);\n         int64_t loopOffsetA = baseMN;\n         int64_t loopOffsetB = baseMN;\n         if (m_ == 1 && transB) {\n@@ -173,10 +175,14 @@ public:\n             loopOffsetA = baseMN * k_;\n         }\n         for (int64_t tileIdx = curBlockIdx; tileIdx < tileNum; tileIdx += blockNum) {\n+            if (tileIdx == tileNum - 1) {\n+                blockMmadOp.SetTailMN(tailMN);\n+            }\n             int64_t offsetA = m_ == 1 ? 0 : tileIdx * loopOffsetA;\n             int64_t offsetB = n_ == 1 ? 0 : tileIdx * loopOffsetB;\n             int64_t offsetC = tileIdx * baseMN;\n-            blockMmadOp(cGlobal_[offsetC], aGlobal_[offsetA], bGlobal_[offsetB]);\n+            int64_t offsetBias = m_ == 1 ? tileIdx * baseMN : 0;\n+            blockMmadOp(cGlobal_[offsetC], aGlobal_[offsetA], bGlobal_[offsetB], biasGlobal_[offsetBias]);\n         }\n     }\n \n",
+      "new_file": false,
+      "new_path": "matmul/common/cmct/kernel/kernel_matmul_to_mul.h",
+      "old_path": "matmul/common/cmct/kernel/kernel_matmul_mn_equal_one.h",
+      "removed_lines": 18,
+      "renamed_file": true,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/5133d31c66a66b9cdba30f0073afc7fdf039c28c/matmul/common/cmct/kernel/kernel_matmul_to_mul.h",
+    "sha": "5133d31c66a66b9cdba30f0073afc7fdf039c28c",
+    "source_branch": "9.0.0",
+    "source_project": {
+      "full_name": "wuyufei/ops-nn",
+      "human_name": "wuyufei / ops-nn",
+      "id": 9016749,
+      "path": "ops-nn"
+    },
+    "status": "renamed",
+    "target_branch": "9.0.0",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 8,
+    "blob_id": "6b7e9d6c59d91a495b9bf1a7987d393db5d6afb0",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/5133d31c66a66b9cdba30f0073afc7fdf039c28c/matmul/common/cmct/policy/dispatch_policy.h",
+    "deletions": 3,
+    "filename": "matmul/common/cmct/policy/dispatch_policy.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 8,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -33,7 +33,7 @@ struct KernelMmadWithScale {};     // Multi-block with scale\n struct KernelMultiBlockStreamK {}; // Multi-tile transfer with K-axis spliting and caching\n struct KernelBatchMatMulToMul {};  // BatchMatmul to mul\n struct KernelMixWithWeightPrologue {};\n-struct KernelMNEqualOne {}; \n+struct KernelMatMulToMul {}; \n \n enum class MatMulL0C2Out : std::uint8_t {\n     ON_THE_FLY = 0,\n@@ -317,9 +317,14 @@ struct MmadAPrefetchBAntiquantScmc {\n     constexpr static uint64_t AIV_NUM = AivNum;\n };\n \n+/**\n+ * @struct MatmulToMul\n+ * @brief Matrix multiplication policy for converting a matmul operation to vector (when M=1 or N=1)\n+ * @param [in] SingleCoreShape: the shape of a single core, default is AscendC::Shape<_0, _0, _0, _0>\n+ */\n template <class SingleCoreShape = AscendC::Shape<_0, _0, _0, _0>>\n-struct MatmulMNEqualOne {\n-    using ScheduleType = KernelMNEqualOne;\n+struct MatmulToMul {\n+    using ScheduleType = KernelMatMulToMul;\n     using SingleShape = SingleCoreShape;\n };\n \n",
+      "new_file": false,
+      "new_path": "matmul/common/cmct/policy/dispatch_policy.h",
+      "old_path": "matmul/common/cmct/policy/dispatch_policy.h",
+      "removed_lines": 3,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/5133d31c66a66b9cdba30f0073afc7fdf039c28c/matmul/common/cmct/policy/dispatch_policy.h",
+    "sha": "5133d31c66a66b9cdba30f0073afc7fdf039c28c",
+    "source_branch": "9.0.0",
+    "source_project": {
+      "full_name": "wuyufei/ops-nn",
+      "human_name": "wuyufei / ops-nn",
+      "id": 9016749,
+      "path": "ops-nn"
+    },
+    "target_branch": "9.0.0",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 7,
+    "blob_id": "a1a29858ee0f189e0c40fd38465cfb9dcad0ee20",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/5133d31c66a66b9cdba30f0073afc7fdf039c28c/matmul/common/op_host/op_api/matmul_util.cpp",
+    "deletions": 4,
+    "filename": "matmul/common/op_host/op_api/matmul_util.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 7,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -354,7 +354,8 @@ static MmOpInfo GetMatmulOpInfoWithTrans(\n     // 如果允许降精度处理， 则开启HF32模式（0x40），否则采用默认模式; 后续此字段配置需要按照字段表进行配置\n     mmOpInfo.enableHf32 = (cubeMathType == ALLOW_FP32_DOWN_PRECISION) || (cubeMathType == USE_HF32);\n     auto npuArch = op::GetCurrentPlatformInfo().GetCurNpuArch();\n-    mmOpInfo.enableForceGrpAccForFp32 = cubeMathType == FORCE_GRP_ACC_FOR_FP32 && (npuArch == NpuArch::DAV_2201);\n+    mmOpInfo.enableForceGrpAccForFp32 =\n+        cubeMathType == FORCE_GRP_ACC_FOR_FP32 && (npuArch == NpuArch::DAV_2201 || npuArch == NpuArch::DAV_3510);\n     mmOpInfo.opImplModeEnum = mmOpInfo.enableHf32 ? 0x40 : (mmOpInfo.enableForceGrpAccForFp32 ? 0x4 : 0x1);\n     OP_LOGD(\n         \"opImplModeEnum=%ld, enableHf32=%d, enableForceGrpAccForFp32=%d cubeMathType=%d\", mmOpInfo.opImplModeEnum,\n@@ -1007,7 +1008,8 @@ MmOpInfo GetMatmulOpInfo(const aclTensor* self, const aclTensor* mat2, int8_t cu\n     // 如果允许降精度处理， 则开启HF32模式（0x40），否则采用默认模式; 后续此字段配置需要按照字段表进行配置\n     mmOpInfo.enableHf32 = (cubeMathType == ALLOW_FP32_DOWN_PRECISION) || (cubeMathType == USE_HF32);\n     auto npuArch = op::GetCurrentPlatformInfo().GetCurNpuArch();\n-    mmOpInfo.enableForceGrpAccForFp32 = cubeMathType == FORCE_GRP_ACC_FOR_FP32 && (npuArch == NpuArch::DAV_2201);\n+    mmOpInfo.enableForceGrpAccForFp32 =\n+        cubeMathType == FORCE_GRP_ACC_FOR_FP32 && (npuArch == NpuArch::DAV_2201 || npuArch == NpuArch::DAV_3510);\n     mmOpInfo.opImplModeEnum = mmOpInfo.enableHf32 ? 0x40 : (mmOpInfo.enableForceGrpAccForFp32 ? 0x4 : 0x1);\n     OP_LOGD(\n         \"opImplModeEnum=%ld, enableHf32=%d, enableForceGrpAccForFp32=%d cubeMathType=%d, inputFp32Flag= %d\", mmOpInfo.opImplModeEnum,\n@@ -1066,8 +1068,9 @@ aclnnStatus CreateMatmulOpInfo(\n                          mmOpInfo.support_info.mat2_dtype == DataType::DT_FLOAT;\n     // 如果允许降精度处理， 则开启HF32模式（0x40），否则采用默认模式; 后续此字段配置需要按照字段表进行配置\n     mmOpInfo.enableHf32 = (cubeMathType == ALLOW_FP32_DOWN_PRECISION) || (cubeMathType == USE_HF32);\n-    mmOpInfo.enableForceGrpAccForFp32 = (cubeMathType == FORCE_GRP_ACC_FOR_FP32) &&\n-                                        (op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_2201);\n+    auto npuArch = op::GetCurrentPlatformInfo().GetCurNpuArch();\n+    mmOpInfo.enableForceGrpAccForFp32 =\n+        cubeMathType == FORCE_GRP_ACC_FOR_FP32 && (npuArch == NpuArch::DAV_2201 || npuArch == NpuArch::DAV_3510);\n     mmOpInfo.opImplModeEnum = mmOpInfo.enableHf32 ? 0x40 : (mmOpInfo.enableForceGrpAccForFp32 ? 0x4 : 0x1);\n     OP_LOGD(\n         \"opImplModeEnum=%ld, enableHf32=%d, enableForceGrpAccForFp32=%d cubeMathType=%d, inputFp32Flag= %d\", mmOpInfo.opImplModeEnum,\n",
+      "new_file": false,
+      "new_path": "matmul/common/op_host/op_api/matmul_util.cpp",
+      "old_path": "matmul/common/op_host/op_api/matmul_util.cpp",
+      "removed_lines": 4,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/5133d31c66a66b9cdba30f0073afc7fdf039c28c/matmul/common/op_host/op_api/matmul_util.cpp",
+    "sha": "5133d31c66a66b9cdba30f0073afc7fdf039c28c",
+    "source_branch": "9.0.0",
+    "source_project": {
+      "full_name": "wuyufei/ops-nn",
+      "human_name": "wuyufei / ops-nn",
+      "id": 9016749,
+      "path": "ops-nn"
+    },
+    "target_branch": "9.0.0",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 23,
+    "blob_id": "d92a64a266b276286e6874f77d97c9d38caa3b4c",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/5133d31c66a66b9cdba30f0073afc7fdf039c28c/matmul/mat_mul_v3/op_host/op_tiling/arch35/matmul_v3_base_tiling_advanced.h",
+    "deletions": 20,
+    "filename": "matmul/mat_mul_v3/op_host/op_tiling/arch35/matmul_v3_base_tiling_advanced.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 23,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -410,18 +410,18 @@ protected:\n         return ge::GRAPH_SUCCESS;\n     };\n \n-    virtual ge::graphStatus GetTilingDataProcess(BatchMatMulToMulBasicTilingData &matmulToMulBasicData) const\n+    virtual ge::graphStatus GetTilingDataProcess(BatchMatMulToMulBasicTilingData &bmmToMulBasicData) const\n     {\n-        matmulToMulBasicData.m = runInfo_.toMulInfo.m;\n-        matmulToMulBasicData.n = runInfo_.toMulInfo.n;\n-        matmulToMulBasicData.b = runInfo_.toMulInfo.b;\n-        matmulToMulBasicData.usedCoreNum = runInfo_.toMulInfo.usedCoreNum;\n-        matmulToMulBasicData.singleCoreBatch = runInfo_.toMulInfo.singleCoreBatch;\n-        matmulToMulBasicData.batchNum = runInfo_.toMulInfo.batchNum;\n-        matmulToMulBasicData.batchNumLastRound = runInfo_.toMulInfo.batchNumLastRound;\n-        matmulToMulBasicData.batchNumLastRoundTail = runInfo_.toMulInfo.batchNumLastRoundTail;\n-        matmulToMulBasicData.lastCoreNum = runInfo_.toMulInfo.lastCoreNum;\n-        matmulToMulBasicData.alignNum = runInfo_.toMulInfo.alignNum;\n+        bmmToMulBasicData.m = runInfo_.bmmToMulInfo.m;\n+        bmmToMulBasicData.n = runInfo_.bmmToMulInfo.n;\n+        bmmToMulBasicData.b = runInfo_.bmmToMulInfo.b;\n+        bmmToMulBasicData.usedCoreNum = runInfo_.bmmToMulInfo.usedCoreNum;\n+        bmmToMulBasicData.singleCoreBatch = runInfo_.bmmToMulInfo.singleCoreBatch;\n+        bmmToMulBasicData.batchNum = runInfo_.bmmToMulInfo.batchNum;\n+        bmmToMulBasicData.batchNumLastRound = runInfo_.bmmToMulInfo.batchNumLastRound;\n+        bmmToMulBasicData.batchNumLastRoundTail = runInfo_.bmmToMulInfo.batchNumLastRoundTail;\n+        bmmToMulBasicData.lastCoreNum = runInfo_.bmmToMulInfo.lastCoreNum;\n+        bmmToMulBasicData.alignNum = runInfo_.bmmToMulInfo.alignNum;\n         return ge::GRAPH_SUCCESS;\n     };\n \n@@ -432,16 +432,19 @@ protected:\n         return ge::GRAPH_SUCCESS;\n     }\n \n-    virtual ge::graphStatus GetTilingDataProcess(MatMulV3MNEqOneBasicTilingData &mnEqOneBasicTilingData) const\n+    virtual ge::graphStatus GetTilingDataProcess(MatMulToMulBasicTilingData &matmulToMulBasicData) const\n     {\n-        mnEqOneBasicTilingData.m = args_.mValue;\n-        mnEqOneBasicTilingData.n = args_.nValue;\n-        mnEqOneBasicTilingData.k = args_.kValue;\n-        mnEqOneBasicTilingData.useAllCoreNum = runInfo_.oneInfo.useAllCoreNum;\n-        mnEqOneBasicTilingData.usedCoreNum = runInfo_.usedCoreNum;\n-        mnEqOneBasicTilingData.tailMN = runInfo_.oneInfo.tailMN;\n-        mnEqOneBasicTilingData.loopK = runInfo_.oneInfo.loopK;\n-        mnEqOneBasicTilingData.hasBias = args_.hasBias;\n+        matmulToMulBasicData.usedCoreNum = runInfo_.usedCoreNum;\n+        matmulToMulBasicData.tileNum = runInfo_.mmToMulInfo.tileNum;\n+        matmulToMulBasicData.m = args_.mValue;\n+        matmulToMulBasicData.n = args_.nValue;\n+        matmulToMulBasicData.k = args_.kValue;\n+        matmulToMulBasicData.baseMN = runInfo_.mmToMulInfo.baseMN;\n+        matmulToMulBasicData.tailMN = runInfo_.mmToMulInfo.tailMN;\n+        matmulToMulBasicData.baseK = runInfo_.mmToMulInfo.baseK;\n+        matmulToMulBasicData.tailK = runInfo_.mmToMulInfo.tailK;\n+        matmulToMulBasicData.loopK = runInfo_.mmToMulInfo.loopK;\n+        matmulToMulBasicData.dataCopyMode = runInfo_.mmToMulInfo.dataCopyMode;\n         return ge::GRAPH_SUCCESS;\n     }\n \n",
+      "new_file": false,
+      "new_path": "matmul/mat_mul_v3/op_host/op_tiling/arch35/matmul_v3_base_tiling_advanced.h",
+      "old_path": "matmul/mat_mul_v3/op_host/op_tiling/arch35/matmul_v3_base_tiling_advanced.h",
+      "removed_lines": 20,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/5133d31c66a66b9cdba30f0073afc7fdf039c28c/matmul/mat_mul_v3/op_host/op_tiling/arch35/matmul_v3_base_tiling_advanced.h",
+    "sha": "5133d31c66a66b9cdba30f0073afc7fdf039c28c",
+    "source_branch": "9.0.0",
+    "source_project": {
+      "full_name": "wuyufei/ops-nn",
+      "human_name": "wuyufei / ops-nn",
+      "id": 9016749,
+      "path": "ops-nn"
+    },
+    "target_branch": "9.0.0",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 11,
+    "blob_id": "689267b451db4b5e758e295749da0d7354d9fe5c",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/5133d31c66a66b9cdba30f0073afc7fdf039c28c/matmul/mat_mul_v3/op_host/op_tiling/arch35/matmul_v3_common_advanced.h",
+    "deletions": 5,
+    "filename": "matmul/mat_mul_v3/op_host/op_tiling/arch35/matmul_v3_common_advanced.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 11,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -34,6 +34,7 @@ constexpr uint64_t BASIC_BLOCK_K_128_BYTE = 128UL;\n constexpr uint64_t NUM_TWO = 2UL;\n constexpr uint64_t NUM_THREE = 3UL;\n constexpr uint64_t NUM_FOUR = 4UL;\n+constexpr uint64_t NUM_FIVE = 5UL;\n constexpr uint64_t CACHELINE = 512UL;\n constexpr uint64_t BLOCK_BYTE_SIZE = 32UL;\n constexpr uint64_t BIAS_TABLE_NUM = 256UL;\n@@ -97,6 +98,7 @@ struct MatMulV3Args {\n     uint64_t fusedOpType = 0UL;\n     uint64_t batchX3 = 1UL;\n     bool hasX3Input = false;\n+    bool isForceGrpAccForFp32 = false;\n     MatMulV3BatchInfo *batchInfo = nullptr;\n };\n \n@@ -125,10 +127,14 @@ struct BatchMatMulV3ToMulInfo {\n     uint64_t alignNum = 1UL;\n };\n \n-struct MatMulV3MNEqualOneInfo {\n-    uint64_t useAllCoreNum = 1UL;\n+struct MatMulV3ToMulInfo {\n+    uint64_t tileNum = 1UL;\n+    uint64_t baseMN = 1UL;\n+    uint64_t tailMN = 1UL;\n+    uint64_t baseK = 1UL;\n+    uint64_t tailK = 1UL;\n     uint64_t loopK = 1UL;\n-    uint64_t tailMN = 0UL;\n+    bool dataCopyMode = false;\n };\n \n struct MatMulV3RunInfo {\n@@ -160,8 +166,8 @@ struct MatMulV3RunInfo {\n     MatMulV3TailInfo tailInfo;\n     BatchMatMulV3RunInfo bmmRunInfo;\n     MatMulV3MixInfo mixInfo;\n-    BatchMatMulV3ToMulInfo toMulInfo;\n-    MatMulV3MNEqualOneInfo oneInfo;\n+    BatchMatMulV3ToMulInfo bmmToMulInfo;\n+    MatMulV3ToMulInfo mmToMulInfo;\n };\n }\n }\n",
+      "new_file": false,
+      "new_path": "matmul/mat_mul_v3/op_host/op_tiling/arch35/matmul_v3_common_advanced.h",
+      "old_path": "matmul/mat_mul_v3/op_host/op_tiling/arch35/matmul_v3_common_advanced.h",
+      "removed_lines": 5,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/5133d31c66a66b9cdba30f0073afc7fdf039c28c/matmul/mat_mul_v3/op_host/op_tiling/arch35/matmul_v3_common_advanced.h",
+    "sha": "5133d31c66a66b9cdba30f0073afc7fdf039c28c",
+    "source_branch": "9.0.0",
+    "source_project": {
+      "full_name": "wuyufei/ops-nn",
+      "human_name": "wuyufei / ops-nn",
+      "id": 9016749,
+      "path": "ops-nn"
+    },
+    "target_branch": "9.0.0",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 1,
+    "blob_id": "787cee170a4d9eeb00244d1019382ba929bd14c1",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/5133d31c66a66b9cdba30f0073afc7fdf039c28c/matmul/mat_mul_v3/op_host/op_tiling/arch35/matmul_v3_tiling_advanced.cpp",
+    "deletions": 0,
+    "filename": "matmul/mat_mul_v3/op_host/op_tiling/arch35/matmul_v3_tiling_advanced.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 1,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -50,6 +50,7 @@ inline void GetDtype(const gert::TilingContext &context, MatMulV3Args &args)\n     if (strcmp(context.GetNodeType(), \"MatMulV3\") == 0) {\n         if (context.GetAttrs()->GetAttrNum() >= OP_IMPL_MODE_ATTR_NUM) {\n             args.isHf32 = *context.GetAttrs()->GetAttrPointer<int64_t>(OP_IMPL_MODE_ATTR_INDEX) == 0x40;\n+            args.isForceGrpAccForFp32 = *context.GetAttrs()->GetAttrPointer<int64_t>(OP_IMPL_MODE_ATTR_INDEX) == 0x4;\n         }\n     } else {\n         if (context.GetAttrs()->GetAttrNum() >= HF32_ATTR_NUM) {\n",
+      "new_file": false,
+      "new_path": "matmul/mat_mul_v3/op_host/op_tiling/arch35/matmul_v3_tiling_advanced.cpp",
+      "old_path": "matmul/mat_mul_v3/op_host/op_tiling/arch35/matmul_v3_tiling_advanced.cpp",
+      "removed_lines": 0,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/5133d31c66a66b9cdba30f0073afc7fdf039c28c/matmul/mat_mul_v3/op_host/op_tiling/arch35/matmul_v3_tiling_advanced.cpp",
+    "sha": "5133d31c66a66b9cdba30f0073afc7fdf039c28c",
+    "source_branch": "9.0.0",
+    "source_project": {
+      "full_name": "wuyufei/ops-nn",
+      "human_name": "wuyufei / ops-nn",
+      "id": 9016749,
+      "path": "ops-nn"
+    },
+    "target_branch": "9.0.0",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 2,
+    "blob_id": "6303fe2eed976e23235c579242bf0edddd1643f6",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/5133d31c66a66b9cdba30f0073afc7fdf039c28c/matmul/mat_mul_v3/op_host/op_tiling/arch35/matmul_v3_tiling_strategy.h",
+    "deletions": 2,
+    "filename": "matmul/mat_mul_v3/op_host/op_tiling/arch35/matmul_v3_tiling_strategy.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 2,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -27,7 +27,7 @@ namespace optiling {\n namespace matmul_v3_advanced {\n namespace strategy {\n constexpr int32_t MATMUL_INPUT_K_EQUAL_ZERO = 0;\n-constexpr int32_t MN_EQUAL_ONE = 1;\n+constexpr int32_t TO_MUL = 1;\n constexpr int32_t BASIC_STREAM_K = 2;\n constexpr int32_t STREAM_K = 3;\n constexpr int32_t BASIC_ASWT = 4;\n@@ -36,7 +36,7 @@ constexpr int32_t BASE = 999;\n \n const static std::map<NpuArch, std::vector<int32_t>> MatMulV3PrioritiesMap = {\n     {NpuArch::DAV_3510,\n-     {strategy::MATMUL_INPUT_K_EQUAL_ZERO, strategy::MN_EQUAL_ONE, strategy::BASIC_STREAM_K, strategy::STREAM_K, strategy::BASIC_ASWT,\n+     {strategy::MATMUL_INPUT_K_EQUAL_ZERO, strategy::TO_MUL, strategy::BASIC_STREAM_K, strategy::STREAM_K, strategy::BASIC_ASWT,\n       strategy::FULL_LOAD_BASE}},\n     {NpuArch::DAV_RESV, {strategy::BASE}}, // supportMmadS8S4平台\n };\n",
+      "new_file": false,
+      "new_path": "matmul/mat_mul_v3/op_host/op_tiling/arch35/matmul_v3_tiling_strategy.h",
+      "old_path": "matmul/mat_mul_v3/op_host/op_tiling/arch35/matmul_v3_tiling_strategy.h",
+      "removed_lines": 2,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/5133d31c66a66b9cdba30f0073afc7fdf039c28c/matmul/mat_mul_v3/op_host/op_tiling/arch35/matmul_v3_tiling_strategy.h",
+    "sha": "5133d31c66a66b9cdba30f0073afc7fdf039c28c",
+    "source_branch": "9.0.0",
+    "source_project": {
+      "full_name": "wuyufei/ops-nn",
+      "human_name": "wuyufei / ops-nn",
+      "id": 9016749,
+      "path": "ops-nn"
+    },
+    "target_branch": "9.0.0",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 52,
+    "blob_id": "3dc67f1ef0d6903b899bfe29048bcc28e45b8175",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/5133d31c66a66b9cdba30f0073afc7fdf039c28c/matmul/mat_mul_v3/op_host/op_tiling/arch35/matmul_v3_to_mul_tiling.cpp",
+    "deletions": 26,
+    "filename": "matmul/mat_mul_v3/op_host/op_tiling/arch35/matmul_v3_to_mul_tiling.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 52,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -10,11 +10,11 @@\n \n \n /* !\n- * \\file matmul_v3_mn_equal_one_tiling.cc\n+ * \\file matmul_v3_to_mul_tiling.cc\n  * \\brief\n  */\n \n-#include \"matmul_v3_mn_equal_one_tiling.h\"\n+#include \"matmul_v3_to_mul_tiling.h\"\n #include \"matmul_tiling_registry.h\"\n #include \"matmul_v3_tiling_strategy.h\"\n #include \"matmul/common/op_host/math_util.h\"\n@@ -23,10 +23,14 @@ namespace optiling {\n namespace matmul_v3_advanced {\n using namespace strategy;\n \n-MM_REGISTER_TILING_TEMPLATE(MatMulV3, MatMulV3MNEqOneTiling, DAV_3510, MN_EQUAL_ONE);\n+MM_REGISTER_TILING_TEMPLATE(MatMulV3, MatMulV3ToMulTiling, DAV_3510, TO_MUL);\n \n-bool MatMulV3MNEqOneTiling::IsCapable()\n+bool MatMulV3ToMulTiling::IsCapable()\n {\n+    // 未使能高精度模式\n+    if (!args_.isForceGrpAccForFp32) {\n+        return false;\n+    }\n     // m=1 || n=1\n     if (args_.mValue != 1UL && args_.nValue != 1UL) {\n         return false;\n@@ -34,54 +38,76 @@ bool MatMulV3MNEqOneTiling::IsCapable()\n     if (args_.aDtypeSize != sizeof(float) || args_.bDtypeSize != sizeof(float)) {\n         return false;\n     }\n-    if (args_.mValue == 1UL && (args_.nValue < BASE_K || args_.nValue % BASE_MN != 0)) {\n-        return false;\n-    } \n-    if (args_.nValue == 1UL && (args_.mValue < BASE_K || args_.mValue % BASE_MN != 0)) {\n-        return false;\n-    }\n-    if (args_.kValue % BASE_K != 0) {\n+    if (args_.kValue < LIMIT_K) {\n         return false;\n     }\n     return true;\n }\n \n-ge::graphStatus MatMulV3MNEqOneTiling::DoOpTiling()\n+ge::graphStatus MatMulV3ToMulTiling::DoOpTiling()\n {\n-    // 仅考虑K循环 N根据BASE_MN分多核 不再切分\n     uint64_t m = args_.mValue;\n     uint64_t n = args_.nValue;\n     uint64_t k = args_.kValue;\n-    // 按照BASE_MN=32切分需要使用的总核数\n-    uint64_t useAllCoreNum = m == 1 ? ops::CeilDiv(n, BASE_MN) : ops::CeilDiv(m, BASE_MN);\n+    uint64_t shapeMN = n * m;\n+    uint64_t ubCount = compileInfo_.ubSize / sizeof(float);\n+    uint64_t biasCount = 0;\n+    // 根据内外轴设置baseMN baseK\n+    bool dataCopyMode = false;\n+    if ((m == 1 && !args_.isBTrans) || (n == 1 && args_.isATrans)) {\n+        dataCopyMode = true;\n+    }\n+    uint64_t baseMN = BASE_MN;\n+    uint64_t baseK = BASE_K;\n+    uint64_t tmpMN = ops::CeilDiv(shapeMN, compileInfo_.aivNum);\n+    // (k, n) || (k, m)\n+    if (dataCopyMode) {\n+        baseMN = std::min(ops::CeilAlign(tmpMN, ALIGN_NUM), BASE_MN);\n+        biasCount = args_.hasBias ? baseMN : 0;\n+        baseK = (ubCount - baseMN - biasCount) / NUM_FIVE / baseMN;\n+    } else { // (m, k) || (n, k)\n+        biasCount = args_.hasBias ? tmpMN : 0;\n+        uint64_t tmpK = ubCount <= (tmpMN + biasCount) ? 0 : (ubCount - tmpMN - biasCount) / NUM_FIVE / tmpMN;\n+        baseK = std::max(ops::FloorAlign(tmpK, ALIGN_NUM), BASE_K);\n+        biasCount = args_.hasBias ? 1 : 0;\n+        baseMN = std::min(tmpMN, ubCount / (NUM_FIVE * baseK + biasCount + 1));\n+    }\n     // 尾核需要处理的MN方向个数\n-    uint64_t tailMN =  m == 1 ? n % BASE_MN : m % BASE_MN;\n-    uint64_t useCoreNum = useAllCoreNum >= compileInfo_.aivNum ? compileInfo_.aivNum : useAllCoreNum;\n-    uint64_t loopK = k / BASE_K;\n-    runInfo_.oneInfo.tailMN = tailMN;\n-    runInfo_.oneInfo.loopK = loopK;\n-    runInfo_.oneInfo.useAllCoreNum = useAllCoreNum;\n+    uint64_t tailMN = shapeMN % baseMN;\n+    // 每个核K方向尾次处理的个数\n+    uint64_t tailK = k % baseK;\n+    uint64_t loopK = ops::CeilDiv(k, baseK);\n+    // 计算实际核数\n+    uint64_t tileNum = ops::CeilDiv(shapeMN, baseMN);\n+    uint64_t useCoreNum = tileNum >= compileInfo_.aivNum ? compileInfo_.aivNum : tileNum;\n+\n+    runInfo_.mmToMulInfo.baseMN = baseMN;\n+    runInfo_.mmToMulInfo.tailMN = tailMN;\n+    runInfo_.mmToMulInfo.baseK = baseK;\n+    runInfo_.mmToMulInfo.tailK = tailK;\n+    runInfo_.mmToMulInfo.loopK = loopK;\n+    runInfo_.mmToMulInfo.tileNum = tileNum;\n     runInfo_.usedCoreNum = useCoreNum;\n+    runInfo_.mmToMulInfo.dataCopyMode = dataCopyMode;\n     return ge::GRAPH_SUCCESS;\n }\n \n-\n-uint64_t MatMulV3MNEqOneTiling::GetTilingKey() const\n+uint64_t MatMulV3ToMulTiling::GetTilingKey() const\n {\n     MatMulV3TilingKey tmp = MatMulV3TilingKey();\n     MatMulV3TilingKey& tilingKey = tilingKeyObj == nullptr ? tmp : *tilingKeyObj;\n     return tilingKey.SetTrans(args_.isATrans, args_.isBTrans)\n         .SetApiLevel(MatMulV3ApiLevel::BASIC_LEVEL)\n         .SetBatchModel(MatMulV3BatchModel::BATCH_MODEL)\n-        .SetModel(MatMulV3Model::MN_EQUAL_ONE)\n+        .SetModel(MatMulV3Model::TO_MUL)\n         .SetFullLoad(MatMulV3FullLoad::NONE_FULL_LOAD)\n         .SetL0C2Out(MatMulV3L0C2Out::ON_THE_FLY)\n         .GetTilingKey();\n }\n \n-ge::graphStatus MatMulV3MNEqOneTiling::GetTilingData(TilingResult& tiling) const\n+ge::graphStatus MatMulV3ToMulTiling::GetTilingData(TilingResult& tiling) const\n {\n-    return GetTilingDataImpl<MatMulV3MNEqOneBasicTilingData>(tiling);\n+    return GetTilingDataImpl<MatMulToMulBasicTilingData>(tiling);\n }\n }\n }\n\\ No newline at end of file\n",
+      "new_file": false,
+      "new_path": "matmul/mat_mul_v3/op_host/op_tiling/arch35/matmul_v3_to_mul_tiling.cpp",
+      "old_path": "matmul/mat_mul_v3/op_host/op_tiling/arch35/matmul_v3_mn_equal_one_tiling.cpp",
+      "removed_lines": 26,
+      "renamed_file": true,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/5133d31c66a66b9cdba30f0073afc7fdf039c28c/matmul/mat_mul_v3/op_host/op_tiling/arch35/matmul_v3_to_mul_tiling.cpp",
+    "sha": "5133d31c66a66b9cdba30f0073afc7fdf039c28c",
+    "source_branch": "9.0.0",
+    "source_project": {
+      "full_name": "wuyufei/ops-nn",
+      "human_name": "wuyufei / ops-nn",
+      "id": 9016749,
+      "path": "ops-nn"
+    },
+    "status": "renamed",
+    "target_branch": "9.0.0",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 11,
+    "blob_id": "e254a74e38c625f2b2b4994a52e270072e72dea8",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/5133d31c66a66b9cdba30f0073afc7fdf039c28c/matmul/mat_mul_v3/op_host/op_tiling/arch35/matmul_v3_to_mul_tiling.h",
+    "deletions": 10,
+    "filename": "matmul/mat_mul_v3/op_host/op_tiling/arch35/matmul_v3_to_mul_tiling.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 11,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -10,22 +10,22 @@\n \n \n /* !\n- * \\file matmul_v3_mn_equal_one_tiling.h\n+ * \\file matmul_v3_to_mul_tiling.h\n  * \\brief\n  */\n-#ifndef __OP_HOST_MATMUL_V3_MN_EQUAL_ONE_TILING_H__\n-#define __OP_HOST_MATMUL_V3_MN_EQUAL_ONE_TILING_H__\n+#ifndef __OP_HOST_MATMUL_V3_TO_MUL_TILING_H__\n+#define __OP_HOST_MATMUL_V3_TO_MUL_TILING_H__\n \n #include \"matmul_v3_base_tiling_advanced.h\"\n \n namespace optiling {\n namespace matmul_v3_advanced {\n-class MatMulV3MNEqOneTiling : public MatMulV3BaseTiling {\n+class MatMulV3ToMulTiling : public MatMulV3BaseTiling {\n public:\n-    MatMulV3MNEqOneTiling(gert::TilingContext *context, MatMulTilingCfg &cfg)\n+    MatMulV3ToMulTiling(gert::TilingContext *context, MatMulTilingCfg &cfg)\n         : MatMulV3BaseTiling(context, cfg) {};\n \n-    ~MatMulV3MNEqOneTiling() override = default;\n+    ~MatMulV3ToMulTiling() override = default;\n protected:\n     bool IsCapable() override;\n \n@@ -35,10 +35,11 @@ protected:\n \n     ge::graphStatus GetTilingData(TilingResult &tiling) const override;\n private:\n-    static constexpr uint64_t BASE_K = 512;\n-    static constexpr uint64_t BASE_MN = 32;\n-    static constexpr uint64_t LIMIT_UB = 16384;\n+    static constexpr uint64_t BASE_MN = 128;\n+    static constexpr uint64_t BASE_K = 128;\n+    static constexpr uint64_t LIMIT_K = 512;\n+    static constexpr uint64_t ALIGN_NUM = 8;\n };\n } // namespace matmul_v3\n } // namespace optiling\n-#endif // __OP_HOST_MATMUL_V3_MN_EQUAL_ONE_H__\n\\ No newline at end of file\n+#endif // __OP_HOST_MATMUL_V3_TO_MUL_TILING_H__\n\\ No newline at end of file\n",
+      "new_file": false,
+      "new_path": "matmul/mat_mul_v3/op_host/op_tiling/arch35/matmul_v3_to_mul_tiling.h",
+      "old_path": "matmul/mat_mul_v3/op_host/op_tiling/arch35/matmul_v3_mn_equal_one_tiling.h",
+      "removed_lines": 10,
+      "renamed_file": true,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/5133d31c66a66b9cdba30f0073afc7fdf039c28c/matmul/mat_mul_v3/op_host/op_tiling/arch35/matmul_v3_to_mul_tiling.h",
+    "sha": "5133d31c66a66b9cdba30f0073afc7fdf039c28c",
+    "source_branch": "9.0.0",
+    "source_project": {
+      "full_name": "wuyufei/ops-nn",
+      "human_name": "wuyufei / ops-nn",
+      "id": 9016749,
+      "path": "ops-nn"
+    },
+    "status": "renamed",
+    "target_branch": "9.0.0",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 26,
+    "blob_id": "79d2b9549bcdc1b0b404d0ec35605bde58238811",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/5133d31c66a66b9cdba30f0073afc7fdf039c28c/matmul/mat_mul_v3/op_kernel/arch35/block_scheduler_mul.h",
+    "deletions": 20,
+    "filename": "matmul/mat_mul_v3/op_kernel/arch35/block_scheduler_mul.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 26,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -9,12 +9,12 @@\n  */\n \n /* !\n- * \\file block_scheduler_one.h\n+ * \\file block_scheduler_mul.h\n  * \\brief\n  */\n \n-#ifndef CMCT_BLOCK_SCHEDULER_ONE_BUILTIN_H\n-#define CMCT_BLOCK_SCHEDULER_ONE_BUILTIN_H\n+#ifndef CMCT_BLOCK_SCHEDULER_MUL_BUILTIN_H\n+#define CMCT_BLOCK_SCHEDULER_MUL_BUILTIN_H\n \n #include \"cmct/block/block_scheduler_utils.h\"\n #include \"cmct/block/block_scheduler_policy.h\"\n@@ -28,31 +28,37 @@ template <\n     class L1TileShape_,\n     class L0TileShape_\n >\n-class BlockSchedulerOneBuiltIn {\n+class BlockSchedulerMulBuiltIn {\n public:\n     int64_t m_{0};\n     int64_t n_{0};\n     int64_t k_{0};\n-    int64_t useAllCoreNum_{0};\n+    int64_t tileNum_{0};\n     int64_t usedCoreNum_{0};\n-    int64_t loopK_{0};\n+    int64_t baseMN_{0};\n     int64_t tailMN_{0};\n-    bool hasBias_{false};\n+    int64_t baseK_{0};\n+    int64_t tailK_{0};\n+    int64_t loopK_{0};\n+    bool dataCopyMode_{false};\n \n+    using TupleShape = Shape<int64_t, int64_t, int64_t, int64_t>;\n     using ProblemShape = ProblemShape_;\n \n     struct Params {\n-        const MatMulV3MNEqOneBasicTilingData* tilingData;\n+        const MatMulToMulBasicTilingData* tilingData;\n     };\n public:\n-    __aicore__ inline BlockSchedulerOneBuiltIn(const ProblemShape& shape, const Params& params)\n+    __aicore__ inline BlockSchedulerMulBuiltIn(const ProblemShape& shape, const Params& params)\n     {\n-        useAllCoreNum_ = params.tilingData->useAllCoreNum;\n+        tileNum_ = params.tilingData->tileNum;\n         usedCoreNum_ = params.tilingData->usedCoreNum;\n-        loopK_ = params.tilingData->loopK;\n+        baseMN_ = params.tilingData->baseMN;\n         tailMN_ = params.tilingData->tailMN;\n-        hasBias_ = params.tilingData->hasBias;\n-        m_ = shape.m;\n+        baseK_ = params.tilingData->baseK;\n+        tailK_ = params.tilingData->tailK;\n+        loopK_ = params.tilingData->loopK;\n+        dataCopyMode_ = params.tilingData->dataCopyMode;\n         n_ = shape.n;\n         k_ = shape.k;\n     }\n@@ -64,7 +70,7 @@ public:\n \n     __aicore__ inline int64_t GetTileNum()\n     {\n-        return useAllCoreNum_;\n+        return tileNum_;\n     }\n \n     __aicore__ inline int64_t GetLoopK()\n@@ -72,14 +78,14 @@ public:\n         return loopK_;\n     }\n \n-    __aicore__ inline int64_t GetTailMN()\n+    __aicore__ inline bool GetDataCopyMode()\n     {\n-        return tailMN_;\n+        return dataCopyMode_;\n     }\n \n-    __aicore__ inline bool GetBias()\n+    __aicore__ inline TupleShape GetBlockInfo()\n     {\n-        return hasBias_;\n+        return {baseMN_, tailMN_, baseK_, tailK_};\n     }\n };\n \n@@ -93,11 +99,11 @@ struct BlockSchedulerSelector<\n     ProblemShape_,\n     L1TileShape_,\n     L0TileShape_,\n-    Cmct::Gemm::BuiltInOneScheduler,\n+    Cmct::Gemm::BuiltInMulScheduler,\n     TransA_,\n     TransB_\n > {\n-using SchedulerOp = BlockSchedulerOneBuiltIn<ProblemShape_, L1TileShape_, L0TileShape_>;\n+using SchedulerOp = BlockSchedulerMulBuiltIn<ProblemShape_, L1TileShape_, L0TileShape_>;\n };\n \n } // namespace Block\n",
+      "new_file": false,
+      "new_path": "matmul/mat_mul_v3/op_kernel/arch35/block_scheduler_mul.h",
+      "old_path": "matmul/mat_mul_v3/op_kernel/arch35/block_scheduler_one.h",
+      "removed_lines": 20,
+      "renamed_file": true,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/5133d31c66a66b9cdba30f0073afc7fdf039c28c/matmul/mat_mul_v3/op_kernel/arch35/block_scheduler_mul.h",
+    "sha": "5133d31c66a66b9cdba30f0073afc7fdf039c28c",
+    "source_branch": "9.0.0",
+    "source_project": {
+      "full_name": "wuyufei/ops-nn",
+      "human_name": "wuyufei / ops-nn",
+      "id": 9016749,
+      "path": "ops-nn"
+    },
+    "status": "renamed",
+    "target_branch": "9.0.0",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 8,
+    "blob_id": "cacff3ede50dfc8b65e114aa2e2e459311d5a4a0",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/5133d31c66a66b9cdba30f0073afc7fdf039c28c/matmul/mat_mul_v3/op_kernel/arch35/mat_mul_tiling_data.h",
+    "deletions": 5,
+    "filename": "matmul/mat_mul_v3/op_kernel/arch35/mat_mul_tiling_data.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 8,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -167,15 +167,18 @@ struct MatMulV3KEqZeroBasicTilingData {\n #pragma pack(pop)\n \n #pragma pack(push, 8)\n-struct MatMulV3MNEqOneBasicTilingData{\n+struct MatMulToMulBasicTilingData{\n+    uint32_t usedCoreNum = 1;\n+    uint32_t tileNum = 1;\n     uint32_t m = 1;\n     uint32_t n = 1;\n     uint32_t k = 1;\n-    uint32_t useAllCoreNum = 1;\n-    uint32_t usedCoreNum = 1;\n-    uint32_t loopK = 1;\n+    uint32_t baseMN = 0;\n     uint32_t tailMN = 0;\n-    bool hasBias = false;\n+    uint32_t baseK = 0;\n+    uint32_t tailK = 0;\n+    uint32_t loopK = 1;\n+    bool dataCopyMode = false;\n };\n #pragma pack(pop)\n \n",
+      "new_file": false,
+      "new_path": "matmul/mat_mul_v3/op_kernel/arch35/mat_mul_tiling_data.h",
+      "old_path": "matmul/mat_mul_v3/op_kernel/arch35/mat_mul_tiling_data.h",
+      "removed_lines": 5,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/5133d31c66a66b9cdba30f0073afc7fdf039c28c/matmul/mat_mul_v3/op_kernel/arch35/mat_mul_tiling_data.h",
+    "sha": "5133d31c66a66b9cdba30f0073afc7fdf039c28c",
+    "source_branch": "9.0.0",
+    "source_project": {
+      "full_name": "wuyufei/ops-nn",
+      "human_name": "wuyufei / ops-nn",
+      "id": 9016749,
+      "path": "ops-nn"
+    },
+    "target_branch": "9.0.0",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 3,
+    "blob_id": "061b99a3c505ae12eebfbdc1adacffd6882a4fa5",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/5133d31c66a66b9cdba30f0073afc7fdf039c28c/matmul/mat_mul_v3/op_kernel/arch35/mat_mul_tiling_key.h",
+    "deletions": 3,
+    "filename": "matmul/mat_mul_v3/op_kernel/arch35/mat_mul_tiling_key.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 3,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -29,7 +29,7 @@ ASCENDC_TPL_ARGS_DECL(\n     ASCENDC_TPL_UINT_DECL(BATCH_MODEL, ASCENDC_TPL_4_BW, ASCENDC_TPL_UI_LIST, MAT_MUL_FOR_BATCH,\n                           MAT_MUL_ITER_BATCH_SINGLE_BIAS),\n     ASCENDC_TPL_UINT_DECL(MODEL, ASCENDC_TPL_4_BW, ASCENDC_TPL_UI_LIST, MAT_MUL_BASIC, MAT_MUL_STREAM_K,\n-                          MAT_MUL_K_EQUAL_ZERO, MAT_MUL_MN_EQUAL_ONE),\n+                          MAT_MUL_K_EQUAL_ZERO, MAT_MUL_TO_MUL),\n     ASCENDC_TPL_UINT_DECL(FULL_LOAD, ASCENDC_TPL_4_BW, ASCENDC_TPL_UI_LIST, MAT_MUL_NO_FULL_LOAD, MAT_MUL_A_FULL_LOAD,\n                           MAT_MUL_B_FULL_LOAD, MAT_MUL_AB_FULL_LOAD),\n     ASCENDC_TPL_UINT_DECL(L0C2OUT_MODEL, ASCENDC_TPL_4_BW, ASCENDC_TPL_UI_LIST, MAT_MUL_ON_THE_FLY,\n@@ -159,9 +159,9 @@ ASCENDC_TPL_SEL(\n         ASCENDC_TPL_UINT_SEL(A_TRANS, ASCENDC_TPL_UI_LIST, MAT_MUL_NO_TRANS, MAT_MUL_TRANS),\n         ASCENDC_TPL_UINT_SEL(B_TRANS, ASCENDC_TPL_UI_LIST, MAT_MUL_NO_TRANS, MAT_MUL_TRANS),\n         ASCENDC_TPL_UINT_SEL(BATCH_MODEL, ASCENDC_TPL_UI_LIST, MAT_MUL_FOR_BATCH),\n-        ASCENDC_TPL_UINT_SEL(MODEL, ASCENDC_TPL_UI_LIST, MAT_MUL_MN_EQUAL_ONE),\n+        ASCENDC_TPL_UINT_SEL(MODEL, ASCENDC_TPL_UI_LIST, MAT_MUL_TO_MUL),\n         ASCENDC_TPL_UINT_SEL(FULL_LOAD, ASCENDC_TPL_UI_LIST, MAT_MUL_NO_FULL_LOAD),\n         ASCENDC_TPL_UINT_SEL(L0C2OUT_MODEL, ASCENDC_TPL_UI_LIST, MAT_MUL_ON_THE_FLY),\n-        ASCENDC_TPL_TILING_STRUCT_SEL(MatMulV3BasicTilingData))\n+        ASCENDC_TPL_TILING_STRUCT_SEL(MatMulToMulBasicTilingData))\n #endif\n );\n\\ No newline at end of file\n",
+      "new_file": false,
+      "new_path": "matmul/mat_mul_v3/op_kernel/arch35/mat_mul_tiling_key.h",
+      "old_path": "matmul/mat_mul_v3/op_kernel/arch35/mat_mul_tiling_key.h",
+      "removed_lines": 3,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/5133d31c66a66b9cdba30f0073afc7fdf039c28c/matmul/mat_mul_v3/op_kernel/arch35/mat_mul_tiling_key.h",
+    "sha": "5133d31c66a66b9cdba30f0073afc7fdf039c28c",
+    "source_branch": "9.0.0",
+    "source_project": {
+      "full_name": "wuyufei/ops-nn",
+      "human_name": "wuyufei / ops-nn",
+      "id": 9016749,
+      "path": "ops-nn"
+    },
+    "target_branch": "9.0.0",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 10,
+    "blob_id": "9fc44435929442bf6eb6cb797a5757fc127292ce",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/5133d31c66a66b9cdba30f0073afc7fdf039c28c/matmul/mat_mul_v3/op_kernel/arch35/mat_mul_to_mul_cmct.h",
+    "deletions": 10,
+    "filename": "matmul/mat_mul_v3/op_kernel/arch35/mat_mul_to_mul_cmct.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 10,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -9,25 +9,25 @@\n  */\n \n /* !\n- * \\file mat_mul_mn_equal_one_cmct.h\n+ * \\file mat_mul_to_mul_cmct.h\n  * \\brief\n  */\n \n-#ifndef MAT_MUL_MN_EQUAL_ONE_CMCT_H\n-#define MAT_MUL_MN_EQUAL_ONE_CMCT_H\n+#ifndef MAT_MUL_TO_MUL_CMCT_H\n+#define MAT_MUL_TO_MUL_CMCT_H\n \n #include \"cmct/block/block_scheduler_policy.h\"\n #include \"cmct/block/block_scheduler_utils.h\"\n-#include \"cmct/kernel/kernel_matmul_mn_equal_one.h\"\n-#include \"block_scheduler_one.h\"\n+#include \"cmct/kernel/kernel_matmul_to_mul.h\"\n+#include \"block_scheduler_mul.h\"\n \n namespace MatmulV3Advanced {\n using namespace Cmct;\n using namespace Cmct::Gemm;\n template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, class A_LAYOUT, class B_LAYOUT, class C_LAYOUT>\n-__aicore__ inline void MatMulMNEqualOneActKernel(\n+__aicore__ inline void MatMulToMulActKernel(\n     GM_ADDR aGM, GM_ADDR bGM, GM_ADDR biasGM, GM_ADDR yGM, GM_ADDR workspaceGM,\n-    const MatMulV3MNEqOneBasicTilingData& tilingData, int64_t batch = 0)\n+    const MatMulToMulBasicTilingData& tilingData, int64_t batch = 0)\n {\n     // 定义L1和L0的TileShape\n     using L1TileShape = AscendC::Shape<_0, _0, _0>;\n@@ -44,12 +44,12 @@ __aicore__ inline void MatMulMNEqualOneActKernel(\n     using LayoutC = C_LAYOUT;\n \n     // 定义scheduler类型 来自block_scheduler_policy.h\n-    using BlockScheduler = BuiltInOneScheduler;\n+    using BlockScheduler = BuiltInMulScheduler;\n \n     // 定义MMAD类型\n     using BlockMmad = Block::BlockMmadBuilder<\n         AType, LayoutA, BType, LayoutB, OutType, LayoutC, BiasType, LayoutC, L1TileShape, L0TileShape, BlockScheduler,\n-        MatmulMNEqualOne<>>;\n+        MatmulToMul<>>;\n \n     // 定义Fusion类型\n     using FusionOp = Block::DefaultFusion<OutType, OutType>;\n@@ -61,7 +61,7 @@ __aicore__ inline void MatMulMNEqualOneActKernel(\n     using ProblemShape = MatmulShape;\n \n     // 定义Kernel类型\n-    using MatmulKernel = Kernel::KernelMatmulMNEqualOne<ProblemShape, BlockMmad, BlockEpilogue, BlockScheduler>;\n+    using MatmulKernel = Kernel::KernelMatmulToMul<ProblemShape, BlockMmad, BlockEpilogue, BlockScheduler>;\n     using Params = typename MatmulKernel::Params;\n     Params params = {\n         {tilingData.m, tilingData.n, tilingData.k, batch}, // shape\n",
+      "new_file": false,
+      "new_path": "matmul/mat_mul_v3/op_kernel/arch35/mat_mul_to_mul_cmct.h",
+      "old_path": "matmul/mat_mul_v3/op_kernel/arch35/mat_mul_mn_equal_one_cmct.h",
+      "removed_lines": 10,
+      "renamed_file": true,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/5133d31c66a66b9cdba30f0073afc7fdf039c28c/matmul/mat_mul_v3/op_kernel/arch35/mat_mul_to_mul_cmct.h",
+    "sha": "5133d31c66a66b9cdba30f0073afc7fdf039c28c",
+    "source_branch": "9.0.0",
+    "source_project": {
+      "full_name": "wuyufei/ops-nn",
+      "human_name": "wuyufei / ops-nn",
+      "id": 9016749,
+      "path": "ops-nn"
+    },
+    "status": "renamed",
+    "target_branch": "9.0.0",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 2,
+    "blob_id": "e308301bacd3f168de2620cc51282314c71507ff",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/5133d31c66a66b9cdba30f0073afc7fdf039c28c/matmul/mat_mul_v3/op_kernel/arch35/mat_mul_v3_tiling_key_public.h",
+    "deletions": 2,
+    "filename": "matmul/mat_mul_v3/op_kernel/arch35/mat_mul_v3_tiling_key_public.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 2,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -29,7 +29,7 @@\n #define MAT_MUL_BASIC 0\n #define MAT_MUL_STREAM_K 1\n #define MAT_MUL_K_EQUAL_ZERO 2\n-#define MAT_MUL_MN_EQUAL_ONE 3\n+#define MAT_MUL_TO_MUL 3\n \n #define MAT_MUL_NO_FULL_LOAD 0\n #define MAT_MUL_A_FULL_LOAD 1\n@@ -70,7 +70,7 @@ enum class MatMulV3Model : std::uint8_t\n     BASIC = MAT_MUL_BASIC,\n     STREAM_K = MAT_MUL_STREAM_K,\n     K_EQUAL_ZERO = MAT_MUL_K_EQUAL_ZERO,\n-    MN_EQUAL_ONE = MAT_MUL_MN_EQUAL_ONE\n+    TO_MUL = MAT_MUL_TO_MUL\n };\n \n enum class MatMulV3FullLoad : std::uint8_t\n",
+      "new_file": false,
+      "new_path": "matmul/mat_mul_v3/op_kernel/arch35/mat_mul_v3_tiling_key_public.h",
+      "old_path": "matmul/mat_mul_v3/op_kernel/arch35/mat_mul_v3_tiling_key_public.h",
+      "removed_lines": 2,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/5133d31c66a66b9cdba30f0073afc7fdf039c28c/matmul/mat_mul_v3/op_kernel/arch35/mat_mul_v3_tiling_key_public.h",
+    "sha": "5133d31c66a66b9cdba30f0073afc7fdf039c28c",
+    "source_branch": "9.0.0",
+    "source_project": {
+      "full_name": "wuyufei/ops-nn",
+      "human_name": "wuyufei / ops-nn",
+      "id": 9016749,
+      "path": "ops-nn"
+    },
+    "target_branch": "9.0.0",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 4,
+    "blob_id": "5b6f0517f6a73afa4ea6c4e0b946f807ffe2562a",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/5133d31c66a66b9cdba30f0073afc7fdf039c28c/matmul/mat_mul_v3/op_kernel/mat_mul_v3_apt.cpp",
+    "deletions": 4,
+    "filename": "matmul/mat_mul_v3/op_kernel/mat_mul_v3_apt.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 4,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -26,7 +26,7 @@\n #include \"arch35/mat_mul_pingpong_basic_cmct.h\"\n #include \"arch35/mat_mul_streamk_basic_cmct.h\"\n #include \"arch35/mat_mul_fixpipe_opti_basic_cmct.h\"\n-#include \"arch35/mat_mul_mn_equal_one_cmct.h\"\n+#include \"arch35/mat_mul_to_mul_cmct.h\"\n \n using namespace Cmct;\n using namespace Cmct::Gemm;\n@@ -177,10 +177,10 @@ __global__ __aicore__ void mat_mul_v3(\n             tilingData, tilingGM, aTran, bTran, nullptr, MatmulV3Advanced::MatmulAswKernelABL1FullLoad,\n             MatmulV3Advanced::MatmulAswBlock, MM_CFG_NO_PRELOAD);\n     } else if constexpr (\n-        API_LEVEL == MAT_MUL_BASIC_LEVEL && FULL_LOAD == MAT_MUL_NO_FULL_LOAD && MODEL == MAT_MUL_MN_EQUAL_ONE &&\n+        API_LEVEL == MAT_MUL_BASIC_LEVEL && FULL_LOAD == MAT_MUL_NO_FULL_LOAD && MODEL == MAT_MUL_TO_MUL &&\n         L0C2OUT_MODEL == MAT_MUL_ON_THE_FLY) {\n-        GET_TILING_DATA_WITH_STRUCT(MatMulV3MNEqOneBasicTilingData, tilingData, tilingGM);\n-        MatmulV3Advanced::MatMulMNEqualOneActKernel<\n+        GET_TILING_DATA_WITH_STRUCT(MatMulToMulBasicTilingData, tilingData, tilingGM);\n+        MatmulV3Advanced::MatMulToMulActKernel<\n             DTYPE_X1, DTYPE_X2, DTYPE_Y, DTYPE_BIAS, aLayout, bLayout, layout::RowMajor>(\n             aGM, bGM, biasGM, cGM, workspaceGM, tilingData);\n #endif\n",
+      "new_file": false,
+      "new_path": "matmul/mat_mul_v3/op_kernel/mat_mul_v3_apt.cpp",
+      "old_path": "matmul/mat_mul_v3/op_kernel/mat_mul_v3_apt.cpp",
+      "removed_lines": 4,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/5133d31c66a66b9cdba30f0073afc7fdf039c28c/matmul/mat_mul_v3/op_kernel/mat_mul_v3_apt.cpp",
+    "sha": "5133d31c66a66b9cdba30f0073afc7fdf039c28c",
+    "source_branch": "9.0.0",
+    "source_project": {
+      "full_name": "wuyufei/ops-nn",
+      "human_name": "wuyufei / ops-nn",
+      "id": 9016749,
+      "path": "ops-nn"
+    },
+    "target_branch": "9.0.0",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 1,
+    "blob_id": "70ec9d6b651938c7e5138663d7e2b9e6b8658141",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/5133d31c66a66b9cdba30f0073afc7fdf039c28c/matmul/mat_mul_v3/tests/ut/op_host/test_aclnn_addmm.cpp",
+    "deletions": 1,
+    "filename": "matmul/mat_mul_v3/tests/ut/op_host/test_aclnn_addmm.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 1,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -1198,4 +1198,4 @@ TEST_F(l2_addmm_test, addmm_inplace_310_FP32_FP16_FP16FP32_KEEP_DTYPE)\n     uint64_t workspace_size = 0;\n     aclnnStatus aclRet = ut.TestGetWorkspaceSize(&workspace_size);\n     EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_INVALID);\n-}\n\\ No newline at end of file\n+}\n",
+      "new_file": false,
+      "new_path": "matmul/mat_mul_v3/tests/ut/op_host/test_aclnn_addmm.cpp",
+      "old_path": "matmul/mat_mul_v3/tests/ut/op_host/test_aclnn_addmm.cpp",
+      "removed_lines": 1,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/5133d31c66a66b9cdba30f0073afc7fdf039c28c/matmul/mat_mul_v3/tests/ut/op_host/test_aclnn_addmm.cpp",
+    "sha": "5133d31c66a66b9cdba30f0073afc7fdf039c28c",
+    "source_branch": "9.0.0",
+    "source_project": {
+      "full_name": "wuyufei/ops-nn",
+      "human_name": "wuyufei / ops-nn",
+      "id": 9016749,
+      "path": "ops-nn"
+    },
+    "target_branch": "9.0.0",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 9,
+    "blob_id": "a499557c648ce3c9b4fff29845072291ba2fb503",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/5133d31c66a66b9cdba30f0073afc7fdf039c28c/matmul/mat_mul_v3/tests/ut/op_host/test_matmul_v3_tiling.cpp",
+    "deletions": 0,
+    "filename": "matmul/mat_mul_v3/tests/ut/op_host/test_matmul_v3_tiling.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 9,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -1026,6 +1026,15 @@ static TilingTestParam ascend950_cases_params[] = {\n     ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND, false, false, 0, 0, {1188, 64}, {64, 2524}, {1188, 2524}, {1188, 64}, {64, 2524}, {1188, 2524}, false, 0, 0, 32, 1UL,\n     \"32 1188 2524 64 208 256 128 208 256 32 64 1 1 1 1 0 0 16843264 0 208 1 0 \", ge::DT_FLOAT, ge::DT_FLOAT\n   },\n+  {\n+    \"MatMulV3_950_matmul_to_mul\", \"MatMulV3\", R\"({\"_pattern\": \"MatMul\", \"attrs\":{\"transpose_a\":false,\"transpose_b\":false},\n+      \"binary_attrs\":{\"bias_flag\":false, \"nd_flag\":true, \"split_k_flag\":false, \"zero_flag\":false, \"weight_nz\": false, \"l2_size\":134217728},\"binary_mode_flag\":true,\n+      \"block_dim\":{\"CORE_NUM\":32, \"vector_core_cnt\": 64},\"corerect_range_flag\":null,\"dynamic_mode\":\"dynamic_mkn\", \"fused_double_operand_num\": 0,\n+      \"hardware_info\": {\"BT_SIZE\": 4096, \"load3d_constraints\": \"unknown\", \"Intrinsic_fix_pipe_l0c2out\": true, \"Intrinsic_data_move_l12ub\": false, \"Intrinsic_data_move_l0c2ub\": false, \"Intrinsic_data_move_l12bt\": true, \"Intrinsic_data_move_out2l1_nd2nz\": true, \"UB_SIZE\": 253952, \"L2_SIZE\": 134217728, \"L1_SIZE\": 524288, \"L0A_SIZE\": 65536, \"L0B_SIZE\": 65536, \"L0C_SIZE\": 262144, \"CORE_NUM\": 32, \"vector_core_cnt\": 64, \"socVersion\": \"Ascend950\" },\n+      \"format_a\":\"ND\",\"format_b\":\"ND\",\"repo_range\":{},\"repo_seeds\":{}})\",\n+    ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND, false, false, 0, 4, {1, 4096}, {4096, 4096}, {1, 4096}, {1, 4096}, {4096, 4096}, {1, 4096}, false, 0, 0, 32, 12289UL,\n+    \"32 32 1 4096 4096 128 0 99 37 42 1 \", ge::DT_FLOAT, ge::DT_FLOAT\n+  },\n };\n INSTANTIATE_TEST_CASE_P(MatMulV3Ascend910B, MatMulV3TilingRuntime, testing::ValuesIn(ascend910B_cases_params));\n INSTANTIATE_TEST_CASE_P(MatMulV3Ascend310P, MatMulV3TilingRuntime, testing::ValuesIn(ascend310P_cases_params));\n",
+      "new_file": false,
+      "new_path": "matmul/mat_mul_v3/tests/ut/op_host/test_matmul_v3_tiling.cpp",
+      "old_path": "matmul/mat_mul_v3/tests/ut/op_host/test_matmul_v3_tiling.cpp",
+      "removed_lines": 0,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/5133d31c66a66b9cdba30f0073afc7fdf039c28c/matmul/mat_mul_v3/tests/ut/op_host/test_matmul_v3_tiling.cpp",
+    "sha": "5133d31c66a66b9cdba30f0073afc7fdf039c28c",
+    "source_branch": "9.0.0",
+    "source_project": {
+      "full_name": "wuyufei/ops-nn",
+      "human_name": "wuyufei / ops-nn",
+      "id": 9016749,
+      "path": "ops-nn"
+    },
+    "target_branch": "9.0.0",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  }
+]

@@ -1,0 +1,32 @@
+[
+  {
+    "additions": 7,
+    "blob_id": "4223dddcc64307cc4d2f79993f51e37705c083d4",
+    "blob_url": "https://gitcode.com/cann/ops-math/blob/ad2ab7bb78785cb893c1f9f314dfe5de7af8dae1/math/cdist/op_kernel/arch35/cdist_simt.h",
+    "deletions": 1,
+    "filename": "math/cdist/op_kernel/arch35/cdist_simt.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 7,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -108,7 +108,13 @@ __simt_vf__ __aicore__ LAUNCH_BOUND(THREAD_NUM) inline void SimtStridedZero(\n         yGmAddr[outputIdx] = 0;\n         for(int64_t i = 0; i < M; i++) {\n             float absNum = abs(static_cast<float>(x1GmAddr[inputIdx1+i]) - static_cast<float>(x2GmAddr[inputIdx2+i]));\n-            float minNum = fminf(ceilf(absNum), static_cast<float>(1));\n+            float ceilNum = ceilf(absNum);\n+            float minNum;\n+            if(isnan(ceilNum)) {\n+                minNum = ceilNum;\n+            } else {\n+                minNum = fminf(ceilNum, static_cast<float>(1));\n+            }\n             asc_atomic_add(yGmAddr + outputIdx, static_cast<T>(minNum));\n         }\n     }\n",
+      "new_file": false,
+      "new_path": "math/cdist/op_kernel/arch35/cdist_simt.h",
+      "old_path": "math/cdist/op_kernel/arch35/cdist_simt.h",
+      "removed_lines": 1,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-math/raw/ad2ab7bb78785cb893c1f9f314dfe5de7af8dae1/math/cdist/op_kernel/arch35/cdist_simt.h",
+    "sha": "ad2ab7bb78785cb893c1f9f314dfe5de7af8dae1",
+    "source_branch": "master",
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-math",
+      "human_name": "CANN / ops-math",
+      "id": 7649531,
+      "path": "ops-math"
+    }
+  }
+]

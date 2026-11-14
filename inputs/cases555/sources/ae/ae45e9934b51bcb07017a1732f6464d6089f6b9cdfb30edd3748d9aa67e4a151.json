@@ -1,0 +1,182 @@
+[
+  {
+    "additions": 15,
+    "blob_id": "5ea63f0bb2fdfcfd2400497c489665236823e1b2",
+    "blob_url": "https://gitcode.com/cann/ops-math/blob/1a028a6a2d768c619b3c8061049ca52bf56284b8/math/radix_top_k/op_host/radix_top_k_tiling.cpp",
+    "deletions": 8,
+    "filename": "math/radix_top_k/op_host/radix_top_k_tiling.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 15,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -28,7 +28,7 @@ namespace RadixTopK {\n static constexpr uint64_t BLOCK_SIZE = 32;\n static constexpr uint64_t CACHE_LINE = 512;\n static constexpr uint64_t MAX_TILE_LEN = 12032;\n-static constexpr uint64_t LARGE_SORT_LEN = 1448600000;\n+static constexpr uint64_t LARGE_SORT_LEN = 1440000000;\n static constexpr uint64_t LARGE_TILE_LEN = 10496;\n static constexpr uint64_t MAX_TILE_NUM_IN_UB = 6144;\n static constexpr uint64_t INPUT_X = 0;\n@@ -87,11 +87,18 @@ ge::graphStatus RadixTopKTiling::GetShapeAttrsInfo()\n ge::graphStatus RadixTopKTiling::DoOpTiling()\n {\n     OP_LOGD(opName_, \"RadixTopKTiling DoOpTiling.\");\n+    bool isCalcSuccess = false;\n     if (!isLargeShape_) {\n-        CalcTilingParams(tilingData_.sortLen);\n+        isCalcSuccess = CalcTilingParams(tilingData_.sortLen);\n+        if (!isCalcSuccess) {\n+            isLargeShape_ = true;\n+            isCalcSuccess = CalcLargeTilingParams(tilingData_.sortLen);\n+        }\n     } else {\n-        CalcLargeTilingParams(tilingData_.sortLen);\n+        isCalcSuccess = CalcLargeTilingParams(tilingData_.sortLen);\n     }\n+    OP_CHECK_IF((!isCalcSuccess), OP_LOGE(opName_, \"RadixTopK Tiling failed.\"), return ge::GRAPH_FAILED);\n+\n     blockDim_ = tilingData_.formerCoreNum + tilingData_.tailCoreNum;\n     tilingData_.coreNum = blockDim_;\n     // 仅 UB 变体可复用 indices 内存（WS 变体的 tileTopK/tileHist 与 CopyOutResult 跨 core 冲突）\n@@ -221,11 +228,11 @@ bool RadixTopKTiling::TryCalcTileDistribution(\n             return true;\n         }\n     }\n-    OP_LOGE(opName_, \"Cannot find suitable tileLen to do RadixTopK.\");\n+    OP_LOGD(opName_, \"Cannot find suitable tileLen to do RadixTopK.\");\n     return false;\n }\n \n-void RadixTopKTiling::CalcLargeTilingParams(const uint64_t &dataNum)\n+bool RadixTopKTiling::CalcLargeTilingParams(const uint64_t &dataNum)\n {\n     uint64_t dataAlign = CACHE_LINE / xDtypeSize_;\n     uint64_t minTileLen = dataAlign;\n@@ -236,10 +243,10 @@ void RadixTopKTiling::CalcLargeTilingParams(const uint64_t &dataNum)\n         return ubUsed <= ubSize_;\n     };\n \n-    TryCalcTileDistribution(dataNum, LARGE_TILE_LEN, minTileLen, dataAlign, checkUb);\n+    return TryCalcTileDistribution(dataNum, LARGE_TILE_LEN, minTileLen, dataAlign, checkUb);\n }\n \n-void RadixTopKTiling::CalcTilingParams(const uint64_t &dataNum)\n+bool RadixTopKTiling::CalcTilingParams(const uint64_t &dataNum)\n {\n     uint64_t coreNum = totalCoreNum_;\n     uint64_t dataAlign = CACHE_LINE / xDtypeSize_;\n@@ -264,7 +271,7 @@ void RadixTopKTiling::CalcTilingParams(const uint64_t &dataNum)\n         startTileLen = utilCap;\n     }\n \n-    TryCalcTileDistribution(dataNum, startTileLen, minTileLen, dataAlign, checkUb);\n+    return TryCalcTileDistribution(dataNum, startTileLen, minTileLen, dataAlign, checkUb);\n }\n \n void RadixTopKTiling::SetTilingData()\n",
+      "new_file": false,
+      "new_path": "math/radix_top_k/op_host/radix_top_k_tiling.cpp",
+      "old_path": "math/radix_top_k/op_host/radix_top_k_tiling.cpp",
+      "removed_lines": 8,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-math/raw/1a028a6a2d768c619b3c8061049ca52bf56284b8/math/radix_top_k/op_host/radix_top_k_tiling.cpp",
+    "sha": "1a028a6a2d768c619b3c8061049ca52bf56284b8",
+    "source_branch": "radix_top_k",
+    "source_project": {
+      "full_name": "huang-wei-chen/ops-math",
+      "human_name": "huang-wei-chen / ops-math",
+      "id": 8361088,
+      "path": "ops-math"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-math",
+      "human_name": "CANN / ops-math",
+      "id": 7649531,
+      "path": "ops-math"
+    }
+  },
+  {
+    "additions": 2,
+    "blob_id": "bd829cc6efd7a465efe844e3a7effd3c44e35567",
+    "blob_url": "https://gitcode.com/cann/ops-math/blob/1a028a6a2d768c619b3c8061049ca52bf56284b8/math/radix_top_k/op_host/radix_top_k_tiling.h",
+    "deletions": 2,
+    "filename": "math/radix_top_k/op_host/radix_top_k_tiling.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 2,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -48,8 +48,8 @@ protected:\n     // 7、保存Tiling数据\n     ge::graphStatus PostTiling() override;\n \n-    void CalcLargeTilingParams(const uint64_t &dataNum);\n-    void CalcTilingParams(const uint64_t &dataNum);\n+    bool CalcLargeTilingParams(const uint64_t &dataNum);\n+    bool CalcTilingParams(const uint64_t &dataNum);\n     void PrintTilingData();\n \n     template<typename CheckUbFn>\n",
+      "new_file": false,
+      "new_path": "math/radix_top_k/op_host/radix_top_k_tiling.h",
+      "old_path": "math/radix_top_k/op_host/radix_top_k_tiling.h",
+      "removed_lines": 2,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-math/raw/1a028a6a2d768c619b3c8061049ca52bf56284b8/math/radix_top_k/op_host/radix_top_k_tiling.h",
+    "sha": "1a028a6a2d768c619b3c8061049ca52bf56284b8",
+    "source_branch": "radix_top_k",
+    "source_project": {
+      "full_name": "huang-wei-chen/ops-math",
+      "human_name": "huang-wei-chen / ops-math",
+      "id": 8361088,
+      "path": "ops-math"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-math",
+      "human_name": "CANN / ops-math",
+      "id": 7649531,
+      "path": "ops-math"
+    }
+  },
+  {
+    "additions": 3,
+    "blob_id": "12f733441363d91ce08023f35bc8bd146f85d7b1",
+    "blob_url": "https://gitcode.com/cann/ops-math/blob/1a028a6a2d768c619b3c8061049ca52bf56284b8/math/radix_top_k/op_kernel/radix_top_k_ub.h",
+    "deletions": 3,
+    "filename": "math/radix_top_k/op_kernel/radix_top_k_ub.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 3,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -163,7 +163,7 @@ template <typename T, bool largest>\n __aicore__ inline void RadixTopKUb<T, largest>::SubProcess(uint64_t batchId)\n {\n     this->involvedMask16_ = 0;\n-    this->andMask16_ = ((1 << BITS_PER_ROUND) - 1) << (16 - BITS_PER_ROUND);\n+    this->andMask16_ = 0xC000; // ((1 << BITS_PER_ROUND) - 1) << (16 - BITS_PER_ROUND);\n     this->totalDefinitelyInTopK_ = 0;\n     this->boundaryBin = 0;\n     this->boundaryBinPrev = 1;\n@@ -238,7 +238,7 @@ __aicore__ inline bool RadixTopKUb<T, largest>::Update(const int32_t &roundId)\n         int32_t safeSumTileNum = FLOAT32_SAFE_INT / this->tileLen_ / int32Align * int32Align;\n         int32_t segSize = this->tileNum_ < safeSumTileNum ? this->tileNum_ : safeSumTileNum;\n         for (int32_t segOff = 0; segOff < this->tileNum_; segOff += segSize) {\n-            int32_t curSegLen = AscendC::Std::min(segSize, this->tileNum_ - segOff);\n+            int32_t curSegLen = AscendC::Std::min(segSize, static_cast<int32_t>(this->tileNum_ - segOff));\n             SToVSync();\n             Cast(tileHistFp32, tileTopK[segOff], RoundMode::CAST_NONE, curSegLen);\n             ReduceSum(tileHistFp32, tileHistFp32, tileHistFp32, curSegLen);\n@@ -302,7 +302,7 @@ __aicore__ inline void RadixTopKUb<T, largest>::HandleLastRoundBoundary(\n     int32_t segSize = this->tileNum_ < safeSumTileNum ? this->tileNum_ : safeSumTileNum;\n     int32_t reduceSumValue = 0;\n     for (int32_t segOff = 0; segOff < this->tileNum_; segOff += segSize) {\n-        int32_t curSegLen = AscendC::Std::min(segSize, this->tileNum_ - segOff);\n+        int32_t curSegLen = AscendC::Std::min(segSize, static_cast<int32_t>(this->tileNum_ - segOff));\n         SToVSync();\n         ReduceSum(tileHistFp32, tileHistFp32[segOff], tileHistFp32[segOff], curSegLen);\n         VToSSync();\n",
+      "new_file": false,
+      "new_path": "math/radix_top_k/op_kernel/radix_top_k_ub.h",
+      "old_path": "math/radix_top_k/op_kernel/radix_top_k_ub.h",
+      "removed_lines": 3,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-math/raw/1a028a6a2d768c619b3c8061049ca52bf56284b8/math/radix_top_k/op_kernel/radix_top_k_ub.h",
+    "sha": "1a028a6a2d768c619b3c8061049ca52bf56284b8",
+    "source_branch": "radix_top_k",
+    "source_project": {
+      "full_name": "huang-wei-chen/ops-math",
+      "human_name": "huang-wei-chen / ops-math",
+      "id": 8361088,
+      "path": "ops-math"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-math",
+      "human_name": "CANN / ops-math",
+      "id": 7649531,
+      "path": "ops-math"
+    }
+  },
+  {
+    "additions": 9,
+    "blob_id": "27ef33f9de2f790e3dc4e885126ea9631fe6e0a2",
+    "blob_url": "https://gitcode.com/cann/ops-math/blob/1a028a6a2d768c619b3c8061049ca52bf56284b8/math/radix_top_k/op_kernel/radix_top_k_ws.h",
+    "deletions": 7,
+    "filename": "math/radix_top_k/op_kernel/radix_top_k_ws.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 9,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -162,7 +162,7 @@ template <typename T, bool largest>\n __aicore__ inline void RadixTopKWs<T, largest>::SubProcess(uint64_t batchId)\n {\n     this->involvedMask16_ = 0;\n-    this->andMask16_ = ((1 << BITS_PER_ROUND) - 1) << (16 - BITS_PER_ROUND);\n+    this->andMask16_ = 0xC000; // ((1 << BITS_PER_ROUND) - 1) << (16 - BITS_PER_ROUND);\n     this->totalDefinitelyInTopK_ = 0;\n     this->boundaryBin = 0;\n     this->boundaryBinPrev = 1;\n@@ -182,8 +182,8 @@ __aicore__ inline void RadixTopKWs<T, largest>::SubProcess(uint64_t batchId)\n \n         for (int32_t repeatId = 0; repeatId <= tileNumBy3RepeatTimes_; repeatId++) {\n             int32_t startTileId = repeatId * MAX_TILE_NUM_IN_UB_BY3;\n-            int32_t endTileId = AscendC::Std::min(startTileId + MAX_TILE_NUM_IN_UB_BY3,\n-                                                    this->tileNum_);\n+            int32_t endTileId = AscendC::Std::min(static_cast<int32_t>(startTileId + MAX_TILE_NUM_IN_UB_BY3),\n+                                                    static_cast<int32_t>(this->tileNum_));\n             for (int32_t tileId = startTileId; tileId < endTileId; tileId++) {\n                 PINGPONG_TILE_BEGIN(tileId, blockOffset);\n \n@@ -300,7 +300,8 @@ __aicore__ inline void RadixTopKWs<T, largest>::HandleLastRoundBoundary(\n         int32_t safeSumTileNum = FLOAT32_SAFE_INT / this->tileLen_ / int32Align * int32Align;\n         int32_t segSize = dataNum < safeSumTileNum ? dataNum : safeSumTileNum;\n         for (int32_t segOff = 0; segOff < dataNum; segOff += segSize) {\n-            int32_t curSegLen = AscendC::Std::min(segSize, dataNum - segOff);\n+            int32_t curSegLen = AscendC::Std::min(segSize, static_cast<int32_t>(dataNum - segOff));\n+            SToVSync();\n             ReduceSum(tileHistFp32, tileHistFp32[segOff], tileHistFp32[segOff], curSegLen);\n             VToSSync();\n             reduceSumValue += static_cast<int32_t>(tileHistFp32.GetValue(0));\n@@ -376,7 +377,7 @@ __aicore__ inline void RadixTopKWs<T, largest>::WriteCoreTopKFromWs(\n         MTE2ToVSync();\n         int32_t segSize = dataNum < safeSumTileNum ? dataNum : safeSumTileNum;\n         for (int32_t segOff = 0; segOff < dataNum; segOff += segSize) {\n-            int32_t curSegLen = AscendC::Std::min(segSize, dataNum - segOff);\n+            int32_t curSegLen = AscendC::Std::min(segSize, static_cast<int32_t>(dataNum - segOff));\n             SToVSync();\n             Cast(tileHistFp32, tileTopK[segOff], RoundMode::CAST_NONE, curSegLen);\n             ReduceSum(tileHistFp32, tileHistFp32, tileHistFp32, curSegLen);\n@@ -464,7 +465,8 @@ __aicore__ inline void RadixTopKWs<T, largest>::TileTopK(\n     uint64_t startRepeatId = firstId / MAX_TILE_NUM_IN_UB;\n     for (uint64_t repeatId = startRepeatId; repeatId <= tileNumRepeatTimes_; repeatId++) {\n         uint64_t startTileId = repeatId * MAX_TILE_NUM_IN_UB;\n-        uint64_t endTileId = AscendC::Std::min(startTileId + MAX_TILE_NUM_IN_UB, this->tileNum_);\n+        uint64_t endTileId = AscendC::Std::min(static_cast<uint64_t>(startTileId + MAX_TILE_NUM_IN_UB),\n+                                                static_cast<uint64_t>(this->tileNum_));\n         if (repeatId > startRepeatId) {\n             CopyTileTopKWs2Ub(tileTopK, repeatId * MAX_TILE_NUM_IN_UB, MAX_TILE_NUM_IN_UB);\n             MTE2ToSSync();\n@@ -477,7 +479,7 @@ __aicore__ inline void RadixTopKWs<T, largest>::TileTopK(\n             uint64_t tileBaseOffset = blockOffset - batchId * this->sortLen_;\n             uint64_t tileOffset = tileBaseOffset + tileId * this->tileLen_;\n \n-            int32_t curTileK = tileTopK.GetValue(tileId - startTileId);\n+            int32_t curTileK = tileTopK.GetValue(tileId - repeatId * MAX_TILE_NUM_IN_UB);\n             PROCESS_ONE_TILE_TOPK_OR_SKIP(curTileK,\n                 tileHistAndTopKBuf_.GetWithOffset<int32_t>(maxIndexLen,\n                     this->tileNumAlign_ * sizeof(int32_t)));\n",
+      "new_file": false,
+      "new_path": "math/radix_top_k/op_kernel/radix_top_k_ws.h",
+      "old_path": "math/radix_top_k/op_kernel/radix_top_k_ws.h",
+      "removed_lines": 7,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-math/raw/1a028a6a2d768c619b3c8061049ca52bf56284b8/math/radix_top_k/op_kernel/radix_top_k_ws.h",
+    "sha": "1a028a6a2d768c619b3c8061049ca52bf56284b8",
+    "source_branch": "radix_top_k",
+    "source_project": {
+      "full_name": "huang-wei-chen/ops-math",
+      "human_name": "huang-wei-chen / ops-math",
+      "id": 8361088,
+      "path": "ops-math"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-math",
+      "human_name": "CANN / ops-math",
+      "id": 7649531,
+      "path": "ops-math"
+    }
+  },
+  {
+    "additions": 2,
+    "blob_id": "8018f731097e5cd1e10e0ba6718174614d5c84ee",
+    "blob_url": "https://gitcode.com/cann/ops-math/blob/1a028a6a2d768c619b3c8061049ca52bf56284b8/math/radix_top_k/op_kernel/radix_top_k_ws_utils.h",
+    "deletions": 1,
+    "filename": "math/radix_top_k/op_kernel/radix_top_k_ws_utils.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 2,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -233,7 +233,8 @@ __aicore__ inline void RadixTopKWs<T, largest>::ClearHistInWs(const int32_t &rou\n     if (roundId == this->round_ - 1) {\n         for (int i = 0; i < tileNumRepeatTimes_; i++) {\n             Duplicate<int32_t>(tileHist, this->tileLen_, MAX_TILE_NUM_IN_UB);\n-            if (tileNumRemain_ == 0 && this->tailTileLen_ != this->tileLen_) {\n+            if (tileNumRemain_ == 0 && i == tileNumRepeatTimes_ - 1\n+                && this->tailTileLen_ != this->tileLen_) {\n                 tileHist.SetValue(MAX_TILE_NUM_IN_UB - 1, this->tailTileLen_);\n             }\n             DataCopyExtParams tileHistOutParams{\n",
+      "new_file": false,
+      "new_path": "math/radix_top_k/op_kernel/radix_top_k_ws_utils.h",
+      "old_path": "math/radix_top_k/op_kernel/radix_top_k_ws_utils.h",
+      "removed_lines": 1,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-math/raw/1a028a6a2d768c619b3c8061049ca52bf56284b8/math/radix_top_k/op_kernel/radix_top_k_ws_utils.h",
+    "sha": "1a028a6a2d768c619b3c8061049ca52bf56284b8",
+    "source_branch": "radix_top_k",
+    "source_project": {
+      "full_name": "huang-wei-chen/ops-math",
+      "human_name": "huang-wei-chen / ops-math",
+      "id": 8361088,
+      "path": "ops-math"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-math",
+      "human_name": "CANN / ops-math",
+      "id": 7649531,
+      "path": "ops-math"
+    }
+  }
+]

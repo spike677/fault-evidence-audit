@@ -1,0 +1,38 @@
+[
+  {
+    "additions": 8,
+    "blob_id": "8aba4062a3e47b11314097fdc27d7364b3a0688b",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/55b9f681298bb033a0a17ce1a5622b9c2fe4d1c5/index/scatter_add/op_kernel/arch35/scatter_add_common.h",
+    "deletions": 6,
+    "filename": "index/scatter_add/op_kernel/arch35/scatter_add_common.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 8,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -188,7 +188,7 @@ __aicore__ inline void BroadcastUpdatesScalar(LocalTensor<T> updatesLocal, Globa\n }\n \n template<typename IDX_T>\n-__aicore__ void ComputeUniqueIdNumInt64(__local_mem__ IDX_T* indicesAddr, __local_mem__ int32_t* uniqueIdCountsAddr, uint16_t loopCnt, int64_t dataLen)\n+__aicore__ inline void ComputeUniqueIdNumInt64(__local_mem__ IDX_T* indicesAddr, __local_mem__ int32_t* uniqueIdCountsAddr, uint16_t loopCnt, int64_t dataLen)\n {\n     uint32_t counter = dataLen + 1;\n     AscendC::MicroAPI::RegTensor<int32_t> orderReg, selReg;\n@@ -212,7 +212,7 @@ __aicore__ void ComputeUniqueIdNumInt64(__local_mem__ IDX_T* indicesAddr, __loca\n }\n \n template<typename IDX_T>\n-__aicore__ void ComputeUniqueIdNumInt32(__local_mem__ IDX_T* indicesAddr, __local_mem__ int32_t* uniqueIdCountsAddr, uint16_t loopCnt, int64_t dataLen)\n+__aicore__ inline void ComputeUniqueIdNumInt32(__local_mem__ IDX_T* indicesAddr, __local_mem__ int32_t* uniqueIdCountsAddr, uint16_t loopCnt, int64_t dataLen)\n {\n     uint32_t counter = dataLen + 1;\n     AscendC::MicroAPI::RegTensor<int32_t> orderReg, selReg;\n@@ -235,7 +235,7 @@ __aicore__ void ComputeUniqueIdNumInt32(__local_mem__ IDX_T* indicesAddr, __loca\n }\n \n template<typename IDX_T>\n-__aicore__ void ComputeUniqueIdNumInt16(__local_mem__ IDX_T* indicesAddr, __local_mem__ int32_t* uniqueIdCountsAddr, uint16_t loopCnt, int64_t dataLen)\n+__aicore__ inline void ComputeUniqueIdNumInt16(__local_mem__ IDX_T* indicesAddr, __local_mem__ int32_t* uniqueIdCountsAddr, uint16_t loopCnt, int64_t dataLen)\n {\n     uint32_t counter = dataLen + 1;\n     AscendC::MicroAPI::RegTensor<int32_t> orderReg, orderReg2, selReg, selReg2;\n@@ -262,7 +262,7 @@ __aicore__ void ComputeUniqueIdNumInt16(__local_mem__ IDX_T* indicesAddr, __loca\n }\n \n template<typename IDX_T>\n-__aicore__ void ComputeUniqueIdNumUint8(__local_mem__ IDX_T* indicesAddr, __local_mem__ int32_t* uniqueIdCountsAddr, uint16_t loopCnt, int64_t dataLen)\n+__aicore__ inline void ComputeUniqueIdNumUint8(__local_mem__ IDX_T* indicesAddr, __local_mem__ int32_t* uniqueIdCountsAddr, uint16_t loopCnt, int64_t dataLen)\n {\n     uint32_t counter = dataLen + 1;\n     AscendC::MicroAPI::RegTensor<int32_t> orderReg, orderReg2, orderReg3, orderReg4;\n@@ -300,7 +300,7 @@ __aicore__ void ComputeUniqueIdNumUint8(__local_mem__ IDX_T* indicesAddr, __loca\n }\n \n template<typename IDX_T>\n-__aicore__ uint32_t ComputeUniqueIdNum(LocalTensor<IDX_T> indicesLocal, LocalTensor<int32_t> uniqueIdCountLocal, int64_t dataLen)\n+__aicore__ inline uint32_t ComputeUniqueIdNum(LocalTensor<IDX_T> indicesLocal, LocalTensor<int32_t> uniqueIdCountLocal, int64_t dataLen)\n {\n     __local_mem__ IDX_T* indicesAddr = (__local_mem__ IDX_T*)indicesLocal[(UB_AGLIN_VALUE / sizeof(IDX_T))].GetPhyAddr();\n     __local_mem__ int32_t* uniqueIdCountsAddr = (__local_mem__ int32_t*)uniqueIdCountLocal.GetPhyAddr();\n@@ -326,7 +326,7 @@ __aicore__ uint32_t ComputeUniqueIdNum(LocalTensor<IDX_T> indicesLocal, LocalTen\n }\n \n template<typename IDX_T>\n-__aicore__ uint32_t SortAndComputeUniqueIdx(int64_t rowLen, LocalTensor<IDX_T> indicesSrcLocal, LocalTensor<IDX_T> sortIndicesLocal, \n+__aicore__ inline uint32_t SortAndComputeUniqueIdx(int64_t rowLen, LocalTensor<IDX_T> indicesSrcLocal, LocalTensor<IDX_T> sortIndicesLocal, \n     LocalTensor<int32_t> uniqueIdxLocal, LocalTensor<uint32_t> updatesOriginIdexLocal)\n {\n     event_t eventIDVToS = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::V_S));\n@@ -337,6 +337,8 @@ __aicore__ uint32_t SortAndComputeUniqueIdx(int64_t rowLen, LocalTensor<IDX_T> i\n     AscendC::Sort<IDX_T, true, sortConfig>(\n         shiftSortLocal, updatesOriginIdexLocal, indicesSrcLocal, static_cast<uint32_t>(rowLen));\n     Duplicate(sortIndicesLocal, (IDX_T)-1, shiftOffset);\n+    SetFlag<HardEvent::V_S>(eventIDVToS);\n+    WaitFlag<HardEvent::V_S>(eventIDVToS);\n     shiftSortLocal(rowLen) = -1;\n     \n     event_t eventIdSToV = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::S_V));\n",
+      "new_file": false,
+      "new_path": "index/scatter_add/op_kernel/arch35/scatter_add_common.h",
+      "old_path": "index/scatter_add/op_kernel/arch35/scatter_add_common.h",
+      "removed_lines": 6,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/55b9f681298bb033a0a17ce1a5622b9c2fe4d1c5/index/scatter_add/op_kernel/arch35/scatter_add_common.h",
+    "sha": "55b9f681298bb033a0a17ce1a5622b9c2fe4d1c5",
+    "source_branch": "master",
+    "source_project": {
+      "full_name": "lihang_13123/ops-nn",
+      "human_name": "lihang_13123 / ops-nn",
+      "id": 9083419,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  }
+]

@@ -1,0 +1,38 @@
+[
+  {
+    "additions": 14,
+    "blob_id": "c6ee1dae4bcdf7b5f8ac83d568a44d3aee05b0b5",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/8eb345d5c600d32d009412003e99003d67b38065/attention/common/op_kernel/arch35/flash_attention_kernel_noquant_mla.h",
+    "deletions": 1,
+    "filename": "attention/common/op_kernel/arch35/flash_attention_kernel_noquant_mla.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 14,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -600,7 +600,20 @@ template <typename CubeBlockType, typename VecBlockType>\n __aicore__ inline bool FAKernelNoquantMla<CubeBlockType, VecBlockType>::IsLastBN(uint32_t bnStartIdx, uint32_t bnEndIdx)\n {\n     if constexpr(layout != LayOutTypeEnum::LAYOUT_TND) {\n-        return bnStartIdx == bnEndIdx - 1;\n+        if (bnStartIdx == bnEndIdx - 1) {\n+            return true;\n+        }\n+        if (constInfo.isActualLenDimsNull) {\n+            return false;\n+        } else {\n+            for (uint32_t bnIdx = bnStartIdx + 1; bnIdx < bnEndIdx; bnIdx++) {\n+                uint32_t boIdx = bnIdx / constInfo.n2Size;\n+                if (actualSeqQlenAddr[boIdx] != 0) {\n+                    return false;\n+                }\n+            }\n+            return true;\n+        }\n     }\n     // TND\n     if (bnStartIdx != bnEndIdx - 1) {\n",
+      "new_file": false,
+      "new_path": "attention/common/op_kernel/arch35/flash_attention_kernel_noquant_mla.h",
+      "old_path": "attention/common/op_kernel/arch35/flash_attention_kernel_noquant_mla.h",
+      "removed_lines": 1,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/8eb345d5c600d32d009412003e99003d67b38065/attention/common/op_kernel/arch35/flash_attention_kernel_noquant_mla.h",
+    "sha": "8eb345d5c600d32d009412003e99003d67b38065",
+    "source_branch": "master",
+    "source_project": {
+      "full_name": "changgl0404/ops-transformer",
+      "human_name": "changgl0404 / ops-transformer",
+      "id": 9061061,
+      "path": "ops-transformer"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  }
+]

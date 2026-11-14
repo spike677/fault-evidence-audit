@@ -1,0 +1,110 @@
+[
+  {
+    "additions": 2,
+    "blob_id": "c890290ddb3b6fa9bdaae5f675e85ee97b1fb04f",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/3da00e8e304bc36f0d19681579eed3ba09ca6af9/optim/inplace_apply_momentum/op_host/arch35/inplace_apply_momentum_tiling_arch35.cpp",
+    "deletions": 2,
+    "filename": "optim/inplace_apply_momentum/op_host/arch35/inplace_apply_momentum_tiling_arch35.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 2,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -42,8 +42,8 @@ constexpr uint32_t MAX_RANK = 8;\n constexpr int64_t SCALAR_ELEM_COUNT = 1;\n constexpr int64_t LR_INPUT_INDEX = 2;\n constexpr int64_t MOMENTUM_INPUT_INDEX = 4;\n-// FP32 路径每元素 UB 开销: 3×VECIN(4B) + 1×VECCALC(4B) = 16B\n-constexpr uint32_t FP32_UB_BYTES_PER_ELEM = 16;\n+// FP32 路径每元素 UB 开销: 3×VECIN(4B) + 1×VECCALC(4B) + 2×VECOUT(4B) = 24B\n+constexpr uint32_t FP32_UB_BYTES_PER_ELEM = 24;\n // 半精度路径每元素 UB 开销: 3×VECIN_half(2B) + 3×VECIN_fp32(4B) + 1×VECOUT_half(2B) + 1×VECCALC(4B) = 32B\n constexpr uint32_t HALF_UB_BYTES_PER_ELEM = 32;\n \n",
+      "new_file": false,
+      "new_path": "optim/inplace_apply_momentum/op_host/arch35/inplace_apply_momentum_tiling_arch35.cpp",
+      "old_path": "optim/inplace_apply_momentum/op_host/arch35/inplace_apply_momentum_tiling_arch35.cpp",
+      "removed_lines": 2,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/3da00e8e304bc36f0d19681579eed3ba09ca6af9/optim/inplace_apply_momentum/op_host/arch35/inplace_apply_momentum_tiling_arch35.cpp",
+    "sha": "3da00e8e304bc36f0d19681579eed3ba09ca6af9",
+    "source_branch": "dev_inplace_apply_momentum",
+    "source_project": {
+      "full_name": "niukang_hw/ops-nn",
+      "human_name": "niukang_hw / ops-nn",
+      "id": 10112439,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 122,
+    "blob_id": "d6a4835e5a3077b9116813bb372f24e57ab74242",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/3da00e8e304bc36f0d19681579eed3ba09ca6af9/optim/inplace_apply_momentum/op_kernel/arch35/inplace_apply_momentum.h",
+    "deletions": 78,
+    "filename": "optim/inplace_apply_momentum/op_kernel/arch35/inplace_apply_momentum.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 122,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -19,7 +19,7 @@\n  *   Standard (use_nesterov=false): var_new = var - lr * accum_new\n  *   Nesterov (use_nesterov=true):  var_new = var - (grad * lr + accum_new * momentum * lr)\n  *\n- * FP32 路径: VECIN TQue 输入（MTE2→Vector 同步），合并 Compute+CopyOut\n+ * FP32 路径: VECIN TQue 输入 → 计算 → VECOUT TQue 输出（MTE2→V→MTE3 全链同步）\n  * FP16/BF16 路径: half VECIN TQue → Cast → FP32 VECIN TQue → 计算 → Cast → half VECOUT TQue\n  * 2 输出: var_out + accum_out（独立 GM 地址）\n  * use_nesterov 通过 TilingData 传递（源自算子属性）\n@@ -81,6 +81,7 @@ private:\n     TQue<TPosition::VECOUT, 1> outAccumHalf;\n \n     TBuf<TPosition::VECCALC> nesterovBuf_;\n+    TBuf<TPosition::VECCALC> scalarBuf_;\n \n     uint32_t totalElements_;\n     uint32_t tileLength_;\n@@ -113,55 +114,6 @@ __aicore__ inline void InplaceApplyMomentum<T, SCH_MODE>::Init(GM_ADDR var, GM_A\n         return;\n     }\n \n-    {\n-        GlobalTensor<T> lrGm;\n-        lrGm.SetGlobalBuffer((__gm__ T*)lr, 1);\n-        if constexpr (std::is_same_v<T, float>) {\n-            lrValue_ = lrGm.GetValue(0);\n-        } else if constexpr (std::is_same_v<T, half>) {\n-            lrValue_ = static_cast<float>(lrGm.GetValue(0));\n-        } else {\n-            auto bf16ToF32 = [](bfloat16_t v) -> float {\n-                union {\n-                    uint16_t u;\n-                    bfloat16_t b;\n-                } src;\n-                src.b = v;\n-                union {\n-                    uint32_t u;\n-                    float f;\n-                } dst;\n-                dst.u = static_cast<uint32_t>(src.u) << 16;\n-                return dst.f;\n-            };\n-            lrValue_ = bf16ToF32(lrGm.GetValue(0));\n-        }\n-    }\n-    {\n-        GlobalTensor<T> momGm;\n-        momGm.SetGlobalBuffer((__gm__ T*)momentum, 1);\n-        if constexpr (std::is_same_v<T, float>) {\n-            momentumValue_ = momGm.GetValue(0);\n-        } else if constexpr (std::is_same_v<T, half>) {\n-            momentumValue_ = static_cast<float>(momGm.GetValue(0));\n-        } else {\n-            auto bf16ToF32 = [](bfloat16_t v) -> float {\n-                union {\n-                    uint16_t u;\n-                    bfloat16_t b;\n-                } src;\n-                src.b = v;\n-                union {\n-                    uint32_t u;\n-                    float f;\n-                } dst;\n-                dst.u = static_cast<uint32_t>(src.u) << 16;\n-                return dst.f;\n-            };\n-            momentumValue_ = bf16ToF32(momGm.GetValue(0));\n-        }\n-    }\n-\n     bool isLastBlock = (blockIdx == blockNum_ - 1);\n     int64_t blockOffset = static_cast<int64_t>(blockFormer_) * blockIdx;\n     blockLength_ = isLastBlock ? static_cast<int64_t>(totalElements_ - blockOffset) :\n@@ -178,6 +130,18 @@ __aicore__ inline void InplaceApplyMomentum<T, SCH_MODE>::Init(GM_ADDR var, GM_A\n                              VECIN_ALIGN_ELEMENTS;\n     if (alignedLength < VECIN_ALIGN_ELEMENTS)\n         alignedLength = VECIN_ALIGN_ELEMENTS;\n+\n+    if constexpr (SCH_MODE == 0) {\n+        constexpr uint32_t MAX_UB_BYTES = 240 * 1024;\n+        constexpr uint32_t FP32_BUF_COUNT = 6;\n+        uint32_t maxElems = MAX_UB_BYTES / (FP32_BUF_COUNT * sizeof(float));\n+        uint32_t maxAligned = (maxElems / VECIN_ALIGN_ELEMENTS) * VECIN_ALIGN_ELEMENTS;\n+        if (alignedLength > maxAligned) {\n+            alignedLength = maxAligned;\n+            ubLength_ = alignedLength;\n+        }\n+    }\n+\n     uint32_t fp32Size = alignedLength * sizeof(float);\n \n     pipe.InitBuffer(inVarBuf, 1, fp32Size);\n@@ -185,7 +149,10 @@ __aicore__ inline void InplaceApplyMomentum<T, SCH_MODE>::Init(GM_ADDR var, GM_A\n     pipe.InitBuffer(inGradBuf, 1, fp32Size);\n     pipe.InitBuffer(nesterovBuf_, fp32Size);\n \n-    if constexpr (SCH_MODE == 1) {\n+    if constexpr (SCH_MODE == 0) {\n+        pipe.InitBuffer(outVarHalf, 1, fp32Size);\n+        pipe.InitBuffer(outAccumHalf, 1, fp32Size);\n+    } else {\n         uint32_t halfSize = alignedLength * sizeof(T);\n         pipe.InitBuffer(inVarHalf, 2, halfSize);\n         pipe.InitBuffer(inAccumHalf, 2, halfSize);\n@@ -193,6 +160,65 @@ __aicore__ inline void InplaceApplyMomentum<T, SCH_MODE>::Init(GM_ADDR var, GM_A\n         pipe.InitBuffer(outVarHalf, 1, halfSize);\n         pipe.InitBuffer(outAccumHalf, 1, halfSize);\n     }\n+\n+    pipe.InitBuffer(scalarBuf_, sizeof(float) * 8);\n+\n+    AscendC::DataCopyExtParams scalarCopy{1, static_cast<uint32_t>(sizeof(T)), 0, 0, 0};\n+    AscendC::DataCopyPadExtParams<T> scalarPad{false, 0, 0, T(0)};\n+    {\n+        GlobalTensor<T> lrGm;\n+        lrGm.SetGlobalBuffer((__gm__ T*)lr, 1);\n+        auto scalarTensor = scalarBuf_.Get<T>();\n+        AscendC::DataCopyPad(scalarTensor, lrGm, scalarCopy, scalarPad);\n+        AscendC::PipeBarrier<PIPE_MTE2>();\n+        if constexpr (std::is_same_v<T, float>) {\n+            lrValue_ = scalarTensor.GetValue(0);\n+        } else if constexpr (std::is_same_v<T, half>) {\n+            lrValue_ = static_cast<float>(scalarTensor.GetValue(0));\n+        } else {\n+            auto bf16ToF32 = [](bfloat16_t v) -> float {\n+                union {\n+                    uint16_t u;\n+                    bfloat16_t b;\n+                } src;\n+                src.b = v;\n+                union {\n+                    uint32_t u;\n+                    float f;\n+                } dst;\n+                dst.u = static_cast<uint32_t>(src.u) << 16;\n+                return dst.f;\n+            };\n+            lrValue_ = bf16ToF32(scalarTensor.GetValue(0));\n+        }\n+    }\n+    {\n+        GlobalTensor<T> momGm;\n+        momGm.SetGlobalBuffer((__gm__ T*)momentum, 1);\n+        auto scalarTensor = scalarBuf_.Get<T>();\n+        AscendC::DataCopyPad(scalarTensor, momGm, scalarCopy, scalarPad);\n+        AscendC::PipeBarrier<PIPE_MTE2>();\n+        if constexpr (std::is_same_v<T, float>) {\n+            momentumValue_ = scalarTensor.GetValue(0);\n+        } else if constexpr (std::is_same_v<T, half>) {\n+            momentumValue_ = static_cast<float>(scalarTensor.GetValue(0));\n+        } else {\n+            auto bf16ToF32 = [](bfloat16_t v) -> float {\n+                union {\n+                    uint16_t u;\n+                    bfloat16_t b;\n+                } src;\n+                src.b = v;\n+                union {\n+                    uint32_t u;\n+                    float f;\n+                } dst;\n+                dst.u = static_cast<uint32_t>(src.u) << 16;\n+                return dst.f;\n+            };\n+            momentumValue_ = bf16ToF32(scalarTensor.GetValue(0));\n+        }\n+    }\n }\n \n // ============================================================================\n@@ -278,37 +304,55 @@ __aicore__ inline void InplaceApplyMomentum<T, SCH_MODE>::ComputeAndCopyOut(int6\n \n     uint32_t uK = (uint32_t)K;\n \n-    // accum_new = accum * momentum + grad\n-    AscendC::Muls(accumFp32, accumFp32, momentumValue_, uK);\n-    AscendC::Add(accumFp32, accumFp32, gradFp32, uK);\n-\n-    if (useNesterov_ == 0) {\n-        // Standard: var -= lr * accum_new\n-        auto lrAccum = nesterovBuf_.Get<float>();\n-        AscendC::Muls(lrAccum, accumFp32, lrValue_, uK);\n-        AscendC::Sub(varFp32, varFp32, lrAccum, uK);\n-    } else {\n-        // Nesterov: var -= (grad * lr + accum_new * momentum * lr)\n-        auto sgdBuf = nesterovBuf_.Get<float>();\n-        // sgdBuf = grad * lr\n-        AscendC::Muls(sgdBuf, gradFp32, lrValue_, uK);\n-        // gradFp32 = accum_new * momentum * lr\n-        AscendC::Muls(gradFp32, accumFp32, momentumValue_, uK);\n-        AscendC::Muls(gradFp32, gradFp32, lrValue_, uK);\n-        // sgdBuf = grad*lr + accum_new*momentum*lr\n-        AscendC::Add(sgdBuf, sgdBuf, gradFp32, uK);\n-        // var -= sgd\n-        AscendC::Sub(varFp32, varFp32, sgdBuf, uK);\n-    }\n-\n-    AscendC::PipeBarrier<PIPE_V>();\n-\n     AscendC::DataCopyExtParams copyParams{1, static_cast<uint32_t>(K * sizeof(T)), 0, 0, 0};\n \n     if constexpr (SCH_MODE == 0) {\n-        AscendC::DataCopyPad(varOutGM[progress * ubLength_], varFp32, copyParams);\n-        AscendC::DataCopyPad(accumOutGM[progress * ubLength_], accumFp32, copyParams);\n+        auto varOut = outVarHalf.template AllocTensor<float>();\n+        auto accumOut = outAccumHalf.template AllocTensor<float>();\n+\n+        AscendC::Muls(accumOut, accumFp32, momentumValue_, uK);\n+        AscendC::Add(accumOut, accumOut, gradFp32, uK);\n+\n+        if (useNesterov_ == 0) {\n+            auto lrAccum = nesterovBuf_.Get<float>();\n+            AscendC::Muls(lrAccum, accumOut, lrValue_, uK);\n+            AscendC::Sub(varOut, varFp32, lrAccum, uK);\n+        } else {\n+            auto sgdBuf = nesterovBuf_.Get<float>();\n+            AscendC::Muls(sgdBuf, gradFp32, lrValue_, uK);\n+            AscendC::Muls(gradFp32, accumOut, momentumValue_, uK);\n+            AscendC::Muls(gradFp32, gradFp32, lrValue_, uK);\n+            AscendC::Add(sgdBuf, sgdBuf, gradFp32, uK);\n+            AscendC::Sub(varOut, varFp32, sgdBuf, uK);\n+        }\n+\n+        AscendC::PipeBarrier<PIPE_V>();\n+\n+        AscendC::DataCopyPad(varOutGM[progress * ubLength_], varOut, copyParams);\n+        AscendC::DataCopyPad(accumOutGM[progress * ubLength_], accumOut, copyParams);\n+\n+        AscendC::PipeBarrier<PIPE_MTE3>();\n+        outVarHalf.FreeTensor(varOut);\n+        outAccumHalf.FreeTensor(accumOut);\n     } else {\n+        AscendC::Muls(accumFp32, accumFp32, momentumValue_, uK);\n+        AscendC::Add(accumFp32, accumFp32, gradFp32, uK);\n+\n+        if (useNesterov_ == 0) {\n+            auto lrAccum = nesterovBuf_.Get<float>();\n+            AscendC::Muls(lrAccum, accumFp32, lrValue_, uK);\n+            AscendC::Sub(varFp32, varFp32, lrAccum, uK);\n+        } else {\n+            auto sgdBuf = nesterovBuf_.Get<float>();\n+            AscendC::Muls(sgdBuf, gradFp32, lrValue_, uK);\n+            AscendC::Muls(gradFp32, accumFp32, momentumValue_, uK);\n+            AscendC::Muls(gradFp32, gradFp32, lrValue_, uK);\n+            AscendC::Add(sgdBuf, sgdBuf, gradFp32, uK);\n+            AscendC::Sub(varFp32, varFp32, sgdBuf, uK);\n+        }\n+\n+        AscendC::PipeBarrier<PIPE_V>();\n+\n         auto vH = outVarHalf.AllocTensor<T>();\n         auto aH = outAccumHalf.AllocTensor<T>();\n \n",
+      "new_file": false,
+      "new_path": "optim/inplace_apply_momentum/op_kernel/arch35/inplace_apply_momentum.h",
+      "old_path": "optim/inplace_apply_momentum/op_kernel/arch35/inplace_apply_momentum.h",
+      "removed_lines": 78,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/3da00e8e304bc36f0d19681579eed3ba09ca6af9/optim/inplace_apply_momentum/op_kernel/arch35/inplace_apply_momentum.h",
+    "sha": "3da00e8e304bc36f0d19681579eed3ba09ca6af9",
+    "source_branch": "dev_inplace_apply_momentum",
+    "source_project": {
+      "full_name": "niukang_hw/ops-nn",
+      "human_name": "niukang_hw / ops-nn",
+      "id": 10112439,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 86,
+    "blob_id": "8658ad2677321f0be8d90abfeb64df2edd4facee",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/3da00e8e304bc36f0d19681579eed3ba09ca6af9/optim/inplace_apply_momentum/tests/assets/golden.py",
+    "deletions": 40,
+    "filename": "optim/inplace_apply_momentum/tests/assets/golden.py",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 86,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -1,5 +1,6 @@\n #!/usr/bin/env python3\n-# -*- coding: utf-8 -*-\n+# -*- coding: UTF-8 -*-\n+# ----------------------------------------------------------------------------\n # Copyright (c) 2026 Huawei Technologies Co., Ltd.\n # This program is free software, you can redistribute it and/or modify it under the terms and conditions of\n # CANN Open Software License Agreement Version 2.0 (the \"License\").\n@@ -8,62 +9,107 @@\n # INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.\n # See LICENSE in the root of the software repository for the full text of the License.\n # ----------------------------------------------------------------------------\n-\n # Generated By CANNBot\n #\n # Golden implementation based on TensorFlow ResourceApplyMomentum competitor baseline.\n-# Formula verified against tf.raw_ops.ResourceApplyMomentum (TF 2.21).\n-# NumPy implementation is mathematically identical to the TF kernel.\n+# Formula verified against tf.raw_ops.ResourceApplyMomentum (TF 2.x).\n+\n+import os\n+\n+os.environ.setdefault(\"TF_CPP_MIN_LOG_LEVEL\", \"3\")\n+os.environ.setdefault(\"CUDA_VISIBLE_DEVICES\", \"-1\")\n \n import numpy as np\n+import tensorflow as tf\n+\n+__spec__ = {\"inplace_apply_momentum\": \"InplaceApplyMomentumTestSpec\"}\n \n \n-__golden__ = {\"kernel\": {\"inplace_apply_momentum\": \"inplace_apply_momentum_golden\"}}\n+def _np_to_tf_dtype(np_dtype):\n+    s = str(np_dtype)\n+    if \"bfloat16\" in s:\n+        return tf.bfloat16\n+    elif \"float16\" in s:\n+        return tf.float16\n+    return tf.float32\n \n \n-def inplace_apply_momentum_golden(var, accum, lr, grad, momentum, **kwargs):\n+class ThirdPartyImpl:\n+    \"\"\"Third-party reference implementation (no precision promotion).\n+\n+    Competitor: tf.raw_ops.ResourceApplyMomentum.\n+    Computes directly in the original dtype without precision promotion.\n     \"\"\"\n-    Golden function for inplace_apply_momentum.\n-    Based on TensorFlow ResourceApplyMomentum competitor baseline.\n \n-    Formula (matching TensorFlow ResourceApplyMomentum):\n-        accum_new = accum * momentum + grad\n-        Standard (use_nesterov=False): var_new = var - lr * accum_new\n-        Nesterov (use_nesterov=True):  var_new = var - lr * grad - lr * momentum * accum_new\n+    def __call__(\n+        self,\n+        var,\n+        accum,\n+        lr,\n+        grad,\n+        momentum,\n+        use_nesterov=False,\n+        use_locking=False,\n+        **kwargs,\n+    ):\n+        tf_dtype = _np_to_tf_dtype(var.dtype)\n+        var_v = tf.Variable(tf.convert_to_tensor(var, dtype=tf_dtype))\n+        accum_v = tf.Variable(tf.convert_to_tensor(accum, dtype=tf_dtype))\n+        tf.raw_ops.ResourceApplyMomentum(\n+            var=var_v.handle,\n+            accum=accum_v.handle,\n+            lr=tf.constant(np.asarray(lr).flat[0], dtype=tf_dtype),\n+            grad=tf.convert_to_tensor(grad, dtype=tf_dtype),\n+            momentum=tf.constant(np.asarray(momentum).flat[0], dtype=tf_dtype),\n+            use_nesterov=use_nesterov,\n+            use_locking=False,\n+        )\n+        return [\n+            var_v.numpy().astype(var.dtype, copy=False),\n+            accum_v.numpy().astype(accum.dtype, copy=False),\n+        ]\n \n-    Inputs follow the operator definition order:\n-        var, accum, lr, grad, momentum  (numpy.ndarray each)\n \n-    Attributes (via kwargs):\n-        use_nesterov: bool, default False\n+class InplaceApplyMomentumTestSpec:\n+    \"\"\"TestSpec for inplace_apply_momentum (kernel mode).\n \n-    Returns:\n-        [var_out, accum_out] -- same dtype as inputs.\n+    Competitor: tf.raw_ops.ResourceApplyMomentum.\n+    For FP16/BF16 inputs: ALL inputs promoted to FP32 BEFORE computation,\n+    results cast back to original dtype.\n     \"\"\"\n-    use_nesterov = kwargs.get(\"use_nesterov\", False)\n \n-    input_dtype = var.dtype\n-    if input_dtype.name in (\"float16\", \"bfloat16\"):\n-        var = var.astype(\"float32\")\n-        accum = accum.astype(\"float32\")\n-        grad = grad.astype(\"float32\")\n-        lr = np.asarray(lr, dtype=\"float32\")\n-        momentum = np.asarray(momentum, dtype=\"float32\")\n+    def golden(\n+        var, accum, lr, grad, momentum, use_nesterov=False, use_locking=False, **kwargs\n+    ):\n+        input_dtype = var.dtype\n \n-    lr_val = float(np.asarray(lr).flat[0])\n-    mom_val = float(np.asarray(momentum).flat[0])\n+        var = var.astype(np.float32)\n+        accum = accum.astype(np.float32)\n+        lr = lr.astype(np.float32)\n+        grad = grad.astype(np.float32)\n+        momentum = momentum.astype(np.float32)\n \n-    # accum_new = accum * momentum + grad\n-    accum_new = mom_val * accum + grad\n+        var_v = tf.Variable(tf.convert_to_tensor(var, dtype=tf.float32))\n+        accum_v = tf.Variable(tf.convert_to_tensor(accum, dtype=tf.float32))\n+        tf.raw_ops.ResourceApplyMomentum(\n+            var=var_v.handle,\n+            accum=accum_v.handle,\n+            lr=tf.constant(np.asarray(lr).flat[0], dtype=tf.float32),\n+            grad=tf.convert_to_tensor(grad, dtype=tf.float32),\n+            momentum=tf.constant(np.asarray(momentum).flat[0], dtype=tf.float32),\n+            use_nesterov=use_nesterov,\n+            use_locking=False,\n+        )\n \n-    if use_nesterov:\n-        # Nesterov: var -= lr * grad + lr * momentum * accum_new\n-        var_new = var - lr_val * grad - lr_val * mom_val * accum_new\n-    else:\n-        # Standard: var -= lr * accum_new\n-        var_new = var - lr_val * accum_new\n+        return [\n+            var_v.numpy().astype(input_dtype, copy=False),\n+            accum_v.numpy().astype(input_dtype, copy=False),\n+        ]\n \n-    return [\n-        var_new.astype(input_dtype, copy=False),\n-        accum_new.astype(input_dtype, copy=False),\n-    ]\n+    third_party = ThirdPartyImpl\n+\n+    tolerance = {\n+        \"float16\": {\"standard\": \"stat_rel_err\"},\n+        \"bfloat16\": {\"standard\": \"stat_rel_err\"},\n+        \"float32\": {\"standard\": \"stat_rel_err\"},\n+    }\n",
+      "new_file": false,
+      "new_path": "optim/inplace_apply_momentum/tests/assets/golden.py",
+      "old_path": "optim/inplace_apply_momentum/tests/assets/golden.py",
+      "removed_lines": 40,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/3da00e8e304bc36f0d19681579eed3ba09ca6af9/optim/inplace_apply_momentum/tests/assets/golden.py",
+    "sha": "3da00e8e304bc36f0d19681579eed3ba09ca6af9",
+    "source_branch": "dev_inplace_apply_momentum",
+    "source_project": {
+      "full_name": "niukang_hw/ops-nn",
+      "human_name": "niukang_hw / ops-nn",
+      "id": 10112439,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  }
+]

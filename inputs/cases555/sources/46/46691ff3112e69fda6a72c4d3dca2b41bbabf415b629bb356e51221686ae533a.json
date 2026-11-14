@@ -1,0 +1,146 @@
+[
+  {
+    "additions": 5,
+    "blob_id": "a747d03da0d0cf1ec70525bece0e0dc091c43128",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/d955e26952bf88c707d5b53147ccdb969cbd31c7/attention/common/op_kernel/arch35/attenmask_gs1.h",
+    "deletions": 5,
+    "filename": "attention/common/op_kernel/arch35/attenmask_gs1.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 5,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -259,7 +259,7 @@ __aicore__ inline void AttentionmaskCopyInForSgLayout(LocalTensor<T> &attenMaskU\n     uint32_t attenMaskS2Stride = attenMaskSizeAlign + 32 * info.attenMaskDstStride;\r\n \r\n     // ub-head\r\n-    AttentionmaskDataCopy(attenMaskUb, srcGmAddr, info, s1StartIdx, info.s1Size, isPre);\r\n+    AttentionmaskDataCopy(attenMaskUb, srcGmAddr, info, s1StartIdx, s1StartIdx + 1, isPre);\r\n \r\n     // ub-remain\r\n     if (remainRowCount > 0) {\r\n@@ -279,28 +279,28 @@ __aicore__ inline void AttentionmaskCopyInForSgLayout(LocalTensor<T> &attenMaskU\n \r\n     LocalTensor<int16_t> attenMaskUbDst = attenMaskUb.template ReinterpretCast<int16_t>();\r\n     LocalTensor<int16_t> mask16 = attenMaskUb.template ReinterpretCast<int16_t>();\r\n-    uint32_t dstMaskOffset = 0;\r\n+    uint32_t dstMaskOffset = attenMaskS2Stride / sizeof(int16_t);\r\n     uint32_t srcMaskBaseOffset = 0;\r\n \r\n     // head\r\n     SetMaskCount();\r\n     SetVectorMask<int16_t, MaskMode::COUNTER>(attenMaskSizeAlign / 2);\r\n     Copy<int16_t, false>(attenMaskUbDst[dstMaskOffset], mask16[srcMaskBaseOffset], AscendC::MASK_PLACEHOLDER,\r\n-                        headGCount, {1, 1, static_cast<uint16_t>(info.attenMaskDstStride + attenMaskSizeAlign / 32), 0});\r\n+        headGCount - 1, {1, 1, static_cast<uint16_t>(info.attenMaskDstStride + attenMaskSizeAlign / 32), 0});\r\n     dstMaskOffset += headGCount * attenMaskS2Stride / sizeof(int16_t);\r\n     srcMaskBaseOffset += headGCount * attenMaskS2Stride / sizeof(int16_t);\r\n \r\n     // mid\r\n     for (uint32_t midIdx = 0; midIdx < midS1Count; midIdx++) {\r\n         Copy<int16_t, false>(attenMaskUbDst[dstMaskOffset], mask16[srcMaskBaseOffset], AscendC::MASK_PLACEHOLDER,\r\n-                            info.gSize, {1, 1, static_cast<uint16_t>(info.attenMaskDstStride + attenMaskSizeAlign / 32), 0});\r\n+            info.gSize - 1, {1, 1, static_cast<uint16_t>(info.attenMaskDstStride + attenMaskSizeAlign / 32), 0});\r\n         dstMaskOffset += info.gSize * attenMaskS2Stride / sizeof(int16_t);\r\n         srcMaskBaseOffset += info.gSize * attenMaskS2Stride / sizeof(int16_t);\r\n     }\r\n     // tail\r\n     if (tailGSize > 0) {\r\n         Copy<int16_t, false>(attenMaskUbDst[dstMaskOffset], mask16[srcMaskBaseOffset], AscendC::MASK_PLACEHOLDER,\r\n-                            tailGSize, {1, 1, static_cast<uint16_t>(info.attenMaskDstStride + attenMaskSizeAlign / 32), 0});\r\n+            tailGSize - 1, {1, 1, static_cast<uint16_t>(info.attenMaskDstStride + attenMaskSizeAlign / 32), 0});\r\n     }\r\n     SetMaskNorm();\r\n     ResetMask();\r\n",
+      "new_file": false,
+      "new_path": "attention/common/op_kernel/arch35/attenmask_gs1.h",
+      "old_path": "attention/common/op_kernel/arch35/attenmask_gs1.h",
+      "removed_lines": 5,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/d955e26952bf88c707d5b53147ccdb969cbd31c7/attention/common/op_kernel/arch35/attenmask_gs1.h",
+    "sha": "d955e26952bf88c707d5b53147ccdb969cbd31c7",
+    "source_branch": "fix_gqa_attenmaskcopy",
+    "source_project": {
+      "full_name": "qq_45930774/ops-transformer",
+      "human_name": "qq_45930774 / ops-transformer",
+      "id": 8831672,
+      "path": "ops-transformer"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  },
+  {
+    "additions": 3,
+    "blob_id": "58b89e33045b4cc88bd5d0a1273efb8277bc3427",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/d955e26952bf88c707d5b53147ccdb969cbd31c7/attention/common/op_kernel/arch35/flash_attention_noquant_block_cube.h",
+    "deletions": 0,
+    "filename": "attention/common/op_kernel/arch35/flash_attention_noquant_block_cube.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 3,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -487,6 +487,9 @@ __aicore__ inline void FANoQuantBlockCube<TEMPLATE_ARGS>::CalcS1Coord(RunInfo<is\n     // 计算s1方向偏移\n     coordInfo[runInfo.taskIdMod3].s1Coord = runInfo.s1oIdx * s1BaseSize;\n     if constexpr (isInfer) {\n+        if (constInfo.isGqa) {\n+            coordInfo[runInfo.taskIdMod3].s1Coord = runInfo.s1oIdx;\n+        }\n         coordInfo[runInfo.taskIdMod3].s1Coord += runInfo.queryLeftPaddingSize;  // 左padding\n         // 推理无效行场景，s1方向起始跳过无效行\n         coordInfo[runInfo.taskIdMod3].s1Coord += (runInfo.nextTokensPerBatch < 0) ? -runInfo.nextTokensPerBatch : 0;\n",
+      "new_file": false,
+      "new_path": "attention/common/op_kernel/arch35/flash_attention_noquant_block_cube.h",
+      "old_path": "attention/common/op_kernel/arch35/flash_attention_noquant_block_cube.h",
+      "removed_lines": 0,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/d955e26952bf88c707d5b53147ccdb969cbd31c7/attention/common/op_kernel/arch35/flash_attention_noquant_block_cube.h",
+    "sha": "d955e26952bf88c707d5b53147ccdb969cbd31c7",
+    "source_branch": "fix_gqa_attenmaskcopy",
+    "source_project": {
+      "full_name": "qq_45930774/ops-transformer",
+      "human_name": "qq_45930774 / ops-transformer",
+      "id": 8831672,
+      "path": "ops-transformer"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  },
+  {
+    "additions": 5,
+    "blob_id": "3d2aaadb943444211b3fbb00167a96c2ff06c842",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/d955e26952bf88c707d5b53147ccdb969cbd31c7/attention/common/op_kernel/arch35/flash_attention_noquant_block_vec_base.h",
+    "deletions": 4,
+    "filename": "attention/common/op_kernel/arch35/flash_attention_noquant_block_vec_base.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 5,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -817,12 +817,13 @@ __aicore__ inline void FANoQuantBlockVecBase<TEMPLATE_BASE_ARGS>::ProcessVec1Nd(\n                 maskInfo.s1Size = runInfo.actualS1Size;\n                 maskInfo.gSize = constInfo.gSize;\n                 maskInfo.s2StartIdx = runInfo.s2LoopCount * s2BaseSize;\n-                maskInfo.s2dealNum = s2BaseSize;\n+                maskInfo.s2dealNum = runInfo.s2RealSize;\n                 maskInfo.s2Size = runInfo.actualS2Size;\n-                maskInfo.preToken = runInfo.preTokensPerBatch;\n-                maskInfo.nextToken = runInfo.nextTokensPerBatch;\n+                maskInfo.preToken = attenMaskInfoPtr->preTokens;\n+                maskInfo.nextToken = attenMaskInfoPtr->nextTokens;\n                 maskInfo.batchIdx = runInfo.boIdx;\n-                maskInfo.attenMaskBatchStride = runInfo.boIdx * attenMaskInfoPtr->attenMaskS1Size * attenMaskInfoPtr->attenMaskS2Size;\n+                maskInfo.attenMaskBatchStride = attenMaskInfoPtr->attenMaskShapeType == attenMaskBS1S2?\n+                    attenMaskInfoPtr->attenMaskS1Size * attenMaskInfoPtr->attenMaskS2Size : 0;\n                 maskInfo.attenMaskS1Stride = attenMaskInfoPtr->attenMaskS2Size;\n                 maskInfo.attenMaskDstStride = s2BaseSize > Align(maskInfo.s2dealNum, 32U) ?\n                     (s2BaseSize - Align(maskInfo.s2dealNum, 32U)) / 32 : 0;\n",
+      "new_file": false,
+      "new_path": "attention/common/op_kernel/arch35/flash_attention_noquant_block_vec_base.h",
+      "old_path": "attention/common/op_kernel/arch35/flash_attention_noquant_block_vec_base.h",
+      "removed_lines": 4,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/d955e26952bf88c707d5b53147ccdb969cbd31c7/attention/common/op_kernel/arch35/flash_attention_noquant_block_vec_base.h",
+    "sha": "d955e26952bf88c707d5b53147ccdb969cbd31c7",
+    "source_branch": "fix_gqa_attenmaskcopy",
+    "source_project": {
+      "full_name": "qq_45930774/ops-transformer",
+      "human_name": "qq_45930774 / ops-transformer",
+      "id": 8831672,
+      "path": "ops-transformer"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  },
+  {
+    "additions": 5,
+    "blob_id": "b48b690e8be427de322edef43809218f6fcc7a51",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/d955e26952bf88c707d5b53147ccdb969cbd31c7/attention/common/op_kernel/arch35/flash_attention_noquant_kernel_infer.h",
+    "deletions": 5,
+    "filename": "attention/common/op_kernel/arch35/flash_attention_noquant_kernel_infer.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 5,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -510,13 +510,13 @@ __aicore__ inline void FlashAttentionNoQuantKernelInfer<CubeBlockType, VecBlockT\n         if constexpr (layout == LayOutTypeEnum::LAYOUT_TND ||\n                       layout == LayOutTypeEnum::LAYOUT_BSH ||\n                       layout == LayOutTypeEnum::LAYOUT_SBH) {\n-            runParam.goIdx = gS1Index % this->constInfo.gSize;\n-            runParam.s1oIdx = gS1Index / this->constInfo.gSize;\n+            runParam.goIdx = gS1Index * this->s1BaseSize % this->constInfo.gSize;\n+            runParam.s1oIdx = gS1Index * this->s1BaseSize / this->constInfo.gSize;\n         } else {\n-            runParam.goIdx = gS1Index / runParam.actualS1Size;\n-            runParam.s1oIdx = gS1Index % runParam.actualS1Size;\n+            runParam.goIdx = gS1Index * this->s1BaseSize / runParam.actualS1Size;\n+            runParam.s1oIdx = gS1Index * this->s1BaseSize % runParam.actualS1Size;\n         }\n-        runParam.gS1Idx = gS1Index;\n+        runParam.gS1Idx = gS1Index * this->s1BaseSize;\n     } else {\n         runParam.goIdx = bnIndex % this->constInfo.headNumRatio;\n         runParam.s1oIdx = gS1Index % this->constInfo.s1OuterSize;\n",
+      "new_file": false,
+      "new_path": "attention/common/op_kernel/arch35/flash_attention_noquant_kernel_infer.h",
+      "old_path": "attention/common/op_kernel/arch35/flash_attention_noquant_kernel_infer.h",
+      "removed_lines": 5,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/d955e26952bf88c707d5b53147ccdb969cbd31c7/attention/common/op_kernel/arch35/flash_attention_noquant_kernel_infer.h",
+    "sha": "d955e26952bf88c707d5b53147ccdb969cbd31c7",
+    "source_branch": "fix_gqa_attenmaskcopy",
+    "source_project": {
+      "full_name": "qq_45930774/ops-transformer",
+      "human_name": "qq_45930774 / ops-transformer",
+      "id": 8831672,
+      "path": "ops-transformer"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  }
+]

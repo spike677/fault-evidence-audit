@@ -1,0 +1,30 @@
+{
+  "can_push": false,
+  "commit": {
+    "author_email": "yelongjian1@huawei.com",
+    "author_name": "yelongjian",
+    "author_user_name": "yelongjian",
+    "authored_date": "2026-10-26T09:23:55.000Z",
+    "committed_date": "2026-10-26T09:23:55.000Z",
+    "committer_avatar_url": "https://cdn-img.gitcode.com/bf/ad/b7f29486a040d7b2f52bf6c78414692d7d585eb1ec628cea3eb01c9d63f68618.png?time=1755691472703",
+    "committer_email": "cann@cann.team",
+    "committer_name": "cann-robot",
+    "committer_user_name": "cann-robot",
+    "created_at": "2026-10-26T09:23:55.000Z",
+    "id": "29e870653a2337c5127dc1731f3829773967eba8",
+    "message": "\nfix: 冒烟结果检查排除安装器版本兼容 WARNING 的误判\n\nCreated-by: yelongjian\nCommit-by: yelongjian\nMerged-by: cann-robot\nDescription: # Pull Request\n\n## 描述\n\n修复 PreSmoke_A2 冒烟门禁的**误判**：`pre_smoke.sh` 的结果检查把 metadef 安装器打印的版本兼容 **WARNING** 当成用例失败。\n\n### 现象\n\nPR !650（run#705）与 PR !645（run#696）的 `PreSmoke_A2` 均在 `checking test results` 阶段报 `run test case failed` 退出码 1，但 example `tc_ge_irrun_open_api_0014` 实际**完全跑通**：\n\n- 编译成功（仅 deprecation / sign-compare 告警，无 error）\n- `GeSessionExecuteGraphWithStreamAsync success`、`Finalize acl success`\n- `npu-smi` 910B4 Health OK\n\n### 根因\n\n`run_test.log` 由两处 `tee -a` 累积写入：\n\n- 第 66 行：`.run` 安装器输出\n- 第 68 行：`run_example.sh` 输出\n\n安装器在 metadef 9.2.0 包装到基座 CANN 9.3.0 的冒烟镜像上时会打印 12 条形如：\n\n```\n[Metadef] [WARNING]: Version compatibility check failed, aoe required metadef version 9.3, but metadef version is 9.2.0!\n[Metadef] [WARNING]: Version compatibility check failed, metadef required runtime version 9.2, but runtime version is 9.3.0!\n```\n\n安装器随后仍输出 `version compatibility check successfully!`，说明这只是 WARNING。但第 97 行的判据 `grep -iE '\\b(FAIL|failed|error:)\\b'` 会命中 WARNING 文本里的 `failed`，而现有的排除项 `grep -viE \"error\\)\"` 过滤不掉，于是误判为用例失败。\n\n按该规则在 run#705 日志上复算：**12 条命中全部来自安装段，example 段 0 条命中**。\n\n### 修改\n\n第 97 行排除项增加 `Version compatibility check failed`：\n\n```diff\n-if grep -iE '\\b(FAIL|failed|error:)\\b' \"./run_test.log\" | grep -viE \"error\\)\"; then\n+if grep -iE '\\b(FAIL|failed|error:)\\b' \"./run_test.log\" | grep -viE \"error\\)|Version compatibility check failed\"; then\n```\n\n### 自测\n\n用 run#705 的真实日志重建 `run_test.log` 后执行判据：\n\n| 规则 | 结果 |\n|------|------|\n| 修改前 | 命中 12 条 → `run test case failed`（复现门禁失败） |\n| 修改后 | 命中 0 条 → 通过 |\n\n再用含真实失败的构造日志（g++ 报错、`Error: build sample ... failed`、`Error: run sample ... failed with exit code 1`、`[IR run log] - ERROR - ... FAILED`）验证修改后的规则：**仍能全部命中**，不会漏判真实失败。\n\n另：`bash -n` 语法检查通过；无行尾空格；文件以换行结尾。\n\n## 变更类型\n请选择本次引入的变更类型：\n<!--  [x] 表示选中 -->\n- [x] 🐛 Bug 修复\n- [ ] ✨ 新功能\n- [ ] 💄 代码风格更新（格式化，局部变量）\n- [ ] ♻️ 重构（既不修复错误也不增加功能的代码变动）\n- [x] 📦 构建过程或辅助工具的变动\n- [ ] 📝 文档内容更新\n\n## 关联的Issue\n<!-- 如果这个PR是为了解决特定的Issue，请在当前页面的右侧'关联Issue'部分添加相应的Issue链接，并勾选'合并后关闭已关联的 Issue'选项。 -->\n\n无（问题来源于 PR !650 / !645 的门禁失败分析）\n\n## 如何测试\n描述测试此变更的步骤和前提条件：\n1. 取 run#705（`d7f4a0f9518e4ff7b854516a0596102a`）`PreSmoke_A2` 的 `3_smoke executor.log`，剥离时间戳前缀重建 `run_test.log`\n2. 在该目录下分别执行修改前/后的第 97 行判据，确认命中数由 12 → 0\n3. 构造含真实编译/运行失败的 `run_test.log`，确认修改后的判据仍能命中\n\n## 核对清单\n<!--  [x] 表示选中 -->\n- [x] 我的代码遵循了项目的代码风格\n- [x] 我已对代码进行了自测\n- [ ] 我已更新了相关的文档\n- [x] 我在标题中使用了合适的类型标签（如：`feat:`, `fix:`）\n- [x] 我已经详细阅读了贡献指南（CONTRIBUTING.md），并遵守了其中的所有规定，包括但不限于commit message的格式、无效commit的合并等\n\n## 其他信息\n\n- 仅改动 1 行，作用域限定在冒烟结果判据，不影响安装、编译、example 执行流程\n- `.gitcode/scripts/` 目录只存在于 master 分支（develop 无此目录），故本 PR 直接提到 master\n- 更彻底的方案是把安装器日志与用例日志分文件（第 66 行改为 `tee -a ./install.log`），可另开 PR 讨论；本 PR 先做最小修复止血\n\n\nSee merge request: cann/metadef!656",
+    "parent_ids": [
+      "7bc555a2ff4f93425866fa6ff9732ff402d379c1",
+      "0da09d64c6ba5337557287e63bfcf5b51030fa75"
+    ],
+    "short_id": "29e87065",
+    "title": "!656 merge fix/pre-smoke-version-compat-warning-false-positive into master"
+  },
+  "default": true,
+  "description": "",
+  "developers_can_merge": false,
+  "developers_can_push": false,
+  "merged": false,
+  "name": "master",
+  "protected": true
+}

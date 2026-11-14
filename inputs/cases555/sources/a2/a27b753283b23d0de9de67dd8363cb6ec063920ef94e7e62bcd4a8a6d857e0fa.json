@@ -1,0 +1,38 @@
+[
+  {
+    "additions": 10,
+    "blob_id": "8944c11495ca21c40444551f8b79578c3a9515dd",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/e602f5b56193283fcd7ff011666acc2966af041c/norm/rms_norm_quant/op_host/rms_norm_quant_common_tiling.cpp",
+    "deletions": 3,
+    "filename": "norm/rms_norm_quant/op_host/rms_norm_quant_common_tiling.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 10,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -163,7 +163,7 @@ static ge::graphStatus NormCommonTiling(gert::TilingContext* context, PrePostTyp\n \n     // calculate numRow\n     int64_t numRow = 1;\n-    for (size_t i = 0; i < xShape.GetDimNum() - 1; ++i) {\n+    for (size_t i = 0; i < xShape.GetDimNum(); ++i) {\n         uint32_t dim = xShape.GetDim(i);\n         OP_CHECK_IF(dim <= 0, OP_LOGD(opName, \"In tensor X dim %d is invalid\", i), return ge::GRAPH_PARAM_OUT_OF_RANGE);\n         OP_CHECK_IF(\n@@ -171,9 +171,16 @@ static ge::graphStatus NormCommonTiling(gert::TilingContext* context, PrePostTyp\n             OP_LOGD(opName, \"At dim %d, tmpNumRow is overflowed\", i), return ge::GRAPH_FAILED);\n         numRow *= dim;\n     }\n+\n+    gert::Shape gamma_shape = context->GetInputShape(static_cast<int>(NormInputIndex::GAMMA))->GetOriginShape();\n+    int64_t gamma_size = 1;\n+    for (size_t i = 0; i < gamma_shape.GetDimNum(); ++i) {\n+        uint32_t dim = gamma_shape.GetDim(i);\n+        gamma_size *= dim;\n+    }\n+    numRow = numRow / gamma_size;\n     tilingData.set_numRow(static_cast<uint32_t>(numRow)); // 修改\n-    // check numCol\n-    uint32_t numCol = xShape.GetDim(xShape.GetDimNum() - 1);\n+    uint32_t numCol = gamma_size;\n     OP_CHECK_IF(\n         numCol > std::numeric_limits<uint32_t>::max(), OP_LOGD(opName, \"numCol is overflowed\"),\n         return ge::GRAPH_PARAM_OUT_OF_RANGE);\n",
+      "new_file": false,
+      "new_path": "norm/rms_norm_quant/op_host/rms_norm_quant_common_tiling.cpp",
+      "old_path": "norm/rms_norm_quant/op_host/rms_norm_quant_common_tiling.cpp",
+      "removed_lines": 3,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/e602f5b56193283fcd7ff011666acc2966af041c/norm/rms_norm_quant/op_host/rms_norm_quant_common_tiling.cpp",
+    "sha": "e602f5b56193283fcd7ff011666acc2966af041c",
+    "source_branch": "master",
+    "source_project": {
+      "full_name": "lihui488/ops-nn",
+      "human_name": "lihui488 / ops-nn",
+      "id": 9409608,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  }
+]

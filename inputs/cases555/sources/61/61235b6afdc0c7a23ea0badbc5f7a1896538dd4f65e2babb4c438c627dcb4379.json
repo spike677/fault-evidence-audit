@@ -1,0 +1,83 @@
+{
+  "assignee": {
+    "avatar_url": "https://cdn-img.gitcode.com/ab/ca/0a2b9caf7ca46a6bf19e0b24ddff3ad1631dfdda40a5bea051331d8a55910754.png",
+    "html_url": "https://gitcode.com/alfengyuan",
+    "id": "67249c734580686cebb01195",
+    "login": "alfengyuan",
+    "name": "AlfengYuan",
+    "object_id": "67249c734580686cebb01195"
+  },
+  "assignees": [
+    {
+      "avatar_url": "https://cdn-img.gitcode.com/ab/ca/0a2b9caf7ca46a6bf19e0b24ddff3ad1631dfdda40a5bea051331d8a55910754.png",
+      "html_url": "https://gitcode.com/alfengyuan",
+      "id": "67249c734580686cebb01195",
+      "login": "alfengyuan",
+      "name": "AlfengYuan",
+      "object_id": "67249c734580686cebb01195"
+    }
+  ],
+  "body": "\n\nThanks for sending an issue! Please fill in the following template to help quickly solve your problem.\n\n### Describe the current behavior / 问题描述 (Mandatory / 必填)\n            \nRoPEGrad 算子agent测试发现问题，请确认\n### Environment / 环境信息 (Mandatory / 必填)\n            \nascend950\ncann9.1.0\n### Steps to reproduce the issue / 重现步骤 (Mandatory / 必填)\n            \n# RotaryPositionEmbeddingGrad 算子 mode=2 dcos 输出错误问题分析报告\n\n## 1. 问题概述\n\n| 项目 | 内容 |\n|------|------|\n| 算子名称 | RotaryPositionEmbeddingGrad |\n| 算子代码路径 | `/workspace/alfengyuan/ops-transformer/posembedding/rotary_position_embedding_grad/` |\n| CANN 版本 | cann-9.1.0 (Ascend950PR / 957b) |\n| 失败路线 | **ACLNN**（ACLNN 97/3 FAIL，GEIR 10/0 PASS） |\n| 问题性质 | **逻辑错误**（dcos 输出符号反转，非精度误差） |\n\n## 2. 失败用例详情\n\n### 2.1 ACLNN 100 条用例结果\n\n| 指标 | 数量 |\n|------|------|\n| 总用例 | 100 |\n| PASS | 97 |\n| FAIL | 3（全部为 mode=2 + 常量输入） |\n\n### 2.2 三个失败用例\n\n| 用例 ID | mode | dtype | dy shape | cos shape | x shape | dy 值 | cos/sin/x 值 | 失败输出 | MERE | MARE |\n|---------|------|-------|----------|-----------|---------|-------|-------------|---------|------|------|\n| CASE038 | 2 (QUARTER) | float32 | (1,16,8,512) | (1,1,1,512) | (1,16,8,512) | 0.001 | 1000 | output[1] dcos | 0.375 | 2.0 |\n| CASE118 | 2 (QUARTER) | bfloat16 | (1,65,8,256) | (1,1,1,256) | (1,65,8,256) | 0.001 | 1000 | output[1] dcos | 0.427 | 1.93 |\n| CASE998 | 2 (QUARTER) | float32 | (4,128,8,128) | (1,1,1,128) | (4,128,8,128) | 0.001 | 1000 | output[1] dcos | 0.474 | 2.0 |\n\n### 2.3 失败特征\n\n- **仅 output[1] (dcos) 失败**：output[0] (dx) 和 output[2] (dsin) 均 PASS\n- **MARE = 2.0**：最大绝对相对误差 200%，表明 kernel 输出与 golden 符号相反\n- **仅 mode=2 (QUARTER) 受影响**：mode=0/1/3 的全部用例 PASS\n- **仅常量输入受影响**：20 个 mode=2 随机输入用例全部 PASS\n- **cos shape = (1,1,1,D)**：全 broadcast（仅在 D 维有值），reduce 跨越 S 和 N 两个轴\n\n### 2.4 对比：同模式同常量但 PASS 的用例\n\n| 用例 ID | mode | dtype | cos shape | 常量? | 结果 |\n|---------|------|-------|-----------|-------|------|\n| CASE974 | 2 (QUARTER) | float32 | (1,1,128,96) | 是 | **PASS** |\n| CASE038 | 2 (QUARTER) | float32 | (1,1,1,512) | 是 | **FAIL** |\n\nCASE974 的 cos shape 为 `(1,1,128,96)`（部分 broadcast，N=128），reduce 仅跨 S 轴。\nCASE038 的 cos shape 为 `(1,1,1,512)`（全 broadcast），reduce 跨 S 和 N 两个轴。\n\n**关键区别**：失败用例的 cos 全 broadcast（reduce 跨多轴），通过用例的 cos 部分 broadcast（reduce 单轴）。\n\n## 3. 数学背景\n\n### 3.1 Forward 公式\n\n```\ny = x * cos + rotate(x) * sin\n```\n\n其中 mode=2 (QUARTER) 的 rotate：\n\n```\nrotate(x) = [-x[D/4:2D/4], x[0:D/4], -x[3D/4:D], x[2D/4:3D/4]]\n```\n\n即将 D 维分成 4 份 q0/q1/q2/q3，rotate 后为 `[-q1, q0, -q3, q2]`。\n\n### 3.2 梯度公式\n\n| 输出 | 公式 | 使用的 x |\n|------|------|---------|\n| dx | ∂y/∂(cos,sin) 的反推 | 不直接依赖 x |\n| dcos | ∂y/∂cos = reduce_sum(dy * x) | **原始 x** |\n| dsin | ∂y/∂sin = reduce_sum(dy * rotate(x)) | **rotate(x)** |\n\n### 3.3 常量输入下的期望值\n\n当 dy=0.001, x=1000（全常量）时：\n\n| 输出 | golden 计算 | golden 值 |\n|------|------------|-----------|\n| dcos | reduce_sum(0.001 × 1000) = N × 1 | **[N, N, N, ...]**（全正） |\n| dsin | reduce_sum(0.001 × rotate(1000)) = reduce_sum(0.001 × [-1000,1000,-1000,1000]) | **[0, 0, 0, ...]**（交替正负抵消） |\n\n### 3.4 Kernel 实际输出（推断）\n\n| 输出 | kernel 计算（推断） | kernel 值 | 与 golden 对比 |\n|------|-------------------|-----------|---------------|\n| dcos | reduce_sum(dy × **rotate(x)**) = reduce_sum(0.001 × [-1000,1000,...]) | **[-N, N, -N, N, ...]** | 符号反转 → MARE=2.0 |\n| dsin | reduce_sum(dy × rotate(x)) | [0, 0, 0, ...] | 匹配 → PASS |\n\nMARE = |N - (-N)| / N = 2.0，与观测值完全一致。\n\n## 4. 根因定位\n\n### 4.1 Kernel 源码分析\n\n**文件**：`/workspace/alfengyuan/ops-transformer/posembedding/rotary_position_embedding_grad/op_kernel/rotary_position_embedding_grad_apt.cpp`\n\n**行号 109-110（A 模板路径）**：\n```cpp\nopGrad.Init(grad, x, usrWorkSpace, cosGrad, sinGrad);\n//                 ^    ^^^^^^^^^^^^\n//                 xCos  xSin\n//                 原始x  rotate(x)\n```\n\n**行号 131-139（Reduce 路径）**：\n```cpp\n// dcos = reduce(grad * x) ← 正确：用原始 x\nreduceOp0.Init(&pipe, grad, x, cosGrad, reduceWorkSpace);\n\n// dsin = reduce(grad * usrWorkSpace) ← 正确：用 rotate(x)\nreduceOp1.Init(&pipe, grad, usrWorkSpace, sinGrad, reduceWorkSpace);\n```\n\n**源码结论**：kernel 源码**正确**使用原始 x 计算 dcos，使用 rotate(x) 计算 dsin。\n\n### 4.2 编译产物分析\n\nkernel 源码正确，但 ACLNN 执行结果与源码不一致。这表明**编译产物（预编译 .o binary）**的行为与源码不同。\n\n**推测**：ACLNN API 在处理常量输入时触发了优化路径，该路径错误地对 dcos 使用了 rotate(x) 而非原始 x。\n\n### 4.3 为什么 GEIR 不受影响\n\nGEIR 路径通过 GE 图框架执行 kernel，不经过 ACLNN API 的常量输入优化。\nGE 图直接调用 kernel binary，使用 tiling data 中的参数，不走优化路径。\n\nGEIR 的 CASE974（mode=2, 常量输入）PASS，证明 GE 图路径正确。\n\n### 4.4 为什么 dx/dsin 不受影响\n\n| 输出 | 是否依赖 x | 为何 PASS |\n|------|-----------|----------|\n| dx | 不直接依赖 x（仅用 dy, cos, sin） | x 的错误不影响 dx |\n| dcos | 依赖 x（dcos = reduce(dy × x)） | kernel 错误用 rotate(x) → FAIL |\n| dsin | 依赖 rotate(x)（dsin = reduce(dy × rotate(x))） | kernel 也用 rotate(x) → 恰好匹配 |\n\n### 4.5 验证实验\n\n将 golden 的 dcos 改为 `reduce_sum(dy × rotate(x))`（匹配 kernel 错误行为）：\n\n| 修改前 | 修改后 | 结果 |\n|--------|--------|------|\n| 3 个常量用例 FAIL | 3 个常量用例 **PASS** | 验证推断正确 |\n| 22 个随机用例 PASS | 22 个随机用例 **FAIL** | 验证仅常量输入受影响 |\n\n这确认了 kernel 在常量输入时对 dcos 使用了 rotate(x)。\n\n## 5. 影响范围\n\n- **ACLNN**：97/100 PASS，3/100 FAIL\n- **GEIR**：10/10 PASS（但 3 个失败用例不在 GEIR 选中范围内）\n- **触发条件**：ACLNN 路径 + mode=2 (QUARTER) + 常量输入 + cos 全 broadcast (shape=(1,1,1,D))\n- **不受影响**：mode=0/1/3、随机输入、cos 部分 broadcast (shape=(1,1,N,D))\n\n## 6. Golden 验证\n\n### 6.1 Golden 公式正确性\n\ngolden 使用 `dcos = reduce_sum(dy × x)`（原始 x），数学正确。\n\n### 6.2 torch 实现验证\n\n将 golden 从 numpy 改为 torch（`torch.arange`, `torch.sum`）后，结果完全一致：\n- ACLNN 仍为 97/3（相同 3 个用例，相同 MERE 值）\n- 证明不是 numpy vs torch 的计算差异\n\n### 6.3 Golden 不是问题\n\n- 20 个 mode=2 随机输入用例全部 PASS → golden 公式正确\n- 用 rotate(x) 替代 x 会使 22 个 PASS 变 FAIL → 证明 golden 用 x 是对的\n\n## 7. 修复建议\n\n### 方案 1（推荐）：修复 ACLNN API 的常量输入优化路径\n\n定位 ACLNN API 中处理常量输入的优化代码，确保 dcos 使用原始 x 而非 rotate(x)。\n\n此方案需要在 CANN ACLNN 框架层面修复，不在算子源码范围内。\n\n### 方案 2：在 kernel 中禁用常量输入优化\n\n在 kernel tiling 中检测常量输入，跳过优化路径，强制走标准计算路径。\n\n### 方案 3：Golden 适配（不推荐）\n\n仅在 mode=2 + 常量输入 + cos 全 broadcast 时使用 rotate(x) 计算 dcos。\n此方案会使 golden 与错误的 kernel 行为一致，掩盖真实 bug。\n\n## 8. 验证方式\n\n1. 修复后重新执行 ACLNN 100 条验证\n2. 确认 GEIR 10 条仍全部 PASS\n3. 重点验证 mode=2 + 常量输入 + cos=(1,1,1,D) 的场景\n4. 验证 mode=2 + 常量输入 + cos=(1,1,N,D) 的场景（CASE974 类似）\n\n### Describe the expected behavior / 预期结果 (Mandatory / 必填)\n            \n预期全部PASS\n### Related log / screenshot / 日志 / 截图 (Mandatory / 必填)\n            \n略\n### Special notes for this issue/备注 (Optional / 选填)\n            \n\n",
+  "comments": 1,
+  "created_at": "2026-08-11T16:39:27+08:00",
+  "finished_at": "2026-08-12T09:35:48+08:00",
+  "html_url": "https://gitcode.com/cann/ops-transformer/issues/4254",
+  "id": 4242458,
+  "issue_priority_detail": {
+    "id": 116,
+    "title": "无优先级"
+  },
+  "issue_state": "已完成",
+  "issue_state_detail": {
+    "id": 287,
+    "serial": 0,
+    "title": "已完成"
+  },
+  "issue_type": "任务",
+  "issue_type_detail": {
+    "id": 255,
+    "is_system": false,
+    "title": "任务"
+  },
+  "labels": [
+    {
+      "color": "#DB2828",
+      "created_at": "2025-06-10T14:17:23+08:00",
+      "id": 3870,
+      "name": "bug-report",
+      "updated_at": "2026-08-11T16:39:27+08:00"
+    },
+    {
+      "color": "#35e029",
+      "created_at": "2026-03-20T11:25:13+08:00",
+      "id": 38861,
+      "name": "resolved",
+      "updated_at": "2026-08-12T10:27:11+08:00"
+    }
+  ],
+  "number": "4254",
+  "priority": 0,
+  "repository": {
+    "assigner": {},
+    "created_at": "2025-09-28T17:54:46+08:00",
+    "description": "本项目是CANN提供的transformer类大模型算子库，实现网络在NPU上加速计算。",
+    "full_name": "cann/ops-transformer",
+    "id": 7673863,
+    "name": "ops-transformer",
+    "paas": "",
+    "path": "ops-transformer",
+    "updated_at": "2025-09-28T18:06:48+08:00"
+  },
+  "state": "closed",
+  "title": "[Bug-Report|缺陷反馈]: RoPEGrad 算子agent测试发现问题，请确认",
+  "updated_at": "2026-08-12T09:37:08+08:00",
+  "user": {
+    "avatar_url": "https://cdn-img.gitcode.com/ab/ca/0a2b9caf7ca46a6bf19e0b24ddff3ad1631dfdda40a5bea051331d8a55910754.png",
+    "html_url": "https://gitcode.com/alfengyuan",
+    "id": "67249c734580686cebb01195",
+    "login": "alfengyuan",
+    "name": "AlfengYuan",
+    "object_id": "67249c734580686cebb01195"
+  },
+  "visibility_reason": "public"
+}

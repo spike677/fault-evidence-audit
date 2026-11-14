@@ -1,0 +1,122 @@
+[
+  {
+    "additions": 2,
+    "blob_id": "aecec0bf77c67a86578d6f485bbf07400a4e564e",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/c8378f768bd5373fb6ca39f55aeb6e7f8d9e72ea/activation/ge_glu_grad_v2/op_kernel/arch35/ge_glu_grad_v2_erf_base.h",
+    "deletions": 1,
+    "filename": "activation/ge_glu_grad_v2/op_kernel/arch35/ge_glu_grad_v2_erf_base.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 2,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -173,6 +173,7 @@ protected:\n     TBuf<QuePosition::VECCALC> resultTempBuf1;\n     TBuf<QuePosition::VECCALC> resultTempBuf2;\n     TBuf<QuePosition::VECCALC> resultTempBuf4;\n+    TBuf<QuePosition::VECCALC> resultTempBuf5;\n \n     int32_t perBlockCount = 0;\n     int32_t dtypeSize = 0;\n@@ -302,7 +303,7 @@ __aicore__ inline void GeGluGradV2ErfBase<T>::ComputeCDF(\n     LocalTensor<float>& y, LocalTensor<float>& x, const int64_t& realProcCount)\n {\n     LocalTensor<float> t1 = resultTempBuf2.Get<float>();\n-    LocalTensor<float> t2 = resultTempBuf4.Get<float>();\n+    LocalTensor<float> t2 = resultTempBuf5.Get<float>();\n \n     Muls(y, x, COEFFICIENT_1, realProcCount);\n \n",
+      "new_file": false,
+      "new_path": "activation/ge_glu_grad_v2/op_kernel/arch35/ge_glu_grad_v2_erf_base.h",
+      "old_path": "activation/ge_glu_grad_v2/op_kernel/arch35/ge_glu_grad_v2_erf_base.h",
+      "removed_lines": 1,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/c8378f768bd5373fb6ca39f55aeb6e7f8d9e72ea/activation/ge_glu_grad_v2/op_kernel/arch35/ge_glu_grad_v2_erf_base.h",
+    "sha": "c8378f768bd5373fb6ca39f55aeb6e7f8d9e72ea",
+    "source_branch": "master",
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 1,
+    "blob_id": "05b1c9babcbcd411c7543cbc214b4163cc8681c9",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/c8378f768bd5373fb6ca39f55aeb6e7f8d9e72ea/activation/ge_glu_grad_v2/op_kernel/arch35/ge_glu_grad_v2_erf_bfp16.h",
+    "deletions": 0,
+    "filename": "activation/ge_glu_grad_v2/op_kernel/arch35/ge_glu_grad_v2_erf_bfp16.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 1,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -67,6 +67,7 @@ __aicore__ inline void GeGluGradV2ErfBFP16::Init()\n     pipe->InitBuffer(resultTempBuf1, maxProcCount * sizeof(float));\n     pipe->InitBuffer(resultTempBuf2, maxProcCount * sizeof(float));\n     pipe->InitBuffer(resultTempBuf4, maxProcCount * sizeof(float));\n+    pipe->InitBuffer(resultTempBuf5, maxProcCount * sizeof(float));\n }\n \n __aicore__ inline void GeGluGradV2ErfBFP16::ComputeLeftHalf(const int64_t& realProcCount)\n",
+      "new_file": false,
+      "new_path": "activation/ge_glu_grad_v2/op_kernel/arch35/ge_glu_grad_v2_erf_bfp16.h",
+      "old_path": "activation/ge_glu_grad_v2/op_kernel/arch35/ge_glu_grad_v2_erf_bfp16.h",
+      "removed_lines": 0,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/c8378f768bd5373fb6ca39f55aeb6e7f8d9e72ea/activation/ge_glu_grad_v2/op_kernel/arch35/ge_glu_grad_v2_erf_bfp16.h",
+    "sha": "c8378f768bd5373fb6ca39f55aeb6e7f8d9e72ea",
+    "source_branch": "master",
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 1,
+    "blob_id": "bb63013c867f095c4d1655a1eb12f6feff2ce3f6",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/c8378f768bd5373fb6ca39f55aeb6e7f8d9e72ea/activation/ge_glu_grad_v2/op_kernel/arch35/ge_glu_grad_v2_erf_fp16.h",
+    "deletions": 0,
+    "filename": "activation/ge_glu_grad_v2/op_kernel/arch35/ge_glu_grad_v2_erf_fp16.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 1,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -64,6 +64,7 @@ __aicore__ inline void GeGluGradV2ErfFP16::Init()\n     pipe->InitBuffer(resultTempBuf1, maxProcCount * sizeof(float));\n     pipe->InitBuffer(resultTempBuf2, maxProcCount * sizeof(float));\n     pipe->InitBuffer(resultTempBuf4, maxProcCount * sizeof(float));\n+    pipe->InitBuffer(resultTempBuf5, maxProcCount * sizeof(float));\n }\n \n __aicore__ inline void GeGluGradV2ErfFP16::ComputeLeftHalf(const int64_t& realProcCount)\n",
+      "new_file": false,
+      "new_path": "activation/ge_glu_grad_v2/op_kernel/arch35/ge_glu_grad_v2_erf_fp16.h",
+      "old_path": "activation/ge_glu_grad_v2/op_kernel/arch35/ge_glu_grad_v2_erf_fp16.h",
+      "removed_lines": 0,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/c8378f768bd5373fb6ca39f55aeb6e7f8d9e72ea/activation/ge_glu_grad_v2/op_kernel/arch35/ge_glu_grad_v2_erf_fp16.h",
+    "sha": "c8378f768bd5373fb6ca39f55aeb6e7f8d9e72ea",
+    "source_branch": "master",
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 1,
+    "blob_id": "725bb2662009a0c73733b3555f3a08cae0c31708",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/c8378f768bd5373fb6ca39f55aeb6e7f8d9e72ea/activation/ge_glu_grad_v2/op_kernel/arch35/ge_glu_grad_v2_erf_fp32.h",
+    "deletions": 0,
+    "filename": "activation/ge_glu_grad_v2/op_kernel/arch35/ge_glu_grad_v2_erf_fp32.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 1,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -64,6 +64,7 @@ __aicore__ inline void GeGluGradV2ErfFP32::Init()\n     pipe->InitBuffer(resultTempBuf1, maxProcCount * sizeof(float));\n     pipe->InitBuffer(resultTempBuf2, maxProcCount * sizeof(float));\n     pipe->InitBuffer(resultTempBuf4, maxProcCount * sizeof(float));\n+    pipe->InitBuffer(resultTempBuf5, maxProcCount * sizeof(float));\n }\n \n __aicore__ inline void GeGluGradV2ErfFP32::ComputeLeftHalf(const int64_t& realProcCount)\n",
+      "new_file": false,
+      "new_path": "activation/ge_glu_grad_v2/op_kernel/arch35/ge_glu_grad_v2_erf_fp32.h",
+      "old_path": "activation/ge_glu_grad_v2/op_kernel/arch35/ge_glu_grad_v2_erf_fp32.h",
+      "removed_lines": 0,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/c8378f768bd5373fb6ca39f55aeb6e7f8d9e72ea/activation/ge_glu_grad_v2/op_kernel/arch35/ge_glu_grad_v2_erf_fp32.h",
+    "sha": "c8378f768bd5373fb6ca39f55aeb6e7f8d9e72ea",
+    "source_branch": "master",
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  }
+]

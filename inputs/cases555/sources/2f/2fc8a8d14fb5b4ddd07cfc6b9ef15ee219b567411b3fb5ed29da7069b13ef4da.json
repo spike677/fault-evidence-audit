@@ -1,0 +1,80 @@
+{
+  "assignee": {
+    "html_url": "https://gitcode.com/cai-chengchao",
+    "id": "6822fc31398335026946c784",
+    "login": "cai-chengchao",
+    "name": "cai-chengchao",
+    "object_id": "6822fc31398335026946c784"
+  },
+  "assignees": [
+    {
+      "html_url": "https://gitcode.com/cai-chengchao",
+      "id": "6822fc31398335026946c784",
+      "login": "cai-chengchao",
+      "name": "cai-chengchao",
+      "object_id": "6822fc31398335026946c784"
+    }
+  ],
+  "body": "**Describe the current behavior / 问题描述**\n\nlayer_norm_v3 和 layer_norm_v4 在 arch35 平台的 Welford 算法实现存在两个缺陷：\n\n1. 在 WelfordFinalize 和 Normalize 中访问 UB 缓存张量（meanTensor、varianceTensor、lastoutTensor/rstdTensor）时，错误使用了 `paramAddr + cacheCount` 作为索引。`paramAddr` 是全局内存偏移量，不应混入本地缓存索引计算，导致读取了错误位置的缓存数据，产生精度偏差。\n\n2. `cacheCount++` 仅在缓存未满时执行（else 分支），当 `cacheCount >= AGGREGATION_COUNT` 时数据未被正确计入缓存批次，进一步影响精度。\n\n**Environment / 环境信息**\n\n昇腾 Ascend950pr 硬件平台，CANN 9.1.0 软件版本\n\n**Steps to reproduce the issue / 重现步骤**\n\n1. 在 Ascend950pr 平台运行 layer_norm_v3/v4 算子\n2. 使用特定数据形状和参数触发 Welford 多次迭代（cacheCount 多次递增后达到 AGGREGATION_COUNT）\n3. 对比输出结果与期望值，发现精度偏差\n\n**Describe the expected behavior / 预期结果**\n\n1. UB 缓存张量应仅使用 `cacheCount` 索引（不含 `paramAddr` 前缀），确保读取正确的缓存位置\n2. `cacheCount++` 应在判断缓存阈值之前执行，确保每次迭代数据均被正确追踪\n3. 算子输出精度应与数学期望一致\n\n**Related log / screenshot / 日志 / 截图**\n\n相关代码位于：\n- norm/layer_norm_v3/op_kernel/arch35/layer_norm_v3_welford.h\n- norm/layer_norm_v4/op_kernel/arch35/layer_norm_v4_welford.h\n\n**Special notes for this issue/备注**\n\n关联 PR：https://gitcode.com/cann/ops-nn/pull/6187",
+  "comments": 0,
+  "created_at": "2026-06-17T10:46:15+08:00",
+  "finished_at": "2026-06-18T15:21:07+08:00",
+  "html_url": "https://gitcode.com/cann/ops-nn/issues/3388",
+  "id": 4100792,
+  "issue_priority_detail": {
+    "id": 116,
+    "title": "无优先级"
+  },
+  "issue_state": "进行中",
+  "issue_state_detail": {
+    "id": 285,
+    "serial": 0,
+    "title": "进行中"
+  },
+  "issue_type": "任务",
+  "issue_type_detail": {
+    "id": 255,
+    "is_system": false,
+    "title": "任务"
+  },
+  "labels": [
+    {
+      "color": "#DB2828",
+      "created_at": "2025-06-10T14:17:23+08:00",
+      "id": 3870,
+      "name": "bug-report",
+      "updated_at": "2026-06-17T10:46:15+08:00"
+    },
+    {
+      "color": "#35e029",
+      "created_at": "2026-03-20T11:25:13+08:00",
+      "id": 38861,
+      "name": "resolved",
+      "updated_at": "2026-06-18T16:40:45+08:00"
+    }
+  ],
+  "number": "3388",
+  "priority": 0,
+  "repository": {
+    "assigner": {},
+    "created_at": "2025-09-27T17:40:34+08:00",
+    "description": "本项目是CANN提供的神经网络类计算算子库，实现网络在NPU上加速计算。",
+    "full_name": "cann/ops-nn",
+    "id": 7665709,
+    "name": "ops-nn",
+    "paas": "",
+    "path": "ops-nn",
+    "updated_at": "2025-09-27T18:09:31+08:00"
+  },
+  "state": "closed",
+  "title": "[Bug-Report|缺陷反馈]: layer_norm v3/v4 Welford 算法缓存参数索引和计数逻辑错误导致精度问题",
+  "updated_at": "2026-06-18T15:21:07+08:00",
+  "user": {
+    "html_url": "https://gitcode.com/cai-chengchao",
+    "id": "6822fc31398335026946c784",
+    "login": "cai-chengchao",
+    "name": "cai-chengchao",
+    "object_id": "6822fc31398335026946c784"
+  },
+  "visibility_reason": "public"
+}

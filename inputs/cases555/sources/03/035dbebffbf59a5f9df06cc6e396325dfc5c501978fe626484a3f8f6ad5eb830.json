@@ -1,0 +1,76 @@
+[
+  {
+    "assignees": [],
+    "base": {
+      "ref": "master",
+      "repo": {
+        "full_name": "cann/ops-transformer",
+        "name": "ops-transformer",
+        "path": "ops-transformer"
+      },
+      "sha": "c7f17d296c22d432c4c302a84dc5e230c4ee020e"
+    },
+    "body": "## 描述\n<!--在这里详细描述你的改动，包括改动的原因和所采取的方法。-->\n\n## 关联的Issue\n<!-- 如果这个PR是为了解决特定的Issue，请在这里提供Issue链接。例如：关联Issue #000-->\n<!-- 如果这个PR是为了解决特定的问题单，请在这里描述问题单单号。-->\n\n## 测试\n<!--描述进行了哪些测试来验证你的改动。包括但不限于二级冒烟、算子泛化等。-->\n\n## 文档更新\n<!--如果这个PR包含文档的更新，请在这里指出。例如：更新了README.md文件。-->\n\n## 类型标签\n<!--  [x] 表示选中 -->\n- [ ] 🐛 Bug修复\n- [ ] ✨ 新特性\n- [ ] ⚡ 性能优化\n- [ ] ♻️ 重构\n- [ ] 🧪 测试\n- [ ] 📦 构建/CI\n- [ ] 🔧 配置变更\n- [ ] 📝 文档更新\n- [ ] ⬆️ 依赖升级\n- [ ] 🔒 安全修复\n- [ ] 🧹 代码清理\n- [ ] ❓ 其他，请描述：\n\n# PR 代码检视报告\n\n## 检视概览\n- PR：https://gitcode.com/cann/ops-transformer/pull/8336\n- 算子：moe_ep_dispatch\n- 代码文件：mc2/moe_ep_dispatch/op_kernel/moe_ep_dispatch.h\n- 代码侧别：Kernel侧\n- 检视文档：cpp-secure.md、cpp-general.md、ascendc-api.md、ascendc-perf.md、ascendc-topk.md、mc2-specific.md\n- 总条例数：78\n- 检视时间：2026-07-06\n\n## PR 变更概要\n\n本次 PR 对 `moe_ep_dispatch` 算子的 Kernel 侧代码进行 4 类修改：\n\n1. **边界条件修正**（`>`→`>=`）：4 处边界检查从 `>` 改为 `>=`，修复 off-by-one 越界风险\n   - `CalSendCntPerRank` L333: `startRankId > epWorldSize_` → `>=`\n   - `CalSendCntPerExpert` L376: `startExpertId > moeExpertNum_` → `>=`\n   - `CalSendCnt` L424/L432: `startId > epWorldSize_`/`startId > moeExpertNum_` → `>=`\n\n2. **对齐常量升级**（`UB_ALIGN`→`ALIGNED_LEN_256`）：将部分对齐计算从 32B 对齐升级为 256B 对齐，满足 Compare API 的 256 字节对齐要求\n\n3. **CalSendCntPerRank 算法重构**：将 `Subs→Abs→Mins→Cast→ReduceSum` 链简化为 `Subs→Abs→ReduceMin`，消除 int32 中间张量和 Cast 转换，简化 pipeline\n\n4. **DataCopyPad→DataCopy 优化**（L554）：`GetRecvCount` 中状态位清零从 `DataCopyPad` 改为 `DataCopy`\n\n## 检视统计\n| 状态 | 条例数 | 占比 |\n|------|------|------|\n| PASS | 77 | 98.7% |\n| FAIL（发现问题）| 0 | 0% |\n| SUSPICIOUS（需关注）| 1 | 1.3% |\n\n## 需关注（MED 置信度）\n\n### [4.2] 禁止使用魔鬼数字/字符串\n- **问题描述**：PR 新增 `static_cast<int16_t>(-1)` 作为\"无效 expert id\"哨兵值，未提取为命名常量。文件顶部已为 `UB_ALIGN=32U`、`ALIGNED_LEN_256=256U`、`COUNTER_STRIDE=2U` 等数值定义了命名常量，但 `-1` 作为无效标记散落在代码中（L352/L618/L723/L756），本次 PR 又新增一处。\n- **代码片段**（mc2/moe_ep_dispatch/op_kernel/moe_ep_dispatch.h 行 348-354）：\n  ```cpp\n  Duplicate<int16_t>(dstTensorInt16, static_cast<int16_t>(moeExpertNumPerRank_), calCnt);\n  Div(tempTensorInt16, expertIdsTensor, dstTensorInt16, calCnt);\n  // 筛选无效expert id 消除影响\n  CompareScalar(gatherMaskTensorInt8, expertIdsTensor, static_cast<int16_t>(0), AscendC::CMPMODE::GE, calCntAlign);\n  Select(dstTensorInt16, gatherMaskTensorInt8, tempTensorInt16, static_cast<int16_t>(-1),\n      AscendC::SELMODE::VSEL_TENSOR_SCALAR_MODE, calCnt);\n  ```\n- **diff 归属**：原代码 `Select` 使用 `VSEL_TENSOR_TENSOR_MODE`（双 tensor，无标量），本次 PR 改为 `VSEL_TENSOR_SCALAR_MODE` 并引入标量 `-1`。`static_cast<int16_t>(-1)` 为本次 diff 新增字面量。\n- **假设检验证据**：\n\n正向证据：\n| 证据类型 | 分值 | 证据描述 |\n|---------|------|---------|\n| 规范违反 | +40% | `-1` 作为\"无效 expert id/rankId\"哨兵值，语义非自明；文件已为 32/256/512/2 等值定义命名常量，但 `-1` 无对应常量 |\n| PR归属 | +20% | `static_cast<int16_t>(-1)` 为本次 diff 新增（原代码为 `VSEL_TENSOR_TENSOR_MODE`，不含标量 `-1`） |\n| 领域关联 | +10% | 条例 4.2 领域为常量/魔鬼数字 |\n\n负向证据：无\n\n自信值 = 40% + 20% + 10% = **70%**（MED，需关注）\n\n- **修复建议**：在文件顶部常量区（L51-65 附近）新增命名常量，统一替换所有 `-1` 无效标记：\n  ```cpp\n  constexpr int16_t INVALID_EXPERT_ID = -1;  // 无效 expert id 哨兵值\n  ```\n  然后将 L352 改为 `Select(dstTensorInt16, gatherMaskTensorInt8, tempTensorInt16, INVALID_EXPERT_ID, ...)`。后续可逐步替换 L618/L723/L756 的既有 `-1`。\n\n## 通过条例\n\n### 安全红线 + MC2 领域规则（波次1，27条全部 PASS）\n- [SEC-1.1] 保证静态类型安全\n- [SEC-1.2] 保证内存安全\n- [SEC-1.3] 禁止使用未定义行为\n- [TOPK-3] 生命周期内使用局部变量指针避免野指针\n- [TOPK-8] gm内存偏移必须int64表示\n- [TOPK-9] atomic累加需src与dst清零\n- [SEC-3.1] 禁止使用未初始化的变量\n- [SEC-3.3] 数组索引校验\n- [SEC-3.4] 禁止sizeof指针\n- [SEC-3.5] 指针使用前判空\n- [TOPK-6] 必须考虑nan/inf/+0/-0等特殊值\n- [TOPK-10] 可整数计算时不允许转浮点\n- [SEC-2.1] 有符号整数运算不溢出\n- [SEC-2.2] 无符号整数运算不回绕\n- [SEC-2.3] 除法/余数运算除零保护\n- [SEC-4.1] 外部输入合法性校验\n- [SEC-4.2] 内存操作长度校验\n- [TOPK-11] 通信算子融合需核间同步\n- [MC2-01] 核间同步必要性\n- [MC2-02] 流同步正确性\n- [MC2-03] SyncAll同步生效\n- [MC2-04] 全局操作一致性\n- [MC2-05] 专家索引边界检查\n- [MC2-06] 专家分发组合一致性\n- [MC2-17] HCCL API参数查阅验证\n- [MC2-18] HCCL通信生命周期与参数\n- [MC2-19] AlltoAllV跨rank参数一致性\n\n### API 最佳实践 + 性能精度（波次2，23条全部 PASS）\n- [API-1] 禁止GlobalTensor::SetValue/GetValue\n- [API-2] 禁止std::计算函数\n- [API-3] DataCopy/DataCopyPad对齐要求\n- [API-4] Compare API 256字节对齐\n- [API-10] DataCopyParams vs DataCopyExtParams单位差异\n- [API-6] AllocTensor/FreeTensor必须配对\n- [API-7] 禁止动态内存分配\n- [API-8] repeatTimes限制（≤255）\n- [API-9] Cast RoundMode正确性\n- [API-12] CrossCoreSetFlag/WaitFlag必须对称\n- [PERF-1] 循环内禁止逐元素操作\n- [PERF-2] 禁止写死硬件参数\n- [PERF-3] Double Buffer使用\n- [PERF-4] PipeBarrier使用\n- [PERF-5] 单次搬运量优化\n- [PERF-6] 避免GM重复读取\n- [PERF-7] 尾块处理正确性\n- [PREC-1] 流水线同步正确性\n- [PREC-2] 除零保护\n- [PREC-3] FP16中间精度保护\n- [MC2-09] 量化参数类型一致性\n- [MC2-11] 量化精度保护\n- [MC2-16] 禁止直接引用kernel_operator.h\n\n### 通用编码规范（波次3，28条：27 PASS + 1 SUSPICIOUS）\n- [TIL-1] 多核负载均衡\n- [TIL-2] 片上缓存容量不溢出\n- [TIL-3] Buffer规划合理性\n- [1.1] 外部数据合法性检查\n- [1.3] 清理无效冗余代码\n- [2.2] 禁止头文件循环依赖\n- [2.3] 避免包含用不到的头文件\n- [2.4] 禁止extern声明引用外部接口\n- [2.5] 禁止在extern\"C\"中包含头文件\n- [2.6] 避免在头文件中使用using导入命名空间\n- [3.1] 避免滥用typedef/#define类型别名\n- [4.3] 每个常量保证单一职责\n- [5.2] 避免全局变量谨慎使用单例\n- [5.3] 禁止变量自增/自减表达式中再次引用\n- [6.1] 表达式比较左变右不变\n- [6.2] 使用括号明确操作符优先级\n- [8.1] switch语句要有default分支\n- [10.6] 指针/引用形参不修改用const\n- [12.1] 断言不能用于运行期错误处理\n- [14.4] 使用强类型参数避免void*\n- [15.1] 函数传参顺序同一文件内保持一致\n- [15.2] 入参用const T&出参用T&或T*\n- [15.5] 单参数构造函数用explicit\n- [TOPK-12] 宏定义中临时变量命名不能和外部变量冲突\n- [SEC-9.1] 禁止逐位操作非trivially copyable对象\n- [SEC-10.3] 敏感信息使用后清零\n- [SEC-10.4] 结构体字段末尾添加\n- [SEC-10.5] 接口变更考虑兼容性\n\n## 检视结论\n\n本次 PR 整体质量良好，4 类变更均为正向改进：\n\n1. **边界条件修正**（`>`→`>=`）：修复了 4 处 off-by-one 越界风险，是安全性增强\n2. **对齐常量升级**（`UB_ALIGN`→`ALIGNED_LEN_256`）：满足 Compare API 的 256 字节对齐要求，修复对齐问题\n3. **算法重构**（ReduceSum→ReduceMin）：消除 int32 中间张量和 Cast 转换，简化 pipeline，全程保持整数计算（符合 TOPK-10）\n4. **DataCopyPad→DataCopy**：对齐的数据搬运使用更高效的 API\n\n唯一需关注的问题为 [4.2] 魔鬼数字 `-1`（MED 置信度 70%），建议提取为命名常量 `INVALID_EXPERT_ID`。此为代码风格层面的建议，不影响功能正确性。\n\n\n",
+    "can_merge_check": true,
+    "created_at": "2026-07-06T20:04:47.346+08:00",
+    "diff_url": "https://gitcode.com/cann/ops-transformer/merge_requests/8336/diffs",
+    "head": {
+      "assigner": {
+        "login": "z1017i",
+        "name": "z1017i"
+      },
+      "ref": "training_0706",
+      "repo": {
+        "full_name": "z1017i/ops-transformer",
+        "name": "ops-transformer",
+        "path": "ops-transformer"
+      },
+      "sha": "3e2b1754dbb198b0fa0021c472b917fe6af07bba"
+    },
+    "html_url": "https://gitcode.com/cann/ops-transformer/merge_requests/8336",
+    "id": 8838578,
+    "labels": [
+      {
+        "color": "#3ee029",
+        "created_at": "2025-12-16T09:45:21+08:00",
+        "id": 22553,
+        "name": "api-check-pass",
+        "updated_at": "2026-07-06T20:37:47+08:00"
+      },
+      {
+        "color": "#21BA45",
+        "created_at": "2025-06-10T14:17:23+08:00",
+        "id": 3873,
+        "name": "ci-pipeline-passed",
+        "updated_at": "2026-07-06T20:38:37+08:00"
+      },
+      {
+        "color": "#17f207",
+        "created_at": "2025-05-29T20:14:01+08:00",
+        "id": 2741,
+        "name": "lgtm",
+        "updated_at": "2026-07-06T22:09:13+08:00"
+      },
+      {
+        "color": "#22ed07",
+        "created_at": "2025-05-29T20:14:31+08:00",
+        "id": 2742,
+        "name": "approved",
+        "updated_at": "2026-07-06T21:19:53+08:00"
+      },
+      {
+        "color": "#2865E0",
+        "created_at": "2025-06-21T10:53:09+08:00",
+        "id": 4929,
+        "name": "cann-cla/yes",
+        "updated_at": "2026-07-06T20:04:56+08:00"
+      }
+    ],
+    "merged_at": "2026-07-06T22:09:21.141+08:00",
+    "number": 8336,
+    "state": "merged",
+    "testers": [],
+    "title": "fix moe_ep_dispatch accuracy",
+    "updated_at": "2026-07-06T22:09:23.299+08:00"
+  }
+]

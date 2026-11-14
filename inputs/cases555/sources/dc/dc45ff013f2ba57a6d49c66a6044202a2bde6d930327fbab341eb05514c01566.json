@@ -1,0 +1,38 @@
+[
+  {
+    "additions": 8,
+    "blob_id": "cc6e5c75063d970e0d46d08d43a6bd42b0da59f6",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/e7cc5afa4f7b3973149ca987c26713aa0b84ba38/pooling/max_pool_v3/op_kernel/max_pool_v3_apt.cpp",
+    "deletions": 23,
+    "filename": "pooling/max_pool_v3/op_kernel/max_pool_v3_apt.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 8,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -13,6 +13,7 @@\n  */\n \n #include <cstdint>\n+#include \"kernel_operator.h\"\n #include \"arch35/max_pool_v3_big_kernel.h\"\n #include \"arch35/max_pool_v3_small_kernel.h\"\n #include \"arch35/max_pool_v3_small_kernel_pad.h\"\n@@ -31,51 +32,35 @@ extern \"C\" __global__ __aicore__ void max_pool_v3(GM_ADDR x, GM_ADDR y, GM_ADDR\n {\n     AscendC::TPipe pipeBase;\n     KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_AIV_ONLY);\n-    TILING_KEY_IS(BIG_KERNEL_FORMAT_NCHW);\n-    TILING_KEY_IS(SMALL_KERNEL_NO_PADDING_FORMAT_NCHW);\n-    TILING_KEY_IS(SMALL_KERNEL_PADDING_FORMAT_NCHW);\n-    TILING_KEY_IS(BIG_KERNEL_FORMAT_NHWC);\n-    TILING_KEY_IS(SMALL_KERNEL_NO_PADDING_FORMAT_NHWC);\n-    TILING_KEY_IS(SMALL_KERNEL_PADDING_FORMAT_NHWC);\n-    #if TILING_KEY_X == BIG_KERNEL_FORMAT_NCHW\n+    if (TILING_KEY_IS(BIG_KERNEL_FORMAT_NCHW)) {\n         GET_TILING_DATA_WITH_STRUCT(MaxPoolV3BigKernelTilingData, tilingData, tiling);\n         MaxPoolV3::MaxPoolV3BigKernel<DTYPE_X> op(&pipeBase, &tilingData);\n         op.Init(x, y);\n         op.Process();\n-    #endif\n-\n-    #if TILING_KEY_X == SMALL_KERNEL_NO_PADDING_FORMAT_NCHW\n+    } else if (TILING_KEY_IS(SMALL_KERNEL_NO_PADDING_FORMAT_NCHW)) {\n         GET_TILING_DATA_WITH_STRUCT(MaxPoolV3SmallKernelTilingData, tilingData, tiling);\n         MaxPoolV3::MaxPoolV3SmallKernel<DTYPE_X> op(&pipeBase, &tilingData);\n         op.Init(x, y);\n         op.Process();\n-    #endif\n-\n-    #if TILING_KEY_X == SMALL_KERNEL_PADDING_FORMAT_NCHW\n+    } else if (TILING_KEY_IS(SMALL_KERNEL_PADDING_FORMAT_NCHW)) {\n         GET_TILING_DATA_WITH_STRUCT(MaxPoolV3SmallKernelTilingData, tilingData, tiling);\n         MaxPoolV3::MaxPoolV3SmallPadKernel<DTYPE_X> op(&pipeBase, &tilingData);\n         op.Init(x, y);\n         op.Process();\n-    #endif\n-\n-    #if TILING_KEY_X == BIG_KERNEL_FORMAT_NHWC\n+    } else if (TILING_KEY_IS(BIG_KERNEL_FORMAT_NHWC)) {\n         GET_TILING_DATA_WITH_STRUCT(MaxPoolV3NHWCBigKernelTilingData, tilingData, tiling);\n         MaxPoolV3::MaxPoolV3NHWCBigKernel<DTYPE_X> op(&pipeBase, &tilingData);\n         op.Init(x, y);\n         op.Process();\n-    #endif\n-\n-    #if TILING_KEY_X == SMALL_KERNEL_NO_PADDING_FORMAT_NHWC\n+    } else if (TILING_KEY_IS(SMALL_KERNEL_NO_PADDING_FORMAT_NHWC)) {\n         GET_TILING_DATA_WITH_STRUCT(MaxPoolV3NHWCSmallKernelTilingData, tilingData, tiling);\n         MaxPoolV3::MaxPoolV3NHWCSmallKernel<DTYPE_X> op(&pipeBase, &tilingData);\n         op.Init(x, y);\n         op.Process();\n-    #endif\n-\n-    #if TILING_KEY_X == SMALL_KERNEL_PADDING_FORMAT_NHWC\n+    } else if (TILING_KEY_IS(SMALL_KERNEL_PADDING_FORMAT_NHWC)) {\n         GET_TILING_DATA_WITH_STRUCT(MaxPoolV3NHWCSmallKernelTilingData, tilingData, tiling);\n         MaxPoolV3::MaxPoolV3NHWCSmallPadKernel<DTYPE_X> op(&pipeBase, &tilingData);\n         op.Init(x, y);\n         op.Process();\n-    #endif\n+    }\n }\n\\ No newline at end of file\n",
+      "new_file": false,
+      "new_path": "pooling/max_pool_v3/op_kernel/max_pool_v3_apt.cpp",
+      "old_path": "pooling/max_pool_v3/op_kernel/max_pool_v3_apt.cpp",
+      "removed_lines": 23,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/e7cc5afa4f7b3973149ca987c26713aa0b84ba38/pooling/max_pool_v3/op_kernel/max_pool_v3_apt.cpp",
+    "sha": "e7cc5afa4f7b3973149ca987c26713aa0b84ba38",
+    "source_branch": "pool_v3",
+    "source_project": {
+      "full_name": "dong-yanrong/ops-nn",
+      "human_name": "dong-yanrong / ops-nn",
+      "id": 9091461,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  }
+]

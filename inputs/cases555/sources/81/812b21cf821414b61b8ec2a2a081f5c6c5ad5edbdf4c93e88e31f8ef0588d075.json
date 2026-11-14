@@ -1,0 +1,73 @@
+{
+  "assignee": {
+    "html_url": "https://gitcode.com/captainmiaow",
+    "id": "680a0031c6be6f6a0f719f68",
+    "login": "captainmiaow",
+    "name": "captainmiaow",
+    "object_id": "680a0031c6be6f6a0f719f68"
+  },
+  "assignees": [
+    {
+      "html_url": "https://gitcode.com/captainmiaow",
+      "id": "680a0031c6be6f6a0f719f68",
+      "login": "captainmiaow",
+      "name": "captainmiaow",
+      "object_id": "680a0031c6be6f6a0f719f68"
+    }
+  ],
+  "body": "\n\nThanks for sending an issue! Please fill in the following template to help quickly solve your problem.\n\n### Describe the current behavior / 问题描述 (Mandatory / 必填)\n            \n超大shape时，算子计算结果出现精度问题，经代码检视发现存在溢出的情况，如下所示\n\nuint64_t blockSt = cal_idx * m0 * pValue * n;\nuint64_t blockSize = m * n;\n\n由于 cal_idx 、m、n m0   pValue 等相关变量定义为uint32数据类型\n运算顺序：全部按uint32_t相乘，当计算结果超过uint32最大值发生溢出截断\n\n修改方案：直接定义为uint64_t或先转为uint64_t 再计算\n\n代码位置：\nhttps://gitcode.com/cann/ops-transformer/blob/master/mc2/all_gather_matmul_v2/op_kernel/all_gather_matmul_aiv_mode.h\n\n![image.png](https://raw.gitcode.com/user-images/assets/7673863/f6369173-4afa-4fa9-8de1-8124fe346d87/image.png 'image.png')\n\n![image.png](https://raw.gitcode.com/user-images/assets/7673863/5e182c16-6fcc-4ee0-b429-4b50cd6f52c7/image.png 'image.png')\n### Environment / 环境信息 (Mandatory / 必填)\n            \nx86 910B2\n### Steps to reproduce the issue / 重现步骤 (Mandatory / 必填)\n            \n算子的输入shape MN超过 uint32的最大值时 \n\n\n### Describe the expected behavior / 预期结果 (Mandatory / 必填)\n            \n算子运行正常，进度正常\n### Related log / screenshot / 日志 / 截图 (Mandatory / 必填)\n            \n详见问题描述\n### Special notes for this issue/备注 (Optional / 选填)\n            \n请同步检查下其他 大shap下相乘的地方是否有溢出风险\n",
+  "comments": 2,
+  "created_at": "2026-07-10T17:45:14+08:00",
+  "finished_at": "2026-07-16T20:33:13+08:00",
+  "html_url": "https://gitcode.com/cann/ops-transformer/issues/3714",
+  "id": 4157221,
+  "issue_priority_detail": {
+    "id": 116,
+    "title": "无优先级"
+  },
+  "issue_state": "进行中",
+  "issue_state_detail": {
+    "id": 285,
+    "serial": 0,
+    "title": "进行中"
+  },
+  "issue_type": "任务",
+  "issue_type_detail": {
+    "id": 255,
+    "is_system": false,
+    "title": "任务"
+  },
+  "labels": [
+    {
+      "color": "#35e029",
+      "created_at": "2026-03-20T11:25:13+08:00",
+      "id": 38861,
+      "name": "resolved",
+      "updated_at": "2026-07-16T22:44:07+08:00"
+    }
+  ],
+  "number": "3714",
+  "priority": 0,
+  "repository": {
+    "assigner": {},
+    "created_at": "2025-09-28T17:54:46+08:00",
+    "description": "本项目是CANN提供的transformer类大模型算子库，实现网络在NPU上加速计算。",
+    "full_name": "cann/ops-transformer",
+    "id": 7673863,
+    "name": "ops-transformer",
+    "paas": "",
+    "path": "ops-transformer",
+    "updated_at": "2025-09-28T18:06:48+08:00"
+  },
+  "state": "closed",
+  "title": "[Bug-Report|缺陷反馈]: 超大shape时（MN 超过 uint32最大值时），算子计算结果出现精度异常问题，经代码检视发现存在中间结果溢出的情况，请修改，详见问题描述",
+  "updated_at": "2026-07-16T20:33:13+08:00",
+  "user": {
+    "html_url": "https://gitcode.com/LetsAiGo",
+    "id": "69256b09d05c2b7ef518f649",
+    "login": "LetsAiGo",
+    "name": "LetsAiGo",
+    "object_id": "69256b09d05c2b7ef518f649"
+  },
+  "visibility_reason": "public"
+}

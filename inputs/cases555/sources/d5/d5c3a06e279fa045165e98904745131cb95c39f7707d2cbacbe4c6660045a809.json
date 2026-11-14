@@ -1,0 +1,62 @@
+[
+  {
+    "additions": 5,
+    "blob_id": "8ea9180155e65fb94ccabd611020f25af523fc3d",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/e95cd8db564eefc11dda9bb989fe6f28c5622e00/conv/common/op_host/op_tiling/arch35/conv_api_tiling_algorithm_base.cpp",
+    "deletions": 6,
+    "filename": "conv/common/op_host/op_tiling/arch35/conv_api_tiling_algorithm_base.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 5,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -86,7 +86,7 @@ uint64_t ConvTilingAlgorithmBase::InferHiL1(uint64_t hoL1, int64_t hi) const\n \n uint64_t ConvTilingAlgorithmBase::InferWiL1(uint64_t woL1, int64_t wi) const\n {\n-    if (woL1 == static_cast<uint64_t>(tilingIns_->shapeInfo.singleWo) && tilingIns_->isC04Flag) {\n+    if (woL1 >= static_cast<uint64_t>(tilingIns_->shapeInfo.singleWo) && tilingIns_->isC04Flag) {\n         return tilingIns_->shapeInfo.orgWi;\n     }\n \n@@ -157,15 +157,14 @@ bool ConvTilingAlgorithmBase::CheckOptGroupPreload() const\n     bool otherFlag = tilingIns_->l1TilingInfo.iterateMNOrder == IterateMNOrder::ITER_M_FST &&\n                      tilingIns_->ubTilingInfo.mUb == 0 && tilingIns_->ubTilingInfo.nUb == 0;\n \n-    bool multiMFlag = tilingIns_->l1TilingInfo.mAL1 == tilingIns_->l0TilingInfo.mL0;\n+    bool multiMNFlag = tilingIns_->l1TilingInfo.mAL1 == tilingIns_->l0TilingInfo.mL0;\n     if (tilingIns_->outputOrder == static_cast<int8_t>(OutputOrder::HW)) {\n-        multiMFlag = tilingIns_->l1TilingInfo.hoAL1 == tilingIns_->l0TilingInfo.hoL0 &&\n+        multiMNFlag = tilingIns_->l1TilingInfo.hoAL1 == tilingIns_->l0TilingInfo.hoL0 &&\n                      tilingIns_->l1TilingInfo.woAL1 == tilingIns_->l0TilingInfo.woL0;\n     }\n+    multiMNFlag = multiMNFlag && (tilingIns_->l1TilingInfo.nBL1 == tilingIns_->l0TilingInfo.nL0);\n \n-    bool resetFlag = sceneFlag && fullLoadFlag && otherFlag && multiMFlag;\n-\n-    return resetFlag;\n+    return (sceneFlag && fullLoadFlag && otherFlag && multiMNFlag);\n }\n \n void ConvTilingAlgorithmBase::SetPBufferRes()\n",
+      "new_file": false,
+      "new_path": "conv/common/op_host/op_tiling/arch35/conv_api_tiling_algorithm_base.cpp",
+      "old_path": "conv/common/op_host/op_tiling/arch35/conv_api_tiling_algorithm_base.cpp",
+      "removed_lines": 6,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/e95cd8db564eefc11dda9bb989fe6f28c5622e00/conv/common/op_host/op_tiling/arch35/conv_api_tiling_algorithm_base.cpp",
+    "sha": "e95cd8db564eefc11dda9bb989fe6f28c5622e00",
+    "source_branch": "9.0.0",
+    "target_branch": "9.0.0",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 17,
+    "blob_id": "507444eab8d0e4cf8c3c4325ea66753784da65d6",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/e95cd8db564eefc11dda9bb989fe6f28c5622e00/conv/common/op_kernel/arch35/conv_common_func.h",
+    "deletions": 3,
+    "filename": "conv/common/op_kernel/arch35/conv_common_func.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 17,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -208,19 +208,23 @@ struct ConvPreProcess {\n                         WaitFlag<HardEvent::FIX_MTE2>(eventId);\n                     }\n                     self->ctx.scaleL1 = self->ctx.queueScaleL1.template AllocTensor<typename Intf::ScaleT>();\n+                    uint64_t scaleLoadNum = self->ctx.singleCoreCo;\n+                    if constexpr (Intf::groupOptPreloadFlag) {\n+                        scaleLoadNum = self->ctx.orgCo;\n+                    }\n                     if constexpr (Intf::isExtendConv2d) {\n                         if (self->ctx.convTiling->quantMode0 == static_cast<uint8_t>(QuantModeType::VECTOR_QUANT)) {\n                             self->ctx.loadScaleL1Ins.LoadChannelWiseL1FullLoad(self->ctx.scaleL1, self->ctx.scalegm,\n-                                self->ctx.singleCoreCo, 0);\n+                                scaleLoadNum, 0);\n                         }\n                         if (self->ctx.convTiling->dualOutput &&\n                             self->ctx.convTiling->quantMode1 == static_cast<uint8_t>(QuantModeType::VECTOR_QUANT)) {\n                             self->ctx.loadScaleL1Ins.LoadChannelWiseL1FullLoad(self->ctx.scaleL1[self->ctx.scale1L1offset],\n-                                self->ctx.scale1gm, self->ctx.singleCoreCo, 0);\n+                                self->ctx.scale1gm, scaleLoadNum, 0);\n                         }\n                     } else {\n                         self->ctx.loadScaleL1Ins.LoadChannelWiseL1FullLoad(self->ctx.scaleL1, self->ctx.scalegm,\n-                            self->ctx.singleCoreCo, 0);\n+                            scaleLoadNum, 0);\n                     }\n                     self->ctx.queueScaleL1.EnQue(self->ctx.scaleL1);\n                     self->ctx.scaleL1 = self->ctx.queueScaleL1.template DeQue<typename Intf::ScaleT>();\n@@ -450,6 +454,11 @@ __aicore__ inline void InitBuffer(Intf *self)\n         uint64_t scale0L1Size = self->ctx.convTiling->fixpParamsFullLoadFlag ? AlignB(\n             self->ctx.singleCoreCo * Intf::sizeOfScale, BLOCK_L0_N * Intf::sizeOfScale) :\n             self->ctx.convTiling->nL0 * Intf::sizeOfScale;\n+        if constexpr (Intf::groupOptPreloadFlag) {\n+            if (self->ctx.convTiling->fixpParamsFullLoadFlag) {\n+                scale0L1Size = AlignB(self->ctx.orgCo * Intf::sizeOfScale, BLOCK_L0_N * Intf::sizeOfScale);\n+            }\n+        }\n         if (self->ctx.convTiling->quantMode0 == static_cast<uint8_t>(QuantModeType::VECTOR_QUANT)) {\n             scaleL1SpaceSize += scale0L1Size;\n         }\n@@ -466,6 +475,11 @@ __aicore__ inline void InitBuffer(Intf *self)\n             uint64_t scaleL1SpaceSize = self->ctx.convTiling->fixpParamsFullLoadFlag ? AlignB(\n                 self->ctx.singleCoreCo * Intf::sizeOfScale, BLOCK_L0_N * Intf::sizeOfScale) :\n                 self->ctx.convTiling->nL0 * Intf::sizeOfScale;\n+            if constexpr (Intf::groupOptPreloadFlag) {\n+                if (self->ctx.convTiling->fixpParamsFullLoadFlag) {\n+                    scaleL1SpaceSize = AlignB(self->ctx.orgCo * Intf::sizeOfScale, BLOCK_L0_N * Intf::sizeOfScale);\n+                }\n+            }\n             self->ctx.pipe.InitBuffer(self->ctx.queueScaleL1, 1, AlignB(scaleL1SpaceSize, C0_SIZE));\n         }\n     }\n",
+      "new_file": false,
+      "new_path": "conv/common/op_kernel/arch35/conv_common_func.h",
+      "old_path": "conv/common/op_kernel/arch35/conv_common_func.h",
+      "removed_lines": 3,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/e95cd8db564eefc11dda9bb989fe6f28c5622e00/conv/common/op_kernel/arch35/conv_common_func.h",
+    "sha": "e95cd8db564eefc11dda9bb989fe6f28c5622e00",
+    "source_branch": "9.0.0",
+    "target_branch": "9.0.0",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  }
+]

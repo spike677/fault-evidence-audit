@@ -1,0 +1,293 @@
+[
+  {
+    "additions": 199,
+    "blob_id": "561ee5f1025b86c5b60870e610551e16863264b6",
+    "blob_url": "https://gitcode.com/cann/ops-math/blob/c7d34cee6cca020dc5904954e61abe70f74a9657/math/polar/op_host/arch35/polar_tiling.cpp",
+    "deletions": 73,
+    "filename": "math/polar/op_host/arch35/polar_tiling.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 199,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -9,87 +9,213 @@\n  */\n \n /*!\n- * \\file polar_tiling.cpp\n- * \\brief polar broadcast tiling implementation\n+ * \\file    polar_tiling.cpp\n+ * \\brief   polar tiling\n  */\n-#include <graph/utils/type_utils.h>\n-#include \"op_host/math_tiling_templates_registry.h\"\n-#include \"log/log.h\"\n-#include \"atvoss/broadcast/broadcast_tiling.h\"\n-#include \"../../op_kernel/arch35/polar_dag.h\"\n-#include \"../../op_kernel/arch35/polar_struct.h\"\n-#include \"polar_tiling.h\"\n \n-using namespace Ops::Base;\n-using namespace AscendC;\n+#include \"polar_tiling.h\"\n+#include <graph/utils/type_utils.h>\n+\n using namespace ge;\n \n namespace optiling {\n+static constexpr uint64_t INPUT_ABS = 0;\n+static constexpr uint64_t INPUT_ANGLE = 1;\n+static constexpr uint64_t OUTPUT_Y = 0;\n \n-constexpr static uint64_t POLAR_COMMON_TILING_PRIORITY = 0;\n-\n-ge::graphStatus PolarTiling::GetShapeAttrsInfo() { return ge::GRAPH_SUCCESS; }\n-\n-bool PolarTiling::IsCapable() { return true; }\n-\n-ge::graphStatus PolarTiling::DoOpTiling()\n+ge::graphStatus PolarTiling::GetPlatformInfo()\n {\n-    auto outputDesc = context_->GetOutputDesc(0);\n-    OP_CHECK_NULL_WITH_CONTEXT(context_, outputDesc);\n-    ge::DataType outputDtype = outputDesc->GetDataType();\n-\n-    ge::graphStatus ret = ge::GRAPH_SUCCESS;\n-    if (outputDtype == ge::DT_COMPLEX64) {\n-        BroadcastBaseTiling<PolarOp::PolarBrcDag<complex64, float>::OpDag> brcBaseTiling(context_);\n-        ret = brcBaseTiling.DoTiling();\n-        tilingKey = GET_TPL_TILING_KEY(brcBaseTiling.GetSchMode());\n-    } else {\n-        OP_LOGE_FOR_INVALID_DTYPE(context_->GetNodeName(), \"output\", ge::TypeUtils::DataTypeToSerialString(outputDtype),\n-                                  \"COMPLEX64\");\n-        return ge::GRAPH_FAILED;\n-    }\n-\n-    return ret;\n-}\n-\n-ge::graphStatus PolarTiling::DoLibApiTiling() { return ge::GRAPH_SUCCESS; }\n-\n-uint64_t PolarTiling::GetTilingKey() const { return tilingKey; }\n-\n-ge::graphStatus PolarTiling::GetWorkspaceSize() { return ge::GRAPH_SUCCESS; }\n-\n-ge::graphStatus PolarTiling::PostTiling() { return ge::GRAPH_SUCCESS; }\n-\n-ge::graphStatus PolarTiling::GetPlatformInfo() { return ge::GRAPH_SUCCESS; }\n-\n-ge::graphStatus TilingForPolar(gert::TilingContext* context)\n-{\n-    OP_LOGD(\"PolarTiling\", \"Enter TilingForPolar\");\n-    if (context == nullptr) {\n-        OP_LOGE(\"PolarTiling\", \"Tiling context is nullptr\");\n-        return ge::GRAPH_FAILED;\n-    }\n-\n-    auto compileInfo = reinterpret_cast<const PolarCompileInfo*>(context->GetCompileInfo());\n-    OP_CHECK_NULL_WITH_CONTEXT(context, compileInfo);\n-\n-    OP_LOGD(context, \"Enter ascendc PolarTiling\");\n-    return Ops::Math::OpTiling::TilingRegistry::GetInstance().DoTilingImpl(context);\n-}\n-\n-ge::graphStatus TilingPrepareForPolar(gert::TilingParseContext* context)\n-{\n-    auto compileInfoPtr = context->GetCompiledInfo<PolarCompileInfo>();\n-    OP_CHECK_NULL_WITH_CONTEXT(context, compileInfoPtr);\n-    fe::PlatFormInfos* platformInfoPtr = context->GetPlatformInfo();\n-    OP_CHECK_NULL_WITH_CONTEXT(context, platformInfoPtr);\n-    auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfoPtr);\n-    compileInfoPtr->coreNum = ascendcPlatform.GetCoreNumAiv();\n-    ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::UB, compileInfoPtr->ubSize);\n+    OP_LOGD(context_, \"PolarTiling GetPlatformInfo.\");\n+    compileInfo_ = static_cast<const PolarCompileInfo*>(context_->GetCompileInfo());\n+    OP_CHECK_NULL_WITH_CONTEXT(context_, compileInfo_);\n     return ge::GRAPH_SUCCESS;\n }\n \n-IMPL_OP_OPTILING(Polar).Tiling(TilingForPolar).TilingParse<PolarCompileInfo>(TilingPrepareForPolar);\n+ge::graphStatus PolarTiling::CheckDtype()\n+{\n+    OP_LOGD(context_, \"PolarTiling CheckDtype.\");\n+    auto input0Desc = context_->GetInputDesc(INPUT_ABS);\n+    OP_CHECK_NULL_WITH_CONTEXT(context_, input0Desc);\n+    ge::DataType input0Dtype = input0Desc->GetDataType();\n+    auto input1Desc = context_->GetInputDesc(INPUT_ANGLE);\n+    OP_CHECK_NULL_WITH_CONTEXT(context_, input1Desc);\n+    ge::DataType input1Dtype = input1Desc->GetDataType();\n+    auto outputDesc = context_->GetOutputDesc(OUTPUT_Y);\n+    OP_CHECK_NULL_WITH_CONTEXT(context_, outputDesc);\n+    ge::DataType outputDtype = outputDesc->GetDataType();\n+    if (input0Dtype != ge::DT_FLOAT || input1Dtype != ge::DT_FLOAT || outputDtype != ge::DT_COMPLEX64) {\n+        std::string dtypesStr = ge::TypeUtils::DataTypeToSerialString(input0Dtype) + \", \" +\n+                                ge::TypeUtils::DataTypeToSerialString(input1Dtype) + \" and \" +\n+                                ge::TypeUtils::DataTypeToSerialString(outputDtype);\n+        OP_LOGE_FOR_INVALID_DTYPES_WITH_REASON(\n+            context_->GetNodeName(), \"abs, angle and y\", dtypesStr.c_str(),\n+            \"The dtypes of abs and angle must be float, and the dtype of y must be complex64\");\n+        return ge::GRAPH_FAILED;\n+    }\n+    return ge::GRAPH_SUCCESS;\n+}\n \n-REGISTER_OPS_TILING_TEMPLATE(Polar, PolarTiling, POLAR_COMMON_TILING_PRIORITY);\n-} // namespace optiling\n\\ No newline at end of file\n+ge::graphStatus PolarTiling::CheckBroadcastAndMergeShape()\n+{\n+    OP_LOGD(context_, \"PolarTiling CheckBroadcastAndMergeShape.\");\n+    const gert::StorageShape* absStorageShape = context_->GetInputShape(INPUT_ABS);\n+    OP_CHECK_NULL_WITH_CONTEXT(context_, absStorageShape);\n+    const gert::StorageShape* angleStorageShape = context_->GetInputShape(INPUT_ANGLE);\n+    OP_CHECK_NULL_WITH_CONTEXT(context_, angleStorageShape);\n+\n+    auto absShape = absStorageShape->GetStorageShape();\n+    auto angleShape = angleStorageShape->GetStorageShape();\n+\n+    int64_t absDimNum = static_cast<int64_t>(absShape.GetDimNum());\n+    int64_t angleDimNum = static_cast<int64_t>(angleShape.GetDimNum());\n+    dimNum_ = std::max(absDimNum, angleDimNum);\n+    OP_CHECK_IF(dimNum_ > POLAR_MAX_DIM,\n+                OP_LOGE(context_, \"dimNum %ld exceeds POLAR_MAX_DIM %ld\", dimNum_, POLAR_MAX_DIM),\n+                return ge::GRAPH_FAILED);\n+\n+    for (int64_t i = 0; i < dimNum_; i++) {\n+        int64_t absOffset = i - (dimNum_ - absDimNum);\n+        int64_t angleOffset = i - (dimNum_ - angleDimNum);\n+        int64_t absDim = (absOffset >= 0) ? absShape.GetDim(absOffset) : 1;\n+        int64_t angleDim = (angleOffset >= 0) ? angleShape.GetDim(angleOffset) : 1;\n+        absDims_[i] = absDim;\n+        angleDims_[i] = angleDim;\n+        OP_CHECK_IF(absDim != angleDim && absDim != 1 && angleDim != 1,\n+                    OP_LOGE(context_, \"Shapes not broadcastable at dim %ld: %ld vs %ld\", i, absDim, angleDim),\n+                    return ge::GRAPH_FAILED);\n+        mergedShape_[i] = std::max(absDim, angleDim);\n+    }\n+\n+    totalElements_ = 1;\n+    for (int64_t i = 0; i < dimNum_; i++) {\n+        totalElements_ *= mergedShape_[i];\n+    }\n+    return ge::GRAPH_SUCCESS;\n+}\n+\n+ge::graphStatus PolarTiling::CalcStride()\n+{\n+    OP_LOGD(context_, \"PolarTiling CalcStride.\");\n+    int64_t strideAbs = 1;\n+    int64_t strideAngle = 1;\n+    int64_t strideMerged = 1;\n+    int64_t strideY = 1;\n+    for (int64_t i = dimNum_ - 1; i >= 0; i--) {\n+        absStride_[i] = (absDims_[i] == 1) ? 0 : strideAbs;\n+        angleStride_[i] = (angleDims_[i] == 1) ? 0 : strideAngle;\n+        mergedStride_[i] = strideMerged;\n+        yStride_[i] = strideY;\n+        strideAbs *= absDims_[i];\n+        strideAngle *= angleDims_[i];\n+        strideMerged *= mergedShape_[i];\n+        strideY *= mergedShape_[i];\n+    }\n+    return ge::GRAPH_SUCCESS;\n+}\n+\n+ge::graphStatus PolarTiling::GetShapeAttrsInfo()\n+{\n+    if (CheckDtype() != ge::GRAPH_SUCCESS)\n+        return ge::GRAPH_FAILED;\n+    if (CheckBroadcastAndMergeShape() != ge::GRAPH_SUCCESS)\n+        return ge::GRAPH_FAILED;\n+    if (CalcStride() != ge::GRAPH_SUCCESS)\n+        return ge::GRAPH_FAILED;\n+    return ge::GRAPH_SUCCESS;\n+}\n+\n+ge::graphStatus PolarTiling::DoOpTiling()\n+{\n+    OP_LOGD(context_, \"PolarTiling DoOpTiling.\");\n+\n+    int64_t coreNum = compileInfo_->coreNum;\n+    int64_t elementsPerCore = totalElements_ / coreNum;\n+    int64_t formerCore = totalElements_ % coreNum;\n+\n+    tilingData_.totalElements = totalElements_;\n+    tilingData_.elementsPerCore = elementsPerCore;\n+    tilingData_.coreNum = coreNum;\n+    tilingData_.formerCore = formerCore;\n+    tilingData_.dimNum = dimNum_;\n+\n+    for (int64_t i = 0; i < POLAR_MAX_DIM; i++) {\n+        if (i < dimNum_) {\n+            tilingData_.mergedStride[i] = mergedStride_[i];\n+            tilingData_.absStride[i] = absStride_[i];\n+            tilingData_.angleStride[i] = angleStride_[i];\n+            tilingData_.yStride[i] = yStride_[i];\n+        } else {\n+            tilingData_.mergedStride[i] = 1;\n+            tilingData_.absStride[i] = 0;\n+            tilingData_.angleStride[i] = 0;\n+            tilingData_.yStride[i] = 0;\n+        }\n+    }\n+\n+    blockDim_ = (totalElements_ < coreNum) ? totalElements_ : coreNum;\n+\n+    return ge::GRAPH_SUCCESS;\n+}\n+\n+ge::graphStatus PolarTiling::PostTiling()\n+{\n+    OP_LOGD(context_, \"PolarTiling PostTiling.\");\n+\n+    auto workspaces = context_->GetWorkspaceSizes(1);\n+    OP_CHECK_NULL_WITH_CONTEXT(context_, workspaces);\n+    workspaces[0] = 0;\n+\n+    auto res = context_->SetBlockDim(static_cast<uint32_t>(blockDim_));\n+    OP_CHECK_IF((res != ge::GRAPH_SUCCESS), OP_LOGE(context_, \"SetBlockDim failed.\"), return ge::GRAPH_FAILED);\n+\n+    errno_t ret = memcpy_s(context_->GetRawTilingData()->GetData(), context_->GetRawTilingData()->GetCapacity(),\n+                           &tilingData_, sizeof(PolarTilingData));\n+    if (ret != EOK) {\n+        OP_LOGE(context_->GetNodeName(), \"memcpy_s failed, ret=%d\", ret);\n+        return ge::GRAPH_FAILED;\n+    }\n+    context_->GetRawTilingData()->SetDataSize(sizeof(PolarTilingData));\n+\n+    return ge::GRAPH_SUCCESS;\n+}\n+\n+static ge::graphStatus Tiling4Polar(gert::TilingContext* context)\n+{\n+    OP_LOGD(context, \"Tiling4Polar start.\");\n+\n+    PolarTiling polarTiling(context);\n+    auto ret = polarTiling.DoTiling();\n+    OP_CHECK_IF((ret == ge::GRAPH_FAILED), OP_LOGD(context, \"Tiling4Polar failed!\"), return ge::GRAPH_FAILED);\n+    OP_LOGD(context, \"Tiling4Polar end.\");\n+    return ge::GRAPH_SUCCESS;\n+}\n+\n+static ge::graphStatus TilingPrepare4PolarAscendc(gert::TilingParseContext* context)\n+{\n+    OP_LOGD(context->GetNodeName(), \"Enter TilingPrepare4PolarAscendc.\");\n+\n+    auto compileInfo = context->GetCompiledInfo<PolarCompileInfo>();\n+    OP_CHECK_NULL_WITH_CONTEXT(context, compileInfo);\n+    auto platformInfo = context->GetPlatformInfo();\n+    OP_CHECK_NULL_WITH_CONTEXT(context, platformInfo);\n+    auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfo);\n+\n+    compileInfo->coreNum = ascendcPlatform.GetCoreNumAiv();\n+    OP_CHECK_IF((compileInfo->coreNum <= 0), OP_LOGE(context->GetNodeName(), \"core num is negative.\"),\n+                return ge::GRAPH_FAILED);\n+\n+    OP_LOGD(context->GetNodeName(), \"Exit TilingPrepare4PolarAscendc.\");\n+    return ge::GRAPH_SUCCESS;\n+}\n+\n+static ge::graphStatus TilingPrepare4Polar(gert::TilingParseContext* context)\n+{\n+    auto compileInfo = context->GetCompiledInfo<PolarCompileInfo>();\n+    OP_CHECK_NULL_WITH_CONTEXT(context, compileInfo);\n+    OP_LOGD(\"TilingPrepare4Polar\", \"Ascend C TilingPrepare4Polar success.\");\n+    return TilingPrepare4PolarAscendc(context);\n+}\n+\n+IMPL_OP_OPTILING(Polar).Tiling(Tiling4Polar).TilingParse<PolarCompileInfo>(TilingPrepare4Polar);\n+\n+} // namespace optiling\n",
+      "new_file": false,
+      "new_path": "math/polar/op_host/arch35/polar_tiling.cpp",
+      "old_path": "math/polar/op_host/arch35/polar_tiling.cpp",
+      "removed_lines": 73,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-math/raw/c7d34cee6cca020dc5904954e61abe70f74a9657/math/polar/op_host/arch35/polar_tiling.cpp",
+    "sha": "c7d34cee6cca020dc5904954e61abe70f74a9657",
+    "source_branch": "rollback-polar",
+    "source_project": {
+      "full_name": "xiu_ling_wang/ops-math",
+      "human_name": "xiu_ling_wang / ops-math",
+      "id": 7659863,
+      "path": "ops-math"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-math",
+      "human_name": "CANN / ops-math",
+      "id": 7649531,
+      "path": "ops-math"
+    }
+  },
+  {
+    "additions": 29,
+    "blob_id": "d93d34c12967f289ebd4befc63a8f73ca5c01c23",
+    "blob_url": "https://gitcode.com/cann/ops-math/blob/c7d34cee6cca020dc5904954e61abe70f74a9657/math/polar/op_host/arch35/polar_tiling.h",
+    "deletions": 12,
+    "filename": "math/polar/op_host/arch35/polar_tiling.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 29,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -10,39 +10,56 @@\n \n /*!\n  * \\file polar_tiling.h\n- * \\brief polar broadcast tiling header\n+ * \\brief polar tiling header\n  */\n #ifndef OPS_BUILD_IN_OP_TILING_RUNTIME_POLAR_TILING_H\n #define OPS_BUILD_IN_OP_TILING_RUNTIME_POLAR_TILING_H\n \n-#include \"register/op_def_registry.h\"\n-#include \"tiling/tiling_api.h\"\n+#include <cstdint>\n+#include \"register/tilingdata_base.h\"\n #include \"op_host/tiling_base_class.h\"\n+#include \"register/op_impl_registry.h\"\n+#include \"platform/platform_ascendc.h\"\n+#include \"log/log.h\"\n+#include \"../../op_kernel/arch35/polar_struct.h\"\n \n namespace optiling {\n \n struct PolarCompileInfo {\n-    uint64_t coreNum = 0;\n-    uint64_t ubSize = 0;\n+    int64_t coreNum = 0;\n };\n \n class PolarTiling : public Ops::Base::TilingBaseClass {\n public:\n-    explicit PolarTiling(gert::TilingContext* context) : Ops::Base::TilingBaseClass(context) {}\n+    explicit PolarTiling(gert::TilingContext* context) : TilingBaseClass(context) {}\n \n protected:\n-    bool IsCapable() override;\n+    bool IsCapable() override { return true; }\n     ge::graphStatus GetPlatformInfo() override;\n     ge::graphStatus GetShapeAttrsInfo() override;\n     ge::graphStatus DoOpTiling() override;\n-    ge::graphStatus DoLibApiTiling() override;\n-    uint64_t GetTilingKey() const override;\n-    ge::graphStatus GetWorkspaceSize() override;\n+    ge::graphStatus DoLibApiTiling() override { return ge::GRAPH_SUCCESS; }\n+    uint64_t GetTilingKey() const override { return 0; }\n+    ge::graphStatus GetWorkspaceSize() override { return ge::GRAPH_SUCCESS; }\n     ge::graphStatus PostTiling() override;\n+    ge::graphStatus CheckDtype();\n+    ge::graphStatus CheckBroadcastAndMergeShape();\n+    ge::graphStatus CalcStride();\n \n private:\n-    uint64_t tilingKey = 0;\n+    const PolarCompileInfo* compileInfo_;\n+    PolarTilingData tilingData_{};\n+    uint32_t blockDim_{1};\n+    int64_t totalElements_ = 0;\n+    int64_t dimNum_ = 0;\n+    int64_t absDims_[POLAR_MAX_DIM] = {0};\n+    int64_t angleDims_[POLAR_MAX_DIM] = {0};\n+    int64_t mergedShape_[POLAR_MAX_DIM] = {0};\n+    int64_t mergedStride_[POLAR_MAX_DIM] = {0};\n+    int64_t absStride_[POLAR_MAX_DIM] = {0};\n+    int64_t angleStride_[POLAR_MAX_DIM] = {0};\n+    int64_t yStride_[POLAR_MAX_DIM] = {0};\n };\n \n } // namespace optiling\n-#endif // OPS_BUILD_IN_OP_TILING_RUNTIME_POLAR_TILING_H\n\\ No newline at end of file\n+#endif // OPS_BUILD_IN_OP_TILING_RUNTIME_POLAR_TILING_H\n",
+      "new_file": false,
+      "new_path": "math/polar/op_host/arch35/polar_tiling.h",
+      "old_path": "math/polar/op_host/arch35/polar_tiling.h",
+      "removed_lines": 12,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-math/raw/c7d34cee6cca020dc5904954e61abe70f74a9657/math/polar/op_host/arch35/polar_tiling.h",
+    "sha": "c7d34cee6cca020dc5904954e61abe70f74a9657",
+    "source_branch": "rollback-polar",
+    "source_project": {
+      "full_name": "xiu_ling_wang/ops-math",
+      "human_name": "xiu_ling_wang / ops-math",
+      "id": 7659863,
+      "path": "ops-math"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-math",
+      "human_name": "CANN / ops-math",
+      "id": 7649531,
+      "path": "ops-math"
+    }
+  },
+  {
+    "additions": 0,
+    "blob_id": "0000000000000000000000000000000000000000",
+    "blob_url": "https://gitcode.com/cann/ops-math/blob/95c9a7f3c6ee75eface3da68713749c0a394aca3/math/polar/op_kernel/arch35/polar.h",
+    "deletions": 33,
+    "filename": "math/polar/op_kernel/arch35/polar.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 0,
+      "b_mode": "0",
+      "deleted_file": true,
+      "diff": "@@ -1,33 +0,0 @@\n-/**\n- * Copyright (c) 2026 Huawei Technologies Co., Ltd.\n- * This program is free software, you can redistribute it and/or modify it under the terms and conditions of\n- * CANN Open Software License Agreement Version 2.0 (the \"License\").\n- * Please refer to the License for details. You may not use this file except in compliance with the License.\n- * THIS SOFTWARE IS PROVIDED ON AN \"AS IS\" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,\n- * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.\n- * See LICENSE in the root of the software repository for the full text of the License.\n- */\n-\n-/*!\n- * \\file polar_simd.h\n- * \\brief polar operator SIMD kernel entry for arch35 (ascend950)\n- */\n-#ifndef POLAR_SIMD_H_\n-#define POLAR_SIMD_H_\n-\n-#include \"kernel_operator.h\"\n-#include \"atvoss/broadcast/broadcast_sch.h\"\n-#include \"polar_dag.h\"\n-#include \"polar_struct.h\"\n-\n-using namespace Ops::Base;\n-\n-template <uint64_t schMode>\n-__global__ __aicore__ void polar(GM_ADDR abs, GM_ADDR angle, GM_ADDR out, GM_ADDR workspace, GM_ADDR tiling)\n-{\n-    using OpDag = PolarOp::PolarBrcDag<complex64, float>::OpDag;\n-    BroadcastSch<schMode, OpDag> sch(tiling);\n-    sch.Process(abs, angle, out);\n-}\n-\n-#endif // POLAR_SIMD_H_\n\\ No newline at end of file\n",
+      "new_file": false,
+      "new_path": "math/polar/op_kernel/arch35/polar.h",
+      "old_path": "math/polar/op_kernel/arch35/polar.h",
+      "removed_lines": 33,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-math/raw/95c9a7f3c6ee75eface3da68713749c0a394aca3/math/polar/op_kernel/arch35/polar.h",
+    "sha": "95c9a7f3c6ee75eface3da68713749c0a394aca3",
+    "source_branch": "rollback-polar",
+    "source_project": {
+      "full_name": "xiu_ling_wang/ops-math",
+      "human_name": "xiu_ling_wang / ops-math",
+      "id": 7659863,
+      "path": "ops-math"
+    },
+    "status": "deleted",
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-math",
+      "human_name": "CANN / ops-math",
+      "id": 7649531,
+      "path": "ops-math"
+    }
+  },
+  {
+    "additions": 0,
+    "blob_id": "0000000000000000000000000000000000000000",
+    "blob_url": "https://gitcode.com/cann/ops-math/blob/95c9a7f3c6ee75eface3da68713749c0a394aca3/math/polar/op_kernel/arch35/polar_dag.h",
+    "deletions": 105,
+    "filename": "math/polar/op_kernel/arch35/polar_dag.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 0,
+      "b_mode": "0",
+      "deleted_file": true,
+      "diff": "@@ -1,105 +0,0 @@\n-/**\n- * Copyright (c) 2026 Huawei Technologies Co., Ltd.\n- * This program is free software, you can redistribute it and/or modify it under the terms and conditions of\n- * CANN Open Software License Agreement Version 2.0 (the \"License\").\n- * Please refer to the License for details. You may not use this file except in compliance with the License.\n- * THIS SOFTWARE IS PROVIDED ON AN \"AS IS\" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,\n- * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.\n- * See LICENSE in the root of the software repository for the full text of the License.\n- */\n-\n-/*!\n- * \\file polar_dag.h\n- * \\brief polar operator BRC DAG definition for arch35 (ascend950)\n- *\n- * Polar operator: abs(float) and angle(float) -> out(complex64)\n- * out.real = abs * cos(angle)\n- * out.imag = abs * sin(angle)\n- * Supports broadcast between abs and angle inputs via CopyInBrc.\n- * Uses AscendC SIMD vector operations (Cos, Sin, Mul) and Interleave\n- * with double buffer pipeline.\n- */\n-#ifndef POLAR_DAG_H_\n-#define POLAR_DAG_H_\n-\n-#include \"atvoss/util/dag.h\"\n-#include \"atvoss/util/vec.h\"\n-#include \"atvoss/util/placeholder.h\"\n-#include \"atvoss/util/elems.h\"\n-\n-#ifndef __CCE_AICORE__\n-struct complex64 {\n-    float real;\n-    float imag;\n-};\n-#else\n-namespace PolarOp {\n-using namespace AscendC;\n-constexpr uint32_t POLAR_TAIL_THREAD_NUM = 1024;\n-\n-template <typename T>\n-__simt_vf__ __aicore__ inline void PolarTailCompute(__ubuf__ T* dst, __ubuf__ T* abs, __ubuf__ T* angle,\n-                                                    uint64_t alignedCount, uint64_t count)\n-{\n-    for (uint64_t i = alignedCount + threadIdx.x; i < count; i += blockDim.x) {\n-        T cosVal = Simt::Cos(angle[i]);\n-        T sinVal = Simt::Sin(angle[i]);\n-        dst[i * 2] = abs[i] * cosVal;\n-        dst[i * 2 + 1] = abs[i] * sinVal;\n-    }\n-}\n-} // namespace PolarOp\n-#endif\n-\n-namespace PolarOp {\n-using namespace Ops::Base;\n-\n-template <class C, class T>\n-struct PolarMerge : public Vec::ElemwiseBinaryOP<C, T, T> {\n-    __aicore__ inline PolarMerge(LocalTensor<C>& dst, LocalTensor<T>& abs, LocalTensor<T>& angle, uint64_t count)\n-    {\n-#ifdef __CCE_AICORE__\n-        using namespace AscendC;\n-        constexpr uint32_t ALIGN_ELEMS = 32 / sizeof(T); // 32B的元素数量\n-        LocalTensor<T> dstT = dst.template ReinterpretCast<T>();\n-\n-        uint64_t alignedCount = (count / ALIGN_ELEMS) * ALIGN_ELEMS;\n-        if (alignedCount > 0) {\n-            LocalTensor<T> tmpReal = dstT;\n-            LocalTensor<T> tmpImag = dstT[alignedCount];\n-\n-            AscendC::Cos(tmpReal, angle, alignedCount);        // tmpReal = cos(angle)\n-            AscendC::Sin(tmpImag, angle, alignedCount);        // tmpImag = sin(angle)\n-            AscendC::Mul(tmpReal, abs, tmpReal, alignedCount); // tmpReal = abs * cos(angle)\n-            AscendC::Mul(tmpImag, abs, tmpImag, alignedCount); // tmpImag = abs * sin(angle)\n-\n-            Interleave(dstT, dstT[alignedCount], tmpReal, tmpImag, alignedCount);\n-        }\n-\n-        // 非32B对齐的尾部数据（<32B，VEC无法处理，用Simt::VF_CALL计算）\n-        if (count > alignedCount) {\n-            __ubuf__ T* dstAddr = (__ubuf__ T*)dstT.GetPhyAddr();\n-            __ubuf__ T* absAddr = (__ubuf__ T*)abs.GetPhyAddr();\n-            __ubuf__ T* angleAddr = (__ubuf__ T*)angle.GetPhyAddr();\n-            Simt::VF_CALL<PolarTailCompute<T>>(Simt::Dim3(POLAR_TAIL_THREAD_NUM), dstAddr, absAddr, angleAddr,\n-                                               alignedCount, count);\n-        }\n-\n-#endif\n-    }\n-};\n-\n-template <typename C, typename T>\n-struct PolarBrcDag {\n-    using OpCopyInAbs = Bind<Vec::CopyInBrc<T>, Placeholder::In0<T>>;\n-    using OpCopyInAngle = Bind<Vec::CopyInBrc<T>, Placeholder::In1<T>>;\n-    using OpMerge = Bind<PolarMerge<C, T>, OpCopyInAbs, OpCopyInAngle>;\n-    using OpCopyOut = Bind<Vec::CopyOut<C>, Placeholder::Out0<C>, OpMerge>;\n-\n-    using Outputs = Elems<OpCopyOut>;\n-    using MemCfg = MemOptCfg<MemLevel::LEVEL_2>;\n-    using OpDag = DAGSch<Outputs, void, MemCfg>;\n-};\n-\n-} // namespace PolarOp\n-#endif // POLAR_DAG_H_\n\\ No newline at end of file\n",
+      "new_file": false,
+      "new_path": "math/polar/op_kernel/arch35/polar_dag.h",
+      "old_path": "math/polar/op_kernel/arch35/polar_dag.h",
+      "removed_lines": 105,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-math/raw/95c9a7f3c6ee75eface3da68713749c0a394aca3/math/polar/op_kernel/arch35/polar_dag.h",
+    "sha": "95c9a7f3c6ee75eface3da68713749c0a394aca3",
+    "source_branch": "rollback-polar",
+    "source_project": {
+      "full_name": "xiu_ling_wang/ops-math",
+      "human_name": "xiu_ling_wang / ops-math",
+      "id": 7659863,
+      "path": "ops-math"
+    },
+    "status": "deleted",
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-math",
+      "human_name": "CANN / ops-math",
+      "id": 7649531,
+      "path": "ops-math"
+    }
+  },
+  {
+    "additions": 122,
+    "blob_id": "de1f216b1706bf80e446fb9277a3cea887dd0e19",
+    "blob_url": "https://gitcode.com/cann/ops-math/blob/c7d34cee6cca020dc5904954e61abe70f74a9657/math/polar/op_kernel/arch35/polar_simt.h",
+    "deletions": 0,
+    "filename": "math/polar/op_kernel/arch35/polar_simt.h",
+    "patch": {
+      "a_mode": "0",
+      "added_lines": 122,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -0,0 +1,122 @@\n+/**\n+ * Copyright (c) 2026 Huawei Technologies Co., Ltd.\n+ * This program is free software, you can redistribute it and/or modify it under the terms and conditions of\n+ * CANN Open Software License Agreement Version 2.0 (the \"License\").\n+ * Please refer to the License for details. You may not use this file except in compliance with the License.\n+ * THIS SOFTWARE IS PROVIDED ON AN \"AS IS\" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,\n+ * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.\n+ * See LICENSE in the root of the software repository for the full text of the License.\n+ */\n+\n+/*!\n+ * \\file polar_simt.h\n+ * \\brief polar simt kernel\n+ */\n+#ifndef POLAR_SIMT_H\n+#define POLAR_SIMT_H\n+\n+#include \"kernel_operator.h\"\n+#include \"polar_struct.h\"\n+#ifdef __CCE_AICORE__\n+#include \"simt_api/asc_simt.h\"\n+#endif\n+\n+namespace PolarOp {\n+using namespace AscendC;\n+\n+constexpr int32_t POLAR_THREAD_DIM = 1024;\n+\n+struct PolarStridePara {\n+    int64_t ms[POLAR_MAX_DIM];\n+    int64_t absS[POLAR_MAX_DIM];\n+    int64_t angleS[POLAR_MAX_DIM];\n+    int64_t yS[POLAR_MAX_DIM];\n+};\n+\n+template <typename T>\n+class PolarSimt {\n+public:\n+    __aicore__ inline PolarSimt() {}\n+    __aicore__ inline ~PolarSimt() {}\n+\n+    __aicore__ inline void Init(GM_ADDR abs, GM_ADDR angle, GM_ADDR y, const PolarTilingData& tilingData)\n+    {\n+        totalElements_ = tilingData.totalElements;\n+        elementsPerCore_ = tilingData.elementsPerCore;\n+        coreNum_ = tilingData.coreNum;\n+        formerCore_ = tilingData.formerCore;\n+        dimNum_ = tilingData.dimNum;\n+\n+        for (int i = 0; i < POLAR_MAX_DIM; i++) {\n+            para_.ms[i] = tilingData.mergedStride[i];\n+            para_.absS[i] = tilingData.absStride[i];\n+            para_.angleS[i] = tilingData.angleStride[i];\n+            para_.yS[i] = tilingData.yStride[i];\n+        }\n+\n+        absGm_.SetGlobalBuffer((__gm__ T*)abs);\n+        angleGm_.SetGlobalBuffer((__gm__ T*)angle);\n+        yGm_.SetGlobalBuffer((__gm__ T*)y);\n+    }\n+\n+    __aicore__ inline void Process()\n+    {\n+        int32_t blockIdx = static_cast<int32_t>(GetBlockIdx());\n+        int64_t startIdx = (blockIdx < formerCore_) ? (elementsPerCore_ + 1) * blockIdx :\n+                                                      formerCore_ + elementsPerCore_ * blockIdx;\n+        int64_t count = (blockIdx < formerCore_) ? (elementsPerCore_ + 1) : elementsPerCore_;\n+\n+        if (count <= 0)\n+            return;\n+\n+        asc_vf_call<SimtPolarCompute<T>>(dim3(POLAR_THREAD_DIM), (__gm__ T*)(absGm_.GetPhyAddr()),\n+                                         (__gm__ T*)(angleGm_.GetPhyAddr()), (__gm__ T*)(yGm_.GetPhyAddr()), startIdx,\n+                                         count, dimNum_, para_);\n+    }\n+\n+private:\n+    template <typename U>\n+    __simt_vf__ LAUNCH_BOUND(POLAR_THREAD_DIM) static void SimtPolarCompute(__gm__ U* absGm, __gm__ U* angleGm,\n+                                                                            __gm__ U* yGm, int64_t startIdx,\n+                                                                            int64_t count, int64_t dimNum,\n+                                                                            PolarStridePara para)\n+    {\n+        const int64_t idx = threadIdx.x;\n+        const int64_t step = blockDim.x;\n+        int64_t i = idx;\n+        while (i < count) {\n+            int64_t v = startIdx + i;\n+            int64_t absBase = 0;\n+            int64_t angleBase = 0;\n+            int64_t yBase = 0;\n+            int64_t vv = v;\n+            for (int64_t d = 0; d < dimNum; d++) {\n+                int64_t c = vv / para.ms[d];\n+                vv -= c * para.ms[d];\n+                absBase += c * para.absS[d];\n+                angleBase += c * para.angleS[d];\n+                yBase += c * para.yS[d];\n+            }\n+            U absVal = absGm[absBase];\n+            U cosVal = Simt::Cos(angleGm[angleBase]);\n+            U sinVal = Simt::Sin(angleGm[angleBase]);\n+            yGm[2 * yBase] = absVal * cosVal;\n+            yGm[2 * yBase + 1] = absVal * sinVal;\n+            i += step;\n+        }\n+    }\n+\n+    GlobalTensor<T> absGm_;\n+    GlobalTensor<T> angleGm_;\n+    GlobalTensor<T> yGm_;\n+    int64_t totalElements_{0};\n+    int64_t elementsPerCore_{0};\n+    int64_t coreNum_{0};\n+    int64_t formerCore_{0};\n+    int64_t dimNum_{0};\n+    PolarStridePara para_;\n+};\n+\n+} // namespace PolarOp\n+\n+#endif // POLAR_SIMT_H\n",
+      "new_file": true,
+      "new_path": "math/polar/op_kernel/arch35/polar_simt.h",
+      "old_path": "math/polar/op_kernel/arch35/polar_simt.h",
+      "removed_lines": 0,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-math/raw/c7d34cee6cca020dc5904954e61abe70f74a9657/math/polar/op_kernel/arch35/polar_simt.h",
+    "sha": "c7d34cee6cca020dc5904954e61abe70f74a9657",
+    "source_branch": "rollback-polar",
+    "source_project": {
+      "full_name": "xiu_ling_wang/ops-math",
+      "human_name": "xiu_ling_wang / ops-math",
+      "id": 7659863,
+      "path": "ops-math"
+    },
+    "status": "added",
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-math",
+      "human_name": "CANN / ops-math",
+      "id": 7649531,
+      "path": "ops-math"
+    }
+  },
+  {
+    "additions": 16,
+    "blob_id": "0168967b1fad7b58debacb488ec09f32891c31f9",
+    "blob_url": "https://gitcode.com/cann/ops-math/blob/c7d34cee6cca020dc5904954e61abe70f74a9657/math/polar/op_kernel/arch35/polar_struct.h",
+    "deletions": 5,
+    "filename": "math/polar/op_kernel/arch35/polar_struct.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 16,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -15,11 +15,22 @@\n #ifndef POLAR_STRUCT_H_\n #define POLAR_STRUCT_H_\n \n-#include \"atvoss/broadcast/broadcast_base_struct.h\"\n+#include <cstdint>\n \n-using namespace Ops::Base;\n+constexpr int64_t POLAR_MAX_DIM = 8;\n \n-ASCENDC_TPL_ARGS_DECL(Polar, BRC_TEMP_SCH_MODE_KEY_DECL(schMode));\n-ASCENDC_TPL_SEL(ASCENDC_TPL_ARGS_SEL(BRC_TEMP_SCH_MODE_KEY_SEL(schMode)));\n+#pragma pack(push, 8)\n+struct PolarTilingData {\n+    int64_t totalElements;\n+    int64_t elementsPerCore;\n+    int64_t coreNum;\n+    int64_t formerCore;\n+    int64_t dimNum;\n+    int64_t mergedStride[POLAR_MAX_DIM];\n+    int64_t absStride[POLAR_MAX_DIM];\n+    int64_t angleStride[POLAR_MAX_DIM];\n+    int64_t yStride[POLAR_MAX_DIM];\n+};\n+#pragma pack(pop)\n \n-#endif // POLAR_STRUCT_H_\n\\ No newline at end of file\n+#endif // POLAR_STRUCT_H_\n",
+      "new_file": false,
+      "new_path": "math/polar/op_kernel/arch35/polar_struct.h",
+      "old_path": "math/polar/op_kernel/arch35/polar_struct.h",
+      "removed_lines": 5,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-math/raw/c7d34cee6cca020dc5904954e61abe70f74a9657/math/polar/op_kernel/arch35/polar_struct.h",
+    "sha": "c7d34cee6cca020dc5904954e61abe70f74a9657",
+    "source_branch": "rollback-polar",
+    "source_project": {
+      "full_name": "xiu_ling_wang/ops-math",
+      "human_name": "xiu_ling_wang / ops-math",
+      "id": 7659863,
+      "path": "ops-math"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-math",
+      "human_name": "CANN / ops-math",
+      "id": 7649531,
+      "path": "ops-math"
+    }
+  },
+  {
+    "additions": 14,
+    "blob_id": "5a29f65c2b7978b1ac2a6f25a498651dfe398304",
+    "blob_url": "https://gitcode.com/cann/ops-math/blob/c7d34cee6cca020dc5904954e61abe70f74a9657/math/polar/op_kernel/polar_apt.cpp",
+    "deletions": 2,
+    "filename": "math/polar/op_kernel/polar_apt.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 14,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -10,8 +10,20 @@\n \n /* !\n  * \\file polar_apt.cpp\n- * \\brief polar kernel entry - dispatch to arch35 SIMD implementation\n+ * \\brief polar kernel\n  */\n \n #include \"kernel_operator.h\"\n-#include \"arch35/polar.h\"\n\\ No newline at end of file\n+#include \"arch35/polar_struct.h\"\n+#include \"arch35/polar_simt.h\"\n+\n+using namespace AscendC;\n+\n+__global__ __aicore__ void polar(GM_ADDR x1, GM_ADDR x2, GM_ADDR y, GM_ADDR workspace, GM_ADDR tiling)\n+{\n+    REGISTER_TILING_DEFAULT(PolarTilingData);\n+    GET_TILING_DATA(tilingData, tiling);\n+    PolarOp::PolarSimt<float> polarOp;\n+    polarOp.Init(x1, x2, y, tilingData);\n+    polarOp.Process();\n+}\n",
+      "new_file": false,
+      "new_path": "math/polar/op_kernel/polar_apt.cpp",
+      "old_path": "math/polar/op_kernel/polar_apt.cpp",
+      "removed_lines": 2,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-math/raw/c7d34cee6cca020dc5904954e61abe70f74a9657/math/polar/op_kernel/polar_apt.cpp",
+    "sha": "c7d34cee6cca020dc5904954e61abe70f74a9657",
+    "source_branch": "rollback-polar",
+    "source_project": {
+      "full_name": "xiu_ling_wang/ops-math",
+      "human_name": "xiu_ling_wang / ops-math",
+      "id": 7659863,
+      "path": "ops-math"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-math",
+      "human_name": "CANN / ops-math",
+      "id": 7649531,
+      "path": "ops-math"
+    }
+  },
+  {
+    "additions": 41,
+    "blob_id": "3cabe441660bc980c572274997a40367d99370a3",
+    "blob_url": "https://gitcode.com/cann/ops-math/blob/c7d34cee6cca020dc5904954e61abe70f74a9657/math/polar/tests/ut/op_host/arch35/test_polar_tiling_arch35.cpp",
+    "deletions": 7,
+    "filename": "math/polar/tests/ut/op_host/arch35/test_polar_tiling_arch35.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 41,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -35,8 +35,8 @@ TEST_F(PolarTilingTest, polar_test_fp32_same_shape)\n                                                   {{{16, 7, 14}, {16, 7, 14}}, ge::DT_COMPLEX64, ge::FORMAT_ND},\n                                               },\n                                               &compileInfo);\n-    uint64_t expectTilingKey = 8;\n-    std::vector<size_t> expectWorkspaces = {16777216};\n+    uint64_t expectTilingKey = 0;\n+    std::vector<size_t> expectWorkspaces = {0};\n     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectWorkspaces);\n }\n \n@@ -53,7 +53,7 @@ TEST_F(PolarTilingTest, polar_test_fp32_broadcast)\n                                               },\n                                               &compileInfo);\n     uint64_t expectTilingKey = 0;\n-    std::vector<size_t> expectWorkspaces = {16777216};\n+    std::vector<size_t> expectWorkspaces = {0};\n     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectWorkspaces);\n }\n \n@@ -71,7 +71,7 @@ TEST_F(PolarTilingTest, polar_test_fp32_broadcast_multidim)\n         },\n         &compileInfo);\n     uint64_t expectTilingKey = 0;\n-    std::vector<size_t> expectWorkspaces = {16777216};\n+    std::vector<size_t> expectWorkspaces = {0};\n     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectWorkspaces);\n }\n \n@@ -88,8 +88,8 @@ TEST_F(PolarTilingTest, polar_test_fp32_scalar_broadcast)\n             {{{16, 1, 4, 4, 8}, {16, 1, 4, 4, 8}}, ge::DT_COMPLEX64, ge::FORMAT_ND},\n         },\n         &compileInfo);\n-    uint64_t expectTilingKey = 8;\n-    std::vector<size_t> expectWorkspaces = {16777216};\n+    uint64_t expectTilingKey = 0;\n+    std::vector<size_t> expectWorkspaces = {0};\n     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectWorkspaces);\n }\n \n@@ -106,10 +106,44 @@ TEST_F(PolarTilingTest, polar_test_fp32_broadcast_diff_shape)\n                                               },\n                                               &compileInfo);\n     uint64_t expectTilingKey = 0;\n-    std::vector<size_t> expectWorkspaces = {16777216};\n+    std::vector<size_t> expectWorkspaces = {0};\n     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectWorkspaces);\n }\n \n+TEST_F(PolarTilingTest, polar_test_failed_dtype_mismatch_input)\n+{\n+    optiling::PolarCompileInfo compileInfo = {64};\n+    gert::TilingContextPara tilingContextPara(\"Polar\",\n+                                              {\n+                                                  {{{16, 7, 14}, {16, 7, 14}}, ge::DT_BF16, ge::FORMAT_ND},\n+                                                  {{{16, 7, 14}, {16, 7, 14}}, ge::DT_BF16, ge::FORMAT_ND},\n+                                              },\n+                                              {\n+                                                  {{{16, 7, 14}, {16, 7, 14}}, ge::DT_COMPLEX64, ge::FORMAT_ND},\n+                                              },\n+                                              &compileInfo);\n+    uint64_t expectTilingKey = 0;\n+    std::vector<size_t> expectWorkspaces = {0};\n+    ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED, expectTilingKey, expectWorkspaces);\n+}\n+\n+TEST_F(PolarTilingTest, polar_test_failed_dtype_mismatch_output)\n+{\n+    optiling::PolarCompileInfo compileInfo = {64};\n+    gert::TilingContextPara tilingContextPara(\"Polar\",\n+                                              {\n+                                                  {{{16, 7, 14}, {16, 7, 14}}, ge::DT_FLOAT, ge::FORMAT_ND},\n+                                                  {{{16, 7, 14}, {16, 7, 14}}, ge::DT_FLOAT, ge::FORMAT_ND},\n+                                              },\n+                                              {\n+                                                  {{{16, 7, 14}, {16, 7, 14}}, ge::DT_FLOAT, ge::FORMAT_ND},\n+                                              },\n+                                              &compileInfo);\n+    uint64_t expectTilingKey = 0;\n+    std::vector<size_t> expectWorkspaces = {0};\n+    ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED, expectTilingKey, expectWorkspaces);\n+}\n+\n TEST_F(PolarTilingTest, polar_test_failed_not_broadcastable)\n {\n     optiling::PolarCompileInfo compileInfo = {64};\n",
+      "new_file": false,
+      "new_path": "math/polar/tests/ut/op_host/arch35/test_polar_tiling_arch35.cpp",
+      "old_path": "math/polar/tests/ut/op_host/arch35/test_polar_tiling_arch35.cpp",
+      "removed_lines": 7,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-math/raw/c7d34cee6cca020dc5904954e61abe70f74a9657/math/polar/tests/ut/op_host/arch35/test_polar_tiling_arch35.cpp",
+    "sha": "c7d34cee6cca020dc5904954e61abe70f74a9657",
+    "source_branch": "rollback-polar",
+    "source_project": {
+      "full_name": "xiu_ling_wang/ops-math",
+      "human_name": "xiu_ling_wang / ops-math",
+      "id": 7659863,
+      "path": "ops-math"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-math",
+      "human_name": "CANN / ops-math",
+      "id": 7649531,
+      "path": "ops-math"
+    }
+  }
+]

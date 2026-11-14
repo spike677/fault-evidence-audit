@@ -1,0 +1,83 @@
+{
+  "assignee": {
+    "avatar_url": "https://cdn-img.gitcode.com/fc/bd/f76c380bdf2f2f82c86b4237571944ca637d0bdf74f07bc8af4f9ef5a3072927.png",
+    "html_url": "https://gitcode.com/m0_73979701",
+    "id": "68fdb234251a86282393827f",
+    "login": "m0_73979701",
+    "name": "m0_73979701",
+    "object_id": "68fdb234251a86282393827f"
+  },
+  "assignees": [
+    {
+      "avatar_url": "https://cdn-img.gitcode.com/fc/bd/f76c380bdf2f2f82c86b4237571944ca637d0bdf74f07bc8af4f9ef5a3072927.png",
+      "html_url": "https://gitcode.com/m0_73979701",
+      "id": "68fdb234251a86282393827f",
+      "login": "m0_73979701",
+      "name": "m0_73979701",
+      "object_id": "68fdb234251a86282393827f"
+    }
+  ],
+  "body": "Thanks for sending an issue! Please fill in the following template to help quickly solve your problem.\n\n####  一、问题描述 （必填）\n<!-- 可粘贴错误日志或描述截图 -->\nAsinh 算子 arch35 实现对非小值统一使用 `log(u) * r / (u - 1)` 进行精度补偿。\n\n该补偿方式在中大数值区间会额外引入约 1～2 ULP 的计算误差；对于极大输入，直接计算 `u ≈ 2|x|` 还可能出现溢出风险，导致 Asinh 算子三方精度测试不通过。\n\n####  二、环境信息 （可选）\n<!--\n• 昇腾硬件型号：\n• CANN版本:\n• 操作系统：\n• 其他相关软件版本：\n -->\n• 昇腾硬件型号：Ascend 950（arch35）\n• 涉及数据类型：FP32、FP16、BF16\n\n####  三、重现步骤 （可选）\n<!-- 提供尽可能多的信息描述如何重现该缺陷 -->\n1. 执行 Asinh 算子三方精度测试。\n2. 使用 FP32、FP16 或 BF16 类型的中值、大值及极大值作为输入。\n3. 将算子输出与对应 golden 结果进行比较。\n4. 在中大数值区间可观察到约 1～2 ULP 的精度误差。\n\n####  四、预期结果 （可选）\n<!-- 描述预期的行为应该是什么样子的 -->\n根据输入绝对值进行分段计算：\n\n- `|x| < 10`：保留原有 `log1p` 补偿路径，保证小值精度；\n- `10 <= |x| < 2^28`：直接使用 `log(u)`，避免额外乘除引入精度误差；\n- `|x| >= 2^28`：使用 `log(|x|) + ln(2) + 1 / |x|^2` 渐近式，避免溢出；\n- 保持原有 NaN 传播语义。\n\n修改后 Asinh 算子的 FP32、FP16、BF16 三方精度测试应全部通过。\n\n💡 备注（选填）\n\n关联 PR：\nhttps://gitcode.com/cann/ops-math/pull/4822\n",
+  "comments": 0,
+  "created_at": "2026-08-19T12:25:37+08:00",
+  "finished_at": "2026-08-19T14:44:19+08:00",
+  "html_url": "https://gitcode.com/cann/ops-math/issues/2734",
+  "id": 4263483,
+  "issue_priority_detail": {
+    "id": 116,
+    "title": "无优先级"
+  },
+  "issue_state": "进行中",
+  "issue_state_detail": {
+    "id": 285,
+    "serial": 0,
+    "title": "进行中"
+  },
+  "issue_type": "任务",
+  "issue_type_detail": {
+    "id": 255,
+    "is_system": false,
+    "title": "任务"
+  },
+  "labels": [
+    {
+      "color": "#DB2828",
+      "created_at": "2025-06-10T14:17:23+08:00",
+      "id": 3870,
+      "name": "bug-report",
+      "updated_at": "2026-08-19T12:25:37+08:00"
+    },
+    {
+      "color": "#35e029",
+      "created_at": "2026-03-20T11:25:13+08:00",
+      "id": 38861,
+      "name": "resolved",
+      "updated_at": "2026-08-19T16:40:30+08:00"
+    }
+  ],
+  "number": "2734",
+  "priority": 0,
+  "repository": {
+    "assigner": {},
+    "created_at": "2025-09-25T16:01:52+08:00",
+    "description": "本项目是CANN提供的数学类基础计算算子库，实现网络在NPU上加速计算。",
+    "full_name": "cann/ops-math",
+    "id": 7649531,
+    "name": "ops-math",
+    "paas": "",
+    "path": "ops-math",
+    "updated_at": "2025-09-25T16:05:53+08:00"
+  },
+  "state": "closed",
+  "title": "[Bug-Report|缺陷反馈]: Asinh中大数值区间精度问题",
+  "updated_at": "2026-09-22T11:24:46+08:00",
+  "user": {
+    "avatar_url": "https://cdn-img.gitcode.com/fc/bd/f76c380bdf2f2f82c86b4237571944ca637d0bdf74f07bc8af4f9ef5a3072927.png",
+    "html_url": "https://gitcode.com/m0_73979701",
+    "id": "68fdb234251a86282393827f",
+    "login": "m0_73979701",
+    "name": "m0_73979701",
+    "object_id": "68fdb234251a86282393827f"
+  },
+  "visibility_reason": "public"
+}

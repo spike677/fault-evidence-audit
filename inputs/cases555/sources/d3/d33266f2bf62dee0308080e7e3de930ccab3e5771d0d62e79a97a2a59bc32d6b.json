@@ -1,0 +1,38 @@
+[
+  {
+    "additions": 5,
+    "blob_id": "b208c71e04e19428b5fcf813eb6ac230102b91bf",
+    "blob_url": "https://gitcode.com/cann/ops-math/blob/642402c4418b9968289290c6b83ae9a6c066f48e/conversion/concat/op_host/arch35/concat_tiling_arch35.cpp",
+    "deletions": 1,
+    "filename": "conversion/concat/op_host/arch35/concat_tiling_arch35.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 5,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -481,7 +481,11 @@ static ge::graphStatus TilingUbForSplitDim1(\n                 context->GetNodeName(), \"everyBlockNumber must be greater than 0, everyBlockNumber: %ld\",\n                 param.everyBlockNumber),\n             return ge::GRAPH_FAILED);\n-        realFactorDim1 = realFactorDim1 / param.everyBlockNumber * param.everyBlockNumber;\n+        int64_t alignFactorDim1 = param.everyBlockNumber;\n+        if (param.inputShapeSame == 1 && param.sameShapeTensorDim1 * param.dtypeSize <= param.gatherThreshold) {\n+            alignFactorDim1 = param.sameShapeTensorDim1;\n+        }\n+        realFactorDim1 = realFactorDim1 / alignFactorDim1 * alignFactorDim1;\n     } else {\n         maxAvaliableUb -= storageAlignUsed;\n     }\n",
+      "new_file": false,
+      "new_path": "conversion/concat/op_host/arch35/concat_tiling_arch35.cpp",
+      "old_path": "conversion/concat/op_host/arch35/concat_tiling_arch35.cpp",
+      "removed_lines": 1,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-math/raw/642402c4418b9968289290c6b83ae9a6c066f48e/conversion/concat/op_host/arch35/concat_tiling_arch35.cpp",
+    "sha": "642402c4418b9968289290c6b83ae9a6c066f48e",
+    "source_branch": "master",
+    "source_project": {
+      "full_name": "wu-shuai2580/ops-math_zdd",
+      "human_name": "wu-shuai2580 / ops-math_zdd",
+      "id": 9093623,
+      "path": "ops-math_zdd"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-math",
+      "human_name": "CANN / ops-math",
+      "id": 7649531,
+      "path": "ops-math"
+    }
+  }
+]

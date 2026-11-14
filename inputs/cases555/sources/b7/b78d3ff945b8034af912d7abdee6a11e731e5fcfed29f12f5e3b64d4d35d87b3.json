@@ -1,0 +1,73 @@
+{
+  "assignee": {
+    "html_url": "https://gitcode.com/zhuzixian-lr",
+    "id": "68c3985d4b75533380ff50ca",
+    "login": "zhuzixian-lr",
+    "name": "zhuzixian-lr",
+    "object_id": "68c3985d4b75533380ff50ca"
+  },
+  "assignees": [
+    {
+      "html_url": "https://gitcode.com/zhuzixian-lr",
+      "id": "68c3985d4b75533380ff50ca",
+      "login": "zhuzixian-lr",
+      "name": "zhuzixian-lr",
+      "object_id": "68c3985d4b75533380ff50ca"
+    }
+  ],
+  "body": "\n\nThanks for sending an issue! Please fill in the following template to help quickly solve your problem.\n\n### Describe the current behavior / 问题描述 (Mandatory / 必填)\n            \n进行计算时，偏移（offset）变量采用 int32 类型进行存储与计算。当输入数据规模较大或分组数（num_groups）较多时，偏移量的累积值可能超过 int32 的最大值（2,147,483,647），导致整数溢出\n### Environment / 环境信息 (Mandatory / 必填)\n            \n950\n### Steps to reproduce the issue / 重现步骤 (Mandatory / 必填)\n            \n实际测试中，当 num_groups=32，channel=1024，batch_size=64 时，偏移量计算值已接近 int32 上限，进一步增加 num_groups 或 channel 时，溢出风险急剧上升\n### Describe the expected behavior / 预期结果 (Mandatory / 必填)\n            \nGroupNormGrad 和 GroupNormV2 算子在计算偏移变量（offset）时，应使用足够大的数据类型以避免整数溢出\n### Related log / screenshot / 日志 / 截图 (Mandatory / 必填)\n            \n超出int32会导致计算错误，网络崩溃等问题\n### Special notes for this issue/备注 (Optional / 选填)\n            \n\n",
+  "comments": 1,
+  "created_at": "2026-03-12T14:31:42+08:00",
+  "finished_at": "2026-03-19T09:23:50+08:00",
+  "html_url": "https://gitcode.com/cann/ops-nn/issues/1445",
+  "id": 3799633,
+  "issue_priority_detail": {
+    "id": 116,
+    "title": "无优先级"
+  },
+  "issue_state": "进行中",
+  "issue_state_detail": {
+    "id": 285,
+    "serial": 0,
+    "title": "进行中"
+  },
+  "issue_type": "任务",
+  "issue_type_detail": {
+    "id": 255,
+    "is_system": false,
+    "title": "任务"
+  },
+  "labels": [
+    {
+      "color": "#35e029",
+      "created_at": "2026-03-20T11:25:13+08:00",
+      "id": 38861,
+      "name": "resolved",
+      "updated_at": "2026-03-20T13:36:49+08:00"
+    }
+  ],
+  "number": "1445",
+  "priority": 0,
+  "repository": {
+    "assigner": {},
+    "created_at": "2025-09-27T17:40:34+08:00",
+    "description": "本项目是CANN提供的神经网络类计算算子库，实现网络在NPU上加速计算。",
+    "full_name": "cann/ops-nn",
+    "id": 7665709,
+    "name": "ops-nn",
+    "paas": "",
+    "path": "ops-nn",
+    "updated_at": "2025-09-27T18:09:31+08:00"
+  },
+  "state": "closed",
+  "title": "[Bug-Report|缺陷反馈]: GroupNormGrad和GroupNormV2算子的偏移变量使用int32类型，存在溢出风险",
+  "updated_at": "2026-03-20T13:36:49+08:00",
+  "user": {
+    "html_url": "https://gitcode.com/zhuzixian-lr",
+    "id": "68c3985d4b75533380ff50ca",
+    "login": "zhuzixian-lr",
+    "name": "zhuzixian-lr",
+    "object_id": "68c3985d4b75533380ff50ca"
+  },
+  "visibility_reason": "public"
+}

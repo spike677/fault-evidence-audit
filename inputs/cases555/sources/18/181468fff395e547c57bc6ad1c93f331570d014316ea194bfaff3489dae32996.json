@@ -1,0 +1,83 @@
+{
+  "assignee": {
+    "avatar_url": "https://cdn-img.gitcode.com/cc/cb/54c196c65c928b997e66a9d6e53d357e4a5c63e61d32874f3d3a5953d364de62.jpg",
+    "html_url": "https://gitcode.com/pingchuantang",
+    "id": "68ad1e460f9a7255ef7a79e1",
+    "login": "pingchuantang",
+    "name": "TangPC",
+    "object_id": "68ad1e460f9a7255ef7a79e1"
+  },
+  "assignees": [
+    {
+      "avatar_url": "https://cdn-img.gitcode.com/cc/cb/54c196c65c928b997e66a9d6e53d357e4a5c63e61d32874f3d3a5953d364de62.jpg",
+      "html_url": "https://gitcode.com/pingchuantang",
+      "id": "68ad1e460f9a7255ef7a79e1",
+      "login": "pingchuantang",
+      "name": "TangPC",
+      "object_id": "68ad1e460f9a7255ef7a79e1"
+    }
+  ],
+  "body": "####  一、问题描述 （必填）\n\n`FusedMulAddAdd` 的 infershape 实现（`math/fused_mul_add_add/op_host/fused_mul_add_add_infershape.cpp`）使用通用广播推导 `Ops::Base::InferShape4Broadcast`，将 x1、x2、x3、x4 四个输入相互广播后得到输出 shape，并接受动态 shape。\n\n但 op_proto（`math/fused_mul_add_add/op_graph/fused_mul_add_add_proto.h`）声明的契约为：\n\n- y 与 x1 具有相同的 dtype 与 shape，x1 承载完整输出 shape，x2/x3/x4 仅向 x1 广播；\n- 运行时要求 x1 必须为完整输出 shape，x1 自身需要被广播放大的场景（如 x1=[1]、x3=[3,4]）不支持。\n\ninfershape 与 op_proto 不一致：当 x1 小于其他输入、或输入为动态 shape(-1)/动态 rank(-2) 时，infershape 会推导出与算子实际契约不符的输出 shape。\n\n####  二、环境信息 （可选）\n\n- 昇腾硬件型号：Ascend 950PR / Ascend 950DT（见 `README.md` 产品支持情况）\n- 其余：不涉及\n\n####  三、重现步骤 （可选）\n\n1. 构造 FusedMulAddAdd 节点，令 x1=[1]、x3=[3,4]（x1 小于输出），或令任一输入为动态 shape(-1) / 动态 rank(-2)；\n2. 触发图编译期 infershape；\n3. 观察输出 shape：旧实现得到广播结果（如 [3,4]）或动态 shape，与 op_proto「输出取 x1 shape、不支持动态 shape」的契约不符。\n\n####  四、预期结果 （可选）\n\n- 输出 shape 等于 x1 的 shape（不做广播放大）；\n- 任一输入为动态 shape / 动态 rank 时返回 `GRAPH_FAILED`。\n\n关联 PR：https://gitcode.com/cann/ops-math/pull/3595\n",
+  "comments": 1,
+  "created_at": "2026-06-27T11:26:39+08:00",
+  "finished_at": "2026-06-29T17:56:21+08:00",
+  "html_url": "https://gitcode.com/cann/ops-math/issues/2074",
+  "id": 4120475,
+  "issue_priority_detail": {
+    "id": 116,
+    "title": "无优先级"
+  },
+  "issue_state": "进行中",
+  "issue_state_detail": {
+    "id": 285,
+    "serial": 0,
+    "title": "进行中"
+  },
+  "issue_type": "任务",
+  "issue_type_detail": {
+    "id": 255,
+    "is_system": false,
+    "title": "任务"
+  },
+  "labels": [
+    {
+      "color": "#DB2828",
+      "created_at": "2025-06-10T14:17:23+08:00",
+      "id": 3870,
+      "name": "bug-report",
+      "updated_at": "2026-06-27T11:26:39+08:00"
+    },
+    {
+      "color": "#35e029",
+      "created_at": "2026-03-20T11:25:13+08:00",
+      "id": 38861,
+      "name": "resolved",
+      "updated_at": "2026-06-29T19:16:18+08:00"
+    }
+  ],
+  "number": "2074",
+  "priority": 0,
+  "repository": {
+    "assigner": {},
+    "created_at": "2025-09-25T16:01:52+08:00",
+    "description": "本项目是CANN提供的数学类基础计算算子库，实现网络在NPU上加速计算。",
+    "full_name": "cann/ops-math",
+    "id": 7649531,
+    "name": "ops-math",
+    "paas": "",
+    "path": "ops-math",
+    "updated_at": "2025-09-25T16:05:53+08:00"
+  },
+  "state": "closed",
+  "title": "[Bug-Report|缺陷反馈]: FusedMulAddAdd infershape 与 op_proto 不一致（误用广播且接受动态 shape）",
+  "updated_at": "2026-06-29T17:56:21+08:00",
+  "user": {
+    "avatar_url": "https://cdn-img.gitcode.com/cc/cb/54c196c65c928b997e66a9d6e53d357e4a5c63e61d32874f3d3a5953d364de62.jpg",
+    "html_url": "https://gitcode.com/pingchuantang",
+    "id": "68ad1e460f9a7255ef7a79e1",
+    "login": "pingchuantang",
+    "name": "TangPC",
+    "object_id": "68ad1e460f9a7255ef7a79e1"
+  },
+  "visibility_reason": "public"
+}

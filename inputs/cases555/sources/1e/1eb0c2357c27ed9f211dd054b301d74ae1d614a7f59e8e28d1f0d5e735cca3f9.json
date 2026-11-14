@@ -1,0 +1,74 @@
+[
+  {
+    "additions": 25,
+    "blob_id": "1693dc6cb6e80eb9fb74de5a985b6829e3019137",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/55386cd73f54156d849a6f667c451f6228e78131/conv/conv3d_backprop_input_v2/op_kernel/arch35/convolution_3d_backprop/conv3d_bp_func.h",
+    "deletions": 0,
+    "filename": "conv/conv3d_backprop_input_v2/op_kernel/arch35/convolution_3d_backprop/conv3d_bp_func.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 25,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -609,6 +609,28 @@ static __aicore__ inline void UpdateKComputeStatus(Intf *self)\n     }\n }\n \n+template <class Intf>\n+static __aicore__ inline bool CheckFreeA1ForKernelSplit(Intf* self)\n+{\n+    // kernel拆分HW场景，如果subpad为负数，需要重新加载A矩阵\n+    if (self->ctx.tiling_->backpropPadUp == 0) {\n+        for (int splitIndex = 0; splitIndex < self->ctx.tiling_->strideW * self->ctx.tiling_->strideH; splitIndex++) {\n+            if (self->ctx.subPadUpList_[splitIndex] < 0) {\n+                return true;\n+            }\n+        }\n+    }\n+    if (self->ctx.tiling_->backpropPadLeft == 0) {\n+        for (int splitIndex = 0; splitIndex < self->ctx.tiling_->strideW * self->ctx.tiling_->strideH; splitIndex++) {\n+            if (self->ctx.subPadLeftList_[splitIndex] < 0) {\n+                return true;\n+            }\n+        }\n+    }\n+\n+    return false;\n+}\n+\n template <class Intf>\n static __aicore__ inline void UpdateFullLoadL1Status(Intf *self)\n {\n@@ -626,6 +648,9 @@ static __aicore__ inline void UpdateFullLoadL1Status(Intf *self)\n         bool isLastRearrangeHWIter = (self->ctx.rearrangeWIndex_ == self->ctx.tiling_->strideW - 1) &&\n             (self->ctx.rearrangeHIndex_ == self->ctx.tiling_->strideH - 1);\n         self->ctx.isFreeA1_ = isLastRearrangeHWIter;\n+        if (!isLastRearrangeHWIter && CheckFreeA1ForKernelSplit(self)) {\n+            self->ctx.isFreeA1_ = true;\n+        }\n         self->ctx.isFreeB1_ = self->ctx.isFreeB1_ && isLastRearrangeHWIter;\n     } else {\n         if (self->ctx.isB1FullLoadFlag_ && self->ctx.tiling_->dk == 1) {\n",
+      "new_file": false,
+      "new_path": "conv/conv3d_backprop_input_v2/op_kernel/arch35/convolution_3d_backprop/conv3d_bp_func.h",
+      "old_path": "conv/conv3d_backprop_input_v2/op_kernel/arch35/convolution_3d_backprop/conv3d_bp_func.h",
+      "removed_lines": 0,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/55386cd73f54156d849a6f667c451f6228e78131/conv/conv3d_backprop_input_v2/op_kernel/arch35/convolution_3d_backprop/conv3d_bp_func.h",
+    "sha": "55386cd73f54156d849a6f667c451f6228e78131",
+    "source_branch": "xtl-kernel",
+    "source_project": {
+      "full_name": "xutianlong1/ops-nn",
+      "human_name": "xutianlong1 / ops-nn",
+      "id": 9277938,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 1,
+    "blob_id": "dda424a671317aac6ab2d39410fe87d4f86b4788",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/55386cd73f54156d849a6f667c451f6228e78131/conv/convolution_backward/op_api/convolutionbackward.cpp",
+    "deletions": 1,
+    "filename": "conv/convolution_backward/op_api/convolutionbackward.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 1,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -1977,7 +1977,7 @@ const aclTensor *Conv3DBackpropFilter(ConvolutionBackwardInputTensor &inputTenso\n OP_TYPE_REGISTER(Conv3DBackpropInput);\n OP_TYPE_REGISTER(Conv3DBackpropInputV2);\n \n-static bool CheckN2HAttrAvailable(const aclIntArray *stride5, aclIntArray *dilation5, aclIntArray *pad6) {\n+static bool CheckN2HAttrAvailable(const aclIntArray *stride5, const aclIntArray *dilation5, const aclIntArray *pad6) {\n   if (stride5 == nullptr) {\n     return false;\n   }\n",
+      "new_file": false,
+      "new_path": "conv/convolution_backward/op_api/convolutionbackward.cpp",
+      "old_path": "conv/convolution_backward/op_api/convolutionbackward.cpp",
+      "removed_lines": 1,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/55386cd73f54156d849a6f667c451f6228e78131/conv/convolution_backward/op_api/convolutionbackward.cpp",
+    "sha": "55386cd73f54156d849a6f667c451f6228e78131",
+    "source_branch": "xtl-kernel",
+    "source_project": {
+      "full_name": "xutianlong1/ops-nn",
+      "human_name": "xutianlong1 / ops-nn",
+      "id": 9277938,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  }
+]

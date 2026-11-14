@@ -1,0 +1,74 @@
+[
+  {
+    "additions": 13,
+    "blob_id": "306e634ae4889937d064ff534d05a5837dcf5d7f",
+    "blob_url": "https://gitcode.com/cann/ops-math/blob/18ba2090dd5e00cab1b6d3585682a3770107c208/math/range/op_graph/range_graph_infer.cpp",
+    "deletions": 1,
+    "filename": "math/range/op_graph/range_graph_infer.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 13,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -15,6 +15,8 @@\n #include \"log/log.h\"\n #include \"register/op_impl_registry.h\"\n #include \"util/math_util.h\"\n+#include \"platform/platform_infos_def.h\"\n+#include \"platform/platform_info.h\"\n \n using namespace ge;\n namespace ops {\n@@ -25,8 +27,18 @@ static ge::graphStatus InferDataType4Range(gert::InferDataTypeContext* context)\n     DataType startDataType = context->GetInputDataType(0);\n     DataType limitDataType = context->GetInputDataType(1);\n     DataType deltaDataType = context->GetInputDataType(2);\n+    fe::PlatformInfo platform_info;\n+    fe::OptionalInfo optional_info;\n+    OP_CHECK_IF(\n+        (fe::PlatformInfoManager::Instance().GetPlatformInfoWithOutSocVersion(platform_info, optional_info) !=\n+        ge::GRAPH_SUCCESS), OP_LOGE(context->GetNodeName(), \"Cannot get platform info!\"), return ge::GRAPH_FAILED);\n+    OP_LOGD(context->GetNodeName(), \"soc version is %s\", platform_info.str_info.short_soc_version.c_str());\n     if ((startDataType == limitDataType) && (limitDataType == deltaDataType)) {\n-        context->SetOutputDataType(0, startDataType);\n+        if (startDataType == ge::DT_DOUBLE && platform_info.str_info.short_soc_version == \"Ascend950\") {\n+            context->SetOutputDataType(0, ge::DT_FLOAT);\n+        } else {\n+            context->SetOutputDataType(0, startDataType);\n+        }\n     } else {\n         context->SetOutputDataType(0, ge::DT_FLOAT);\n     }\n",
+      "new_file": false,
+      "new_path": "math/range/op_graph/range_graph_infer.cpp",
+      "old_path": "math/range/op_graph/range_graph_infer.cpp",
+      "removed_lines": 1,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-math/raw/18ba2090dd5e00cab1b6d3585682a3770107c208/math/range/op_graph/range_graph_infer.cpp",
+    "sha": "18ba2090dd5e00cab1b6d3585682a3770107c208",
+    "source_branch": "master",
+    "source_project": {
+      "full_name": "alfengyuan/ops-math",
+      "human_name": "alfengyuan / ops-math",
+      "id": 8833013,
+      "path": "ops-math"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-math",
+      "human_name": "CANN / ops-math",
+      "id": 7649531,
+      "path": "ops-math"
+    }
+  },
+  {
+    "additions": 2,
+    "blob_id": "a24009572303fab0bc01f709632fa7d650bd1f27",
+    "blob_url": "https://gitcode.com/cann/ops-math/blob/18ba2090dd5e00cab1b6d3585682a3770107c208/math/range/op_graph/range_proto.h",
+    "deletions": 0,
+    "filename": "math/range/op_graph/range_proto.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 2,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -42,6 +42,8 @@ namespace ge {\n *    The auto inferred type of output is the same as input when the types of start/limit/delta are the same,\n *    otherwise the auto inferred type of output is float32. \\n\n *    The double type of y is not supported in Ascend950 AI Processor. \\n\n+*    If the input parameters start, limit, delta are all of type double,\n+*    the output parameters y is only supported as float32 in Ascend950 AI Processor. \\n\n *\n * @par Attributes:\n * is_closed: An optional attribute of type bool, inducating upper limit is closed or not.\n",
+      "new_file": false,
+      "new_path": "math/range/op_graph/range_proto.h",
+      "old_path": "math/range/op_graph/range_proto.h",
+      "removed_lines": 0,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-math/raw/18ba2090dd5e00cab1b6d3585682a3770107c208/math/range/op_graph/range_proto.h",
+    "sha": "18ba2090dd5e00cab1b6d3585682a3770107c208",
+    "source_branch": "master",
+    "source_project": {
+      "full_name": "alfengyuan/ops-math",
+      "human_name": "alfengyuan / ops-math",
+      "id": 8833013,
+      "path": "ops-math"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-math",
+      "human_name": "CANN / ops-math",
+      "id": 7649531,
+      "path": "ops-math"
+    }
+  }
+]

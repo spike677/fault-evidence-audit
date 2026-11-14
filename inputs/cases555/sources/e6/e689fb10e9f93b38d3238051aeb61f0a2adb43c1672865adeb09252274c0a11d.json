@@ -1,0 +1,38 @@
+[
+  {
+    "additions": 0,
+    "blob_id": "1a61bac2e3aa81de3e8e0239baf11b8ede4782b1",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/8b9108e5b28d41ecd9890ccd30d3b504e4cdaefe/attention/common/op_kernel/arch35/flash_attention_score_antiquant_processor.h",
+    "deletions": 12,
+    "filename": "attention/common/op_kernel/arch35/flash_attention_score_antiquant_processor.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 0,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -454,10 +454,6 @@ __aicore__ inline void AntiquantProcessorBaseAPI<ANTIQUANT_TEMPLATE_ARGS, ANTIQU\n {\n     LocalTensor<KV_T> tmpUb = kvInputQue.template AllocTensor<KV_T>();\n \n-    event_t eventVMTE2 = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::V_MTE2));\n-    SetFlag<HardEvent::V_MTE2>(eventVMTE2);\n-    WaitFlag<HardEvent::V_MTE2>(eventVMTE2);\n-\n     if constexpr (!PAGE_ATTENTION) {\n         uint64_t kvOffset = taskParam.kvGmOffset + copyLoopIdx * taskParam.copySplitS * taskParam.kvStep;\n         CopyKV(tmpUb, kvGm, kvOffset, dealRowCount, taskParam.headDim, taskParam.kvHeadNum,\n@@ -467,10 +463,6 @@ __aicore__ inline void AntiquantProcessorBaseAPI<ANTIQUANT_TEMPLATE_ARGS, ANTIQU\n         CopyKVPageAttention(tmpUb, kvGm, blockTableGm, taskParam, curSeqence, dealRowCount);\n     }\n \n-    event_t eventMTE2V = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::MTE2_V));\n-    SetFlag<HardEvent::MTE2_V>(eventMTE2V);\n-    WaitFlag<HardEvent::MTE2_V>(eventMTE2V);\n-\n     kvInputQue.template EnQue(tmpUb);\n     kvInputQue.DeQue<KV_T>();\n \n@@ -478,10 +470,6 @@ __aicore__ inline void AntiquantProcessorBaseAPI<ANTIQUANT_TEMPLATE_ARGS, ANTIQU\n     AntiquantVec(outUb, tmpUb, copyLoopIdx, dealRowCount, taskParam, isBeforeHalf);\n     kvInputQue.FreeTensor(tmpUb);\n \n-    event_t UbToL1Event = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::V_MTE3));\n-    SetFlag<HardEvent::V_MTE3>(UbToL1Event);\n-    WaitFlag<HardEvent::V_MTE3>(UbToL1Event);\n-\n     kvOutputQue.template EnQue(outUb);\n     kvOutputQue.DeQue<Q_T>();\n     CopyAntiquantResToL1BaseAPI(outScm, outUb, copyLoopIdx, dealRowCount, taskParam, taskId, isBeforeHalf, s2RealSize);\n",
+      "new_file": false,
+      "new_path": "attention/common/op_kernel/arch35/flash_attention_score_antiquant_processor.h",
+      "old_path": "attention/common/op_kernel/arch35/flash_attention_score_antiquant_processor.h",
+      "removed_lines": 12,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/8b9108e5b28d41ecd9890ccd30d3b504e4cdaefe/attention/common/op_kernel/arch35/flash_attention_score_antiquant_processor.h",
+    "sha": "8b9108e5b28d41ecd9890ccd30d3b504e4cdaefe",
+    "source_branch": "master",
+    "source_project": {
+      "full_name": "lijiaroad/ops-transformer",
+      "human_name": "lijiaroad / ops-transformer",
+      "id": 9427041,
+      "path": "ops-transformer"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  }
+]

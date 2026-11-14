@@ -1,0 +1,143 @@
+[
+  {
+    "assignees": [],
+    "base": {
+      "ref": "master",
+      "repo": {
+        "full_name": "cann/ops-transformer",
+        "name": "ops-transformer",
+        "path": "ops-transformer"
+      },
+      "sha": "6d6ac9b5b01e83d25782ffbef5d60e9527f94cf4"
+    },
+    "body": "## 描述\n修复 FIA 算子在 GQA 模式下 mm1RopeKa 计算逻辑错误，以及 BNSD layout 下 actualSeqLengthsQ 处理不当的问题。\n\n## 改动\n- flash_attention_no_quant_kernel_base.h: GQA 模式下 mm1RopeKa 应为 n2Size*gSize*dSizeRope，非 GQA 模式下应为 dSizeRope\n- fused_infer_attention_score_tiling_impl.cpp: BNSD layout 下 gsMergeFlag 时 actualSeqLengthsQ 应使用 S1Size 而非 actSeqLenQData\n\n## 关联的Issue\n#2724\n\n## 测试\n- 已在 ascend950 (arch35) 平台验证 GQA 和非 GQA 模式下 RoPE 计算正确性\n- 已验证 BNSD layout 下 actualSeqLengthsQ 计算符合预期\n\n## 类型标签\n- [x] 🐛 Bug 修复",
+    "can_merge_check": true,
+    "created_at": "2026-05-27T16:51:17.840+08:00",
+    "diff_url": "https://gitcode.com/cann/ops-transformer/merge_requests/6008/diffs",
+    "head": {
+      "assigner": {
+        "login": "leiqingji",
+        "name": "leiqingji"
+      },
+      "ref": "fix/fia-rope-gqa-actualseqlen",
+      "repo": {
+        "full_name": "leiqingji/ops-transformer",
+        "name": "ops-transformer",
+        "path": "ops-transformer"
+      },
+      "sha": "71b3953934903f9b74d85b60c38951f67b7fd934"
+    },
+    "html_url": "https://gitcode.com/cann/ops-transformer/merge_requests/6008",
+    "id": 8657981,
+    "labels": [
+      {
+        "color": "#22ed07",
+        "created_at": "2025-05-29T20:14:31+08:00",
+        "id": 2742,
+        "name": "approved",
+        "updated_at": "2026-05-28T20:30:17+08:00"
+      },
+      {
+        "color": "#17f207",
+        "created_at": "2025-05-29T20:14:01+08:00",
+        "id": 2741,
+        "name": "lgtm",
+        "updated_at": "2026-05-28T21:12:47+08:00"
+      },
+      {
+        "color": "#2865E0",
+        "created_at": "2025-06-21T10:53:09+08:00",
+        "id": 4929,
+        "name": "cann-cla/yes",
+        "updated_at": "2026-05-27T16:51:29+08:00"
+      },
+      {
+        "color": "#21BA45",
+        "created_at": "2025-06-10T14:17:23+08:00",
+        "id": 3873,
+        "name": "ci-pipeline-passed",
+        "updated_at": "2026-05-28T09:41:34+08:00"
+      },
+      {
+        "color": "#3ee029",
+        "created_at": "2025-12-16T09:45:21+08:00",
+        "id": 22553,
+        "name": "api-check-pass",
+        "updated_at": "2026-05-28T09:40:47+08:00"
+      }
+    ],
+    "merged_at": "2026-05-28T21:12:57.364+08:00",
+    "number": 6008,
+    "state": "merged",
+    "testers": [],
+    "title": "fix(fia): 修复GQA模式下mm1RopeKa计算与BNSD layout的actualSeqLengthsQ处理",
+    "updated_at": "2026-05-28T21:12:58.444+08:00"
+  },
+  {
+    "assignees": [],
+    "base": {
+      "ref": "9.1.0-beta.2",
+      "repo": {
+        "full_name": "cann/ops-transformer",
+        "name": "ops-transformer",
+        "path": "ops-transformer"
+      },
+      "sha": "a0967f9251383269f446353d0fb35fbe051b4baf"
+    },
+    "body": "## 描述\n修复 FIA 算子在 GQA 模式下 mm1RopeKa 计算逻辑错误，以及 BNSD layout 下 actualSeqLengthsQ 处理不当的问题。\n\n## 改动\n- flash_attention_no_quant_kernel_base.h: GQA 模式下 mm1RopeKa 应为 n2Size*gSize*dSizeRope，非 GQA 模式下应为 dSizeRope\n- fused_infer_attention_score_tiling_impl.cpp: BNSD layout 下 gsMergeFlag 时 actualSeqLengthsQ 应使用 S1Size 而非 actSeqLenQData\n\n## 关联的Issue\n#2724\n\n## 测试\n- 已在 ascend950 (arch35) 平台验证 GQA 和非 GQA 模式下 RoPE 计算正确性\n- 已验证 BNSD layout 下 actualSeqLengthsQ 计算符合预期\n\n## 类型标签\n- [x] 🐛 Bug 修复",
+    "can_merge_check": true,
+    "created_at": "2026-05-28T19:30:59.295+08:00",
+    "diff_url": "https://gitcode.com/cann/ops-transformer/merge_requests/6069/diffs",
+    "head": {
+      "assigner": {
+        "login": "leiqingji",
+        "name": "leiqingji"
+      },
+      "ref": "cherry-pick-mr-6008-1779967817200-auto",
+      "repo": {
+        "full_name": "leiqingji/ops-transformer",
+        "name": "ops-transformer",
+        "path": "ops-transformer"
+      },
+      "sha": "1a1bacdaa5c3802748447efb39e99f64d815471d"
+    },
+    "html_url": "https://gitcode.com/cann/ops-transformer/merge_requests/6069",
+    "id": 8664886,
+    "labels": [
+      {
+        "color": "#2865E0",
+        "created_at": "2025-06-21T10:53:09+08:00",
+        "id": 4929,
+        "name": "cann-cla/yes",
+        "updated_at": "2026-05-28T19:31:11+08:00"
+      },
+      {
+        "color": "#21BA45",
+        "created_at": "2025-06-10T14:17:23+08:00",
+        "id": 3873,
+        "name": "ci-pipeline-passed",
+        "updated_at": "2026-05-28T19:43:19+08:00"
+      },
+      {
+        "color": "#22ed07",
+        "created_at": "2025-05-29T20:14:31+08:00",
+        "id": 2742,
+        "name": "approved",
+        "updated_at": "2026-05-28T20:30:26+08:00"
+      },
+      {
+        "color": "#17f207",
+        "created_at": "2025-05-29T20:14:01+08:00",
+        "id": 2741,
+        "name": "lgtm",
+        "updated_at": "2026-05-28T21:12:40+08:00"
+      }
+    ],
+    "merged_at": "2026-05-28T21:12:49.140+08:00",
+    "number": 6069,
+    "state": "merged",
+    "testers": [],
+    "title": "fix(fia): 修复GQA模式下mm1RopeKa计算与BNSD layout的actualSeqLengthsQ处理",
+    "updated_at": "2026-05-28T21:12:50.056+08:00"
+  }
+]

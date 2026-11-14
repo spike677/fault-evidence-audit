@@ -1,0 +1,38 @@
+[
+  {
+    "additions": 14,
+    "blob_id": "c7657f5fddf86d19ee1efcb8ad0f164afe995ec8",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/f993b8401922159250a868a5578b8731dbec5348/matmul/quant_batch_matmul_v3/op_kernel/quant_batch_matmul_v3_apt.cpp",
+    "deletions": 0,
+    "filename": "matmul/quant_batch_matmul_v3/op_kernel/quant_batch_matmul_v3_apt.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 14,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -235,6 +235,12 @@ UT_STATIC __global__ __aicore__ void quant_batch_matmul_v3(\n             } else if constexpr (TPL_ATRANS == 0 && TPL_BTRANS == 1) {\n                 QUANT_BMMV3_MX_CMCT_IMPL_CLASS(Cmct::Gemm::layout::RowMajor, Cmct::Gemm::layout::Zn,\n                                                Cmct::Gemm::layout::RowMajorAlign, 0);\n+            } else if constexpr (TPL_ATRANS == 1 && TPL_BTRANS == 0) {\n+                QUANT_BMMV3_MX_CMCT_IMPL_CLASS(\n+                    Cmct::Gemm::layout::ColumnMajor, Cmct::Gemm::layout::Nz, Cmct::Gemm::layout::RowMajorAlign, 0);\n+            } else if constexpr (TPL_ATRANS == 1 && TPL_BTRANS == 1) {\n+                QUANT_BMMV3_MX_CMCT_IMPL_CLASS(\n+                    Cmct::Gemm::layout::ColumnMajor, Cmct::Gemm::layout::Zn, Cmct::Gemm::layout::RowMajorAlign, 0);\n             }\n         } else if constexpr (TPL_KERNELTYPE == TPL_NO_VEC_EPILOGUE_CUSTOM_GMTOAL1_WITH_MMAPI) {\n             if constexpr (TPL_ATRANS == 0 && TPL_BTRANS == 0) {\n@@ -243,6 +249,14 @@ UT_STATIC __global__ __aicore__ void quant_batch_matmul_v3(\n             } else if constexpr (TPL_ATRANS == 0 && TPL_BTRANS == 1) {\n                 QUANT_BMMV3_MX_CMCT_IMPL_CLASS(Cmct::Gemm::layout::RowMajor, Cmct::Gemm::layout::Zn,\n                                                Cmct::Gemm::layout::RowMajorAlign, Cmct::Gemm::A_FULL_LOAD_MODE);\n+            } else if constexpr (TPL_ATRANS == 1 && TPL_BTRANS == 0) {\n+                QUANT_BMMV3_MX_CMCT_IMPL_CLASS(\n+                    Cmct::Gemm::layout::ColumnMajor, Cmct::Gemm::layout::Nz, Cmct::Gemm::layout::RowMajorAlign,\n+                    Cmct::Gemm::A_FULL_LOAD_MODE);\n+            } else if constexpr (TPL_ATRANS == 1 && TPL_BTRANS == 1) {\n+                QUANT_BMMV3_MX_CMCT_IMPL_CLASS(\n+                    Cmct::Gemm::layout::ColumnMajor, Cmct::Gemm::layout::Zn, Cmct::Gemm::layout::RowMajorAlign,\n+                    Cmct::Gemm::A_FULL_LOAD_MODE);\n             }\n         }\n #else\n",
+      "new_file": false,
+      "new_path": "matmul/quant_batch_matmul_v3/op_kernel/quant_batch_matmul_v3_apt.cpp",
+      "old_path": "matmul/quant_batch_matmul_v3/op_kernel/quant_batch_matmul_v3_apt.cpp",
+      "removed_lines": 0,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/f993b8401922159250a868a5578b8731dbec5348/matmul/quant_batch_matmul_v3/op_kernel/quant_batch_matmul_v3_apt.cpp",
+    "sha": "f993b8401922159250a868a5578b8731dbec5348",
+    "source_branch": "fix/mxfp80408",
+    "source_project": {
+      "full_name": "zhoushaolong/ops-nn_zsl",
+      "human_name": "zhoushaolong / ops-nn_zsl",
+      "id": 9517254,
+      "path": "ops-nn_zsl"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  }
+]

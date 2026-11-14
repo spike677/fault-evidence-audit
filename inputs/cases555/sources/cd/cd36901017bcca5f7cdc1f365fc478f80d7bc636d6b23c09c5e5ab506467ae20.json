@@ -1,0 +1,88 @@
+{
+  "assignee": {
+    "html_url": "https://gitcode.com/huang-chuhong",
+    "id": "68771b9430980b376fba17a0",
+    "login": "huang-chuhong",
+    "name": "huang-chuhong",
+    "object_id": "68771b9430980b376fba17a0"
+  },
+  "assignees": [
+    {
+      "html_url": "https://gitcode.com/huang-chuhong",
+      "id": "68771b9430980b376fba17a0",
+      "login": "huang-chuhong",
+      "name": "huang-chuhong",
+      "object_id": "68771b9430980b376fba17a0"
+    }
+  ],
+  "body": "\n\nThanks for sending an issue! Please fill in the following template to help quickly solve your problem.\n\n### Describe the current behavior / 问题描述 (Mandatory / 必填)\n            \nhttps://gitcode.com/cann/ops-transformer/blob/master/attention/common/op_kernel/arch35/flash_attention_kernel_noquant_mla.h文件里\n由于模版做了PRELOAD_N，当前默认为1，因此某个核在最后一次BN循环时，需要进行s2LoopLimit+1，来补充因为前面preload操作而少做的一次MM2和Vec2。\n当前存在bug的场景是若某个核分到负载跨越多个BN，并且最后一个BN的S2=0，此时由于S2=0，经过行无效修正后会认为，runParam.actualS1Size = 0，随后\nComputeS1LoopInfo函数得到当前BN场景下的S1looptimes=0，最终导致无法进入主流程的循环逻辑，**无法补充**因为前面preload操作而少做的一次MM2和Vec2。\n### Environment / 环境信息 (Mandatory / 必填)\n            \n950 最新cann包环境\n### Steps to reproduce the issue / 重现步骤 (Mandatory / 必填)\n            \nimport torch_npu\nimport torch\nimport math\n\nquery = torch.rand(3, 1, 512).to(torch.bfloat16).npu()\nkey =  torch.rand(3048, 1, 512).to(torch.bfloat16).npu()\nvalue =  torch.rand(3048, 1, 512).to(torch.bfloat16).npu()\n\nquery_rope = torch.rand(3, 1, 64).to(torch.bfloat16).npu()\nkey_rope = torch.rand(3048, 1, 64).to(torch.bfloat16).npu()\n\nnum_heads = 1\nsoftmax_scale = 192 **(-0.5) \nactual_seq_lengths = [1,2,3]\nactual_seq_lengths_kv = [2148,2148,3048]\npreTokens = 128\nnextTokens = 0\n\n\nmask_dtype = torch.uint8\natten_mask_npu = torch.triu(torch.ones([2048, 2048]), diagonal=1).to(mask_dtype).npu()\n\nattn_output, _ = torch.ops.npu.npu_fused_infer_attention_score(\n                        query, key, value, query_rope=query_rope, key_rope=key_rope,\n                        num_heads=num_heads,\n                        num_key_value_heads=1, input_layout=\"TND\",\n                        atten_mask=atten_mask_npu, \n                        scale=softmax_scale,\n                        antiquant_mode=0, antiquant_scale=None,\n                        pre_tokens = preTokens,\n                        next_tokens = nextTokens,\n                        actual_seq_lengths=actual_seq_lengths,\n                        actual_seq_lengths_kv=actual_seq_lengths_kv,\n                        sparse_mode=4\n                        )\nprint(attn_output)\n### Describe the expected behavior / 预期结果 (Mandatory / 必填)\n            \n上述脚本中第一个batch的结果不应该为0，第二个batch才是0.\n### Related log / screenshot / 日志 / 截图 (Mandatory / 必填)\n            \ntensor([[[0.0000, 0.0000, 0.0000,  ..., 0.0000, 0.0000, 0.0000]],\n\n        [[0.0000, 0.0000, 0.0000,  ..., 0.0000, 0.0000, 0.0000]],\n\n        [[0.5273, 0.4922, 0.5195,  ..., 0.4961, 0.5000, 0.5195]]],\n       device='npu:0', dtype=torch.bfloat16)\n### Special notes for this issue/备注 (Optional / 选填)\n            \n\n",
+  "comments": 0,
+  "created_at": "2026-04-07T15:00:37+08:00",
+  "finished_at": "2026-04-13T19:57:27+08:00",
+  "html_url": "https://gitcode.com/cann/ops-transformer/issues/1728",
+  "id": 3839725,
+  "issue_priority_detail": {
+    "id": 116,
+    "title": "无优先级"
+  },
+  "issue_state": "已完成",
+  "issue_state_detail": {
+    "id": 287,
+    "serial": 0,
+    "title": "已完成"
+  },
+  "issue_type": "任务",
+  "issue_type_detail": {
+    "id": 255,
+    "is_system": false,
+    "title": "任务"
+  },
+  "labels": [
+    {
+      "color": "#DB2828",
+      "created_at": "2025-06-10T14:17:23+08:00",
+      "id": 3870,
+      "name": "bug-report",
+      "updated_at": "2026-04-07T15:00:37+08:00"
+    },
+    {
+      "color": "#2469f5",
+      "created_at": "2025-10-09T20:53:07+08:00",
+      "id": 14930,
+      "name": "Accepted",
+      "updated_at": "2026-04-08T16:20:02+08:00"
+    },
+    {
+      "color": "#35e029",
+      "created_at": "2026-03-20T11:25:13+08:00",
+      "id": 38861,
+      "name": "resolved",
+      "updated_at": "2026-04-13T20:43:57+08:00"
+    }
+  ],
+  "number": "1728",
+  "priority": 0,
+  "repository": {
+    "assigner": {},
+    "created_at": "2025-09-28T17:54:46+08:00",
+    "description": "本项目是CANN提供的transformer类大模型算子库，实现网络在NPU上加速计算。",
+    "full_name": "cann/ops-transformer",
+    "id": 7673863,
+    "name": "ops-transformer",
+    "paas": "",
+    "path": "ops-transformer",
+    "updated_at": "2025-09-28T18:06:48+08:00"
+  },
+  "state": "closed",
+  "title": "[Bug-Report|缺陷反馈]: 【CANN开源内测】mla 576模版下 解决单个核处理 最后一个BN的S2等于0的场景，会出现少一次preload的补充循环",
+  "updated_at": "2026-04-13T19:57:27+08:00",
+  "user": {
+    "avatar_url": "https://cdn-img.gitcode.com/df/dd/2d08485317915632fd2d63da0dfde10b68e7a5dd441c3da982b60db254e29f06.png",
+    "html_url": "https://gitcode.com/zzqzz5ii",
+    "id": "67063d831d9bfb547df4cbb0",
+    "login": "zzqzz5ii",
+    "name": "hw_zzq666",
+    "object_id": "67063d831d9bfb547df4cbb0"
+  },
+  "visibility_reason": "public"
+}

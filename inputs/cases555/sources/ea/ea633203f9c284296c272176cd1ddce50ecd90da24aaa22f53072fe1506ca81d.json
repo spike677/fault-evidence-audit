@@ -1,0 +1,38 @@
+[
+  {
+    "additions": 3,
+    "blob_id": "1a574ff6b8bc001a991043bd5c856da55218be62",
+    "blob_url": "https://gitcode.com/cann/ops-math/blob/97ae5981d88bf86a74e6b06d18c620dd5cbafb02/math/cummin/op_kernel/arch35/cummin.h",
+    "deletions": 3,
+    "filename": "math/cummin/op_kernel/arch35/cummin.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 3,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -53,9 +53,9 @@ __simt_vf__ LAUNCH_BOUND(THREAD_DIM) void SimtCompute(\n             const int64_t curr_idx = idx + j * N;\n             const X curr_val = xGm[curr_idx];\n \n-            const bool is_smaller = (curr_val <= minVal);\n-            minVal = is_smaller ? curr_val : minVal;\n-            minIdx = is_smaller ? static_cast<ARGMIN>(j) : minIdx;\n+            bool is_not_smaller = (minVal < curr_val);\n+            minVal = is_not_smaller ? minVal : curr_val;\n+ \t        minIdx = is_not_smaller ? minIdx : static_cast<ARGMIN>(j);\n \n             yGm[curr_idx] = minVal;\n             argminGm[curr_idx] = minIdx;\n",
+      "new_file": false,
+      "new_path": "math/cummin/op_kernel/arch35/cummin.h",
+      "old_path": "math/cummin/op_kernel/arch35/cummin.h",
+      "removed_lines": 3,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-math/raw/97ae5981d88bf86a74e6b06d18c620dd5cbafb02/math/cummin/op_kernel/arch35/cummin.h",
+    "sha": "97ae5981d88bf86a74e6b06d18c620dd5cbafb02",
+    "source_branch": "9.1.0",
+    "source_project": {
+      "full_name": "sakuraqqz/ops-math",
+      "human_name": "sakuraqqz / ops-math",
+      "id": 7650764,
+      "path": "ops-math"
+    },
+    "target_branch": "9.1.0",
+    "target_project": {
+      "full_name": "cann/ops-math",
+      "human_name": "CANN / ops-math",
+      "id": 7649531,
+      "path": "ops-math"
+    }
+  }
+]

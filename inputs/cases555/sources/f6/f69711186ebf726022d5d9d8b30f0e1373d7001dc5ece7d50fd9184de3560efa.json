@@ -1,0 +1,38 @@
+[
+  {
+    "additions": 6,
+    "blob_id": "4ea673dcf88bd5310ba782ecd99c100cf2ca5993",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/a8368ba23ab1ae523a894c97546aba9e58b09599/matmul/quant_batch_matmul_v3/op_api/aclnn_quant_matmul_v4.cpp",
+    "deletions": 4,
+    "filename": "matmul/quant_batch_matmul_v3/op_api/aclnn_quant_matmul_v4.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 6,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -1249,10 +1249,12 @@ static aclTensor* ConvertTensorToInt4(const aclTensor* input, aclOpExecutor* exe\n     viewShape[viewShapeDim - 1] = viewShape[viewShapeDim - 1] * INT4_NUMS_IN_INT32;\n     auto inputTemp = executor->CreateView(input, viewShape, input->GetViewOffset());\n     inputTemp->SetDataType(DataType::DT_INT4);\n-    storageShape[storageShape.GetDimNum() - 1] = NZ_K0_VALUE_INT4_TRANS;\n-    storageShape[storageShape.GetDimNum() - MIN_DIM_NUM_NZ] = (viewShape[viewShapeDim - 1] +\n-        NZ_K0_VALUE_INT4_TRANS - 1) / NZ_K0_VALUE_INT4_TRANS;\n-    inputTemp->SetStorageShape(storageShape);\n+    if (input->GetStorageFormat() == op::Format::FORMAT_FRACTAL_NZ) {\n+        storageShape[storageShape.GetDimNum() - 1] = NZ_K0_VALUE_INT4_TRANS;\n+        storageShape[storageShape.GetDimNum() - MIN_DIM_NUM_NZ] = (viewShape[viewShapeDim - 1] +\n+            NZ_K0_VALUE_INT4_TRANS - 1) / NZ_K0_VALUE_INT4_TRANS;\n+        inputTemp->SetStorageShape(storageShape);\n+    }\n     OP_LOGD(\"The conversion from int32 to int4 is completed.\");\n     return inputTemp;\n }\n",
+      "new_file": false,
+      "new_path": "matmul/quant_batch_matmul_v3/op_api/aclnn_quant_matmul_v4.cpp",
+      "old_path": "matmul/quant_batch_matmul_v3/op_api/aclnn_quant_matmul_v4.cpp",
+      "removed_lines": 4,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/a8368ba23ab1ae523a894c97546aba9e58b09599/matmul/quant_batch_matmul_v3/op_api/aclnn_quant_matmul_v4.cpp",
+    "sha": "a8368ba23ab1ae523a894c97546aba9e58b09599",
+    "source_branch": "cherry-pick-mr-2697-1773416907224-auto",
+    "source_project": {
+      "full_name": "llqx-1/ops-nn",
+      "human_name": "llqx-1 / ops-nn",
+      "id": 7674557,
+      "path": "ops-nn"
+    },
+    "target_branch": "9.0.0",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  }
+]

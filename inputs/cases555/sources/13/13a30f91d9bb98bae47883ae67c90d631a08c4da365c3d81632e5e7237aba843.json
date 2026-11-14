@@ -1,0 +1,92 @@
+[
+  {
+    "additions": 3,
+    "blob_id": "38219190131b360565086e03fa0dd83d30f9ea6f",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/f561dacc6742538e978a7e790a02b627fa28eed5/activation/threshold_grad_v2_d/op_host/arch35/threshold_grad_v2_d_tiling_arch35.cpp",
+    "deletions": 3,
+    "filename": "activation/threshold_grad_v2_d/op_host/arch35/threshold_grad_v2_d_tiling_arch35.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 3,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -87,7 +87,7 @@ ge::graphStatus ThresholdGradV2DTiling::DoOpTiling()\n         tilingKey = GET_TPL_TILING_KEY(brcBaseTiling.GetSchMode(), THRESHOLD_GRAD_V2_D_TPL_FP32);\n         brcBaseTiling.SetScalar<float>(thresHold);\n     } else if (input0DType == ge::DT_INT32) {\n-        BroadcastBaseTiling<ThresholdGradV2DDag<int32_t>::OpDag> brcBaseTiling(context_);\n+        BroadcastBaseTiling<ThresholdGradV2DInt32Dag<int32_t>::OpDag> brcBaseTiling(context_);\n         baseTilingResult = brcBaseTiling.DoTiling();\n         OP_CHECK_IF(baseTilingResult == ge::GRAPH_FAILED,\n                     OP_LOGE(context_->GetNodeName(), \"BroadcastBaseTiling<ThresholdGradV2DDag<int32_t>::OpDag> failed\"),\n@@ -95,7 +95,7 @@ ge::graphStatus ThresholdGradV2DTiling::DoOpTiling()\n         tilingKey = GET_TPL_TILING_KEY(brcBaseTiling.GetSchMode(), THRESHOLD_GRAD_V2_D_TPL_INT32);\n         brcBaseTiling.SetScalar<float>(thresHold);\n     } else if (input0DType == ge::DT_INT8) {\n-        BroadcastBaseTiling<ThresholdGradV2DDag<int8_t>::OpDag> brcBaseTiling(context_);\n+        BroadcastBaseTiling<ThresholdGradV2D8BDag<int8_t>::OpDag> brcBaseTiling(context_);\n         baseTilingResult = brcBaseTiling.DoTiling();\n         OP_CHECK_IF(baseTilingResult == ge::GRAPH_FAILED,\n                     OP_LOGE(context_->GetNodeName(), \"BroadcastBaseTiling<ThresholdGradV2DDag<int8_t>::OpDag> failed\"),\n@@ -103,7 +103,7 @@ ge::graphStatus ThresholdGradV2DTiling::DoOpTiling()\n         tilingKey = GET_TPL_TILING_KEY(brcBaseTiling.GetSchMode(), THRESHOLD_GRAD_V2_D_TPL_INT8);\n         brcBaseTiling.SetScalar<float>(thresHold);\n     } else if (input0DType == ge::DT_UINT8) {\n-        BroadcastBaseTiling<ThresholdGradV2DDag<uint8_t>::OpDag> brcBaseTiling(context_);\n+        BroadcastBaseTiling<ThresholdGradV2D8BDag<uint8_t>::OpDag> brcBaseTiling(context_);\n         baseTilingResult = brcBaseTiling.DoTiling();\n         OP_CHECK_IF(baseTilingResult == ge::GRAPH_FAILED,\n                     OP_LOGE(context_->GetNodeName(), \"BroadcastBaseTiling<ThresholdGradV2DDag<uint8_t>::OpDag> failed\"),\n",
+      "new_file": false,
+      "new_path": "activation/threshold_grad_v2_d/op_host/arch35/threshold_grad_v2_d_tiling_arch35.cpp",
+      "old_path": "activation/threshold_grad_v2_d/op_host/arch35/threshold_grad_v2_d_tiling_arch35.cpp",
+      "removed_lines": 3,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/f561dacc6742538e978a7e790a02b627fa28eed5/activation/threshold_grad_v2_d/op_host/arch35/threshold_grad_v2_d_tiling_arch35.cpp",
+    "sha": "f561dacc6742538e978a7e790a02b627fa28eed5",
+    "source_branch": "9.2.0-beta.1",
+    "target_branch": "9.2.0-beta.1",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 41,
+    "blob_id": "d686ff80898a5a76e345398f0b0dbd5498519147",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/f561dacc6742538e978a7e790a02b627fa28eed5/activation/threshold_grad_v2_d/op_kernel/arch35/threshold_grad_v2_d_dag.h",
+    "deletions": 0,
+    "filename": "activation/threshold_grad_v2_d/op_kernel/arch35/threshold_grad_v2_d_dag.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 41,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -25,6 +25,47 @@ using namespace Ops::Base;\n constexpr int COMPARE_MODE_GT = 1;\n constexpr int SELECT_MODE_TENSOR = 2;\n \n+template <typename U>\n+struct ThresholdGradV2D8BDag {\n+    using const_zero = MAKE_CONST(float, 0.0);\n+    using data_threshold = Bind<Vec::Duplicate<float>, Placeholder::Var<float, 0>>;\n+    using data_zero = Bind<Vec::Duplicate<float>, const_zero>;\n+    using OpCopyInGrad = Bind<Vec::CopyInBrc<U>, Placeholder::In0<U>>;\n+    using OpCopyInGradHalf = Bind<Vec::Cast<half, U, 0>, OpCopyInGrad>;\n+    using OpCopyInGradCast = Bind<Vec::Cast<float, half, 0>, OpCopyInGradHalf>;\n+    using OpCopyInSelf = Bind<Vec::CopyInBrc<U>, Placeholder::In1<U>>;\n+    using OpCopyInSelfHalf = Bind<Vec::Cast<half, U, 0>, OpCopyInSelf>;\n+    using OpCopyInSelfCast = Bind<Vec::Cast<float, half, 0>, OpCopyInSelfHalf>;\n+    using Compare = Bind<Vec::Compare<uint8_t, float, COMPARE_MODE_GT>, OpCopyInSelfCast, data_threshold>;\n+    using Select = Bind<Vec::Select<uint8_t, float, SELECT_MODE_TENSOR>, Compare, OpCopyInGradCast, data_zero>;\n+    using SelectHalf = Bind<Vec::Cast<half, float, 1>, Select>;\n+    using SelectCast = Bind<Vec::Cast<U, half, 1>, SelectHalf>;\n+    using OpCopyOut = Bind<Vec::CopyOut<U>, Placeholder::Out0<U>, SelectCast>;\n+    // 指定输出节点\n+    using Outputs = Elems<OpCopyOut>;\n+    using MemCfg = MemOptCfg<MemLevel::LEVEL_2>;\n+    using OpDag = DAGSch<Outputs, void, MemCfg>;\n+};\n+\n+template <typename U>\n+struct ThresholdGradV2DInt32Dag {\n+    using const_zero = MAKE_CONST(float, 0.0);\n+    using data_threshold = Bind<Vec::Duplicate<float>, Placeholder::Var<float, 0>>;\n+    using data_zero = Bind<Vec::Duplicate<float>, const_zero>;\n+    using OpCopyInGrad = Bind<Vec::CopyInBrc<U>, Placeholder::In0<U>>;\n+    using OpCopyInGradCast = Bind<Vec::Cast<float, U, 1>, OpCopyInGrad>;\n+    using OpCopyInSelf = Bind<Vec::CopyInBrc<U>, Placeholder::In1<U>>;\n+    using OpCopyInSelfCast = Bind<Vec::Cast<float, U, 1>, OpCopyInSelf>;\n+    using Compare = Bind<Vec::Compare<uint8_t, float, COMPARE_MODE_GT>, OpCopyInSelfCast, data_threshold>;\n+    using Select = Bind<Vec::Select<uint8_t, float, SELECT_MODE_TENSOR>, Compare, OpCopyInGradCast, data_zero>;\n+    using SelectCast = Bind<Vec::Cast<U, float, 1>, Select>;\n+    using OpCopyOut = Bind<Vec::CopyOut<U>, Placeholder::Out0<U>, SelectCast>;\n+    // 指定输出节点\n+    using Outputs = Elems<OpCopyOut>;\n+    using MemCfg = MemOptCfg<MemLevel::LEVEL_2>;\n+    using OpDag = DAGSch<Outputs, void, MemCfg>;\n+};\n+\n template <typename U>\n struct ThresholdGradV2DDag {\n     using const_zero = MAKE_CONST(float, 0.0);\n",
+      "new_file": false,
+      "new_path": "activation/threshold_grad_v2_d/op_kernel/arch35/threshold_grad_v2_d_dag.h",
+      "old_path": "activation/threshold_grad_v2_d/op_kernel/arch35/threshold_grad_v2_d_dag.h",
+      "removed_lines": 0,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/f561dacc6742538e978a7e790a02b627fa28eed5/activation/threshold_grad_v2_d/op_kernel/arch35/threshold_grad_v2_d_dag.h",
+    "sha": "f561dacc6742538e978a7e790a02b627fa28eed5",
+    "source_branch": "9.2.0-beta.1",
+    "target_branch": "9.2.0-beta.1",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 3,
+    "blob_id": "f7acdbb5ab4fca69d635b18f2e78007160b62786",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/f561dacc6742538e978a7e790a02b627fa28eed5/activation/threshold_grad_v2_d/op_kernel/threshold_grad_v2_d.cpp",
+    "deletions": 3,
+    "filename": "activation/threshold_grad_v2_d/op_kernel/threshold_grad_v2_d.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 3,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -36,13 +36,13 @@ __global__ __aicore__ void threshold_grad_v2_d(GM_ADDR gradOutput, GM_ADDR self,\n         BroadcastSch<schMode, ThresholdGradV2DDag<float>::OpDag> sch(tiling);\n         sch.Process(gradOutput, self, out);\n     } else if constexpr (dtype == static_cast<uint64_t>(THRESHOLD_GRAD_V2_D_TPL_INT32)) {\n-        BroadcastSch<schMode, ThresholdGradV2DDag<int32_t>::OpDag> sch(tiling);\n+        BroadcastSch<schMode, ThresholdGradV2DInt32Dag<int32_t>::OpDag> sch(tiling);\n         sch.Process(gradOutput, self, out);\n     } else if constexpr (dtype == static_cast<uint64_t>(THRESHOLD_GRAD_V2_D_TPL_INT8)) {\n-        BroadcastSch<schMode, ThresholdGradV2DDag<int8_t>::OpDag> sch(tiling);\n+        BroadcastSch<schMode, ThresholdGradV2D8BDag<int8_t>::OpDag> sch(tiling);\n         sch.Process(gradOutput, self, out);\n     } else if constexpr (dtype == static_cast<uint64_t>(THRESHOLD_GRAD_V2_D_TPL_UINT8)) {\n-        BroadcastSch<schMode, ThresholdGradV2DDag<uint8_t>::OpDag> sch(tiling);\n+        BroadcastSch<schMode, ThresholdGradV2D8BDag<uint8_t>::OpDag> sch(tiling);\n         sch.Process(gradOutput, self, out);\n     }\n     return;\n",
+      "new_file": false,
+      "new_path": "activation/threshold_grad_v2_d/op_kernel/threshold_grad_v2_d.cpp",
+      "old_path": "activation/threshold_grad_v2_d/op_kernel/threshold_grad_v2_d.cpp",
+      "removed_lines": 3,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/f561dacc6742538e978a7e790a02b627fa28eed5/activation/threshold_grad_v2_d/op_kernel/threshold_grad_v2_d.cpp",
+    "sha": "f561dacc6742538e978a7e790a02b627fa28eed5",
+    "source_branch": "9.2.0-beta.1",
+    "target_branch": "9.2.0-beta.1",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  }
+]

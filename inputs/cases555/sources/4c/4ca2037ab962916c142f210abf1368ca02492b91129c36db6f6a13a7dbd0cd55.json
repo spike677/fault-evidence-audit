@@ -1,0 +1,74 @@
+[
+  {
+    "additions": 7,
+    "blob_id": "d9b3678c24aab69fe605a16d51ca396c84b613f2",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/a306383bfb71692e2f7414ea6976e0a3c19dc2f9/index/gather_elements_v2/op_kernel/gather_elements_v2_common.h",
+    "deletions": 0,
+    "filename": "index/gather_elements_v2/op_kernel/gather_elements_v2_common.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 7,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -128,6 +128,13 @@ protected:\n         WaitFlag<HardEvent::V_MTE2>(eventIDVToMTE2);\n     }\n \n+    __aicore__ inline void MTE3ToVSync()\n+    {\n+        event_t eventIDMTE3ToV = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::MTE3_V));\n+        SetFlag<HardEvent::MTE3_V>(eventIDMTE3ToV);\n+        WaitFlag<HardEvent::MTE3_V>(eventIDMTE3ToV);\n+    }\n+\n     template <typename T>\n     __aicore__ inline T Min(T a, T b)\n     {\n",
+      "new_file": false,
+      "new_path": "index/gather_elements_v2/op_kernel/gather_elements_v2_common.h",
+      "old_path": "index/gather_elements_v2/op_kernel/gather_elements_v2_common.h",
+      "removed_lines": 0,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/a306383bfb71692e2f7414ea6976e0a3c19dc2f9/index/gather_elements_v2/op_kernel/gather_elements_v2_common.h",
+    "sha": "a306383bfb71692e2f7414ea6976e0a3c19dc2f9",
+    "source_branch": "9.0.0/gather_elements_v2",
+    "source_project": {
+      "full_name": "huang-wei-chen/ops-nn",
+      "human_name": "huang-wei-chen / ops-nn",
+      "id": 8085944,
+      "path": "ops-nn"
+    },
+    "target_branch": "9.0.0",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 1,
+    "blob_id": "f39f3246ba359e21fbc770448653a062e67f0490",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/a306383bfb71692e2f7414ea6976e0a3c19dc2f9/index/gather_elements_v2/op_kernel/gather_elements_v2_transpose.h",
+    "deletions": 0,
+    "filename": "index/gather_elements_v2/op_kernel/gather_elements_v2_transpose.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 1,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -256,6 +256,7 @@ private:\n                 GatherInUb(this->xGatherDim_, gatherParam_.idxGatherDimSlice);\n                 this->VToMTE2Sync();\n                 CopyOutY2Workspace(idxWorkspaceOffset, gatherParam_.idxGatherDimSlice);\n+                this->MTE3ToVSync();\n             }\n             // tail\n             if (gatherParam_.idxGatherDimTail) {\n",
+      "new_file": false,
+      "new_path": "index/gather_elements_v2/op_kernel/gather_elements_v2_transpose.h",
+      "old_path": "index/gather_elements_v2/op_kernel/gather_elements_v2_transpose.h",
+      "removed_lines": 0,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/a306383bfb71692e2f7414ea6976e0a3c19dc2f9/index/gather_elements_v2/op_kernel/gather_elements_v2_transpose.h",
+    "sha": "a306383bfb71692e2f7414ea6976e0a3c19dc2f9",
+    "source_branch": "9.0.0/gather_elements_v2",
+    "source_project": {
+      "full_name": "huang-wei-chen/ops-nn",
+      "human_name": "huang-wei-chen / ops-nn",
+      "id": 8085944,
+      "path": "ops-nn"
+    },
+    "target_branch": "9.0.0",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  }
+]

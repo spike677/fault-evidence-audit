@@ -1,0 +1,74 @@
+[
+  {
+    "additions": 36,
+    "blob_id": "4d3627f621f479fdfb9a4bf97d605706fc58328d",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/d121ebee780a78e901c4ff4b8ac9b36828499554/index/repeat_interleave_grad/op_kernel/v35/repeat_interleave_grad_david.h",
+    "deletions": 0,
+    "filename": "index/repeat_interleave_grad/op_kernel/v35/repeat_interleave_grad_david.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 36,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -32,6 +32,7 @@ public:\n     constexpr static uint64_t MAX_NUM_PER_RES = 2 * 1024;\n     constexpr static int32_t ELEMENT_ONE_REPEAT_ORI = platform::GetVRegSize() / sizeof(DataT);\n     constexpr static int32_t ELEMENT_ONE_REPEAT_COMPUTE = platform::GetVRegSize() / sizeof(PromoteDataT);\n+    constexpr static float INIT_FLOAT_VALUE = 0.0;\n \n     __aicore__ inline RepeatInterleaveGradDavid(TPipe& pipe) : pipe_(pipe)\n     {}\n@@ -62,6 +63,8 @@ private:\n \n     __aicore__ inline void UpdateCacheAux(const int64_t cacheID, const int64_t stride, const int64_t count);\n \n+    __aicore__ inline void ProcessZeroR(int64_t outputDataOffset, int32_t dimA);\n+\n private:\n     const RepeatInterleaveGradDavidTilingData* tiling_;\n     TPipe& pipe_;\n@@ -169,6 +172,17 @@ __aicore__ inline void RepeatInterleaveGradDavid<DataT, PromoteDataT, IndexT>::P\n     }\n }\n \n+\n+template <typename DataT, typename PromoteDataT, typename IndexT>\n+__aicore__ inline void RepeatInterleaveGradDavid<DataT, PromoteDataT, IndexT>::ProcessZeroR(\n+    int64_t outputDataOffset, int32_t dimA)\n+{\n+    Duplicate<PromoteDataT>(computeRes_, INIT_FLOAT_VALUE, dimA);\n+    CopyOut(yGm_[outputDataOffset], computeRes_, dimA);\n+    SetFlag<HardEvent::MTE3_V>(GetTPipePtr()->FetchEventID(HardEvent::MTE3_V));\n+    WaitFlag<HardEvent::MTE3_V>(GetTPipePtr()->FetchEventID(HardEvent::MTE3_V));    \n+}\n+\n template <typename DataT, typename PromoteDataT, typename IndexT>\n __aicore__ inline void RepeatInterleaveGradDavid<DataT, PromoteDataT, IndexT>::ProcessRepeatBlock(\n     int32_t repeatFactor, LocalTensor<IndexT>& curRepeat, LocalTensor<IndexT>& preRepeat)\n@@ -193,6 +207,28 @@ __aicore__ inline void RepeatInterleaveGradDavid<DataT, PromoteDataT, IndexT>::P\n         int64_t rOffset = lastRepeatCount_ * tiling_->lenN;\n         r = curRepeat.GetValue(k);\n \n+        if (r == 0) {\n+            int32_t nBaseFactor = tiling_->basicBlockSize / BLOCK_SIZE_BYTE * BLOCK_SIZE_BYTE / sizeof(DataT);\n+            if (nBaseFactor > MAX_NUM_PER_RES) {\n+                nBaseFactor = MAX_NUM_PER_RES;\n+            }\n+            UbParaUnit newSplitN;\n+            __RIGUtil::DoUbSplit(tiling_->lenN, nBaseFactor, newSplitN);\n+            int32_t nFactor = newSplitN.ubFactor;\n+            int64_t outputDataOffset = 0;\n+            int64_t nOffset = 0;\n+            for (int32_t n = 0; n < newSplitN.ubCount - 1; n++) { // 重新切分的整块\n+                nOffset = n * nFactor;\n+                outputDataOffset = mOutputOffset_ + rOffset + nOffset;\n+                ProcessZeroR(outputDataOffset, nFactor);\n+            }\n+            // 重新切分的尾块\n+            nOffset = (newSplitN.ubCount - 1) * nFactor;\n+            outputDataOffset = mOutputOffset_ + rOffset + nOffset;\n+            ProcessZeroR(outputDataOffset, newSplitN.ubTailFactor);\n+            continue;\n+        }\n+\n         // r * lenN_ <= tiling_->basicBlockSize  -> 正常计算，实际调用的也是AscendC的接口，不作区分\n         if (r < tiling_->rFactor) {\n             // 如果r很小，需要调整N的切分\n",
+      "new_file": false,
+      "new_path": "index/repeat_interleave_grad/op_kernel/v35/repeat_interleave_grad_david.h",
+      "old_path": "index/repeat_interleave_grad/op_kernel/v35/repeat_interleave_grad_david.h",
+      "removed_lines": 0,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/d121ebee780a78e901c4ff4b8ac9b36828499554/index/repeat_interleave_grad/op_kernel/v35/repeat_interleave_grad_david.h",
+    "sha": "d121ebee780a78e901c4ff4b8ac9b36828499554",
+    "source_branch": "master",
+    "source_project": {
+      "full_name": "wow5523/ops-nn",
+      "human_name": "wow5523 / ops-nn",
+      "id": 9336699,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 22,
+    "blob_id": "360729970f1567909aaf5c1747e2c7a7c56077bd",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/d121ebee780a78e901c4ff4b8ac9b36828499554/index/repeat_interleave_grad/op_kernel/v35/repeat_interleave_grad_n_1.h",
+    "deletions": 0,
+    "filename": "index/repeat_interleave_grad/op_kernel/v35/repeat_interleave_grad_n_1.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 22,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -69,6 +69,7 @@ public:\n     constexpr static int32_t ELEMENT_ONE_REPEAT_ORI = VL_LENGTH_B / sizeof(DataT);\n     constexpr static int32_t ELEMENT_ONE_REPEAT_COMPUTE = VL_LENGTH_B / sizeof(PromoteDataT);\n     constexpr static int32_t ELEMENT_ONE_BLOCK_SIZE = BLOCK_SIZE_BYTE / sizeof(PromoteDataT);\n+    constexpr static float INIT_FLOAT_VALUE = 0.0;\n \n public:\n     __aicore__ inline RepeatInterleaveGradDimNOneDavid(TPipe& pipe) : pipe_(pipe)\n@@ -142,6 +143,14 @@ public:\n     }\n \n private:\n+    __aicore__ inline void ProcessZeroR(int64_t outputDataOffset, int32_t dimA)\n+    {\n+        Duplicate<PromoteDataT>(computeRes_, INIT_FLOAT_VALUE, dimA);\n+        CopyOut(yGm_[outputDataOffset], computeRes_, dimA);\n+        SetFlag<HardEvent::MTE3_V>(GetTPipePtr()->FetchEventID(HardEvent::MTE3_V));\n+        WaitFlag<HardEvent::MTE3_V>(GetTPipePtr()->FetchEventID(HardEvent::MTE3_V));    \n+    }\n+\n     __aicore__ inline void ProcessRepeatBlock(int32_t repeatFactor, LocalTensor<IndexT>& repeatTensor)\n     {\n         int32_t mCount = 0;\n@@ -177,6 +186,19 @@ private:\n             int64_t inputDataOffset = 0;\n             int64_t outputDataOffset = 0;\n             r = repeatTensor.GetValue(k);\n+\n+            if (r == 0) {\n+                for (int32_t m = 0; m < mCount - 1; m++) {\n+                    mOffset = m * mFactor;\n+                    outputDataOffset = mOutputOffset_ + rOffset + mOffset * tiling_->lenR;\n+                    ProcessZeroR(outputDataOffset, mFactor);\n+                }\n+                mOffset = (mCount - 1) * mFactor;\n+                outputDataOffset = mOutputOffset_ + rOffset + mOffset * tiling_->lenR;\n+                ProcessZeroR(outputDataOffset, mTailFactor);\n+                continue;\n+            }\n+\n             if (r == 1) {\n                 for (int32_t m = 0; m < mCount - 1; m++) {\n                     mOffset = m * mFactor;\n",
+      "new_file": false,
+      "new_path": "index/repeat_interleave_grad/op_kernel/v35/repeat_interleave_grad_n_1.h",
+      "old_path": "index/repeat_interleave_grad/op_kernel/v35/repeat_interleave_grad_n_1.h",
+      "removed_lines": 0,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/d121ebee780a78e901c4ff4b8ac9b36828499554/index/repeat_interleave_grad/op_kernel/v35/repeat_interleave_grad_n_1.h",
+    "sha": "d121ebee780a78e901c4ff4b8ac9b36828499554",
+    "source_branch": "master",
+    "source_project": {
+      "full_name": "wow5523/ops-nn",
+      "human_name": "wow5523 / ops-nn",
+      "id": 9336699,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  }
+]

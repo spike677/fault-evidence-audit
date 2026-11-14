@@ -1,0 +1,80 @@
+{
+  "assignee": {
+    "html_url": "https://gitcode.com/cheng-ziyang2",
+    "id": "6822e11c60184036954b1c44",
+    "login": "cheng-ziyang2",
+    "name": "cheng-ziyang2",
+    "object_id": "6822e11c60184036954b1c44"
+  },
+  "assignees": [
+    {
+      "html_url": "https://gitcode.com/cheng-ziyang2",
+      "id": "6822e11c60184036954b1c44",
+      "login": "cheng-ziyang2",
+      "name": "cheng-ziyang2",
+      "object_id": "6822e11c60184036954b1c44"
+    }
+  ],
+  "body": "#### 一、问题描述\ndequant_swiglu_quant 算子在 arch35 平台上，当 quant_scale 尾轴为 1（quantIsOne 分支）时，错误地使用乘法（Mul）应用量化缩放因子，应使用除法（Div）。该问题导致反量化计算结果错误，影响 `SwigluSingleYWithQuantScale`、`SwigluV2SingleYWithQuantScale`、`StaticQuantWithOne`、`StaticQuantWithQuantOffsetOne` 共 4 个函数。\n\n#### 二、环境信息\n- 硬件平台：Ascend 910B（arch35）\n- 算子：dequant_swiglu_quant\n- 文件：quant/dequant_swiglu_quant/op_kernel/arch35/dequant_swiglu_quant_common.h\n\n#### 三、重现步骤\n1. 使用 dequant_swiglu_quant 算子，配置 quant_scale 尾轴为 1\n2. 执行反量化计算\n3. 对比输出结果与预期值，发现计算结果偏差\n\n#### 四、预期结果\nquantIsOne 分支应使用除法（Div）应用量化缩放因子，与 else 分支（尾轴非 1）行为一致，反量化输出结果正确。\n\n#### 五、日志/截图\n修复前后对比：4 处 `AscendC::MicroAPI::Mul` 替换为 `AscendC::MicroAPI::Div`\n\n#### 六、备注\n关联 PR：https://gitcode.com/cann/ops-nn/pull/8009",
+  "comments": 1,
+  "created_at": "2026-07-28T17:28:11+08:00",
+  "finished_at": "2026-07-31T09:26:40+08:00",
+  "html_url": "https://gitcode.com/cann/ops-nn/issues/4394",
+  "id": 4201247,
+  "issue_priority_detail": {
+    "id": 116,
+    "title": "无优先级"
+  },
+  "issue_state": "进行中",
+  "issue_state_detail": {
+    "id": 285,
+    "serial": 0,
+    "title": "进行中"
+  },
+  "issue_type": "任务",
+  "issue_type_detail": {
+    "id": 255,
+    "is_system": false,
+    "title": "任务"
+  },
+  "labels": [
+    {
+      "color": "#DB2828",
+      "created_at": "2025-06-10T14:17:23+08:00",
+      "id": 3870,
+      "name": "bug-report",
+      "updated_at": "2026-07-28T17:28:11+08:00"
+    },
+    {
+      "color": "#35e029",
+      "created_at": "2026-03-20T11:25:13+08:00",
+      "id": 38861,
+      "name": "resolved",
+      "updated_at": "2026-07-31T11:05:58+08:00"
+    }
+  ],
+  "number": "4394",
+  "priority": 0,
+  "repository": {
+    "assigner": {},
+    "created_at": "2025-09-27T17:40:34+08:00",
+    "description": "本项目是CANN提供的神经网络类计算算子库，实现网络在NPU上加速计算。",
+    "full_name": "cann/ops-nn",
+    "id": 7665709,
+    "name": "ops-nn",
+    "paas": "",
+    "path": "ops-nn",
+    "updated_at": "2025-09-27T18:09:31+08:00"
+  },
+  "state": "closed",
+  "title": "[Bug-Report|缺陷反馈]: dequant_swiglu_quant 算子 quantIsOne 分支量化缩放计算错误",
+  "updated_at": "2026-07-31T09:26:40+08:00",
+  "user": {
+    "html_url": "https://gitcode.com/cheng-ziyang2",
+    "id": "6822e11c60184036954b1c44",
+    "login": "cheng-ziyang2",
+    "name": "cheng-ziyang2",
+    "object_id": "6822e11c60184036954b1c44"
+  },
+  "visibility_reason": "public"
+}

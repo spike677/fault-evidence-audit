@@ -1,0 +1,83 @@
+{
+  "assignee": {
+    "avatar_url": "https://cdn-img.gitcode.com/ad/ce/a15dc6e197189b3ca2c520615e1c2f2feef96c9ec820b72df5453f83686e71e2.jpg",
+    "html_url": "https://gitcode.com/liiu-qii",
+    "id": "6777b25e72aaba512f037c52",
+    "login": "liiu-qii",
+    "name": "刘琦",
+    "object_id": "6777b25e72aaba512f037c52"
+  },
+  "assignees": [
+    {
+      "avatar_url": "https://cdn-img.gitcode.com/ad/ce/a15dc6e197189b3ca2c520615e1c2f2feef96c9ec820b72df5453f83686e71e2.jpg",
+      "html_url": "https://gitcode.com/liiu-qii",
+      "id": "6777b25e72aaba512f037c52",
+      "login": "liiu-qii",
+      "name": "刘琦",
+      "object_id": "6777b25e72aaba512f037c52"
+    }
+  ],
+  "body": "\n\nThanks for sending an issue! Please fill in the following template to help quickly solve your problem.\n\n### Describe the current behavior / 问题描述 (Mandatory / 必填)\n            \n在norm/add_rms_norm_dynamic_quant/op_kernel/arch35/add_rms_norm_dynamic_quant_regbase_common.h中，提取的公共函数ComputeYAndAbsMaxVF中缺少了原有的y3/y4搬出逻辑。\n### Environment / 环境信息 (Mandatory / 必填)\n            \n硬件型号：Ascend 950PR / Ascend 950DT（arch35 / DAV_3510）\nCANN 版本：9.2.0\n### Steps to reproduce the issue / 重现步骤 (Mandatory / 必填)\n            \n算子的add_rms_norm_dynamic_quant_regbase_split_reduce.h和add_rms_norm_dynamic_quant_regbase.h两个模板调用\nadd_rms_norm_dynamic_quant_regbase_common.h中的函数来计算y3/y4，因为二者逻辑一致，但在common中写了两个计算逻辑一致的函数，之前代码整改，提取公共函数时，将原有搬出逻辑删除后忘记加到公共函数中，导致这两个模板计算的y3和y4是错误的。\n\n\n### Describe the expected behavior / 预期结果 (Mandatory / 必填)\n            \n将y3和y4的地址传入公共函数进行搬出。\n### Related log / screenshot / 日志 / 截图 (Mandatory / 必填)\n            \n![image.png](https://raw.gitcode.com/user-images/assets/7665709/75eefbbc-4857-45eb-ab44-59486a677f71/image.png 'image.png')\n公共函数中没有将y3和y4地址传入进行搬出\n### Special notes for this issue/备注 (Optional / 选填)\n            \n\n",
+  "comments": 0,
+  "created_at": "2026-08-06T11:19:31+08:00",
+  "finished_at": "2026-08-06T17:18:12+08:00",
+  "html_url": "https://gitcode.com/cann/ops-nn/issues/4609",
+  "id": 4223304,
+  "issue_priority_detail": {
+    "id": 116,
+    "title": "无优先级"
+  },
+  "issue_state": "进行中",
+  "issue_state_detail": {
+    "id": 285,
+    "serial": 0,
+    "title": "进行中"
+  },
+  "issue_type": "任务",
+  "issue_type_detail": {
+    "id": 255,
+    "is_system": false,
+    "title": "任务"
+  },
+  "labels": [
+    {
+      "color": "#DB2828",
+      "created_at": "2025-06-10T14:17:23+08:00",
+      "id": 3870,
+      "name": "bug-report",
+      "updated_at": "2026-08-06T11:19:31+08:00"
+    },
+    {
+      "color": "#35e029",
+      "created_at": "2026-03-20T11:25:13+08:00",
+      "id": 38861,
+      "name": "resolved",
+      "updated_at": "2026-08-06T18:58:04+08:00"
+    }
+  ],
+  "number": "4609",
+  "priority": 0,
+  "repository": {
+    "assigner": {},
+    "created_at": "2025-09-27T17:40:34+08:00",
+    "description": "本项目是CANN提供的神经网络类计算算子库，实现网络在NPU上加速计算。",
+    "full_name": "cann/ops-nn",
+    "id": 7665709,
+    "name": "ops-nn",
+    "paas": "",
+    "path": "ops-nn",
+    "updated_at": "2025-09-27T18:09:31+08:00"
+  },
+  "state": "closed",
+  "title": "[Bug-Report|缺陷反馈]: AddRmsNormDynamicQuant算子公共函数中缺少y3/y4搬出",
+  "updated_at": "2026-08-06T17:18:12+08:00",
+  "user": {
+    "avatar_url": "https://cdn-img.gitcode.com/ad/ce/a15dc6e197189b3ca2c520615e1c2f2feef96c9ec820b72df5453f83686e71e2.jpg",
+    "html_url": "https://gitcode.com/liiu-qii",
+    "id": "6777b25e72aaba512f037c52",
+    "login": "liiu-qii",
+    "name": "刘琦",
+    "object_id": "6777b25e72aaba512f037c52"
+  },
+  "visibility_reason": "public"
+}

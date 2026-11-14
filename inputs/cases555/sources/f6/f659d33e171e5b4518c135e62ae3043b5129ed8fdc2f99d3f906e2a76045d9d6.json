@@ -1,0 +1,74 @@
+[
+  {
+    "additions": 48,
+    "blob_id": "bad453132f82649f3d4c2907003d5c9b0532607d",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/08660198e3b97732d39ab6d94dd5423aa9a2d886/conv/conv3d_backprop_filter_v2/op_host/conv3d_backprop_filter_v2_infershape.cpp",
+    "deletions": 1,
+    "filename": "conv/conv3d_backprop_filter_v2/op_host/conv3d_backprop_filter_v2_infershape.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 48,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -21,6 +21,51 @@ namespace Conv {\n \n constexpr size_t kConv3dDimSizeLimit = 5;\n constexpr size_t kConv2dDimSizeLimit = 4;\n+constexpr int32_t NCDHW_N_INDEX = 0;\n+constexpr int32_t NCDHW_C_INDEX = 1;\n+constexpr int32_t DHWCN_N_INDEX = 4;\n+constexpr int32_t DHWCN_C_INDEX = 3;\n+constexpr int32_t FROM_DEPTHWISE_INDEX = 8;\n+\n+static ge::graphStatus InferShapeForDepthwiseConv2DBackpropFilter(gert::InferShapeContext* context, ge::graphStatus ret)\n+{\n+    if (ret != ge::GRAPH_SUCCESS) {\n+        return ret;\n+    }\n+\n+    OP_CHECK_IF(context == nullptr, CUBE_INNER_ERR_REPORT(\"\", \"Get %s failed\", \"context\"), return ge::GRAPH_FAILED);\n+    auto y_shape = context->GetOutputShape(0);\n+    OP_CHECK_IF(y_shape == nullptr, CUBE_INNER_ERR_REPORT(\"\", \"Get %s failed\", \"y shape\"), return ge::GRAPH_FAILED);\n+    \n+    const auto runtime_attrs = context->GetAttrs();\n+    OP_LOGE_IF(runtime_attrs == nullptr, ge::GRAPH_FAILED, context->GetNodeName(), \"failed to get runtime attrs\");\n+    if (runtime_attrs->GetAttrNum() <= FROM_DEPTHWISE_INDEX) {\n+        return ret;\n+    }\n+\n+    const bool* from_depthwise = runtime_attrs->GetAttrPointer<bool>(FROM_DEPTHWISE_INDEX);\n+    OP_LOGE_IF(from_depthwise == nullptr, ge::GRAPH_FAILED, context->GetNodeName(), \"failed to get runtime attrs from_depthwise\");\n+\n+    if (!*from_depthwise) {\n+        return ge::GRAPH_SUCCESS;\n+    }\n+\n+    OP_LOGD(context->GetNodeName(), \"transfer from DepthwiseConv2DBackpropFilter, need to reset y shape\");\n+    const auto y_desc = context->GetOutputDesc(0);\n+    OP_CHECK_IF(y_desc == nullptr, CUBE_INNER_ERR_REPORT(context->GetNodeName(), \"y desc is null\"), return ge::GRAPH_FAILED);\n+    const auto y_format = y_desc->GetOriginFormat();\n+    if (y_format == ge::FORMAT_NCDHW) {\n+        y_shape->SetDim(NCDHW_N_INDEX, y_shape->GetDim(NCDHW_N_INDEX) * y_shape->GetDim(NCDHW_C_INDEX));\n+        y_shape->SetDim(NCDHW_C_INDEX, 1);\n+    } else if (y_format == ge::FORMAT_DHWCN) {\n+        y_shape->SetDim(DHWCN_N_INDEX, y_shape->GetDim(DHWCN_C_INDEX) * y_shape->GetDim(DHWCN_N_INDEX));\n+        y_shape->SetDim(DHWCN_C_INDEX, 1);\n+    }\n+\n+    OP_LOGD(context->GetNodeName(), \"y_shape: %s\", Ops::Base::ToString(*y_shape).c_str());\n+    return ge::GRAPH_SUCCESS;\n+}\n+\n static ge::graphStatus InferShapeForConv3DBackpropFilter(gert::InferShapeContext* context)\n {\n     auto const_tensor = context->GetInputTensor(1);\n@@ -32,6 +77,7 @@ static ge::graphStatus InferShapeForConv3DBackpropFilter(gert::InferShapeContext\n     auto ret = ge::GRAPH_SUCCESS;\n     if (const_tensor_dim_num == kConv2dDimSizeLimit) {\n         ret = InferShapeForConvBackpropExtend3D(context, 1, \"filter_size\");\n+        ret = InferShapeForDepthwiseConv2DBackpropFilter(context, ret);\n     } else {\n         ret = InferShapeForConvBackprop(context, 1, \"filter_size\", kConv3dDimSizeLimit);\n     }\n@@ -55,6 +101,7 @@ IMPL_OP_INFERSHAPE(Conv3DBackpropFilterV2)\n     .InferDataType(Ops::NN::Conv::InferDataTypeForConv3DBackpropFilterV2)\n     .InputsDataDependency({1})\n     .PrivateAttr(\"padding\", \"\")\n-    .PrivateAttr(\"_op_impl_mode_enum\", 0L);\n+    .PrivateAttr(\"_op_impl_mode_enum\", 0L)\n+    .PrivateAttr(\"from_depthwise\", false);\n }  // namespace NN\n }  // namespace Ops\n",
+      "new_file": false,
+      "new_path": "conv/conv3d_backprop_filter_v2/op_host/conv3d_backprop_filter_v2_infershape.cpp",
+      "old_path": "conv/conv3d_backprop_filter_v2/op_host/conv3d_backprop_filter_v2_infershape.cpp",
+      "removed_lines": 1,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/08660198e3b97732d39ab6d94dd5423aa9a2d886/conv/conv3d_backprop_filter_v2/op_host/conv3d_backprop_filter_v2_infershape.cpp",
+    "sha": "08660198e3b97732d39ab6d94dd5423aa9a2d886",
+    "source_branch": "compatibility",
+    "source_project": {
+      "full_name": "hongyiliu111/ops-nn",
+      "human_name": "hongyiliu111 / ops-nn",
+      "id": 9136285,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 55,
+    "blob_id": "bbcee982c59535ed7c87cfee1d5119c2dc742ad6",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/08660198e3b97732d39ab6d94dd5423aa9a2d886/conv/conv3d_backprop_filter_v2/tests/ut/op_host/test_conv3d_backprop_filter_v2_infershape.cpp",
+    "deletions": 0,
+    "filename": "conv/conv3d_backprop_filter_v2/tests/ut/op_host/test_conv3d_backprop_filter_v2_infershape.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 55,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -153,3 +153,58 @@ TEST_F(Conv3DBackpropFilterV2ProtoTest, 2d_extend_3d_dynamic) {\n   auto output = holder.GetContext<gert::InferShapeContext>()->GetOutputShape(0);\n   ASSERT_EQ(Ops::Base::ToString(*output), \"[3, 1, 3, 128, 256]\");\n }\n+\n+TEST_F(Conv3DBackpropFilterV2ProtoTest, depthwise_2d_extend_3d_dynamic) {\n+  vector<int64_t> strides({1, 1, 1, 1, 1});\n+  vector<int64_t> pads({1, 1, 1, 1, 1, 1});\n+  vector<int64_t> dilations({1, 1, 1, 1, 1});\n+  int64_t groups = 1;\n+  string data_format(\"NCDHW\");\n+  bool enable_hf32 = false;\n+  string padding(\"\");\n+  int64_t _op_impl_mode_enum = 0L;\n+  bool from_depthwise = true;\n+\n+\n+  vector<int64_t> filter_sizes = {7, 5, 3, 3};\n+  gert::StorageShape filter_sizes_shape = {{7, 5, 3, 3}, {7, 5, 3, 3}};\n+  gert::StorageShape fmap_shape = {{2, 5, 1, 16, 16}, {2, 5, 1, 16, 16}};\n+  gert::StorageShape out_backprop_shape = {{2, 35, 1, 16, 16}, {2, 35, 1, 16, 16}};\n+  gert::StorageShape output_shape = {{}, {}};\n+\n+  size_t total_size = 0;\n+  auto tensor_holder =\n+  gert::Tensor::CreateFollowing(filter_sizes_shape.GetStorageShape().GetDimNum(), ge::DT_INT64, total_size);\n+  auto tensor = reinterpret_cast<gert::Tensor *>(tensor_holder.get());\n+  tensor->MutableStorageShape().AppendDim(filter_sizes_shape.MutableStorageShape().GetDimNum());\n+  tensor->MutableOriginShape().AppendDim(filter_sizes_shape.MutableOriginShape().GetDimNum());\n+  tensor->SetOriginFormat(ge::FORMAT_NCDHW);\n+  tensor->SetStorageFormat(ge::FORMAT_NCDHW);\n+  (void)memcpy_s(tensor->GetData<uint8_t>(), total_size - sizeof(gert::Tensor), filter_sizes.data(),\n+                 filter_sizes.size() * sizeof(int64_t));\n+\n+  auto holder = gert::InferShapeContextFaker()\n+                    .NodeIoNum(3, 1)\n+                    .IrInstanceNum({1, 1, 1})\n+                    .InputShapes({&fmap_shape, tensor, &out_backprop_shape})\n+                    .OutputShapes({&output_shape})\n+                    .NodeAttrs({{\"strides\", Ops::NN::AnyValue::CreateFrom<std::vector<int64_t>>(strides)},\n+                                {\"pads\", Ops::NN::AnyValue::CreateFrom<std::vector<int64_t>>(pads)},\n+                                {\"dilations\", Ops::NN::AnyValue::CreateFrom<std::vector<int64_t>>(dilations)},\n+                                {\"groups\", Ops::NN::AnyValue::CreateFrom<int64_t>(groups)},\n+                                {\"data_format\", Ops::NN::AnyValue::CreateFrom<std::string>(data_format)},\n+                                {\"enable_hf32\", Ops::NN::AnyValue::CreateFrom<bool>(enable_hf32)},\n+                                {\"padding\", Ops::NN::AnyValue::CreateFrom<std::string>(padding)},\n+                                {\"_op_impl_mode_enum\", Ops::NN::AnyValue::CreateFrom<bool>(_op_impl_mode_enum)},\n+                                {\"from_depthwise\", Ops::NN::AnyValue::CreateFrom<bool>(from_depthwise)}})\n+                    .NodeInputTd(0, ge::DT_INT64, ge::FORMAT_NCDHW, ge::FORMAT_NCDHW)\n+                    .NodeInputTd(1, ge::DT_FLOAT16, ge::FORMAT_NCDHW, ge::FORMAT_NCDHW)\n+                    .NodeInputTd(2, ge::DT_FLOAT16, ge::FORMAT_NCDHW, ge::FORMAT_NCDHW)\n+                    .NodeOutputTd(0, ge::DT_FLOAT16, ge::FORMAT_NCDHW, ge::FORMAT_NCDHW)\n+                    .Build();\n+\n+  auto infer_shape_func = gert::OpImplRegistry::GetInstance().GetOpImpl(\"Conv3DBackpropFilterV2\")->infer_shape;\n+  ASSERT_EQ(infer_shape_func(holder.GetContext<gert::InferShapeContext>()), ge::GRAPH_SUCCESS);\n+  auto output = holder.GetContext<gert::InferShapeContext>()->GetOutputShape(0);\n+  ASSERT_EQ(Ops::Base::ToString(*output), \"[35, 1, 1, 3, 3]\");\n+}\n\\ No newline at end of file\n",
+      "new_file": false,
+      "new_path": "conv/conv3d_backprop_filter_v2/tests/ut/op_host/test_conv3d_backprop_filter_v2_infershape.cpp",
+      "old_path": "conv/conv3d_backprop_filter_v2/tests/ut/op_host/test_conv3d_backprop_filter_v2_infershape.cpp",
+      "removed_lines": 0,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/08660198e3b97732d39ab6d94dd5423aa9a2d886/conv/conv3d_backprop_filter_v2/tests/ut/op_host/test_conv3d_backprop_filter_v2_infershape.cpp",
+    "sha": "08660198e3b97732d39ab6d94dd5423aa9a2d886",
+    "source_branch": "compatibility",
+    "source_project": {
+      "full_name": "hongyiliu111/ops-nn",
+      "human_name": "hongyiliu111 / ops-nn",
+      "id": 9136285,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  }
+]

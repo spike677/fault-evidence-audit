@@ -1,0 +1,68 @@
+{
+  "assignee": {
+    "avatar_url": "https://cdn-img.gitcode.com/da/ee/8d801ae8e3fdc198d48c6bfe0b0214cb4701995a00d7e5795e96351da648e70c.jpg",
+    "html_url": "https://gitcode.com/ForestFrame",
+    "id": "652fc3cd5e9f4c45d0a240de",
+    "login": "ForestFrame",
+    "name": "ForestFrame",
+    "object_id": "652fc3cd5e9f4c45d0a240de"
+  },
+  "assignees": [
+    {
+      "avatar_url": "https://cdn-img.gitcode.com/da/ee/8d801ae8e3fdc198d48c6bfe0b0214cb4701995a00d7e5795e96351da648e70c.jpg",
+      "html_url": "https://gitcode.com/ForestFrame",
+      "id": "652fc3cd5e9f4c45d0a240de",
+      "login": "ForestFrame",
+      "name": "ForestFrame",
+      "object_id": "652fc3cd5e9f4c45d0a240de"
+    }
+  ],
+  "body": "\n\nThanks for sending an issue! Please fill in the following template to help quickly solve your problem.\n\n### Describe the current behavior / 问题描述 (Mandatory / 必填)\n            \n`ops-nn` 仓 `activation/selu_grad` 算子的 kernel 实现中，分支判定使用 `CMPMODE::LT`（outputs < 0），导致 `outputs == 0` 时走 SCALE 分支（`y = SCALE * grad`），与 PyTorch `elu_backward(is_result=True)` 的 `outputs <= 0` 语义不一致（PyTorch 中 `outputs == 0` 走 SAP 分支 `y = grad * (outputs + SAP)`）。\n\n**具体影响**：\n\n- `outputs == 0` 边界点，NPU 输出 `SCALE * grad`（1.0507×grad），PyTorch 输出 `SAP * grad`（1.7581×grad），两者差异 `0.7074 × |grad|`\n- 对 **int 类型**（int32/int8/uint8）影响显著：int 离散值取 0 的概率约 9%，导致大量用例精度 fail（bitwise mismatch）\n- 对 **float 类型** 影响极小：连续浮点数恰好等于 0 的概率趋近 0，但 `float16` 仍可能在 52M 元素中出现 1 个 `-0.0`（IEEE 754: `-0.0 < 0` 为 false）触发同一问题\n\n**根因定位**：\n\n文件 `activation/selu_grad/op_kernel/arch35/selu_grad.h` 第 78 行：\n\n```cpp\n// 当前实现 (有缺陷):\nCompareScalar(selMask, outFp32, (float)0.0f, CMPMODE::LT, n);  // outputs < 0\n```\n\n等价于 `outputs < 0 → SAP 分支`，即 `outputs >= 0（含 0）→ SCALE 分支`。\n\n而 PyTorch 源码 `aten/src/ATen/native/cuda/ElementwiseUnaryOps.cu` 中 `elu_backward(is_result=True)` 的判定为 `bop <= 0`，即 `outputs <= 0 → SAP 分支`。\n\n**数据验证**：\n\n我们对 288 个非广播测试用例（6 dtype × 48 例）做了全量 NPU vs golden 三方对比，所有 int 型 fail 的 mismatch **100% 发生在 outputs==0 位置**，outputs!=0 位置零 mismatch（共 2.76 亿元素逐点统计）：\n\n| mismatch 位置                       | 数量       | 占比   |\n| ----------------------------------- | ---------- | ------ |\n| outputs == 0（分支判定差异）        | 41,819,668 | 100.0% |\n| outputs != 0（Cast 路径等其他原因） | 0          | 0.0%   |\n### Environment / 环境信息 (Mandatory / 必填)\n            \n## \n\n| 项目      | 信息                                                       |\n| --------- | ---------------------------------------------------------- |\n| 硬件型号  | Ascend950DT (Ascend950)                                    |\n| CANN 版本 | 9.1.0                                                      |\n| 算子仓    | ops-nn (https://gitcode.com/cann/ops-nn)                   |\n| 算子路径  | activation/selu_grad/                                      |\n| 问题文件  | op_kernel/arch35/selu_grad.h                               |\n| 问题行号  | 第 78 行                                                   |\n| 构建方式  | `bash build.sh --pkg --soc=ascend950 --ops=selu_grad -j16` |\n| 安装路径  | Ascend_cus/vendors/custom_nn/                              |\n| 对比竞品  | PyTorch 2.11.0a0 (CUDA), NVIDIA A100-PCIE-40GB             |\n| 测试框架  | ops-test-kit (TTK) kernel 直调                             |\n\n---\n### Steps to reproduce the issue / 重现步骤 (Mandatory / 必填)\n            \n1. 构建并安装 selu_grad 算子到 custom_nn 包：\n\n   ```bash\n   cd /path/to/ops-nn\n   export OP_NAME=selu_grad op_name=selu_grad\n   bash build.sh --pkg --soc=ascend950 --ops=selu_grad -j16\n   bash build_out/cann-ops-nn-custom_linux-x86_64.run --install-path=/path/to/Ascend_cus\n   source /path/to/Ascend_cus/vendors/custom_nn/bin/set_env.bash\n   ```\n\n2. 准备包含 `outputs == 0` 的 int 类型测试用例（CSV 格式，TTK 26 列），例如：\n\n   ```\n   testcase_name,op_name,input_shapes,output_shapes,input_dtypes,...\n   selu_grad_edge0_int32,selu_grad,\"((8,),(8,))\",\"((8,),)\",\"('int32','int32')\",...\n   ```\n\n   其中 outputs 输入数据包含 0 值（如 `[-1, 0, 1, -2, 2, 0, -3, 3]`）。\n\n3. 使用 TTK kernel 模式运行算子并 dump 输出：\n\n   ```bash\n   cd /path/to/ops-test-kit\n   python -m ttk kernel -i test_cases.csv -o result.csv \\\n       --dump full --dump-format npy --csv-preserve --warmup 5 --run 100\n   ```\n\n4. 用 PyTorch 生成 golden（int 类型 PyTorch 不原生支持，用 numpy 按 PyTorch `<=0` 口径模拟）：\n\n   ```python\n   # golden: outputs <= 0 -> grad * (outputs + SAP); outputs > 0 -> SCALE * grad\n   mask = outputs <= 0\n   golden = np.where(mask, grad * (outputs + SAP), SCALE * grad)\n   ```\n\n5. 比对 NPU 输出与 golden：\n\n   - `outputs == 0` 位置：NPU = `round(SCALE * grad)`，golden = `round(SAP * grad)`，不匹配\n   - `outputs != 0` 位置：完全一致\n\n**最小复现示例**：\n\n```\n输入: grad=5, outputs=0\nNPU 输出:  round(1.0507 × 5) = round(5.25)  = 5   (SCALE 分支)\n预期输出:  round(1.7581 × 5) = round(8.79)  = 9   (SAP 分支)\n差异: 4\n```\n\n---\n\n## \n### Describe the expected behavior / 预期结果 (Mandatory / 必填)\n            \n`outputs == 0` 应走 SAP 分支（`y = grad * (outputs + SAP)`），与 PyTorch `elu_backward(is_result=True)` 的 `outputs <= 0` 语义一致。\n\n**修复方式**：\n\n将 `activation/selu_grad/op_kernel/arch35/selu_grad.h` 第 78 行的 `CMPMODE::LT` 改为 `CMPMODE::LE`：\n\n```cpp\n// 修复后:\nCompareScalar(selMask, outFp32, (float)0.0f, CMPMODE::LE, n);  // outputs <= 0\n```\n\n**修复验证**：\n\n我们已在本地应用此修复并重跑全量 288 例三方对比测试，结果从 127 fail → **0 fail，288/288 全部 PASS**：\n\n| dtype    | 修复前 (LT)                           | 修复后 (LE)             |\n| -------- | ------------------------------------- | ----------------------- |\n| float32  | 48/48 PASS                            | 48/48 PASS              |\n| float16  | 47/48 PASS（1 个 -0.0 边界 fail）     | 48/48 PASS              |\n| bfloat16 | 48/48 PASS                            | 48/48 PASS              |\n| int32    | 6/48 PASS（42 fail，全在 outputs==0） | 48/48 PASS              |\n| int8     | 6/48 PASS（42 fail）                  | 48/48 PASS              |\n| uint8    | 6/48 PASS（42 fail）                  | 48/48 PASS              |\n| **合计** | **161/288 PASS (55.9%)**              | **288/288 PASS (100%)** |\n\n该改动仅影响 `outputs == 0` 单点的分支归属，不影响 `outputs != 0` 的任何元素（已验证 outputs!=0 位置零 mismatch）。\n### Related log / screenshot / 日志 / 截图 (Mandatory / 必填)\n            \n**1. 问题代码定位**：\n\n```\n文件: activation/selu_grad/op_kernel/arch35/selu_grad.h\n行号: 78\n代码: CompareScalar(selMask, outFp32, (float)0.0f, CMPMODE::LT, n);\n```\n\n**2. int 型 fail 统计（修复前，288 例）**：\n\n```\nprecision_result.csv 统计:\n  float32:  48 pass, 0 fail\n  float16:  47 pass, 1 fail (-0.0 边界)\n  bfloat16: 48 pass, 0 fail\n  int32:     6 pass, 42 fail (全部在 outputs==0)\n  int8:      6 pass, 42 fail\n  uint8:     6 pass, 42 fail\n  合计: 161 pass, 127 fail\n```\n\n**3. 逐元素 mismatch 归因统计（2.76 亿元素）**：\n\n```\nTotal mismatches: 41,819,668\n  At outputs==0 (branch difference): 41,819,668 (100.0%)\n  At outputs!=0 (cast path / other):           0 (0.0%)\n```\n\n**4. 修复后全量结果**：\n\n```\nprecision_result.csv 统计:\n  float32:  48 pass, 0 fail\n  float16:  48 pass, 0 fail\n  bfloat16: 48 pass, 0 fail\n  int32:    48 pass, 0 fail\n  int8:     48 pass, 0 fail\n  uint8:    48 pass, 0 fail\n  合计: 288 pass, 0 fail (100.0%)\n```\n\n**5. 抽样 case 证据**：\n\n```\ncase: od1d_16_int32, idx=2\n  grad=5, out=0\n  NPU (LT):  output = 5   (SCALE 分支: 1.0507 × 5 = 5.25 → round 5)\n  golden:    output = 9   (SAP 分支: 1.7581 × 5 = 8.79 → round 9)\n  diff = 4\n```\n\n---\n### Special notes for this issue/备注 (Optional / 选填)\n            \n**1. 关于 int 类型支持**\n\nPyTorch 的 `elu_backward` / `elu` / `selu` 均不支持 int 类型（`NotImplementedError: \"elu_backward_cpu\" not implemented for 'Int'`），因为梯度算子数学语义上只对浮点类型有意义。NPU ops-nn 仓的 selu_grad 通过 `int → half → float32 → 计算 → half → int` 两步 Cast 路径扩展支持了 int 类型。\n\n本次 bug 的 int 型 fail 经数据验证 100% 来自 `outputs==0` 的分支判定差异，与 int→half→float32 的 Cast 路径无关（outputs!=0 位置零 mismatch）。\n\n**2. 修复影响范围**\n\n`CMPMODE::LT` → `CMPMODE::LE` 仅改变 `outputs == 0` 单点的分支归属：\n\n- `outputs < 0`：行为不变（仍走 SAP 分支）\n- `outputs > 0`：行为不变（仍走 SCALE 分支）\n- `outputs == 0`：从 SCALE 分支改为 SAP 分支（对齐 PyTorch）\n\n不影响算子性能（相同的指令数，仅比较模式不同）。\n\n**3. float16 的 -0.0 变体**\n\nfloat16 连续浮点数恰好为 0 的概率极低，但 IEEE 754 的 `-0.0` 也会触发同一 bug（`-0.0 < 0` 为 false）。修复后 `-0.0` 走 SAP 分支，与 golden `<= 0` 一致，52M 元素的 float16 大数组测试已验证 PASS。\n\n**4. 测试产物**\n\n完整的测试用例 CSV、NPU dump、CPU/GPU golden、精度/性能比对结果已生成，存放于 `/home/y50059782/study/ttk/分析结果/selu_grad/`，包含：\n\n- `expanded_whitebox.csv`：288 例非广播测试用例\n- `precision_result.csv`：逐 case 精度比对\n- `performance_result.csv`：逐 case NPU vs GPU 性能对比\n- `summary.md`：完整测试报告\n",
+  "comments": 3,
+  "created_at": "2026-07-09T11:28:24+08:00",
+  "finished_at": "2026-08-10T16:23:03+08:00",
+  "html_url": "https://gitcode.com/cann/ops-nn/issues/3976",
+  "id": 4153175,
+  "issue_priority_detail": {
+    "id": 116,
+    "title": "无优先级"
+  },
+  "issue_state": "已解决",
+  "issue_state_detail": {
+    "id": 4212,
+    "serial": 0,
+    "title": "已解决"
+  },
+  "issue_type": "任务",
+  "issue_type_detail": {
+    "id": 255,
+    "is_system": false,
+    "title": "任务"
+  },
+  "labels": [],
+  "number": "3976",
+  "priority": 0,
+  "repository": {
+    "assigner": {},
+    "created_at": "2025-09-27T17:40:34+08:00",
+    "description": "本项目是CANN提供的神经网络类计算算子库，实现网络在NPU上加速计算。",
+    "full_name": "cann/ops-nn",
+    "id": 7665709,
+    "name": "ops-nn",
+    "paas": "",
+    "path": "ops-nn",
+    "updated_at": "2025-09-27T18:09:31+08:00"
+  },
+  "state": "closed",
+  "title": "[Bug-Report|缺陷反馈]: ops-nn activation/selu_grad 算子 outputs==0 边界分支判定与 PyTorch 竞品不一致",
+  "updated_at": "2026-08-10T16:23:03+08:00",
+  "user": {
+    "avatar_url": "https://cdn-img.gitcode.com/da/ee/8d801ae8e3fdc198d48c6bfe0b0214cb4701995a00d7e5795e96351da648e70c.jpg",
+    "html_url": "https://gitcode.com/ForestFrame",
+    "id": "652fc3cd5e9f4c45d0a240de",
+    "login": "ForestFrame",
+    "name": "ForestFrame",
+    "object_id": "652fc3cd5e9f4c45d0a240de"
+  },
+  "visibility_reason": "public"
+}

@@ -1,0 +1,80 @@
+{
+  "assignee": {
+    "html_url": "https://gitcode.com/qianzehong",
+    "id": "68c138243be0a23c91c2437b",
+    "login": "qianzehong",
+    "name": "qianzehong",
+    "object_id": "68c138243be0a23c91c2437b"
+  },
+  "assignees": [
+    {
+      "html_url": "https://gitcode.com/qianzehong",
+      "id": "68c138243be0a23c91c2437b",
+      "login": "qianzehong",
+      "name": "qianzehong",
+      "object_id": "68c138243be0a23c91c2437b"
+    }
+  ],
+  "body": "### Describe the current behavior / 问题描述 (Mandatory / 必填)\n\n两个算子上同一个根因的两种表现：ND 格式的 x 落进了接不住它的 Welford 模板。基类已把五种 format\n统一折算成 (r1, a, r0)，模板往下只消费这三个值，但模板选择和 Welford 自带的折算里仍按 format\n做了过滤，导致 ND 被排除或直接失败。\n\n- batch_norm：ND 小归约长度场景，batch_mean / batch_variance 恒为 0，reserve_space_2 恒为\n  1/sqrt(eps)=100，y 随之被放大约 100 倍；部分归约长度下表现为 VEC_ERROR。\n  FullReduce / RARBlockSplitR 的 IsCapable 里 `xFormat_ != FORMAT_NCHW && != FORMAT_NCDHW\n  -> false` 把 ND 排除，只剩兜底的 Welford（IsCapable 恒 true）可选，而 Welford 的二分折叠算法\n  在归约长度不超过一个 VL 时没有合法取值。\n- batch_norm_v3：ND 大归约长度场景直接报 OPTILING_FAILURE，算子无法运行（见下方日志）。\n\n### Environment / 环境信息 (Mandatory / 必填)\n\nAscend950（NpuArch=dav-3510 / arch35）\n\n### Steps to reproduce the issue / 重现步骤 (Mandatory / 必填)\n\nbatch_norm，训练场景（is_training=true），ND fp32：\n- x=[8,512,4]：batch_mean/batch_variance 恒为 0，y 被放大约 100 倍\n- r1*r0 = 40/48/64：VEC_ERROR\n\nbatch_norm_v3，训练场景，ND fp32，以下 shape 直接 tiling 失败：\n[2048,32,16] / [4096,32,8] / [1024,64,16] / [4096,16,8] / [8192,8,16]\n\n### Describe the expected behavior / 预期结果 (Mandatory / 必填)\n\n上述 ND 场景应与同 dims 的 NCHW 输入产出一致的正确结果，tiling 应成功。\n\n### Related log / screenshot / 日志 / 截图 (Mandatory / 必填)\n\nbatch_norm_v3 报错：\n[batch_norm_v3_tiling_welford_arch35.cpp][GetShapeAttrsInfo]\nParameter x of has incorrect format ND. It should be NCHW or NCDHW.\n\n### Special notes for this issue/备注 (Optional / 选填)\n\n已提交修复 PR，详见下方关联 PR。\n\n关联 PR：https://gitcode.com/cann/ops-nn/pull/8087\n",
+  "comments": 1,
+  "created_at": "2026-07-30T17:19:07+08:00",
+  "finished_at": "2026-08-05T14:48:47+08:00",
+  "html_url": "https://gitcode.com/cann/ops-nn/issues/4443",
+  "id": 4206898,
+  "issue_priority_detail": {
+    "id": 116,
+    "title": "无优先级"
+  },
+  "issue_state": "进行中",
+  "issue_state_detail": {
+    "id": 285,
+    "serial": 0,
+    "title": "进行中"
+  },
+  "issue_type": "任务",
+  "issue_type_detail": {
+    "id": 255,
+    "is_system": false,
+    "title": "任务"
+  },
+  "labels": [
+    {
+      "color": "#DB2828",
+      "created_at": "2025-06-10T14:17:23+08:00",
+      "id": 3870,
+      "name": "bug-report",
+      "updated_at": "2026-07-30T17:19:08+08:00"
+    },
+    {
+      "color": "#35e029",
+      "created_at": "2026-03-20T11:25:13+08:00",
+      "id": 38861,
+      "name": "resolved",
+      "updated_at": "2026-08-05T16:18:00+08:00"
+    }
+  ],
+  "number": "4443",
+  "priority": 0,
+  "repository": {
+    "assigner": {},
+    "created_at": "2025-09-27T17:40:34+08:00",
+    "description": "本项目是CANN提供的神经网络类计算算子库，实现网络在NPU上加速计算。",
+    "full_name": "cann/ops-nn",
+    "id": 7665709,
+    "name": "ops-nn",
+    "paas": "",
+    "path": "ops-nn",
+    "updated_at": "2025-09-27T18:09:31+08:00"
+  },
+  "state": "closed",
+  "title": "[Bug-Report|缺陷反馈]: batch_norm/batch_norm_v3 arch35 ND 格式训练场景结果错误与 tiling 失败",
+  "updated_at": "2026-08-05T14:48:47+08:00",
+  "user": {
+    "html_url": "https://gitcode.com/qianzehong",
+    "id": "68c138243be0a23c91c2437b",
+    "login": "qianzehong",
+    "name": "qianzehong",
+    "object_id": "68c138243be0a23c91c2437b"
+  },
+  "visibility_reason": "public"
+}

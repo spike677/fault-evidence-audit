@@ -1,0 +1,38 @@
+[
+  {
+    "additions": 23,
+    "blob_id": "092abf022421106d89db9ecf27fc5feefa2bad6a",
+    "blob_url": "https://gitcode.com/cann/ops-math/blob/a42bda054bc54f8bda446c082cbaa1a5a61d4887/math/logspace/op_api/aclnn_logspace.cpp",
+    "deletions": 4,
+    "filename": "math/logspace/op_api/aclnn_logspace.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 23,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -89,24 +89,43 @@ aclnnStatus aclnnLogSpaceGetWorkspaceSize(const aclScalar *start, const aclScala\n \r\n     DataType result_dtype = result->GetDataType();\r\n \r\n-    const aclTensor* start_tensor = ScalarToTensor(start, result_dtype, uniqueExecutor.get());\r\n+    // 推导数据类型，以输出类型为基准\r\n+    auto compute_dtype = result_dtype;\r\n+\r\n+    // Linspace L0接口不支持int64输入，转为float32计算\r\n+    if (compute_dtype == DataType::DT_INT64) {\r\n+        compute_dtype = DataType::DT_FLOAT;\r\n+    }\r\n+    // start和end为FP16/BF16混合类型时升精度到FP32计算，避免Linspace和Pow多次cast导致精度损失\r\n+    if ((start->GetDataType() == DataType::DT_FLOAT16 && end->GetDataType() == DataType::DT_BF16) ||\r\n+        (start->GetDataType() == DataType::DT_BF16 && end->GetDataType() == DataType::DT_FLOAT16)) {\r\n+        compute_dtype = DataType::DT_FLOAT;\r\n+    }\r\n+\r\n+    const aclTensor* start_tensor = ScalarToTensor(start, compute_dtype, uniqueExecutor.get());\r\n     CHECK_RET(start_tensor != nullptr, ACLNN_ERR_INNER_NULLPTR);\r\n \r\n-    const aclTensor* end_tensor = ScalarToTensor(end, result_dtype, uniqueExecutor.get());\r\n+    const aclTensor* end_tensor = ScalarToTensor(end, compute_dtype, uniqueExecutor.get());\r\n     CHECK_RET(end_tensor != nullptr, ACLNN_ERR_INNER_NULLPTR);\r\n \r\n-    const aclTensor* linspace_result = l0op::Linspace(start_tensor, end_tensor, steps,uniqueExecutor.get());\r\n+    const aclTensor* linspace_result = l0op::Linspace(start_tensor, end_tensor, steps, uniqueExecutor.get());\r\n     CHECK_RET(linspace_result != nullptr, ACLNN_ERR_INNER_NULLPTR);\r\n \r\n     aclScalar* base_scalar = uniqueExecutor.get()->AllocScalar(static_cast<float>(base));\r\n     CHECK_RET(base_scalar != nullptr, ACLNN_ERR_INNER_NULLPTR);\r\n \r\n-    const aclTensor* base_tensor = ScalarToTensor(base_scalar, result_dtype, uniqueExecutor.get());\r\n+    const aclTensor* base_tensor = ScalarToTensor(base_scalar, compute_dtype, uniqueExecutor.get());\r\n     CHECK_RET(base_tensor != nullptr, ACLNN_ERR_INNER_NULLPTR);\r\n \r\n     const aclTensor* pow_result = l0op::InplacePow(base_tensor, linspace_result, uniqueExecutor.get());\r\n     CHECK_RET(pow_result != nullptr, ACLNN_ERR_INNER_NULLPTR);\r\n \r\n+    // 如果计算类型与输出类型不一致，Cast 转换后再 ViewCopy\r\n+    if (compute_dtype != result_dtype) {\r\n+        pow_result = l0op::Cast(pow_result, result_dtype, uniqueExecutor.get());\r\n+        CHECK_RET(pow_result != nullptr, ACLNN_ERR_INNER_NULLPTR);\r\n+    }\r\n+\r\n     auto view_copy_result = l0op::ViewCopy(pow_result, result, uniqueExecutor.get());\r\n     CHECK_RET(view_copy_result != nullptr, ACLNN_ERR_INNER_NULLPTR);\r\n \r\n",
+      "new_file": false,
+      "new_path": "math/logspace/op_api/aclnn_logspace.cpp",
+      "old_path": "math/logspace/op_api/aclnn_logspace.cpp",
+      "removed_lines": 4,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-math/raw/a42bda054bc54f8bda446c082cbaa1a5a61d4887/math/logspace/op_api/aclnn_logspace.cpp",
+    "sha": "a42bda054bc54f8bda446c082cbaa1a5a61d4887",
+    "source_branch": "logspace",
+    "source_project": {
+      "full_name": "sunchun/ops-math_b",
+      "human_name": "sunchun / ops-math_b",
+      "id": 10247591,
+      "path": "ops-math_b"
+    },
+    "target_branch": "9.1.0",
+    "target_project": {
+      "full_name": "cann/ops-math",
+      "human_name": "CANN / ops-math",
+      "id": 7649531,
+      "path": "ops-math"
+    }
+  }
+]

@@ -1,0 +1,80 @@
+{
+  "assignee": {
+    "html_url": "https://gitcode.com/huang-wei-chen",
+    "id": "6822d7c960184036954b1709",
+    "login": "huang-wei-chen",
+    "name": "huang-wei-chen",
+    "object_id": "6822d7c960184036954b1709"
+  },
+  "assignees": [
+    {
+      "html_url": "https://gitcode.com/huang-wei-chen",
+      "id": "6822d7c960184036954b1709",
+      "login": "huang-wei-chen",
+      "name": "huang-wei-chen",
+      "object_id": "6822d7c960184036954b1709"
+    }
+  ],
+  "body": "#### 一、问题描述（必填）\n\n`ffn/ffn/op_kernel/ffn_antiquant_msd.h` 的 `CopyOutFinalResult` 函数中，行 975-980 存在冗余 Cast 调用，覆盖了 if-else 条件分支的舍入模式选择，导致 bf16 场景精度异常。\n\n**代码片段**（行 975-980）：\n\n```cpp\nif constexpr (IsSameType<xT, half>::value) {\n    Cast(outputInUb, middleResult3, RoundMode::CAST_NONE, curV2BaseM * curBaseNAligned);   // half 场景\n} else {\n    Cast(outputInUb, middleResult3, RoundMode::CAST_RINT, curV2BaseM * curBaseNAligned);   // bf16 场景\n}\nCast(outputInUb, middleResult3, RoundMode::CAST_NONE, curV2BaseM * curBaseNAligned);       // 无条件覆盖！\n```\n\n**问题分析**：\n\n行 980 无条件执行 `Cast(..., CAST_NONE, ...)`，将 if-else 分支中 bf16 场景选择的 `CAST_RINT` 舍入语义覆盖为 `CAST_NONE`。`CAST_RINT` 采用四舍五入，而 `CAST_NONE` 直接截断，两者精度行为不同，影响 bf16 输出的数值正确性。\n\n该问题同时被代码检视中的 API-9（API 使用规范）和 GEN-1.3（通用编码规范）两个维度独立发现。\n\n#### 二、环境信息（必填）\n\n- 算子仓：ops-transformer\n- 算子名：FFN\n- 涉及文件：`ffn/ffn/op_kernel/ffn_antiquant_msd.h`\n- 涉及行号：975-980\n\n#### 三、复现步骤（必填）\n\nFFN 算子 MSD 伪量化路径，xT 为 bfloat16 时触发 `CopyOutFinalResult`，观察输出数值与预期精度的偏差。\n\n#### 四、修复建议\n\n删除行 980 的冗余 Cast 调用：\n\n```cpp\n// 修复后\nif constexpr (IsSameType<xT, half>::value) {\n    Cast(outputInUb, middleResult3, RoundMode::CAST_NONE, curV2BaseM * curBaseNAligned);\n} else {\n    Cast(outputInUb, middleResult3, RoundMode::CAST_RINT, curV2BaseM * curBaseNAligned);\n}\n// 删除此处冗余 Cast\noutQueueY_.EnQue(outputInUb);\n```",
+  "comments": 2,
+  "created_at": "2026-05-25T10:58:25+08:00",
+  "finished_at": "2026-06-29T22:17:02+08:00",
+  "html_url": "https://gitcode.com/cann/ops-transformer/issues/2637",
+  "id": 4043550,
+  "issue_priority_detail": {
+    "id": 116,
+    "title": "无优先级"
+  },
+  "issue_state": "已完成",
+  "issue_state_detail": {
+    "id": 287,
+    "serial": 0,
+    "title": "已完成"
+  },
+  "issue_type": "缺陷",
+  "issue_type_detail": {
+    "id": 258,
+    "is_system": false,
+    "title": "缺陷"
+  },
+  "labels": [
+    {
+      "color": "#35e029",
+      "created_at": "2026-03-20T11:25:13+08:00",
+      "id": 38861,
+      "name": "resolved",
+      "updated_at": "2026-06-29T23:55:17+08:00"
+    },
+    {
+      "color": "#2469f5",
+      "created_at": "2025-10-09T20:53:07+08:00",
+      "id": 14930,
+      "name": "Accepted",
+      "updated_at": "2026-06-30T10:37:02+08:00"
+    }
+  ],
+  "number": "2637",
+  "priority": 0,
+  "repository": {
+    "assigner": {},
+    "created_at": "2025-09-28T17:54:46+08:00",
+    "description": "本项目是CANN提供的transformer类大模型算子库，实现网络在NPU上加速计算。",
+    "full_name": "cann/ops-transformer",
+    "id": 7673863,
+    "name": "ops-transformer",
+    "paas": "",
+    "path": "ops-transformer",
+    "updated_at": "2025-09-28T18:06:48+08:00"
+  },
+  "state": "closed",
+  "title": "[Bug-Report] ffn_antiquant_msd.h: CopyOutFinalResult 冗余 Cast 覆盖 bf16 舍入语义",
+  "updated_at": "2026-06-30T10:34:44+08:00",
+  "user": {
+    "html_url": "https://gitcode.com/sreofwiseone",
+    "id": "684c7e95acf20f14f9d74e9a",
+    "login": "sreofwiseone",
+    "name": "daishuangshuang",
+    "object_id": "684c7e95acf20f14f9d74e9a"
+  },
+  "visibility_reason": "public"
+}

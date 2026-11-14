@@ -1,0 +1,74 @@
+[
+  {
+    "additions": 5,
+    "blob_id": "247211c45a38f7a88284a825b62e6a9c7fd41ea3",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/8018410d603e0f311df50f07057dc0b7d7dfcb46/index/scatter_add/op_host/arch35/scatter_add_tiling_base.cpp",
+    "deletions": 4,
+    "filename": "index/scatter_add/op_host/arch35/scatter_add_tiling_base.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 5,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -187,7 +187,7 @@ ge::graphStatus ScatterAddTiling::GetShapeAttrsInfo()\n     auto updateShape = updates->GetStorageShape();\n     updatesSize_ = updateShape.GetShapeSize();\n     uint64_t updateDims = updateShape.GetDimNum();\n-    if (updateDims == 0) {\n+    if ((updateDims == 1 && updatesSize_ == 1) || updateDims == 0) {\n         isUpdateScalar_ = 1;\n     } else {\n         OP_CHECK_IF(CheckUpdatesShape(varShape, indiceShape, updateShape) != ge::GRAPH_SUCCESS,\n@@ -210,10 +210,11 @@ ge::graphStatus ScatterAddTiling::GetShapeAttrsInfo()\n         }\n     }\n \n-    if (context_->GetDeterministic() == 1 && isUpdateScalar_ == 0 &&\n-        scatterAddDeterminsiticType.find(varDtype_) != scatterAddDeterminsiticType.end()) {\n-        isDeterminTemplate_ = 1;\n+    if (context_->GetDeterministic() == 1 && scatterAddDeterminsiticType.find(varDtype_) != scatterAddDeterminsiticType.end()) {\n         isSort_ = 0;\n+        if (isUpdateScalar_ == 0) {\n+            isDeterminTemplate_ = 1;\n+        }\n     }\n     return ge::GRAPH_SUCCESS;\n }\n",
+      "new_file": false,
+      "new_path": "index/scatter_add/op_host/arch35/scatter_add_tiling_base.cpp",
+      "old_path": "index/scatter_add/op_host/arch35/scatter_add_tiling_base.cpp",
+      "removed_lines": 4,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/8018410d603e0f311df50f07057dc0b7d7dfcb46/index/scatter_add/op_host/arch35/scatter_add_tiling_base.cpp",
+    "sha": "8018410d603e0f311df50f07057dc0b7d7dfcb46",
+    "source_branch": "scatter_add",
+    "source_project": {
+      "full_name": "lihang_13123/ops-nn",
+      "human_name": "lihang_13123 / ops-nn",
+      "id": 9083419,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 3,
+    "blob_id": "e83af4ed183d36d6a733173569c6f7e63dd3cf3e",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/8018410d603e0f311df50f07057dc0b7d7dfcb46/index/scatter_add/op_kernel/arch35/scatter_add_simd_support_atomicadd.h",
+    "deletions": 0,
+    "filename": "index/scatter_add/op_kernel/arch35/scatter_add_simd_support_atomicadd.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 3,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -94,6 +94,9 @@ __aicore__ inline void ScatterAddSIMDSupportAtomicAdd<T, U, updatesIsScalar, sca\n \n             if constexpr (updatesIsScalar) {\n                 LocalTensor<T> updatesLocal = updatesQueue_.DeQue<T>();\n+                event_t eventIDMTE2ToS = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::MTE2_S));\n+                SetFlag<HardEvent::MTE2_S>(eventIDMTE2ToS);\n+                WaitFlag<HardEvent::MTE2_S>(eventIDMTE2ToS);\n                 SetAtomicAdd<T>();\n                 for (uint64_t i = 0; i < rows; i++) {\n                     U dstIdx = indicesLocal.GetValue(i);      // 找到当次循环对应的indices内的值，即var的索引\n",
+      "new_file": false,
+      "new_path": "index/scatter_add/op_kernel/arch35/scatter_add_simd_support_atomicadd.h",
+      "old_path": "index/scatter_add/op_kernel/arch35/scatter_add_simd_support_atomicadd.h",
+      "removed_lines": 0,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/8018410d603e0f311df50f07057dc0b7d7dfcb46/index/scatter_add/op_kernel/arch35/scatter_add_simd_support_atomicadd.h",
+    "sha": "8018410d603e0f311df50f07057dc0b7d7dfcb46",
+    "source_branch": "scatter_add",
+    "source_project": {
+      "full_name": "lihang_13123/ops-nn",
+      "human_name": "lihang_13123 / ops-nn",
+      "id": 9083419,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  }
+]

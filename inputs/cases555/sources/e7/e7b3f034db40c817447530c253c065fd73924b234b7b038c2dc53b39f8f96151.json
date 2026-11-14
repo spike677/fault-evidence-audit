@@ -1,0 +1,70 @@
+[
+  {
+    "assignees": [],
+    "base": {
+      "ref": "master",
+      "repo": {
+        "full_name": "cann/ops-transformer",
+        "name": "ops-transformer",
+        "path": "ops-transformer"
+      },
+      "sha": "8255723ac7473a54cc7286032643b21a9516e963"
+    },
+    "body": "## 描述\n<!--在这里详细描述你的改动，包括改动的原因和所采取的方法。-->\n\n## 关联的Issue\n<!-- 如果这个PR是为了解决特定的Issue，请在这里提供Issue链接。例如：关联Issue #000-->\n<!-- 如果这个PR是为了解决特定的问题单，请在这里描述问题单单号。-->\n\n## 测试\n<!--描述进行了哪些测试来验证你的改动。包括但不限于二级冒烟、算子泛化等。-->\n\n## 文档更新\n<!--如果这个PR包含文档的更新，请在这里指出。例如：更新了README.md文件。-->\n\n## 类型标签\n<!--  [x] 表示选中 -->\n- [ ] 🐛 Bug 修复\n- [ ] ✨ 新特性\n- [ ] ⚡ 性能优化\n- [ ] ♻️ 重构\n- [ ] 🧪 测试\n- [ ] 📦 构建/CI\n- [ ] 🔧 配置变更\n- [ ] 📝 文档更新\n- [ ] ⬆️ 依赖升级\n- [ ] 🔒 安全修复\n- [ ] 🧹 代码清理\n- [ ] ❓ 其他，请描述：\n\n# 代码检视报告\n**项目名称**：ops-transformer\n**检视模块**：mc2/moe_distribute_combine_v2/op_kernel/\n**检视人**：Turing Team\n**检视日期**：2026-04-13\n\n\n## 🔍 检视概览\n| 统计项 | 数值 |\n| ---- | ---- |\n| 发现问题总数 | 3 个 |\n| 严重级（CRITICAL）问题 | 1 个 |\n| 中等级（MEDIUM）问题 | 2 个 |\n| 误报数量 | 0 个 |\n\n**核心结论**：PR#3558 包含3处代码修改，涉及控制寄存器操作和DataCopy参数变更。其中1处Critical级问题（未文档化API使用）需确认，2处Medium级变更需说明变更背景。\n\n## ❌ 问题详情及修改建议\n\n### 问题ID：ISSUE-001 | 严重级别：CRITICAL（严重）\n\n#### 🔬 假设检验过程\n**代码段**：moe_distribute_combine_v2.cpp:80-82 和 147-149\n**假设**：H0: 使用未文档化的GetCtrlSpr/SetCtrlSpr API是安全的\n\n| 证据序号 | 证据类型 | 规范ID | 证据描述 | 分值增量 | 累计自信值 |\n|---------|---------|--------|---------|---------|-----------|\n| 1 | API文档缺失 | CPP-SEC-1.3 | GetCtrlSpr/SetCtrlSpr API在官方Ascend C API文档中未找到对应说明 | +40% | 40% |\n| 2 | 规范违反 | API-BLACKLIST | 使用未在标准文档中定义的Control Register API | +40% | 80% |\n\n**结论**：自信值 **80%** > 60%，**推翻原假设H0**，该代码存在使用未文档化API的风险。\n\n---\n\n**关联规范条款**：Ascend C API 最佳实践 - API 黑名单\n**代码路径**：\n- mc2/moe_distribute_combine_v2/op_kernel/moe_distribute_combine_v2.cpp:80\n- mc2/moe_distribute_combine_v2/op_kernel/moe_distribute_combine_v2.cpp:147\n**问题类型**：使用未文档化API\n**问题描述**：代码使用了`AscendC::GetCtrlSpr`和`AscendC::SetCtrlSpr` API来获取和设置FLOAT_OVERFLOW_MODE_CTRL (值为60)控制寄存器。这些API未在官方Ascend C API文档（1022个API）中找到对应说明，使用未文档化的硬件控制寄存器可能导致硬件行为异常或运行时不兼容。\n\n#### 修改建议\n**修改前代码**：\n```cpp\n#if ((ORIG_DTYPE_EXPAND_X == DT_BF16) || (ORIG_DTYPE_EXPAND_X == DT_FLOAT16))\n#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)\n    int64_t oriOverflowMode = AscendC::GetCtrlSpr<FLOAT_OVERFLOW_MODE_CTRL, FLOAT_OVERFLOW_MODE_CTRL>();\n    // ... A5 implementation ...\n#endif\n```\n**修改后代码**：\n```cpp\n// 建议确认方案之一：\n// 1. 若此API为内部API，需在代码注释中说明来源和适用场景\n// 2. 或提供对应的CANNOps接口文档链接\n// 3. 或使用其他文档化的方式实现\n```\n**修改说明**：建议补充以下内容之一：\n- (1) 增加代码注释说明该API的来源（如内部文档或CANNOps技术支持）\n- (2) 提供API的使用说明文档链接\n- (3) 确认该寄存器(60)在所有目标硬件版本上的兼容性\n\n---\n\n### 问题ID：ISSUE-002 | 严重级别：MEDIUM\n\n#### 🔬 假设检验过程\n**代码段**：moe_distribute_combine_v2.h:42\n**假设**：H0: 自定义宏FLOAT_OVERFLOW_MODE_CTRL是安全的\n\n| 证据序号 | 证据类型 | 规范ID | 证据描述 | 分值增量 | 累计自信值 |\n|---------|---------|--------|---------|---------|-----------|\n| 1 | 规范违反 | CPP-SEC-1.3 | 硬编码控制寄存器号60，无官方文档说明其用途 | +40% | 40% |\n\n**结论**：自信值 **40%** < 60%，原假设H0部分成立，但建议补充文档。\n\n---\n\n**关联规范条款**：Ascend C 通用编码规范 - 接口变更考虑兼容性\n**代码路径**：mc2/moe_distribute_combine_v2/op_kernel/moe_distribute_combine_v2.h:42\n**问题类型**：未文档化的常量定义\n**问题描述**：新增 `#define FLOAT_OVERFLOW_MODE_CTRL 60` 宏定义，控制寄存器号60在官方文档中无对应说明。硬编码寄存器号可能因硬件版本差异导致兼容性问题。\n\n#### 修改建议\n**修改前代码**：\n```cpp\n#define FLOAT_OVERFLOW_MODE_CTRL 60\n```\n**修改后代码**：\n```cpp\n#define FLOAT_OVERFLOW_MODE_CTRL 60  // 需补充说明：浮点溢出模式控制寄存器，0为单指令饱和模式\n```\n**修改说明**：建议在注释中说明该寄存器的用途和可选值，或提供相关文档链接\n\n---\n\n### 问题ID：ISSUE-003 | 严重级别：MEDIUM\n\n#### 🔬 假设检验过程\n**代码段**：moe_distribute_combine_v2.h:919\n**假设**：H0: DataCopyPad的enablePadding参数变更不影响功能正确性\n\n| 证据序号 | 证据类型 | 规范ID | 证据描述 | 分值增量 | 累计自信值 |\n|---------|---------|--------|---------|---------|-----------|\n| 1 | 上下文变更 | API-10 | enablePadding从false变为true，改变数据拷贝行为 | +30% | 30% |\n| 2 | 功能验证 | - | 需确认此变更对精度/结果的影响 | +20% | 50% |\n\n**结论**：自信值 **50%** < 60%，原假设H0暂时成立，但需验证。\n\n---\n\n**关联规范条款**：Ascend C API 最佳实践 - API-10\n**代码路径**：mc2/moe_distribute_combine_v2/op_kernel/moe_distribute_combine_v2.h:919\n**问题类型**：DataCopy参数变更\n**问题描述**：`DataCopyPadExtParams` 的 `enablePadding` 参数从 `false` 变为 `true`。此参数控制是否对数据进行Padding处理，变更可能影响数据拷贝行为和最终计算结果，需确认变更的必要性。\n\n#### 修改建议\n**修改前代码**：\n```cpp\nDataCopyPadExtParams<ExpandXType> copyPadExtParams{false, 0U, 0U, 0U};\n```\n**修改后代码**：\n```cpp\nDataCopyPadExtParams<ExpandXType> copyPadExtParams{true, 0U, 0U, 0U};\n```\n**修改说明**：建议补充变更说明：\n- (1) 说明为何需要开启Padding（数据对齐问题？）\n- (2) 确认Padding值为0对计算结果无影响\n- (3) 或提供相关测试验证结果\n\n---\n\n## ✅ 合规项确认\n\n以下修改经检视符合规范要求：\n\n1. **BuffInit中的控制寄存器重置** (moe_distribute_combine_v2.h:556-559)\n   - 在BuffInit后设置FLOAT_OVERFLOW_MODE_CTRL为0，符合预期初始化逻辑\n\n2. **代码结构完整性**\n   - GetCtrlSpr/SetCtrlSpr配对使用，资源获取和释放匹配\n   - 条件编译 `#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)` 正确限定使用范围\n\n---\n\n## 📋 补充说明\n\n### 关于Issue-001的进一步说明\n\n经查阅Ascend C官方API文档（1022个API）及相关资源，未找到`GetCtrlSpr`/`SetCtrlSpr` API的官方文档。如这些API为：\n- CANN内部API（非开源）：需通过Huawei CANN技术支持获取使用说明\n- 新增API（8.5.0+）：需确认本地的CANN版本是否支持\n- 硬件特定API：需确认只在arch35硬件上有效\n\n**建议操作**：在合并PR前，通过Huawei CANN技术支持确认这些API的官方使用说明，以避免后续兼容性问题。\n\n## 报告生成时间\n2026-04-13 15:30:00\n## 报告状态\n已完成检视，需确认Issue-001的API来源后决定是否合并",
+    "can_merge_check": true,
+    "created_at": "2026-03-31T12:16:48.186+08:00",
+    "diff_url": "https://gitcode.com/cann/ops-transformer/merge_requests/3558/diffs",
+    "html_url": "https://gitcode.com/cann/ops-transformer/merge_requests/3558",
+    "id": 8464941,
+    "labels": [
+      {
+        "color": "#555353",
+        "created_at": "2025-06-10T14:17:24+08:00",
+        "id": 3881,
+        "name": "stat/needs-squash",
+        "updated_at": "2026-03-31T14:29:33+08:00"
+      },
+      {
+        "color": "#2865E0",
+        "created_at": "2025-06-21T10:53:09+08:00",
+        "id": 4929,
+        "name": "cann-cla/yes",
+        "updated_at": "2026-03-31T12:16:57+08:00"
+      },
+      {
+        "color": "#22ed07",
+        "created_at": "2025-05-29T20:14:31+08:00",
+        "id": 2742,
+        "name": "approved",
+        "updated_at": "2026-04-13T11:35:58+08:00"
+      },
+      {
+        "color": "#17f207",
+        "created_at": "2025-05-29T20:14:01+08:00",
+        "id": 2741,
+        "name": "lgtm",
+        "updated_at": "2026-04-13T11:57:14+08:00"
+      },
+      {
+        "color": "#21BA45",
+        "created_at": "2025-06-10T14:17:23+08:00",
+        "id": 3873,
+        "name": "ci-pipeline-passed",
+        "updated_at": "2026-04-10T17:17:53+08:00"
+      },
+      {
+        "color": "#3ee029",
+        "created_at": "2025-12-16T09:45:21+08:00",
+        "id": 22553,
+        "name": "api-check-pass",
+        "updated_at": "2026-04-10T17:17:04+08:00"
+      }
+    ],
+    "merged_at": "2026-04-13T11:57:22.422+08:00",
+    "number": 3558,
+    "state": "merged",
+    "testers": [],
+    "title": "fix A5  combine v2 mxfp8 quant err",
+    "updated_at": "2026-04-13T11:57:23.150+08:00"
+  }
+]

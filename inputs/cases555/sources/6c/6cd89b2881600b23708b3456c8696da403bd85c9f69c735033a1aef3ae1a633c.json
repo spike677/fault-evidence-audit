@@ -1,0 +1,38 @@
+[
+  {
+    "additions": 4,
+    "blob_id": "9c30fbe72f4df3462452fefeb22959f6fe7bd096",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/3e7348621a0c410646bab5b69ef6901c094c6bea/index/embedding_dense_grad_v2/op_kernel/v35/embedding_dense_grad_v2_regbase.h",
+    "deletions": 1,
+    "filename": "index/embedding_dense_grad_v2/op_kernel/v35/embedding_dense_grad_v2_regbase.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 4,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -539,10 +539,13 @@ __aicore__ inline void EmbeddingDenseGradV2Kernel<GRAD_T, CAST_T, IDX_T, isScale\n     IDX_T curLastIdx = -2; // 确保本核最后放到workspace的indices是升序的\n     IDX_T curLastCount = 0;\n     for (int64_t i = 0; i < arNum; i++) {\n+        if (idxOffset >= indices.GetSize()) {\n+            break;\n+        }\n         IDX_T idx = indices(idxOffset);\n         IDX_T interval = noDupCountTensor(i);\n         idxOffset = idxOffset + interval;\n-        if (idx == tiling_.paddingIdx || idx < 0 || idx >= tiling_.numWeights) {\n+        if (idx == tiling_.paddingIdx || static_cast<uint64_t>(idx) >= tiling_.numWeights) {\n             continue;\n         }\n \n",
+      "new_file": false,
+      "new_path": "index/embedding_dense_grad_v2/op_kernel/v35/embedding_dense_grad_v2_regbase.h",
+      "old_path": "index/embedding_dense_grad_v2/op_kernel/v35/embedding_dense_grad_v2_regbase.h",
+      "removed_lines": 1,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/3e7348621a0c410646bab5b69ef6901c094c6bea/index/embedding_dense_grad_v2/op_kernel/v35/embedding_dense_grad_v2_regbase.h",
+    "sha": "3e7348621a0c410646bab5b69ef6901c094c6bea",
+    "source_branch": "embeddingv2fix",
+    "source_project": {
+      "full_name": "SimonZzz/ops-nn",
+      "human_name": "SimonZzz / ops-nn",
+      "id": 9090330,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  }
+]

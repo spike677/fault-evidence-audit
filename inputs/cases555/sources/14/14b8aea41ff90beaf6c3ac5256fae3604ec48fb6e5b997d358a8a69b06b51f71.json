@@ -1,0 +1,287 @@
+{
+  "approval_reviewers": [
+    {
+      "accept": false,
+      "accept_status": "pending",
+      "assignee": false,
+      "code_owner": false,
+      "html_url": "https://gitcode.com/zhou-qilong",
+      "id": "6822cc0d6a68fa1fec6cc502",
+      "login": "zhou-qilong",
+      "name": "sunday"
+    },
+    {
+      "accept": false,
+      "accept_status": "pending",
+      "assignee": false,
+      "code_owner": false,
+      "html_url": "https://gitcode.com/tangweiwei2",
+      "id": "6880d13aba419813105ac7ab",
+      "login": "tangweiwei2",
+      "name": "tangweiwei2"
+    },
+    {
+      "accept": false,
+      "accept_status": "pending",
+      "assignee": true,
+      "code_owner": false,
+      "html_url": "https://gitcode.com/Andy-lb",
+      "id": "68d55468c9e33e3d8f4119c6",
+      "login": "Andy-lb",
+      "name": "Andy-lb"
+    },
+    {
+      "accept": false,
+      "accept_status": "pending",
+      "assignee": false,
+      "avatar_url": "https://cdn-img.gitcode.com/fc/ce/fc0c4ea3a1475e7c17f62a0f56f5cc495303247ae65117dc587acd502be1f96c.png?time=1753758215470",
+      "code_owner": false,
+      "html_url": "https://gitcode.com/fanqirui",
+      "id": "6822c8bee4b985165b4b0686",
+      "login": "fanqirui",
+      "name": "范其瑞"
+    },
+    {
+      "accept": false,
+      "accept_status": "pending",
+      "assignee": false,
+      "code_owner": false,
+      "html_url": "https://gitcode.com/crystalhu",
+      "id": "6822c65c6a68fa1fec6cc32e",
+      "login": "crystalhu",
+      "name": "胡碧霞"
+    },
+    {
+      "accept": false,
+      "accept_status": "pending",
+      "assignee": false,
+      "avatar_url": "",
+      "code_owner": false,
+      "html_url": "https://gitcode.com/chenqi317",
+      "id": "6861e48dadc5e31e4da8818d",
+      "login": "chenqi317",
+      "name": "chenqi317"
+    },
+    {
+      "accept": false,
+      "accept_status": "pending",
+      "assignee": false,
+      "code_owner": false,
+      "html_url": "https://gitcode.com/liubo75",
+      "id": "6880ab8479db6d209b3bc340",
+      "login": "liubo75",
+      "name": "liubo75"
+    },
+    {
+      "accept": false,
+      "accept_status": "pending",
+      "assignee": true,
+      "avatar_url": "",
+      "code_owner": false,
+      "html_url": "https://gitcode.com/gcw_Dm2TsRUi",
+      "id": "68d645601331e546a263edb0",
+      "login": "gcw_Dm2TsRUi",
+      "name": "mizhenkun"
+    },
+    {
+      "accept": false,
+      "accept_status": "pending",
+      "assignee": false,
+      "code_owner": false,
+      "html_url": "https://gitcode.com/yangyang016",
+      "id": "6822c8b559bdd61f837dbd1c",
+      "login": "yangyang016",
+      "name": "yangyang016"
+    },
+    {
+      "accept": false,
+      "accept_status": "pending",
+      "assignee": true,
+      "avatar_url": "",
+      "code_owner": false,
+      "html_url": "https://gitcode.com/gcw_kUomxQ2l",
+      "id": "68d502180329437872e54496",
+      "login": "gcw_kUomxQ2l",
+      "name": "liulun0308"
+    }
+  ],
+  "assignees": [
+    {
+      "accept": false,
+      "assignee": true,
+      "code_owner": false,
+      "html_url": "https://gitcode.com/Andy-lb",
+      "id": "68d55468c9e33e3d8f4119c6",
+      "login": "Andy-lb",
+      "name": "Andy-lb"
+    },
+    {
+      "accept": false,
+      "assignee": true,
+      "avatar_url": "",
+      "code_owner": false,
+      "html_url": "https://gitcode.com/gcw_Dm2TsRUi",
+      "id": "68d645601331e546a263edb0",
+      "login": "gcw_Dm2TsRUi",
+      "name": "mizhenkun"
+    },
+    {
+      "accept": false,
+      "assignee": true,
+      "avatar_url": "",
+      "code_owner": false,
+      "html_url": "https://gitcode.com/gcw_kUomxQ2l",
+      "id": "68d502180329437872e54496",
+      "login": "gcw_kUomxQ2l",
+      "name": "liulun0308"
+    }
+  ],
+  "assignees_number": 3,
+  "base": {
+    "label": "9.0.0",
+    "ref": "9.0.0",
+    "repo": {
+      "full_name": "cann/ops-nn",
+      "html_url": "https://gitcode.com/cann/ops-nn.git",
+      "name": "ops-nn",
+      "namespace": {
+        "path": "cann"
+      },
+      "path": "ops-nn"
+    },
+    "sha": "8ac78fb1700262c7c7a97f36b58fe587b9917c8a"
+  },
+  "body": "## 描述\n\n目标分支：`9.0.0` → `cann/ops-nn:9.0.0`\n\n本 PR 修复 batch_mat_mul_v3 在 B=FRACTAL_NZ 场景下的 GM 偏移计算错误。\n\n**问题：** 在 910B legacy kernel 路径（`batch_mat_mul_v3_com_base_block.h`）中，`BatchMatMulCommonBaseBlock::CalcBOffset` 的 **B=FRACTAL_NZ** 分支使用 `baseN` 计算 N 方向 stride，而同文件 **B=ND** 分支及 `mat_mul_v3` 的对应实现均使用 `singleCoreN`。当 tiling 使 `singleCoreN > baseN`（例如 AL1 full-load，tiling key 65792，N 方向多块切分）时，B 矩阵 GM 地址计算错误，导致计算结果不正确；B=ND 时结果正常。\n\n**修复：** 将 NZ 分支中 `nCntIndex` 的 stride 从 `baseN` 改为 `singleCoreN`，与 ND 路径及 `mat_mul_v3/op_kernel/mat_mul_base_block.h` 保持一致。\n\n**影响范围：** 910B（`NPU_ARCH=2201` / `ascend910b`）legacy kernel 路径；涉及 B 为 FRACTAL_NZ 格式的 batch matmul 场景。\n\n### 备注：分支包含的其他 commit\n\n除上述 bugfix 外，本分支还包含以下已存在于 fork 的 commit，请 reviewer 一并确认：\n\n- `11b5c29bc correct description of cubeMathType on 950PR.`\n\n## 关联的Issue\n\n- 关联 Issue #2935：https://gitcode.com/cann/ops-nn/issues/2935\n- Issue #2936（einsum 日志）在本分支不适用\n\n## 测试\n\n## 文档更新\n\n无文档变更。\n\n## 类型标签\n\n- [x] Bug修复\n- [ ] 新特性\n- [ ] 性能优化\n- [ ] 文档更新\n- [ ] 其他，请描述：",
+  "can_merge_check": true,
+  "close_related_issue": true,
+  "closed_at": "2026-06-01T16:56:21+08:00",
+  "created_at": "2026-05-28T20:53:35+08:00",
+  "draft": false,
+  "head": {
+    "label": "9.0.0",
+    "ref": "9.0.0",
+    "repo": {
+      "full_name": "void_ptr/ops-nn",
+      "html_url": "https://gitcode.com/void_ptr/ops-nn.git",
+      "name": "ops-nn",
+      "namespace": {
+        "path": "void_ptr"
+      },
+      "path": "ops-nn"
+    },
+    "sha": "dfc4758e02b78484fc4ad4ae4c5dec907b1232ca",
+    "user": {
+      "html_url": "https://gitcode.com/void_ptr",
+      "id": "688199e65294102de27ef081",
+      "login": "void_ptr",
+      "name": "void_ptr"
+    }
+  },
+  "html_url": "https://gitcode.com/cann/ops-nn/merge_requests/5368",
+  "id": 8665532,
+  "issue_url": "https://api.gitcode.com/api/v5/repos/cann/ops-nn/pulls/5368/issues",
+  "labels": [
+    {
+      "color": "#555353",
+      "created_at": "2025-06-10T14:17:24+08:00",
+      "id": 3881,
+      "name": "stat/needs-squash",
+      "repository_id": 7665709,
+      "updated_at": "2026-05-29T11:26:49+08:00"
+    },
+    {
+      "color": "#2865E0",
+      "created_at": "2025-06-21T10:53:09+08:00",
+      "id": 4929,
+      "name": "cann-cla/yes",
+      "repository_id": 7665709,
+      "updated_at": "2026-05-29T11:26:52+08:00"
+    },
+    {
+      "color": "#22ed07",
+      "created_at": "2025-05-29T20:14:31+08:00",
+      "id": 2742,
+      "name": "approved",
+      "repository_id": 7665709,
+      "updated_at": "2026-06-01T15:25:32+08:00"
+    },
+    {
+      "color": "#17f207",
+      "created_at": "2025-05-29T20:14:01+08:00",
+      "id": 2741,
+      "name": "lgtm",
+      "repository_id": 7665709,
+      "updated_at": "2026-06-01T15:25:32+08:00"
+    },
+    {
+      "color": "#21BA45",
+      "created_at": "2025-06-10T14:17:23+08:00",
+      "id": 3873,
+      "name": "ci-pipeline-passed",
+      "repository_id": 7665709,
+      "updated_at": "2026-06-01T16:56:13+08:00"
+    }
+  ],
+  "mergeable": true,
+  "mergeable_state": {
+    "all_depend_merge_request_merged_passed": true,
+    "approval_approvers_required_passed": true,
+    "approval_approvers_result": 2,
+    "approval_reviewers_required_passed": true,
+    "approval_testers_required_passed": true,
+    "approval_testers_result": 2,
+    "branch_missing_passed": true,
+    "can_force_merge": false,
+    "check_tasks_num": 0,
+    "ci_state_passed": true,
+    "conflict_passed": true,
+    "merge_by_self_passed": true,
+    "merge_request_id": 8665532,
+    "merge_request_switch": {
+      "add_notes_after_merged": true,
+      "approval_required_reviewers_branch": "*",
+      "approval_required_reviewers_count": 0,
+      "can_force_merge": false,
+      "can_reopen": true,
+      "disable_merge_by_self": false,
+      "disable_squash_merge": false,
+      "mark_auto_merged_mr_as_closed": false,
+      "merge_method": "merge",
+      "only_allow_merge_if_all_discussions_are_resolved": true,
+      "only_allow_merge_if_pipeline_succeeds": false,
+      "review_mode": "approval",
+      "squash_merge_with_no_merge_commit": true
+    },
+    "merged_by_user_passed": true,
+    "mr_state_passed": true,
+    "non_ff_passed": true,
+    "reason": {},
+    "resolve_discussion_passed": true,
+    "state": true,
+    "status_without_user_auth": true,
+    "work_in_progress_passed": true
+  },
+  "merged_at": "2026-06-01T16:56:21+08:00",
+  "merged_by": {
+    "avatar_url": "https://cdn-img.gitcode.com/bf/ad/b7f29486a040d7b2f52bf6c78414692d7d585eb1ec628cea3eb01c9d63f68618.png?time=1755691472703",
+    "html_url": "https://gitcode.com/cann-robot",
+    "id": "673c1552584fe8295cfd4a13",
+    "login": "cann-robot",
+    "name": "CANN-robot"
+  },
+  "number": 5368,
+  "prune_branch": false,
+  "squash_merge": true,
+  "state": "merged",
+  "testers": [],
+  "title": "fix: correct FRACTAL_NZ B GM offset and downgrade einsum tiling log level",
+  "updated_at": "2026-06-01T16:56:22+08:00",
+  "url": "https://api.gitcode.com/api/v5/repos/cann/ops-nn/pulls/5368",
+  "user": {
+    "html_url": "https://gitcode.com/void_ptr",
+    "id": "688199e65294102de27ef081",
+    "login": "void_ptr",
+    "name": "void_ptr"
+  },
+  "visibility_reason": "public"
+}

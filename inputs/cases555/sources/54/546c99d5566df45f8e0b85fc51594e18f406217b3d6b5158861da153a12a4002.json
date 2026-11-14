@@ -1,0 +1,80 @@
+{
+  "assignee": {
+    "html_url": "https://gitcode.com/captainmiaow",
+    "id": "680a0031c6be6f6a0f719f68",
+    "login": "captainmiaow",
+    "name": "captainmiaow",
+    "object_id": "680a0031c6be6f6a0f719f68"
+  },
+  "assignees": [
+    {
+      "html_url": "https://gitcode.com/captainmiaow",
+      "id": "680a0031c6be6f6a0f719f68",
+      "login": "captainmiaow",
+      "name": "captainmiaow",
+      "object_id": "680a0031c6be6f6a0f719f68"
+    }
+  ],
+  "body": "\n\nThanks for sending an issue! Please fill in the following template to help quickly solve your problem.\n\n### Describe the current behavior / 问题描述 (Mandatory / 必填)\n            \n![image.png](https://raw.gitcode.com/user-images/assets/7673863/308f5c49-753c-423e-9d42-0ccc7249f401/image.png 'image.png')\ntail块和tile块tiling不同，tail块继承tile块的preCoreNum，会导致UpdateBasicIndex计算params_.index时出现uint64_t负数溢出。\nops-transformer\\mc2\\common\\op_kernel\\mc2_quant_batch_matmul_asw_block.h中UpdateBasicIndex()在计算index时\nparams_.index = newBlockIdx + roundIdx * tilingData_->matmulTiling.usedCoreNum - preCoreNum_;\n需要在tail块清零preCoreNum\n### Environment / 环境信息 (Mandatory / 必填)\n            \nhw: 2P A5 \nsw: master or 9.1.0 beta2\n### Steps to reproduce the issue / 重现步骤 (Mandatory / 必填)\n            \n2P A5 \n![image.png](https://raw.gitcode.com/user-images/assets/7673863/47fae295-2993-48c0-b274-aa34c2b7e51c/image.png 'image.png')\n### Describe the expected behavior / 预期结果 (Mandatory / 必填)\n            \n精度正确\n### Related log / screenshot / 日志 / 截图 (Mandatory / 必填)\n            \n![image.png](https://raw.gitcode.com/user-images/assets/7673863/a39e9d72-3745-445c-9d50-3821701cf114/image.png 'image.png')\n### Special notes for this issue/备注 (Optional / 选填)\n            \n\n",
+  "comments": 1,
+  "created_at": "2026-06-12T10:13:27+08:00",
+  "finished_at": "2026-06-12T18:18:36+08:00",
+  "html_url": "https://gitcode.com/cann/ops-transformer/issues/3081",
+  "id": 4090963,
+  "issue_priority_detail": {
+    "id": 116,
+    "title": "无优先级"
+  },
+  "issue_state": "进行中",
+  "issue_state_detail": {
+    "id": 285,
+    "serial": 0,
+    "title": "进行中"
+  },
+  "issue_type": "任务",
+  "issue_type_detail": {
+    "id": 255,
+    "is_system": false,
+    "title": "任务"
+  },
+  "labels": [
+    {
+      "color": "#DB2828",
+      "created_at": "2025-06-10T14:17:23+08:00",
+      "id": 3870,
+      "name": "bug-report",
+      "updated_at": "2026-06-12T10:13:27+08:00"
+    },
+    {
+      "color": "#35e029",
+      "created_at": "2026-03-20T11:25:13+08:00",
+      "id": 38861,
+      "name": "resolved",
+      "updated_at": "2026-06-12T18:51:22+08:00"
+    }
+  ],
+  "number": "3081",
+  "priority": 0,
+  "repository": {
+    "assigner": {},
+    "created_at": "2025-09-28T17:54:46+08:00",
+    "description": "本项目是CANN提供的transformer类大模型算子库，实现网络在NPU上加速计算。",
+    "full_name": "cann/ops-transformer",
+    "id": 7673863,
+    "name": "ops-transformer",
+    "paas": "",
+    "path": "ops-transformer",
+    "updated_at": "2025-09-28T18:06:48+08:00"
+  },
+  "state": "closed",
+  "title": "[Bug-Report|缺陷反馈]: AllGatherMatmulV2 尾块preCoreNum未清零会导致某些shape的UpdateBasicIndex计算params_.index时出现uint64_t负数溢出。",
+  "updated_at": "2026-06-12T18:18:36+08:00",
+  "user": {
+    "html_url": "https://gitcode.com/captainmiaow",
+    "id": "680a0031c6be6f6a0f719f68",
+    "login": "captainmiaow",
+    "name": "captainmiaow",
+    "object_id": "680a0031c6be6f6a0f719f68"
+  },
+  "visibility_reason": "public"
+}

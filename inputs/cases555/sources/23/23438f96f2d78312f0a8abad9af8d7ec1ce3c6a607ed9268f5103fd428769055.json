@@ -1,0 +1,144 @@
+{
+  "approval_reviewers": [],
+  "assignees": [],
+  "assignees_number": 0,
+  "base": {
+    "label": "9.1.0",
+    "ref": "9.1.0",
+    "repo": {
+      "full_name": "cann/ops-nn",
+      "html_url": "https://gitcode.com/cann/ops-nn.git",
+      "name": "ops-nn",
+      "namespace": {
+        "path": "cann"
+      },
+      "path": "ops-nn"
+    },
+    "sha": "a452f1cfc5ed268cecd714673845e0dcafe3130f"
+  },
+  "body": "## 描述\n\n修复 layer_norm_v3 和 layer_norm_v4 在 arch35 平台 Welford 算法实现中的两个精度问题：\n\n1. **缓存参数索引偏移错误**：WelfordFinalize 和 Normalize 函数中访问 meanTensor、varianceTensor、lastoutTensor/rstdTensor 时，使用了 `paramAddr + cacheCount` 作为索引。`paramAddr` 是全局内存（GM）偏移量，不应混入本地 UB 缓存张量的索引计算，导致读取了错误位置的缓存数据，影响计算精度。修正为直接使用 `cacheCount` 索引。\n\n2. **cacheCount 计数顺序错误**：原实现中 `cacheCount++` 仅在未达缓存阈值时执行（else 分支），导致数据未正确计入当前缓存批次。修正为先递增计数再判断阈值，确保每次迭代的数据均被正确追踪。\n\n### 改动方法\n- 移除 `meanTensor[paramAddr + cacheCount]` 等表达式中的 `paramAddr` 前缀，改为 `meanTensor[cacheCount]`，同样适用于 varianceTensor、lastoutTensor、rstdTensor\n- 将 `cacheCount++` 提至 `if (cacheCount >= AGGREGATION_COUNT)` 判断之前\n- layer_norm_v3 测试用例 CMakeLists.txt 增加 norm_common 依赖参数\n\n## 关联的Issue\n- #3388\n\n## 测试\n通过 layer_norm_v3/v4 UT 测试验证精度修复效果\n\n## 文档更新\n无\n\n## 类型标签\n- [x] Bug修复\n- [ ] 新特性\n- [ ] 性能优化\n- [ ] 文档更新\n- [ ] 其他，请描述：",
+  "can_merge_check": true,
+  "close_related_issue": true,
+  "closed_at": "2026-06-18T15:21:07+08:00",
+  "created_at": "2026-06-17T10:40:43+08:00",
+  "draft": false,
+  "head": {
+    "label": "ln_fix_c11",
+    "ref": "ln_fix_c11",
+    "repo": {
+      "full_name": "cai-chengchao/ops-nn",
+      "html_url": "https://gitcode.com/cai-chengchao/ops-nn.git",
+      "name": "ops-nn",
+      "namespace": {
+        "path": "cai-chengchao"
+      },
+      "path": "ops-nn"
+    },
+    "sha": "0ce187dc58460d5d8ed4521f9121435cfc4e1cfe",
+    "user": {
+      "html_url": "https://gitcode.com/cai-chengchao",
+      "id": "6822fc31398335026946c784",
+      "login": "cai-chengchao",
+      "name": "cai-chengchao"
+    }
+  },
+  "html_url": "https://gitcode.com/cann/ops-nn/merge_requests/6187",
+  "id": 8750481,
+  "issue_url": "https://api.gitcode.com/api/v5/repos/cann/ops-nn/pulls/6187/issues",
+  "labels": [
+    {
+      "color": "#2865E0",
+      "created_at": "2025-06-21T10:53:09+08:00",
+      "id": 4929,
+      "name": "cann-cla/yes",
+      "repository_id": 7665709,
+      "updated_at": "2026-06-17T10:40:52+08:00"
+    },
+    {
+      "color": "#21BA45",
+      "created_at": "2025-06-10T14:17:23+08:00",
+      "id": 3873,
+      "name": "ci-pipeline-passed",
+      "repository_id": 7665709,
+      "updated_at": "2026-06-17T14:15:32+08:00"
+    },
+    {
+      "color": "#22ed07",
+      "created_at": "2025-05-29T20:14:31+08:00",
+      "id": 2742,
+      "name": "approved",
+      "repository_id": 7665709,
+      "updated_at": "2026-06-18T14:06:09+08:00"
+    },
+    {
+      "color": "#17f207",
+      "created_at": "2025-05-29T20:14:01+08:00",
+      "id": 2741,
+      "name": "lgtm",
+      "repository_id": 7665709,
+      "updated_at": "2026-06-18T15:20:59+08:00"
+    }
+  ],
+  "mergeable": true,
+  "mergeable_state": {
+    "all_depend_merge_request_merged_passed": true,
+    "approval_approvers_required_passed": true,
+    "approval_approvers_result": 2,
+    "approval_reviewers_required_passed": true,
+    "approval_testers_required_passed": true,
+    "approval_testers_result": 2,
+    "branch_missing_passed": true,
+    "can_force_merge": false,
+    "check_tasks_num": 0,
+    "ci_state_passed": true,
+    "conflict_passed": true,
+    "merge_by_self_passed": true,
+    "merge_request_id": 8750481,
+    "merge_request_switch": {
+      "add_notes_after_merged": true,
+      "approval_required_reviewers_branch": "*",
+      "approval_required_reviewers_count": 0,
+      "can_force_merge": false,
+      "can_reopen": true,
+      "disable_merge_by_self": false,
+      "disable_squash_merge": false,
+      "mark_auto_merged_mr_as_closed": false,
+      "merge_method": "merge",
+      "only_allow_merge_if_all_discussions_are_resolved": true,
+      "only_allow_merge_if_pipeline_succeeds": false,
+      "review_mode": "approval",
+      "squash_merge_with_no_merge_commit": true
+    },
+    "merged_by_user_passed": true,
+    "mr_state_passed": true,
+    "non_ff_passed": true,
+    "reason": {},
+    "resolve_discussion_passed": true,
+    "state": true,
+    "status_without_user_auth": true,
+    "work_in_progress_passed": true
+  },
+  "merged_at": "2026-06-18T15:21:07+08:00",
+  "merged_by": {
+    "avatar_url": "https://cdn-img.gitcode.com/bf/ad/b7f29486a040d7b2f52bf6c78414692d7d585eb1ec628cea3eb01c9d63f68618.png?time=1755691472703",
+    "html_url": "https://gitcode.com/cann-robot",
+    "id": "673c1552584fe8295cfd4a13",
+    "login": "cann-robot",
+    "name": "CANN-robot"
+  },
+  "number": 6187,
+  "prune_branch": false,
+  "squash_merge": true,
+  "state": "merged",
+  "testers": [],
+  "title": "fix: 修复 layer_norm Welford 算法缓存参数索引和计数逻辑错误",
+  "updated_at": "2026-06-18T15:21:15+08:00",
+  "url": "https://api.gitcode.com/api/v5/repos/cann/ops-nn/pulls/6187",
+  "user": {
+    "html_url": "https://gitcode.com/cai-chengchao",
+    "id": "6822fc31398335026946c784",
+    "login": "cai-chengchao",
+    "name": "cai-chengchao"
+  },
+  "visibility_reason": "public"
+}

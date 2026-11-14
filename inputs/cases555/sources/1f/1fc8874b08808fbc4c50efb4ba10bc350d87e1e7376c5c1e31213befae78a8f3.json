@@ -1,0 +1,38 @@
+[
+  {
+    "additions": 27,
+    "blob_id": "71a92a3df619e2fea3abc2412a18be4a0c84e934",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/7f81830c71186e522beb2707d8a9163ad67adc4f/attention/common/op_kernel/arch32/fia_block_vec_nonquant.h",
+    "deletions": 25,
+    "filename": "attention/common/op_kernel/arch32/fia_block_vec_nonquant.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 27,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -589,46 +589,48 @@ __aicore__ inline void FiaBlockVecNonQuant<FIAT>::ElewiseCompute(\n \n         maskInfo.attenMaskType = fa_base_vector::MASK_BOOL; // compatible with int8/uint8\n \n-        // 添加Sparse9的处理，由于sparse9的mask拷贝只占最小块的一部分，所以需要对UB空间赋初值0，表示不被掩码覆盖\n-        // TND场景下mask传入∑s1²，其余场景传入[B,S1,S1]\n-        LocalTensor<bool> maskUb = inputQue2.AllocTensor<bool>();\n-        LocalTensor<bool> attenMaskTmpUb = maskUb[BUFFER_SIZE_BYTE_16K / 2];\n         LocalTensor<uint8_t> ubWorkSpace = tmpBuf.Get<uint8_t>();\n-        event_t eventIdVMte2 = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::V_MTE2));\n         if (maskInfo.sparseMode == fa_base_vector::TREE) {\n+            // TREE模式：提前分配并初始化为0，保持占用直到处理完成\n+            LocalTensor<bool> maskUb = inputQue2.AllocTensor<bool>();\n+            LocalTensor<bool> attenMaskTmpUb = maskUb[BUFFER_SIZE_BYTE_16K / 2];\n+            event_t eventIdVMte2 = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::V_MTE2));\n             LocalTensor<int16_t> mask16 = maskUb.template ReinterpretCast<int16_t>();\n-            uint32_t zeroCount  = BUFFER_SIZE_BYTE_8K / sizeof(int16_t);\n-            Duplicate(mask16, static_cast<int16_t>(0), zeroCount);\n+            Duplicate(mask16, static_cast<int16_t>(0), BUFFER_SIZE_BYTE_8K / sizeof(int16_t));\n             maskUb = mask16.template ReinterpretCast<bool>();\n             SetFlag<HardEvent::V_MTE2>(eventIdVMte2);\n             WaitFlag<HardEvent::V_MTE2>(eventIdVMte2);\n-            // 修改attenMaskStride、attenMaskBatchStride值\n-            maskInfo.attenMaskBatchStride = maskInfo.attenMaskBatchStride * maskInfo.batchIdx;\n-            if (LAYOUT_T == FIA_LAYOUT::TND || LAYOUT_T == FIA_LAYOUT::NTD) {\n+            maskInfo.attenMaskBatchStride *= maskInfo.batchIdx;\n+            if constexpr (LAYOUT_T == FIA_LAYOUT::TND || LAYOUT_T == FIA_LAYOUT::NTD) {\n                 maskInfo.attenMaskStride = info.actS1Size;\n                 maskInfo.attenMaskBatchStride = 0;\n                 for (int32_t i = 0; i < maskInfo.batchIdx; i++) {\n                     maskInfo.attenMaskBatchStride += qActSeqLensParser.GetActualSeqLength(i) * qActSeqLensParser.GetActualSeqLength(i);\n                 }\n             }\n-        }\n-\n-        if (!fa_base_vector::IsSkipAttentionmask(maskInfo)) {\n-            if (maskInfo.sparseMode == fa_base_vector::TREE) {\n+            if (!fa_base_vector::IsSkipAttentionmask(maskInfo)) {\n                 fa_base_vector::AttentionmaskCopyIn<bool, bool, true>(maskUb, attenMaskBoolGm, attenMaskTmpUb, maskInfo);\n-            } else {\n-                fa_base_vector::AttentionmaskCopyIn(maskUb, attenMaskBoolGm, attenMaskTmpUb, maskInfo);\n+                AscendC::PipeBarrier<PIPE_V>();\n+                fa_base_vector::AttentionMaskCompute<MM1_OUT_T>(mmResUb, mmResUb, maskUb, ubWorkSpace, maskInfo);\n+            }\n+            inputQue2.FreeTensor(maskUb);\n+        } else {\n+            if (!fa_base_vector::IsSkipAttentionmask(maskInfo)) {\n+                LocalTensor<bool> maskUb = inputQue2.AllocTensor<bool>();\n+                LocalTensor<bool> attenMaskTmpUb = maskUb[BUFFER_SIZE_BYTE_16K / 2];\n+                fa_base_vector::AttentionmaskCopyIn(maskUb, attenMaskBoolGm, attenMaskTmpUb, maskInfo);\n+                AscendC::PipeBarrier<PIPE_V>();\n+                fa_base_vector::AttentionMaskCompute<MM1_OUT_T>(mmResUb, mmResUb, maskUb, ubWorkSpace, maskInfo);\n+                inputQue2.FreeTensor(maskUb);\n+            }\n+            if (!fa_base_vector::IsSkipAttentionmaskForPre(maskInfo)) {\n+                LocalTensor<bool> maskUb = inputQue2.AllocTensor<bool>();\n+                LocalTensor<bool> attenMaskTmpUb = maskUb[BUFFER_SIZE_BYTE_16K / 2];\n+                fa_base_vector::AttentionmaskCopyIn(maskUb, attenMaskBoolGm, attenMaskTmpUb, maskInfo, true);\n+                fa_base_vector::AttentionMaskCompute<MM1_OUT_T>(mmResUb, mmResUb, maskUb, ubWorkSpace, maskInfo, true);\n+                inputQue2.FreeTensor(maskUb);\n             }\n-            AscendC::PipeBarrier<PIPE_V>();\n-            fa_base_vector::AttentionMaskCompute<MM1_OUT_T>(mmResUb, mmResUb, maskUb, ubWorkSpace, maskInfo);\n         }\n-        if (!fa_base_vector::IsSkipAttentionmaskForPre(maskInfo)) {\n-            SetFlag<HardEvent::V_MTE2>(eventIdVMte2);\n-            WaitFlag<HardEvent::V_MTE2>(eventIdVMte2);\n-            fa_base_vector::AttentionmaskCopyIn(maskUb, attenMaskBoolGm, attenMaskTmpUb, maskInfo, true);\n-            fa_base_vector::AttentionMaskCompute<MM1_OUT_T>(mmResUb, mmResUb, maskUb, ubWorkSpace, maskInfo, true);\n-        }\n-        inputQue2.FreeTensor(maskUb);\n     }\n }\n \n",
+      "new_file": false,
+      "new_path": "attention/common/op_kernel/arch32/fia_block_vec_nonquant.h",
+      "old_path": "attention/common/op_kernel/arch32/fia_block_vec_nonquant.h",
+      "removed_lines": 25,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/7f81830c71186e522beb2707d8a9163ad67adc4f/attention/common/op_kernel/arch32/fia_block_vec_nonquant.h",
+    "sha": "7f81830c71186e522beb2707d8a9163ad67adc4f",
+    "source_branch": "fix_sprase4",
+    "source_project": {
+      "full_name": "liyangzhi/ops-transformer_sparse9",
+      "human_name": "liyangzhi / ops-transformer_sparse9",
+      "id": 9105671,
+      "path": "ops-transformer_sparse9"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  }
+]

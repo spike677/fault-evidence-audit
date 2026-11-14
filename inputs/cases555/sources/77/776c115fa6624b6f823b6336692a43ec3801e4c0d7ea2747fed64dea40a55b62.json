@@ -1,0 +1,74 @@
+[
+  {
+    "additions": 2,
+    "blob_id": "60dfaf795f979ada9d9d0f3df47f0d452fd5d3a3",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/59f06967daf4a3e9e26cfe715977c37d90ad4ad8/attention/attention_update/README.md",
+    "deletions": 2,
+    "filename": "attention/attention_update/README.md",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 2,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -42,7 +42,7 @@\n ## 功能说明\n \n + 算子功能：将各SP域PA算子的输出的中间结果lse，localOut两个局部变量结果更新成全局结果。\n-+ 计算公式：输入$lse_i$和$O_i$、输出$O$。\n++ 计算公式：输入$lse_i$和$O_i$、输出$O$和$lse_m$。\n \n $$\n lse_{max} = \\text{max}lse_i\n@@ -94,7 +94,7 @@ $$\n   </tr>\n   <tr>\n     <td class=\"tg-0pky\">O</td>\n-    <td class=\"tg-0pky\">输入</td>\n+    <td class=\"tg-0pky\">输出</td>\n     <td class=\"tg-0pky\">更新后的全局attentionout。</td>\n     <td class=\"tg-0pky\">FLOAT32，FLOAT16，BFLOAT16</td>\n     <td class=\"tg-0pky\">ND</td>\n",
+      "new_file": false,
+      "new_path": "attention/attention_update/README.md",
+      "old_path": "attention/attention_update/README.md",
+      "removed_lines": 2,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/59f06967daf4a3e9e26cfe715977c37d90ad4ad8/attention/attention_update/README.md",
+    "sha": "59f06967daf4a3e9e26cfe715977c37d90ad4ad8",
+    "source_branch": "master",
+    "source_project": {
+      "full_name": "skyqwzw/ops-transformer_attentionupdate_inf",
+      "human_name": "skyqwzw / ops-transformer_attentionupdate_inf",
+      "id": 7954914,
+      "path": "ops-transformer_attentionupdate_inf"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  },
+  {
+    "additions": 47,
+    "blob_id": "4f9cad79f1972a2835708a3f36d8beb722f2a083",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/59f06967daf4a3e9e26cfe715977c37d90ad4ad8/attention/attention_update/op_kernel/decode_update.h",
+    "deletions": 18,
+    "filename": "attention/attention_update/op_kernel/decode_update.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 47,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -16,6 +16,7 @@\n #ifndef ASCENDC_ATTENTION_UPDATE_DECODE_UPDATE_H_\n #define ASCENDC_ATTENTION_UPDATE_DECODE_UPDATE_H_\n \n+#include <limits>\n #include \"kernel_operator.h\"\n #include \"kernel_utils.h\"\n #include \"kernel_tiling/kernel_tiling.h\"\n@@ -32,11 +33,15 @@ static constexpr uint32_t NUM8 = 8;\n static constexpr uint32_t NUM16 = 16;\n static constexpr uint32_t NUM32 = 32;\n static constexpr uint32_t NUM64 = 64;\n+static constexpr uint32_t NUM255 = 255;\n static constexpr uint32_t NUM256 = 256;\n+static constexpr float POS_INF = std::numeric_limits<float>::infinity();\n+static constexpr float NEG_INF = -std::numeric_limits<float>::infinity();\n static constexpr uint32_t MAX_UB_SIZE = 188 * 1024; //  double buffer, 每块94KB共188KB\n static const uint16_t ALIGNED_TO_8 = 8;\n static const int32_t ALIGNED_TO_2 = 2;\n static const uint32_t SPLIT_TO_2 = 2;\n+static const uint32_t ELEM_PER_256B = NUM256 / sizeof(float);\n \n template <typename lseType, typename outType>\n class DecodeUpdate {\n@@ -53,25 +58,27 @@ public:\n         this->updateType = tdata->updateType;\n         if (GetBlockIdx() < tdata->formerNum) {\n             blockLength = tdata->formerLength;\n-            this->GmStartOffset = GetBlockIdx() * tdata->formerLength;\n+            this->gmStartOffset = GetBlockIdx() * tdata->formerLength;\n         } else {\n             blockLength = tdata->tailLength;\n-            this->GmStartOffset = tdata->formerNum * tdata->formerLength +\n+            this->gmStartOffset = tdata->formerNum * tdata->formerLength +\n                                   (GetBlockIdx() - tdata->formerNum) * tdata->tailLength; // tail block\n         }\n         uint32_t spAligned = (NUM8 + 7) / NUM8 * NUM8;\n         //  用94K的UB大小推算出 tileLength 最大能设置到多少\n-        uint32_t maxTileLength = (MAX_UB_SIZE - NUM8 * sizeof(uint32_t)) /\n+        uint32_t maxTileLength = (MAX_UB_SIZE - NUM8 * sizeof(uint32_t) - (ELEM_PER_256B - 1) * (sizeof(float) + sizeof(uint8_t))) /\n                                 (sizeof(float) * spAligned * BUFFER_NUM * (NUM2 * (NUM1 + hDim) + hDim / spAligned) +\n                                 hDim * spAligned * sizeof(float) * NUM2 +\n                                 sizeof(float) * BUFFER_NUM +\n-                                sizeof(float) * NUM2);\n+                                sizeof(float) * NUM2 +\n+                                sizeof(uint8_t) * spAligned);\n         if constexpr (!std::is_same<outType, float>::value) {\n-            maxTileLength = (MAX_UB_SIZE - NUM8 * sizeof(uint32_t)) /\n+            maxTileLength = (MAX_UB_SIZE - NUM8 * sizeof(uint32_t) - (ELEM_PER_256B - 1) * (sizeof(float) + sizeof(uint8_t))) /\n                                     (sizeof(float) * spAligned * BUFFER_NUM * (NUM2 * (NUM1 + hDim) + hDim / spAligned) +\n                                     hDim * spAligned * sizeof(float) * NUM2 +\n                                     sizeof(float) * BUFFER_NUM +\n-                                    sizeof(float) * NUM2 + (sp + NUM1) * NUM16 * BUFFER_NUM);\n+                                    sizeof(float) * NUM2 + (sp + NUM1) * NUM16 * BUFFER_NUM +\n+                                    sizeof(uint8_t) * spAligned);\n         }\n         if (sp >= NUM8) {\n             maxTileLength = maxTileLength / SPLIT_TO_2;\n@@ -87,7 +94,8 @@ public:\n         outGm.SetGlobalBuffer((__gm__ outType *)out, totalLength * hDim);\n         lseoutGm.SetGlobalBuffer((__gm__ lseType *)lesout, totalLength);\n \n-        pipe.InitBuffer(inQueueLse, BUFFER_NUM, tileLengthAlig * sp * sizeof(float));\n+        uint32_t inQueueLseLengthAlign = (tileLengthAlig * sp * sizeof(float) + NUM255) / NUM256 * NUM256;\n+        pipe.InitBuffer(inQueueLse, BUFFER_NUM, inQueueLseLengthAlign);\n         if constexpr (std::is_same<outType, float>::value) {\n             pipe.InitBuffer(inQueueIn, BUFFER_NUM, tileLength * hDim * sp * sizeof(float));\n         } else {\n@@ -105,6 +113,7 @@ public:\n         } else {\n             pipe.InitBuffer(lseexpBroadcastBuffer, tileLengthAlig * sp * hDim * sizeof(float));\n         }\n+        pipe.InitBuffer(selMaskBuffer, inQueueLseLengthAlign * sizeof(uint8_t));\n     }\n     __aicore__ inline void Process()\n     {\n@@ -143,15 +152,15 @@ private:\n             for (int32_t i = 0; i < sp; i++) {\n                 lseGm.SetGlobalBuffer(reinterpret_cast<__gm__ lseType*>(*(lsePtr + i)), totalLength);\n                 inGm.SetGlobalBuffer(reinterpret_cast<__gm__ outType*>(*(inPtr + i)), totalLength * hDim);\n-                DataCopy(lseLocal[curLength * i], lseGm[progress * tileLength + GmStartOffset],\n+                DataCopy(lseLocal[curLength * i], lseGm[progress * tileLength + gmStartOffset],\n                          curLength);\n                 if constexpr (std::is_same<outType, float>::value) {\n                     DataCopy(inLocal[curLength * hDim * i],\n-                         inGm[progress * tileLength * hDim + GmStartOffset * hDim],\n+                         inGm[progress * tileLength * hDim + gmStartOffset * hDim],\n                          curLength * hDim);\n                 } else {\n                     DataCopy(inLocalFp16[curLength * hDim * i],\n-                         inGm[progress * tileLength * hDim + GmStartOffset * hDim],\n+                         inGm[progress * tileLength * hDim + gmStartOffset * hDim],\n                          curLength * hDim);\n                 }\n             }\n@@ -166,12 +175,12 @@ private:\n             for (int32_t i = 0; i < sp; i++) {\n                 lseGm.SetGlobalBuffer(reinterpret_cast<__gm__ lseType*>(*(lsePtr + i)), totalLength);\n                 inGm.SetGlobalBuffer(reinterpret_cast<__gm__ outType*>(*(inPtr + i)), totalLength * hDim);\n-                DataCopyPad(lseLocal[curLengthAlig * i], lseGm[progress * tileLength + GmStartOffset],\n+                DataCopyPad(lseLocal[curLengthAlig * i], lseGm[progress * tileLength + gmStartOffset],\n                             {static_cast<uint16_t>(1), static_cast<uint32_t>(curLength * sizeof(lseType)), 0, 0, 0},\n                             {true, 0, static_cast<uint8_t>(NUM8 - curLength % NUM8), 0});\n                 if constexpr (std::is_same<outType, float>::value) {\n                     DataCopy(inLocal[curLength * hDim * i],\n-                         inGm[progress * tileLength * hDim + GmStartOffset * hDim],\n+                         inGm[progress * tileLength * hDim + gmStartOffset * hDim],\n                          curLength * hDim);\n                 } else {\n                     uint64_t inLocalFp16OffestAlign32 = curLength * hDim * i * NUM2;\n@@ -179,7 +188,7 @@ private:\n                         inLocalFp16OffestAlign32 += NUM16;\n                     }\n                     DataCopyPad(inLocalFp16[inLocalFp16OffestAlign32 / NUM2],\n-                         inGm[progress * tileLength * hDim + GmStartOffset * hDim],\n+                         inGm[progress * tileLength * hDim + gmStartOffset * hDim],\n                          {static_cast<uint16_t>(1), static_cast<uint32_t>(curLength * hDim * sizeof(outType)), 0, 0, 0},\n                             {true, 0, static_cast<uint8_t>((NUM32 - curLength * hDim * sizeof(outType) % NUM32) / NUM2), 0});\n                     PipeBarrier<PIPE_ALL>();\n@@ -191,6 +200,23 @@ private:\n         inQueueLse.EnQue(lseLocal);\n         inQueueIn.EnQue(inLocal);\n     }\n+\n+    __aicore__ inline void ProcessLseInfReplacement(LocalTensor<float>& lseLocal)\n+    {\n+        LocalTensor<uint8_t> selMask = selMaskBuffer.Get<uint8_t>();\n+        uint32_t alignedCount = ((tileLengthAlig * sp + ELEM_PER_256B - 1) / ELEM_PER_256B) * ELEM_PER_256B;\n+\n+        CompareScalar(selMask, lseLocal, POS_INF, CMPMODE::EQ, alignedCount);\n+        PipeBarrier<PIPE_V>();\n+\n+        LocalTensor<float> negInfTensor = lseexpBuffer.Get<float>();\n+        Duplicate<float>(negInfTensor, NEG_INF, static_cast<int32_t>(tileLengthAlig * sp));\n+        PipeBarrier<PIPE_V>();\n+\n+        Select<float, uint8_t>(lseLocal, selMask, negInfTensor, lseLocal, SELMODE::VSEL_TENSOR_TENSOR_MODE, static_cast<uint32_t>(tileLengthAlig * sp));\n+        PipeBarrier<PIPE_V>();\n+    }\n+\n     __aicore__ inline void Compute(int32_t progress)\n     {\n         LocalTensor<float> lseLocal = inQueueLse.DeQue<float>();\n@@ -202,6 +228,8 @@ private:\n         LocalTensor<float> lseexpBroadcastLocal = lseexpBroadcastBuffer.Get<float>();\n         LocalTensor<float> lseoutLocal = outQueueLse.AllocTensor<float>();\n \n+        ProcessLseInfReplacement(lseLocal);\n+\n         // broad to 8\n         uint32_t curLengthPad = ((curLength + NUM7) / NUM8) * NUM8;\n         const uint32_t srcShape[2] = {sp * curLengthPad, 1};\n@@ -292,24 +320,24 @@ private:\n     {\n         LocalTensor<float> outLocal = outQueueOut.DeQue<float>();\n         if constexpr (std::is_same<outType, float>::value) { // fp32直接搬运\n-            DataCopy(outGm[GmStartOffset * hDim + progress * tileLength * hDim], outLocal, curLength * hDim);\n+            DataCopy(outGm[gmStartOffset * hDim + progress * tileLength * hDim], outLocal, curLength * hDim);\n         } else if constexpr (std::is_same<outType, bfloat16_t>::value){ // 先转fp32，再搬运\n             LocalTensor<outType> outLocal16 = outLocal.template ReinterpretCast<outType>();\n             Cast(outLocal16, outLocal, RoundMode::CAST_RINT, curLength * hDim);\n             PipeBarrier<PIPE_V>();\n-            DataCopyPad(outGm[GmStartOffset * hDim + progress * tileLength * hDim], outLocal16,\n+            DataCopyPad(outGm[gmStartOffset * hDim + progress * tileLength * hDim], outLocal16,\n                         {static_cast<uint16_t>(1), static_cast<uint32_t>(curLength * hDim * sizeof(outType)), 0, 0, 0});\n         } else {\n             LocalTensor<outType> outLocal16 = outLocal.template ReinterpretCast<outType>();\n             Cast(outLocal16, outLocal, RoundMode::CAST_NONE, curLength * hDim);\n             PipeBarrier<PIPE_V>();\n-            DataCopyPad(outGm[GmStartOffset * hDim + progress * tileLength * hDim], outLocal16,\n+            DataCopyPad(outGm[gmStartOffset * hDim + progress * tileLength * hDim], outLocal16,\n                         {static_cast<uint16_t>(1), static_cast<uint32_t>(curLength * hDim * sizeof(outType)), 0, 0, 0});\n         }\n         outQueueOut.FreeTensor(outLocal);\n         LocalTensor<float> lseoutLocal = outQueueLse.DeQue<float>();\n         if (updateType == 1) {\n-            uint32_t lseoutGmStart = GmStartOffset + progress * tileLength; // lseout无hDim维度，直接按长度偏移\n+            uint32_t lseoutGmStart = gmStartOffset + progress * tileLength; // lseout无hDim维度，直接按长度偏移\n             uint32_t validBytes = static_cast<uint32_t>(curLength * sizeof(float));\n             DataCopyExtParams copyParams{1, validBytes, 0, 0, 0};\n             DataCopyPad(lseoutGm[lseoutGmStart], lseoutLocal, copyParams);\n@@ -327,6 +355,7 @@ private:\n     TBuf<QuePosition::VECCALC> lsemaxBuffer;\n     TBuf<QuePosition::VECCALC> lseexpsumBuffer;\n     TBuf<QuePosition::VECCALC> lseexpBroadcastBuffer;\n+    TBuf<QuePosition::VECCALC> selMaskBuffer;\n \n     GlobalTensor<lseType> lseGm;\n     GlobalTensor<outType> inGm;\n@@ -347,7 +376,7 @@ private:\n     uint32_t tileLengthAlig;\n     uint32_t lastLengthAlig;\n     uint32_t totalLength;\n-    uint32_t GmStartOffset;\n+    uint32_t gmStartOffset;\n     uint32_t updateType;\n };\n } // namespace AttentionUpdate\n",
+      "new_file": false,
+      "new_path": "attention/attention_update/op_kernel/decode_update.h",
+      "old_path": "attention/attention_update/op_kernel/decode_update.h",
+      "removed_lines": 18,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/59f06967daf4a3e9e26cfe715977c37d90ad4ad8/attention/attention_update/op_kernel/decode_update.h",
+    "sha": "59f06967daf4a3e9e26cfe715977c37d90ad4ad8",
+    "source_branch": "master",
+    "source_project": {
+      "full_name": "skyqwzw/ops-transformer_attentionupdate_inf",
+      "human_name": "skyqwzw / ops-transformer_attentionupdate_inf",
+      "id": 7954914,
+      "path": "ops-transformer_attentionupdate_inf"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  }
+]

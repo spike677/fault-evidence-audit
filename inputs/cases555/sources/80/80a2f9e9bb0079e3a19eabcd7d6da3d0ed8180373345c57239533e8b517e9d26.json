@@ -1,0 +1,38 @@
+[
+  {
+    "additions": 3,
+    "blob_id": "58b1d686c53624ab7a6b82db0b91f1fbb5b06f35",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/451035a2dfbcbc772c29b16b2b347679a0029414/moe/moe_init_routing_v3/op_kernel/moe_init_routing_v3_apt.cpp",
+    "deletions": 3,
+    "filename": "moe/moe_init_routing_v3/op_kernel/moe_init_routing_v3_apt.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 3,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -196,7 +196,7 @@ extern \"C\" __global__ __aicore__ void moe_init_routing_v3(GM_ADDR x, GM_ADDR exp\n                TILING_KEY_IS(MOE_INIT_ROUTING_V3_SORTMULTICORE_MXFP8QUANT_SCATTER)) {\n         // MXFP8量化。由于MXFP8模板用到的指令不支持DTYPE_X为int8_t等类型，因此需要constexpr-if来规避编译\n         if constexpr ((IsSameType<DTYPE_X, bfloat16_t>::value || IsSameType<DTYPE_X, half>::value) && \n-            (IsSameType<DTYPE_EXPANDED_X, fp8_e4m3fn_t>::value || IsSameType<DTYPE_X, fp8_e5m2_t>::value)) {\n+            (IsSameType<DTYPE_EXPANDED_X, fp8_e4m3fn_t>::value || IsSameType<DTYPE_EXPANDED_X, fp8_e5m2_t>::value)) {\n             TPipe gatherPipe;\n             MoeGatherOutMxfp8Quant<DTYPE_X, DTYPE_EXPANDED_X> gatherMxfp8QuantOp;\n             gatherMxfp8QuantOp.Init(x, scale, userWS, expandedRowIdx, expandedX, expandedScale, t, &gatherPipe);\n@@ -219,7 +219,7 @@ extern \"C\" __global__ __aicore__ void moe_init_routing_v3(GM_ADDR x, GM_ADDR exp\n                TILING_KEY_IS(MOE_INIT_ROUTING_V3_SORTMULTICORE_HIF8_PERTENSOR_QUANT_GATHER) ||\n                TILING_KEY_IS(MOE_INIT_ROUTING_V3_SORTMULTICORE_HIF8_PERTENSOR_QUANT_SCATTER)) {\n         // HIF8 PERTENSOR量化\n-        if constexpr (IsSameType<DTYPE_X, bfloat16_t>::value || IsSameType<DTYPE_X, half>::value) {\n+        if constexpr ((IsSameType<DTYPE_X, bfloat16_t>::value || IsSameType<DTYPE_X, half>::value) && IsSameType<DTYPE_EXPANDED_X, hifloat8_t>::value) {\n             TPipe gatherPipe;\n             MoeGatherOutHif8PertensorQuant<DTYPE_X> gatherHif8PerTensorQuantOp;\n             gatherHif8PerTensorQuantOp.Init(x, scale, userWS, expandedRowIdx, expandedX, t, &gatherPipe);\n@@ -231,7 +231,7 @@ extern \"C\" __global__ __aicore__ void moe_init_routing_v3(GM_ADDR x, GM_ADDR exp\n                TILING_KEY_IS(MOE_INIT_ROUTING_V3_SORTMULTICORE_HIF8_PERTOKEN_QUANT_GATHER) ||\n                TILING_KEY_IS(MOE_INIT_ROUTING_V3_SORTMULTICORE_HIF8_PERTOKEN_QUANT_SCATTER)) {\n         // HIF8 PERTOKENR量化\n-        if constexpr (IsSameType<DTYPE_X, bfloat16_t>::value || IsSameType<DTYPE_X, half>::value) {\n+        if constexpr ((IsSameType<DTYPE_X, bfloat16_t>::value || IsSameType<DTYPE_X, half>::value) && IsSameType<DTYPE_EXPANDED_X, hifloat8_t>::value) {\n             TPipe gatherPipe;\n             MoeGatherOutHif8PertokenQuant<DTYPE_X> gatherHif8PerTokenQuantOp;\n             gatherHif8PerTokenQuantOp.Init(x, userWS, expandedRowIdx, expandedX, expandedScale, t, &gatherPipe);\n",
+      "new_file": false,
+      "new_path": "moe/moe_init_routing_v3/op_kernel/moe_init_routing_v3_apt.cpp",
+      "old_path": "moe/moe_init_routing_v3/op_kernel/moe_init_routing_v3_apt.cpp",
+      "removed_lines": 3,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/451035a2dfbcbc772c29b16b2b347679a0029414/moe/moe_init_routing_v3/op_kernel/moe_init_routing_v3_apt.cpp",
+    "sha": "451035a2dfbcbc772c29b16b2b347679a0029414",
+    "source_branch": "master",
+    "source_project": {
+      "full_name": "zoujiamin123/ops-transformer_mxfp8",
+      "human_name": "zoujiamin123 / ops-transformer_mxfp8",
+      "id": 9360755,
+      "path": "ops-transformer_mxfp8"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  }
+]

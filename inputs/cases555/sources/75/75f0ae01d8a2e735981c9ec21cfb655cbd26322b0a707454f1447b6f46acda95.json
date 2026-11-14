@@ -1,0 +1,83 @@
+{
+  "assignee": {
+    "avatar_url": "https://cdn-img.gitcode.com/cf/ae/9cf77585952a28efa8854ace708c222aeb91bcedbac2b0ea6d700dc23176dcc9.jpg",
+    "html_url": "https://gitcode.com/daiwei18",
+    "id": "6858b31841ba0d21e5b3dc84",
+    "login": "daiwei18",
+    "name": "daiwei18",
+    "object_id": "6858b31841ba0d21e5b3dc84"
+  },
+  "assignees": [
+    {
+      "avatar_url": "https://cdn-img.gitcode.com/cf/ae/9cf77585952a28efa8854ace708c222aeb91bcedbac2b0ea6d700dc23176dcc9.jpg",
+      "html_url": "https://gitcode.com/daiwei18",
+      "id": "6858b31841ba0d21e5b3dc84",
+      "login": "daiwei18",
+      "name": "daiwei18",
+      "object_id": "6858b31841ba0d21e5b3dc84"
+    }
+  ],
+  "body": "Thanks for sending an issue! Please fill in the following template to help quickly solve your problem.\n\n### Describe the current behavior / 问题描述 (Mandatory / 必填)\n\nAscend 950（arch35/A5）上的 DeepNorm 和 DeepNormGrad 实现存在以下与 arch22/A2 计算逻辑不一致或边界保护不足的问题：\n\n1. DeepNorm 全量加载和部分加载路径在归约写入后缺少 `VEC_STORE -> VEC_LOAD` 内存屏障，后续 rstd 计算存在读取未同步数据的风险。\n2. DeepNormGrad 的 backward 多核切分直接使用 `min(numRows, coreNum)`，与 A2 的均衡切分逻辑不一致。\n3. DeepNormGrad 的 FP32 到 FP16 输出转换使用 `CAST_NONE`，且尾块循环中 `remaining` 的更新时机不统一。\n4. backward 和 gamma/beta 路径缺少行、列起始位置的提前返回保护，边界相加存在溢出风险。\n5. Host tiling 未校验展平元素总数及对应字节跨度是否超过 `uint64_t` 范围。\n\n### Environment / 环境信息 (Mandatory / 必填)\n\n- 硬件：Ascend 950（arch35/A5）\n- 对照平台：Atlas A2（arch22）\n- 软件：CANN 算子开发环境，ops-nn master 分支\n- 算子：DeepNorm、DeepNormGrad\n\n### Steps to reproduce the issue / 重现步骤 (Mandatory / 必填)\n\n1. 在 Ascend 950 上执行 DeepNorm 全量加载及 reduce 轴超过 UB 容量的部分加载场景，例如 `(2, 8193)`、`(1, 15361)`，检查归约结果到 rstd 计算之间的数据同步。\n2. 执行 DeepNormGrad 的 FP32/FP16/BF16 尾块和生产规格 tile 用例，例如 `(3, 193)`、`(2, 8193)`、`(5, 1000)`、`(73, 257)`。\n3. 使用 73 行输入验证 backward 多核切分，比较 A5 与 A2 的 `rowsPerCore` 和有效核数。\n4. 构造展平元素总数或字节跨度超过 `uint64_t` 范围的 shape，检查 tiling 是否拒绝输入。\n\n### Describe the expected behavior / 预期结果 (Mandatory / 必填)\n\n- A5 的 DeepNorm/DeepNormGrad 计算逻辑、切核结果和输出精度与 A2 保持一致。\n- 归约写入在 rstd 计算前完成同步，尾块及空闲核不会越界访问。\n- 超大 shape 在 host tiling 阶段返回校验失败，不发生整数溢出。\n\n### Related log / screenshot / 日志 / 截图 (Mandatory / 必填)\n\n修复后的验证结果：\n\n- directed pre-commit：通过\n- OAT：7 个非 CSV 文件，0 个问题\n- DeepNorm Ascend 950 kernel UT：6/6 通过\n- DeepNormGrad Ascend 950 kernel UT：4/4 通过\n- DeepNorm/DeepNormGrad host + infer 组合 UT：34/34 通过\n- TTK Ascend 950 泛化验证：16/16 通过，精度、性能状态和内存检查均通过\n\n### Special notes for this issue/备注 (Optional / 选填)\n\n关联 PR：https://gitcode.com/cann/ops-nn/pull/8165\n",
+  "comments": 0,
+  "created_at": "2026-08-02T15:18:46+08:00",
+  "finished_at": "2026-08-03T19:04:24+08:00",
+  "html_url": "https://gitcode.com/cann/ops-nn/issues/4490",
+  "id": 4212597,
+  "issue_priority_detail": {
+    "id": 116,
+    "title": "无优先级"
+  },
+  "issue_state": "进行中",
+  "issue_state_detail": {
+    "id": 285,
+    "serial": 0,
+    "title": "进行中"
+  },
+  "issue_type": "任务",
+  "issue_type_detail": {
+    "id": 255,
+    "is_system": false,
+    "title": "任务"
+  },
+  "labels": [
+    {
+      "color": "#DB2828",
+      "created_at": "2025-06-10T14:17:23+08:00",
+      "id": 3870,
+      "name": "bug-report",
+      "updated_at": "2026-08-02T15:18:46+08:00"
+    },
+    {
+      "color": "#35e029",
+      "created_at": "2026-03-20T11:25:13+08:00",
+      "id": 38861,
+      "name": "resolved",
+      "updated_at": "2026-08-03T20:36:00+08:00"
+    }
+  ],
+  "number": "4490",
+  "priority": 0,
+  "repository": {
+    "assigner": {},
+    "created_at": "2025-09-27T17:40:34+08:00",
+    "description": "本项目是CANN提供的神经网络类计算算子库，实现网络在NPU上加速计算。",
+    "full_name": "cann/ops-nn",
+    "id": 7665709,
+    "name": "ops-nn",
+    "paas": "",
+    "path": "ops-nn",
+    "updated_at": "2025-09-27T18:09:31+08:00"
+  },
+  "state": "closed",
+  "title": "[Bug-Report|缺陷反馈]: Ascend 950 DeepNorm/DeepNormGrad 与 A2 计算逻辑不一致",
+  "updated_at": "2026-08-03T19:04:24+08:00",
+  "user": {
+    "avatar_url": "https://cdn-img.gitcode.com/cf/ae/9cf77585952a28efa8854ace708c222aeb91bcedbac2b0ea6d700dc23176dcc9.jpg",
+    "html_url": "https://gitcode.com/daiwei18",
+    "id": "6858b31841ba0d21e5b3dc84",
+    "login": "daiwei18",
+    "name": "daiwei18",
+    "object_id": "6858b31841ba0d21e5b3dc84"
+  },
+  "visibility_reason": "public"
+}

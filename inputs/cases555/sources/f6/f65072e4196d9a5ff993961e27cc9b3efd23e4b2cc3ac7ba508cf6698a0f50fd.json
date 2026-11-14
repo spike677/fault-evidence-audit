@@ -1,0 +1,73 @@
+{
+  "assignee": {
+    "html_url": "https://gitcode.com/raoliang_sac",
+    "id": "68c94ebce53de9418257b095",
+    "login": "raoliang_sac",
+    "name": "raoliang_sac",
+    "object_id": "68c94ebce53de9418257b095"
+  },
+  "assignees": [
+    {
+      "html_url": "https://gitcode.com/raoliang_sac",
+      "id": "68c94ebce53de9418257b095",
+      "login": "raoliang_sac",
+      "name": "raoliang_sac",
+      "object_id": "68c94ebce53de9418257b095"
+    }
+  ],
+  "body": "## 问题描述\n\n在 `norm/rms_norm/op_kernel/arch35/rms_norm_regbase_split_d.h` 的 `ComputeFormer` 函数中，stage2 处理非整尾块逻辑时，`level1 += 1` 和 `ComputeMultiLevelReduce` 在 line 182-183 无条件执行，缺少 `if (tail > 0)` 保护。\n\n## 触发条件\n\n当 `colTail` 恰好被 `ubFactor` 整除时（`tail = colTail % ubFactor == 0`），stage2 的两个 if/else-if 分支均不进入，`ComputeSum` 不执行，`level1Local[level1]` 无有效数据。\n\n## 影响\n\n- `level1 += 1` 无条件执行，向归约树写入一个空槽位（初始化为 0.0）\n- `ComputeMultiLevelReduce` 使用错误的 level1 计数执行，导致 level2/level3 读取位置错位\n- 最终 `ComputeMultiLevelRstd` 计算出的 rstd 值不正确\n\n## 对比参考\n\n`norm/add_rms_norm_quant/op_kernel/arch35/add_rms_norm_quant_regbase_split_reduce.h` 的 line 288 已正确使用 `if (tail > 0)` 包裹了相同逻辑。\n\n## 修复方案\n\n将 line 182-183 用 `if (tail > 0)` 包裹：\n\n```cpp\nif (tail > 0) {\n    level1 += 1;\n    ComputeMultiLevelReduce(level1Local, level2Local, level3Local, level1, level2, level3);\n}\n```",
+  "comments": 0,
+  "created_at": "2026-06-05T17:26:59+08:00",
+  "finished_at": "2026-06-13T17:46:02+08:00",
+  "html_url": "https://gitcode.com/cann/ops-nn/issues/3158",
+  "id": 4077597,
+  "issue_priority_detail": {
+    "id": 116,
+    "title": "无优先级"
+  },
+  "issue_state": "进行中",
+  "issue_state_detail": {
+    "id": 285,
+    "serial": 0,
+    "title": "进行中"
+  },
+  "issue_type": "任务",
+  "issue_type_detail": {
+    "id": 255,
+    "is_system": false,
+    "title": "任务"
+  },
+  "labels": [
+    {
+      "color": "#35e029",
+      "created_at": "2026-03-20T11:25:13+08:00",
+      "id": 38861,
+      "name": "resolved",
+      "updated_at": "2026-06-13T18:57:33+08:00"
+    }
+  ],
+  "number": "3158",
+  "priority": 0,
+  "repository": {
+    "assigner": {},
+    "created_at": "2025-09-27T17:40:34+08:00",
+    "description": "本项目是CANN提供的神经网络类计算算子库，实现网络在NPU上加速计算。",
+    "full_name": "cann/ops-nn",
+    "id": 7665709,
+    "name": "ops-nn",
+    "paas": "",
+    "path": "ops-nn",
+    "updated_at": "2025-09-27T18:09:31+08:00"
+  },
+  "state": "closed",
+  "title": "[Bug] rms_norm_regbase_split_d.h: tail==0 时 level1 和 ComputeMultiLevelReduce 无条件执行导致 rstd 计算错误",
+  "updated_at": "2026-06-13T17:46:02+08:00",
+  "user": {
+    "html_url": "https://gitcode.com/raoliang_sac",
+    "id": "68c94ebce53de9418257b095",
+    "login": "raoliang_sac",
+    "name": "raoliang_sac",
+    "object_id": "68c94ebce53de9418257b095"
+  },
+  "visibility_reason": "public"
+}

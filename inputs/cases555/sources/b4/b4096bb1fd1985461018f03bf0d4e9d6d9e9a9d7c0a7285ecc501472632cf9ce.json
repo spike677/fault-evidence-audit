@@ -1,0 +1,38 @@
+[
+  {
+    "additions": 5,
+    "blob_id": "5acf7bb186219b24f29b67d8d4d48ff033a452d9",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/43f7479e5be294fa646a5dc9a4714266c534021d/index/repeat_interleave/op_kernel/arch35/repeat_interleave.h",
+    "deletions": 7,
+    "filename": "index/repeat_interleave/op_kernel/arch35/repeat_interleave.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 5,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -220,12 +220,12 @@ __aicore__ inline void RepeatInterleaveImpl<T, U>::CopyXToMatchOut(int64_t start\n             xOutLocal = xOutQueue_.AllocTensor<T>();\n             xOutQueue_.EnQue(xOutLocal);\n         }\n-        if (copyToMatchOutNum_ > tilingData_.ubFactor - tailRepeatTimes * tilingData_.mergedDims[2]) {\n-            CopyMatchOutToY();\n-            xOutLocal = xOutQueue_.AllocTensor<T>();\n-            xOutQueue_.EnQue(xOutLocal);\n-        }\n         CopyOneCpToRepeatOut(xInLocal, tailRepeatTimes);\n+        CopyMatchOutToY();\n+ \t    if (likely(repeatDimIdx < cpCount - 1)) {\n+ \t        xOutLocal = xOutQueue_.AllocTensor<T>();\n+ \t        xOutQueue_.EnQue(xOutLocal);\n+ \t    }\n         copyFromXNum_ += tilingData_.mergedDims[2];\n     }\n     xInQueue_.FreeTensor(xInLocal);\n@@ -316,12 +316,10 @@ __aicore__ inline void RepeatInterleaveImpl<T, U>::ProcessCpMatchToUb(int64_t st\n         handleStartCpIdx = startCpIdx + loopIdx * mainCpNum;\n         CopyInX(handleStartCpIdx, 0, mainCpNum * tilingData_.mergedDims[2]);\n         CopyXToMatchOut(handleStartCpIdx, mainCpNum);\n-        CopyMatchOutToY();\n     }\n     handleStartCpIdx = startCpIdx + (loopSize - 1) * mainCpNum;\n     CopyInX(handleStartCpIdx, 0, tailCpNum * tilingData_.mergedDims[2]);\n     CopyXToMatchOut(handleStartCpIdx, tailCpNum);\n-    CopyMatchOutToY();\n }\n \n template <typename T, typename U>\n",
+      "new_file": false,
+      "new_path": "index/repeat_interleave/op_kernel/arch35/repeat_interleave.h",
+      "old_path": "index/repeat_interleave/op_kernel/arch35/repeat_interleave.h",
+      "removed_lines": 7,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/43f7479e5be294fa646a5dc9a4714266c534021d/index/repeat_interleave/op_kernel/arch35/repeat_interleave.h",
+    "sha": "43f7479e5be294fa646a5dc9a4714266c534021d",
+    "source_branch": "repeat90",
+    "source_project": {
+      "full_name": "yourealize/ops-nn",
+      "human_name": "yourealize / ops-nn",
+      "id": 8853379,
+      "path": "ops-nn"
+    },
+    "target_branch": "9.0.0",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  }
+]

@@ -1,0 +1,73 @@
+{
+  "assignee": {
+    "html_url": "https://gitcode.com/huang-chuhong",
+    "id": "68771b9430980b376fba17a0",
+    "login": "huang-chuhong",
+    "name": "huang-chuhong",
+    "object_id": "68771b9430980b376fba17a0"
+  },
+  "assignees": [
+    {
+      "html_url": "https://gitcode.com/huang-chuhong",
+      "id": "68771b9430980b376fba17a0",
+      "login": "huang-chuhong",
+      "name": "huang-chuhong",
+      "object_id": "68771b9430980b376fba17a0"
+    }
+  ],
+  "body": "### Describe the current behavior / 问题描述 (Mandatory / 必填)\nTND格式下空kv batch(S_q>0但S_kv=0)散布在batch中间时，FlashAttentionScore算子精度失败，6个非空batch的max_abs_err高达4.7。\n\n### Environment / 环境信息 (Mandatory / 必填)\nascend950 (arch35)\n\n### Steps to reproduce the issue / 重现步骤 (Mandatory / 必填)\n1. 构造B=153的TND格式输入，其中75个batch存在S_q>0但S_kv=0的空kv场景，空batch散布在中间（非尾部）\n2. 调用npu_fusion_attention_v2，input_layout=\"TND\"，pre_tokens=65536，next_tokens=65536\n3. 对比CPU golden，6个非空batch精度失败，错误集中在query序列末尾\n\n### Describe the expected behavior / 预期结果 (Mandatory / 必填)\n所有非空batch精度通过（pass_rate>=99.5%），空kv batch输出为0。\n\n### Related log / screenshot / 日志 / 截图 (Mandatory / 必填)\nprintf日志显示：空kv batch的s2LoopLimit=-1导致内层循环不执行、taskId不递增，流水线buffer中滞留的BMM1结果被后续batch覆盖。\n\n### Special notes for this issue/备注 (Optional / 选填)\n根因：空kv batch的s1块被计入totalSize参与多核分配，但kernel遇到s2LoopLimit=-1跳过内层循环，流水线BMM1结果被覆盖。\n修复：tiling和kernel中跳过空kv batch的s1块计数，保留偏移累积。\n关联PR: 9414",
+  "comments": 3,
+  "created_at": "2026-07-31T11:46:22+08:00",
+  "finished_at": "2026-08-12T16:44:38+08:00",
+  "html_url": "https://gitcode.com/cann/ops-transformer/issues/4041",
+  "id": 4209074,
+  "issue_priority_detail": {
+    "id": 116,
+    "title": "无优先级"
+  },
+  "issue_state": "进行中",
+  "issue_state_detail": {
+    "id": 285,
+    "serial": 0,
+    "title": "进行中"
+  },
+  "issue_type": "任务",
+  "issue_type_detail": {
+    "id": 255,
+    "is_system": false,
+    "title": "任务"
+  },
+  "labels": [
+    {
+      "color": "#35e029",
+      "created_at": "2026-03-20T11:25:13+08:00",
+      "id": 38861,
+      "name": "resolved",
+      "updated_at": "2026-08-12T17:28:43+08:00"
+    }
+  ],
+  "number": "4041",
+  "priority": 0,
+  "repository": {
+    "assigner": {},
+    "created_at": "2025-09-28T17:54:46+08:00",
+    "description": "本项目是CANN提供的transformer类大模型算子库，实现网络在NPU上加速计算。",
+    "full_name": "cann/ops-transformer",
+    "id": 7673863,
+    "name": "ops-transformer",
+    "paas": "",
+    "path": "ops-transformer",
+    "updated_at": "2025-09-28T18:06:48+08:00"
+  },
+  "state": "closed",
+  "title": "[Bug-Report|缺陷反馈]: TND格式下空kv batch散布中间导致FlashAttentionScore精度失败",
+  "updated_at": "2026-08-12T16:44:38+08:00",
+  "user": {
+    "html_url": "https://gitcode.com/huang-chuhong",
+    "id": "68771b9430980b376fba17a0",
+    "login": "huang-chuhong",
+    "name": "huang-chuhong",
+    "object_id": "68771b9430980b376fba17a0"
+  },
+  "visibility_reason": "public"
+}

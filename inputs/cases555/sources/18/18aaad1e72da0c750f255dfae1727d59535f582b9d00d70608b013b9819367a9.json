@@ -1,0 +1,110 @@
+[
+  {
+    "additions": 76,
+    "blob_id": "5942a4b1970438c277a348b4985c5304befa7536",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/5cb07b534745dd050b1523fc9a3a761ba5293d29/matmul/common/op_host/op_api/matmul_util.cpp",
+    "deletions": 66,
+    "filename": "matmul/common/op_host/op_api/matmul_util.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 76,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -722,21 +722,32 @@ bool CheckNonContiguousShapeSupport(MmOpInfo& mmOpInfo)\n }\n \n /*\n-   判断Tensor是否满足非连续Slice\n+   判断是否满足左矩阵非连续Slice\n */\n-bool IsSliceNonContiguous(const aclTensor* tensor)\n+bool IsSliceNonContiguous(const aclTensor* self, const aclTensor* mat2)\n {\n-    if (!IsUseNonContiguous(tensor)) {\n+    if (!IsUseNonContiguous(self)) {\n         return false;\n     }\n-    int64_t dimNum = tensor->GetViewShape().GetDimNum();\n+    // 不支持NZ\n+    if (mat2->GetStorageFormat() == op::Format::FORMAT_FRACTAL_NZ ||\n+        self->GetStorageFormat() == op::Format::FORMAT_FRACTAL_NZ) {\n+        OP_LOGI(\"Format NZ is not supported for slice.\");\n+        return false;\n+    }\n+    // slice场景下，增加dtype判断，仅支持左右矩阵dtype相同\n+    if (self->GetDataType() != mat2->GetDataType()) {\n+        OP_LOGI(\"The data type of the self does not match the type of mat2 for slice\");\n+        return false;\n+    }\n+    int64_t dimNum = self->GetViewShape().GetDimNum();\n     if (dimNum != 3) { // only support 2D or 3D\n         return false;\n     }\n-    const auto& viewStrides = tensor->GetViewStrides();\n-    const auto& viewShape = tensor->GetViewShape();\n-    auto viewOffset = tensor->GetViewOffset();\n-    auto storageSize = tensor->GetStorageShape().GetShapeSize();\n+    const auto& viewStrides = self->GetViewStrides();\n+    const auto& viewShape = self->GetViewShape();\n+    auto viewOffset = self->GetViewOffset();\n+    auto storageSize = self->GetStorageShape().GetShapeSize();\n     // Validate view params\n     if (dimNum != static_cast<int64_t>(viewStrides.size()) || storageSize <= 0) {\n         return false;\n@@ -1089,7 +1100,7 @@ const aclTensor* ExecMmOpWithBias(\n     CHECK_RET(mat2 != nullptr, nullptr);\n     CHECK_RET(CheckDtypeValid(self, mat2, bias, nullptr, cubeMathType), nullptr);\n     // 左输入矩阵非连续\n-    bool isSelfSlice = IsSliceNonContiguous(self);\n+    bool isSelfSlice = IsSliceNonContiguous(self, mat2);\n     CHECK_RET(CheckShapeValid(self, mat2, transposeX2, isSelfSlice), nullptr);\n     CHECK_RET(CheckMathType(self, mat2, cubeMathType), nullptr);\n     // 空Tensor处理逻辑\n@@ -1104,22 +1115,38 @@ const aclTensor* ExecMmOpWithBias(\n     MmOpInfo mmOpInfo = GetMatmulOpInfo(self, mat2, cubeMathType, isSelfSlice);\n     // weightNZ转置属性刷新\n     mmOpInfo.shapeInfo.transposeX2 = mmOpInfo.shapeInfo.transposeX2 || transposeX2;\n+    bool needFoldBatch = false;\n     // 校验非连续Slice场景shape\n-    if (isSelfSlice) {\n-        // 不支持NZ\n-        if (mat2->GetStorageFormat() == op::Format::FORMAT_FRACTAL_NZ ||\n-            self->GetStorageFormat() == op::Format::FORMAT_FRACTAL_NZ) {\n-            OP_LOGI(\"format NZ is not supported for slice.\");\n-            isSelfSlice = false;\n-        }\n-        // check shape\n-        if (!CheckNonContiguousShapeSupport(mmOpInfo)) {\n-            OP_LOGI(\"shape is not supported for slice.\");\n-            isSelfSlice = false;\n-        }\n+    if (isSelfSlice && !CheckNonContiguousShapeSupport(mmOpInfo)) {\n+        OP_LOGI(\"Curruent shape is not supported for slice.\");\n+        isSelfSlice = false;\n+        needFoldBatch = true;\n     }\n     // 非ND转ND\n-    if (!isSelfSlice) {\n+    auto selfCastOut = self;\n+    if (isSelfSlice) {\n+        // 刷新oriShape\n+        selfCastOut = executor->CreateView(\n+            self, self->GetViewShape(), self->GetStorageShape(), self->GetViewStrides(), self->GetViewOffset());\n+        CHECK_RET(selfCastOut != nullptr, nullptr);\n+        // 非ND修改format为ND\n+        selfCastOut = SetTensorToNDFormat(selfCastOut);\n+    } else {\n+        // 转连续\n+        bool selfCastRes = ContiguousAndCast(\n+            self, selfCastOut, mmOpInfo.shapeInfo.transposeX1, mmOpInfo.support_info.self_dtype, executor);\n+        CHECK_RET(selfCastRes, nullptr);\n+        // 再次合并batch和M\n+        if (needFoldBatch) {\n+            // Fold the batch into the first dimension\n+            auto dimTensor1 = selfCastOut->GetViewShape().GetDimNum();\n+            op::Shape shape{-1, selfCastOut->GetViewShape().GetDim(dimTensor1 - 1)};\n+            selfCastOut = l0op::Reshape(selfCastOut, shape, executor);\n+            CHECK_RET(selfCastOut != nullptr, nullptr);\n+            // 更新m n k\n+            mmOpInfo = GetMatmulOpInfo(self, mat2, cubeMathType, isSelfSlice);\n+        }\n+        // reformat为ND\n         self = l0op::ReFormat(self, op::Format::FORMAT_ND);\n         CHECK_RET(self != nullptr, nullptr);\n         if (mat2->GetStorageFormat() != op::Format::FORMAT_FRACTAL_NZ) {\n@@ -1136,21 +1163,6 @@ const aclTensor* ExecMmOpWithBias(\n         CHECK_RET(contiguousBias != nullptr, nullptr);\n     }\n \n-    auto selfCastOut = self;\n-    if (isSelfSlice) {\n-        // 刷新oriShape\n-        selfCastOut = executor->CreateView(\n-            self, self->GetViewShape(), self->GetStorageShape(), self->GetViewStrides(), self->GetViewOffset());\n-        CHECK_RET(selfCastOut != nullptr, nullptr);\n-        // 非ND修改format为ND\n-        selfCastOut = SetTensorToNDFormat(selfCastOut);\n-    } else {\n-        // 转连续\n-        bool selfCastRes = ContiguousAndCast(\n-            self, selfCastOut, mmOpInfo.shapeInfo.transposeX1, mmOpInfo.support_info.self_dtype, executor);\n-        CHECK_RET(selfCastRes, nullptr);\n-    }\n-\n     auto mat2CastOut = mat2;\n     auto mat2StorageShape = mat2->GetStorageShape();\n     bool mat2CastRes = ContiguousAndCast(\n@@ -1233,7 +1245,7 @@ const aclTensor* MatmulCommonProcess (\n   */\n \n     // 左输入矩阵非连续\n-    bool isSelfSlice = IsSliceNonContiguous(self);\n+    bool isSelfSlice = IsSliceNonContiguous(self, mat2);\n     CHECK_RET(CheckShapeValid(self, mat2, transposeX2, isSelfSlice), nullptr);\n \n     // 空Tensor处理逻辑\n@@ -1251,36 +1263,13 @@ const aclTensor* MatmulCommonProcess (\n \n     // weightNZ转置属性刷新\n     mmOpInfo.shapeInfo.transposeX2 = mmOpInfo.shapeInfo.transposeX2 || transposeX2;\n+    bool needFoldBatch = false;\n     // 校验非连续Slice场景shape\n-    if (isSelfSlice) {\n-        // 不支持NZ\n-        if (mat2->GetStorageFormat() == op::Format::FORMAT_FRACTAL_NZ ||\n-            self->GetStorageFormat() == op::Format::FORMAT_FRACTAL_NZ) {\n-            OP_LOGI(\"format NZ is not supported for slice.\");\n-            isSelfSlice = false;\n-        }\n-        // check shape\n-        if (!CheckNonContiguousShapeSupport(mmOpInfo)) {\n-            OP_LOGI(\"shape is not supported for slice.\");\n-            isSelfSlice = false;\n-        }\n-        // slice场景下，增加dtype判断，仅支持左右矩阵dtype相同\n-        if (self->GetDataType() != mat2->GetDataType()) {\n-            OP_LOGI(\"The data type of the self does not match the type of mat2 for slice\");\n-            isSelfSlice = false;\n-        }\n+    if (isSelfSlice && !CheckNonContiguousShapeSupport(mmOpInfo)) {\n+        OP_LOGI(\"Curruent shape is not supported for slice.\");\n+        isSelfSlice = false;\n+        needFoldBatch = true;\n     }\n-    // 非ND转ND\n-    if (!isSelfSlice) {\n-        self = l0op::ReFormat(self, op::Format::FORMAT_ND);\n-        CHECK_RET(self != nullptr, nullptr);\n-        if (mat2->GetStorageFormat() != op::Format::FORMAT_FRACTAL_NZ) {\n-            OP_LOGI(\"mat2 StorageFormat not FORMAT_FRACTAL_NZ.\");\n-            mat2 = l0op::ReFormat(mat2, op::Format::FORMAT_ND);\n-            CHECK_RET(mat2 != nullptr, nullptr);\n-        }\n-    }\n-    OP_LOGI(\"mat2 origin storage shape is  [%s].\", op::ToString(mat2->GetStorageShape()).GetString());\n     // 左输入非连续转连续\n     auto selfCastOut = self;\n     if (isSelfSlice) {\n@@ -1295,7 +1284,28 @@ const aclTensor* MatmulCommonProcess (\n         bool selfCastRes = ContiguousAndCast(\n             self, selfCastOut, mmOpInfo.shapeInfo.transposeX1, mmOpInfo.support_info.self_dtype, executor);\n         CHECK_RET(selfCastRes, nullptr);\n+        // 再次合并batch和M\n+        if (needFoldBatch) {\n+            // Fold the batch into the first dimension\n+            auto dimTensor1 = selfCastOut->GetViewShape().GetDimNum();\n+            op::Shape shape{-1, selfCastOut->GetViewShape().GetDim(dimTensor1 - 1)};\n+            selfCastOut = l0op::Reshape(selfCastOut, shape, executor);\n+            CHECK_RET(selfCastOut != nullptr, nullptr);\n+            // 更新m n k\n+            aclnnStatus result = CreateMatmulOpInfo(selfCastOut, mat2, bias, out, cubeMathType, mmOpInfo, isSelfSlice);\n+            CHECK_RET(result == ACLNN_SUCCESS, nullptr);\n+        }\n+        // reformat为ND\n+        self = l0op::ReFormat(self, op::Format::FORMAT_ND);\n+        CHECK_RET(self != nullptr, nullptr);\n+        if (mat2->GetStorageFormat() != op::Format::FORMAT_FRACTAL_NZ) {\n+            OP_LOGI(\"mat2 StorageFormat not FORMAT_FRACTAL_NZ.\");\n+            mat2 = l0op::ReFormat(mat2, op::Format::FORMAT_ND);\n+            CHECK_RET(mat2 != nullptr, nullptr);\n+        }\n     }\n+    OP_LOGI(\"mat2 origin storage shape is  [%s].\", op::ToString(mat2->GetStorageShape()).GetString());\n+\n     auto mat2CastOut = mat2;\n     auto mat2StorageShape = mat2->GetStorageShape();\n     bool mat2CastRes = ContiguousAndCast(\n",
+      "new_file": false,
+      "new_path": "matmul/common/op_host/op_api/matmul_util.cpp",
+      "old_path": "matmul/common/op_host/op_api/matmul_util.cpp",
+      "removed_lines": 66,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/5cb07b534745dd050b1523fc9a3a761ba5293d29/matmul/common/op_host/op_api/matmul_util.cpp",
+    "sha": "5cb07b534745dd050b1523fc9a3a761ba5293d29",
+    "source_branch": "slice_matmul",
+    "source_project": {
+      "full_name": "sxb154714/ops-nn",
+      "human_name": "sxb154714 / ops-nn",
+      "id": 9038874,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 1,
+    "blob_id": "cbbcecd55f750d89e04ebbcd2f917ee4748e3aae",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/5cb07b534745dd050b1523fc9a3a761ba5293d29/matmul/common/op_host/op_api/matmul_util.h",
+    "deletions": 1,
+    "filename": "matmul/common/op_host/op_api/matmul_util.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 1,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -89,7 +89,7 @@ bool IsTransposeLastTwoDims(const aclTensor* tensor);\n bool CheckGemmV3Support(const aclTensor* mat1, const aclTensor* mat2, MmOpInfo& mmOpInfo,\n                                       int8_t cubeMathType);\n \n-bool IsSliceNonContiguous(const aclTensor* tensor);\n+bool IsSliceNonContiguous(const aclTensor* tensor, const aclTensor* mat2);\n \n bool IsTransposeNonContiguous(const aclTensor* tensor, bool& isNeedSwapInnerTwoDim);\n \n",
+      "new_file": false,
+      "new_path": "matmul/common/op_host/op_api/matmul_util.h",
+      "old_path": "matmul/common/op_host/op_api/matmul_util.h",
+      "removed_lines": 1,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/5cb07b534745dd050b1523fc9a3a761ba5293d29/matmul/common/op_host/op_api/matmul_util.h",
+    "sha": "5cb07b534745dd050b1523fc9a3a761ba5293d29",
+    "source_branch": "slice_matmul",
+    "source_project": {
+      "full_name": "sxb154714/ops-nn",
+      "human_name": "sxb154714 / ops-nn",
+      "id": 9038874,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 951,
+    "blob_id": "e0494235fc8700c5a370e997b15a180ef65f524a",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/5cb07b534745dd050b1523fc9a3a761ba5293d29/matmul/mat_mul_v3/op_host/op_api/aclnn_matmul.cpp",
+    "deletions": 951,
+    "filename": "matmul/mat_mul_v3/op_host/op_api/aclnn_matmul.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 951,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "The file is empty",
+      "new_file": false,
+      "new_path": "matmul/mat_mul_v3/op_host/op_api/aclnn_matmul.cpp",
+      "old_path": "matmul/mat_mul_v3/op_host/op_api/aclnn_matmul.cpp",
+      "removed_lines": 951,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/5cb07b534745dd050b1523fc9a3a761ba5293d29/matmul/mat_mul_v3/op_host/op_api/aclnn_matmul.cpp",
+    "sha": "5cb07b534745dd050b1523fc9a3a761ba5293d29",
+    "source_branch": "slice_matmul",
+    "source_project": {
+      "full_name": "sxb154714/ops-nn",
+      "human_name": "sxb154714 / ops-nn",
+      "id": 9038874,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  }
+]

@@ -1,0 +1,146 @@
+[
+  {
+    "additions": 3,
+    "blob_id": "7ef5eaf495440cec5c83f5f46ad4dd3767767fdd",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/649b3f3bdd97934f559856dde52ac5e235779f6e/attention/common/op_kernel/arch35/flash_attention_score_block_vec_base.h",
+    "deletions": 3,
+    "filename": "attention/common/op_kernel/arch35/flash_attention_score_block_vec_base.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 3,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -277,13 +277,13 @@ __aicore__ inline void FABlockVecBase<TEMPLATE_BASE_ARGS>::ProcessVec1Dn(\n     float descaleQK = 1.0;\n     if constexpr (isFp8) {\n         int64_t deScaleQOffset = 0;\n-        if (layout == LayOutTypeEnum::LAYOUT_NTD) {\n+        if constexpr (layout == LayOutTypeEnum::LAYOUT_NTD) {\n             int64_t s1BlockCnt = constInfo.t1Size / FP8_QUANT_BLOCK_SIZE + constInfo.bSize; // Q的反量化scale内容在Gm中的偏移 原始shape为 [N2, G,T // 128 + B, 1]\n             int64_t s2BlockCnt = constInfo.t2Size / FP8_QUANT_KV_BLOCK_SIZE + constInfo.bSize; // KV的反量化scale内容在Gm中的偏移 原始shape为 [N2, G, T // 256 + B, 1]\n             deScaleQOffset = runInfo.n2oIdx * constInfo.gSize * s1BlockCnt +\n-                                    runInfo.goIdx * s1BlockCnt + (runInfo.s1SizeAcc >> 7) + runInfo.s1oIdx;\n+                                    runInfo.goIdx * s1BlockCnt + runInfo.s1ScaleNumAcc + runInfo.s1oIdx;\n             runInfo.deScaleKvOffset = runInfo.n2oIdx * s2BlockCnt +\n-                                    (runInfo.s2SizeAcc >> 8) + runInfo.s2LoopCount; // 8 ：按照256分块计算deScaleKv偏移\n+                                    runInfo.s2ScaleNumAcc + runInfo.s2LoopCount; // 8 ：按照256分块计算deScaleKv偏移\n         } else {\n             int64_t s1BlockCnt = CeilDiv(constInfo.s1Size, FP8_QUANT_BLOCK_SIZE); // Q的反量化scale内容在Gm中的偏移 原始shape为 [B, N2, G, Ceil(S1, 128), 1]\n             int64_t s2BlockCnt = CeilDiv(constInfo.s2Size, FP8_QUANT_KV_BLOCK_SIZE); // KV的反量化scale内容在Gm中的偏移 原始shape为 [B, N2, G, Ceil(S2, 256), 1]\n",
+      "new_file": false,
+      "new_path": "attention/common/op_kernel/arch35/flash_attention_score_block_vec_base.h",
+      "old_path": "attention/common/op_kernel/arch35/flash_attention_score_block_vec_base.h",
+      "removed_lines": 3,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/649b3f3bdd97934f559856dde52ac5e235779f6e/attention/common/op_kernel/arch35/flash_attention_score_block_vec_base.h",
+    "sha": "649b3f3bdd97934f559856dde52ac5e235779f6e",
+    "source_branch": "master",
+    "source_project": {
+      "full_name": "yangxh1203/ops-transformer",
+      "human_name": "yangxh1203 / ops-transformer",
+      "id": 9026771,
+      "path": "ops-transformer"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  },
+  {
+    "additions": 4,
+    "blob_id": "0f51831bad31b3951dcd2c0923679b2fb88c12af",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/649b3f3bdd97934f559856dde52ac5e235779f6e/attention/common/op_kernel/arch35/flash_attention_score_kernel_base.h",
+    "deletions": 0,
+    "filename": "attention/common/op_kernel/arch35/flash_attention_score_kernel_base.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 4,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -127,6 +127,8 @@ public:\n     uint64_t s1OuterSizeAcc;\n     uint64_t s1SizeAcc;\n     uint64_t s2SizeAcc;\n+    uint64_t s1ScaleNumAcc;\n+    uint64_t s2ScaleNumAcc;\n \n     // prefix\n     int64_t actualKVPrefixLen = 0;\n@@ -609,6 +611,8 @@ __aicore__ inline void FlashAttentionScoreKernelBase<ChildClass, CubeBlockType,\n     }\n     if constexpr (layout == LayOutTypeEnum::LAYOUT_TND || layout == LayOutTypeEnum::LAYOUT_NTD) {\n         runInfo.boIdx = runParam.boIdx;\n+        runInfo.s1ScaleNumAcc = s1ScaleNumAcc;\n+        runInfo.s2ScaleNumAcc = s2ScaleNumAcc;\n         runInfo.s1SizeAcc = s1SizeAcc;\n         runInfo.s2SizeAcc = s2SizeAcc;\n     } else {\n",
+      "new_file": false,
+      "new_path": "attention/common/op_kernel/arch35/flash_attention_score_kernel_base.h",
+      "old_path": "attention/common/op_kernel/arch35/flash_attention_score_kernel_base.h",
+      "removed_lines": 0,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/649b3f3bdd97934f559856dde52ac5e235779f6e/attention/common/op_kernel/arch35/flash_attention_score_kernel_base.h",
+    "sha": "649b3f3bdd97934f559856dde52ac5e235779f6e",
+    "source_branch": "master",
+    "source_project": {
+      "full_name": "yangxh1203/ops-transformer",
+      "human_name": "yangxh1203 / ops-transformer",
+      "id": 9026771,
+      "path": "ops-transformer"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  },
+  {
+    "additions": 14,
+    "blob_id": "13dd9687f63a3a4ecd47dc79420639a28b814493",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/649b3f3bdd97934f559856dde52ac5e235779f6e/attention/common/op_kernel/arch35/flash_attention_score_kernel_infer.h",
+    "deletions": 11,
+    "filename": "attention/common/op_kernel/arch35/flash_attention_score_kernel_infer.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 14,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -280,20 +280,23 @@ template <typename CubeBlockType, typename VecBlockType>\n __aicore__ inline void FlashAttentionScoreKernelInfer<CubeBlockType, VecBlockType>::ComputeAxisIdxByBnAndGs1(\n     int64_t bnIndex, int64_t gS1Index, RunParamStr<isInfer> &runParam)\n {\n+    constexpr uint64_t fp8QBlockSize = 128U; // 128 is SOuterSize\n+    constexpr uint64_t fp8KvBlockSize = 256U; // 256 is SInnerSize\n     if constexpr (layout == LayOutTypeEnum::LAYOUT_NTD) {\n-        if (runParam.boIdx == 0) {\n-            this->s1SizeAcc = 0;\n-            this->s2SizeAcc = 0;\n+        if (runParam.boIdx == 0 || runParam.boIdx == 1) {\n+            this->s1ScaleNumAcc = runParam.boIdx == 0 ? 0 : CeilDiv(this->actualSeqQlenAddr[0], fp8QBlockSize);\n+            this->s2ScaleNumAcc = runParam.boIdx == 0 ? 0 : CeilDiv(this->actualSeqKvlenAddr[0], fp8KvBlockSize);\n+            this->s1SizeAcc = runParam.boIdx == 0 ? 0 : this->actualSeqQlenAddr[0];\n+            this->s2SizeAcc = runParam.boIdx == 0 ? 0 : this->actualSeqKvlenAddr[0];\n         } else {\n-            this->s1SizeAcc = this->actualSeqQlenAddr[runParam.boIdx - 1];\n-            if constexpr (isPa) {\n-                this->s2SizeAcc = 0;\n-                for (uint32_t boIdx = 0; boIdx < runParam.boIdx; boIdx++) {\n-                    this->s2SizeAcc += this->actualSeqKvlenAddr[boIdx];\n-                }\n-            } else {\n-                this->s2SizeAcc = this->actualSeqKvlenAddr[runParam.boIdx - 1];\n+            this->s1ScaleNumAcc = CeilDiv(this->actualSeqQlenAddr[0], fp8QBlockSize);\n+            this->s2ScaleNumAcc = CeilDiv(this->actualSeqKvlenAddr[0], fp8KvBlockSize);\n+            for (uint32_t boIdx = 1; boIdx < runParam.boIdx; boIdx++) {\n+                this->s1ScaleNumAcc += CeilDiv(this->actualSeqQlenAddr[boIdx] - this->actualSeqQlenAddr[boIdx - 1], fp8QBlockSize);\n+                this->s2ScaleNumAcc += CeilDiv(this->actualSeqKvlenAddr[boIdx] - this->actualSeqKvlenAddr[boIdx - 1], fp8KvBlockSize);\n             }\n+            this->s1SizeAcc = this->actualSeqQlenAddr[runParam.boIdx - 1];\n+            this->s2SizeAcc = this->actualSeqKvlenAddr[runParam.boIdx - 1];\n         }\n     }\n     // GS1合轴时，g轴信息包含在gS1中；GS1不合轴时，g轴信息包含在bn2g中；\n",
+      "new_file": false,
+      "new_path": "attention/common/op_kernel/arch35/flash_attention_score_kernel_infer.h",
+      "old_path": "attention/common/op_kernel/arch35/flash_attention_score_kernel_infer.h",
+      "removed_lines": 11,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/649b3f3bdd97934f559856dde52ac5e235779f6e/attention/common/op_kernel/arch35/flash_attention_score_kernel_infer.h",
+    "sha": "649b3f3bdd97934f559856dde52ac5e235779f6e",
+    "source_branch": "master",
+    "source_project": {
+      "full_name": "yangxh1203/ops-transformer",
+      "human_name": "yangxh1203 / ops-transformer",
+      "id": 9026771,
+      "path": "ops-transformer"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  },
+  {
+    "additions": 2,
+    "blob_id": "ba106fb866267eeec5858515f8ba660077a3c04b",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/649b3f3bdd97934f559856dde52ac5e235779f6e/attention/common/op_kernel/arch35/util_regbase.h",
+    "deletions": 0,
+    "filename": "attention/common/op_kernel/arch35/util_regbase.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 2,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -165,6 +165,8 @@ struct RunParamStr<true> {  // 分核与切块需要使用到参数\n     int64_t multiCoreInnerIdx = 0; \\\n     \\\n     int64_t attentionOutOffset; \\\n+    uint64_t s1ScaleNumAcc; \\\n+    uint64_t s2ScaleNumAcc; \\\n     int64_t s1SizeAcc; /* 对于非TND场景 = boIdx * pseInfo.s2Size; TND场景等于前面boIdx个batch的s2之和（每个batch的s2不同）*/ \\\n     int64_t s2SizeAcc; /* 对于非TND场景 = boIdx * pseInfo.s2Size; TND场景等于前面boIdx个batch的s2之和（每个batch的s2不同）*/ \\\n     int64_t actualS1Size; /* 非TND场景=总s1Size, Tnd场景下当前batch对应的s1 */ \\\n",
+      "new_file": false,
+      "new_path": "attention/common/op_kernel/arch35/util_regbase.h",
+      "old_path": "attention/common/op_kernel/arch35/util_regbase.h",
+      "removed_lines": 0,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/649b3f3bdd97934f559856dde52ac5e235779f6e/attention/common/op_kernel/arch35/util_regbase.h",
+    "sha": "649b3f3bdd97934f559856dde52ac5e235779f6e",
+    "source_branch": "master",
+    "source_project": {
+      "full_name": "yangxh1203/ops-transformer",
+      "human_name": "yangxh1203 / ops-transformer",
+      "id": 9026771,
+      "path": "ops-transformer"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  }
+]

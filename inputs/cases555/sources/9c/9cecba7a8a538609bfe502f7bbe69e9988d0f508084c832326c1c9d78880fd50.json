@@ -1,0 +1,76 @@
+{
+  "assignee": {
+    "avatar_url": "https://cdn-img.gitcode.com/ac/ae/1ac30a43e7e5c7ebf6339c15d1b51a15c9d96b23e7e2ea2816fcd63c2e92394d.jpg",
+    "html_url": "https://gitcode.com/PerrySkywalker",
+    "id": "682abf2a709a492cad560617",
+    "login": "PerrySkywalker",
+    "name": "PerrySkywalker",
+    "object_id": "682abf2a709a492cad560617"
+  },
+  "assignees": [
+    {
+      "avatar_url": "https://cdn-img.gitcode.com/ac/ae/1ac30a43e7e5c7ebf6339c15d1b51a15c9d96b23e7e2ea2816fcd63c2e92394d.jpg",
+      "html_url": "https://gitcode.com/PerrySkywalker",
+      "id": "682abf2a709a492cad560617",
+      "login": "PerrySkywalker",
+      "name": "PerrySkywalker",
+      "object_id": "682abf2a709a492cad560617"
+    }
+  ],
+  "body": "### Describe the current behavior / 问题描述 (Mandatory / 必填)\nFlashAttention BAND 模式 (mask_mode=4) 下，MergeMask 函数中 halfS1RealSizeLoop = halfS1RealSize + 1 在 s2BaseSize >= regBytes (rowNumEachLoop=1) 时导致 loopCount 多 1，MergeBand 多写 1 整行 (s2BaseSize bytes) 到 attenMaskUb buffer 之外，越界覆盖相邻 UB buffer 数据，mask 被破坏后未 mask 的 key 参与 softmax 产生异常大值（MaxAbsErr=182），精度验证失败。\n\n### Environment / 环境信息 (Mandatory / 必填)\nascend950\n\n### Steps to reproduce the issue / 重现步骤 (Mandatory / 必填)\n1. 构造 case：B=1 N1=20 N2=4 S1=31 S2=112384 D=128 mask_mode=4 win_left=26755 win_right=0 layout_kv=PA_BNBD block_size=512\n2. 运行精度测试：python test_flash_attn.py --case_id BAND_PA_BNBD_01\n3. 观察输出：MaxAbsErr=182.42, FailRatio=1.67%, FAIL\n\n### Describe the expected behavior / 预期结果 (Mandatory / 必填)\nMaxAbsErr < 0.01, FailRatio < 0.5%, PASS\n\n### Related log / screenshot / 日志 / 截图 (Mandatory / 必填)\n修复前：MaxAbsErr=182.42 FailRatio=1.67% FAIL\n修复后：MaxAbsErr=0.00225 FailRatio=0.38% PASS\n\n### Special notes for this issue/备注 (Optional / 选填)\n修复方案：将 halfS1RealSizeLoop = halfS1RealSize + 1 改为 ceil 除法 (halfS1RealSizeLoop + rowNumEachLoop - 1) / rowNumEachLoop * rowNumTimesEachLoop，在所有 s2BaseSize 下正确计算 loopCount。\n关联PR: #9114 (master), #9117 (9.1.0)",
+  "comments": 1,
+  "created_at": "2026-07-24T15:22:17+08:00",
+  "finished_at": "2026-07-25T19:49:07+08:00",
+  "html_url": "https://gitcode.com/cann/ops-transformer/issues/3923",
+  "id": 4191400,
+  "issue_priority_detail": {
+    "id": 116,
+    "title": "无优先级"
+  },
+  "issue_state": "进行中",
+  "issue_state_detail": {
+    "id": 285,
+    "serial": 0,
+    "title": "进行中"
+  },
+  "issue_type": "任务",
+  "issue_type_detail": {
+    "id": 255,
+    "is_system": false,
+    "title": "任务"
+  },
+  "labels": [
+    {
+      "color": "#35e029",
+      "created_at": "2026-03-20T11:25:13+08:00",
+      "id": 38861,
+      "name": "resolved",
+      "updated_at": "2026-07-25T20:58:38+08:00"
+    }
+  ],
+  "number": "3923",
+  "priority": 0,
+  "repository": {
+    "assigner": {},
+    "created_at": "2025-09-28T17:54:46+08:00",
+    "description": "本项目是CANN提供的transformer类大模型算子库，实现网络在NPU上加速计算。",
+    "full_name": "cann/ops-transformer",
+    "id": 7673863,
+    "name": "ops-transformer",
+    "paas": "",
+    "path": "ops-transformer",
+    "updated_at": "2025-09-28T18:06:48+08:00"
+  },
+  "state": "closed",
+  "title": "[Bug-Report|缺陷反馈]: flash_attn BAND 模式 MergeMask loopCount 越界写导致精度失败",
+  "updated_at": "2026-07-25T19:49:07+08:00",
+  "user": {
+    "avatar_url": "https://cdn-img.gitcode.com/ac/ae/1ac30a43e7e5c7ebf6339c15d1b51a15c9d96b23e7e2ea2816fcd63c2e92394d.jpg",
+    "html_url": "https://gitcode.com/PerrySkywalker",
+    "id": "682abf2a709a492cad560617",
+    "login": "PerrySkywalker",
+    "name": "PerrySkywalker",
+    "object_id": "682abf2a709a492cad560617"
+  },
+  "visibility_reason": "public"
+}

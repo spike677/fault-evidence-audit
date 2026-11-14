@@ -1,0 +1,38 @@
+[
+  {
+    "additions": 58,
+    "blob_id": "98280259588407ccb2404f6d88a7625e360ead83",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/25876ceabe19a0c6bb73bd9e57bd8480e52c2175/conv/conv3d_backprop_input_v2/op_host/op_tiling/common/conv_backprop_input_context_utils.cpp",
+    "deletions": 2,
+    "filename": "conv/conv3d_backprop_input_v2/op_host/op_tiling/common/conv_backprop_input_context_utils.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 58,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -932,6 +932,62 @@ static bool CalPads(gert::TilingContext *context, Conv3dBpInputV2RunInfo &runInf\n   return CheckCalPads(context, runInfoV2, op_type, otherParams);\n }\n \n+static int32_t CalFmapH(gert::TilingContext *context, const Conv3dBpInputV2RunInfo &runInfoV2, const OtherParams& otherParams)\n+{\n+    int32_t minBaseM = 1024;\n+\n+    int64_t dedx_w = otherParams.c_shape.w;\n+    OP_CHECK_IF(dedx_w == 0, OP_LOGE(context, \"dedx_w is 0\"), return 0);\n+\n+    constexpr int32_t FMAP_H_NUM = 2;\n+    int32_t hiCal;\n+\n+    if (minBaseM % dedx_w == 0 || dedx_w % minBaseM == 0) {\n+        hiCal = Ops::Base::CeilDiv(static_cast<int64_t>(minBaseM), dedx_w);\n+    } else if (minBaseM > dedx_w) {\n+        hiCal = minBaseM / dedx_w + FMAP_H_NUM;\n+    } else {\n+        hiCal = FMAP_H_NUM;\n+    }\n+    // L1HKhk=1dilation\n+    int32_t khDilation = (otherParams.b_shape.h - 1) * runInfoV2.dilation_h + 1;\n+    int32_t hoCal = (hiCal - 1) + khDilation;\n+    int64_t hoExpand = static_cast<int64_t>(otherParams.a_shape.h - 1) * runInfoV2.stride_h + 1;\n+    return static_cast<int32_t>(std::min(static_cast<int64_t>(hoCal), hoExpand));\n+}\n+\n+static bool IsNeedTilingHkWk(gert::TilingContext *context, const Conv3dBpInputV2RunInfo &runInfoV2, const OtherParams& otherParams)\n+{\n+    uint32_t minBaseN = 16;\n+    uint32_t dtypeByteL0a_ = runInfoV2.a_dtype_bytes;\n+    uint32_t dtypeByteL0b_ = runInfoV2.b_dtype_bytes;\n+    uint32_t blockSize_ = BYTE_BLOCK / dtypeByteL0b_;\n+    uint64_t l1_size  = 0;\n+\n+    fe::PlatFormInfos* platformInfo = context->GetPlatformInfo();\n+    OP_CHECK_IF(platformInfo == nullptr, OP_LOGE(context, \"platformInfoPtr is null\"), return false);\n+    auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfo);\n+    ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::L1, l1_size);\n+\n+    int64_t bpPadRight = otherParams.c_shape.w - (static_cast<int64_t>(otherParams.a_shape.w - 1) * runInfoV2.stride_w + 1) +\n+        (otherParams.b_shape.w - 1) * runInfoV2.dilation_w - runInfoV2.backprop_pad_l;\n+    int32_t curHo = CalFmapH(context, runInfoV2, otherParams);\n+    uint64_t minA1Size = static_cast<uint64_t>(dtypeByteL0a_) * curHo *\n+        otherParams.a_shape.w * runInfoV2.stride_w * blockSize_;\n+    uint64_t lenHkWkC0 = otherParams.b_shape.h * otherParams.b_shape.w * blockSize_;\n+    uint64_t minB1Size = static_cast<uint64_t>(dtypeByteL0b_) * lenHkWkC0 * minBaseN;\n+\n+    if ((minA1Size + minB1Size) <= l1_size &&\n+        runInfoV2.backprop_pad_l <= PAD_DIM_UP && bpPadRight <= PAD_DIM_UP &&\n+        runInfoV2.backprop_pad_u <= PAD_DIM_UP && runInfoV2.backprop_pad_d <= PAD_DIM_UP &&\n+        runInfoV2.dilation_h <= PAD_DIM_UP && runInfoV2.dilation_w <= PAD_DIM_UP) {\n+        return false;\n+    }\n+\n+    OP_LOGD(context, \"need tiling hw wk\");\n+    return true;\n+}\n+\n static bool CalRealG(gert::TilingContext *context, Conv3dBpInputV2RunInfo &runInfoV2, OtherParams& otherParams) {\n   // calc real g and check shape\n   int32_t dy_c_ori = otherParams.a_shape.c / runInfoV2.groups;\n@@ -973,7 +1029,7 @@ static bool CalRealG(gert::TilingContext *context, Conv3dBpInputV2RunInfo &runIn\n     bool nonExtendedDtype = (filter_desc->GetDataType() == ge::DT_FLOAT8_E4M3FN || filter_desc->GetDataType() == ge::DT_HIFLOAT8 ||\n       filter_desc->GetDataType() == ge::DT_INT8) || (out_backprop_desc->GetDataType() == ge::DT_FLOAT8_E4M3FN ||\n       out_backprop_desc->GetDataType() == ge::DT_HIFLOAT8 || out_backprop_desc->GetDataType() == ge::DT_INT8);\n-    if (disableGroupEnlarge || nonExtendedDtype) {\n+    if (disableGroupEnlarge || nonExtendedDtype || IsNeedTilingHkWk(context, runInfoV2, otherParams)) {\n       otherParams.multiple_extend = 1;\n       runInfoV2.real_g = runInfoV2.groups;\n       otherParams.ci1g = Ops::Base::CeilDiv(otherParams.b_shape.c, static_cast<int64_t>(kBlockSize));\n@@ -1399,8 +1455,8 @@ bool Conv3DBackpropInputParseFunc(gert::TilingContext *context, optiling::OpType\n                 OP_LOGE(context, \"failed to get input output format\"), return false);\n     OP_CHECK_IF(!CalGroups(context, otherParams, runInfoV2), OP_LOGE(op_name, \"Calc groups failed.\"), return false);\n     OP_CHECK_IF(!CalPads(context, runInfoV2, opType, otherParams), OP_LOGE(op_name, \"Calc pads failed.\"), return false);\n-    OP_CHECK_IF(!CalRealG(context, runInfoV2, otherParams), OP_LOGE(op_name, \"Calc real_g failed.\"), return false);\n     OP_CHECK_IF(!CalModify(context, runInfoV2, otherParams), OP_LOGE(op_name, \"Modify pad failed.\"), return false);\n+    OP_CHECK_IF(!CalRealG(context, runInfoV2, otherParams), OP_LOGE(op_name, \"Calc real_g failed.\"), return false);\n     OP_CHECK_IF(!CalScale(context, runInfoV2, otherParams), OP_LOGE(op_name, \"Sacle size too big, not support.\"), return false);\n     return true;\n }\n",
+      "new_file": false,
+      "new_path": "conv/conv3d_backprop_input_v2/op_host/op_tiling/common/conv_backprop_input_context_utils.cpp",
+      "old_path": "conv/conv3d_backprop_input_v2/op_host/op_tiling/common/conv_backprop_input_context_utils.cpp",
+      "removed_lines": 2,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/25876ceabe19a0c6bb73bd9e57bd8480e52c2175/conv/conv3d_backprop_input_v2/op_host/op_tiling/common/conv_backprop_input_context_utils.cpp",
+    "sha": "25876ceabe19a0c6bb73bd9e57bd8480e52c2175",
+    "source_branch": "group_tilinghkwk",
+    "source_project": {
+      "full_name": "cheng_gao/ops-nn",
+      "human_name": "cheng_gao / ops-nn",
+      "id": 9128754,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  }
+]

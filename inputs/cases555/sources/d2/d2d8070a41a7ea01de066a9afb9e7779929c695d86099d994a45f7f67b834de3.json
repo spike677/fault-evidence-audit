@@ -1,0 +1,38 @@
+[
+  {
+    "additions": 3,
+    "blob_id": "5306bbf60a373a1b147d3e7db93323cf277c7075",
+    "blob_url": "https://gitcode.com/cann/opbase/blob/e84e140a9b96d8a9738d646357b59e380d530eb3/pkg_inc/op_common/atvoss/util/broadcast_utils.h",
+    "deletions": 3,
+    "filename": "pkg_inc/op_common/atvoss/util/broadcast_utils.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 3,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -274,10 +274,10 @@ __aicore__ inline void BroadcastNddmaWithLoopContiguousFuseAxis(AscendC::GlobalT\n     int64_t nddmaProduct = BroadcastFuseAxes(outputDims2, ubSplitAxis, shapeLen - NDDMA_MAX_DIMS);\n     for (int64_t i = 0; i < nddmaProduct; i++) {\n       if (i != 0) {\n-        BroadcastUpdateNddmaAxesIndices(nddmaIndices, outputDims, ubSplitAxis, shapeLen - NDDMA_MAX_DIMS - 1 - ubSplitAxis);\n+        BroadcastUpdateNddmaAxesIndices(nddmaIndices, outputDims2, ubSplitAxis, shapeLen - NDDMA_MAX_DIMS - 1 - ubSplitAxis);\n       }\n-      int64_t nddmaGmOffset = BroadcastGetNddmaOffset(nddmaIndices, inputStrides, ubSplitAxis, shapeLen - NDDMA_MAX_DIMS);\n-      int64_t nddmaUbOffset = BroadcastGetNddmaOffset(nddmaIndices, outputStrides, ubSplitAxis, shapeLen - NDDMA_MAX_DIMS);\n+      int64_t nddmaGmOffset = BroadcastGetNddmaOffset(nddmaIndices, inputStrides2, ubSplitAxis, shapeLen - NDDMA_MAX_DIMS);\n+      int64_t nddmaUbOffset = BroadcastGetNddmaOffset(nddmaIndices, outputStrides2, ubSplitAxis, shapeLen - NDDMA_MAX_DIMS);\n       if constexpr (AscendC::IsSameType<T1, T2>::value) {\n         AscendC::DataCopy<T1, NDDMA_MAX_DIMS, config>(outputTensor[nddmaUbOffset], inputGm[gmOffset + nddmaGmOffset], paramsMain);\n       } else {\n",
+      "new_file": false,
+      "new_path": "pkg_inc/op_common/atvoss/util/broadcast_utils.h",
+      "old_path": "pkg_inc/op_common/atvoss/util/broadcast_utils.h",
+      "removed_lines": 3,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/opbase/raw/e84e140a9b96d8a9738d646357b59e380d530eb3/pkg_inc/op_common/atvoss/util/broadcast_utils.h",
+    "sha": "e84e140a9b96d8a9738d646357b59e380d530eb3",
+    "source_branch": "broadcast_fuse_bug_fix3",
+    "source_project": {
+      "full_name": "gcw_O7A9kyAn/opbase",
+      "human_name": "gcw_O7A9kyAn / opbase",
+      "id": 9079127,
+      "path": "opbase"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/opbase",
+      "human_name": "CANN / opbase",
+      "id": 7649482,
+      "path": "opbase"
+    }
+  }
+]

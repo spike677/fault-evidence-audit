@@ -1,0 +1,110 @@
+[
+  {
+    "additions": 1,
+    "blob_id": "5a6e32bf209e951bec18c3f018b1a3c0a223ebb6",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/2e71061b2d8e25fc85ce3dbebe1743507ea96e2c/docs/zh/op_api_list.md",
+    "deletions": 0,
+    "filename": "docs/zh/op_api_list.md",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 1,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -241,6 +241,7 @@\n | [aclnnIndexAdd](../../index/inplace_scatter_add/docs/aclnnIndexAdd.md) | 在指定维度上，根据给定的索引，将源张量中的值加到输入张量中对应位置的值上。 | 默认非确定性实现，支持配置开启 | 默认非确定性实现，支持配置开启 |\n | [aclnnIndexAddV2](../../index/inplace_scatter_add/docs/aclnnIndexAddV2.md) | 在指定维度上，根据给定的索引，将源张量中的值加到输入张量中对应位置的值上。支持开启高性能计算模式。 | 默认非确定性实现，支持配置开启 | 默认非确定性实现，支持配置开启 |\n | [aclnnIndexCopy&aclnnInplaceIndexCopy](../../index/scatter_update/docs/aclnnIndexCopy&aclnnInplaceIndexCopy.md) | 将index张量中元素值作为索引，针对指定轴dim，把source中元素复制到selfRef的对应位置上。 | 默认确定性实现 | 默认非确定性实现，支持配置开启 |\n+| [aclnnIndexFill&aclnnInplaceIndexFill](../../index/index_fill_d/docs/aclnnIndexFill&aclnnInplaceIndexFill.md) | 沿输入self的给定轴dim，将index指定位置的值使用value进行替换。 | 默认确定性实现 | 默认确定性实现 |\n | [aclnnIndexFillTensor&aclnnInplaceIndexFillTensor](../../index/index_fill_d/docs/aclnnIndexFillTensor&aclnnInplaceIndexFillTensor.md) | 沿输入self的给定轴dim，将index指定位置的值使用value进行替换。 | 默认确定性实现 | 默认确定性实现 |\n | [aclnnIndexPutImpl](../../index/index_put_v2/docs/aclnnIndexPutImpl.md) | 根据索引 indices 将输入 x 对应坐标的数据与输入 value 进行替换或累加。 | 默认非确定性实现，支持配置开启 | 默认非确定性实现，支持配置开启 |\n | [aclnnInplacePut](../../index/scatter_nd_update/docs/aclnnInplacePut.md) | 将selfRef视为一维张量，把index张量中元素值作为索引，如果accumulate为true，把source中元素和selfRef对应的位置上元素做累加操作；如果accumulate为false，把source中元素替换掉selfRef对应位置上的元素。 | 默认非确定性实现，支持配置开启 | 默认非确定性实现，支持配置开启 |\n",
+      "new_file": false,
+      "new_path": "docs/zh/op_api_list.md",
+      "old_path": "docs/zh/op_api_list.md",
+      "removed_lines": 0,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/2e71061b2d8e25fc85ce3dbebe1743507ea96e2c/docs/zh/op_api_list.md",
+    "sha": "2e71061b2d8e25fc85ce3dbebe1743507ea96e2c",
+    "source_branch": "dev_zl_2026_0122",
+    "source_project": {
+      "full_name": "klein8793/ops-nn",
+      "human_name": "klein8793 / ops-nn",
+      "id": 7694902,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 2,
+    "blob_id": "8cf367e1f4bc13d4fa500676e3ed73d84136105e",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/2e71061b2d8e25fc85ce3dbebe1743507ea96e2c/index/index_fill/op_host/arch35/index_fill_tiling_simt.cpp",
+    "deletions": 1,
+    "filename": "index/index_fill/op_host/arch35/index_fill_tiling_simt.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 2,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -127,7 +127,8 @@ uint64_t IndexFillSimtTiling::GetTilingKey() const\n         templateMode = static_cast<uint64_t>(TPL_MODE_TEMPLATE_EMPTY);\n     }\n \n-    if (totalDataSize > MAX_INT32) {\n+    uint64_t processNum = static_cast<uint64_t>(inputData.indicesNum * inputData.P * inputData.Q);\n+    if (totalDataSize > MAX_INT32 || processNum > MAX_INT32) {\n         dTypeMode = static_cast<uint64_t>(TPL_MODE_DTYPE_B64);\n     }\n     const uint64_t tilingKey = GET_TPL_TILING_KEY(templateMode, dTypeMode);\n",
+      "new_file": false,
+      "new_path": "index/index_fill/op_host/arch35/index_fill_tiling_simt.cpp",
+      "old_path": "index/index_fill/op_host/arch35/index_fill_tiling_simt.cpp",
+      "removed_lines": 1,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/2e71061b2d8e25fc85ce3dbebe1743507ea96e2c/index/index_fill/op_host/arch35/index_fill_tiling_simt.cpp",
+    "sha": "2e71061b2d8e25fc85ce3dbebe1743507ea96e2c",
+    "source_branch": "dev_zl_2026_0122",
+    "source_project": {
+      "full_name": "klein8793/ops-nn",
+      "human_name": "klein8793 / ops-nn",
+      "id": 7694902,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 1,
+    "blob_id": "1c89c89ce6999328770aaef61484843c0471b082",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/2e71061b2d8e25fc85ce3dbebe1743507ea96e2c/index/index_fill_d/docs/aclnnIndexFill&aclnnInplaceIndexFill.md",
+    "deletions": 1,
+    "filename": "index/index_fill_d/docs/aclnnIndexFill&aclnnInplaceIndexFill.md",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 1,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -4,7 +4,7 @@\n \n | 产品                                                         | 是否支持 |\n | :----------------------------------------------------------- | :------: |\n-| <term>Ascend 950PR/Ascend 950DT</term>                          |    ×     |\n+| <term>Ascend 950PR/Ascend 950DT</term>                          |    √     |\n | <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>     |    √     |\n | <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>     |    √     |\n | <term>Atlas 200I/500 A2 推理产品</term>                      |    ×     |\n",
+      "new_file": false,
+      "new_path": "index/index_fill_d/docs/aclnnIndexFill&aclnnInplaceIndexFill.md",
+      "old_path": "index/index_fill_d/docs/aclnnIndexFill&aclnnInplaceIndexFill.md",
+      "removed_lines": 1,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/2e71061b2d8e25fc85ce3dbebe1743507ea96e2c/index/index_fill_d/docs/aclnnIndexFill&aclnnInplaceIndexFill.md",
+    "sha": "2e71061b2d8e25fc85ce3dbebe1743507ea96e2c",
+    "source_branch": "dev_zl_2026_0122",
+    "source_project": {
+      "full_name": "klein8793/ops-nn",
+      "human_name": "klein8793 / ops-nn",
+      "id": 7694902,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  }
+]

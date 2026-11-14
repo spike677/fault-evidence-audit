@@ -1,0 +1,110 @@
+[
+  {
+    "additions": 2,
+    "blob_id": "5f500908e606f8ec4f289a0bd5a35a216e8cd74d",
+    "blob_url": "https://gitcode.com/cann/ops-math/blob/b0773e8af91fd9ec16f2f9a8862b5752ff44aaed/math/cdist/docs/aclnnCdist.md",
+    "deletions": 2,
+    "filename": "math/cdist/docs/aclnnCdist.md",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 2,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -105,7 +105,7 @@ aclnnStatus aclnnCdist(\n       <td>compute_mode</td>\n       <td>输入</td>\n       <td>表示计算模式，预留参数，暂无作用。</td>\n-      <td><ul><li>预留参数，当前无作用，当p为2.0时，此参数只支持0。</li></td>\n+      <td><ul><li>预留参数，当前无作用，当p为2.0时，此参数只支持2。</li></td>\n       <td>int64_t</td>\n       <td>-</td>\n       <td>-</td>\n@@ -181,7 +181,7 @@ aclnnStatus aclnnCdist(\n ## 约束说明\n - **功能维度**\n   * 数据类型支持\n-    * <term>Ascend 950PR/Ascend 950DT</term>：x1、x2、y支持FLOAT32、FLOAT16、BFLOAT16。<term>昇腾910B AI处理器</term>、<term>昇腾910_93 AI处理器</term>：x1、x2、y支持FLOAT32、FLOAT16。\n+    * <term>Ascend 950PR/Ascend 950DT</term>：x1、x2、y支持FLOAT32、FLOAT16、BFLOAT16。<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：x1、x2、y支持FLOAT32、FLOAT16。\n     * p 支持：float。\n     * compute_mode 支持：int64_t。\n   * 数据格式支持：ND。\n",
+      "new_file": false,
+      "new_path": "math/cdist/docs/aclnnCdist.md",
+      "old_path": "math/cdist/docs/aclnnCdist.md",
+      "removed_lines": 2,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-math/raw/b0773e8af91fd9ec16f2f9a8862b5752ff44aaed/math/cdist/docs/aclnnCdist.md",
+    "sha": "b0773e8af91fd9ec16f2f9a8862b5752ff44aaed",
+    "source_branch": "aclnnCdist_CM",
+    "source_project": {
+      "full_name": "BoyangZhang/ops-math",
+      "human_name": "BoyangZhang / ops-math",
+      "id": 7925083,
+      "path": "ops-math"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-math",
+      "human_name": "CANN / ops-math",
+      "id": 7649531,
+      "path": "ops-math"
+    }
+  },
+  {
+    "additions": 2,
+    "blob_id": "1c14856fd5fc7b70d3873f432ca83c575baf6886",
+    "blob_url": "https://gitcode.com/cann/ops-math/blob/b0773e8af91fd9ec16f2f9a8862b5752ff44aaed/math/cdist/op_api/aclnn_cdist.cpp",
+    "deletions": 2,
+    "filename": "math/cdist/op_api/aclnn_cdist.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 2,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -105,8 +105,8 @@ static bool CheckParamsLogic(float& p, const int64_t compute_mode, SocVersion so\n         return false;\n     }\n     // 强校验compute_mode\n-    if (std::fabs(p - 2.0) < 1e-6 && compute_mode != 0){\n-        OP_LOGE(ACLNN_ERR_PARAM_INVALID, \"compute_mode %lld is not supported, only support 0 when pValue equals 2.0\",\n+    if (std::fabs(p - 2.0) < 1e-6 && compute_mode != 2){\n+        OP_LOGE(ACLNN_ERR_PARAM_INVALID, \"compute_mode %lld is not supported, only support 2 when pValue equals 2.0\",\n                 compute_mode);\n         return false;\n     }\n",
+      "new_file": false,
+      "new_path": "math/cdist/op_api/aclnn_cdist.cpp",
+      "old_path": "math/cdist/op_api/aclnn_cdist.cpp",
+      "removed_lines": 2,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-math/raw/b0773e8af91fd9ec16f2f9a8862b5752ff44aaed/math/cdist/op_api/aclnn_cdist.cpp",
+    "sha": "b0773e8af91fd9ec16f2f9a8862b5752ff44aaed",
+    "source_branch": "aclnnCdist_CM",
+    "source_project": {
+      "full_name": "BoyangZhang/ops-math",
+      "human_name": "BoyangZhang / ops-math",
+      "id": 7925083,
+      "path": "ops-math"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-math",
+      "human_name": "CANN / ops-math",
+      "id": 7649531,
+      "path": "ops-math"
+    }
+  },
+  {
+    "additions": 3,
+    "blob_id": "3106c873639f3031f08b24d5a2d073e1e18d8a5d",
+    "blob_url": "https://gitcode.com/cann/ops-math/blob/b0773e8af91fd9ec16f2f9a8862b5752ff44aaed/math/cdist/tests/ut/op_api/test_aclnn_cdist.cpp",
+    "deletions": 3,
+    "filename": "math/cdist/tests/ut/op_api/test_aclnn_cdist.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 3,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -41,7 +41,7 @@ TEST_F(l2_cdist_test, case_01_float)\n     auto x2Desc = TensorDesc({2, 2}, ACL_FLOAT, ACL_FORMAT_ND);\n     auto outDesc = TensorDesc({2, 2}, ACL_FLOAT, ACL_FORMAT_ND);\n     float p = 2.0;\n-    int64_t compute_mode = 0;\n+    int64_t compute_mode = 2;\n \n     auto ut = OP_API_UT(aclnnCdist, INPUT(x1Desc, x2Desc, p, compute_mode), OUTPUT(outDesc));\n     \n@@ -56,7 +56,7 @@ TEST_F(l2_cdist_test, case_02_float16)\n     auto x2Desc = TensorDesc({2, 2}, ACL_FLOAT16, ACL_FORMAT_ND);\n     auto outDesc = TensorDesc({2, 2}, ACL_FLOAT16, ACL_FORMAT_ND);\n     float p = 2.0;\n-    int64_t compute_mode = 0;\n+    int64_t compute_mode = 2;\n \n     auto ut = OP_API_UT(aclnnCdist, INPUT(x1Desc, x2Desc, p, compute_mode), OUTPUT(outDesc));\n     \n@@ -71,7 +71,7 @@ TEST_F(l2_cdist_test, case_04_empty_tensor)\n     auto x2Desc = TensorDesc({0, 1}, ACL_FLOAT, ACL_FORMAT_ND);\n     auto outDesc = TensorDesc({0, 0}, ACL_FLOAT, ACL_FORMAT_ND);\n     float p = 2.0;\n-    int64_t compute_mode = 0;\n+    int64_t compute_mode = 2;\n \n     auto ut = OP_API_UT(aclnnCdist, INPUT(x1Desc, x2Desc, p, compute_mode), OUTPUT(outDesc));\n     \n",
+      "new_file": false,
+      "new_path": "math/cdist/tests/ut/op_api/test_aclnn_cdist.cpp",
+      "old_path": "math/cdist/tests/ut/op_api/test_aclnn_cdist.cpp",
+      "removed_lines": 3,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-math/raw/b0773e8af91fd9ec16f2f9a8862b5752ff44aaed/math/cdist/tests/ut/op_api/test_aclnn_cdist.cpp",
+    "sha": "b0773e8af91fd9ec16f2f9a8862b5752ff44aaed",
+    "source_branch": "aclnnCdist_CM",
+    "source_project": {
+      "full_name": "BoyangZhang/ops-math",
+      "human_name": "BoyangZhang / ops-math",
+      "id": 7925083,
+      "path": "ops-math"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-math",
+      "human_name": "CANN / ops-math",
+      "id": 7649531,
+      "path": "ops-math"
+    }
+  }
+]

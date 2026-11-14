@@ -1,0 +1,83 @@
+[
+  {
+    "assignees": [],
+    "base": {
+      "ref": "master",
+      "repo": {
+        "full_name": "cann/ops-transformer",
+        "name": "ops-transformer",
+        "path": "ops-transformer"
+      },
+      "sha": "3feaa868c9f6700744699675f2dd5944e8f180ad"
+    },
+    "body": "## 描述\n改动原因：fia算子适配sparse9的改动代码改变了fia_block_vec_nonquant.h里的ElewiseCompute函数里sparsemode4的同步逻辑，出现了sparsemode4+learnablesink用例精度不过的情况\n改动内容：attention/common/op_kernel/arch32/fia_block_vec_nonquant.h里的ElewiseCompute函数完全分开TREE(sparsemode9)分支和非TREE两个分支，避免逻辑纠缠\n\n## 关联的Issue\n[Bug-Report|缺陷反馈]: FIA算子sparse9修改导致sparse4+learnablesink用例精度不达标Bug\nhttps://gitcode.com/cann/ops-transformer/issues/1561\n\n## 测试\n<!--描述进行了哪些测试来验证你的改动。包括但不限于二级冒烟、算子泛化等。-->\n二级冒烟\n## 文档更新\n<!--如果这个PR包含文档的更新，请在这里指出。例如：更新了README.md文件。-->\n\n## 类型标签\n<!--  [x] 表示选中 -->\n- [x] 🐛 Bug 修复\n- [ ] ✨ 新特性\n- [ ] ⚡ 性能优化\n- [ ] ♻️ 重构\n- [ ] 🧪 测试\n- [ ] 📦 构建/CI\n- [ ] 🔧 配置变更\n- [ ] 📝 文档更新\n- [ ] ⬆️ 依赖升级\n- [ ] 🔒 安全修复\n- [ ] 🧹 代码清理\n- [ ] ❓ 其他，请描述：\n\n",
+    "can_merge_check": true,
+    "created_at": "2026-03-28T11:30:16.729+08:00",
+    "diff_url": "https://gitcode.com/cann/ops-transformer/merge_requests/3431/diffs",
+    "head": {
+      "assigner": {
+        "login": "jiangyu741",
+        "name": "jiangyu741"
+      },
+      "ref": "fix_sprase4",
+      "repo": {
+        "full_name": "liyangzhi/ops-transformer_sparse9",
+        "name": "ops-transformer_sparse9",
+        "path": "ops-transformer_sparse9"
+      },
+      "sha": "7f81830c71186e522beb2707d8a9163ad67adc4f"
+    },
+    "html_url": "https://gitcode.com/cann/ops-transformer/merge_requests/3431",
+    "id": 8456048,
+    "labels": [
+      {
+        "color": "#3ee029",
+        "created_at": "2025-12-16T09:45:21+08:00",
+        "id": 22553,
+        "name": "api-check-pass",
+        "updated_at": "2026-03-30T11:39:47+08:00"
+      },
+      {
+        "color": "#21BA45",
+        "created_at": "2025-06-10T14:17:23+08:00",
+        "id": 3873,
+        "name": "ci-pipeline-passed",
+        "updated_at": "2026-03-30T11:39:50+08:00"
+      },
+      {
+        "color": "#22ed07",
+        "created_at": "2025-05-29T20:14:31+08:00",
+        "id": 2742,
+        "name": "approved",
+        "updated_at": "2026-03-30T17:15:54+08:00"
+      },
+      {
+        "color": "#17f207",
+        "created_at": "2025-05-29T20:14:01+08:00",
+        "id": 2741,
+        "name": "lgtm",
+        "updated_at": "2026-03-30T23:05:33+08:00"
+      },
+      {
+        "color": "#2865E0",
+        "created_at": "2025-06-21T10:53:09+08:00",
+        "id": 4929,
+        "name": "cann-cla/yes",
+        "updated_at": "2026-03-28T11:30:25+08:00"
+      },
+      {
+        "color": "#555353",
+        "created_at": "2025-06-10T14:17:24+08:00",
+        "id": 3881,
+        "name": "stat/needs-squash",
+        "updated_at": "2026-03-28T11:53:40+08:00"
+      }
+    ],
+    "merged_at": "2026-03-30T23:05:43.957+08:00",
+    "number": 3431,
+    "state": "merged",
+    "testers": [],
+    "title": "【FIA算子】fix sparse9代码导致sparse4+learnablesink用例精度不达标 bug",
+    "updated_at": "2026-03-30T23:05:45.151+08:00"
+  }
+]

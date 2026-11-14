@@ -1,0 +1,76 @@
+{
+  "assignee": {
+    "avatar_url": "",
+    "html_url": "https://gitcode.com/gcw_kTZ5XeTb",
+    "id": "694deb1a52986c0b8ca46346",
+    "login": "gcw_kTZ5XeTb",
+    "name": "yanshijia",
+    "object_id": "694deb1a52986c0b8ca46346"
+  },
+  "assignees": [
+    {
+      "avatar_url": "",
+      "html_url": "https://gitcode.com/gcw_kTZ5XeTb",
+      "id": "694deb1a52986c0b8ca46346",
+      "login": "gcw_kTZ5XeTb",
+      "name": "yanshijia",
+      "object_id": "694deb1a52986c0b8ca46346"
+    }
+  ],
+  "body": "\n\nThanks for sending an issue! Please fill in the following template to help quickly solve your problem.\n\n### Describe the current behavior / 问题描述 (Mandatory / 必填)\n            \n2048token数量输入torch_npu.npu_moe_gating_top_k_softmax(）算子，出现INF值，与1024+1024拼接实现结果不对齐\n◆【测试步骤】：\n此处可详细描述测试用例和测试思路\n测试脚本：\nimport torch\nimport torch_npu\n\ntorch.manual_seed(0)\ntorch.npu.set_compile_mode(jit_compile=False)\n\n# 2048 个 token 使用完全相同的 router logits，正确结果也应该完全相同。\nrouter_logits = torch.randn(1, 256, dtype=torch.float16).repeat(2048, 1).npu()\n\n# 原始调用：2048 个 token 一次送入算子。\nfull_weights, full_ids, _ = torch_npu.npu_moe_gating_top_k_softmax(\nrouter_logits, k=8\n)\n\n# 对照调用：相同输入按 1024 个 token 分块。\npart1 = torch_npu.npu_moe_gating_top_k_softmax(router_logits[:1024], k=8)\npart2 = torch_npu.npu_moe_gating_top_k_softmax(router_logits[1024:], k=8)\nchunk_weights = torch.cat([part1[0], part2[0]], dim=0)\nchunk_ids = torch.cat([part1[1], part2[1]], dim=0)\n\ntorch.npu.synchronize()\n\nprint(\"full batch 非有限权重数量:\", (~torch.isfinite(full_weights)).sum().item())\nprint(\"chunked 非有限权重数量:\", (~torch.isfinite(chunk_weights)).sum().item())\nprint(\"full batch 与 chunked 的 expert id 差异数量:\", (full_ids != chunk_ids).sum().item())\nprint(\"full batch 与 chunked 的最大权重差:\", (full_weights - chunk_weights).abs().max().item())\n\n### Environment / 环境信息 (Mandatory / 必填)\n            \nAscend310P3\nCANN-9.1.0\n### Steps to reproduce the issue / 重现步骤 (Mandatory / 必填)\n            \n◆【测试步骤】：\n此处可详细描述测试用例和测试思路\n测试脚本：\nimport torch\nimport torch_npu\n\ntorch.manual_seed(0)\ntorch.npu.set_compile_mode(jit_compile=False)\n\n# 2048 个 token 使用完全相同的 router logits，正确结果也应该完全相同。\nrouter_logits = torch.randn(1, 256, dtype=torch.float16).repeat(2048, 1).npu()\n\n# 原始调用：2048 个 token 一次送入算子。\nfull_weights, full_ids, _ = torch_npu.npu_moe_gating_top_k_softmax(\nrouter_logits, k=8\n)\n\n# 对照调用：相同输入按 1024 个 token 分块。\npart1 = torch_npu.npu_moe_gating_top_k_softmax(router_logits[:1024], k=8)\npart2 = torch_npu.npu_moe_gating_top_k_softmax(router_logits[1024:], k=8)\nchunk_weights = torch.cat([part1[0], part2[0]], dim=0)\nchunk_ids = torch.cat([part1[1], part2[1]], dim=0)\n\ntorch.npu.synchronize()\n\nprint(\"full batch 非有限权重数量:\", (~torch.isfinite(full_weights)).sum().item())\nprint(\"chunked 非有限权重数量:\", (~torch.isfinite(chunk_weights)).sum().item())\nprint(\"full batch 与 chunked 的 expert id 差异数量:\", (full_ids != chunk_ids).sum().item())\nprint(\"full batch 与 chunked 的最大权重差:\", (full_weights - chunk_weights).abs().max().item())\n### Describe the expected behavior / 预期结果 (Mandatory / 必填)\n            \nfull batch 非有限权重数量: 0\nchunked 非有限权重数量: 0\nfull batch 与 chunked 的 expert id 差异数量: 0\nfull batch 与 chunked 的最大权重差: 0.0\n### Related log / screenshot / 日志 / 截图 (Mandatory / 必填)\n            \n![image.png](https://raw.gitcode.com/user-images/assets/7673863/5cc3f0e2-960f-482d-a71e-6bb1507a49c4/image.png 'image.png')\n### Special notes for this issue/备注 (Optional / 选填)\n            \n\n",
+  "comments": 1,
+  "created_at": "2026-07-06T19:46:03+08:00",
+  "finished_at": "2026-07-07T16:37:53+08:00",
+  "html_url": "https://gitcode.com/cann/ops-transformer/issues/3621",
+  "id": 4146271,
+  "issue_priority_detail": {
+    "id": 116,
+    "title": "无优先级"
+  },
+  "issue_state": "进行中",
+  "issue_state_detail": {
+    "id": 285,
+    "serial": 0,
+    "title": "进行中"
+  },
+  "issue_type": "任务",
+  "issue_type_detail": {
+    "id": 255,
+    "is_system": false,
+    "title": "任务"
+  },
+  "labels": [
+    {
+      "color": "#35e029",
+      "created_at": "2026-03-20T11:25:13+08:00",
+      "id": 38861,
+      "name": "resolved",
+      "updated_at": "2026-07-07T18:15:10+08:00"
+    }
+  ],
+  "number": "3621",
+  "priority": 0,
+  "repository": {
+    "assigner": {},
+    "created_at": "2025-09-28T17:54:46+08:00",
+    "description": "本项目是CANN提供的transformer类大模型算子库，实现网络在NPU上加速计算。",
+    "full_name": "cann/ops-transformer",
+    "id": 7673863,
+    "name": "ops-transformer",
+    "paas": "",
+    "path": "ops-transformer",
+    "updated_at": "2025-09-28T18:06:48+08:00"
+  },
+  "state": "closed",
+  "title": "[Bug-Report|缺陷反馈]: torch_npu.npu_moe_gating_top_k_softmax 310Pbatch过大精度异常",
+  "updated_at": "2026-07-07T16:37:53+08:00",
+  "user": {
+    "avatar_url": "",
+    "html_url": "https://gitcode.com/gcw_kTZ5XeTb",
+    "id": "694deb1a52986c0b8ca46346",
+    "login": "gcw_kTZ5XeTb",
+    "name": "yanshijia",
+    "object_id": "694deb1a52986c0b8ca46346"
+  },
+  "visibility_reason": "public"
+}

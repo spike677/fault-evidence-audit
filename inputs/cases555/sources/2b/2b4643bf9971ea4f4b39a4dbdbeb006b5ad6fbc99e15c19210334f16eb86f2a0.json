@@ -1,0 +1,74 @@
+[
+  {
+    "additions": 10,
+    "blob_id": "92eed72d53cabc6e776ca300136d48fea72c2be8",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/1a1bacdaa5c3802748447efb39e99f64d815471d/attention/common/op_kernel/arch35/flash_attention_noquant_kernel_base.h",
+    "deletions": 0,
+    "filename": "attention/common/op_kernel/arch35/flash_attention_noquant_kernel_base.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 10,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -424,6 +424,11 @@ __aicore__ inline void FlashAttentionNoQuantKernelBase<ChildClass, CubeBlockType\n         constInfo.s1BaseN2GDv = s1BaseSize * constInfo.n2GDv;\n         if constexpr (hasRope) {\n             constInfo.mm1RopeKa = constInfo.n2Size * constInfo.gSize * constInfo.dSizeRope;\n+            if constexpr (isInfer) {\n+                if (sharedParams.isGqa) {\n+                    constInfo.mm1RopeKa = constInfo.dSizeRope;\n+                }\n+            }\n             constInfo.mm1RopeKb = constInfo.n2Size * constInfo.dSizeRope;\n         }\n \n@@ -450,6 +455,11 @@ __aicore__ inline void FlashAttentionNoQuantKernelBase<ChildClass, CubeBlockType\n         constInfo.s1BaseN2GDv = s1BaseSize * constInfo.n2GDv;\n         if constexpr (hasRope) {\n             constInfo.mm1RopeKa = constInfo.n2Size * constInfo.gSize * constInfo.dSizeRope;\n+            if constexpr (isInfer) {\n+                if (sharedParams.isGqa) {\n+                    constInfo.mm1RopeKa = constInfo.dSizeRope;\n+                }\n+            }\n             constInfo.mm1RopeKb = constInfo.n2Size * constInfo.dSizeRope;\n         }\n         constInfo.mm1Ka = constInfo.n2Size * constInfo.gSize * constInfo.dSize;\n",
+      "new_file": false,
+      "new_path": "attention/common/op_kernel/arch35/flash_attention_noquant_kernel_base.h",
+      "old_path": "attention/common/op_kernel/arch35/flash_attention_noquant_kernel_base.h",
+      "removed_lines": 0,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/1a1bacdaa5c3802748447efb39e99f64d815471d/attention/common/op_kernel/arch35/flash_attention_noquant_kernel_base.h",
+    "sha": "1a1bacdaa5c3802748447efb39e99f64d815471d",
+    "source_branch": "cherry-pick-mr-6008-1779967817200-auto",
+    "source_project": {
+      "full_name": "leiqingji/ops-transformer",
+      "human_name": "leiqingji / ops-transformer",
+      "id": 9015522,
+      "path": "ops-transformer"
+    },
+    "target_branch": "9.1.0-beta.2",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  },
+  {
+    "additions": 5,
+    "blob_id": "5e649a57a7c33b5a2a0ecd0f11b8be07c6c81b60",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/1a1bacdaa5c3802748447efb39e99f64d815471d/attention/fused_infer_attention_score/op_host/arch35/fused_infer_attention_score_tiling_impl.cpp",
+    "deletions": 1,
+    "filename": "attention/fused_infer_attention_score/op_host/arch35/fused_infer_attention_score_tiling_impl.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 5,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -231,7 +231,11 @@ void FusedInferAttentionScoreTilingImpl::InitImplParam(const FiaTilingInfo &fiaI\n                 }\n             }\n             if (gsMergeFlag_) {\n-                actualSeqLengthsQ_.push_back(actSeqLenQData * fiaInfo.gSize);\n+                if (fiaInfo.mlaMode == MlaMode::ROPE_SPLIT_D512 && fiaInfo.qLayout == FiaLayout::BNSD) {\n+                    actualSeqLengthsQ_.push_back(fiaInfo.s1Size * fiaInfo.gSize);\n+                } else {\n+                    actualSeqLengthsQ_.push_back(actSeqLenQData * fiaInfo.gSize);\n+                }\n             } else {\n                 actualSeqLengthsQ_.push_back(actSeqLenQData);\n             }\n",
+      "new_file": false,
+      "new_path": "attention/fused_infer_attention_score/op_host/arch35/fused_infer_attention_score_tiling_impl.cpp",
+      "old_path": "attention/fused_infer_attention_score/op_host/arch35/fused_infer_attention_score_tiling_impl.cpp",
+      "removed_lines": 1,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/1a1bacdaa5c3802748447efb39e99f64d815471d/attention/fused_infer_attention_score/op_host/arch35/fused_infer_attention_score_tiling_impl.cpp",
+    "sha": "1a1bacdaa5c3802748447efb39e99f64d815471d",
+    "source_branch": "cherry-pick-mr-6008-1779967817200-auto",
+    "source_project": {
+      "full_name": "leiqingji/ops-transformer",
+      "human_name": "leiqingji / ops-transformer",
+      "id": 9015522,
+      "path": "ops-transformer"
+    },
+    "target_branch": "9.1.0-beta.2",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  }
+]

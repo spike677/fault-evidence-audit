@@ -1,0 +1,38 @@
+[
+  {
+    "additions": 3,
+    "blob_id": "63b5886f78a53fbfef2d0785623416854ec0d42d",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/c9d19729d080d4a33f3feb1bbf7e888b56e17c74/attention/flash_attention_score_grad/op_kernel/arch35/flash_attention_score_grad_block_cube.h",
+    "deletions": 2,
+    "filename": "attention/flash_attention_score_grad/op_kernel/arch35/flash_attention_score_grad_block_cube.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 3,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -129,7 +129,8 @@ public:\n     constexpr static bool IS_L1_PRELOAD = GET_IS_L1_PRELOAD<INPUT_TYPE>(\n         HEAD_DIM_ALIGN, SPLIT_AXIS, IS_DETER_OLD(DETER_SPARSE_TYPE), IS_TND, FP8_OPEN_TSCM, IS_ROPE);\n     constexpr static SyncType SYNC_TYPE = IS_L1_PRELOAD ? SyncType::NO_SYNC : SyncType::INNER_CORE_SYNC;\n-    constexpr static bool IS_DKV_RESIDENT_L0C = IS_DKV_RESIDENT_L0C(CUBE_BASEM, CUBE_BASEN, HEAD_DIM_ALIGN) && !IS_FP8_INPUT;\n+    constexpr static bool IS_DKV_RESIDENT_L0C = IS_DKV_RESIDENT_L0C(CUBE_BASEM, CUBE_BASEN, HEAD_DIM_ALIGN) &&\n+                                                !IS_FP8_INPUT && !IS_FP32_INPUT;\n     constexpr static bool IS_FP32_D_EXCEED_256 = IS_FP32_INPUT && HEAD_DIM_ALIGN > 256;\n  \n     constexpr static uint32_t DQ_L0_SPLIT_K = GET_DQ_L0_SPLIT_K<INPUT_TYPE, CUBE_BASEM, HEAD_DIM_ALIGN>();\n@@ -276,7 +277,7 @@ TEMPLATES_DEF_NO_DEFAULT\n __aicore__ inline void FAGBlockCube<TEMPLATE_ARGS>::InitCubeBuffer(FagConstInfo &constInfo)\n {\n     isDkvL0CResidentForD192Dv128 =\n-        ((SPLIT_AXIS == BN2GS1S2 || SPLIT_AXIS == BN2S2) &&\n+        !IS_FP32_INPUT && ((SPLIT_AXIS == BN2GS1S2 || SPLIT_AXIS == BN2S2) &&\n          (HEAD_DIM_ALIGN == static_cast<uint32_t>(DTemplateType::Aligned192) &&\n           constInfo.commonConstInfo.dSizeV <= static_cast<uint32_t>(DTemplateType::Aligned128))) ||\n         IS_ROPE;\n",
+      "new_file": false,
+      "new_path": "attention/flash_attention_score_grad/op_kernel/arch35/flash_attention_score_grad_block_cube.h",
+      "old_path": "attention/flash_attention_score_grad/op_kernel/arch35/flash_attention_score_grad_block_cube.h",
+      "removed_lines": 2,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/c9d19729d080d4a33f3feb1bbf7e888b56e17c74/attention/flash_attention_score_grad/op_kernel/arch35/flash_attention_score_grad_block_cube.h",
+    "sha": "c9d19729d080d4a33f3feb1bbf7e888b56e17c74",
+    "source_branch": "master",
+    "source_project": {
+      "full_name": "llwy0320/ops-transformer",
+      "human_name": "llwy0320 / ops-transformer",
+      "id": 9383593,
+      "path": "ops-transformer"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  }
+]

@@ -1,0 +1,76 @@
+{
+  "assignee": {
+    "avatar_url": "",
+    "html_url": "https://gitcode.com/gcw_SUaZx3UQ",
+    "id": "6842af273692723d6caa2469",
+    "login": "gcw_SUaZx3UQ",
+    "name": "zhangqijia1",
+    "object_id": "6842af273692723d6caa2469"
+  },
+  "assignees": [
+    {
+      "avatar_url": "",
+      "html_url": "https://gitcode.com/gcw_SUaZx3UQ",
+      "id": "6842af273692723d6caa2469",
+      "login": "gcw_SUaZx3UQ",
+      "name": "zhangqijia1",
+      "object_id": "6842af273692723d6caa2469"
+    }
+  ],
+  "body": "## Describe the current behavior / 问题描述 (Mandatory / 必填)\n\nModulateGrad（`vfusion/modulate_grad`）从 tiling 到 kernel 全链路使用 `uint32_t` 承载维度 B/L/D 及由其派生的乘积，存在三处整型溢出/截断缺陷：\n\n1. **维度读取窄化**（`op_host/modulate_grad_tiling.cpp:121-123`）：`GetStorageShape().GetDim()` 返回 `int64_t`，被赋给 `uint32_t` B/L/D，高位截断。\n2. **`B*D` 在 uint32_t 域溢出**（`modulate_grad_tiling.cpp:74`）：`numBlocks < B*D` 中的 `B*D` 在 32 位计算，`B*D ≥ 2^32` 时回绕，导致分核错误；极端回绕为 0 时还会触发 `B / numBlocks` 除零。\n3. **kernel GM 元素偏移在 uint32_t 域溢出**（`op_kernel/modulate_grad.cpp:278,291`）：`allOffset = (b_index_+tileBIndex)*L_*D_ + offset*D_ + ...` 整条乘加链为 `uint32_t`。当张量总元素数 ≥ 2^32（float 即 ≥17.2GB，64GB HBM 可容纳）时 `allOffset` 回绕，读写错误 GM 地址，梯度输出全部损坏。\n\n## Environment / 环境信息 (Mandatory / 必填)\n\n- 硬件：A2/A3\n- 软件：CANN（ops-nn 主线）\n- 发现方式：代码静态审查；缺陷为类型域层面，触发条件为大张量 shape。\n\n## Steps to reproduce the issue / 重现步骤 (Mandatory / 必填)\n\n构造单算子用例，输入张量 shape 使总元素数 ≥ 2^32，例如 `[B=128, L=8192, D=8192]`（≈8.6×10^9 元素 / 34GB float），调用 ModulateGrad 反向。偏移计算 `(b_index_+tileBIndex)*L_*D_` 超过 `UINT32_MAX` 回绕，kernel 访问错误 GM 地址。\n\n（`B*D` 溢出的触发需 `B*D ≥ 2^32`，如 `B=65536, D=65536`，分核参数错误。）\n\n## Describe the expected behavior / 预期结果 (Mandatory / 必填)\n\n维度与偏移在 64 位域计算，大张量下 GM 寻址正确，梯度输出与小张量逻辑一致、无损坏。\n\n## Related log / screenshot / 日志 / 截图 (Mandatory / 必填)\n\n关键代码行：\n- `modulate_grad_tiling.cpp:74`、`:121-123`\n- `modulate_grad.cpp:278,291`（`CalculateOffsets` 偏移链）\n\n## Special notes for this issue / 备注 (Optional / 选填)\n\n",
+  "comments": 0,
+  "created_at": "2026-05-29T11:06:23+08:00",
+  "finished_at": "2026-06-22T09:42:47+08:00",
+  "html_url": "https://gitcode.com/cann/ops-nn/issues/2954",
+  "id": 4055405,
+  "issue_priority_detail": {
+    "id": 116,
+    "title": "无优先级"
+  },
+  "issue_state": "已完成",
+  "issue_state_detail": {
+    "id": 287,
+    "serial": 0,
+    "title": "已完成"
+  },
+  "issue_type": "任务",
+  "issue_type_detail": {
+    "id": 255,
+    "is_system": false,
+    "title": "任务"
+  },
+  "labels": [
+    {
+      "color": "#2469f5",
+      "created_at": "2025-10-09T20:53:07+08:00",
+      "id": 14930,
+      "name": "Accepted",
+      "updated_at": "2026-06-22T09:45:00+08:00"
+    }
+  ],
+  "number": "2954",
+  "priority": 0,
+  "repository": {
+    "assigner": {},
+    "created_at": "2025-09-27T17:40:34+08:00",
+    "description": "本项目是CANN提供的神经网络类计算算子库，实现网络在NPU上加速计算。",
+    "full_name": "cann/ops-nn",
+    "id": 7665709,
+    "name": "ops-nn",
+    "paas": "",
+    "path": "ops-nn",
+    "updated_at": "2025-09-27T18:09:31+08:00"
+  },
+  "state": "closed",
+  "title": "[Bug-Report|缺陷反馈]: ModulateGrad 维度/偏移全程 uint32_t，大张量下 GM 偏移整型溢出导致梯度结果损坏",
+  "updated_at": "2026-06-22T09:42:47+08:00",
+  "user": {
+    "avatar_url": "",
+    "html_url": "https://gitcode.com/gcw_SUaZx3UQ",
+    "id": "6842af273692723d6caa2469",
+    "login": "gcw_SUaZx3UQ",
+    "name": "zhangqijia1",
+    "object_id": "6842af273692723d6caa2469"
+  },
+  "visibility_reason": "public"
+}

@@ -1,0 +1,122 @@
+[
+  {
+    "additions": 29,
+    "blob_id": "cf84aaaa35e95b1cfa9af8ee51535dac49dc9849",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/f68e0b5253c6911c46b00a3065b2c6b90a78efeb/attention/common/op_kernel/arch35/infer_flash_attention_kvcache.h",
+    "deletions": 14,
+    "filename": "attention/common/op_kernel/arch35/infer_flash_attention_kvcache.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 29,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -91,9 +91,6 @@ __aicore__ inline int64_t CalculateActualS1Size(RunParamStr<isInfer>& runParam,\n             actualMSize = constInfo.gS1;\n             runParam.actualSeqLengthOfMlaPerBatch = constInfo.s1Size;\n         }\n-        if (constInfo.isGqa) {\n-            actualMSize = constInfo.gS1;\n-        }\n         return actualMSize;\n     }\n     \n@@ -118,15 +115,9 @@ __aicore__ inline int64_t CalculateActualS1Size(RunParamStr<isInfer>& runParam,\n                          layout == LayOutTypeEnum::LAYOUT_NTD) {\n         actualMSize = (bIdx == 0) ? actualSeqQlenAddr[0] :\n             actualSeqQlenAddr[bIdx] - actualSeqQlenAddr[bIdx - 1];\n-        if (constInfo.isGqa) {\n-            actualMSize *= constInfo.gSize;\n-        }\n     } else {\n         actualMSize = (constInfo.actualSeqLenSize == actualSeqMin) ? \n             actualSeqQlenAddr[0] : actualSeqQlenAddr[bIdx];\n-        if (constInfo.isGqa) {\n-            actualMSize *= constInfo.gSize;\n-        }\n     }\n     \n     return actualMSize;\n@@ -419,6 +410,15 @@ __aicore__ inline void ComputeS1LoopInfo(RunParamStr<isInfer>& runParam, const C\n {\n     constexpr int32_t s1BaseSize = static_cast<int32_t>(s1TemplateType);\n     int32_t s1LoopTimes = CeilDiv(runParam.actualS1Size, s1BaseSize);\n+    if constexpr (hasRope && (dTemplateType == DTemplateType::Aligned576)) {\n+        s1LoopTimes = CeilDiv(runParam.actualS1Size, s1BaseSize);\n+    } else {\n+        if (constInfo.isGqa) {\n+            s1LoopTimes = CeilDiv(runParam.actualS1Size * constInfo.gSize, s1BaseSize);\n+        } else {\n+            s1LoopTimes = CeilDiv(runParam.actualS1Size, s1BaseSize);\n+        }\n+    }\n     // 不是最后一个bn, 赋值souterBlockNum\n     if (!lastBN) {\n         runParam.s1LoopTimes = s1LoopTimes;\n@@ -438,7 +438,15 @@ __aicore__ inline void ComputeSouterParam(RunParamStr<isInfer>& runParam, const\n     if (runParam.actualS1Size == 0) {\n         runParam.s1RealSize = 0;\n     } else {\n-        runParam.s1RealSize = Min((uint32_t)s1TemplateType, runParam.actualS1Size - cubeSOuterOffset);\n+        if constexpr (hasRope && (dTemplateType == DTemplateType::Aligned576)) {\n+            s1LoopTimes = Min((uint32_t)s1TemplateType, runParam.actualS1Size - cubeSOuterOffset);\n+        } else {\n+            if (constInfo.isGqa) {\n+                s1LoopTimes = Min((uint32_t)s1TemplateType, runParam.actualS1Size * constInfo.gSize - cubeSOuterOffset);\n+            } else {\n+                s1LoopTimes = Min((uint32_t)s1TemplateType, runParam.actualS1Size - cubeSOuterOffset);\n+            }\n+        }\n     }\n \n     cubeSOuterOffset += (runParam.nextTokensPerBatch < 0) ? -runParam.nextTokensPerBatch : 0;\n@@ -671,10 +679,17 @@ __aicore__ inline bool ComputeS2LoopInfo(RunParamStr<isInfer>& runParam, const C\n         runParam.s2LineEndIdx = ClipSInnerTokenCube<TEMPLATE_INTF_ARGS>(CeilDiv(runParam.cubeSOuterOffset + runParam.nextTokensPerBatch +\n             runParam.s1RealSize, constInfo.gSize), 0, runParam.actualS2Size);\n     } else {\n-        sInnerFirstToken = ClipSInnerTokenCube<TEMPLATE_INTF_ARGS>(runParam.cubeSOuterOffset - runParam.preTokensPerBatch,\n-            0, runParam.actualS2Size);\n-        runParam.s2LineEndIdx = ClipSInnerTokenCube<TEMPLATE_INTF_ARGS>(runParam.cubeSOuterOffset + runParam.nextTokensPerBatch +\n-            runParam.s1RealSize, 0, runParam.actualS2Size);\n+         if (constInfo.isGqa) {\n+            sInnerFirstToken = ClipSInnerTokenCube<TEMPLATE_INTF_ARGS>(runParam.s1oIdx - runParam.preTokensPerBatch,\n+                0, runParam.actualS2Size);\n+            runParam.s2LineEndIdx = ClipSInnerTokenCube<TEMPLATE_INTF_ARGS>(runParam.s1oIdx + runParam.nextTokensPerBatch +\n+                runParam.s1RealSize, 0, runParam.actualS2Size);\n+        } else {\n+            sInnerFirstToken = ClipSInnerTokenCube<TEMPLATE_INTF_ARGS>(runParam.cubeSOuterOffset - runParam.preTokensPerBatch,\n+                0, runParam.actualS2Size);\n+            runParam.s2LineEndIdx = ClipSInnerTokenCube<TEMPLATE_INTF_ARGS>(runParam.cubeSOuterOffset + runParam.nextTokensPerBatch +\n+                runParam.s1RealSize, 0, runParam.actualS2Size);\n+        }\n     }\n     runParam.s2LoopEndIdx = (runParam.s2LineEndIdx + s2BaseSize - 1) / s2BaseSize - sInnerFirstToken / s2BaseSize;\n     if constexpr (enableKVPrefix) {\n",
+      "new_file": false,
+      "new_path": "attention/common/op_kernel/arch35/infer_flash_attention_kvcache.h",
+      "old_path": "attention/common/op_kernel/arch35/infer_flash_attention_kvcache.h",
+      "removed_lines": 14,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/f68e0b5253c6911c46b00a3065b2c6b90a78efeb/attention/common/op_kernel/arch35/infer_flash_attention_kvcache.h",
+    "sha": "f68e0b5253c6911c46b00a3065b2c6b90a78efeb",
+    "source_branch": "9.0.0-beta.2",
+    "target_branch": "9.0.0-beta.2",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  },
+  {
+    "additions": 1,
+    "blob_id": "a7efc2e1e353ddda9713cf4ca0ff76ed2f3c8438",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/f68e0b5253c6911c46b00a3065b2c6b90a78efeb/attention/prompt_flash_attention/op_host/prompt_flash_attention_tiling_v2.cpp",
+    "deletions": 1,
+    "filename": "attention/prompt_flash_attention/op_host/prompt_flash_attention_tiling_v2.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 1,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -4733,7 +4733,7 @@ ge::graphStatus PromptFlashAttentionTilingV2::ComputeTilingData(ContextParamsFor\n             tilingData);\n     }\n \n-    if (enableIFA && !enablePFAMerge) {\n+    if (enableIFA && !enablePFAMerge && sparseModeVal == SPARSE_MODE_ALL_MASK) {\n         PromptAttentionSingleCoreParams* singleCoreParams = &tilingData.promptAttentionSingleCoreParams;\n         uint32_t sOuterSize = singleCoreParams->get_singleProcessSOuterSize();\n         uint64_t batchSize = tilingData.promptAttentionBaseParams.get_batchSize();\n",
+      "new_file": false,
+      "new_path": "attention/prompt_flash_attention/op_host/prompt_flash_attention_tiling_v2.cpp",
+      "old_path": "attention/prompt_flash_attention/op_host/prompt_flash_attention_tiling_v2.cpp",
+      "removed_lines": 1,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/f68e0b5253c6911c46b00a3065b2c6b90a78efeb/attention/prompt_flash_attention/op_host/prompt_flash_attention_tiling_v2.cpp",
+    "sha": "f68e0b5253c6911c46b00a3065b2c6b90a78efeb",
+    "source_branch": "9.0.0-beta.2",
+    "target_branch": "9.0.0-beta.2",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  },
+  {
+    "additions": 2,
+    "blob_id": "82e88586a502e4151c444a7e746ade04977e0967",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/f68e0b5253c6911c46b00a3065b2c6b90a78efeb/attention/prompt_flash_attention/tests/ut/op_host/arch35/test_prompt_flash_attention_tiling.cpp",
+    "deletions": 2,
+    "filename": "attention/prompt_flash_attention/tests/ut/op_host/arch35/test_prompt_flash_attention_tiling.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 2,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -486,7 +486,7 @@ TEST_F(PromptFlashAttentionTiling, PromptFlashAttention_950_tiling_10)\n             {\"inner_precise\", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)}\n         },\n         &compileInfo, \"Ascend950\", 64, 262144, 16384);\n-    int64_t expectTilingKey = 1206124800;\n+    int64_t expectTilingKey = 132382976;\n     std::string expectTilingData = \"\";\n     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData);\n }\n@@ -528,7 +528,7 @@ TEST_F(PromptFlashAttentionTiling, PromptFlashAttention_950_tiling_11)\n             {\"inner_precise\", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)}\n         },\n         &compileInfo, \"Ascend950\", 64, 262144, 16384);\n-    int64_t expectTilingKey = 1206124800;\n+    int64_t expectTilingKey = 132382976;\n     std::string expectTilingData = \"\";\n     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData);\n }\n",
+      "new_file": false,
+      "new_path": "attention/prompt_flash_attention/tests/ut/op_host/arch35/test_prompt_flash_attention_tiling.cpp",
+      "old_path": "attention/prompt_flash_attention/tests/ut/op_host/arch35/test_prompt_flash_attention_tiling.cpp",
+      "removed_lines": 2,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/f68e0b5253c6911c46b00a3065b2c6b90a78efeb/attention/prompt_flash_attention/tests/ut/op_host/arch35/test_prompt_flash_attention_tiling.cpp",
+    "sha": "f68e0b5253c6911c46b00a3065b2c6b90a78efeb",
+    "source_branch": "9.0.0-beta.2",
+    "target_branch": "9.0.0-beta.2",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  },
+  {
+    "additions": 1,
+    "blob_id": "4a53b1098b75997ec15ecabf3e292825f6f5c402",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/f68e0b5253c6911c46b00a3065b2c6b90a78efeb/experimental/attention/fused_infer_attention_score/README.md",
+    "deletions": 1,
+    "filename": "experimental/attention/fused_infer_attention_score/README.md",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 1,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -68,7 +68,7 @@ source /usr/local/Ascend/cann/set_env.sh\n # source ${install_path}/cann/set_env.sh\n ```\n ## 编译运行\n-**注意：首先确认自己的机器是哪种npu型号, 工程默认使用910b(A2)机器，如果是910c(A3)的机器,则需要修改编译命令，将编译命令中的-soc=ascend910b改成-soc=ascend910_93**\n+**注意：首先确认自己的机器是哪种npu型号, 工程默认使用910b(A2)机器，如果是910c(A3)的机器，则需要修改编译命令，将编译命令中的-soc=ascend910b改成-soc=ascend910_93**\n \n 提供两种方式运行本Demo\n - 一键式安装运行(run.sh脚本默认使用A2命令编译，若在A3上运行需要自行修改脚本内的编译命令)\n",
+      "new_file": false,
+      "new_path": "experimental/attention/fused_infer_attention_score/README.md",
+      "old_path": "experimental/attention/fused_infer_attention_score/README.md",
+      "removed_lines": 1,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/f68e0b5253c6911c46b00a3065b2c6b90a78efeb/experimental/attention/fused_infer_attention_score/README.md",
+    "sha": "f68e0b5253c6911c46b00a3065b2c6b90a78efeb",
+    "source_branch": "9.0.0-beta.2",
+    "target_branch": "9.0.0-beta.2",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  }
+]

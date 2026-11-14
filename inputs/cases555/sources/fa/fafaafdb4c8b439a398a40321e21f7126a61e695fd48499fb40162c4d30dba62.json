@@ -1,0 +1,182 @@
+[
+  {
+    "additions": 1,
+    "blob_id": "006ef0b6ebfc64d05fb6e71d667deabd1caca67c",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/b4872b55b1221e7026258b5af3354dc20237ff13/conv/common/op_host/op_tiling/arch35/conv_api_tiling_algorithm_BBmode.cpp",
+    "deletions": 1,
+    "filename": "conv/common/op_host/op_tiling/arch35/conv_api_tiling_algorithm_BBmode.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 1,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -986,7 +986,7 @@ int64_t ConvTilingAlgorithmBBmode::KAllSplit::GetCinL1(ConvTilingAlgorithmBBmode\n }\n \n bool ConvTilingAlgorithmBBmode::KAllSplit::MultiLoadKAllSplit(ConvTilingAlgorithmBBmode* bbPtr,\n-    const Kl1MultiAxis& kL1MultiAxis)\n+    const Kl1MultiAxis& kL1MultiAxis) const\n {\n     bool ret = false;\n     if (kL1MultiAxis == Kl1MultiAxis::KAL1) {\n",
+      "new_file": false,
+      "new_path": "conv/common/op_host/op_tiling/arch35/conv_api_tiling_algorithm_BBmode.cpp",
+      "old_path": "conv/common/op_host/op_tiling/arch35/conv_api_tiling_algorithm_BBmode.cpp",
+      "removed_lines": 1,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/b4872b55b1221e7026258b5af3354dc20237ff13/conv/common/op_host/op_tiling/arch35/conv_api_tiling_algorithm_BBmode.cpp",
+    "sha": "b4872b55b1221e7026258b5af3354dc20237ff13",
+    "source_branch": "conv1d_error",
+    "source_project": {
+      "full_name": "demon_coffee/ops-nn",
+      "human_name": "demon_coffee / ops-nn",
+      "id": 8750662,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 1,
+    "blob_id": "606d4a0efce8d6a8d828cbf24d82128d36c187e6",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/b4872b55b1221e7026258b5af3354dc20237ff13/conv/common/op_host/op_tiling/arch35/conv_api_tiling_algorithm_BBmode.h",
+    "deletions": 1,
+    "filename": "conv/common/op_host/op_tiling/arch35/conv_api_tiling_algorithm_BBmode.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 1,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -117,7 +117,7 @@ public:\n         bool GetL1LoadStrategy(ConvTilingAlgorithmBBmode* bbPtr) override;\n         bool GetL1LoadTilingParams(ConvTilingAlgorithmBBmode* bbPtr) override;\n         bool MultiLoadKAllSplit(ConvTilingAlgorithmBBmode* bbPtr);\n-        bool MultiLoadKAllSplit(ConvTilingAlgorithmBBmode* bbPtr, const Kl1MultiAxis& kL1MultiAxis);\n+        bool MultiLoadKAllSplit(ConvTilingAlgorithmBBmode* bbPtr, const Kl1MultiAxis& kL1MultiAxis) const;\n         int64_t GetCinL1(ConvTilingAlgorithmBBmode* bbPtr) const;\n     };\n \n",
+      "new_file": false,
+      "new_path": "conv/common/op_host/op_tiling/arch35/conv_api_tiling_algorithm_BBmode.h",
+      "old_path": "conv/common/op_host/op_tiling/arch35/conv_api_tiling_algorithm_BBmode.h",
+      "removed_lines": 1,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/b4872b55b1221e7026258b5af3354dc20237ff13/conv/common/op_host/op_tiling/arch35/conv_api_tiling_algorithm_BBmode.h",
+    "sha": "b4872b55b1221e7026258b5af3354dc20237ff13",
+    "source_branch": "conv1d_error",
+    "source_project": {
+      "full_name": "demon_coffee/ops-nn",
+      "human_name": "demon_coffee / ops-nn",
+      "id": 8750662,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 4,
+    "blob_id": "99b7b076694bf9927da4505d5dca72679e52946f",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/b4872b55b1221e7026258b5af3354dc20237ff13/conv/common/op_host/op_tiling/arch35/conv_api_tiling_algorithm_Mmode.cpp",
+    "deletions": 2,
+    "filename": "conv/common/op_host/op_tiling/arch35/conv_api_tiling_algorithm_Mmode.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 4,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -915,8 +915,10 @@ void ConvTilingAlgorithmMmode::CalFormulaicInnerBatch()\n     } else {\n         currentFmapK = static_cast<uint64_t>(tilingIns_->shapeInfo.orgWi * tilingIns_->shapeInfo.orgHi) * l0TilingParams.kL0 * this->fMapDTypeSize * CONST_VALUE_2;\n     }\n-    uint64_t innerBatchLimit3 = (tilingIns_->platformInfo.l1Size - currentBiasL1Size - currentWeightL1Size) / currentFmapK;\n-    \n+    bool isL1SizeOverFlow = currentBiasL1Size + currentWeightL1Size > tilingIns_->platformInfo.l1Size;\n+    uint64_t innerBatchLimit3 = isL1SizeOverFlow ? 0 :\n+        (tilingIns_->platformInfo.l1Size - currentBiasL1Size - currentWeightL1Size) / currentFmapK;\n+\n     uint64_t innerBatchLimit4 = tilingIns_->shapeInfo.singleBatch;\n     if (innerBatchLimit1 == 0 || innerBatchLimit2 == 0 || innerBatchLimit3 == 0 || innerBatchLimit4 == 0) {\n         tilingIns_->enableInnerBatch = false;\n",
+      "new_file": false,
+      "new_path": "conv/common/op_host/op_tiling/arch35/conv_api_tiling_algorithm_Mmode.cpp",
+      "old_path": "conv/common/op_host/op_tiling/arch35/conv_api_tiling_algorithm_Mmode.cpp",
+      "removed_lines": 2,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/b4872b55b1221e7026258b5af3354dc20237ff13/conv/common/op_host/op_tiling/arch35/conv_api_tiling_algorithm_Mmode.cpp",
+    "sha": "b4872b55b1221e7026258b5af3354dc20237ff13",
+    "source_branch": "conv1d_error",
+    "source_project": {
+      "full_name": "demon_coffee/ops-nn",
+      "human_name": "demon_coffee / ops-nn",
+      "id": 8750662,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 3,
+    "blob_id": "98be6965660c5457a7cba1a2fe42e39cabee48a5",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/b4872b55b1221e7026258b5af3354dc20237ff13/conv/conv2d_v2/op_host/op_tiling/arch35/conv2d_v2_base_tiling_fast_tiling.cpp",
+    "deletions": 0,
+    "filename": "conv/conv2d_v2/op_host/op_tiling/arch35/conv2d_v2_base_tiling_fast_tiling.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 3,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -157,6 +157,9 @@ ge::graphStatus Conv2dBaseTiling::GetTilingSplitMode()\n \n void Conv2dBaseTiling::SelectMModeAlgorithm()\n {\n+    if (shapeInfo_.hi <= CONST_VALUE_2) {\n+        return;\n+    }\n     flagInfo_.mBasicBlockFlag = false;\n     uint64_t basicBlockM = 0;\n     uint64_t basicBlockN = 0;\n",
+      "new_file": false,
+      "new_path": "conv/conv2d_v2/op_host/op_tiling/arch35/conv2d_v2_base_tiling_fast_tiling.cpp",
+      "old_path": "conv/conv2d_v2/op_host/op_tiling/arch35/conv2d_v2_base_tiling_fast_tiling.cpp",
+      "removed_lines": 0,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/b4872b55b1221e7026258b5af3354dc20237ff13/conv/conv2d_v2/op_host/op_tiling/arch35/conv2d_v2_base_tiling_fast_tiling.cpp",
+    "sha": "b4872b55b1221e7026258b5af3354dc20237ff13",
+    "source_branch": "conv1d_error",
+    "source_project": {
+      "full_name": "demon_coffee/ops-nn",
+      "human_name": "demon_coffee / ops-nn",
+      "id": 8750662,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 9,
+    "blob_id": "afbf8e86bf1f72430ecb3c2e90e637c8fe3f6907",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/b4872b55b1221e7026258b5af3354dc20237ff13/conv/conv2d_v2/tests/ut/op_tiling/test_conv2d_v2_ascendc_tiling.cpp",
+    "deletions": 3,
+    "filename": "conv/conv2d_v2/tests/ut/op_tiling/test_conv2d_v2_ascendc_tiling.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 9,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -2620,8 +2620,14 @@ TEST_F(Conv2dv2Tiling, run_conv2d_case_NCHW_dma_groups_8) {\n    Conv2DTestCase({4,35,224,224}, {765,32,79}, {3,3,3,3}, {32,32}, {1,1}, ge::DT_BF16, 1, 0, false, 5, \"SPECIFIC\", false, \"NCHW\");\n }\n TEST_F(Conv2dv2Tiling, run_conv2d_case_NCHW_MMode_groups) {\n- \tConv2DTestCase({1,6,142,132}, {6,3,3}, {0,0,0,0}, {56,56}, {1,1}, ge::DT_HIFLOAT8, 0, 0, false, 6, \"SPECIFIC\", false, \"NCHW\");\n-} \t \n+   Conv2DTestCase({1,6,142,132}, {6,3,3}, {0,0,0,0}, {56,56}, {1,1}, ge::DT_HIFLOAT8, 0, 0, false, 6, \"SPECIFIC\", false, \"NCHW\");\n+}\n TEST_F(Conv2dv2Tiling, run_conv2d_case_NCHW_opt_groups) {\n- \tConv2DTestCase({1,40,29,595}, {80,11,11}, {4,4,5,5}, {43,15}, {1,44}, ge::DT_BF16, 0, 0, false, 2, \"SPECIFIC\", false, \"NCHW\");\n+   Conv2DTestCase({1,40,29,595}, {80,11,11}, {4,4,5,5}, {43,15}, {1,44}, ge::DT_BF16, 0, 0, false, 2, \"SPECIFIC\", false, \"NCHW\");\n+}\n+TEST_F(Conv2dv2Tiling, run_conv1d_Msplit_fp16_case1) {\n+   Conv2DTestCase({64,1024,1,1376}, {256,1,255}, {0,0,134,0}, {1,11}, {1,2}, ge::DT_FLOAT16, 0, 0, false, 1, \"SPECIFIC\", false, \"NCHW\");\n+}\n+TEST_F(Conv2dv2Tiling, run_conv2d_case_l1size_overflow) {\n+   Conv2DTestCase({256,128,267,9}, {256,105,6}, {47,49,2,4}, {41,7}, {1,1}, ge::DT_HIFLOAT8, 1, 0, false, 1, \"SPECIFIC\", false, \"NCHW\");\n }\n\\ No newline at end of file\n",
+      "new_file": false,
+      "new_path": "conv/conv2d_v2/tests/ut/op_tiling/test_conv2d_v2_ascendc_tiling.cpp",
+      "old_path": "conv/conv2d_v2/tests/ut/op_tiling/test_conv2d_v2_ascendc_tiling.cpp",
+      "removed_lines": 3,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/b4872b55b1221e7026258b5af3354dc20237ff13/conv/conv2d_v2/tests/ut/op_tiling/test_conv2d_v2_ascendc_tiling.cpp",
+    "sha": "b4872b55b1221e7026258b5af3354dc20237ff13",
+    "source_branch": "conv1d_error",
+    "source_project": {
+      "full_name": "demon_coffee/ops-nn",
+      "human_name": "demon_coffee / ops-nn",
+      "id": 8750662,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  }
+]

@@ -1,0 +1,470 @@
+[
+  {
+    "additions": 31,
+    "blob_id": "591fc727f5022ec8f47eedb5e663e93c8602c230",
+    "blob_url": "https://gitcode.com/cann/ops-math/blob/666fb856601965b4b04f2491c3a6e686eb85e599/math/mul/op_api/mul.cpp",
+    "deletions": 0,
+    "filename": "math/mul/op_api/mul.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 31,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -143,4 +143,35 @@ const aclTensor *Mul(const aclTensor *self, const aclTensor *other, aclOpExecuto\n   return MulAiCpu(self, other, mulOut, executor);\n }\n \n+const aclTensor *MulInplace(const aclTensor *self, const aclTensor *rfRes, aclOpExecutor *executor) {\n+  Shape broadcastShape;\n+  OP_CHECK_BROADCAST_AND_INFER_SHAPE(self, rfRes, broadcastShape, return nullptr);\n+\n+  // 校验输出tensor的shape和rfRes tensor一致\n+  if (broadcastShape != rfRes->GetViewShape()) {\n+      OP_LOGE(ACLNN_ERR_PARAM_INVALID, \"self and rfRes broadcastShape [%s] not equal to rfRes shape [%s], do no support inplace from the 'rfRes' tensor!\", \n+          op::ToString(broadcastShape).GetString(), op::ToString(rfRes->GetViewShape()).GetString());\n+      return nullptr;\n+  }\n+\n+  // 校验输出tensor的dtype和rfRes tensor一致\n+  bool isMixDataType = (self->GetDataType() == DataType::DT_FLOAT16 && rfRes->GetDataType() == DataType::DT_FLOAT) ||\n+                        (self->GetDataType() == DataType::DT_FLOAT && rfRes->GetDataType() == DataType::DT_FLOAT16) ||\n+                        (self->GetDataType() == DataType::DT_BF16 && rfRes->GetDataType() == DataType::DT_FLOAT) ||\n+                        (self->GetDataType() == DataType::DT_FLOAT && rfRes->GetDataType() == DataType::DT_BF16);\n+  if (isMixDataType && (rfRes->GetDataType() == DataType::DT_FLOAT16 || rfRes->GetDataType() == DataType::DT_BF16)) {\n+      OP_LOGE(ACLNN_ERR_PARAM_INVALID, \"out dtype DataType::DT_FLOAT not equal to rfRes dtype [%s], do no support inplace from the 'rfRes' tensor!\", \n+          op::ToString(rfRes->GetDataType()).GetString());\n+      return nullptr;\n+  }\n+\n+  auto mulOut = const_cast<aclTensor*>(rfRes);\n+\n+  if (isMixDataType || (IsAiCoreSupport(self) && IsAiCoreSupport(rfRes)) || IsDoubleSupport(self, rfRes)) {\n+    return MulAiCore(self, rfRes, mulOut, executor);\n+  }\n+\n+  return MulAiCpu(self, rfRes, mulOut, executor);\n+}\n+\n } // namespace l0op\n",
+      "new_file": false,
+      "new_path": "math/mul/op_api/mul.cpp",
+      "old_path": "math/mul/op_api/mul.cpp",
+      "removed_lines": 0,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-math/raw/666fb856601965b4b04f2491c3a6e686eb85e599/math/mul/op_api/mul.cpp",
+    "sha": "666fb856601965b4b04f2491c3a6e686eb85e599",
+    "source_branch": "normalFix_c11",
+    "source_project": {
+      "full_name": "gh_M/ops-math_0706",
+      "human_name": "gh_M / ops-math_0706",
+      "id": 10305335,
+      "path": "ops-math_0706"
+    },
+    "target_branch": "9.1.0",
+    "target_project": {
+      "full_name": "cann/ops-math",
+      "human_name": "CANN / ops-math",
+      "id": 7649531,
+      "path": "ops-math"
+    }
+  },
+  {
+    "additions": 2,
+    "blob_id": "dcf4fee7422d4f0553f4b9629fec540394a734db",
+    "blob_url": "https://gitcode.com/cann/ops-math/blob/666fb856601965b4b04f2491c3a6e686eb85e599/math/mul/op_api/mul.h",
+    "deletions": 1,
+    "filename": "math/mul/op_api/mul.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 2,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -15,7 +15,8 @@\n \n namespace l0op {\n const aclTensor *Mul(const aclTensor *self, const aclTensor *other, aclOpExecutor *executor);\n-    bool IsMulSupportNonContiguous(const aclTensor* self, const aclTensor *other);\n+bool IsMulSupportNonContiguous(const aclTensor* self, const aclTensor *other);\n+const aclTensor *MulInplace(const aclTensor *self, const aclTensor *rfRes, aclOpExecutor *executor);\n }\n \n #endif // OP_API_INC_LEVEL0_MUL_H_\n",
+      "new_file": false,
+      "new_path": "math/mul/op_api/mul.h",
+      "old_path": "math/mul/op_api/mul.h",
+      "removed_lines": 1,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-math/raw/666fb856601965b4b04f2491c3a6e686eb85e599/math/mul/op_api/mul.h",
+    "sha": "666fb856601965b4b04f2491c3a6e686eb85e599",
+    "source_branch": "normalFix_c11",
+    "source_project": {
+      "full_name": "gh_M/ops-math_0706",
+      "human_name": "gh_M / ops-math_0706",
+      "id": 10305335,
+      "path": "ops-math_0706"
+    },
+    "target_branch": "9.1.0",
+    "target_project": {
+      "full_name": "cann/ops-math",
+      "human_name": "CANN / ops-math",
+      "id": 7649531,
+      "path": "ops-math"
+    }
+  },
+  {
+    "additions": 40,
+    "blob_id": "c245bf53e2713383e8fe5cec74f43c61e8bc1e6e",
+    "blob_url": "https://gitcode.com/cann/ops-math/blob/666fb856601965b4b04f2491c3a6e686eb85e599/random/dsa_random_normal/op_host/op_api/aclnn_normal.cpp",
+    "deletions": 130,
+    "filename": "random/dsa_random_normal/op_host/op_api/aclnn_normal.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 40,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -15,7 +15,6 @@\n #include \"random/stateless_random_normal_v2/op_api/stateless_random_normal_v2.h\"\n #include \"random/stateless_random_normal_v3/op_api/stateless_random_normal_v3.h\"\n #include \"random/stateless_normal/op_api/stateless_normal.h\"\n-#include \"conversion/broadcast_to/op_api/broadcast_to.h\"\n #include \"dsa_random_normal.h\"\n #include \"../../../../conversion/concat_d/op_api/concat_d.h\"\n #include \"opdev/platform.h\"\n@@ -147,9 +146,8 @@ static aclTensor* ProcessOffsetTensor(const aclTensor* offsetTensor, int64_t off\n }\n \n // DT_DOUBLE 路径：StatelessRandomNormalV2 + Mul(std) + Add(mean)\n-static const aclTensor* normalDoublePath(\n-    const aclTensor* selfContiguous, const aclTensor* stateLessOut,\n-    float mean, float std, aclOpExecutor* executor)\n+static const aclTensor* normalDoublePath(const aclTensor* selfContiguous, const aclTensor* stateLessOut, float mean,\n+                                         float std, aclOpExecutor* executor)\n {\n     CHECK_RET(stateLessOut != nullptr, nullptr);\n \n@@ -166,61 +164,19 @@ static const aclTensor* normalDoublePath(\n }\n \n // 非DSA路径的 normal 正态分布计算\n-static const aclTensor* normalDavidPath(\n-    const aclTensor* selfContiguous, int64_t seed, int64_t offset,\n-    float mean, float std, aclOpExecutor* executor)\n+static const aclTensor* normalDavidPath(const aclTensor* selfContiguous, int64_t seed, int64_t offset, float mean,\n+                                        float std, aclOpExecutor* executor)\n {\n-    if (GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510 && selfContiguous->GetDataType() != DataType::DT_DOUBLE) {\n-        if (!aclnnGetPytorchRandom()) {\n-            OP_LOGD(\"compat mode, use V3 uniform\");\n-            // seed转化为key\n-            FVector<int64_t, op::MAX_DIM_NUM> key_vec = {seed};\n-            auto keyArr = executor->AllocIntArray(key_vec.data(), key_vec.size());\n+    if (GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510 &&\n+        selfContiguous->GetDataType() != DataType::DT_DOUBLE) {\n+        // 精度等价：kernel 内 z * static_cast<float>(std) + static_cast<float>(mean) 在 fp32 下完成，\n+        // 最终 static_cast<T>(result) 仅一次 fp32→T 舍入，与原来 L2 层 Mul+Add+外层Cast 等价\n+        FVector<float> meanVector = {mean};\n+        auto meanTensor = executor->ConvertToTensor(meanVector.data(), meanVector.size(), op::DataType::DT_FLOAT);\n+        FVector<float> stdVector = {std};\n+        auto stdTensor = executor->ConvertToTensor(stdVector.data(), stdVector.size(), op::DataType::DT_FLOAT);\n \n-            // offset转化为counter\n-            FVector<int64_t, op::MAX_DIM_NUM> counter_vec = {0, offset};\n-            auto counterArr = executor->AllocIntArray(counter_vec.data(), counter_vec.size());\n-            FVector<float> meanVector = {mean};\n-            auto meanTensorV3 = executor->ConvertToTensor(meanVector.data(), meanVector.size(), op::DataType::DT_FLOAT);\n-\n-            FVector<float> stdVector = {std};\n-            auto stdTensorV3 = executor->ConvertToTensor(stdVector.data(), stdVector.size(), op::DataType::DT_FLOAT);\n-            // 调用normal_算子kernel function(AI Core算子)\n-            return l0op::StatelessRandomNormalV3(\n-            selfContiguous, keyArr, counterArr, meanTensorV3, stdTensorV3, executor);\n-        }\n-        // V4 标量路径：对标 PyTorch normal_(scalar_mean, scalar_std) 单步 FMA\n-        // PyTorch 在 float 精度下计算 z * std + mean，最后一次 cast 到目标 dtype\n-        auto selfFloat = (selfContiguous->GetDataType() != DataType::DT_FLOAT)\n-            ? l0op::Cast(selfContiguous, op::DataType::DT_FLOAT, executor)\n-            : selfContiguous;\n-        CHECK_RET(selfFloat != nullptr, nullptr);\n-\n-        FVector<float> zeroMeanVector = {0.0f};\n-        auto zeroMeanTensor = executor->ConvertToTensor(\n-            zeroMeanVector.data(), zeroMeanVector.size(), op::DataType::DT_FLOAT);\n-        FVector<float> oneStdVector = {1.0f};\n-        auto oneStdTensor = executor->ConvertToTensor(\n-            oneStdVector.data(), oneStdVector.size(), op::DataType::DT_FLOAT);\n-\n-        auto outDims = op::ToShapeVector(selfContiguous->GetViewShape());\n-        auto outShapeArray = executor->AllocIntArray(outDims.data(), outDims.size());\n-        zeroMeanTensor = l0op::BroadcastTo(zeroMeanTensor, outShapeArray, executor);\n-        oneStdTensor = l0op::BroadcastTo(oneStdTensor, outShapeArray, executor);\n-\n-        auto normalOut = l0op::StatelessNormal(\n-            selfFloat, seed, offset, zeroMeanTensor, oneStdTensor, executor);\n-        CHECK_RET(normalOut != nullptr, nullptr);\n-\n-        // fp32 下做 z * std + mean（全程 fp32，无中间舍入）\n-        auto stdScalar = executor->AllocScalar(std);\n-        auto stdTensor = executor->ConvertToTensor(stdScalar, op::DataType::DT_FLOAT);\n-        auto mulOut = l0op::Mul(normalOut, stdTensor, executor);\n-        CHECK_RET(mulOut != nullptr, nullptr);\n-\n-        auto meanScalar = executor->AllocScalar(mean);\n-        auto meanTensor = executor->ConvertToTensor(meanScalar, op::DataType::DT_FLOAT);\n-        return l0op::Add(mulOut, meanTensor, executor);\n+        return l0op::StatelessNormal(selfContiguous, seed, offset, meanTensor, stdTensor, executor);\n     } else {\n         // V2 路径：seed 转化为 key，offset 转化为 counter\n         FVector<int64_t, op::MAX_DIM_NUM> key_vec = {seed};\n@@ -233,16 +189,15 @@ static const aclTensor* normalDavidPath(\n         int64_t alg = 1;\n         auto algScalar = executor->AllocScalar(&alg, DataType::DT_INT32);\n         const aclTensor* algTensor = executor->ConvertToTensor(algScalar, op::ToOpDataType(ACL_INT32));\n-        auto stateLessOut =\n-            l0op::StatelessRandomNormalV2(selfContiguous, keyArr, counterArr, algTensor, executor);\n+        auto stateLessOut = l0op::StatelessRandomNormalV2(selfContiguous, keyArr, counterArr, algTensor, executor);\n         return normalDoublePath(selfContiguous, stateLessOut, mean, std, executor);\n     }\n }\n \n // 非DSA路径的 normal 正态分布计算（Tensor seed/offset 版本）\n-static const aclTensor* normalTensorDavidPath(\n-    const aclTensor* selfContiguous, const aclTensor* seedTensor, const aclTensor* offsetTensor,\n-    int64_t offset, float mean, float std, aclOpExecutor* executor)\n+static const aclTensor* normalTensorDavidPath(const aclTensor* selfContiguous, const aclTensor* seedTensor,\n+                                              const aclTensor* offsetTensor, int64_t offset, float mean, float std,\n+                                              aclOpExecutor* executor)\n {\n     if (seedTensor->GetDataType() != op::DataType::DT_INT64) {\n         OP_LOGE(ACLNN_ERR_PARAM_INVALID, \"Normal seedTensor dtype must be DT_INT64, got %s.\",\n@@ -255,64 +210,20 @@ static const aclTensor* normalTensorDavidPath(\n         return nullptr;\n     }\n \n-    if (GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510 && selfContiguous->GetDataType() != DataType::DT_DOUBLE) {\n-        if (!aclnnGetPytorchRandom()) {\n-            OP_LOGD(\"compat mode, use V3 uniform\");\n-            // seedTensor/offsetTensor 从 int64 Cast 为 uint64（V3 OpDef 要求 uint64）\n-            auto normalSeedU64 = l0op::Cast(seedTensor, op::DataType::DT_UINT64, executor);\n-            CHECK_RET(normalSeedU64 != nullptr, nullptr);\n-            auto normalOffsetU64 = l0op::Cast(offsetTensor, op::DataType::DT_UINT64, executor);\n-            CHECK_RET(normalOffsetU64 != nullptr, nullptr);\n-\n-            FVector<int64_t> offsetVector{0, static_cast<int64_t>(offset)};\n-            aclIntArray* offsetList = executor->AllocIntArray(offsetVector.data(), 2);\n-            auto tmpTensor = executor->ConvertToTensor(offsetList, op::DataType::DT_UINT64);\n-            auto resultAddOut = l0op::Add(normalOffsetU64, tmpTensor, executor);\n-            CHECK_RET(resultAddOut != nullptr, nullptr);\n-            FVector<float> meanVector = {mean};\n-            auto meanTensorV3 = executor->ConvertToTensor(meanVector.data(), meanVector.size(), op::DataType::DT_FLOAT);\n-            FVector<float> stdVector = {std};\n-            auto stdTensorV3 = executor->ConvertToTensor(stdVector.data(), stdVector.size(), op::DataType::DT_FLOAT);\n-            return l0op::StatelessRandomNormalV3(\n-                selfContiguous, normalSeedU64, resultAddOut, meanTensorV3, stdTensorV3, executor);\n-        }\n-        // V4 标量路径：对标 PyTorch normal_(scalar_mean, scalar_std) 单步 FMA\n+    if (GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510 &&\n+        selfContiguous->GetDataType() != DataType::DT_DOUBLE) {\n+        // 精度等价论证同 normalDavidPath 改造\n         FVector<int64_t> offsetVector{static_cast<int64_t>(offset)};\n         auto tmpTensor = executor->ConvertToTensor(offsetVector.data(), offsetVector.size(), op::DataType::DT_INT64);\n         auto resultAddOut = l0op::Add(offsetTensor, tmpTensor, executor);\n         CHECK_RET(resultAddOut != nullptr, nullptr);\n \n-        // Step 1: Kernel 以 fp32 生成 N(0,1)\n-        auto selfFloat = (selfContiguous->GetDataType() != DataType::DT_FLOAT)\n-            ? l0op::Cast(selfContiguous, op::DataType::DT_FLOAT, executor)\n-            : selfContiguous;\n-        CHECK_RET(selfFloat != nullptr, nullptr);\n+        FVector<float> meanVector = {mean};\n+        auto meanTensor = executor->ConvertToTensor(meanVector.data(), meanVector.size(), op::DataType::DT_FLOAT);\n+        FVector<float> stdVector = {std};\n+        auto stdTensor = executor->ConvertToTensor(stdVector.data(), stdVector.size(), op::DataType::DT_FLOAT);\n \n-        FVector<float> zeroMeanVector = {0.0f};\n-        auto zeroMeanTensor = executor->ConvertToTensor(\n-            zeroMeanVector.data(), zeroMeanVector.size(), op::DataType::DT_FLOAT);\n-        FVector<float> oneStdVector = {1.0f};\n-        auto oneStdTensor = executor->ConvertToTensor(\n-            oneStdVector.data(), oneStdVector.size(), op::DataType::DT_FLOAT);\n-\n-        auto outDims = op::ToShapeVector(selfContiguous->GetViewShape());\n-        auto outShapeArray = executor->AllocIntArray(outDims.data(), outDims.size());\n-        zeroMeanTensor = l0op::BroadcastTo(zeroMeanTensor, outShapeArray, executor);\n-        oneStdTensor = l0op::BroadcastTo(oneStdTensor, outShapeArray, executor);\n-\n-        auto normalOut = l0op::StatelessNormal(\n-            selfFloat, seedTensor, resultAddOut, zeroMeanTensor, oneStdTensor, executor);\n-        CHECK_RET(normalOut != nullptr, nullptr);\n-\n-        // Step 2: fp32 下做 z * std + mean\n-        auto stdScalar = executor->AllocScalar(std);\n-        auto stdTensor = executor->ConvertToTensor(stdScalar, op::DataType::DT_FLOAT);\n-        auto mulOut = l0op::Mul(normalOut, stdTensor, executor);\n-        CHECK_RET(mulOut != nullptr, nullptr);\n-\n-        auto meanScalar = executor->AllocScalar(mean);\n-        auto meanTensor = executor->ConvertToTensor(meanScalar, op::DataType::DT_FLOAT);\n-        return l0op::Add(mulOut, meanTensor, executor);\n+        return l0op::StatelessNormal(selfContiguous, seedTensor, resultAddOut, meanTensor, stdTensor, executor);\n     } else {\n         // V2 路径：保持原有 Cast/concat 逻辑\n         auto normalSeedU64 = l0op::Cast(seedTensor, op::DataType::DT_UINT64, executor);\n@@ -329,8 +240,8 @@ static const aclTensor* normalTensorDavidPath(\n         int64_t alg = 1;\n         auto algScalar = executor->AllocScalar(&alg, DataType::DT_INT32);\n         const aclTensor* algTensor = executor->ConvertToTensor(algScalar, op::ToOpDataType(ACL_INT32));\n-        auto stateLessOut =\n-            l0op::StatelessRandomNormalV2(selfContiguous, normalSeedU64, resultAddOut, algTensor, executor);\n+        auto stateLessOut = l0op::StatelessRandomNormalV2(selfContiguous, normalSeedU64, resultAddOut, algTensor,\n+                                                          executor);\n         return normalDoublePath(selfContiguous, stateLessOut, mean, std, executor);\n     }\n }\n@@ -338,9 +249,8 @@ static const aclTensor* normalTensorDavidPath(\n /**\n  * torch.Tensor.normal_()的API的总体调用流程\n  */\n-aclnnStatus aclnnInplaceNormalGetWorkspaceSize(\n-    const aclTensor* selfRef, float mean, float std, int64_t seed, int64_t offset, uint64_t* workspaceSize,\n-    aclOpExecutor** executor)\n+aclnnStatus aclnnInplaceNormalGetWorkspaceSize(const aclTensor* selfRef, float mean, float std, int64_t seed,\n+                                               int64_t offset, uint64_t* workspaceSize, aclOpExecutor** executor)\n {\n     OP_CHECK_COMM_INPUT(workspaceSize, executor);\n \n@@ -402,14 +312,14 @@ aclnnStatus aclnnInplaceNormalGetWorkspaceSize(\n     return ACLNN_SUCCESS;\n }\n \n-aclnnStatus aclnnInplaceNormalTensorGetWorkspaceSize(\n-    const aclTensor* selfRef, float mean, float std, const aclTensor* seedTensor, const aclTensor* offsetTensor,\n-    int64_t offset, uint64_t* workspaceSize, aclOpExecutor** executor)\n+aclnnStatus aclnnInplaceNormalTensorGetWorkspaceSize(const aclTensor* selfRef, float mean, float std,\n+                                                     const aclTensor* seedTensor, const aclTensor* offsetTensor,\n+                                                     int64_t offset, uint64_t* workspaceSize, aclOpExecutor** executor)\n {\n     OP_CHECK_COMM_INPUT(workspaceSize, executor);\n \n-    L2_DFX_PHASE_1(\n-        aclnnInplaceNormalTensor, DFX_IN(selfRef, mean, std, seedTensor, offsetTensor, offset), DFX_OUT(selfRef));\n+    L2_DFX_PHASE_1(aclnnInplaceNormalTensor, DFX_IN(selfRef, mean, std, seedTensor, offsetTensor, offset),\n+                   DFX_OUT(selfRef));\n     auto out = const_cast<aclTensor*>(selfRef);\n \n     // 固定写法，创建OpExecutor\n@@ -449,11 +359,11 @@ aclnnStatus aclnnInplaceNormalTensorGetWorkspaceSize(\n         CHECK_RET(stdScalar != nullptr, ACLNN_ERR_INNER_NULLPTR);\n         auto concatTensor = ProcessOffsetTensor(offsetTensor, offset, uniqueExecutor.get());\n         CHECK_RET(concatTensor != nullptr, ACLNN_ERR_INNER_NULLPTR);\n-        computeOut = l0op::DSARandomNormalTensor(\n-            inputShapeArray, seedTensor, concatTensor, meanScalar, stdScalar, uniqueExecutor.get());\n+        computeOut = l0op::DSARandomNormalTensor(inputShapeArray, seedTensor, concatTensor, meanScalar, stdScalar,\n+                                                 uniqueExecutor.get());\n     } else {\n-        computeOut = normalTensorDavidPath(\n-            selfContiguous, seedTensor, offsetTensor, offset, mean, std, uniqueExecutor.get());\n+        computeOut = normalTensorDavidPath(selfContiguous, seedTensor, offsetTensor, offset, mean, std,\n+                                           uniqueExecutor.get());\n     }\n     CHECK_RET(computeOut != nullptr, ACLNN_ERR_INNER_NULLPTR);\n \n@@ -477,8 +387,8 @@ aclnnStatus aclnnInplaceNormal(void* workspace, uint64_t workspaceSize, aclOpExe\n     return CommonOpExecutorRun(workspace, workspaceSize, executor, stream);\n }\n \n-aclnnStatus aclnnInplaceNormalTensor(\n-    void* workspace, uint64_t workspaceSize, aclOpExecutor* executor, aclrtStream stream)\n+aclnnStatus aclnnInplaceNormalTensor(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,\n+                                     aclrtStream stream)\n {\n     L2_DFX_PHASE_2(aclnnInplaceNormalTensor);\n     // 固定写法，调用框架能力，完成计算\n",
+      "new_file": false,
+      "new_path": "random/dsa_random_normal/op_host/op_api/aclnn_normal.cpp",
+      "old_path": "random/dsa_random_normal/op_host/op_api/aclnn_normal.cpp",
+      "removed_lines": 130,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-math/raw/666fb856601965b4b04f2491c3a6e686eb85e599/random/dsa_random_normal/op_host/op_api/aclnn_normal.cpp",
+    "sha": "666fb856601965b4b04f2491c3a6e686eb85e599",
+    "source_branch": "normalFix_c11",
+    "source_project": {
+      "full_name": "gh_M/ops-math_0706",
+      "human_name": "gh_M / ops-math_0706",
+      "id": 10305335,
+      "path": "ops-math_0706"
+    },
+    "target_branch": "9.1.0",
+    "target_project": {
+      "full_name": "cann/ops-math",
+      "human_name": "CANN / ops-math",
+      "id": 7649531,
+      "path": "ops-math"
+    }
+  },
+  {
+    "additions": 2,
+    "blob_id": "13b7d352917b3a46bb7caf7fa088414550fab4ba",
+    "blob_url": "https://gitcode.com/cann/ops-math/blob/666fb856601965b4b04f2491c3a6e686eb85e599/random/stateless_normal/op_graph/stateless_normal_proto.h",
+    "deletions": 2,
+    "filename": "random/stateless_normal/op_graph/stateless_normal_proto.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 2,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -28,8 +28,8 @@ namespace ge {\n * @li shape: 1-D. The shape of the output tensor. Must be one of the following types: int64.\r\n * @li seed: 0-D. Seed for the Philox4x32-10 RNG algorithm. Must be one of the following types: int64.\r\n * @li offset: 0-D. Offset for the Philox4x32-10 RNG algorithm. Must be one of the following types: int64.\r\n-* @li mean: Scalar or tensor. Mean of the normal distribution. Must be one of the following types: float, float16, bfloat16.\r\n-* @li std: Scalar or tensor. Standard deviation of the normal distribution. Must be one of the following types: float, float16, bfloat16. \\n\r\n+* @li mean: Scalar or tensor. Mean of the normal distribution. Must be one of the following types: float, float16, bfloat16. Only the 0th element is used for calculation if a tensor is input.\r\n+* @li std: Scalar or tensor. Standard deviation of the normal distribution. Must be one of the following types: float, float16, bfloat16. Only the 0th element is used for calculation if a tensor is input. \\n\r\n \r\n * @par Attributes:\r\n * dtype: Output data type. Must be one of the following types: float16, bfloat16, float32.\r\n",
+      "new_file": false,
+      "new_path": "random/stateless_normal/op_graph/stateless_normal_proto.h",
+      "old_path": "random/stateless_normal/op_graph/stateless_normal_proto.h",
+      "removed_lines": 2,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-math/raw/666fb856601965b4b04f2491c3a6e686eb85e599/random/stateless_normal/op_graph/stateless_normal_proto.h",
+    "sha": "666fb856601965b4b04f2491c3a6e686eb85e599",
+    "source_branch": "normalFix_c11",
+    "source_project": {
+      "full_name": "gh_M/ops-math_0706",
+      "human_name": "gh_M / ops-math_0706",
+      "id": 10305335,
+      "path": "ops-math_0706"
+    },
+    "target_branch": "9.1.0",
+    "target_project": {
+      "full_name": "cann/ops-math",
+      "human_name": "CANN / ops-math",
+      "id": 7649531,
+      "path": "ops-math"
+    }
+  },
+  {
+    "additions": 0,
+    "blob_id": "3068e0bffa9b5bd987f6406f41df177428740700",
+    "blob_url": "https://gitcode.com/cann/ops-math/blob/666fb856601965b4b04f2491c3a6e686eb85e599/random/stateless_normal/op_host/arch35/stateless_normal_tiling_arch35.cpp",
+    "deletions": 30,
+    "filename": "random/stateless_normal/op_host/arch35/stateless_normal_tiling_arch35.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 0,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -81,36 +81,6 @@ StatelessNormalTiling::StatelessNormalTiling(gert::TilingContext* ctx)\n \r\n ge::graphStatus StatelessNormalTiling::UniqueProcess()\r\n {\r\n-    // L2 层已将 Size=1 的 mean/stdev 广播到 output shape，kernel 只需 BothTensor 路径\r\n-\r\n-    auto outputShape = context_->GetOutputShape(OUTPUT_IDX_Y);\r\n-    OP_CHECK_NULL_WITH_CONTEXT(context_, outputShape);\r\n-    int64_t outputSize = outputShape->GetStorageShape().GetShapeSize();\r\n-\r\n-    // 校验 mean/stdev shape 与 output 一致（L2 已完成广播）\r\n-    auto meanTensor = context_->GetInputTensor(INPUT_IDX_MEAN);\r\n-    OP_CHECK_NULL_WITH_CONTEXT(context_, meanTensor);\r\n-    int64_t meanSize = meanTensor->GetShapeSize();\r\n-    if (meanSize != outputSize) {\r\n-        std::string valueStr = std::to_string(meanSize) + \" and \" + std::to_string(outputSize);\r\n-        std::string reasonMsg = \"StatelessNormal requires mean shapeSize == output shapeSize\";\r\n-        OP_LOGE_FOR_INVALID_SHAPESIZES_WITH_REASON(context_->GetNodeName(), \"input mean\", valueStr.c_str(), reasonMsg.c_str());\r\n-        return ge::GRAPH_FAILED;\r\n-    }\r\n-\r\n-    auto stdevTensor = context_->GetInputTensor(INPUT_IDX_STDEV);\r\n-    OP_CHECK_NULL_WITH_CONTEXT(context_, stdevTensor);\r\n-    int64_t stdevSize = stdevTensor->GetShapeSize();\r\n-    if (stdevSize != outputSize) {\r\n-        std::string valueStr = std::to_string(stdevSize) + \" and \" + std::to_string(outputSize);\r\n-        std::string reasonMsg = \"StatelessNormal requires stdev shapeSize == output shapeSize\";\r\n-        OP_LOGE_FOR_INVALID_SHAPESIZES_WITH_REASON(context_->GetNodeName(), \"input stdev\", valueStr.c_str(), reasonMsg.c_str());\r\n-        return ge::GRAPH_FAILED;\r\n-    }\r\n-\r\n-    // SplitUntil32Bit + totalThreads/counterOffset/kernelOffset 全部由基类 enableSplitBlocks 自动完成\r\n-    // tilingKey 使用基类默认值 100（与 V3 一致），不再设置\r\n-\r\n     return ge::GRAPH_SUCCESS;\r\n }\r\n \r\n",
+      "new_file": false,
+      "new_path": "random/stateless_normal/op_host/arch35/stateless_normal_tiling_arch35.cpp",
+      "old_path": "random/stateless_normal/op_host/arch35/stateless_normal_tiling_arch35.cpp",
+      "removed_lines": 30,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-math/raw/666fb856601965b4b04f2491c3a6e686eb85e599/random/stateless_normal/op_host/arch35/stateless_normal_tiling_arch35.cpp",
+    "sha": "666fb856601965b4b04f2491c3a6e686eb85e599",
+    "source_branch": "normalFix_c11",
+    "source_project": {
+      "full_name": "gh_M/ops-math_0706",
+      "human_name": "gh_M / ops-math_0706",
+      "id": 10305335,
+      "path": "ops-math_0706"
+    },
+    "target_branch": "9.1.0",
+    "target_project": {
+      "full_name": "cann/ops-math",
+      "human_name": "CANN / ops-math",
+      "id": 7649531,
+      "path": "ops-math"
+    }
+  },
+  {
+    "additions": 26,
+    "blob_id": "bbc2ca64767fe273757f0b0996d987505cea7184",
+    "blob_url": "https://gitcode.com/cann/ops-math/blob/666fb856601965b4b04f2491c3a6e686eb85e599/random/stateless_normal/op_kernel/arch35/stateless_normal.h",
+    "deletions": 25,
+    "filename": "random/stateless_normal/op_kernel/arch35/stateless_normal.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 26,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -30,51 +30,46 @@ namespace StatelessNormalSimt {\n using namespace AscendC;\r\n using namespace RandomKernelBase;\r\n \r\n+static constexpr uint16_t NUM_TWO = 2;\r\n+\r\n // Box-Muller normal transform functor\r\n // mean/stdev are always float* (DT_FLOAT from L2 layer), output is T* (may be bf16/fp16/fp32)\r\n // For bf16/fp16: three-step rounding to match GPU normal_()→mul_(std)→add_(mean)\r\n-template <typename T>\r\n+template <typename T, typename M_T, typename S_T>\r\n struct NormalTransform {\r\n-    __gm__ volatile float* meanGM_;\r\n-    __gm__ volatile float* stdevGM_;\r\n+    M_T meanVal_;\r\n+    S_T stdVal_;\r\n \r\n-    __aicore__ NormalTransform(__gm__ volatile float* meanGM, __gm__ volatile float* stdevGM)\r\n-        : meanGM_(meanGM), stdevGM_(stdevGM) {}\r\n+    __aicore__ NormalTransform(M_T meanVal, S_T stdVal)\r\n+        : meanVal_(meanVal), stdVal_(stdVal) {}\r\n \r\n     __simt_callee__ __aicore__ inline void operator()(\r\n         __gm__ volatile T* outputGm, uint64_t li, const uint32_t* results, uint32_t iStep,\r\n         [[maybe_unused]] uint32_t unroll = 1)\r\n     {\r\n-        uint32_t pairBase = (iStep / 2) * 2;\r\n+        uint32_t pairBase = (iStep / NUM_TWO) * NUM_TWO;\r\n         float u1 = results[pairBase] * RAND_2POW32_INV + RAND_2POW32_INV_HALF;\r\n         float u2 = results[pairBase + 1] * RAND_2POW32_INV + RAND_2POW32_INV_HALF;\r\n         float z0, z1;\r\n         // 使用对齐torch版本的BoxMullerFloat，无需eps保护\r\n         BoxMullerFloat(u1, u2, &z0, &z1);\r\n-        float z = (iStep % 2 == 0) ? z0 : z1;\r\n-        if constexpr (IsSameType<T, float>::value) {\r\n-            // fp32: 无中间舍入，直接计算\r\n-            outputGm[li] = z * stdevGM_[li] + meanGM_[li];\r\n-        } else {\r\n-            // bf16/fp16: 严格对标 PyTorch GPU 三步舍入\r\n-            // GPU 内部: output.normal_(0,1) → output.mul_(std) → output.add_(mean)\r\n-            // 每步都在目标 dtype 上存储，产生中间舍入\r\n-            T zT = static_cast<T>(z);                                       // step1: normal_() 存为目标dtype\r\n-            T mulT = static_cast<T>(static_cast<float>(zT) * stdevGM_[li]); // step2: mul_(std) 在目标dtype下\r\n-            outputGm[li] = static_cast<T>(static_cast<float>(mulT) + meanGM_[li]); // step3: add_(mean) 在目标dtype下\r\n-        }\r\n+        float z = (iStep % NUM_TWO == 0) ? z0 : z1;\r\n+\r\n+        outputGm[li] = static_cast<T>(z * static_cast<float>(stdVal_) + static_cast<float>(meanVal_));\r\n     }\r\n };\r\n \r\n // Launcher: wraps VF_CALL for each split block, adjusts GM pointers by gmOffset\r\n // mean/stdev pointers are always float* (DT_FLOAT), output is T*\r\n-template <typename T>\r\n+template <typename T, typename M_T, typename S_T>\r\n struct NormalLauncher {\r\n     int64_t seed_;\r\n     int64_t realOffset_;\r\n     GM_ADDR yAddr_;\r\n     GM_ADDR meanAddr_;\r\n     GM_ADDR stdevAddr_;\r\n+    AscendC::GlobalTensor<M_T> meanGlobal_;\r\n+    AscendC::GlobalTensor<S_T> stdGlobal_;\r\n \r\n     __aicore__ NormalLauncher(int64_t seed, int64_t realOffset, GM_ADDR y, GM_ADDR mean, GM_ADDR stdev)\r\n         : seed_(seed), realOffset_(realOffset), yAddr_(y), meanAddr_(mean), stdevAddr_(stdev) {}\r\n@@ -89,11 +84,17 @@ struct NormalLauncher {\n     {\r\n         __gm__ volatile T* gmPtr = reinterpret_cast<__gm__ volatile T*>(yAddr_) + gmOffset;\r\n         // mean/stdev 始终按 float* 读取（L2 传入 DT_FLOAT tensor）\r\n-        __gm__ volatile float* meanPtr = reinterpret_cast<__gm__ volatile float*>(meanAddr_) + gmOffset;\r\n-        __gm__ volatile float* stdevPtr = reinterpret_cast<__gm__ volatile float*>(stdevAddr_) + gmOffset;\r\n+        __gm__ M_T* meanPtr = reinterpret_cast<__gm__ M_T*>(meanAddr_);\r\n+        __gm__ S_T* stdevPtr = reinterpret_cast<__gm__ S_T*>(stdevAddr_);\r\n+        \r\n+        meanGlobal_.SetGlobalBuffer(meanPtr);\r\n+        stdGlobal_.SetGlobalBuffer(stdevPtr);\r\n \r\n-        NormalTransform<T> transform(meanPtr, stdevPtr);\r\n-        Simt::VF_CALL<PhiloxSimtKernelDiscontinuous<T, NormalTransform<T>>>(\r\n+        M_T meanVal = meanGlobal_(0);\r\n+        S_T stdVal = stdGlobal_(0);\r\n+\r\n+        NormalTransform<T, M_T, S_T> transform(meanVal, stdVal);\r\n+        Simt::VF_CALL<PhiloxSimtKernelDiscontinuous<T, NormalTransform<T, M_T, S_T>>>(\r\n             Simt::Dim3(DEFAULT_SIMT_THREAD_NUM),\r\n             gmPtr, realOffset_ + kernelOffset, seed_, static_cast<uint64_t>(numel),\r\n             policy.magic, policy.shift, static_cast<uint64_t>(totalThreads), transform);\r\n@@ -101,7 +102,7 @@ struct NormalLauncher {\n };\r\n \r\n // Entry point: called from stateless_normal.cpp\r\n-template <typename T>\r\n+template <typename T, typename M_T, typename S_T>\r\n __aicore__ inline void Process(\r\n     GM_ADDR seed, GM_ADDR offset,\r\n     GM_ADDR y, GM_ADDR mean, GM_ADDR stdev,\r\n@@ -115,7 +116,7 @@ __aicore__ inline void Process(\n     int64_t realSeed = *(reinterpret_cast<__gm__ int64_t*>(seed));\r\n     int64_t realOffset = *(reinterpret_cast<__gm__ int64_t*>(offset));\r\n \r\n-    NormalLauncher<T> launcher(realSeed, realOffset, y, mean, stdev);\r\n+    NormalLauncher<T, M_T, S_T> launcher(realSeed, realOffset, y, mean, stdev);\r\n     ProcessWithSplitBlocks(tilingData, launcher);\r\n }\r\n \r\n",
+      "new_file": false,
+      "new_path": "random/stateless_normal/op_kernel/arch35/stateless_normal.h",
+      "old_path": "random/stateless_normal/op_kernel/arch35/stateless_normal.h",
+      "removed_lines": 25,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-math/raw/666fb856601965b4b04f2491c3a6e686eb85e599/random/stateless_normal/op_kernel/arch35/stateless_normal.h",
+    "sha": "666fb856601965b4b04f2491c3a6e686eb85e599",
+    "source_branch": "normalFix_c11",
+    "source_project": {
+      "full_name": "gh_M/ops-math_0706",
+      "human_name": "gh_M / ops-math_0706",
+      "id": 10305335,
+      "path": "ops-math_0706"
+    },
+    "target_branch": "9.1.0",
+    "target_project": {
+      "full_name": "cann/ops-math",
+      "human_name": "CANN / ops-math",
+      "id": 7649531,
+      "path": "ops-math"
+    }
+  },
+  {
+    "additions": 1,
+    "blob_id": "eea550227e68e28ea11179cec0cdbe1375bbecd4",
+    "blob_url": "https://gitcode.com/cann/ops-math/blob/666fb856601965b4b04f2491c3a6e686eb85e599/random/stateless_normal/op_kernel/stateless_normal.cpp",
+    "deletions": 1,
+    "filename": "random/stateless_normal/op_kernel/stateless_normal.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 1,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -22,6 +22,6 @@ extern \"C\" __global__ __aicore__ void stateless_normal(\n     KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIV_1_0);\r\n     GET_TILING_DATA_WITH_STRUCT(RandomUnifiedSimtTilingDataStruct, tilingData, tiling);\r\n     if (TILING_KEY_IS(STATELESS_NORMAL_DEFAULT_TILING_KEY)) {\r\n-        StatelessNormalSimt::Process<DTYPE_Y>(seed, offset, y, mean, stdev, &tilingData);\r\n+        StatelessNormalSimt::Process<DTYPE_Y, DTYPE_MEAN, DTYPE_STDEV>(seed, offset, y, mean, stdev, &tilingData);\r\n     }\r\n }\r\n",
+      "new_file": false,
+      "new_path": "random/stateless_normal/op_kernel/stateless_normal.cpp",
+      "old_path": "random/stateless_normal/op_kernel/stateless_normal.cpp",
+      "removed_lines": 1,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-math/raw/666fb856601965b4b04f2491c3a6e686eb85e599/random/stateless_normal/op_kernel/stateless_normal.cpp",
+    "sha": "666fb856601965b4b04f2491c3a6e686eb85e599",
+    "source_branch": "normalFix_c11",
+    "source_project": {
+      "full_name": "gh_M/ops-math_0706",
+      "human_name": "gh_M / ops-math_0706",
+      "id": 10305335,
+      "path": "ops-math_0706"
+    },
+    "target_branch": "9.1.0",
+    "target_project": {
+      "full_name": "cann/ops-math",
+      "human_name": "CANN / ops-math",
+      "id": 7649531,
+      "path": "ops-math"
+    }
+  },
+  {
+    "additions": 0,
+    "blob_id": "0668ac8dd663d1f0164d429388ddc85596675047",
+    "blob_url": "https://gitcode.com/cann/ops-math/blob/666fb856601965b4b04f2491c3a6e686eb85e599/random/stateless_normal/tests/ut/op_host/arch35/test_stateless_normal_tiling.cpp",
+    "deletions": 56,
+    "filename": "random/stateless_normal/tests/ut/op_host/arch35/test_stateless_normal_tiling.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 0,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -337,59 +337,3 @@ TEST_F(StatelessNormalTilingTest, test_both_tensor_fp16)\n     std::vector<size_t> expectWorkspaces = {0};\r\n     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectWorkspaces);\r\n }\r\n-\r\n-// Test 11: Error case - stdev shape mismatch (not scalar, not equal to output)\r\n-TEST_F(StatelessNormalTilingTest, test_stdev_shape_mismatch_error)\r\n-{\r\n-    optiling::RandomOperatorCompileInfo compileInfo = {40, 196608};\r\n-    vector<int64_t> shapeValue = {1024};\r\n-    int64_t seedValue = 2;\r\n-    int64_t offsetValue = 0;\r\n-    float meanValue = 0.0f;\r\n-    std::vector<float> stdevData(256, 1.0f);  // size 256 != output size 1024\r\n-    gert::TilingContextPara tilingContextPara(\r\n-        \"StatelessNormal\",\r\n-        {\r\n-            {{{1,}, {1,}}, ge::DT_INT64, ge::FORMAT_ND, true, shapeValue.data()},\r\n-            {{{1,}, {1,}}, ge::DT_INT64, ge::FORMAT_ND, true, &seedValue},\r\n-            {{{1,}, {1,}}, ge::DT_INT64, ge::FORMAT_ND, true, &offsetValue},\r\n-            {{{1,}, {1,}}, ge::DT_FLOAT, ge::FORMAT_ND, true, &meanValue},\r\n-            {{{256,}, {256,}}, ge::DT_FLOAT, ge::FORMAT_ND, true, stdevData.data()},\r\n-        },\r\n-        {\r\n-            {{{1024,}, {1024,}}, ge::DT_FLOAT, ge::FORMAT_ND},\r\n-        },\r\n-        {\r\n-            {\"dtype\", Ops::Math::AnyValue::CreateFrom<int64_t>(0)},\r\n-        },\r\n-        &compileInfo);\r\n-    ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);\r\n-}\r\n-\r\n-// Test 12: Error case - mean shape mismatch with BF16 (not scalar, not equal to output)\r\n-TEST_F(StatelessNormalTilingTest, test_mean_shape_mismatch_error)\r\n-{\r\n-    optiling::RandomOperatorCompileInfo compileInfo = {40, 196608};\r\n-    vector<int64_t> shapeValue = {1024};\r\n-    int64_t seedValue = 1;\r\n-    int64_t offsetValue = 0;\r\n-    std::vector<float> meanData(512, 0.0f);  // size 512 != output size 1024\r\n-    float stdevValue = 1.0f;\r\n-    gert::TilingContextPara tilingContextPara(\r\n-        \"StatelessNormal\",\r\n-        {\r\n-            {{{1,}, {1,}}, ge::DT_INT64, ge::FORMAT_ND, true, shapeValue.data()},\r\n-            {{{1,}, {1,}}, ge::DT_INT64, ge::FORMAT_ND, true, &seedValue},\r\n-            {{{1,}, {1,}}, ge::DT_INT64, ge::FORMAT_ND, true, &offsetValue},\r\n-            {{{512,}, {512,}}, ge::DT_FLOAT, ge::FORMAT_ND, true, meanData.data()},\r\n-            {{{1,}, {1,}}, ge::DT_FLOAT, ge::FORMAT_ND, true, &stdevValue},\r\n-        },\r\n-        {\r\n-            {{{1024,}, {1024,}}, ge::DT_FLOAT, ge::FORMAT_ND},\r\n-        },\r\n-        {\r\n-            {\"dtype\", Ops::Math::AnyValue::CreateFrom<int64_t>(0)},\r\n-        },\r\n-        &compileInfo);\r\n-    ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);\r\n-}\r\n",
+      "new_file": false,
+      "new_path": "random/stateless_normal/tests/ut/op_host/arch35/test_stateless_normal_tiling.cpp",
+      "old_path": "random/stateless_normal/tests/ut/op_host/arch35/test_stateless_normal_tiling.cpp",
+      "removed_lines": 56,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-math/raw/666fb856601965b4b04f2491c3a6e686eb85e599/random/stateless_normal/tests/ut/op_host/arch35/test_stateless_normal_tiling.cpp",
+    "sha": "666fb856601965b4b04f2491c3a6e686eb85e599",
+    "source_branch": "normalFix_c11",
+    "source_project": {
+      "full_name": "gh_M/ops-math_0706",
+      "human_name": "gh_M / ops-math_0706",
+      "id": 10305335,
+      "path": "ops-math_0706"
+    },
+    "target_branch": "9.1.0",
+    "target_project": {
+      "full_name": "cann/ops-math",
+      "human_name": "CANN / ops-math",
+      "id": 7649531,
+      "path": "ops-math"
+    }
+  },
+  {
+    "additions": 57,
+    "blob_id": "2044a5a207036f66c17eb8f467c2c7640ed3cc84",
+    "blob_url": "https://gitcode.com/cann/ops-math/blob/666fb856601965b4b04f2491c3a6e686eb85e599/random/stateless_normal/tests/ut/op_kernel/stateless_normal_tiling.h",
+    "deletions": 57,
+    "filename": "random/stateless_normal/tests/ut/op_kernel/stateless_normal_tiling.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 57,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -1,57 +1,57 @@\n-/**\n- * Copyright (c) 2026 Huawei Technologies Co., Ltd.\n- * This program is free software, you can redistribute it and/or modify it under the terms and conditions of\n- * CANN Open Software License Agreement Version 2.0 (the \"License\").\n- * Please refer to the License for details. You may not use this file except in compliance with the License.\n- * THIS SOFTWARE IS PROVIDED ON AN \"AS IS\" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,\n- * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.\n- * See LICENSE in the root of the software repository for the full text of the License.\n- */\n-\n-#ifndef STATELESS_NORMAL_TILING_H\n-#define STATELESS_NORMAL_TILING_H\n-\n-#include <cstdint>\n-#include <cstring>\n-\n-#include \"../../../../random_common/op_kernel/arch35/random_unified_tiling_data_arch35.h\"\n-#include \"kernel_tiling/kernel_tiling.h\"\n-\n-static inline unsigned long long __mul_i32toi64(unsigned int lhs, unsigned int rhs)\n-{\n-    return static_cast<unsigned long long>(lhs) * rhs;\n-}\n-\n-#define __aicore__\n-#ifdef __NPU_TILING__\n-inline[aicore] void InitTilingData(const __gm__ uint8_t* tiling, RandomUnifiedSimtTilingDataStruct* constData)\n-{\n-    const __gm__ uint32_t* src = reinterpret_cast<const __gm__ uint32_t*>(tiling);\n-    uint32_t* dst = reinterpret_cast<uint32_t*>(constData);\n-    for (size_t i = 0; i < sizeof(RandomUnifiedSimtTilingDataStruct) / sizeof(uint32_t); ++i) {\n-        *(dst + i) = *(src + i);\n-    }\n-}\n-#else\n-inline void InitTilingData(uint8_t* tiling, RandomUnifiedSimtTilingDataStruct* constData)\n-{\n-    std::memcpy(constData, tiling, sizeof(RandomUnifiedSimtTilingDataStruct));\n-}\n-#endif // __NPU_TILING__\n-\n-#define CONVERT_TILING_DATA(tilingStruct, tilingDataPointer, tilingPointer) \\\n-    __ubuf__ tilingStruct* tilingDataPointer =                              \\\n-        reinterpret_cast<__ubuf__ tilingStruct*>(reinterpret_cast<__ubuf__ uint8_t*>(tilingPointer));\n-\n-#define INIT_TILING_DATA(tilingStruct, tilingDataPointer, tilingPointer) \\\n-    CONVERT_TILING_DATA(tilingStruct, tilingDataPointer, tilingPointer);\n-\n-#define GET_TILING_DATA_WITH_STRUCT(tilingStruct, tilingData, tilingArg) \\\n-    tilingStruct tilingData;                                             \\\n-    InitTilingData(tilingArg, &tilingData)\n-\n-#define GET_TILING_DATA(tilingData, tilingArg)    \\\n-    RandomUnifiedSimtTilingDataStruct tilingData; \\\n-    InitTilingData(tilingArg, &tilingData)\n-\n-#endif // STATELESS_SAMPLE_MULTINOMIAL_TILING_H\n\\ No newline at end of file\n+/**\r\n+ * Copyright (c) 2026 Huawei Technologies Co., Ltd.\r\n+ * This program is free software, you can redistribute it and/or modify it under the terms and conditions of\r\n+ * CANN Open Software License Agreement Version 2.0 (the \"License\").\r\n+ * Please refer to the License for details. You may not use this file except in compliance with the License.\r\n+ * THIS SOFTWARE IS PROVIDED ON AN \"AS IS\" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,\r\n+ * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.\r\n+ * See LICENSE in the root of the software repository for the full text of the License.\r\n+ */\r\n+\r\n+#ifndef STATELESS_NORMAL_TILING_H\r\n+#define STATELESS_NORMAL_TILING_H\r\n+\r\n+#include <cstdint>\r\n+#include <cstring>\r\n+\r\n+#include \"../../../../random_common/op_kernel/arch35/random_unified_tiling_data_arch35.h\"\r\n+#include \"kernel_tiling/kernel_tiling.h\"\r\n+\r\n+static inline unsigned long long __mul_i32toi64(unsigned int lhs, unsigned int rhs)\r\n+{\r\n+    return static_cast<unsigned long long>(lhs) * rhs;\r\n+}\r\n+\r\n+#define __aicore__\r\n+#ifdef __NPU_TILING__\r\n+inline[aicore] void InitTilingData(const __gm__ uint8_t* tiling, RandomUnifiedSimtTilingDataStruct* constData)\r\n+{\r\n+    const __gm__ uint32_t* src = reinterpret_cast<const __gm__ uint32_t*>(tiling);\r\n+    uint32_t* dst = reinterpret_cast<uint32_t*>(constData);\r\n+    for (size_t i = 0; i < sizeof(RandomUnifiedSimtTilingDataStruct) / sizeof(uint32_t); ++i) {\r\n+        *(dst + i) = *(src + i);\r\n+    }\r\n+}\r\n+#else\r\n+inline void InitTilingData(uint8_t* tiling, RandomUnifiedSimtTilingDataStruct* constData)\r\n+{\r\n+    std::memcpy(constData, tiling, sizeof(RandomUnifiedSimtTilingDataStruct));\r\n+}\r\n+#endif // __NPU_TILING__\r\n+\r\n+#define CONVERT_TILING_DATA(tilingStruct, tilingDataPointer, tilingPointer) \\\r\n+    __ubuf__ tilingStruct* tilingDataPointer =                              \\\r\n+        reinterpret_cast<__ubuf__ tilingStruct*>(reinterpret_cast<__ubuf__ uint8_t*>(tilingPointer));\r\n+\r\n+#define INIT_TILING_DATA(tilingStruct, tilingDataPointer, tilingPointer) \\\r\n+    CONVERT_TILING_DATA(tilingStruct, tilingDataPointer, tilingPointer);\r\n+\r\n+#define GET_TILING_DATA_WITH_STRUCT(tilingStruct, tilingData, tilingArg) \\\r\n+    tilingStruct tilingData;                                             \\\r\n+    InitTilingData(tilingArg, &tilingData)\r\n+\r\n+#define GET_TILING_DATA(tilingData, tilingArg)    \\\r\n+    RandomUnifiedSimtTilingDataStruct tilingData; \\\r\n+    InitTilingData(tilingArg, &tilingData)\r\n+\r\n+#endif // STATELESS_SAMPLE_MULTINOMIAL_TILING_H\r\n",
+      "new_file": false,
+      "new_path": "random/stateless_normal/tests/ut/op_kernel/stateless_normal_tiling.h",
+      "old_path": "random/stateless_normal/tests/ut/op_kernel/stateless_normal_tiling.h",
+      "removed_lines": 57,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-math/raw/666fb856601965b4b04f2491c3a6e686eb85e599/random/stateless_normal/tests/ut/op_kernel/stateless_normal_tiling.h",
+    "sha": "666fb856601965b4b04f2491c3a6e686eb85e599",
+    "source_branch": "normalFix_c11",
+    "source_project": {
+      "full_name": "gh_M/ops-math_0706",
+      "human_name": "gh_M / ops-math_0706",
+      "id": 10305335,
+      "path": "ops-math_0706"
+    },
+    "target_branch": "9.1.0",
+    "target_project": {
+      "full_name": "cann/ops-math",
+      "human_name": "CANN / ops-math",
+      "id": 7649531,
+      "path": "ops-math"
+    }
+  },
+  {
+    "additions": 1,
+    "blob_id": "bb548806ba9dc64b9079cc888fca1ea5e2c9deb3",
+    "blob_url": "https://gitcode.com/cann/ops-math/blob/666fb856601965b4b04f2491c3a6e686eb85e599/random/stateless_random_normal_v2/docs/aclnnNormalFloatTensor.md",
+    "deletions": 1,
+    "filename": "random/stateless_random_normal_v2/docs/aclnnNormalFloatTensor.md",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 1,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -110,7 +110,7 @@ aclnnStatus aclnnNormalFloatTensor(\n       <td>out</td>\n       <td>输出</td>\n       <td>输出张量，Device侧的aclTensor。</td>\n-      <td>数据类型需要是std可转换的数据类型。shape需要和std的shape相等。当std的元素个数为1且out为空tensor且维度与std相同时，直接返回成功，不执行计算。</td>\n+      <td>数据类型需要同std数据类型一致。shape需要和std的shape相等。当std的元素个数为1且out为空tensor且维度与std相同时，直接返回成功，不执行计算。</td>\n       <td>BF16、FLOAT16、FLOAT、DOUBLE</td>\n       <td>ND</td>\n       <td>0-8</td>\n",
+      "new_file": false,
+      "new_path": "random/stateless_random_normal_v2/docs/aclnnNormalFloatTensor.md",
+      "old_path": "random/stateless_random_normal_v2/docs/aclnnNormalFloatTensor.md",
+      "removed_lines": 1,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-math/raw/666fb856601965b4b04f2491c3a6e686eb85e599/random/stateless_random_normal_v2/docs/aclnnNormalFloatTensor.md",
+    "sha": "666fb856601965b4b04f2491c3a6e686eb85e599",
+    "source_branch": "normalFix_c11",
+    "source_project": {
+      "full_name": "gh_M/ops-math_0706",
+      "human_name": "gh_M / ops-math_0706",
+      "id": 10305335,
+      "path": "ops-math_0706"
+    },
+    "target_branch": "9.1.0",
+    "target_project": {
+      "full_name": "cann/ops-math",
+      "human_name": "CANN / ops-math",
+      "id": 7649531,
+      "path": "ops-math"
+    }
+  },
+  {
+    "additions": 1,
+    "blob_id": "e17787da3fc11703ba265c3beec08a3b75a665a2",
+    "blob_url": "https://gitcode.com/cann/ops-math/blob/666fb856601965b4b04f2491c3a6e686eb85e599/random/stateless_random_normal_v2/docs/aclnnNormalTensorFloat.md",
+    "deletions": 1,
+    "filename": "random/stateless_random_normal_v2/docs/aclnnNormalTensorFloat.md",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 1,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -110,7 +110,7 @@ aclnnStatus aclnnNormalTensorFloat(\n       <td>out</td>\n       <td>输出</td>\n       <td>输出张量，Device侧的aclTensor。</td>\n-      <td>数据类型需要是mean可转换的数据类型。shape需要和mean做broadcast之后的shape相等。当mean为空tensor或元素个数为1，且out为空tensor且维度与mean相同时，直接返回成功，不执行计算。</td>\n+      <td>数据类型需要同mean数据类型一致。shape需要和mean做broadcast之后的shape相等。当mean为空tensor或元素个数为1，且out为空tensor且维度与mean相同时，直接返回成功，不执行计算。</td>\n       <td>BF16、FLOAT16、FLOAT、DOUBLE</td>\n       <td>ND</td>\n       <td>0-8</td>\n",
+      "new_file": false,
+      "new_path": "random/stateless_random_normal_v2/docs/aclnnNormalTensorFloat.md",
+      "old_path": "random/stateless_random_normal_v2/docs/aclnnNormalTensorFloat.md",
+      "removed_lines": 1,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-math/raw/666fb856601965b4b04f2491c3a6e686eb85e599/random/stateless_random_normal_v2/docs/aclnnNormalTensorFloat.md",
+    "sha": "666fb856601965b4b04f2491c3a6e686eb85e599",
+    "source_branch": "normalFix_c11",
+    "source_project": {
+      "full_name": "gh_M/ops-math_0706",
+      "human_name": "gh_M / ops-math_0706",
+      "id": 10305335,
+      "path": "ops-math_0706"
+    },
+    "target_branch": "9.1.0",
+    "target_project": {
+      "full_name": "cann/ops-math",
+      "human_name": "CANN / ops-math",
+      "id": 7649531,
+      "path": "ops-math"
+    }
+  },
+  {
+    "additions": 3,
+    "blob_id": "378d100dd1744042cde581c725855b83fe1210f2",
+    "blob_url": "https://gitcode.com/cann/ops-math/blob/666fb856601965b4b04f2491c3a6e686eb85e599/random/stateless_random_normal_v2/docs/aclnnNormalTensorTensor.md",
+    "deletions": 9,
+    "filename": "random/stateless_random_normal_v2/docs/aclnnNormalTensorTensor.md",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 3,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -70,7 +70,7 @@ aclnnStatus aclnnNormalTensorTensor(\n       <td>mean</td>\n       <td>输入</td>\n       <td>生成随机数分布均值的张量，Device侧的aclTensor。</td>\n-      <td>数据类型与std的数据类型需满足数据类型推导规则（参见<a href=\"../../../docs/zh/context/互推导关系.md\" target=\"_blank\">互推导关系</a>）。shape需要与std满足<a href=\"../../../docs/zh/context/broadcast关系.md\" target=\"_blank\">broadcast关系</a>。</td>\n+      <td>数据类型与std的数据类型一致。shape需要与std满足<a href=\"../../../docs/zh/context/broadcast关系.md\" target=\"_blank\">broadcast关系</a>。</td>\n       <td>BF16、FLOAT16、FLOAT、DOUBLE</td>\n       <td>ND</td>\n       <td>0-8</td>\n@@ -80,7 +80,7 @@ aclnnStatus aclnnNormalTensorTensor(\n       <td>std</td>\n       <td>输入</td>\n       <td>生成随机数分布标准差的张量，Device侧的aclTensor。</td>\n-      <td>数据类型与mean的数据类型需满足数据类型推导规则（参见<a href=\"../../../docs/zh/context/互推导关系.md\" target=\"_blank\">互推导关系</a>）。shape需要与mean满足<a href=\"../../../docs/zh/context/broadcast关系.md\" target=\"_blank\">broadcast关系</a>。</td>\n+      <td>数据类型与mean的数据类型一致。shape需要与mean满足<a href=\"../../../docs/zh/context/broadcast关系.md\" target=\"_blank\">broadcast关系</a>。</td>\n       <td>BF16、FLOAT16、FLOAT、DOUBLE</td>\n       <td>ND</td>\n       <td>0-8</td>\n@@ -110,7 +110,7 @@ aclnnStatus aclnnNormalTensorTensor(\n       <td>out</td>\n       <td>输出</td>\n       <td>输出张量，Device侧的aclTensor。</td>\n-      <td>数据类型需要是mean与std推导之后可转换的数据类型。shape需要和mean与std broadcast之后的shape相等。当mean或std为空tensor且out也为空tensor时，直接返回成功，不执行计算。</td>\n+      <td>数据类型需要同mean与std数据类型一致。shape需要和mean与std broadcast之后的shape相等。当mean或std为空tensor且out也为空tensor时，直接返回成功，不执行计算。</td>\n       <td>BF16、FLOAT16、FLOAT、DOUBLE</td>\n       <td>ND</td>\n       <td>0-8</td>\n@@ -176,12 +176,6 @@ aclnnStatus aclnnNormalTensorTensor(\n     <tr>\n       <td>mean和std的shape做broadcast之后不等于out的shape。</td>\n     </tr>\n-    <tr>\n-      <td>mean和std无法做数据类型推导。</td>\n-    </tr>\n-    <tr>\n-      <td>mean和std推导出的数据类型无法转换为指定输出out的类型。</td>\n-    </tr>\n   </tbody>\n   </table>\n \n",
+      "new_file": false,
+      "new_path": "random/stateless_random_normal_v2/docs/aclnnNormalTensorTensor.md",
+      "old_path": "random/stateless_random_normal_v2/docs/aclnnNormalTensorTensor.md",
+      "removed_lines": 9,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-math/raw/666fb856601965b4b04f2491c3a6e686eb85e599/random/stateless_random_normal_v2/docs/aclnnNormalTensorTensor.md",
+    "sha": "666fb856601965b4b04f2491c3a6e686eb85e599",
+    "source_branch": "normalFix_c11",
+    "source_project": {
+      "full_name": "gh_M/ops-math_0706",
+      "human_name": "gh_M / ops-math_0706",
+      "id": 10305335,
+      "path": "ops-math_0706"
+    },
+    "target_branch": "9.1.0",
+    "target_project": {
+      "full_name": "cann/ops-math",
+      "human_name": "CANN / ops-math",
+      "id": 7649531,
+      "path": "ops-math"
+    }
+  },
+  {
+    "additions": 33,
+    "blob_id": "5fbf3b72b4ab3cfa793850303cc59cd6ae7b0d07",
+    "blob_url": "https://gitcode.com/cann/ops-math/blob/666fb856601965b4b04f2491c3a6e686eb85e599/random/stateless_random_normal_v2/op_api/aclnn_normal_out.cpp",
+    "deletions": 65,
+    "filename": "random/stateless_random_normal_v2/op_api/aclnn_normal_out.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 33,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -40,6 +40,14 @@ static constexpr size_t MAX_DIM_LEN = 8;\n static const std::initializer_list<op::DataType> DTYPE_SUPPORT_LIST = {\n     op::DataType::DT_BF16, op::DataType::DT_FLOAT16, op::DataType::DT_FLOAT, op::DataType::DT_DOUBLE};\n \n+// 表示mean,std的数据类型是Tensor还是Scalar\n+enum class ScalarMode {\n+    TensorTensor,\n+    TensorScalar,\n+    ScalarTensor,\n+    ScalarScalar\n+};\n+\n /* 查看TensorFloat的Dtype和Shape */\n static bool CheckTensorAndFloatDtype(const aclTensor* mean, const aclTensor* out)\n {\n@@ -205,34 +213,12 @@ static aclnnStatus CheckTensorAndTensorParams(const aclTensor* mean, const aclTe\n aclnnStatus CommonLogicGeneralNormal(\n     const aclTensor* mean, const aclTensor* std, int64_t seed, int64_t offset, aclTensor* self, aclTensor* out,\n     UniqueExecutor& uniqueExecutor, uint64_t* workspaceSize, aclOpExecutor** executor,\n-    bool isScalarMode = false)\n+    ScalarMode scalarMode = ScalarMode::TensorTensor)\n {\n     const aclTensor* addOut = nullptr;\n \n-    if (!aclnnGetPytorchRandom() && GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510 &&\n-        self->GetDataType() != DataType::DT_DOUBLE) {\n-        OP_LOGD(\"compat mode, use V3 Normal\");\n-        // seed转化为key\n-        FVector<int64_t, op::MAX_DIM_NUM> key_vec = {seed};\n-        auto keyArr = (uniqueExecutor.get())->AllocIntArray(key_vec.data(), key_vec.size());\n-\n-        // offset转化为counter\n-        FVector<int64_t, op::MAX_DIM_NUM> counter_vec = {0, offset};\n-        auto counterArr = (uniqueExecutor.get())->AllocIntArray(counter_vec.data(), counter_vec.size());\n-        auto meanFP32 = l0op::Cast(mean, DataType::DT_FLOAT, uniqueExecutor.get());\n-        CHECK_RET(meanFP32 != nullptr, ACLNN_ERR_INNER_NULLPTR);\n-        auto stdFP32 = l0op::Cast(std, DataType::DT_FLOAT, uniqueExecutor.get());\n-        CHECK_RET(stdFP32 != nullptr, ACLNN_ERR_INNER_NULLPTR);\n-        addOut = l0op::StatelessRandomNormalV3(self, keyArr, counterArr, meanFP32, stdFP32, uniqueExecutor.get());\n-    } else if (GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510 && self->GetDataType() != DataType::DT_DOUBLE){\n-        if (isScalarMode) {\n-            // V4 标量路径：对标 PyTorch normal_(scalar_mean, scalar_std) 单步 FMA\n-            // Kernel 以 fp32 生成 N(0,1)，L2 层 fp32 Mul+Add，最后 Cast 到目标 dtype\n-            auto selfFloat = (self->GetDataType() != DataType::DT_FLOAT)\n-                ? l0op::Cast(self, DataType::DT_FLOAT, uniqueExecutor.get())\n-                : self;\n-            CHECK_RET(selfFloat != nullptr, ACLNN_ERR_INNER_NULLPTR);\n-\n+    if(GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510 && self->GetDataType() != DataType::DT_DOUBLE){\n+        if (scalarMode == ScalarMode::TensorTensor || scalarMode == ScalarMode::ScalarTensor) {\n             FVector<float> zeroMeanVector = {0.0f};\n             auto zeroMeanTensor = uniqueExecutor.get()->ConvertToTensor(\n                 zeroMeanVector.data(), zeroMeanVector.size(), op::DataType::DT_FLOAT);\n@@ -240,48 +226,30 @@ aclnnStatus CommonLogicGeneralNormal(\n             auto oneStdTensor = uniqueExecutor.get()->ConvertToTensor(\n                 oneStdVector.data(), oneStdVector.size(), op::DataType::DT_FLOAT);\n \n-            auto outDims = op::ToShapeVector(out->GetViewShape());\n-            auto outShapeArray = uniqueExecutor.get()->AllocIntArray(outDims.data(), outDims.size());\n-            zeroMeanTensor = l0op::BroadcastTo(zeroMeanTensor, outShapeArray, uniqueExecutor.get());\n-            oneStdTensor = l0op::BroadcastTo(oneStdTensor, outShapeArray, uniqueExecutor.get());\n-\n             auto normalOut = l0op::StatelessNormal(\n-                selfFloat, seed, offset, zeroMeanTensor, oneStdTensor, uniqueExecutor.get());\n+                self, seed, offset, zeroMeanTensor, oneStdTensor, uniqueExecutor.get());\n             CHECK_RET(normalOut != nullptr, ACLNN_ERR_INNER_NULLPTR);\n \n             auto mulOut = l0op::Mul(normalOut, std, uniqueExecutor.get());\n             CHECK_RET(mulOut != nullptr, ACLNN_ERR_INNER_NULLPTR);\n-            addOut = l0op::Add(mulOut, mean, uniqueExecutor.get());\n-        } else {\n-            // V4 Tensor 路径：kernel 以目标 dtype 输出并做三步舍入对齐 GPU tensor 路径\n-            const aclTensor* selfForKernel = self;\n-            auto meanCasted = l0op::Cast(mean, DataType::DT_FLOAT, uniqueExecutor.get());\n-            CHECK_RET(meanCasted != nullptr, ACLNN_ERR_INNER_NULLPTR);\n-            auto stdCasted = l0op::Cast(std, DataType::DT_FLOAT, uniqueExecutor.get());\n-            CHECK_RET(stdCasted != nullptr, ACLNN_ERR_INNER_NULLPTR);\n-\n-            bool selfNeedBcast = selfForKernel->GetViewShape() != out->GetViewShape();\n-            bool meanNeedBcast = meanCasted->GetViewShape() != out->GetViewShape();\n-            bool stdNeedBcast = stdCasted->GetViewShape() != out->GetViewShape();\n-            if (selfNeedBcast || meanNeedBcast || stdNeedBcast) {\n-                op::FVector<int64_t, op::MAX_DIM_NUM> outDims = op::ToShapeVector(out->GetViewShape());\n-                auto outShapeArray = uniqueExecutor.get()->AllocIntArray(outDims.data(), outDims.size());\n-                CHECK_RET(outShapeArray != nullptr, ACLNN_ERR_INNER_NULLPTR);\n-\n-                if (selfNeedBcast) {\n-                    selfForKernel = l0op::BroadcastTo(selfForKernel, outShapeArray, uniqueExecutor.get());\n-                    CHECK_RET(selfForKernel != nullptr, ACLNN_ERR_INNER_NULLPTR);\n-                }\n-                if (meanNeedBcast) {\n-                    meanCasted = l0op::BroadcastTo(meanCasted, outShapeArray, uniqueExecutor.get());\n-                    CHECK_RET(meanCasted != nullptr, ACLNN_ERR_INNER_NULLPTR);\n-                }\n-                if (stdNeedBcast) {\n-                    stdCasted = l0op::BroadcastTo(stdCasted, outShapeArray, uniqueExecutor.get());\n-                    CHECK_RET(stdCasted != nullptr, ACLNN_ERR_INNER_NULLPTR);\n-                }\n+            // ScalarTensor 模式下，mean的类型一定为f32，mulout数据类型可为f16\\f32\\bf16，但mean是scalar, 故不能用AddInplace\n+            if (scalarMode == ScalarMode::ScalarTensor) {\n+                addOut = l0op::Add(mulOut, mean, uniqueExecutor.get());\n+            } else {\n+                addOut = l0op::AddInplace(mean, mulOut, uniqueExecutor.get());\n             }\n-            addOut = l0op::StatelessNormal(selfForKernel, seed, offset, meanCasted, stdCasted, uniqueExecutor.get());\n+        } else if (scalarMode == ScalarMode::TensorScalar) {\n+            FVector<float> zeroMeanVector = {0.0f};\n+            auto zeroMeanTensor = uniqueExecutor.get()->ConvertToTensor(\n+                zeroMeanVector.data(), zeroMeanVector.size(), op::DataType::DT_FLOAT);\n+\n+            auto normalOut = l0op::StatelessNormal(\n+                self, seed, offset, zeroMeanTensor, std, uniqueExecutor.get());\n+            CHECK_RET(normalOut != nullptr, ACLNN_ERR_INNER_NULLPTR);\n+\n+            addOut = l0op::AddInplace(mean, normalOut, uniqueExecutor.get());\n+        } else {\n+            addOut = l0op::StatelessNormal(self, seed, offset, mean, std, uniqueExecutor.get());\n         }\n     }\n     else{\n@@ -379,7 +347,7 @@ aclnnStatus aclnnNormalTensorTensorGetWorkspaceSize(\n     // 拷贝mean副本\n     auto self = const_cast<aclTensor*>(meanCasted);\n     return CommonLogicGeneralNormal(\n-        meanCasted, stdCasted, seed, offset, self, out, uniqueExecutor, workspaceSize, executor);\n+        meanCasted, stdCasted, seed, offset, self, out, uniqueExecutor, workspaceSize, executor, ScalarMode::TensorTensor);\n }\n \n // normal.Tensor_float_out\n@@ -419,7 +387,7 @@ aclnnStatus aclnnNormalTensorFloatGetWorkspaceSize(\n     // 拷贝mean副本\n     auto self = const_cast<aclTensor*>(out);\n     return CommonLogicGeneralNormal(\n-        meanContiguous, stdContiguous, seed, offset, self, out, uniqueExecutor, workspaceSize, executor);\n+        meanContiguous, stdContiguous, seed, offset, self, out, uniqueExecutor, workspaceSize, executor, ScalarMode::TensorScalar);\n }\n \n // normal.float_Tensor_out\n@@ -459,7 +427,7 @@ aclnnStatus aclnnNormalFloatTensorGetWorkspaceSize(\n     // 拷贝std副本\n     auto self = const_cast<aclTensor*>(stdContiguous);\n     return CommonLogicGeneralNormal(\n-        meanContiguous, stdContiguous, seed, offset, self, out, uniqueExecutor, workspaceSize, executor);\n+        meanContiguous, stdContiguous, seed, offset, self, out, uniqueExecutor, workspaceSize, executor, ScalarMode::ScalarTensor);\n }\n \n // normal.float_float_out\n@@ -500,7 +468,7 @@ aclnnStatus aclnnNormalFloatFloatGetWorkspaceSize(\n     auto self = const_cast<aclTensor*>(out);\n     return CommonLogicGeneralNormal(\n         meanContiguous, stdContiguous, seed, offset, self, out, uniqueExecutor, workspaceSize, executor,\n-        true);\n+        ScalarMode::ScalarScalar);\n }\n \n aclnnStatus aclnnNormalTensorTensor(\n",
+      "new_file": false,
+      "new_path": "random/stateless_random_normal_v2/op_api/aclnn_normal_out.cpp",
+      "old_path": "random/stateless_random_normal_v2/op_api/aclnn_normal_out.cpp",
+      "removed_lines": 65,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-math/raw/666fb856601965b4b04f2491c3a6e686eb85e599/random/stateless_random_normal_v2/op_api/aclnn_normal_out.cpp",
+    "sha": "666fb856601965b4b04f2491c3a6e686eb85e599",
+    "source_branch": "normalFix_c11",
+    "source_project": {
+      "full_name": "gh_M/ops-math_0706",
+      "human_name": "gh_M / ops-math_0706",
+      "id": 10305335,
+      "path": "ops-math_0706"
+    },
+    "target_branch": "9.1.0",
+    "target_project": {
+      "full_name": "cann/ops-math",
+      "human_name": "CANN / ops-math",
+      "id": 7649531,
+      "path": "ops-math"
+    }
+  }
+]

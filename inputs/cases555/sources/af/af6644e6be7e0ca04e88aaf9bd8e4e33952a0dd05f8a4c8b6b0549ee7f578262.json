@@ -1,0 +1,74 @@
+[
+  {
+    "additions": 31,
+    "blob_id": "7c8231fd9b0b7c64ebd1e807f989edcbea1c5c04",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/ef9a260e32290f0b214e7c64387528baf0c5c843/conv/convolution_backward/op_api/aclnn_convolution_backward.cpp",
+    "deletions": 23,
+    "filename": "conv/convolution_backward/op_api/aclnn_convolution_backward.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 31,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -636,17 +636,6 @@ static const aclTensor *PreDilation(ConvolutionBackwardInputTensor &inputTensor,\n                                     aclOpExecutor *executor) {\n   const aclTensor *preDilationGradOutputNC1HWC0 = nullptr;\n   int64_t preDilationDilationsVector[] = {1, 1, (*params.stride)[kSTRIDEHIdx], (*params.stride)[kSTRIDEWIdx], 1};\n-  /* 当输出的h/w为1时，把传给Dilation算子的dilation值修正为fmap_h/w，避免在dilation值超大时，Dilation算子超时 */\n-  if (inputTensor.gradOutput->GetViewShape().GetDim(kHDimNCHWIdx) == 1 &&\n-      (*params.stride)[kSTRIDEHIdx] > inputTensor.input->GetViewShape().GetDim(kHDimNCHWIdx)) {\n-    preDilationDilationsVector[kHDimNC1HWC0Idx] = inputTensor.input->GetViewShape().GetDim(kHDimNCHWIdx);\n-  }\n-  if (inputTensor.gradOutput->GetViewShape().GetDim(kWDimNCHWIdx) == 1 &&\n-      (*params.stride)[kSTRIDEWIdx] > inputTensor.input->GetViewShape().GetDim(kWDimNCHWIdx)) {\n-    preDilationDilationsVector[kWDimNC1HWC0Idx] = inputTensor.input->GetViewShape().GetDim(kWDimNCHWIdx);\n-  }\n-  aclIntArray *preDilationDilations = executor->AllocIntArray(preDilationDilationsVector, 5);\n-  CHECK_RET(preDilationDilations != nullptr, nullptr);\n   int64_t preDilationPadUp = 0;\n   int64_t preDilationPadLeft = 0;\n   int64_t preDilationPadH = 0;\n@@ -658,6 +647,19 @@ static const aclTensor *PreDilation(ConvolutionBackwardInputTensor &inputTensor,\n     preDilationPadH = 2 * (*params.padding)[kPADDINGUPIdx];\n     preDilationPadW = 2 * (*params.padding)[kPADDINGLEFTIdx];\n   }\n+\n+  /* 当输出的h/w为1时，把传给Dilation算子的dilation值修正为fmap_h/w + pad，避免在dilation值超大时，Dilation算子超时 */\n+  if (inputTensor.gradOutput->GetViewShape().GetDim(kHDimNCHWIdx) == 1 &&\n+      (*params.stride)[kSTRIDEHIdx] > inputTensor.input->GetViewShape().GetDim(kHDimNCHWIdx) + preDilationPadH) {\n+    preDilationDilationsVector[kHDimNC1HWC0Idx] = inputTensor.input->GetViewShape().GetDim(kHDimNCHWIdx) + preDilationPadH;\n+  }\n+  if (inputTensor.gradOutput->GetViewShape().GetDim(kWDimNCHWIdx) == 1 &&\n+      (*params.stride)[kSTRIDEWIdx] > inputTensor.input->GetViewShape().GetDim(kWDimNCHWIdx) + preDilationPadW) {\n+    preDilationDilationsVector[kWDimNC1HWC0Idx] = inputTensor.input->GetViewShape().GetDim(kWDimNCHWIdx) + preDilationPadW;\n+  }\n+  aclIntArray *preDilationDilations = executor->AllocIntArray(preDilationDilationsVector, 5);\n+  CHECK_RET(preDilationDilations != nullptr, nullptr);\n+\n   int64_t preDilationPadDown =\n       inputTensor.input->GetViewShape().GetDim(kHDimNCHWIdx) -\n       (inputTensor.weight->GetViewShape().GetDim(kHDimNCHWIdx) - 1) * (*params.dilation)[kDILATIONHIdx] +\n@@ -684,33 +686,39 @@ static const aclTensor *PostDilation(const aclTensor *dxGradInputNC1HWC0, Convol\n                                      ConvolutionBackwardParams &params, aclOpExecutor *executor) {\n   const aclTensor *postDilationGradInputNC1HWC0 = nullptr;\n   int64_t postDilationDilationsVector[] = {1, 1, (*params.stride)[kSTRIDEHIdx], (*params.stride)[kSTRIDEWIdx], 1};\n-  /* 当输出的h/w为1时，把传给Dilation算子的dilation值修正为fmap_h/w，避免在dilation值超大时，Dilation算子超时 */\n-  if (inputTensor.gradOutput->GetViewShape().GetDim(kHDimNCHWIdx) == 1 &&\n-      (*params.stride)[kSTRIDEHIdx] > inputTensor.input->GetViewShape().GetDim(kHDimNCHWIdx)) {\n-    postDilationDilationsVector[kHDimNC1HWC0Idx] = inputTensor.input->GetViewShape().GetDim(kHDimNCHWIdx);\n-  }\n-  if (inputTensor.gradOutput->GetViewShape().GetDim(kWDimNCHWIdx) == 1 &&\n-      (*params.stride)[kSTRIDEWIdx] > inputTensor.input->GetViewShape().GetDim(kWDimNCHWIdx)) {\n-    postDilationDilationsVector[kWDimNC1HWC0Idx] = inputTensor.input->GetViewShape().GetDim(kWDimNCHWIdx);\n-  }\n-  aclIntArray *post_dilation_dilations = executor->AllocIntArray(postDilationDilationsVector, 5);\n-  CHECK_RET(post_dilation_dilations != nullptr, nullptr);\n-\n   int64_t postDilationPadUp = 0;\n   int64_t postDilationPadLeft = 0;\n   int64_t padUp = 0;\n   int64_t padLeft = 0;\n+  int64_t padH = 0;\n+  int64_t padW = 0;\n   if (params.padding->Size() == 4) {\n     postDilationPadUp = -(*params.padding)[kPadding4UpIdx];\n     postDilationPadLeft = -(*params.padding)[kPadding4LeftIdx];\n     padUp = (*params.padding)[kPadding4UpIdx];\n     padLeft = (*params.padding)[kPadding4LeftIdx];\n+    padH = (*params.padding)[kPadding4UpIdx] + (*params.padding)[kPadding4DownIdx];\n+    padW = (*params.padding)[kPadding4LeftIdx] + (*params.padding)[kPadding4RightIdx];\n   } else {\n     postDilationPadUp = -(*params.padding)[kPADDINGUPIdx];\n     postDilationPadLeft = -(*params.padding)[kPADDINGLEFTIdx];\n     padUp = (*params.padding)[kPADDINGUPIdx];\n     padLeft = (*params.padding)[kPADDINGLEFTIdx];\n+    padH = 2 * (*params.padding)[kPADDINGUPIdx];\n+    padW = 2 * (*params.padding)[kPADDINGLEFTIdx];\n   }\n+  /* 当输出的h/w为1时，把传给Dilation算子的dilation值修正为fmap_h/w + pad，避免在dilation值超大时，Dilation算子超时 */\n+  if (inputTensor.gradOutput->GetViewShape().GetDim(kHDimNCHWIdx) == 1 &&\n+      (*params.stride)[kSTRIDEHIdx] > inputTensor.input->GetViewShape().GetDim(kHDimNCHWIdx) + padH) {\n+    postDilationDilationsVector[kHDimNC1HWC0Idx] = inputTensor.input->GetViewShape().GetDim(kHDimNCHWIdx) + padH;\n+  }\n+  if (inputTensor.gradOutput->GetViewShape().GetDim(kWDimNCHWIdx) == 1 &&\n+      (*params.stride)[kSTRIDEWIdx] > inputTensor.input->GetViewShape().GetDim(kWDimNCHWIdx) + padW) {\n+    postDilationDilationsVector[kWDimNC1HWC0Idx] = inputTensor.input->GetViewShape().GetDim(kWDimNCHWIdx) + padW;\n+  }\n+  aclIntArray *post_dilation_dilations = executor->AllocIntArray(postDilationDilationsVector, 5);\n+  CHECK_RET(post_dilation_dilations != nullptr, nullptr);\n+\n   int64_t postDilationPadDown =\n       inputTensor.input->GetViewShape().GetDim(kHDimNCHWIdx) + padUp -\n       (inputTensor.gradOutput->GetViewShape().GetDim(kHDimNCHWIdx) - 1) * (*params.stride)[kSTRIDEHIdx] - 1;\n",
+      "new_file": false,
+      "new_path": "conv/convolution_backward/op_api/aclnn_convolution_backward.cpp",
+      "old_path": "conv/convolution_backward/op_api/aclnn_convolution_backward.cpp",
+      "removed_lines": 23,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/ef9a260e32290f0b214e7c64387528baf0c5c843/conv/convolution_backward/op_api/aclnn_convolution_backward.cpp",
+    "sha": "ef9a260e32290f0b214e7c64387528baf0c5c843",
+    "source_branch": "fix_dx",
+    "source_project": {
+      "full_name": "jiangqi2025/ops-nn",
+      "human_name": "jiangqi2025 / ops-nn",
+      "id": 8228001,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 31,
+    "blob_id": "9a13b911c8fddca974a038dbff8dbb8613a3cb10",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/ef9a260e32290f0b214e7c64387528baf0c5c843/pooling/avg_pool3_d_grad/op_api/avgpool2d_conv2d_backprop_input_util.cpp",
+    "deletions": 23,
+    "filename": "pooling/avg_pool3_d_grad/op_api/avgpool2d_conv2d_backprop_input_util.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 31,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -105,17 +105,6 @@ static const aclTensor *PreDilation(ConvolutionBackwardInputTensorForAvgPool2d &\n                                     aclOpExecutor *executor) {\n   const aclTensor *preDilationGradOutputNC1HWC0 = nullptr;\n   int64_t preDilationDilationsVector[] = {1, 1, (*params.stride)[kSTRIDEHIdx], (*params.stride)[kSTRIDEWIdx], 1};\n-  /* 当输出的h/w为1时，把传给Dilation算子的dilation值修正为fmap_h/w，避免在dilation值超大时，Dilation算子超时 */\n-  if (inputTensor.gradOutput->GetViewShape().GetDim(kHDimNCHWIdx) == 1 &&\n-      (*params.stride)[kSTRIDEHIdx] > inputTensor.input->GetViewShape().GetDim(kHDimNCHWIdx)) {\n-    preDilationDilationsVector[kHDimNC1HWC0Idx] = inputTensor.input->GetViewShape().GetDim(kHDimNCHWIdx);\n-  }\n-  if (inputTensor.gradOutput->GetViewShape().GetDim(kWDimNCHWIdx) == 1 &&\n-      (*params.stride)[kSTRIDEWIdx] > inputTensor.input->GetViewShape().GetDim(kWDimNCHWIdx)) {\n-    preDilationDilationsVector[kWDimNC1HWC0Idx] = inputTensor.input->GetViewShape().GetDim(kWDimNCHWIdx);\n-  }\n-  aclIntArray *preDilationDilations = executor->AllocIntArray(preDilationDilationsVector, 5);\n-  CHECK_RET(preDilationDilations != nullptr, nullptr);\n   int64_t preDilationPadUp = 0;\n   int64_t preDilationPadLeft = 0;\n   int64_t preDilationPadH = 0;\n@@ -127,6 +116,19 @@ static const aclTensor *PreDilation(ConvolutionBackwardInputTensorForAvgPool2d &\n     preDilationPadH = NUM2 * (*params.padding)[kPADDINGUPIdx];\n     preDilationPadW = NUM2 * (*params.padding)[kPADDINGLEFTIdx];\n   }\n+\n+  /* 当输出的h/w为1时，把传给Dilation算子的dilation值修正为fmap_h/w + pad，避免在dilation值超大时，Dilation算子超时 */\n+  if (inputTensor.gradOutput->GetViewShape().GetDim(kHDimNCHWIdx) == 1 &&\n+      (*params.stride)[kSTRIDEHIdx] > inputTensor.input->GetViewShape().GetDim(kHDimNCHWIdx) + preDilationPadH) {\n+    preDilationDilationsVector[kHDimNC1HWC0Idx] = inputTensor.input->GetViewShape().GetDim(kHDimNCHWIdx) + preDilationPadH;\n+  }\n+  if (inputTensor.gradOutput->GetViewShape().GetDim(kWDimNCHWIdx) == 1 &&\n+      (*params.stride)[kSTRIDEWIdx] > inputTensor.input->GetViewShape().GetDim(kWDimNCHWIdx) + preDilationPadW) {\n+    preDilationDilationsVector[kWDimNC1HWC0Idx] = inputTensor.input->GetViewShape().GetDim(kWDimNCHWIdx) + preDilationPadW;\n+  }\n+  aclIntArray *preDilationDilations = executor->AllocIntArray(preDilationDilationsVector, 5);\n+  CHECK_RET(preDilationDilations != nullptr, nullptr);\n+\n   int64_t preDilationPadDown =\n       inputTensor.input->GetViewShape().GetDim(kHDimNCHWIdx) -\n       (inputTensor.weight->GetViewShape().GetDim(kHDimNCHWIdx) - 1) * (*params.dilation)[kDILATIONHIdx] +\n@@ -223,33 +225,39 @@ static const aclTensor *PostDilation(const aclTensor *dxGradInputNC1HWC0, Convol\n                                      ConvolutionBackwardParamsForAvgPool2d &params, aclOpExecutor *executor) {\n   const aclTensor *postDilationGradInputNC1HWC0 = nullptr;\n   int64_t postDilationDilationsVector[] = {1, 1, (*params.stride)[kSTRIDEHIdx], (*params.stride)[kSTRIDEWIdx], 1};\n-  /* 当输出的h/w为1时，把传给Dilation算子的dilation值修正为fmap_h/w，避免在dilation值超大时，Dilation算子超时 */\n-  if (inputTensor.gradOutput->GetViewShape().GetDim(kHDimNCHWIdx) == 1 &&\n-      (*params.stride)[kSTRIDEHIdx] > inputTensor.input->GetViewShape().GetDim(kHDimNCHWIdx)) {\n-    postDilationDilationsVector[kHDimNC1HWC0Idx] = inputTensor.input->GetViewShape().GetDim(kHDimNCHWIdx);\n-  }\n-  if (inputTensor.gradOutput->GetViewShape().GetDim(kWDimNCHWIdx) == 1 &&\n-      (*params.stride)[kSTRIDEWIdx] > inputTensor.input->GetViewShape().GetDim(kWDimNCHWIdx)) {\n-    postDilationDilationsVector[kWDimNC1HWC0Idx] = inputTensor.input->GetViewShape().GetDim(kWDimNCHWIdx);\n-  }\n-  aclIntArray *post_dilation_dilations = executor->AllocIntArray(postDilationDilationsVector, 5);\n-  CHECK_RET(post_dilation_dilations != nullptr, nullptr);\n-\n   int64_t postDilationPadUp = 0;\n   int64_t postDilationPadLeft = 0;\n   int64_t padUp = 0;\n   int64_t padLeft = 0;\n+  int64_t padH = 0;\n+  int64_t padW = 0;\n   if (params.padding->Size() == NUM4) {\n     postDilationPadUp = -(*params.padding)[kPadding4UpIdx];\n     postDilationPadLeft = -(*params.padding)[kPadding4LeftIdx];\n     padUp = (*params.padding)[kPadding4UpIdx];\n     padLeft = (*params.padding)[kPadding4LeftIdx];\n+    padH = (*params.padding)[kPadding4UpIdx] + (*params.padding)[kPadding4DownIdx];\n+    padW = (*params.padding)[kPadding4LeftIdx] + (*params.padding)[kPadding4RightIdx];\n   } else {\n     postDilationPadUp = -(*params.padding)[kPADDINGUPIdx];\n     postDilationPadLeft = -(*params.padding)[kPADDINGLEFTIdx];\n     padUp = (*params.padding)[kPADDINGUPIdx];\n     padLeft = (*params.padding)[kPADDINGLEFTIdx];\n+    padH = NUM2 * (*params.padding)[kPADDINGUPIdx];\n+    padW = NUM2 * (*params.padding)[kPADDINGLEFTIdx];\n   }\n+  /* 当输出的h/w为1时，把传给Dilation算子的dilation值修正为fmap_h/w + pad，避免在dilation值超大时，Dilation算子超时 */\n+  if (inputTensor.gradOutput->GetViewShape().GetDim(kHDimNCHWIdx) == 1 &&\n+      (*params.stride)[kSTRIDEHIdx] > inputTensor.input->GetViewShape().GetDim(kHDimNCHWIdx) + padH) {\n+    postDilationDilationsVector[kHDimNC1HWC0Idx] = inputTensor.input->GetViewShape().GetDim(kHDimNCHWIdx) + padH;\n+  }\n+  if (inputTensor.gradOutput->GetViewShape().GetDim(kWDimNCHWIdx) == 1 &&\n+      (*params.stride)[kSTRIDEWIdx] > inputTensor.input->GetViewShape().GetDim(kWDimNCHWIdx) + padW) {\n+    postDilationDilationsVector[kWDimNC1HWC0Idx] = inputTensor.input->GetViewShape().GetDim(kWDimNCHWIdx) + padW;\n+  }\n+  aclIntArray *post_dilation_dilations = executor->AllocIntArray(postDilationDilationsVector, 5);\n+  CHECK_RET(post_dilation_dilations != nullptr, nullptr);\n+\n   int64_t postDilationPadDown =\n       inputTensor.input->GetViewShape().GetDim(kHDimNCHWIdx) + padUp -\n       (inputTensor.gradOutput->GetViewShape().GetDim(kHDimNCHWIdx) - 1) * (*params.stride)[kSTRIDEHIdx] - 1;\n",
+      "new_file": false,
+      "new_path": "pooling/avg_pool3_d_grad/op_api/avgpool2d_conv2d_backprop_input_util.cpp",
+      "old_path": "pooling/avg_pool3_d_grad/op_api/avgpool2d_conv2d_backprop_input_util.cpp",
+      "removed_lines": 23,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/ef9a260e32290f0b214e7c64387528baf0c5c843/pooling/avg_pool3_d_grad/op_api/avgpool2d_conv2d_backprop_input_util.cpp",
+    "sha": "ef9a260e32290f0b214e7c64387528baf0c5c843",
+    "source_branch": "fix_dx",
+    "source_project": {
+      "full_name": "jiangqi2025/ops-nn",
+      "human_name": "jiangqi2025 / ops-nn",
+      "id": 8228001,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  }
+]

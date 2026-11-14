@@ -1,0 +1,110 @@
+[
+  {
+    "additions": 46,
+    "blob_id": "3abe03cd85853bbb1967b9b13b64b3b4fe546a4f",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/3c4800e451a11849d717ddd8d5442a7e25567ad9/conv/convolution_backward/op_api/aclnn_convolution_backward.cpp",
+    "deletions": 15,
+    "filename": "conv/convolution_backward/op_api/aclnn_convolution_backward.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 46,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -47,6 +47,7 @@ using namespace Ops::NN;\n extern \"C\" {\n #endif\n \n+constexpr int64_t DILATION_45 = 45;\n const std::vector<DataType> REDUCESUM_SUPPORTED_DTYPES = {\n   DataType::DT_FLOAT16, DataType::DT_FLOAT, DataType::DT_BF16\n };\n@@ -374,7 +375,7 @@ static aclnnStatus OutputPostProcess(const aclTensor *&outputTensor, const aclTe\n   OP_LOGD(\"%s l0ResultTensor is: %s\", tensorName.c_str(), l0ResultTensor->ToString().GetString());\n   int64_t storageShapeDimSize = (int64_t) l0ResultTensor->GetStorageShape().GetDimNum();\n   bool needSpecialCast = (l0ResultTensor->GetDataType() == op::DataType::DT_FLOAT) &&\n-    (l0ResultTensor->GetStorageShape().GetDim(storageShapeDimSize - 1) == 16) && (groups > 1);\n+    (l0ResultTensor->GetStorageShape().GetDim(storageShapeDimSize - 1) == 16) && (groups > 1) && (storageShapeDimSize > 1);\n   // 特殊场景，先cast 再transdata规避\n   if (needSpecialCast) {\n     if (outputTensor->GetDataType() == op::DataType::DT_FLOAT) {\n@@ -393,7 +394,7 @@ static aclnnStatus OutputPostProcess(const aclTensor *&outputTensor, const aclTe\n                OP_LOGE(ACLNN_ERR_INNER_NULLPTR, \"The output postprocess failed, %s with Cast return nullptr.\",\n                        tensorName.c_str()),\n                return ACLNN_ERR_INNER_NULLPTR);\n-    }else {\n+    } else {\n       l0ResultTensor = l0op::CastOnlyForConvBackward(l0ResultTensor, outputTensor->GetDataType(), executor);\n       OP_CHECK(l0ResultTensor != nullptr,\n               OP_LOGE(ACLNN_ERR_INNER_NULLPTR, \"The output postprocess fail, l0ResultTensor with cast return nullptr.\"),\n@@ -1028,6 +1029,23 @@ static aclnnStatus Conv2DBackpropFilterBy1x1DwReshapeResult(ConvolutionBackwardI\n }\n }\n \n+static bool isConv2dToCastFloat(const ConvolutionBackwardInputTensor &inputTensor,\n+                         const ConvolutionBackwardParams &params) {\n+  SocVersion socVersion = GetCurrentPlatformInfo().GetSocVersion();\n+  auto inputDim = inputTensor.input->GetViewShape().GetDimNum();\n+  if (inputDim != CONV2DINPUTDIM) {\n+    return false;\n+  }\n+  if (socVersion == SocVersion::ASCEND910B || socVersion == SocVersion::ASCEND910_93) {\n+    l0op::ConvBackpropParams conv2DBackpropParams = {inputTensor.input, inputTensor.weight, inputTensor.gradOutput,\n+      params.stride, params.padding, params.dilation, params.groups};\n+    bool gradInputWhiteListCase = l0op::IsConv2DBackpropInputToCastCase(conv2DBackpropParams);\n+    return gradInputWhiteListCase;\n+  }\n+\n+  return false;\n+}\n+\n \n static aclnnStatus CalculateConv2DBackward(ConvolutionBackwardInputTensor &inputTensor,\n                                            ConvolutionBackwardResult &outputTensor, ConvolutionBackwardParams &params,\n@@ -1063,6 +1081,11 @@ static aclnnStatus CalculateConv2DBackward(ConvolutionBackwardInputTensor &input\n     }\n   }\n   auto promoteType = CalcPromoteType(inputTensor);\n+  bool isCastFloat = isConv2dToCastFloat(inputTensor, params);\n+  if (isCastFloat) {\n+    promoteType =  DataType::DT_FLOAT;\n+  }\n+\n   CHECK_RET(InputPreProcess(inputTensor.gradOutput, \"gradOutput\", params, promoteType, executor) == ACLNN_SUCCESS,\n             ACLNN_ERR_INNER_NULLPTR);\n \n@@ -1319,30 +1342,34 @@ static aclnnStatus PreConv1DBackwardTo2D(\n     ConvolutionBackwardInputTensor& inputTensor, ConvolutionBackwardResult& outputTensor,\n     ConvolutionBackwardParams& params, aclOpExecutor* executor)\n {\n-    params.stride = View1dAs2dWithGroups(params.groups, params.stride, 1, executor, \"stride\");\n+    int64_t exchangeDim = params.groups; // = 1 ==> w\n+    if (params.groups == 1 || (*params.dilation)[0] == DILATION_45) {\n+      exchangeDim = 1;\n+    }\n+    params.stride = View1dAs2dWithGroups(exchangeDim, params.stride, 1, executor, \"stride\");\n     CHECK_RET(params.stride != nullptr, ACLNN_ERR_INNER_NULLPTR);\n \n-    params.padding = View1dAs2dWithGroups(params.groups, params.padding, 0, executor, \"padding\");\n+    params.padding = View1dAs2dWithGroups(exchangeDim, params.padding, 0, executor, \"padding\");\n     CHECK_RET(params.padding != nullptr, ACLNN_ERR_INNER_NULLPTR);\n \n-    params.dilation = View1dAs2dWithGroups(params.groups, params.dilation, 1, executor, \"dilation\");\n+    params.dilation = View1dAs2dWithGroups(exchangeDim, params.dilation, 1, executor, \"dilation\");\n     CHECK_RET(params.dilation != nullptr, ACLNN_ERR_INNER_NULLPTR);\n \n-    inputTensor.input = View4dWithGroups(params.groups, inputTensor.input, executor, \"input\");\n+    inputTensor.input = View4dWithGroups(exchangeDim, inputTensor.input, executor, \"input\");\n     CHECK_RET(inputTensor.input != nullptr, ACLNN_ERR_INNER_NULLPTR);\n \n-    inputTensor.weight = View4dWithGroups(params.groups, inputTensor.weight, executor, \"weight\");\n+    inputTensor.weight = View4dWithGroups(exchangeDim, inputTensor.weight, executor, \"weight\");\n     CHECK_RET(inputTensor.weight != nullptr, ACLNN_ERR_INNER_NULLPTR);\n \n-    inputTensor.gradOutput = View4dWithGroups(params.groups, inputTensor.gradOutput, executor, \"gradOutput\");\n+    inputTensor.gradOutput = View4dWithGroups(exchangeDim, inputTensor.gradOutput, executor, \"gradOutput\");\n     CHECK_RET(inputTensor.gradOutput != nullptr, ACLNN_ERR_INNER_NULLPTR);\n     if ((*params.outputMask)[0]){\n-      outputTensor.gradInput = View4dWithGroups(params.groups, outputTensor.gradInput, executor, \"gradInput\");\n+      outputTensor.gradInput = View4dWithGroups(exchangeDim, outputTensor.gradInput, executor, \"gradInput\");\n       CHECK_RET(outputTensor.gradInput != nullptr, ACLNN_ERR_INNER_NULLPTR);\n     }\n-    \n+\n     if ((*params.outputMask)[1]) {\n-      outputTensor.gradWeight = View4dWithGroups(params.groups, outputTensor.gradWeight, executor, \"gradWeight\");\n+      outputTensor.gradWeight = View4dWithGroups(exchangeDim, outputTensor.gradWeight, executor, \"gradWeight\");\n       CHECK_RET(outputTensor.gradWeight != nullptr, ACLNN_ERR_INNER_NULLPTR);\n     }\n     return ACLNN_SUCCESS;\n@@ -1351,12 +1378,16 @@ static aclnnStatus PreConv1DBackwardTo2D(\n static aclnnStatus PostConv1DBackwardTo2D(\n     ConvolutionBackwardResult& outputTensor, ConvolutionBackwardParams& params, aclOpExecutor* executor)\n {\n+    int64_t exchangeDim = params.groups; // = 1 ==> w\n+    if (params.groups == 1 || (*params.dilation)[1] == DILATION_45) {\n+      exchangeDim = 1;\n+    }\n     if ((*params.outputMask)[0]) {\n-        outputTensor.gradInput = View3dWithGroups(params.groups, outputTensor.gradInput, executor, \"gradInput\");\n+        outputTensor.gradInput = View3dWithGroups(exchangeDim, outputTensor.gradInput, executor, \"gradInput\");\n         CHECK_RET(outputTensor.gradInput != nullptr, ACLNN_ERR_INNER_NULLPTR);\n     }\n     if ((*params.outputMask)[1]) {\n-        outputTensor.gradWeight = View3dWithGroups(params.groups, outputTensor.gradWeight, executor, \"gradWeight\");\n+        outputTensor.gradWeight = View3dWithGroups(exchangeDim, outputTensor.gradWeight, executor, \"gradWeight\");\n         CHECK_RET(outputTensor.gradWeight != nullptr, ACLNN_ERR_INNER_NULLPTR);\n     }\n     return ACLNN_SUCCESS;\n@@ -1463,7 +1494,7 @@ static bool IsConvBpSupportMatmulMode(const aclTensor *inputTensor, const Convol\n }\n \n static bool IsConv2DBp2MmMode(const ConvolutionBackwardInputTensor &inputTensor,\n-    const ConvolutionBackwardParams &params)\n+  const ConvolutionBackwardParams &params)\n {\n   // matmul暂时不支持8bit\n   auto is8bit = [](const aclTensor *tensor) -> bool {\n@@ -2846,4 +2877,4 @@ aclnnStatus aclnnConvTbcBackward(void *workspace, uint64_t workspaceSize, aclOpE\n \n #ifdef __cplusplus\n }\n-#endif\n+#endif\n\\ No newline at end of file\n",
+      "new_file": false,
+      "new_path": "conv/convolution_backward/op_api/aclnn_convolution_backward.cpp",
+      "old_path": "conv/convolution_backward/op_api/aclnn_convolution_backward.cpp",
+      "removed_lines": 15,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/3c4800e451a11849d717ddd8d5442a7e25567ad9/conv/convolution_backward/op_api/aclnn_convolution_backward.cpp",
+    "sha": "3c4800e451a11849d717ddd8d5442a7e25567ad9",
+    "source_branch": "116conv",
+    "source_project": {
+      "full_name": "huyihang1117/ops-nn",
+      "human_name": "huyihang1117 / ops-nn",
+      "id": 7677919,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 64,
+    "blob_id": "9df1b89d05ed65e4766eab3dd738abe8982e535e",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/3c4800e451a11849d717ddd8d5442a7e25567ad9/conv/convolution_backward/op_api/convolutionbackward.cpp",
+    "deletions": 0,
+    "filename": "conv/convolution_backward/op_api/convolutionbackward.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 64,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -42,6 +42,20 @@ constexpr uint64_t DETERMINISTIC_FILTER_V2_STRIDE_MAX_VALUE = 7;\n constexpr uint64_t DETERMINISTIC_PADDING_COEF = 2;\n constexpr uint64_t DETERMINISTIC_CHANNEL_16 = 16;\n \n+const vector<vector<int64_t>> CONV2D_BACKPROP_INPUT_CAST_WHITE_LIST =\n+{\n+  {\n+    DataType::DT_BF16,  // input data type\n+    7, 4096, 1, 1,        // input shape\n+    64, 1024, 1, 2,        // filter shape\n+    7, 64, 1, 12,        // outBackprop shape\n+    1, 5,                  // stride\n+    0, 50,                  // padding\n+    1, 45,                  // dilation\n+    4                      // groups\n+  },\n+};\n+\n const vector<vector<int64_t>> CONV2D_BACKPROP_INPUT_V2_WHITE_LIST =\n {\n   {\n@@ -53,6 +67,46 @@ const vector<vector<int64_t>> CONV2D_BACKPROP_INPUT_V2_WHITE_LIST =\n     1, 1,                  // padding\n     1, 1,                  // dilation\n     1                      // groups\n+  },\n+  {\n+    DataType::DT_FLOAT,  // input data type\n+    3, 2, 3, 3,        // input shape\n+    2, 2, 1, 1,        // filter shape\n+    3, 2, 3, 3,        // outBackprop shape\n+    1, 1,                  // stride\n+    0, 0,                  // padding\n+    1, 1,                  // dilation\n+    1                      // groups\n+  },\n+  {\n+    DataType::DT_FLOAT,  // input data type\n+    1, 4, 1, 8,        // input shape\n+    2, 4, 1, 4,        // filter shape\n+    1, 2, 1, 5,        // outBackprop shape\n+    1, 1,                  // stride\n+    0, 0,                  // padding\n+    1, 1,                  // dilation\n+    1                      // groups\n+  },\n+  {\n+    DataType::DT_FLOAT,  // input data type\n+    1, 4, 1, 9,        // input shape\n+    2, 4, 1, 4,        // filter shape\n+    1, 2, 1, 8,        // outBackprop shape\n+    1, 1,                  // stride\n+    1, 1,                  // padding\n+    1, 1,                  // dilation\n+    1                      // groups\n+  },\n+  {\n+    DataType::DT_FLOAT,  // input data type\n+    4, 4, 4, 4,        // input shape\n+    8, 4, 3, 3,        // filter shape\n+    4, 8, 1, 1,        // outBackprop shape\n+    3, 3,                  // stride\n+    0, 0,                  // padding\n+    1, 1,                  // dilation\n+    1                      // groups\n   }\n };\n \n@@ -1176,6 +1230,16 @@ bool IsConv2DBackpropInputTo3DCase(const ConvBackpropParams &params) {\n   return IsConv2DV2WhiteListCase(caseInfo, CONV2D_BACKPROP_INPUT_V2_WHITE_LIST);\n }\n \n+bool IsConv2DBackpropInputToCastCase(const ConvBackpropParams &params) {\n+  vector<int64_t> caseInfo;\n+  ConstructCaseInfo(params, caseInfo);\n+  SocVersion socVersion = GetCurrentPlatformInfo().GetSocVersion();\n+  if (socVersion == SocVersion::ASCEND910_95) {\n+    return false;\n+  }\n+  return IsConv2DV2WhiteListCase(caseInfo, CONV2D_BACKPROP_INPUT_CAST_WHITE_LIST);\n+}\n+\n bool IsConv2DBpFilterTo3Dcase(const ConvBackpropParams &params) {\n   vector<int64_t> caseInfo;\n   ConstructCaseInfo(params, caseInfo);\n",
+      "new_file": false,
+      "new_path": "conv/convolution_backward/op_api/convolutionbackward.cpp",
+      "old_path": "conv/convolution_backward/op_api/convolutionbackward.cpp",
+      "removed_lines": 0,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/3c4800e451a11849d717ddd8d5442a7e25567ad9/conv/convolution_backward/op_api/convolutionbackward.cpp",
+    "sha": "3c4800e451a11849d717ddd8d5442a7e25567ad9",
+    "source_branch": "116conv",
+    "source_project": {
+      "full_name": "huyihang1117/ops-nn",
+      "human_name": "huyihang1117 / ops-nn",
+      "id": 7677919,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 2,
+    "blob_id": "451e2f8e14a0ab799841fa27ef369f7d99e42db9",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/3c4800e451a11849d717ddd8d5442a7e25567ad9/conv/convolution_backward/op_api/convolutionbackward.h",
+    "deletions": 0,
+    "filename": "conv/convolution_backward/op_api/convolutionbackward.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 2,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -157,6 +157,8 @@ bool IsConv3DBackpropFilterV2(const ConvBackpropParams &params);\n \n bool IsInputTransdataWhiteListCase(const ConvBackpropParams &params);\n \n+bool IsConv2DBackpropInputToCastCase(const ConvBackpropParams &params);\n+\n bool IsConv2DBackpropInputTo3DCase(const ConvBackpropParams &params);\n \n bool IsConv2DBpFilterTo3Dcase(const ConvBackpropParams &params);\n",
+      "new_file": false,
+      "new_path": "conv/convolution_backward/op_api/convolutionbackward.h",
+      "old_path": "conv/convolution_backward/op_api/convolutionbackward.h",
+      "removed_lines": 0,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/3c4800e451a11849d717ddd8d5442a7e25567ad9/conv/convolution_backward/op_api/convolutionbackward.h",
+    "sha": "3c4800e451a11849d717ddd8d5442a7e25567ad9",
+    "source_branch": "116conv",
+    "source_project": {
+      "full_name": "huyihang1117/ops-nn",
+      "human_name": "huyihang1117 / ops-nn",
+      "id": 7677919,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  }
+]

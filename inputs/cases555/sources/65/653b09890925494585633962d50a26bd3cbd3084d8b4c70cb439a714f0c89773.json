@@ -1,0 +1,74 @@
+[
+  {
+    "additions": 60,
+    "blob_id": "f435062bbf382a7f68f5107f1ec11397d35415f2",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/e0481973735eb9bbed3cb8a1d162a4a2ad61a993/matmul/batch_mat_mul_v3/op_kernel/arch35/batch_mat_mul_v3_asw_block_advanced.h",
+    "deletions": 6,
+    "filename": "matmul/batch_mat_mul_v3/op_kernel/arch35/batch_mat_mul_v3_asw_block_advanced.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 60,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -29,6 +29,8 @@ namespace BatchMatMulV3Advanced {\n using namespace AscendC;\n using namespace matmul;\n \n+constexpr uint64_t FP32_SPLIT_K_THRESHOLD = 8192;\n+\n struct BmmAswBlockOffset {\n     uint64_t offsetA = 0;\n     uint64_t offsetB = 0;\n@@ -77,6 +79,12 @@ struct BmmAswBlockArgs {\n     uint64_t tailWindow = 0;\n     uint64_t kbAlignSize = 0;\n     uint64_t nAlignSize = 0;\n+\n+    uint64_t offsetABatch_ = 0;\n+    uint64_t offsetBBatch_ = 0;\n+    uint64_t splitKRound = 1;\n+    uint64_t singleCoreSplitK = 0;\n+    uint64_t singleShapeKTail = 0;\n };\n \n \n@@ -90,6 +98,8 @@ public:\n     __aicore__ inline void UpdateBlockParams(uint64_t roundIdx);\n     template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE>\n     __aicore__ inline void CalcGMOffset();\n+    template <class A_TYPE, class B_TYPE>\n+    __aicore__ inline void CalcSplitKGMOffset(uint64_t splitKIndex);\n \n public:\n     BmmAswBlockOffset offset_;\n@@ -141,6 +151,25 @@ __aicore__ inline void BatchMatMulAswBlock::Init(const void *tilingData)\n     using B_T = typename B_TYPE::T;\n     params_.kbAlignSize = (B_TYPE::isTrans) ? BLOCK_BYTE_SIZE / sizeof(B_T) : BLOCK_SIZE;\n     params_.nAlignSize = (B_TYPE::isTrans) ? BLOCK_SIZE : BLOCK_BYTE_SIZE / sizeof(B_T);\n+\n+    params_.splitKRound = 1;\n+    params_.singleCoreSplitK = batchMatmulTilingData_->matMulTilingData.tCubeTiling.singleCoreK;\n+    params_.singleShapeKTail = batchMatmulTilingData_->matMulTilingData.tCubeTiling.singleCoreK;\n+    constexpr bool isFp32 = std::is_same_v<typename C_TYPE::T, float>;\n+    // 如果是fp32且singleCoreK大于8192且B矩阵不是NZ格式，需要单核切K保精度，否则不需要切K\n+    if (isFp32 && !batchMatmulTilingData_->matMulTilingData.isHf32 && B_TYPE::format == CubeFormat::ND &&\n+        batchMatmulTilingData_->matMulTilingData.tCubeTiling.singleCoreK > FP32_SPLIT_K_THRESHOLD) {\n+        params_.splitKRound =\n+            MMV3DivCeil(batchMatmulTilingData_->matMulTilingData.tCubeTiling.singleCoreK, FP32_SPLIT_K_THRESHOLD);\n+        params_.singleCoreSplitK = MMV3CeilAlign(\n+            MMV3DivCeil(batchMatmulTilingData_->matMulTilingData.tCubeTiling.singleCoreK, params_.splitKRound),\n+            ALIGN_BYTE / DATA_SIZE_FP32);\n+        params_.singleShapeKTail =\n+            batchMatmulTilingData_->matMulTilingData.tCubeTiling.singleCoreK % params_.singleCoreSplitK;\n+        if (params_.singleShapeKTail == 0) {\n+            params_.singleShapeKTail = params_.singleCoreSplitK;\n+        }\n+    }\n }\n \n __aicore__ inline void BatchMatMulAswBlock::UpdateBasicIndex(uint64_t roundIdx, uint64_t newBlockIdx)\n@@ -189,7 +218,7 @@ __aicore__ inline void BatchMatMulAswBlock::CalcGMOffset()\n     uint64_t batchA4Index = batchC4Index % params_.batchA4;\n     uint64_t batchAIndex = batchA1Index * (params_.batchA2 * params_.batchA3 * params_.batchA4) +\n         batchA2Index * (params_.batchA3 * params_.batchA4) + batchA3Index * params_.batchA4 + batchA4Index;\n-    uint64_t offsetABatch = batchAIndex * batchMatmulTilingData_->matMulTilingData.tCubeTiling.M *\n+     params_.offsetABatch_ = batchAIndex * batchMatmulTilingData_->matMulTilingData.tCubeTiling.M *\n                             static_cast<uint64_t>(batchMatmulTilingData_->matMulTilingData.tCubeTiling.Ka);\n     uint64_t batchB1Index = batchC1Index % params_.batchB1;\n     uint64_t batchB2Index = batchC2Index % params_.batchB2;\n@@ -197,20 +226,20 @@ __aicore__ inline void BatchMatMulAswBlock::CalcGMOffset()\n     uint64_t batchB4Index = batchC4Index % params_.batchB4;\n     uint64_t batchBIndex = batchB1Index * (params_.batchB2 * params_.batchB3 * params_.batchB4) +\n         batchB2Index * (params_.batchB3 * params_.batchB4) + batchB3Index * params_.batchB4 + batchB4Index;\n-    uint64_t offsetBBatch = batchBIndex * batchMatmulTilingData_->matMulTilingData.tCubeTiling.N *\n+    params_.offsetBBatch_ = batchBIndex * batchMatmulTilingData_->matMulTilingData.tCubeTiling.N *\n                             static_cast<uint64_t>(batchMatmulTilingData_->matMulTilingData.tCubeTiling.Kb);\n \n     if constexpr (A_TYPE::isTrans) {\n-        offset_.offsetA = offsetABatch + params_.mCntIndex * params_.blockBaseM;\n+        offset_.offsetA = params_.offsetABatch_ + params_.mCntIndex * params_.blockBaseM;\n     } else {\n-        offset_.offsetA = offsetABatch + (params_.mCntIndex * params_.blockBaseM) *\n+        offset_.offsetA = params_.offsetABatch_ + (params_.mCntIndex * params_.blockBaseM) *\n             static_cast<uint64_t>(batchMatmulTilingData_->matMulTilingData.tCubeTiling.Ka);\n     }\n     if constexpr (B_TYPE::isTrans) {\n-        offset_.offsetB = offsetBBatch + (params_.nCntIndex * params_.blockBaseN) *\n+        offset_.offsetB = params_.offsetBBatch_ + (params_.nCntIndex * params_.blockBaseN) *\n             static_cast<uint64_t>(batchMatmulTilingData_->matMulTilingData.tCubeTiling.Kb);\n     } else {\n-        offset_.offsetB = offsetBBatch + params_.nCntIndex * params_.blockBaseN;\n+        offset_.offsetB = params_.offsetBBatch_ + params_.nCntIndex * params_.blockBaseN;\n     }\n     offset_.offsetC = batchCIndex * static_cast<uint64_t>(batchMatmulTilingData_->matMulTilingData.tCubeTiling.M) *\n         batchMatmulTilingData_->matMulTilingData.tCubeTiling.N + (params_.nCntIndex * params_.blockBaseN) +\n@@ -222,6 +251,31 @@ __aicore__ inline void BatchMatMulAswBlock::CalcGMOffset()\n     }\n }\n \n+template <class A_TYPE, class B_TYPE>\n+__aicore__ inline void BatchMatMulAswBlock::CalcSplitKGMOffset(uint64_t splitKIndex)\n+{\n+    if constexpr (A_TYPE::isTrans) {\n+        offset_.offsetA = params_.offsetABatch_ + params_.mCntIndex * params_.blockBaseM +\n+                          splitKIndex * params_.singleCoreSplitK *\n+                              static_cast<uint64_t>(batchMatmulTilingData_->matMulTilingData.tCubeTiling.M);\n+    } else {\n+        offset_.offsetA = params_.offsetABatch_ +\n+                          (params_.mCntIndex * params_.blockBaseM) *\n+                              static_cast<uint64_t>(batchMatmulTilingData_->matMulTilingData.tCubeTiling.Ka) +\n+                          splitKIndex * params_.singleCoreSplitK;\n+    }\n+    if constexpr (B_TYPE::isTrans) {\n+        offset_.offsetB = params_.offsetBBatch_ +\n+                          (params_.nCntIndex * params_.blockBaseN) *\n+                              static_cast<uint64_t>(batchMatmulTilingData_->matMulTilingData.tCubeTiling.Kb) +\n+                          splitKIndex * params_.singleCoreSplitK;\n+    } else {\n+        offset_.offsetB = params_.offsetBBatch_ + params_.nCntIndex * params_.blockBaseN +\n+                          splitKIndex * params_.singleCoreSplitK *\n+                              static_cast<uint64_t>(batchMatmulTilingData_->matMulTilingData.tCubeTiling.N);\n+    }\n+}\n+\n } // namespace BatchMatMulV3Advanced\n \n #endif // BATCH_MAT_MUL_V3_ASW_BLOCK_ADVANCED_H\n\\ No newline at end of file\n",
+      "new_file": false,
+      "new_path": "matmul/batch_mat_mul_v3/op_kernel/arch35/batch_mat_mul_v3_asw_block_advanced.h",
+      "old_path": "matmul/batch_mat_mul_v3/op_kernel/arch35/batch_mat_mul_v3_asw_block_advanced.h",
+      "removed_lines": 6,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/e0481973735eb9bbed3cb8a1d162a4a2ad61a993/matmul/batch_mat_mul_v3/op_kernel/arch35/batch_mat_mul_v3_asw_block_advanced.h",
+    "sha": "e0481973735eb9bbed3cb8a1d162a4a2ad61a993",
+    "source_branch": "bmm_fp32_broadcast",
+    "source_project": {
+      "full_name": "pzyy00/ops-nn",
+      "human_name": "pzyy00 / ops-nn",
+      "id": 8851099,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 25,
+    "blob_id": "96c651381bead648282130e0bde204c69d8252f5",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/e0481973735eb9bbed3cb8a1d162a4a2ad61a993/matmul/batch_mat_mul_v3/op_kernel/arch35/batch_mat_mul_v3_asw_kernel_advanced.h",
+    "deletions": 9,
+    "filename": "matmul/batch_mat_mul_v3/op_kernel/arch35/batch_mat_mul_v3_asw_kernel_advanced.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 25,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -37,6 +37,7 @@ public:\n         GM_ADDR workspaceGM, const void *tilingData, TPipe *pipe);\n     __aicore__ inline void UpdateGlobalTensor(GM_ADDR aGM, GM_ADDR bGM, GM_ADDR cGM, GM_ADDR biasGM, GM_ADDR offsetWGM,\n         GM_ADDR workspaceGM);\n+    __aicore__ inline void UpdateBias(uint64_t kIndex);\n     __aicore__ inline void InitInputs(GM_ADDR aGM, GM_ADDR bGM, GM_ADDR cGM, GM_ADDR biasGM);\n     __aicore__ inline void Process(uint8_t enAtomic = 0);\n     __aicore__ inline void End() { mm_.End(); }\n@@ -95,6 +96,20 @@ __aicore__ inline void BatchMatMulAswKernel<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, B\n     InitInputs(aGM, bGM, cGM, biasGM);\n }\n \n+template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, class BLOCK_TYPE, const MatmulConfig& MM_CFG>\n+__aicore__ inline void BatchMatMulAswKernel<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, BLOCK_TYPE, MM_CFG>::UpdateBias(\n+    uint64_t kIndex)\n+{\n+    if (block_.batchMatmulTilingData_->matMulTilingData.tCubeTiling.isBias) {\n+        if (kIndex == 0) {\n+            mm_.SetBias(biasGlobal_[block_.offset_.offsetBias]);\n+        } else {\n+            mm_.ClearBias();\n+        }\n+    }\n+}\n+\n+\n \n template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, class BLOCK_TYPE, const MatmulConfig &MM_CFG>\n __aicore__ inline void BatchMatMulAswKernel<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, BLOCK_TYPE, MM_CFG>::Process(uint8_t enAtomic)\n@@ -115,16 +130,17 @@ __aicore__ inline void BatchMatMulAswKernel<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, B\n             block_.template UpdateBlockParams<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE>(j);\n             if (block_.params_.singleCoreM > 0 && block_.params_.singleCoreN > 0) {\n                 block_.template CalcGMOffset<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE>();\n-\n-                mm_.SetSingleShape(block_.params_.singleCoreM, block_.params_.singleCoreN,\n-                    block_.batchMatmulTilingData_->matMulTilingData.tCubeTiling.singleCoreK);\n-                mm_.SetTensorA(aGlobal_[block_.offset_.offsetA], A_TYPE::isTrans);\n-                mm_.SetTensorB(bGlobal_[block_.offset_.offsetB], B_TYPE::isTrans);\n-                if (block_.batchMatmulTilingData_->matMulTilingData.tCubeTiling.isBias) {\n-                    mm_.SetBias(biasGlobal_[block_.offset_.offsetBias]);\n+                for (uint64_t kIndex = 0; kIndex < block_.params_.splitKRound; kIndex++) {\n+                    uint64_t singleShapeK = kIndex == block_.params_.splitKRound - 1 ? block_.params_.singleShapeKTail : \n+                    block_.params_.singleCoreSplitK;\n+                    mm_.SetSingleShape(block_.params_.singleCoreM, block_.params_.singleCoreN, singleShapeK);\n+                    block_.template CalcSplitKGMOffset<A_TYPE, B_TYPE>(kIndex);\n+                    mm_.SetTensorA(aGlobal_[block_.offset_.offsetA], A_TYPE::isTrans);\n+                    mm_.SetTensorB(bGlobal_[block_.offset_.offsetB], B_TYPE::isTrans);\n+                    UpdateBias(kIndex);\n+                    mm_.Iterate();\n+                    mm_.GetTensorC(cGlobal_[block_.offset_.offsetC], kIndex != 0);\n                 }\n-                mm_.Iterate();\n-                mm_.GetTensorC(cGlobal_[block_.offset_.offsetC], enAtomic);\n             }\n         }\n     }\n",
+      "new_file": false,
+      "new_path": "matmul/batch_mat_mul_v3/op_kernel/arch35/batch_mat_mul_v3_asw_kernel_advanced.h",
+      "old_path": "matmul/batch_mat_mul_v3/op_kernel/arch35/batch_mat_mul_v3_asw_kernel_advanced.h",
+      "removed_lines": 9,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/e0481973735eb9bbed3cb8a1d162a4a2ad61a993/matmul/batch_mat_mul_v3/op_kernel/arch35/batch_mat_mul_v3_asw_kernel_advanced.h",
+    "sha": "e0481973735eb9bbed3cb8a1d162a4a2ad61a993",
+    "source_branch": "bmm_fp32_broadcast",
+    "source_project": {
+      "full_name": "pzyy00/ops-nn",
+      "human_name": "pzyy00 / ops-nn",
+      "id": 8851099,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  }
+]

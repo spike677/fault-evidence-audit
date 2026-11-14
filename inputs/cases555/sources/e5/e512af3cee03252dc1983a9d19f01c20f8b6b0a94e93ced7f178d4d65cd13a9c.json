@@ -1,0 +1,218 @@
+[
+  {
+    "additions": 7,
+    "blob_id": "008f7e001f7d7a54ce2b7245f8bddd64399edc25",
+    "blob_url": "https://gitcode.com/cann/ops-math/blob/aa31e07c7421f9265d8ced709b4f2f8bd8fab5ed/random/random_common/op_host/arch35/random_tiling_arch35.cpp",
+    "deletions": 4,
+    "filename": "random/random_common/op_host/arch35/random_tiling_arch35.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 7,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -280,10 +280,13 @@ ge::graphStatus RandomTilingArch35::DoUbTiling()\n     // 通用分UB逻辑：根据存活节点数量计算 singleBufferSize\n     OP_CHECK_IF((bufNum_ == 0), OP_LOGE(opName_, \"bufNum_ is equal to 0. please check.\"), return ge::GRAPH_FAILED);\n     tilingData_.singleBufferSize = ubSize_ / bufNum_;\n-    auto ubBlockSize = Ops::Base::GetUbBlockSize(context_);\n-    OP_CHECK_IF(\n-        (ubBlockSize == 0), OP_LOGE(opName_, \"ubBlockSize is equal to 0. please check.\"), return ge::GRAPH_FAILED);\n-    tilingData_.singleBufferSize = tilingData_.singleBufferSize / ubBlockSize * ubBlockSize;\n+    if (config_.ubAlignSize == 0) {\n+        auto ubBlockSize = Ops::Base::GetUbBlockSize(context_);\n+        OP_CHECK_IF((ubBlockSize == 0), OP_LOGE(opName_, \"ubBlockSize is equal to 0. please check.\"), return ge::GRAPH_FAILED);\n+        tilingData_.singleBufferSize = tilingData_.singleBufferSize / ubBlockSize * ubBlockSize;\n+    } else {\n+        tilingData_.singleBufferSize = tilingData_.singleBufferSize / config_.ubAlignSize * config_.ubAlignSize;\n+    }\n     return ge::GRAPH_SUCCESS;\n }\n \n",
+      "new_file": false,
+      "new_path": "random/random_common/op_host/arch35/random_tiling_arch35.cpp",
+      "old_path": "random/random_common/op_host/arch35/random_tiling_arch35.cpp",
+      "removed_lines": 4,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-math/raw/aa31e07c7421f9265d8ced709b4f2f8bd8fab5ed/random/random_common/op_host/arch35/random_tiling_arch35.cpp",
+    "sha": "aa31e07c7421f9265d8ced709b4f2f8bd8fab5ed",
+    "source_branch": "master",
+    "source_project": {
+      "full_name": "zoujiamin123/ops-math-dropoutgenmask",
+      "human_name": "zoujiamin123 / ops-math-dropoutgenmask",
+      "id": 9454790,
+      "path": "ops-math-dropoutgenmask"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-math",
+      "human_name": "CANN / ops-math",
+      "id": 7649531,
+      "path": "ops-math"
+    }
+  },
+  {
+    "additions": 1,
+    "blob_id": "d8b5ff2fe80084139e315e8dbd2b8a66b059c87a",
+    "blob_url": "https://gitcode.com/cann/ops-math/blob/aa31e07c7421f9265d8ced709b4f2f8bd8fab5ed/random/random_common/op_host/arch35/random_tiling_arch35.h",
+    "deletions": 0,
+    "filename": "random/random_common/op_host/arch35/random_tiling_arch35.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 1,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -62,6 +62,7 @@ struct OpTilingConfig {\n     int64_t DcacheSize = 0;\n     int64_t sharedTmpBufSize = 0;\n     int64_t coreAlignSize = 4;\n+    int64_t ubAlignSize = 0;\n     int64_t keepProbNum = 0;\n };\n \n",
+      "new_file": false,
+      "new_path": "random/random_common/op_host/arch35/random_tiling_arch35.h",
+      "old_path": "random/random_common/op_host/arch35/random_tiling_arch35.h",
+      "removed_lines": 0,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-math/raw/aa31e07c7421f9265d8ced709b4f2f8bd8fab5ed/random/random_common/op_host/arch35/random_tiling_arch35.h",
+    "sha": "aa31e07c7421f9265d8ced709b4f2f8bd8fab5ed",
+    "source_branch": "master",
+    "source_project": {
+      "full_name": "zoujiamin123/ops-math-dropoutgenmask",
+      "human_name": "zoujiamin123 / ops-math-dropoutgenmask",
+      "id": 9454790,
+      "path": "ops-math-dropoutgenmask"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-math",
+      "human_name": "CANN / ops-math",
+      "id": 7649531,
+      "path": "ops-math"
+    }
+  },
+  {
+    "additions": 1,
+    "blob_id": "d339a17b27db37a9d85a219fff262af01832695d",
+    "blob_url": "https://gitcode.com/cann/ops-math/blob/aa31e07c7421f9265d8ced709b4f2f8bd8fab5ed/random/random_common/op_kernel/arch35/random_unified_tiling_data_arch35.h",
+    "deletions": 0,
+    "filename": "random/random_common/op_kernel/arch35/random_unified_tiling_data_arch35.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 1,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -29,6 +29,7 @@ public:\n     int64_t probTensorSize = 0;\n     int64_t sharedTmpBufSize = 0;\n     float keepProb = 0;\n+    uint32_t reserved = 0;\n \n     std::ostringstream DumpTilingInfo() {\n         std::ostringstream info;\n",
+      "new_file": false,
+      "new_path": "random/random_common/op_kernel/arch35/random_unified_tiling_data_arch35.h",
+      "old_path": "random/random_common/op_kernel/arch35/random_unified_tiling_data_arch35.h",
+      "removed_lines": 0,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-math/raw/aa31e07c7421f9265d8ced709b4f2f8bd8fab5ed/random/random_common/op_kernel/arch35/random_unified_tiling_data_arch35.h",
+    "sha": "aa31e07c7421f9265d8ced709b4f2f8bd8fab5ed",
+    "source_branch": "master",
+    "source_project": {
+      "full_name": "zoujiamin123/ops-math-dropoutgenmask",
+      "human_name": "zoujiamin123 / ops-math-dropoutgenmask",
+      "id": 9454790,
+      "path": "ops-math-dropoutgenmask"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-math",
+      "human_name": "CANN / ops-math",
+      "id": 7649531,
+      "path": "ops-math"
+    }
+  },
+  {
+    "additions": 11,
+    "blob_id": "b520641e96bc5bc08aceacd3f33800bbc500514c",
+    "blob_url": "https://gitcode.com/cann/ops-math/blob/aa31e07c7421f9265d8ced709b4f2f8bd8fab5ed/random/stateless_drop_out_gen_mask/op_host/arch35/stateless_drop_out_gen_mask_tiling_arch35.cpp",
+    "deletions": 6,
+    "filename": "random/stateless_drop_out_gen_mask/op_host/arch35/stateless_drop_out_gen_mask_tiling_arch35.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 11,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -35,6 +35,9 @@ static constexpr int64_t OUT_Y_IDX = 0;\n static constexpr uint64_t BUFFER_NUM = 2;\n static constexpr uint64_t EXIST_NODE_NUM = 3;\n static constexpr uint64_t CORE_ALIGN_SIZE =256;\n+static constexpr uint64_t UB_ALIGN_SIZE = 256;\n+static constexpr uint64_t REGBASE_CCEC_CACHE_SIZE = 8 * 1024;\n+static constexpr uint32_t RIGHT_SHIFT_NUM = 32;\n \n // ========== 仅需配置校验规则+特定字段回调函数 ==========\n OpTilingConfig StatelessDropOutGenMaskTiling::BuildOpConfig()\n@@ -100,18 +103,20 @@ OpTilingConfig StatelessDropOutGenMaskTiling::BuildOpConfig()\n             counterTemp = { inputOffset_[0], inputOffset_[1] };\n         }\n         key[0] = static_cast<int32_t>(keyTemp);\n-        key[1] = static_cast<int32_t>(keyTemp >> 32); // 32 for lower 32 bits\n+        key[1] = static_cast<int32_t>(keyTemp >> RIGHT_SHIFT_NUM); // 32 for lower 32 bits\n         counter[0] = static_cast<int32_t>(counterTemp[0]);\n-        counter[1] = static_cast<int32_t>(counterTemp[0] >> 32); // 32 for lower 32 bits\n+        counter[1] = static_cast<int32_t>(counterTemp[0] >> RIGHT_SHIFT_NUM); // 32 for lower 32 bits\n         counter[2] = static_cast<int32_t>(counterTemp[1]);\n-        counter[3] = static_cast<int32_t>(counterTemp[1] >> 32); // 32 for lower 32 bits\n+        counter[3] = static_cast<int32_t>(counterTemp[1] >> RIGHT_SHIFT_NUM); // 32 for lower 32 bits\n         return ge::GRAPH_SUCCESS;\n     };\n \n+    config.ubAlignSize = UB_ALIGN_SIZE;   \n+\n     config.getBufferNum = [](gert::TilingContext* ctx, int64_t& bufNum) -> ge::graphStatus {\n         auto outDesc = ctx->GetOutputDesc(0);\n         OP_CHECK_NULL_WITH_CONTEXT(ctx, outDesc);\n-        bufNum = sizeof(uint32_t) + sizeof(float) * BUFFER_NUM + sizeof(uint8_t) * BUFFER_NUM;\n+        bufNum = sizeof(uint32_t) + sizeof(float) * BUFFER_NUM + sizeof(float) * BUFFER_NUM;\n         return ge::GRAPH_SUCCESS;\n     };\n \n@@ -120,7 +125,7 @@ OpTilingConfig StatelessDropOutGenMaskTiling::BuildOpConfig()\n     return config;\n }\n \n-StatelessDropOutGenMaskTiling::StatelessDropOutGenMaskTiling(gert::TilingContext* context) : RandomTilingArch35(context, BuildOpConfig()){}\n+StatelessDropOutGenMaskTiling::StatelessDropOutGenMaskTiling(gert::TilingContext* ctx) : RandomTilingArch35(ctx, BuildOpConfig()){}\n \n static ge::graphStatus TilingPrepare4StatelessDropOutGenMaskTiling(gert::TilingParseContext* context)\n {\n@@ -138,4 +143,4 @@ IMPL_OP_OPTILING(StatelessDropOutGenMask)\n     .Tiling(TilingStatelessDropOutGenMask)\n     .TilingParse<RandomOperatorCompileInfo>(TilingPrepare4StatelessDropOutGenMaskTiling)\n     .TilingInputsDataDependency({ IN_SHAPE_IDX, IN_PROB_IDX, IN_SEED_IDX, IN_SEED1_IDX, IN_OFFSET_IDX });\n-} // namespace optiling\n+} // namespace optiling\n\\ No newline at end of file\n",
+      "new_file": false,
+      "new_path": "random/stateless_drop_out_gen_mask/op_host/arch35/stateless_drop_out_gen_mask_tiling_arch35.cpp",
+      "old_path": "random/stateless_drop_out_gen_mask/op_host/arch35/stateless_drop_out_gen_mask_tiling_arch35.cpp",
+      "removed_lines": 6,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-math/raw/aa31e07c7421f9265d8ced709b4f2f8bd8fab5ed/random/stateless_drop_out_gen_mask/op_host/arch35/stateless_drop_out_gen_mask_tiling_arch35.cpp",
+    "sha": "aa31e07c7421f9265d8ced709b4f2f8bd8fab5ed",
+    "source_branch": "master",
+    "source_project": {
+      "full_name": "zoujiamin123/ops-math-dropoutgenmask",
+      "human_name": "zoujiamin123 / ops-math-dropoutgenmask",
+      "id": 9454790,
+      "path": "ops-math-dropoutgenmask"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-math",
+      "human_name": "CANN / ops-math",
+      "id": 7649531,
+      "path": "ops-math"
+    }
+  },
+  {
+    "additions": 4,
+    "blob_id": "f4b65f9b4c77f5498c43da454f227f93e1260de9",
+    "blob_url": "https://gitcode.com/cann/ops-math/blob/aa31e07c7421f9265d8ced709b4f2f8bd8fab5ed/random/stateless_drop_out_gen_mask/op_kernel/arch35/stateless_drop_out_gen_mask_pt.h",
+    "deletions": 4,
+    "filename": "random/stateless_drop_out_gen_mask/op_kernel/arch35/stateless_drop_out_gen_mask_pt.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 4,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -89,10 +89,10 @@ __aicore__ inline void StatelessDropOutGenMaskPt<T>::Init(\n     outputGm_.SetGlobalBuffer((__gm__ uint8_t*)y + (blockOffset_ / byteBitRatio));\n \n     // InitBuffer\n-    pipe_->InitBuffer(outQueY_, BUFFER_NUM, this->AlignUp256(singleBufferProNum * sizeof(float)));\n-    pipe_->InitBuffer(philoxQueBuf_, this->AlignUp256(singleBufferProNum * sizeof(uint32_t)));\n-    pipe_->InitBuffer(calcuDataBuf_, this->AlignUp256(singleBufferProNum * sizeof(float)));\n-    pipe_->InitBuffer(tempDataBuf_, this->AlignUp256(singleBufferProNum * sizeof(float)));\n+    pipe_->InitBuffer(outQueY_, BUFFER_NUM, singleBufferProNum * sizeof(float));\n+    pipe_->InitBuffer(philoxQueBuf_, singleBufferProNum * sizeof(uint32_t));\n+    pipe_->InitBuffer(calcuDataBuf_, singleBufferProNum * sizeof(float));\n+    pipe_->InitBuffer(tempDataBuf_, singleBufferProNum * sizeof(float));\n \n     // GetValue\n     T currProb = probInputGm_.GetValue(0);\n",
+      "new_file": false,
+      "new_path": "random/stateless_drop_out_gen_mask/op_kernel/arch35/stateless_drop_out_gen_mask_pt.h",
+      "old_path": "random/stateless_drop_out_gen_mask/op_kernel/arch35/stateless_drop_out_gen_mask_pt.h",
+      "removed_lines": 4,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-math/raw/aa31e07c7421f9265d8ced709b4f2f8bd8fab5ed/random/stateless_drop_out_gen_mask/op_kernel/arch35/stateless_drop_out_gen_mask_pt.h",
+    "sha": "aa31e07c7421f9265d8ced709b4f2f8bd8fab5ed",
+    "source_branch": "master",
+    "source_project": {
+      "full_name": "zoujiamin123/ops-math-dropoutgenmask",
+      "human_name": "zoujiamin123 / ops-math-dropoutgenmask",
+      "id": 9454790,
+      "path": "ops-math-dropoutgenmask"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-math",
+      "human_name": "CANN / ops-math",
+      "id": 7649531,
+      "path": "ops-math"
+    }
+  },
+  {
+    "additions": 7,
+    "blob_id": "00951b10ced5dfa1fe20838b82583338b166692c",
+    "blob_url": "https://gitcode.com/cann/ops-math/blob/aa31e07c7421f9265d8ced709b4f2f8bd8fab5ed/random/stateless_drop_out_gen_mask/tests/ut/op_host/arch35/test_stateless_drop_out_gen_mask_tiling_arch35.cpp",
+    "deletions": 7,
+    "filename": "random/stateless_drop_out_gen_mask/tests/ut/op_host/arch35/test_stateless_drop_out_gen_mask_tiling_arch35.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 7,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -58,7 +58,7 @@ TEST_F(StatelessDropOutGenMaskTilingTest, stateless_drop_out_gen_mask_test_01)\n     }, \r\n     &compileInfo);\r\n     uint64_t expectTilingKey = 100;\r\n-    string expectTilingData = \"64 256 256 18720 2 0 8 16384 0 0 0 \";\r\n+    string expectTilingData = \"64 256 256 13056 2 0 8 16384 0 0 0 \";\r\n     std::vector<size_t> expectWorkspaces = {0};\r\n     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);\r\n }\r\n@@ -86,7 +86,7 @@ TEST_F(StatelessDropOutGenMaskTilingTest, stateless_drop_out_gen_mask_test_02)\n     }, \r\n     &compileInfo);\r\n     uint64_t expectTilingKey = 100;\r\n-    string expectTilingData = \"54 768 256 18720 24 0 36 40960 0 0 0 \";\r\n+    string expectTilingData = \"54 768 256 13056 24 0 36 40960 0 0 0 \";\r\n     std::vector<size_t> expectWorkspaces = {0};\r\n     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);\r\n }\r\n@@ -114,7 +114,7 @@ TEST_F(StatelessDropOutGenMaskTilingTest, stateless_drop_out_gen_mask_test_03)\n     }, \r\n     &compileInfo);\r\n     uint64_t expectTilingKey = 100;\r\n-    string expectTilingData = \"54 768 256 18720 24 0 36 40960 0 0 0 \";\r\n+    string expectTilingData = \"54 768 256 13056 24 0 36 40960 0 0 0 \";\r\n     std::vector<size_t> expectWorkspaces = {0};\r\n     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);\r\n }\r\n@@ -142,7 +142,7 @@ TEST_F(StatelessDropOutGenMaskTilingTest, stateless_drop_out_gen_mask_test_04)\n     }, \r\n     &compileInfo);\r\n     uint64_t expectTilingKey = 100;\r\n-    string expectTilingData = \"54 768 256 18720 24 0 36 40960 0 0 0 \";\r\n+    string expectTilingData = \"54 768 256 13056 24 0 36 40960 0 0 0 \";\r\n     std::vector<size_t> expectWorkspaces = {0};\r\n     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);\r\n }\r\n@@ -170,7 +170,7 @@ TEST_F(StatelessDropOutGenMaskTilingTest, stateless_drop_out_gen_mask_test_05)\n     }, \r\n     &compileInfo);\r\n     uint64_t expectTilingKey = 100;\r\n-    string expectTilingData = \"64 12800 12800 18720 16 0 36 819200 0 0 0 \";\r\n+    string expectTilingData = \"64 12800 12800 13056 16 0 36 819200 0 0 0 \";\r\n     std::vector<size_t> expectWorkspaces = {0};\r\n     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);\r\n }\r\n@@ -198,7 +198,7 @@ TEST_F(StatelessDropOutGenMaskTilingTest, stateless_drop_out_gen_mask_test_06)\n     }, \r\n     &compileInfo);\r\n     uint64_t expectTilingKey = 100;\r\n-    string expectTilingData = \"40 512 512 18720 24 0 36 20480 0 0 0 \";\r\n+    string expectTilingData = \"40 512 512 13056 24 0 36 20480 0 0 0 \";\r\n     std::vector<size_t> expectWorkspaces = {0};\r\n     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);\r\n }\r\n@@ -226,7 +226,7 @@ TEST_F(StatelessDropOutGenMaskTilingTest, stateless_drop_out_gen_mask_test_07)\n     }, \r\n     &compileInfo);\r\n     uint64_t expectTilingKey = 100;\r\n-    string expectTilingData = \"48 512 512 18720 24 0 36 24576 0 0 0 \";\r\n+    string expectTilingData = \"48 512 512 13056 24 0 36 24576 0 0 0 \";\r\n     std::vector<size_t> expectWorkspaces = {0};\r\n     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);\r\n }\n\\ No newline at end of file\n",
+      "new_file": false,
+      "new_path": "random/stateless_drop_out_gen_mask/tests/ut/op_host/arch35/test_stateless_drop_out_gen_mask_tiling_arch35.cpp",
+      "old_path": "random/stateless_drop_out_gen_mask/tests/ut/op_host/arch35/test_stateless_drop_out_gen_mask_tiling_arch35.cpp",
+      "removed_lines": 7,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-math/raw/aa31e07c7421f9265d8ced709b4f2f8bd8fab5ed/random/stateless_drop_out_gen_mask/tests/ut/op_host/arch35/test_stateless_drop_out_gen_mask_tiling_arch35.cpp",
+    "sha": "aa31e07c7421f9265d8ced709b4f2f8bd8fab5ed",
+    "source_branch": "master",
+    "source_project": {
+      "full_name": "zoujiamin123/ops-math-dropoutgenmask",
+      "human_name": "zoujiamin123 / ops-math-dropoutgenmask",
+      "id": 9454790,
+      "path": "ops-math-dropoutgenmask"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-math",
+      "human_name": "CANN / ops-math",
+      "id": 7649531,
+      "path": "ops-math"
+    }
+  }
+]

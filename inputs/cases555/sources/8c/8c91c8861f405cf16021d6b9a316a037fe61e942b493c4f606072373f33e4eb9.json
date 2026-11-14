@@ -1,0 +1,66 @@
+{
+  "assignees": [],
+  "body": "**Describe the current behavior / 问题描述**\ngrouped_matmul_swiglu_quant_v2 算子在 A8W4/A4W4 per-group 量化、WeightNZ 路径下，输出 shape 计算错误。\n\n根因：per-group 的 weightScale 为 3D（[E, KGroup, N]），与 MX multi-weight scale rank 相同。代码中 `isMxShape` 使用 `weightScaleDimNum == MX_MULTI_WEIGHT_SCALE_DIM` 判断，将 per-group 3D weightScale 误判为 MX 场景；同时在 L0 输出 shape 计算中 `n` 取 `GetDim(1)` 且 DAV_3510 路径按 transposeWeight 选择 N 维索引，未区分 perToken 与 MX，导致 N 取错、输出 [M, N/2] 不正确。\n\n涉及位置：\n1. `op_host/grouped_matmul_swiglu_quant_v2_infershape.cpp` 的 `InferShape4GroupedMatmulSwigluQuantV2`：`isMxShape` 误用 rank 判断。\n2. `op_api/grouped_matmul_swiglu_quant_v2.cpp` 的 L0 `GroupedMatmulSwigluQuantV2`：`n` 取 `GetDim(1)` 固定维，DAV_3510 路径未对 perToken 单独处理。\n\n**Environment / 环境信息**\n- 算子：grouped_matmul_swiglu_quant_v2 (gmmsqv2)\n- 仓库：cann/ops-transformer\n- 路径：WeightNZ（WeightNzV2）\n- 量化类型：A8W4 / A4W4 per-group（weightScale 3D）\n- 平台：Ascend910B / DAV_3510\n\n**Steps to reproduce the issue / 重现步骤**\n1. 构造 A8W4 per-group 场景：x 为 INT8 ND，weight 为 INT32 FRACTAL_NZ，weightScale 为 3D [E, KGroup, N]（如 256:2:64）。\n2. 调用 aclnnGroupedMatmulSwigluQuantWeightNzV2 接口。\n3. 观察输出 tensor shape，N 维因 isMxShape 误判与 N 维索引取错而计算错误。\n\n**Describe the expected behavior / 预期结果**\nper-group（perToken，quantMode=0）场景下，N 应恒取 weightScale 末维（per-channel [E,N]、per-group [E,KGroup,N] 末维均为 N，不受 transposeWeight 影响），输出 shape 为 [M, N/2]；`isMxShape` 仅由 `quantMode == QUANT_MODE_MX_TYPE` 判定，不依据 weightScale rank。\n\n**Related log / screenshot / 日志 / 截图**\n修复前：per-group 3D weightScale 被误判为 MX，N 维索引取错，输出 shape 不正确。\n修复后：perToken 分支 N 取 weightScale 末维，输出 shape 正确。\n\n**Special notes for this issue/备注**\n关联 PR：https://gitcode.com/cann/ops-transformer/pull/8826\n",
+  "comments": 0,
+  "created_at": "2026-07-22T10:09:10+08:00",
+  "finished_at": "2026-07-22T11:44:30+08:00",
+  "html_url": "https://gitcode.com/cann/ops-transformer/issues/3877",
+  "id": 4183983,
+  "issue_priority_detail": {
+    "id": 116,
+    "title": "无优先级"
+  },
+  "issue_state": "已完成",
+  "issue_state_detail": {
+    "id": 287,
+    "serial": 0,
+    "title": "已完成"
+  },
+  "issue_type": "任务",
+  "issue_type_detail": {
+    "id": 255,
+    "is_system": false,
+    "title": "任务"
+  },
+  "labels": [
+    {
+      "color": "#DB2828",
+      "created_at": "2025-06-10T14:17:23+08:00",
+      "id": 3870,
+      "name": "bug-report",
+      "updated_at": "2026-07-22T10:09:11+08:00"
+    },
+    {
+      "color": "#2469f5",
+      "created_at": "2025-10-09T20:53:07+08:00",
+      "id": 14930,
+      "name": "Accepted",
+      "updated_at": "2026-07-22T11:46:45+08:00"
+    }
+  ],
+  "number": "3877",
+  "priority": 0,
+  "repository": {
+    "assigner": {},
+    "created_at": "2025-09-28T17:54:46+08:00",
+    "description": "本项目是CANN提供的transformer类大模型算子库，实现网络在NPU上加速计算。",
+    "full_name": "cann/ops-transformer",
+    "id": 7673863,
+    "name": "ops-transformer",
+    "paas": "",
+    "path": "ops-transformer",
+    "updated_at": "2025-09-28T18:06:48+08:00"
+  },
+  "state": "closed",
+  "title": "[Bug-Report|缺陷反馈]: grouped_matmul_swiglu_quant_v2 A8W4/A4W4 per-group WeightNZ 路径输出 shape 计算错误",
+  "updated_at": "2026-07-22T11:44:30+08:00",
+  "user": {
+    "avatar_url": "https://cdn-img.gitcode.com/ca/db/55c58a290dbc27025de6aa083d62193edbe754dcff96b8d3060487583ceb2133.png?time=1769657556971",
+    "html_url": "https://gitcode.com/zhoushaolong",
+    "id": "6825a8db2f11da2d75ca7d79",
+    "login": "zhoushaolong",
+    "name": "zhoushaolong",
+    "object_id": "6825a8db2f11da2d75ca7d79"
+  },
+  "visibility_reason": "public"
+}

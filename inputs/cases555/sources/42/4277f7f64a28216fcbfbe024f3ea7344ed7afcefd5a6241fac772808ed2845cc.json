@@ -1,0 +1,146 @@
+[
+  {
+    "additions": 10,
+    "blob_id": "c5eaf5024fa3d10f69072031f70ce059dda660dc",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/2427735903cfe3d3739a074af88c32bbef9d5dc8/mhc/mhc_pre_sinkhorn/op_host/op_tiling/mhc_pre_sinkhorn_tiling.cpp",
+    "deletions": 2,
+    "filename": "mhc/mhc_pre_sinkhorn/op_host/op_tiling/mhc_pre_sinkhorn_tiling.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 10,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -53,6 +53,7 @@ constexpr int64_t ITER_TIMES_ATTR_IDX = 1;\n constexpr int64_t HC_EPS_ATTR_IDX = 2;\n constexpr int64_t NORM_EPS_ATTR_IDX = 3;\n constexpr int64_t NEED_BACKWARD_ATTR_IDX = 4;\n+constexpr int64_t HCMULT_VALUE = 4;\n constexpr int64_t DEFAULT_ITER_TIMES = 20;\n constexpr int64_t BS_SPLIT_THRESHOLD = 128;\n constexpr int64_t MAX_BS_PER_LOOP = 32;\n@@ -67,19 +68,22 @@ ge::graphStatus MhcPreSinkhornTiling::GetPlatformInfo()\n         OP_CHECK_IF(compileInfoPtr == nullptr, OP_LOGE(context_, \"compile info is null\"),\n                       return ge::GRAPH_FAILED);\n         aivCoreNum_ = compileInfoPtr->coreNum;\n+        aicCoreNum_ = compileInfoPtr->aicCoreNum;\n         ubSize_ = compileInfoPtr->ubSize;\n     } else {\n         auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfo);\n         aivCoreNum_ = ascendcPlatform.GetCoreNumAiv();\n         aicCoreNum_ = ascendcPlatform.GetCoreNumAic();\n-        aivCoreNum_ = 40;\n-        aicCoreNum_ = 20;\n \n         uint64_t ubSizePlatForm;\n         ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::UB, ubSizePlatForm);\n         ubSize_ = ubSizePlatForm;\n         socVersion_ = ascendcPlatform.GetSocVersion();\n     }\n+    OP_CHECK_IF(aicCoreNum_ == 0, OP_LOGE(context_, \"aicCoreNum is 0, cannot do tiling\"),\n+                  return ge::GRAPH_FAILED);\n+    OP_CHECK_IF(aivCoreNum_ == 0, OP_LOGE(context_, \"aivCoreNum_ is 0, cannot do tiling\"),\n+                  return ge::GRAPH_FAILED);\n     return ge::GRAPH_SUCCESS;\n }\n \n@@ -146,6 +150,10 @@ ge::graphStatus MhcPreSinkhornTiling::GetShapeAttrsInfoInner()\n     OP_CHECK_IF(GetAttr() != ge::GRAPH_SUCCESS,\n                   OP_LOGE(context_->GetNodeName(), \"get attr failed.\"),\n                   return ge::GRAPH_FAILED);\n+    // hcMult only support 4\n+    OP_CHECK_IF(hcMult_ != HCMULT_VALUE,\n+                OP_LOGE(context_->GetNodeName(), \"hcMult should be %ld, but is %ld\", HCMULT_VALUE, hcMult_),\n+                return ge::GRAPH_FAILED);\n \n     return ge::GRAPH_SUCCESS;\n }\n",
+      "new_file": false,
+      "new_path": "mhc/mhc_pre_sinkhorn/op_host/op_tiling/mhc_pre_sinkhorn_tiling.cpp",
+      "old_path": "mhc/mhc_pre_sinkhorn/op_host/op_tiling/mhc_pre_sinkhorn_tiling.cpp",
+      "removed_lines": 2,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/2427735903cfe3d3739a074af88c32bbef9d5dc8/mhc/mhc_pre_sinkhorn/op_host/op_tiling/mhc_pre_sinkhorn_tiling.cpp",
+    "sha": "2427735903cfe3d3739a074af88c32bbef9d5dc8",
+    "source_branch": "master",
+    "source_project": {
+      "full_name": "liuyun_nj/ops-transformer_1",
+      "human_name": "liuyun_nj / ops-transformer_1",
+      "id": 10417798,
+      "path": "ops-transformer_1"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  },
+  {
+    "additions": 1,
+    "blob_id": "ae86995202d0ca4e5e3c55e695c0faccdd7e419b",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/2427735903cfe3d3739a074af88c32bbef9d5dc8/mhc/mhc_pre_sinkhorn/op_host/op_tiling/mhc_pre_sinkhorn_tiling.h",
+    "deletions": 0,
+    "filename": "mhc/mhc_pre_sinkhorn/op_host/op_tiling/mhc_pre_sinkhorn_tiling.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 1,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -177,6 +177,7 @@ REGISTER_TILING_DATA_CLASS(MhcPreSinkhorn_2001, MhcPreSinkhornRegbaseTilingData)\n \n struct MhcPreSinkhornCompileInfo {\n     uint64_t coreNum = 0;\n+    uint64_t aicCoreNum = 0;\n     uint64_t ubSize = 0;\n     uint64_t sysWorkspaceSize = 0;\n };\n",
+      "new_file": false,
+      "new_path": "mhc/mhc_pre_sinkhorn/op_host/op_tiling/mhc_pre_sinkhorn_tiling.h",
+      "old_path": "mhc/mhc_pre_sinkhorn/op_host/op_tiling/mhc_pre_sinkhorn_tiling.h",
+      "removed_lines": 0,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/2427735903cfe3d3739a074af88c32bbef9d5dc8/mhc/mhc_pre_sinkhorn/op_host/op_tiling/mhc_pre_sinkhorn_tiling.h",
+    "sha": "2427735903cfe3d3739a074af88c32bbef9d5dc8",
+    "source_branch": "master",
+    "source_project": {
+      "full_name": "liuyun_nj/ops-transformer_1",
+      "human_name": "liuyun_nj / ops-transformer_1",
+      "id": 10417798,
+      "path": "ops-transformer_1"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  },
+  {
+    "additions": 4,
+    "blob_id": "3c9a4210faaddcbe97e8b7581bdc63db8da71198",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/2427735903cfe3d3739a074af88c32bbef9d5dc8/mhc/mhc_pre_sinkhorn/op_kernel/mhc_pre_sinkhorn_base.h",
+    "deletions": 4,
+    "filename": "mhc/mhc_pre_sinkhorn/op_kernel/mhc_pre_sinkhorn_base.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 4,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -216,7 +216,6 @@ __aicore__ inline void MulABLastDimBrcInline2(const LocalTensor<T> &output, cons\n                 }\n             }\n         }\n-        // 非128对齐场景;\n         if (numRemainPerLine > 0) {\n             if (dstRepStridePerLine > MAX_REPEAT_STRIDE) {\n                 instrParams.dstBlkStride = 1;\n@@ -227,8 +226,9 @@ __aicore__ inline void MulABLastDimBrcInline2(const LocalTensor<T> &output, cons\n                 instrParams.src1RepStride = 0;\n                 for (uint32_t i = 0; i < curRowNum; i++) {\n                     Mul(output[numRepeatPerLine * elemInOneRepeat + i * curColNumAlign],\n-                        input0[numRepeatPerLine * elemInOneRepeat + i * curColNumAlign], tmpBuffer[i * elemInOneBlock],\n-                        numRemainPerLine, 1, instrParams);\n+                        input0[numRepeatPerLine * elemInOneRepeat + i * curColNumAlign],\n+                        tmpBuffer[(i / numN * elemInOneBlock + i % numN) * elemInOneBlock], numRemainPerLine, 1,\n+                        instrParams);\n                 }\n             } else {\n                 instrParams.dstBlkStride = 1;\n@@ -236,7 +236,7 @@ __aicore__ inline void MulABLastDimBrcInline2(const LocalTensor<T> &output, cons\n                 instrParams.src1BlkStride = 0;\n                 instrParams.dstRepStride = dstRepStridePerLine;\n                 instrParams.src0RepStride = dstRepStridePerLine;\n-                instrParams.src1RepStride = 0;\n+                instrParams.src1RepStride = 1;\n                 Mul(output[numRepeatPerLine * elemInOneRepeat], input0[numRepeatPerLine * elemInOneRepeat], tmpBuffer,\n                     numRemainPerLine, curRowNum, instrParams);\n             }\n",
+      "new_file": false,
+      "new_path": "mhc/mhc_pre_sinkhorn/op_kernel/mhc_pre_sinkhorn_base.h",
+      "old_path": "mhc/mhc_pre_sinkhorn/op_kernel/mhc_pre_sinkhorn_base.h",
+      "removed_lines": 4,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/2427735903cfe3d3739a074af88c32bbef9d5dc8/mhc/mhc_pre_sinkhorn/op_kernel/mhc_pre_sinkhorn_base.h",
+    "sha": "2427735903cfe3d3739a074af88c32bbef9d5dc8",
+    "source_branch": "master",
+    "source_project": {
+      "full_name": "liuyun_nj/ops-transformer_1",
+      "human_name": "liuyun_nj / ops-transformer_1",
+      "id": 10417798,
+      "path": "ops-transformer_1"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  },
+  {
+    "additions": 2,
+    "blob_id": "ea1bc1560fec92391c37e428592054cc72e9dd34",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/2427735903cfe3d3739a074af88c32bbef9d5dc8/mhc/mhc_pre_sinkhorn/op_kernel/mhc_pre_sinkhorn_cube_compute.h",
+    "deletions": 2,
+    "filename": "mhc/mhc_pre_sinkhorn/op_kernel/mhc_pre_sinkhorn_cube_compute.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 2,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -34,8 +34,8 @@ using AscendC::WaitFlag;\n using namespace AscendC;\n \n namespace MhcPreSinkhorn {\n-\n-constexpr MatmulConfig MHC_PRE_GRAD_MM1_CFG = GetMDLConfig(false, false, 0, false, false, false, true);\n+// Set the first parameter to true when K > 65536 to trigger loop-based buffer loading.\n+constexpr MatmulConfig MHC_PRE_GRAD_MM1_CFG = GetMDLConfig(true, false, 0, false, false, false, true);\n \n struct MmParams {\n     uint64_t curML1;\n",
+      "new_file": false,
+      "new_path": "mhc/mhc_pre_sinkhorn/op_kernel/mhc_pre_sinkhorn_cube_compute.h",
+      "old_path": "mhc/mhc_pre_sinkhorn/op_kernel/mhc_pre_sinkhorn_cube_compute.h",
+      "removed_lines": 2,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/2427735903cfe3d3739a074af88c32bbef9d5dc8/mhc/mhc_pre_sinkhorn/op_kernel/mhc_pre_sinkhorn_cube_compute.h",
+    "sha": "2427735903cfe3d3739a074af88c32bbef9d5dc8",
+    "source_branch": "master",
+    "source_project": {
+      "full_name": "liuyun_nj/ops-transformer_1",
+      "human_name": "liuyun_nj / ops-transformer_1",
+      "id": 10417798,
+      "path": "ops-transformer_1"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  }
+]

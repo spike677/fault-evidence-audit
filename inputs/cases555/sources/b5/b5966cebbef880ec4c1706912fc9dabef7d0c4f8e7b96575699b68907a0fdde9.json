@@ -1,0 +1,326 @@
+[
+  {
+    "additions": 19,
+    "blob_id": "70ba7400f8b967d2aee69486e93b099cd79bc103",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/0dc888169b28a24054044c00e6566ca8f79bf197/attention/mixed_quant_sparse_flash_mla/tests/pytest/mixed_quant_sparse_flash_mla_golden.py",
+    "deletions": 18,
+    "filename": "attention/mixed_quant_sparse_flash_mla/tests/pytest/mixed_quant_sparse_flash_mla_golden.py",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 19,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -12,9 +12,6 @@\n \n import os\n import torch\n-import torch_npu\n-import check_valid_param\n-import pytest\n import random\n import numpy as np\n import math\n@@ -233,13 +230,6 @@ class GeneralizedSFAQuant:\n                         print(\n                             f\"      进度：{current_pct:.1f}% | 步数：{i_S1:>{len(str(cur_act_q))}}/{cur_act_q}\"\n                         )\n-                    if (\n-                        self.ori_mask_mode == 3 and i_S1 < cur_act_q - cur_ori_act_kv\n-                    ):  # 根据 win_kv 判断行无效\n-                        attn_out[i_B, i_N2 * G : (i_N2 + 1) * G, i_S1, :] = torch.zeros(\n-                            [G, self.D], dtype=torch.float\n-                        )\n-                        continue\n                     ori_threshold = cur_ori_act_kv - cur_act_q + i_S1 + 1\n                     if self.ori_mask_mode == 3:\n                         ori_win_start = 0\n@@ -263,13 +253,14 @@ class GeneralizedSFAQuant:\n                         ori_win_end = cur_ori_act_kv\n                     ori_win_start = min(ori_win_start, cur_ori_act_kv)\n \n-                    if ori_win_start >= ori_win_end:  # 根据 win_kv 判断行无效\n-                        attn_out[i_B, i_N2 * G : (i_N2 + 1) * G, i_S1, :] = torch.zeros(\n-                            [G, self.D], dtype=torch.float\n+                    if ori_win_start >= ori_win_end:\n+                        cur_ori_k_bnsd = torch.zeros(\n+                            [0, self.D], dtype=ori_k_bnsd.dtype\n                         )\n-                        continue\n-\n-                    cur_ori_k_bnsd = ori_k_bnsd[i_B, i_N2, ori_win_start:ori_win_end, :]\n+                    else:\n+                        cur_ori_k_bnsd = ori_k_bnsd[\n+                            i_B, i_N2, ori_win_start:ori_win_end, :\n+                        ]\n \n                     if (\n                         self.template_run_mode == \"CSA\"\n@@ -351,6 +342,12 @@ class GeneralizedSFAQuant:\n                         cmp_s2_loop_time = math.ceil(cur_cmp_k.size(0) / s2_base_size)\n                         cur_cmp_k_fp32 = cur_cmp_k.to(dtype=torch.float32)\n \n+                    if cur_ori_k_bnsd.size(0) == 0 and cur_cmp_k == []:\n+                        attn_out[i_B, i_N2 * G : (i_N2 + 1) * G, i_S1, :] = torch.zeros(\n+                            [G, self.D], dtype=torch.float\n+                        )\n+                        continue\n+\n                     cur_attn_out = attn_out[i_B, i_N2 * G : (i_N2 + 1) * G, i_S1, :]\n                     q_curr = q_bnsd[i_B, i_N2 * G : (i_N2 + 1) * G, i_S1, :]\n                     q_curr_fp32 = q_curr.to(dtype=torch.float32)\n@@ -364,13 +361,17 @@ class GeneralizedSFAQuant:\n \n                         mm1_res = torch.matmul(q_curr_fp32, k_concat_fp32.T)\n                         scale_res = mm1_res * self.softmax_scale\n-                        softmax_res, softmax_sum = self.sinks_softmax(\n+                        softmax_res, x_max, softmax_sum = self.sinks_softmax(\n                             scale_res, cur_sinks_expand\n                         )\n                         softmax_res = softmax_res.to(q_bnsd.dtype).to(torch.float32)\n                         mm2_res = torch.matmul(softmax_res, v_concat_fp32)\n                         v2_res = torch.div(mm2_res, softmax_sum)\n                         attn_out[i_B, i_N2 * G : (i_N2 + 1) * G, i_S1, :] = v2_res\n+                        if return_softmax_lse:\n+                            softmax_lse[i_B, i_N2, i_S1, :] = x_max[:, 0] + torch.log(\n+                                softmax_sum[:, 0] + 1e-10\n+                            )\n                     elif RUN_MODE == 1:\n                         ori_s2_loop_time = math.ceil(\n                             cur_ori_k_bnsd.size(0) / s2_base_size\n@@ -559,7 +560,7 @@ class GeneralizedSFAQuant:\n         x_sub = x - x_max\n         y = torch.exp(x_sub)\n         x_sum = y.sum(dim=-1, keepdims=True) + torch.exp(sinks - x_max)\n-        return y, x_sum\n+        return y, x_max, x_sum\n \n     def trans_shape_to_bnsd(\n         self, tensor, shape, layout, cu_seqlens_q=None, seqused_q=None\n",
+      "new_file": false,
+      "new_path": "attention/mixed_quant_sparse_flash_mla/tests/pytest/mixed_quant_sparse_flash_mla_golden.py",
+      "old_path": "attention/mixed_quant_sparse_flash_mla/tests/pytest/mixed_quant_sparse_flash_mla_golden.py",
+      "removed_lines": 18,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/0dc888169b28a24054044c00e6566ca8f79bf197/attention/mixed_quant_sparse_flash_mla/tests/pytest/mixed_quant_sparse_flash_mla_golden.py",
+    "sha": "0dc888169b28a24054044c00e6566ca8f79bf197",
+    "source_branch": "lse_bugfix",
+    "source_project": {
+      "full_name": "changlei24/ops-transformer_lse_test",
+      "human_name": "changlei24 / ops-transformer_MQSMLA_LSE",
+      "id": 9807779,
+      "path": "ops-transformer_lse_test"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  },
+  {
+    "additions": 39,
+    "blob_id": "42b3e6e0087a594b760a6a3bb29cb7bd6015c71f",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/0dc888169b28a24054044c00e6566ca8f79bf197/attention/mixed_quant_sparse_flash_mla/tests/pytest/test_mixed_quant_sparse_flash_mla_batch.py",
+    "deletions": 24,
+    "filename": "attention/mixed_quant_sparse_flash_mla/tests/pytest/test_mixed_quant_sparse_flash_mla_batch.py",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 39,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -10,38 +10,41 @@\n # See LICENSE in the root of the software repository for the full text of the License.\n # -----------------------------------------------------------------------------------------------------------\n \n-import itertools\n import torch\n import pytest\n-import random\n import pandas as pd\n from pathlib import Path\n-import numpy as np\n-import math\n import os\n-import multiprocessing as mp\n import concurrent.futures\n import result_compare_method\n-import check_valid_param\n from batch import mixed_quant_sparse_flash_mla_process\n import utils\n \n testcase_path = os.environ.get(\"MQSMLA_PT_DIR\", \"mqsmla_testcase\")\n-batch_test_mode = int(os.environ.get(\"MQSMLA_BATCH_TEST_MODE\", 0))  # 0:路径下全量批跑，1:按表格中case批跑\n-excel_path = os.environ.get(\"MQSMLA_EXCEL_PATH\", os.path.join(os.path.dirname(__file__), \"excel\", \"testcase.xlsx\"))\n-result_path = os.environ.get(\"MQSMLA_RESULT_SAVE_PATH\", './mqsmla_result.xlsx')\n+batch_test_mode = int(\n+    os.environ.get(\"MQSMLA_BATCH_TEST_MODE\", 0)\n+)  # 0:路径下全量批跑，1:按表格中case批跑\n+excel_path = os.environ.get(\n+    \"MQSMLA_EXCEL_PATH\",\n+    os.path.join(os.path.dirname(__file__), \"excel\", \"testcase.xlsx\"),\n+)\n+result_path = os.environ.get(\"MQSMLA_RESULT_SAVE_PATH\", \"./mqsmla_result.xlsx\")\n device_id = int(os.environ.get(\"MQSMLA_DEVICE_ID\", 0))\n \n testcase_files = []\n if os.path.isdir(testcase_path):\n     if batch_test_mode == 1:\n         df = pd.read_excel(excel_path)\n-        target_names = [str(name) for name in df['Testcase_Name'].dropna().tolist() if str(name) != 'None']\n+        target_names = [\n+            str(name)\n+            for name in df[\"Testcase_Name\"].dropna().tolist()\n+            if str(name) != \"None\"\n+        ]\n         if not target_names:\n             print(f\"错误: 表格中没有有效的Testcase_Name: {excel_path}\")\n         else:\n             print(f\"从表格中读取到 {len(target_names)} 个目标用例名\")\n-            pt_files = [f for f in os.listdir(testcase_path) if f.endswith('.pt')]\n+            pt_files = [f for f in os.listdir(testcase_path) if f.endswith(\".pt\")]\n             for target_name in target_names:\n                 matched = [f for f in pt_files if target_name in f]\n                 if matched:\n@@ -53,7 +56,7 @@ if os.path.isdir(testcase_path):\n                     print(f\"警告: 用例名 '{target_name}' 未匹配到任何.pt文件\")\n             print(f\"按表格筛选后共 {len(testcase_files)} 个测试用例文件\")\n     else:\n-        pt_files = [f for f in os.listdir(testcase_path) if f.endswith('.pt')]\n+        pt_files = [f for f in os.listdir(testcase_path) if f.endswith(\".pt\")]\n         if not pt_files:\n             print(f\"错误: 目录中没有找到.pt文件: {testcase_path}\")\n         else:\n@@ -64,22 +67,28 @@ if os.path.isdir(testcase_path):\n else:\n     print(f\"错误: 输出目录不存在: {testcase_path}\")\n \n+\n def mqsmla(testcase_files):\n     test_data = torch.load(testcase_files, map_location=\"cpu\", weights_only=False)\n     npu_error_msg = None\n     try:\n-        npu_result, cpu_quant_result, cpu_lse, npu_lse = mixed_quant_sparse_flash_mla_process.test_mqsmla_quant_process_ci(\n-            test_data, device_id=device_id)\n-        attn_result, attn_percent = result_compare_method.check_result(cpu_quant_result, npu_result)\n+        npu_result, cpu_quant_result, cpu_lse, npu_lse = (\n+            mixed_quant_sparse_flash_mla_process.test_mqsmla_quant_process_ci(\n+                test_data, device_id=device_id\n+            )\n+        )\n+        attn_result, attn_percent = result_compare_method.check_result(\n+            cpu_quant_result, npu_result\n+        )\n         lse_res, lse_pct = None, None\n         fail_info = []\n         min_fulfill = attn_percent  # 修复：main_pct → attn_percent\n \n-        if test_data['params'].get('return_softmax_lse'):\n+        if test_data[\"params\"].get(\"return_softmax_lse\"):\n             print(\"return_softmax_lse is true!!!\")\n             lse_res, lse_pct = result_compare_method.check_result(cpu_lse, npu_lse)\n             min_fulfill = min(min_fulfill, lse_pct)\n-        \n+\n         if attn_result != \"Pass\":\n             fail_info.append(f\"MAIN_FAILED:{attn_result}\")\n         # LSE失败记录\n@@ -98,15 +107,21 @@ def mqsmla(testcase_files):\n         result = \"NPU ERROR\"\n         fulfill_percent = 0\n \n-    utils.save_result(test_data['params'], result, fulfill_percent, Path(result_path))\n+    utils.save_result(test_data[\"params\"], result, fulfill_percent, Path(result_path))\n \n-    if result == \"Failed\":\n-        pytest.fail(f\"用例精度失败:{test_data['Testcase_Name']} 精度:{fulfill_percent:.2f}%\")\n     if result == \"NPU ERROR\":\n-        pytest.fail(f\"用例执行失败:{test_data['Testcase_Name']} NPU ERROR: {npu_error_msg}\")\n+        pytest.fail(\n+            f\"用例执行失败:{test_data['Testcase_Name']} NPU ERROR: {npu_error_msg}\"\n+        )\n+    elif result != \"Pass\":\n+        pytest.fail(\n+            f\"用例精度失败:{test_data['Testcase_Name']} 精度:{fulfill_percent:.2f}%\"\n+        )\n+\n \n testcase_ids = [os.path.splitext(os.path.basename(f))[0] for f in testcase_files]\n \n+\n @pytest.mark.ci\n @pytest.mark.parametrize(\"testcase_files\", testcase_files, ids=testcase_ids)\n def test_mixed_quant_sparse_flash_mla(testcase_files):\n@@ -116,6 +131,6 @@ def test_mixed_quant_sparse_flash_mla(testcase_files):\n         # 等待并获取结果\n         for future in concurrent.futures.as_completed([futures]):\n             try:\n-                result = future.result()\n-            except Exception as e:\n-                pytest.fail(f\"当前用例线程执行失败\")\n+                future.result()\n+            except Exception:\n+                pytest.fail(\"当前用例线程执行失败\")\n",
+      "new_file": false,
+      "new_path": "attention/mixed_quant_sparse_flash_mla/tests/pytest/test_mixed_quant_sparse_flash_mla_batch.py",
+      "old_path": "attention/mixed_quant_sparse_flash_mla/tests/pytest/test_mixed_quant_sparse_flash_mla_batch.py",
+      "removed_lines": 24,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/0dc888169b28a24054044c00e6566ca8f79bf197/attention/mixed_quant_sparse_flash_mla/tests/pytest/test_mixed_quant_sparse_flash_mla_batch.py",
+    "sha": "0dc888169b28a24054044c00e6566ca8f79bf197",
+    "source_branch": "lse_bugfix",
+    "source_project": {
+      "full_name": "changlei24/ops-transformer_lse_test",
+      "human_name": "changlei24 / ops-transformer_MQSMLA_LSE",
+      "id": 9807779,
+      "path": "ops-transformer_lse_test"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  },
+  {
+    "additions": 42,
+    "blob_id": "b0914c2e851656f125266905d424e8657416e70c",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/0dc888169b28a24054044c00e6566ca8f79bf197/attention/mixed_quant_sparse_flash_mla/tests/pytest/test_mixed_quant_sparse_flash_mla_batch_graph.py",
+    "deletions": 25,
+    "filename": "attention/mixed_quant_sparse_flash_mla/tests/pytest/test_mixed_quant_sparse_flash_mla_batch_graph.py",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 42,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -10,38 +10,41 @@\n # See LICENSE in the root of the software repository for the full text of the License.\n # -----------------------------------------------------------------------------------------------------------\n \n-import itertools\n import torch\n import pytest\n-import random\n import pandas as pd\n from pathlib import Path\n-import numpy as np\n-import math\n import os\n-import multiprocessing as mp\n import concurrent.futures\n import result_compare_method\n-import check_valid_param\n from batch import mixed_quant_sparse_flash_mla_process\n import utils\n \n testcase_path = os.environ.get(\"MQSMLA_PT_DIR\", \"mqsmla_testcase\")\n-batch_test_mode = int(os.environ.get(\"MQSMLA_BATCH_TEST_MODE\", 0))  # 0:路径下全量批跑，1:按表格中case批跑\n-excel_path = os.environ.get(\"MQSMLA_EXCEL_PATH\", os.path.join(os.path.dirname(__file__), \"excel\", \"testcase.xlsx\"))\n-result_path = os.environ.get(\"MQSMLA_RESULT_SAVE_PATH\", './mqsmla_result.xlsx')\n+batch_test_mode = int(\n+    os.environ.get(\"MQSMLA_BATCH_TEST_MODE\", 0)\n+)  # 0:路径下全量批跑，1:按表格中case批跑\n+excel_path = os.environ.get(\n+    \"MQSMLA_EXCEL_PATH\",\n+    os.path.join(os.path.dirname(__file__), \"excel\", \"testcase.xlsx\"),\n+)\n+result_path = os.environ.get(\"MQSMLA_RESULT_SAVE_PATH\", \"./mqsmla_result.xlsx\")\n device_id = int(os.environ.get(\"MQSMLA_DEVICE_ID\", 0))\n \n locals()[\"testcase_files\"] = []\n if os.path.isdir(testcase_path):\n     if batch_test_mode == 1:\n         df = pd.read_excel(excel_path)\n-        target_names = [str(name) for name in df['Testcase_Name'].dropna().tolist() if str(name) != 'None']\n+        target_names = [\n+            str(name)\n+            for name in df[\"Testcase_Name\"].dropna().tolist()\n+            if str(name) != \"None\"\n+        ]\n         if not target_names:\n             print(f\"错误: 表格中没有有效的Testcase_Name: {excel_path}\")\n         else:\n             print(f\"从表格中读取到 {len(target_names)} 个目标用例名\")\n-            pt_files = [f for f in os.listdir(testcase_path) if f.endswith('.pt')]\n+            pt_files = [f for f in os.listdir(testcase_path) if f.endswith(\".pt\")]\n             for target_name in target_names:\n                 matched = [f for f in pt_files if target_name in f]\n                 if matched:\n@@ -53,7 +56,7 @@ if os.path.isdir(testcase_path):\n                     print(f\"警告: 用例名 '{target_name}' 未匹配到任何.pt文件\")\n             print(f\"按表格筛选后共 {len(locals()['testcase_files'])} 个测试用例文件\")\n     else:\n-        pt_files = [f for f in os.listdir(testcase_path) if f.endswith('.pt')]\n+        pt_files = [f for f in os.listdir(testcase_path) if f.endswith(\".pt\")]\n         if not pt_files:\n             print(f\"错误: 目录中没有找到.pt文件: {testcase_path}\")\n         else:\n@@ -64,14 +67,20 @@ if os.path.isdir(testcase_path):\n else:\n     print(f\"错误: 输出目录不存在: {testcase_path}\")\n \n+\n def mqsmla_aclgraph(testcase_files):\n     test_data = torch.load(testcase_files, map_location=\"cpu\")\n     npu_error_msg = None\n     try:\n-        npu_result, cpu_quant_result, npu_lse, cpu_lse = mixed_quant_sparse_flash_mla_process.test_mqsmla_quant_process_graph(\n-            test_data, device_id=device_id)\n-        \n-        attn_result, attn_pct = result_compare_method.check_result(cpu_quant_result, npu_result)\n+        npu_result, cpu_quant_result, npu_lse, cpu_lse = (\n+            mixed_quant_sparse_flash_mla_process.test_mqsmla_quant_process_graph(\n+                test_data, device_id=device_id\n+            )\n+        )\n+\n+        attn_result, attn_pct = result_compare_method.check_result(\n+            cpu_quant_result, npu_result\n+        )\n         lse_result, lse_pct = None, 0.0\n         fail_info = []\n         min_fulfill = attn_pct\n@@ -79,7 +88,7 @@ def mqsmla_aclgraph(testcase_files):\n         if attn_result != \"Pass\":\n             fail_info.append(f\"MAIN_FAILED:{attn_result}\")\n \n-        if test_data['params'].get('return_softmax_lse'):\n+        if test_data[\"params\"].get(\"return_softmax_lse\"):\n             print(\"return_softmax_lse is true!!!\")\n             lse_result, lse_pct = result_compare_method.check_result(cpu_lse, npu_lse)\n             min_fulfill = min(min_fulfill, lse_pct)\n@@ -95,14 +104,22 @@ def mqsmla_aclgraph(testcase_files):\n         result = \"NPU ERROR\"\n         fulfill_percent = 0\n \n-    utils.save_result(test_data['params'], result, fulfill_percent, Path(result_path))\n+    utils.save_result(test_data[\"params\"], result, fulfill_percent, Path(result_path))\n \n-    if result == \"Failed\":\n-        pytest.fail(f\"用例精度失败:{test_data['Testcase_Name']} 精度:{fulfill_percent:.2f}%\")\n     if result == \"NPU ERROR\":\n-        pytest.fail(f\"用例执行失败:{test_data['Testcase_Name']} NPU ERROR: {npu_error_msg}\")\n+        pytest.fail(\n+            f\"用例执行失败:{test_data['Testcase_Name']} NPU ERROR: {npu_error_msg}\"\n+        )\n+    elif result != \"Pass\":\n+        pytest.fail(\n+            f\"用例精度失败:{test_data['Testcase_Name']} 精度:{fulfill_percent:.2f}%\"\n+        )\n+\n+\n+testcase_ids = [\n+    os.path.splitext(os.path.basename(f))[0] for f in locals()[\"testcase_files\"]\n+]\n \n-testcase_ids = [os.path.splitext(os.path.basename(f))[0] for f in locals()[\"testcase_files\"]]\n \n @pytest.mark.graph\n @pytest.mark.parametrize(\"testcase_files\", locals()[\"testcase_files\"], ids=testcase_ids)\n@@ -113,6 +130,6 @@ def test_mixed_quant_sparse_flash_mla(testcase_files):\n         # 等待并获取结果\n         for future in concurrent.futures.as_completed([futures]):\n             try:\n-                result = future.result()\n-            except Exception as e:\n-                pytest.fail(f\"当前用例线程执行失败\")\n+                future.result()\n+            except Exception:\n+                pytest.fail(\"当前用例线程执行失败\")\n",
+      "new_file": false,
+      "new_path": "attention/mixed_quant_sparse_flash_mla/tests/pytest/test_mixed_quant_sparse_flash_mla_batch_graph.py",
+      "old_path": "attention/mixed_quant_sparse_flash_mla/tests/pytest/test_mixed_quant_sparse_flash_mla_batch_graph.py",
+      "removed_lines": 25,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/0dc888169b28a24054044c00e6566ca8f79bf197/attention/mixed_quant_sparse_flash_mla/tests/pytest/test_mixed_quant_sparse_flash_mla_batch_graph.py",
+    "sha": "0dc888169b28a24054044c00e6566ca8f79bf197",
+    "source_branch": "lse_bugfix",
+    "source_project": {
+      "full_name": "changlei24/ops-transformer_lse_test",
+      "human_name": "changlei24 / ops-transformer_MQSMLA_LSE",
+      "id": 9807779,
+      "path": "ops-transformer_lse_test"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  },
+  {
+    "additions": 4,
+    "blob_id": "52fb9b6bedab298cd4bdfc33a453ab45db31a4a5",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/0dc888169b28a24054044c00e6566ca8f79bf197/attention/mixed_quant_sparse_flash_mla/tests/pytest/test_mixed_quant_sparse_flash_mla_single.py",
+    "deletions": 4,
+    "filename": "attention/mixed_quant_sparse_flash_mla/tests/pytest/test_mixed_quant_sparse_flash_mla_single.py",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 4,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -163,14 +163,14 @@ def mqsmla(param_combinations):\n \n     utils.save_result(test_data[\"params\"], result, fulfill_percent, result_path)\n \n-    if result == \"Failed\":\n-        pytest.fail(\n-            f\"用例精度失败:{test_data['Testcase_Name']} 精度:{fulfill_percent:.2f}%\"\n-        )\n     if result == \"NPU ERROR\":\n         pytest.fail(\n             f\"用例执行失败:{test_data['Testcase_Name']} NPU ERROR: {npu_error_msg}\"\n         )\n+    elif result != \"Pass\":\n+        pytest.fail(\n+            f\"用例精度失败:{test_data['Testcase_Name']} 精度:{fulfill_percent:.2f}%\"\n+        )\n \n \n def _gen_testcase_id(params, idx):\n",
+      "new_file": false,
+      "new_path": "attention/mixed_quant_sparse_flash_mla/tests/pytest/test_mixed_quant_sparse_flash_mla_single.py",
+      "old_path": "attention/mixed_quant_sparse_flash_mla/tests/pytest/test_mixed_quant_sparse_flash_mla_single.py",
+      "removed_lines": 4,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/0dc888169b28a24054044c00e6566ca8f79bf197/attention/mixed_quant_sparse_flash_mla/tests/pytest/test_mixed_quant_sparse_flash_mla_single.py",
+    "sha": "0dc888169b28a24054044c00e6566ca8f79bf197",
+    "source_branch": "lse_bugfix",
+    "source_project": {
+      "full_name": "changlei24/ops-transformer_lse_test",
+      "human_name": "changlei24 / ops-transformer_MQSMLA_LSE",
+      "id": 9807779,
+      "path": "ops-transformer_lse_test"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  },
+  {
+    "additions": 14,
+    "blob_id": "350f4b7a8b0c97f1f6a202bbd76c93ab8aa992e0",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/0dc888169b28a24054044c00e6566ca8f79bf197/attention/quant_sparse_flash_mla/tests/pytest/quant_sparse_flash_mla_golden.py",
+    "deletions": 7,
+    "filename": "attention/quant_sparse_flash_mla/tests/pytest/quant_sparse_flash_mla_golden.py",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 14,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -161,12 +161,6 @@ class GeneralizedSFAQuant:\n                         logging.info(\n                             f\"      进度：{current_pct:.1f}% | 步数：{i_S1:>{len(str(cur_act_q))}}/{cur_act_q}\"\n                         )\n-                    if self.ori_mask_mode == 3 and i_S1 < cur_act_q - cur_ori_act_kv:\n-                        attn_out[i_B, i_N2 * G : (i_N2 + 1) * G, i_S1, :] = torch.zeros(\n-                            [G, self.D], dtype=torch.float\n-                        )\n-                        continue\n-\n                     if self.ori_mask_mode == 0:\n                         ori_win_start = 0\n                         ori_win_end = cur_ori_act_kv\n@@ -192,7 +186,14 @@ class GeneralizedSFAQuant:\n                                 cur_ori_act_kv,\n                             )\n \n-                    cur_ori_k_bnsd = ori_k_bnsd[i_B, i_N2, ori_win_start:ori_win_end, :]\n+                    if ori_win_start >= ori_win_end:\n+                        cur_ori_k_bnsd = torch.zeros(\n+                            [0, self.D], dtype=ori_k_bnsd.dtype\n+                        )\n+                    else:\n+                        cur_ori_k_bnsd = ori_k_bnsd[\n+                            i_B, i_N2, ori_win_start:ori_win_end, :\n+                        ]\n \n                     if (\n                         self.template_run_mode == \"CSA\"\n@@ -274,6 +275,12 @@ class GeneralizedSFAQuant:\n                         cmp_s2_loop_time = math.ceil(cur_cmp_k.size(0) / s2_base_size)\n                         cur_cmp_k_fp32 = cur_cmp_k.to(dtype=torch.float32)\n \n+                    if cur_ori_k_bnsd.size(0) == 0 and cur_cmp_k == []:\n+                        attn_out[i_B, i_N2 * G : (i_N2 + 1) * G, i_S1, :] = torch.zeros(\n+                            [G, self.D], dtype=torch.float\n+                        )\n+                        continue\n+\n                     q_curr = q_bnsd[i_B, i_N2 * G : (i_N2 + 1) * G, i_S1, :]\n                     q_curr_fp32 = q_curr.to(dtype=torch.float32)\n                     ori_s2_loop_time = math.ceil(cur_ori_k_bnsd.size(0) / s2_base_size)\n",
+      "new_file": false,
+      "new_path": "attention/quant_sparse_flash_mla/tests/pytest/quant_sparse_flash_mla_golden.py",
+      "old_path": "attention/quant_sparse_flash_mla/tests/pytest/quant_sparse_flash_mla_golden.py",
+      "removed_lines": 7,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/0dc888169b28a24054044c00e6566ca8f79bf197/attention/quant_sparse_flash_mla/tests/pytest/quant_sparse_flash_mla_golden.py",
+    "sha": "0dc888169b28a24054044c00e6566ca8f79bf197",
+    "source_branch": "lse_bugfix",
+    "source_project": {
+      "full_name": "changlei24/ops-transformer_lse_test",
+      "human_name": "changlei24 / ops-transformer_MQSMLA_LSE",
+      "id": 9807779,
+      "path": "ops-transformer_lse_test"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  },
+  {
+    "additions": 1,
+    "blob_id": "01f1b4e631972b827c40d68ea5f5c27cc7205e12",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/0dc888169b28a24054044c00e6566ca8f79bf197/attention/quant_sparse_flash_mla/tests/pytest/test_quant_sparse_flash_mla_batch.py",
+    "deletions": 1,
+    "filename": "attention/quant_sparse_flash_mla/tests/pytest/test_quant_sparse_flash_mla_batch.py",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 1,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -97,7 +97,7 @@ def qsmla(testcase_files):\n \n     utils.save_result(test_data[\"params\"], result, fulfill_percent, Path(result_path))\n \n-    if result in (\"NPU ERROR\", \"Failed\"):\n+    if result != \"PASS\":\n         pytest.fail(\n             f\"用例执行失败:{test_data['Testcase_Name']} 精度:{fulfill_percent:.2f}%\"\n         )\n",
+      "new_file": false,
+      "new_path": "attention/quant_sparse_flash_mla/tests/pytest/test_quant_sparse_flash_mla_batch.py",
+      "old_path": "attention/quant_sparse_flash_mla/tests/pytest/test_quant_sparse_flash_mla_batch.py",
+      "removed_lines": 1,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/0dc888169b28a24054044c00e6566ca8f79bf197/attention/quant_sparse_flash_mla/tests/pytest/test_quant_sparse_flash_mla_batch.py",
+    "sha": "0dc888169b28a24054044c00e6566ca8f79bf197",
+    "source_branch": "lse_bugfix",
+    "source_project": {
+      "full_name": "changlei24/ops-transformer_lse_test",
+      "human_name": "changlei24 / ops-transformer_MQSMLA_LSE",
+      "id": 9807779,
+      "path": "ops-transformer_lse_test"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  },
+  {
+    "additions": 1,
+    "blob_id": "fe53c6834ca83ecd589066399186f189d243aae1",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/0dc888169b28a24054044c00e6566ca8f79bf197/attention/quant_sparse_flash_mla/tests/pytest/test_quant_sparse_flash_mla_single.py",
+    "deletions": 1,
+    "filename": "attention/quant_sparse_flash_mla/tests/pytest/test_quant_sparse_flash_mla_single.py",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 1,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -176,7 +176,7 @@ def qsmla(param_combinations):\n \n     utils.save_result(test_data[\"params\"], result, fulfill_percent, result_path)\n \n-    if result in (\"NPU ERROR\", \"Failed\"):\n+    if result != \"PASS\":\n         pytest.fail(\n             f\"用例执行失败:{test_data['Testcase_Name']} 精度:{fulfill_percent:.2f}%\"\n         )\n",
+      "new_file": false,
+      "new_path": "attention/quant_sparse_flash_mla/tests/pytest/test_quant_sparse_flash_mla_single.py",
+      "old_path": "attention/quant_sparse_flash_mla/tests/pytest/test_quant_sparse_flash_mla_single.py",
+      "removed_lines": 1,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/0dc888169b28a24054044c00e6566ca8f79bf197/attention/quant_sparse_flash_mla/tests/pytest/test_quant_sparse_flash_mla_single.py",
+    "sha": "0dc888169b28a24054044c00e6566ca8f79bf197",
+    "source_branch": "lse_bugfix",
+    "source_project": {
+      "full_name": "changlei24/ops-transformer_lse_test",
+      "human_name": "changlei24 / ops-transformer_MQSMLA_LSE",
+      "id": 9807779,
+      "path": "ops-transformer_lse_test"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  },
+  {
+    "additions": 48,
+    "blob_id": "ea7e3b80d7e5aaef4f014d2c30997683264d648f",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/0dc888169b28a24054044c00e6566ca8f79bf197/attention/sparse_flash_mla/tests/pytest/sparse_flash_mla_golden.py",
+    "deletions": 39,
+    "filename": "attention/sparse_flash_mla/tests/pytest/sparse_flash_mla_golden.py",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 48,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -25,6 +25,15 @@ DATA_RANGE_RIGHT = 10\n \n RUN_MODE = 1\n \n+\n+def is_empty(obj):\n+    if isinstance(obj, list):\n+        return len(obj) == 0\n+    if isinstance(obj, torch.Tensor):\n+        return obj.nelement() == 0\n+    return obj is None\n+\n+\n # np.random.seed(42)\n # torch.manual_seed(42)\n \n@@ -118,24 +127,6 @@ class GeneralizedSFA:\n         attn_out = torch.zeros(q_bnsd.shape, dtype=q_bnsd.dtype)\n         softmax_lse = None\n         if return_softmax_lse:\n-            softmax_max = torch.zeros(\n-                (\n-                    q_bnsd.shape[0],\n-                    ori_k_bnsd.shape[1],\n-                    q_bnsd.shape[2],\n-                    q_bnsd.shape[1] // ori_k_bnsd.shape[1],\n-                ),\n-                dtype=torch.float32,\n-            )\n-            softmax_sum = torch.zeros(\n-                (\n-                    q_bnsd.shape[0],\n-                    ori_k_bnsd.shape[1],\n-                    q_bnsd.shape[2],\n-                    q_bnsd.shape[1] // ori_k_bnsd.shape[1],\n-                ),\n-                dtype=torch.float32,\n-            )\n             softmax_lse = torch.zeros(\n                 (\n                     q_bnsd.shape[0],\n@@ -184,14 +175,6 @@ class GeneralizedSFA:\n                         print(\n                             f\"      进度：{current_pct:.1f}% | 步数：{i_S1:>{len(str(cur_act_q))}}/{cur_act_q}\"\n                         )\n-                    if (\n-                        self.ori_mask_mode == 3\n-                    ) and i_S1 < cur_act_q - cur_ori_act_kv:  # 根据 ori_kv 判断行无效\n-                        attn_out[i_B, i_N2 * G : (i_N2 + 1) * G, i_S1, :] = torch.zeros(\n-                            [G, self.D], dtype=torch.float\n-                        )\n-                        continue\n-\n                     q_curr = q_bnsd[i_B, i_N2 * G : (i_N2 + 1) * G, i_S1, :]\n                     q_curr_fp32 = q_curr.to(dtype=torch.float32)\n \n@@ -234,7 +217,7 @@ class GeneralizedSFA:\n                                 self.cmp_ratio,\n                                 cur_cmp_act_kv,\n                             )\n-                        if cur_cmp_k == []:\n+                        if is_empty(cur_cmp_k):\n                             cmp_s2_loop_time = 0\n                             cur_cmp_k_fp32 = []\n                         else:\n@@ -265,7 +248,7 @@ class GeneralizedSFA:\n                             1,\n                             cur_ori_act_kv,\n                         )\n-                        if cur_ori_k_bnsd == []:\n+                        if is_empty(cur_ori_k_bnsd):\n                             ori_s2_loop_time = 0\n                         else:\n                             ori_s2_loop_time = math.ceil(\n@@ -289,23 +272,42 @@ class GeneralizedSFA:\n                                 )\n                         elif self.ori_mask_mode == 3:\n                             ori_threshold = cur_ori_act_kv - cur_act_q + i_S1 + 1\n-                            ori_win_end = ori_threshold\n+                            ori_win_end = max(ori_threshold, 0)\n                             ori_win_start = 0\n                         elif self.ori_mask_mode == 0:\n                             ori_win_start = 0\n                             ori_win_end = cur_ori_act_kv\n \n-                        cur_ori_k_bnsd = ori_k_bnsd[\n-                            i_B, i_N2, ori_win_start:ori_win_end, :\n-                        ]\n-                        empty_flag_ori = False\n+                        if ori_win_start >= ori_win_end:\n+                            cur_ori_k_bnsd = []\n+                            empty_flag_ori = True\n+                        else:\n+                            cur_ori_k_bnsd = ori_k_bnsd[\n+                                i_B, i_N2, ori_win_start:ori_win_end, :\n+                            ]\n+                            empty_flag_ori = False\n+\n+                    if is_empty(cur_ori_k_bnsd) and is_empty(cur_cmp_k):\n+                        attn_out[i_B, i_N2 * G : (i_N2 + 1) * G, i_S1, :] = torch.zeros(\n+                            [G, self.D], dtype=torch.float\n+                        )\n+                        continue\n \n                     cur_attn_out = attn_out[i_B, i_N2 * G : (i_N2 + 1) * G, i_S1, :]\n                     if RUN_MODE == 0:\n                         if empty_flag:\n-                            k_concat = cur_ori_k_bnsd\n+                            k_concat = (\n+                                cur_ori_k_bnsd\n+                                if not is_empty(cur_ori_k_bnsd)\n+                                else cur_cmp_k\n+                            )\n                         else:\n-                            k_concat = torch.concat([cur_ori_k_bnsd, cur_cmp_k], dim=0)\n+                            if is_empty(cur_ori_k_bnsd):\n+                                k_concat = cur_cmp_k\n+                            else:\n+                                k_concat = torch.concat(\n+                                    [cur_ori_k_bnsd, cur_cmp_k], dim=0\n+                                )\n \n                         k_concat_fp32 = k_concat.to(dtype=torch.float32)\n                         v_concat_fp32 = k_concat_fp32.clone()\n@@ -323,15 +325,18 @@ class GeneralizedSFA:\n                             dtype=q_bnsd.dtype\n                         )\n                         if return_softmax_lse:\n-                            softmax_max[batch, n2Idx, s1Idx, :] = x_max[:, 0]\n-                            softmax_sum[batch, n2Idx, s1Idx, :] = x_sum[:, 0]\n+                            softmax_lse[i_B, i_N2, i_S1, :] = x_max[:, 0] + torch.log(\n+                                x_sum[:, 0] + 1e-10\n+                            )\n                     elif RUN_MODE == 1:\n                         if empty_flag_ori:\n                             ori_s2_loop_time = 0\n-                            total_s2_loop_time = 0\n+                            total_s2_loop_time = cmp_s2_loop_time\n                             row_sum = torch.empty((G), dtype=torch.float32).uniform_(\n                                 1.0, 1.0\n                             )\n+                            row_max = torch.empty((G, 1), dtype=torch.float32)\n+                            row_max = cur_sinks\n                         else:\n                             ori_s2_loop_time = math.ceil(\n                                 cur_ori_k_bnsd.size(0) / s2_base_size\n@@ -502,6 +507,10 @@ class GeneralizedSFA:\n                         attn_out[i_B, i_N2 * G : (i_N2 + 1) * G, i_S1, :] = (\n                             O_flash / row_sum_expand / tmp_scale_16_expand\n                         ).to(dtype=q_bnsd.dtype)\n+                        if return_softmax_lse:\n+                            softmax_lse[i_B, i_N2, i_S1, :] = row_max + torch.log(\n+                                row_sum + 1e-10\n+                            )\n                     else:\n                         raise ValueError(f\"unsupported RUN_MODE:{RUN_MODE}\")\n         return attn_out, softmax_lse\n@@ -556,7 +565,7 @@ class GeneralizedSFA:\n \n         empty_flag = False\n         if len(s2_sparse) == 0:\n-            cur_cmp_k = torch.tensor([])\n+            cur_cmp_k = []\n             empty_flag = True\n         else:\n             cur_cmp_k = k_tensor[i_B, i_N2, s2_sparse, :]\n",
+      "new_file": false,
+      "new_path": "attention/sparse_flash_mla/tests/pytest/sparse_flash_mla_golden.py",
+      "old_path": "attention/sparse_flash_mla/tests/pytest/sparse_flash_mla_golden.py",
+      "removed_lines": 39,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/0dc888169b28a24054044c00e6566ca8f79bf197/attention/sparse_flash_mla/tests/pytest/sparse_flash_mla_golden.py",
+    "sha": "0dc888169b28a24054044c00e6566ca8f79bf197",
+    "source_branch": "lse_bugfix",
+    "source_project": {
+      "full_name": "changlei24/ops-transformer_lse_test",
+      "human_name": "changlei24 / ops-transformer_MQSMLA_LSE",
+      "id": 9807779,
+      "path": "ops-transformer_lse_test"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  },
+  {
+    "additions": 43,
+    "blob_id": "23bab3ff049d42ba93718118e3047ad03440dc95",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/0dc888169b28a24054044c00e6566ca8f79bf197/attention/sparse_flash_mla/tests/pytest/test_sparse_flash_mla_batch_graph.py",
+    "deletions": 19,
+    "filename": "attention/sparse_flash_mla/tests/pytest/test_sparse_flash_mla_batch_graph.py",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 43,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -11,7 +11,6 @@\n # -----------------------------------------------------------------------------------------------------------\n \n import torch\n-import torch_npu\n import result_compare_method\n import utils\n from batch import sparse_flash_mla_process\n@@ -22,9 +21,11 @@ from pathlib import Path\n import os\n \n pt_dir = os.getenv(\"SMLA_PT_LOAD_PATH\", \"./data\")\n-result_path = Path(os.getenv(\"SMLA_RESULT_SAVE_PATH\", './result/smla_result.xlsx'))\n+result_path = Path(os.getenv(\"SMLA_RESULT_SAVE_PATH\", \"./result/smla_result.xlsx\"))\n batch_test_mode = int(os.environ.get(\"SMLA_BATCH_TEST_MODE\", 0))\n-excel_path = os.environ.get(\"SMLA_EXCEL_PATH\", os.path.join(os.path.dirname(__file__), \"excel\", \"example.xlsx\"))\n+excel_path = os.environ.get(\n+    \"SMLA_EXCEL_PATH\", os.path.join(os.path.dirname(__file__), \"excel\", \"example.xlsx\")\n+)\n excel_sheet = os.environ.get(\"SMLA_EXCEL_SHEET\", \"CSA\")\n device_id = int(os.environ.get(\"SMLA_DEVICE_ID\", 0))\n \n@@ -33,19 +34,27 @@ _single_case_path = os.environ.get(\"QSAS_TESTCASE_PATH\", \"\").strip()\n locals()[\"testcase_files\"] = []\n if _single_case_path:\n     if not os.path.isfile(_single_case_path):\n-        print(f\"错误: 环境变量 QSAS_TESTCASE_PATH 指定的用例文件不存在: {_single_case_path}\")\n+        print(\n+            f\"错误: 环境变量 QSAS_TESTCASE_PATH 指定的用例文件不存在: {_single_case_path}\"\n+        )\n     else:\n         print(f\"单用例隔离模式, 仅执行: {_single_case_path}\")\n         locals()[\"testcase_files\"].append(_single_case_path)\n elif os.path.isdir(pt_dir):\n-    pt_files = [f for f in os.listdir(pt_dir) if f.endswith('.pt')]\n+    pt_files = [f for f in os.listdir(pt_dir) if f.endswith(\".pt\")]\n     if not pt_files:\n         print(f\"错误: 目录中没有找到.pt文件: {pt_dir}\")\n     elif batch_test_mode == 1:\n         df = pd.read_excel(excel_path, sheet_name=excel_sheet)\n-        target_names = [str(name) for name in df['testcase_name'].dropna().tolist() if str(name) != 'None']\n+        target_names = [\n+            str(name)\n+            for name in df[\"testcase_name\"].dropna().tolist()\n+            if str(name) != \"None\"\n+        ]\n         if not target_names:\n-            print(f\"错误: 表格中没有有效的testcase_name: {excel_path} sheet: {excel_sheet}\")\n+            print(\n+                f\"错误: 表格中没有有效的testcase_name: {excel_path} sheet: {excel_sheet}\"\n+            )\n         else:\n             print(f\"从表格[{excel_sheet}]中读取到 {len(target_names)} 个目标用例名\")\n             for target_name in target_names:\n@@ -68,18 +77,25 @@ else:\n \n print(\"files:\", locals()[\"testcase_files\"])\n \n+\n def smla_graph(testcase_files):\n     test_data = torch.load(testcase_files, map_location=\"cpu\")\n     npu_error_msg = None\n     try:\n-        npu_result, softmax_lse = sparse_flash_mla_process.call_npu_graph(test_data, device_id=device_id)\n-        attn_result, attn_percent = result_compare_method.check_result(test_data['cpu_output'], npu_result)\n+        npu_result, softmax_lse = sparse_flash_mla_process.call_npu_graph(\n+            test_data, device_id=device_id\n+        )\n+        attn_result, attn_percent = result_compare_method.check_result(\n+            test_data[\"cpu_output\"], npu_result\n+        )\n         lse_result, lse_percent = None, None\n         fail_info = []\n         min_fulfill = attn_percent\n-        if test_data['params'].get('return_softmax_lse'):\n+        if test_data[\"params\"].get(\"return_softmax_lse\"):\n             print(\"return_softmax_lse is true!!!\")\n-            lse_result, lse_percent = result_compare_method.check_result(test_data['softmax_lse'], softmax_lse)\n+            lse_result, lse_percent = result_compare_method.check_result(\n+                test_data[\"softmax_lse\"], softmax_lse\n+            )\n             min_fulfill = min(min_fulfill, lse_percent)\n \n         if attn_result != \"Pass\":\n@@ -99,14 +115,22 @@ def smla_graph(testcase_files):\n         result = \"NPU ERROR\"\n         fulfill_percent = 0\n \n-    utils.save_result(result, fulfill_percent, test_data['params'], result_path)\n+    utils.save_result(result, fulfill_percent, test_data[\"params\"], result_path)\n \n-    if result == \"Failed\":\n-        pytest.fail(f\"用例精度失败:{os.path.basename(testcase_files)} 精度:{fulfill_percent:.2f}%\")\n     if result == \"NPU ERROR\":\n-        pytest.fail(f\"用例执行失败:{os.path.basename(testcase_files)} NPU ERROR: {npu_error_msg}\")\n+        pytest.fail(\n+            f\"用例执行失败:{os.path.basename(testcase_files)} NPU ERROR: {npu_error_msg}\"\n+        )\n+    elif result != \"Pass\":\n+        pytest.fail(\n+            f\"用例精度失败:{os.path.basename(testcase_files)} 精度:{fulfill_percent:.2f}%\"\n+        )\n+\n+\n+testcase_ids = [\n+    os.path.splitext(os.path.basename(f))[0] for f in locals()[\"testcase_files\"]\n+]\n \n-testcase_ids = [os.path.splitext(os.path.basename(f))[0] for f in locals()[\"testcase_files\"]]\n \n @pytest.mark.graph\n @pytest.mark.parametrize(\"testcase_files\", locals()[\"testcase_files\"], ids=testcase_ids)\n@@ -115,6 +139,6 @@ def test_sparse_flash_mla(testcase_files):\n         futures = executor.submit(smla_graph, testcase_files)\n         for future in concurrent.futures.as_completed([futures]):\n             try:\n-                result = future.result()\n-            except Exception as e:\n-                pytest.fail(f\"当前用例线程执行失败\")\n+                future.result()\n+            except Exception:\n+                pytest.fail(\"当前用例线程执行失败\")\n",
+      "new_file": false,
+      "new_path": "attention/sparse_flash_mla/tests/pytest/test_sparse_flash_mla_batch_graph.py",
+      "old_path": "attention/sparse_flash_mla/tests/pytest/test_sparse_flash_mla_batch_graph.py",
+      "removed_lines": 19,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/0dc888169b28a24054044c00e6566ca8f79bf197/attention/sparse_flash_mla/tests/pytest/test_sparse_flash_mla_batch_graph.py",
+    "sha": "0dc888169b28a24054044c00e6566ca8f79bf197",
+    "source_branch": "lse_bugfix",
+    "source_project": {
+      "full_name": "changlei24/ops-transformer_lse_test",
+      "human_name": "changlei24 / ops-transformer_MQSMLA_LSE",
+      "id": 9807779,
+      "path": "ops-transformer_lse_test"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  }
+]

@@ -1,0 +1,83 @@
+{
+  "assignee": {
+    "avatar_url": "https://cdn-img.gitcode.com/da/bd/d388a7bddff9dc2549b5e39c2fdc183bcd1fef443e1b7202cd260f5acf179555.png?time=1762323318276",
+    "html_url": "https://gitcode.com/zhangzhizhuo",
+    "id": "6756d5afb8cec71a29230bd9",
+    "login": "zhangzhizhuo",
+    "name": "zhangzhizhuo",
+    "object_id": "6756d5afb8cec71a29230bd9"
+  },
+  "assignees": [
+    {
+      "avatar_url": "https://cdn-img.gitcode.com/da/bd/d388a7bddff9dc2549b5e39c2fdc183bcd1fef443e1b7202cd260f5acf179555.png?time=1762323318276",
+      "html_url": "https://gitcode.com/zhangzhizhuo",
+      "id": "6756d5afb8cec71a29230bd9",
+      "login": "zhangzhizhuo",
+      "name": "zhangzhizhuo",
+      "object_id": "6756d5afb8cec71a29230bd9"
+    }
+  ],
+  "body": "Thanks for sending an issue! Please fill in the following template to help quickly solve your problem.\n\n### Describe the current behavior / 问题描述 (Mandatory / 必填)\n\nPR #7302 合入后，影响了 PR #6925 支持的 MXA8W4 多 Tensor 功能。\n\n`CheckMXTranspose()` 中新增的判断：\n\n`if (!IsMultiTensorWeight())`\n\n会同时匹配 MXA8W4 多 Tensor 和 MX WeightNz 多 Tensor，导致 MXA8W4 多 Tensor 跳过必要的 weight、weightScale 转置 view 转换，从而引起精度异常。\n\n### Environment / 环境信息 (Mandatory / 必填)\n\n- 仓库：`cann/ops-transformer`\n- 分支：`master`\n- 架构：Ascend 950\n- 算子：`GroupedMatmulSwigluQuantWeightNzV2`\n- 场景：MXA8W4 多 Tensor\n- 相关 PR：#6925、#7302\n\n### Steps to reproduce the issue / 重现步骤 (Mandatory / 必填)\n\n1. 构造 MXA8W4 多 Tensor 输入。\n2. 调用 `aclnnGroupedMatmulSwigluQuantWeightNzV2`。\n3. 对比 PR #7302 合入前后的计算结果。\n4. PR #7302 合入后出现精度异常。\n\n可参考现有用例：\n\n`ascend950_mxA8W4_multi_weight_normal`\n\n### Describe the expected behavior / 预期结果 (Mandatory / 必填)\n\nMXA8W4 多 Tensor 应继续执行原有的 weight、weightScale 转置 view 转换，计算结果满足精度要求。\n\nPR #7302 支持的 MX WeightNz 多 Tensor 通路应保持不变。\n\n### Related log / screenshot / 日志 / 截图 (Mandatory / 必填)\n\n建议修改：\n\n```diff\n- if (!IsMultiTensorWeight()) {\n+ if (!IsMxWeightNzMultiTensorSupported()) {",
+  "comments": 0,
+  "created_at": "2026-07-16T11:00:13+08:00",
+  "finished_at": "2026-07-22T10:31:32+08:00",
+  "html_url": "https://gitcode.com/cann/ops-transformer/issues/3788",
+  "id": 4168540,
+  "issue_priority_detail": {
+    "id": 116,
+    "title": "无优先级"
+  },
+  "issue_state": "进行中",
+  "issue_state_detail": {
+    "id": 285,
+    "serial": 0,
+    "title": "进行中"
+  },
+  "issue_type": "任务",
+  "issue_type_detail": {
+    "id": 255,
+    "is_system": false,
+    "title": "任务"
+  },
+  "labels": [
+    {
+      "color": "#DB2828",
+      "created_at": "2025-06-10T14:17:23+08:00",
+      "id": 3870,
+      "name": "bug-report",
+      "updated_at": "2026-07-16T11:00:14+08:00"
+    },
+    {
+      "color": "#35e029",
+      "created_at": "2026-03-20T11:25:13+08:00",
+      "id": 38861,
+      "name": "resolved",
+      "updated_at": "2026-07-22T12:21:03+08:00"
+    }
+  ],
+  "number": "3788",
+  "priority": 0,
+  "repository": {
+    "assigner": {},
+    "created_at": "2025-09-28T17:54:46+08:00",
+    "description": "本项目是CANN提供的transformer类大模型算子库，实现网络在NPU上加速计算。",
+    "full_name": "cann/ops-transformer",
+    "id": 7673863,
+    "name": "ops-transformer",
+    "paas": "",
+    "path": "ops-transformer",
+    "updated_at": "2025-09-28T18:06:48+08:00"
+  },
+  "state": "closed",
+  "title": "[Bug-Report|缺陷反馈]: 【GroupedMatmulSwigluQuantV2】MX WeightNz多Tensor改动导致MXA8W4多Tensor功能",
+  "updated_at": "2026-07-22T10:31:32+08:00",
+  "user": {
+    "avatar_url": "https://cdn-img.gitcode.com/da/bd/d388a7bddff9dc2549b5e39c2fdc183bcd1fef443e1b7202cd260f5acf179555.png?time=1762323318276",
+    "html_url": "https://gitcode.com/zhangzhizhuo",
+    "id": "6756d5afb8cec71a29230bd9",
+    "login": "zhangzhizhuo",
+    "name": "zhangzhizhuo",
+    "object_id": "6756d5afb8cec71a29230bd9"
+  },
+  "visibility_reason": "public"
+}

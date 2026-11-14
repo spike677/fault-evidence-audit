@@ -1,0 +1,62 @@
+[
+  {
+    "additions": 4,
+    "blob_id": "b90f04a0e63180e680fe1fc8cd4954f1a5e9b426",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/1705788e60440b3fa5543682a579f467a93be871/mc2/moe_distribute_combine_v2/op_kernel/moe_distribute_combine_v2.cpp",
+    "deletions": 0,
+    "filename": "mc2/moe_distribute_combine_v2/op_kernel/moe_distribute_combine_v2.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 4,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -77,6 +77,7 @@ __global__ __aicore__ void moe_distribute_combine_v2(GM_ADDR expandX, GM_ADDR ex\n \n #if ((ORIG_DTYPE_EXPAND_X == DT_BF16) || (ORIG_DTYPE_EXPAND_X == DT_FLOAT16))\n #if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)\n+    int64_t oriOverflowMode = AscendC::GetCtrlSpr<FLOAT_OVERFLOW_MODE_CTRL, FLOAT_OVERFLOW_MODE_CTRL>();\n     if constexpr (ArchTag == TILINGKEY_TPL_A5) {\n         GET_TILING_DATA_WITH_STRUCT(MoeDistributeCombineV2TilingData, tilingData, tilingGM);\n         MoeDistributeCombineA5Impl::MoeDistributeCombineA5<DTYPE_EXPAND_X, int32_t> op;\n@@ -143,5 +144,8 @@ __global__ __aicore__ void moe_distribute_combine_v2(GM_ADDR expandX, GM_ADDR ex\n             op.Process();\n         }\n     }\n+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)\n+    AscendC::SetCtrlSpr<FLOAT_OVERFLOW_MODE_CTRL, FLOAT_OVERFLOW_MODE_CTRL>(oriOverflowMode);\n+#endif\n #endif\n }\n\\ No newline at end of file\n",
+      "new_file": false,
+      "new_path": "mc2/moe_distribute_combine_v2/op_kernel/moe_distribute_combine_v2.cpp",
+      "old_path": "mc2/moe_distribute_combine_v2/op_kernel/moe_distribute_combine_v2.cpp",
+      "removed_lines": 0,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/1705788e60440b3fa5543682a579f467a93be871/mc2/moe_distribute_combine_v2/op_kernel/moe_distribute_combine_v2.cpp",
+    "sha": "1705788e60440b3fa5543682a579f467a93be871",
+    "source_branch": "master_lmx",
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  },
+  {
+    "additions": 6,
+    "blob_id": "a019f396e1465b69c5b088747d0ec3576cec0d40",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/1705788e60440b3fa5543682a579f467a93be871/mc2/moe_distribute_combine_v2/op_kernel/moe_distribute_combine_v2.h",
+    "deletions": 1,
+    "filename": "mc2/moe_distribute_combine_v2/op_kernel/moe_distribute_combine_v2.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 6,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -39,6 +39,7 @@\n #include \"../../moe_distribute_dispatch_v2/op_kernel/moe_distribute_elastic.h\"\n #endif\n \n+#define FLOAT_OVERFLOW_MODE_CTRL 60\n namespace MoeDistributeCombineV2Impl {\n using namespace MoeDistributeV2Base;\n using namespace Mc2Kernel;\n@@ -552,6 +553,10 @@ template <CombineMC2TypeClass>\n __aicore__ inline void MoeDistributeCombineV2<CombineMC2TypeFunc>::BuffInit()\n {\n     tpipe_->Reset();\n+    #if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510) // reset后 ctrl寄存器会复位为默认值\n+        // 单指令饱和模式\n+        AscendC::SetCtrlSpr<FLOAT_OVERFLOW_MODE_CTRL, FLOAT_OVERFLOW_MODE_CTRL>(0);\n+    #endif\n     tpipe_->InitBuffer(readStateBuf_, UB_ALIGN);  // 32\n     if constexpr (IsNeedReduceScatter) {\n         tpipe_->InitBuffer(gmTpSendCountInQueue_, BUFFER_NUM, hExpandXAlign32Size_);   // 28K 存储输入拷过来的token\n@@ -916,7 +921,7 @@ __aicore__ inline void MoeDistributeCombineV2<CombineMC2TypeFunc>::ExpertAlltoAl\n     uint32_t tokenWinOffset = tkIndex * hAlignWinCnt_;\n     GM_ADDR rankGM = GetWinAddrByRankId(toRankId, EP_DOMAIN) + epOffset * hAlignWinSize_;\n     rankWindow_.SetGlobalBuffer((__gm__ XType*)rankGM);\n-    DataCopyPadExtParams<ExpandXType> copyPadExtParams{false, 0U, 0U, 0U};\n+    DataCopyPadExtParams<ExpandXType> copyPadExtParams{true, 0U, 0U, 0U};\n     DataCopyExtParams expandXCopyParams{1U, static_cast<uint32_t>(hExpandXTypeSize_), 0U, 0U, 0U};\n     DataCopyExtParams xScaleCopyParams{1U, static_cast<uint32_t>(tokenScaleCnt_ * sizeof(ExpandXType)), 0U, 0U, 0U};\n     if constexpr (IsNeedReduceScatter) {\n",
+      "new_file": false,
+      "new_path": "mc2/moe_distribute_combine_v2/op_kernel/moe_distribute_combine_v2.h",
+      "old_path": "mc2/moe_distribute_combine_v2/op_kernel/moe_distribute_combine_v2.h",
+      "removed_lines": 1,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/1705788e60440b3fa5543682a579f467a93be871/mc2/moe_distribute_combine_v2/op_kernel/moe_distribute_combine_v2.h",
+    "sha": "1705788e60440b3fa5543682a579f467a93be871",
+    "source_branch": "master_lmx",
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  }
+]

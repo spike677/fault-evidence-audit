@@ -1,0 +1,87 @@
+{
+  "assignee": {
+    "html_url": "https://gitcode.com/void_ptr",
+    "id": "688199e65294102de27ef081",
+    "login": "void_ptr",
+    "name": "void_ptr",
+    "object_id": "688199e65294102de27ef081"
+  },
+  "assignees": [
+    {
+      "html_url": "https://gitcode.com/void_ptr",
+      "id": "688199e65294102de27ef081",
+      "login": "void_ptr",
+      "name": "void_ptr",
+      "object_id": "688199e65294102de27ef081"
+    }
+  ],
+  "body": "### Describe the current behavior / 问题描述 (Mandatory / 必填)\n\n在 910B legacy kernel 路径（`matmul/batch_mat_mul_v3/op_kernel/batch_mat_mul_v3_com_base_block.h`）中，`BatchMatMulCommonBaseBlock::CalcBOffset` 的 **B=FRACTAL_NZ** 分支使用 `baseN` 计算 N 方向 GM stride，而同文件 **B=ND** 分支及 `mat_mul_v3/op_kernel/mat_mul_base_block.h` 的对应实现均使用 `singleCoreN`。\n\n当 tiling 使 `singleCoreN > baseN` 时（例如 AL1 full-load，tiling key 65792，N 方向多块切分），B 矩阵 GM 地址计算错误，导致 batch matmul 输出不正确；相同 shape 下 B=ND 结果正常。\n\n问题代码（upstream 当前）：\n\n```cpp\n// batch_mat_mul_v3_com_base_block.h, CalcBOffset, B_TYPE::format == CubeFormat::NZ\noffset_.offsetB = B_TYPE::isTrans ?\n    offsetBBatch + (nCntIndex * ...baseN * params_.c0Size) + ... :\n    offsetBBatch + (nCntIndex * ...baseN * params_.alignedKbSize) + ...;\n```\n\n### Environment / 环境信息 (Mandatory / 必填)\n\n- 硬件：Atlas A2 / Ascend 910B（`NPU_ARCH=2201`）\n- 算子：`batch_mat_mul_v3`（legacy kernel 路径，非 arch35）\n- 输入格式：A=ND，B=FRACTAL_NZ\n- 影响分支：upstream 全部 release/beta 分支（自 init 提交起存在）\n\n### Steps to reproduce the issue / 重现步骤 (Mandatory / 必填)\n\n1. 在 910B 上运行 `batch_mat_mul_v3`，B 矩阵使用 FRACTAL_NZ 格式。\n2. 构造使 `singleCoreN > baseN` 的 shape/tiling 场景，例如触发 AL1 full-load（tiling key 65792）。\n3. 对比 B=FRACTAL_NZ 与 B=ND 的输出。\n4. 观察 NZ 路径输出错误，ND 路径输出正确。\n\n### Describe the expected behavior / 预期结果 (Mandatory / 必填)\n\n`CalcBOffset` 的 NZ 分支应与 ND 分支及 `mat_mul_v3` 一致，使用 `singleCoreN` 计算 N 方向 stride：\n\n```cpp\noffset_.offsetB = B_TYPE::isTrans ?\n    offsetBBatch + (nCntIndex * ...singleCoreN * params_.c0Size) + ... :\n    offsetBBatch + (nCntIndex * ...singleCoreN * params_.alignedKbSize) + ...;\n```\n\n修复后 B=FRACTAL_NZ 与 B=ND 在相同输入下应输出一致结果。\n\n### Related log / screenshot / 日志 / 截图 (Mandatory / 必填)\n\n- 正确参考实现：`matmul/mat_mul_v3/op_kernel/mat_mul_base_block.h` 中 `CalcBOffset` NZ 分支（使用 `singleCoreN`）。\n- 910B kernel 入口：`matmul/batch_mat_mul_v3/op_kernel/batch_mat_mul_v3.cpp`（legacy 路径）。\n- 相关 UT 参考：`BatchMatMulV3_AL1FullLoad_general_test_01`（当前为 ND×ND，无 ND×NZ 覆盖）。\n\n### Special notes for this issue/备注 (Optional / 选填)\n\n该问题自仓库 init 提交（`e11fe07f3`）起存在于所有 upstream 分支，尚未修复。910B 走 legacy kernel，950/arch35 使用独立 offset 逻辑，不在本 issue 同一代码路径内。",
+  "comments": 1,
+  "created_at": "2026-05-28T17:06:45+08:00",
+  "finished_at": "2026-06-25T09:31:49+08:00",
+  "html_url": "https://gitcode.com/cann/ops-nn/issues/2935",
+  "id": 4053145,
+  "issue_priority_detail": {
+    "id": 116,
+    "title": "无优先级"
+  },
+  "issue_state": "已完成",
+  "issue_state_detail": {
+    "id": 287,
+    "serial": 0,
+    "title": "已完成"
+  },
+  "issue_type": "任务",
+  "issue_type_detail": {
+    "id": 255,
+    "is_system": false,
+    "title": "任务"
+  },
+  "labels": [
+    {
+      "color": "#DB2828",
+      "created_at": "2025-06-10T14:17:23+08:00",
+      "id": 3870,
+      "name": "bug-report",
+      "updated_at": "2026-05-28T17:06:45+08:00"
+    },
+    {
+      "color": "#35e029",
+      "created_at": "2026-03-20T11:25:13+08:00",
+      "id": 38861,
+      "name": "resolved",
+      "updated_at": "2026-06-25T09:31:36+08:00"
+    },
+    {
+      "color": "#2469f5",
+      "created_at": "2025-10-09T20:53:07+08:00",
+      "id": 14930,
+      "name": "Accepted",
+      "updated_at": "2026-06-25T09:33:44+08:00"
+    }
+  ],
+  "number": "2935",
+  "priority": 0,
+  "repository": {
+    "assigner": {},
+    "created_at": "2025-09-27T17:40:34+08:00",
+    "description": "本项目是CANN提供的神经网络类计算算子库，实现网络在NPU上加速计算。",
+    "full_name": "cann/ops-nn",
+    "id": 7665709,
+    "name": "ops-nn",
+    "paas": "",
+    "path": "ops-nn",
+    "updated_at": "2025-09-27T18:09:31+08:00"
+  },
+  "state": "closed",
+  "title": "[Bug-Report|缺陷反馈]: batch_mat_mul_v3 CalcBOffset uses baseN instead of singleCoreN for B=FRACTAL_NZ",
+  "updated_at": "2026-06-25T09:31:50+08:00",
+  "user": {
+    "html_url": "https://gitcode.com/void_ptr",
+    "id": "688199e65294102de27ef081",
+    "login": "void_ptr",
+    "name": "void_ptr",
+    "object_id": "688199e65294102de27ef081"
+  },
+  "visibility_reason": "public"
+}

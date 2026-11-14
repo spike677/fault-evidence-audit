@@ -1,0 +1,38 @@
+[
+  {
+    "additions": 4,
+    "blob_id": "698437c1fca15baec9f867b4d20b8f66f130e7e9",
+    "blob_url": "https://gitcode.com/cann/ops-math/blob/c347fb7fb3c69b86f537d473598785bed08e1740/math/pow/op_api/aclnn_pow.cpp",
+    "deletions": 0,
+    "filename": "math/pow/op_api/aclnn_pow.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 4,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -34,6 +34,7 @@ extern \"C\" {\n #endif\n \n const float SQRT_EXP = 0.5;\n+const float NOOP_EXP = 1.0;\n const float SQUARE_EXP = 2.0;\n const float CUBE_EXP = 3.0;\n const float NEGTIVE_SQRT_EXP = -0.5;\n@@ -433,6 +434,7 @@ aclnnStatus aclnnPowTensorScalarGetWorkspaceSize(const aclTensor *self,\n                                                    selfCast->GetDataType() == op::DataType::DT_INT64 ||\n                                                    selfCast->GetDataType() == op::DataType::DT_COMPLEX64 ||\n                                                    selfCast->GetDataType() == op::DataType::DT_COMPLEX128)));\n+  bool canNoUseOp = static_cast<float>(exponent->ToFloat()) == NOOP_EXP && !IsRegBase();\n   if (CheckSupportPows(selfCast, exponent)) {\n     auto expTensor = uniqueExecutor.get()->ConvertToTensor(exponent, promoteType);\n     CHECK_RET(expTensor != nullptr, ACLNN_ERR_INNER_NULLPTR);\n@@ -446,6 +448,8 @@ aclnnStatus aclnnPowTensorScalarGetWorkspaceSize(const aclTensor *self,\n     }\n     // 当exponent为2.0时，使用square算子计算\n     powOut = const_cast<aclTensor *>(l0op::Square(squareInput, uniqueExecutor.get()));\n+  } else if (canNoUseOp) {\n+    powOut = const_cast<aclTensor *>(selfCast);\n   } else {\n     auto expTensor = uniqueExecutor.get()->ConvertToTensor(exponent, promoteType);\n     CHECK_RET(expTensor != nullptr, ACLNN_ERR_INNER_NULLPTR);\n",
+      "new_file": false,
+      "new_path": "math/pow/op_api/aclnn_pow.cpp",
+      "old_path": "math/pow/op_api/aclnn_pow.cpp",
+      "removed_lines": 0,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-math/raw/c347fb7fb3c69b86f537d473598785bed08e1740/math/pow/op_api/aclnn_pow.cpp",
+    "sha": "c347fb7fb3c69b86f537d473598785bed08e1740",
+    "source_branch": "squareBack",
+    "source_project": {
+      "full_name": "wym_666/ops-math",
+      "human_name": "wym_666 / ops-math",
+      "id": 10208326,
+      "path": "ops-math"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-math",
+      "human_name": "CANN / ops-math",
+      "id": 7649531,
+      "path": "ops-math"
+    }
+  }
+]

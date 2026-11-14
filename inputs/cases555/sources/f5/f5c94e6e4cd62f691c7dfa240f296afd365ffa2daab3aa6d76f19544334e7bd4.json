@@ -1,0 +1,83 @@
+{
+  "assignee": {
+    "avatar_url": "https://cdn-img.gitcode.com/fc/af/9853f2c3af384f598f137dac3afddba45d3768ca771b4cd7bc1b552e9560ff82.jpg",
+    "html_url": "https://gitcode.com/liangyuhua",
+    "id": "67c01c9b1a95a5378f573eea",
+    "login": "liangyuhua",
+    "name": "liangyuhua",
+    "object_id": "67c01c9b1a95a5378f573eea"
+  },
+  "assignees": [
+    {
+      "avatar_url": "https://cdn-img.gitcode.com/fc/af/9853f2c3af384f598f137dac3afddba45d3768ca771b4cd7bc1b552e9560ff82.jpg",
+      "html_url": "https://gitcode.com/liangyuhua",
+      "id": "67c01c9b1a95a5378f573eea",
+      "login": "liangyuhua",
+      "name": "liangyuhua",
+      "object_id": "67c01c9b1a95a5378f573eea"
+    }
+  ],
+  "body": "#### 一、问题描述\n\n在 ascend950平台上，以下量化算子的 FP8/HIF8 输出类型存在饱和模式控制问题：\n- rms_norm_quant_v2\n- add_rms_norm_quant  \n- add_rms_norm_dynamic_quant\n\n**问题表现：**\n1. CastTrait 使用非饱和模式（SatMode::NO_SAT），导致 FP8/HIF8 类型转换时溢出处理不正确\n2. 溢出模式控制函数在计算循环内频繁调用，影响性能\n3. 缺少针对 FP8/HIF8 类型的溢出模式初始化设置\n\n#### 二、环境信息\n\n- **硬件平台**: Ascend 950\n- **算子类型**: rms_norm_quant_v2, add_rms_norm_quant, add_rms_norm_dynamic_quant\n- **输出类型**: fp8_e4m3fn_t, fp8_e5m2_t, hifloat8_t\n- **影响范围**: norm 模块下的实现\n\n#### 三、重现步骤\n\n1. 使用 FP8/HIF8 输出类型调用上述量化算子\n2. 观察输出结果的溢出处理行为\n3. 发现超出 FP8/HIF8 表示范围的数值未正确饱和到最大/最小值\n\n#### 四、预期结果\n\n1. FP8/HIF8 类型转换时应使用饱和模式\n2. 溢出模式控制应在 Init 函数中一次性设置，而非循环内频繁调用\n3. 超出表示范围的数值应正确饱和到 FP8/HIF8 的最大/最小值\n\n#### 五、解决方案\n\n**代码变更要点：**\n\n1. **CastTrait 修复**：将 SatMode::NO_SAT 改为 SatMode::SAT\n2. **溢出模式控制优化**：新增 GetOverflowMode() 和 SetOverflowMode() 函数\n3. **Init 函数一次性设置**：在 Init 中设置溢出模式，避免循环内频繁调用\n4. **移除循环内频繁调用**：提升性能并避免编译错误\n\n**验证结果：**\n- ascend950 平台编译成功，冒烟和st 测试ok\n\n#### 六、备注\n\n**其他修复：**\n1. 移除冗余的 using 声明，解决 CodeCheck 重复代码问题\n2. 修正 UT 测试芯片版本配置：ascend950 → ascend950pr_9599\n\n**关联 PR**: https://gitcode.com/cann/ops-nn/pull/4168\n",
+  "comments": 0,
+  "created_at": "2026-05-06T17:51:33+08:00",
+  "finished_at": "2026-05-07T20:08:53+08:00",
+  "html_url": "https://gitcode.com/cann/ops-nn/issues/2526",
+  "id": 3894861,
+  "issue_priority_detail": {
+    "id": 116,
+    "title": "无优先级"
+  },
+  "issue_state": "进行中",
+  "issue_state_detail": {
+    "id": 285,
+    "serial": 0,
+    "title": "进行中"
+  },
+  "issue_type": "任务",
+  "issue_type_detail": {
+    "id": 255,
+    "is_system": false,
+    "title": "任务"
+  },
+  "labels": [
+    {
+      "color": "#DB2828",
+      "created_at": "2025-06-10T14:17:23+08:00",
+      "id": 3870,
+      "name": "bug-report",
+      "updated_at": "2026-05-06T17:51:33+08:00"
+    },
+    {
+      "color": "#35e029",
+      "created_at": "2026-03-20T11:25:13+08:00",
+      "id": 38861,
+      "name": "resolved",
+      "updated_at": "2026-05-07T20:15:13+08:00"
+    }
+  ],
+  "number": "2526",
+  "priority": 0,
+  "repository": {
+    "assigner": {},
+    "created_at": "2025-09-27T17:40:34+08:00",
+    "description": "本项目是CANN提供的神经网络类计算算子库，实现网络在NPU上加速计算。",
+    "full_name": "cann/ops-nn",
+    "id": 7665709,
+    "name": "ops-nn",
+    "paas": "",
+    "path": "ops-nn",
+    "updated_at": "2025-09-27T18:09:31+08:00"
+  },
+  "state": "closed",
+  "title": "[Bug-Report]: FP8/HIF8 量化算子饱和模式控制问题",
+  "updated_at": "2026-05-07T20:08:53+08:00",
+  "user": {
+    "avatar_url": "https://cdn-img.gitcode.com/fc/af/9853f2c3af384f598f137dac3afddba45d3768ca771b4cd7bc1b552e9560ff82.jpg",
+    "html_url": "https://gitcode.com/liangyuhua",
+    "id": "67c01c9b1a95a5378f573eea",
+    "login": "liangyuhua",
+    "name": "liangyuhua",
+    "object_id": "67c01c9b1a95a5378f573eea"
+  },
+  "visibility_reason": "public"
+}

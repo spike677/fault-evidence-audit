@@ -1,0 +1,74 @@
+[
+  {
+    "additions": 3,
+    "blob_id": "a773fd830260e03a92b5ad099b70b48b84241e06",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/3592e5f8bb51d0b83f116fec4e4ca1006e02209e/quant/swi_glu_quant/op_kernel/swi_glu_quant.h",
+    "deletions": 0,
+    "filename": "quant/swi_glu_quant/op_kernel/swi_glu_quant.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 3,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -305,6 +305,9 @@ private:\n             ReduceMax(tmpLocal, tmpLocal, tmpLocal, basicColLen, false);\n             PipeBarrier<PIPE_V>();\n \n+            AscendC::Maxs(tmpLocal, tmpLocal, MIN_VALUE, MAX_VALUE_NUM);\n+            PipeBarrier<PIPE_V>();\n+\n             Div(tmpLocal, constScale, tmpLocal, MAX_VALUE_NUM);\n             PipeBarrier<PIPE_V>();\n \n",
+      "new_file": false,
+      "new_path": "quant/swi_glu_quant/op_kernel/swi_glu_quant.h",
+      "old_path": "quant/swi_glu_quant/op_kernel/swi_glu_quant.h",
+      "removed_lines": 0,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/3592e5f8bb51d0b83f116fec4e4ca1006e02209e/quant/swi_glu_quant/op_kernel/swi_glu_quant.h",
+    "sha": "3592e5f8bb51d0b83f116fec4e4ca1006e02209e",
+    "source_branch": "master",
+    "source_project": {
+      "full_name": "guijianwei/ops-nn",
+      "human_name": "guijianwei / ops-nn",
+      "id": 7694885,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 1,
+    "blob_id": "7f2536f6dfcac4b246c924bf419f6485b3fa8b6e",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/3592e5f8bb51d0b83f116fec4e4ca1006e02209e/quant/swi_glu_quant/op_kernel/swi_glu_quant_base.h",
+    "deletions": 0,
+    "filename": "quant/swi_glu_quant/op_kernel/swi_glu_quant_base.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 1,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -32,6 +32,7 @@ constexpr float SWI_GLU_QUANT_INT8_SYM_SCALE = 127.0;\n constexpr float SWI_GLU_QUANT_INT4_SYM_SCALE = 7.0;\n constexpr uint32_t MAX_VALUE_NUM = 8;\n constexpr uint32_t SMOOTH_INDEX_UPBOUND = 65536;\n+constexpr float MIN_VALUE = 1e-8;\n \n // 单输入场景，一个tile需要的偏置参数\n struct XxGluSingleTileOffsetParam {\n",
+      "new_file": false,
+      "new_path": "quant/swi_glu_quant/op_kernel/swi_glu_quant_base.h",
+      "old_path": "quant/swi_glu_quant/op_kernel/swi_glu_quant_base.h",
+      "removed_lines": 0,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/3592e5f8bb51d0b83f116fec4e4ca1006e02209e/quant/swi_glu_quant/op_kernel/swi_glu_quant_base.h",
+    "sha": "3592e5f8bb51d0b83f116fec4e4ca1006e02209e",
+    "source_branch": "master",
+    "source_project": {
+      "full_name": "guijianwei/ops-nn",
+      "human_name": "guijianwei / ops-nn",
+      "id": 7694885,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  }
+]

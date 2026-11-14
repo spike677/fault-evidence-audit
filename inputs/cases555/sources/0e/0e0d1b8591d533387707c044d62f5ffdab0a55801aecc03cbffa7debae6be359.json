@@ -1,0 +1,38 @@
+[
+  {
+    "additions": 3,
+    "blob_id": "7e71ffde3eaebb94b0a36d130af75689dbb75347",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/79594faaf894852b1c8680a769ba59250978f531/index/embedding_dense_grad_v2/op_kernel/v35/embedding_dense_grad_v2_regbase.h",
+    "deletions": 0,
+    "filename": "index/embedding_dense_grad_v2/op_kernel/v35/embedding_dense_grad_v2_regbase.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 3,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -907,6 +907,9 @@ __aicore__ inline bool EmbeddingDenseGradV2Kernel<GRAD_T, CAST_T, IDX_T, isScale\n     inQueGrad_.template EnQue<IDX_T>(indicesBeginTensor);\n \n     LocalTensor<uint64_t> checkResult = cmpResult.template ReinterpretCast<uint64_t>();\n+    event_t eventV_S = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::V_S));\n+    SetFlag<HardEvent::V_S>(eventV_S);\n+    WaitFlag<HardEvent::V_S>(eventV_S);\n     int64_t sameIdxCount = ScalarGetCountOfValue<1>(checkResult(0));  // 统计 bit=1的数量，bit 1 代表核间的头和尾相等，需要累加\n     return sameIdxCount != 0;\n }\n",
+      "new_file": false,
+      "new_path": "index/embedding_dense_grad_v2/op_kernel/v35/embedding_dense_grad_v2_regbase.h",
+      "old_path": "index/embedding_dense_grad_v2/op_kernel/v35/embedding_dense_grad_v2_regbase.h",
+      "removed_lines": 0,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/79594faaf894852b1c8680a769ba59250978f531/index/embedding_dense_grad_v2/op_kernel/v35/embedding_dense_grad_v2_regbase.h",
+    "sha": "79594faaf894852b1c8680a769ba59250978f531",
+    "source_branch": "add_sync",
+    "source_project": {
+      "full_name": "SimonZzz/ops-nn",
+      "human_name": "SimonZzz / ops-nn",
+      "id": 9090330,
+      "path": "ops-nn"
+    },
+    "target_branch": "9.0.0",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  }
+]

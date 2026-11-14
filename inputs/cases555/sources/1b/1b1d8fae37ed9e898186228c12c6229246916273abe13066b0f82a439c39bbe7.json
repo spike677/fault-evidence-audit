@@ -1,0 +1,146 @@
+[
+  {
+    "additions": 1,
+    "blob_id": "572d09f275295b673ddeba9cd38b057a2d681335",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/51b6af0420bec9b0f6b1e7285e29ff1556e7c63e/loss/nll_loss_grad/op_host/arch35/nll_loss_grad_tiling_arch35.cpp",
+    "deletions": 1,
+    "filename": "loss/nll_loss_grad/op_host/arch35/nll_loss_grad_tiling_arch35.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 1,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -67,7 +67,7 @@ ge::graphStatus NLLLossGradSimtTiling::GetShapeAttrsInfo()\n         return attrStatus;\n     }\n \n-    OP_LOGD(\"NLLLossGrad Simt\", \"ignoreIndex: %u\", static_cast<uint32_t>(tilingData_.get_ignoreIdx()));\n+    OP_LOGD(\"NLLLossGrad Simt\", \"ignoreIndex: %ld\", tilingData_.get_ignoreIdx());\n     OP_LOGD(\"NLLLossGrad Simt\", \"batchNum_: %lu\", batchNum_);\n     OP_LOGD(\"NLLLossGrad Simt\", \"classNum: %lu\", tilingData_.get_classNum());\n     OP_LOGD(\"NLLLossGrad Simt\", \"height_: %lu\", height_);\n",
+      "new_file": false,
+      "new_path": "loss/nll_loss_grad/op_host/arch35/nll_loss_grad_tiling_arch35.cpp",
+      "old_path": "loss/nll_loss_grad/op_host/arch35/nll_loss_grad_tiling_arch35.cpp",
+      "removed_lines": 1,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/51b6af0420bec9b0f6b1e7285e29ff1556e7c63e/loss/nll_loss_grad/op_host/arch35/nll_loss_grad_tiling_arch35.cpp",
+    "sha": "51b6af0420bec9b0f6b1e7285e29ff1556e7c63e",
+    "source_branch": "master",
+    "source_project": {
+      "full_name": "wei-peng-1991/ops-nn",
+      "human_name": "wei-peng-1991 / ops-nn",
+      "id": 9249133,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 2,
+    "blob_id": "8a0ccb75679a110809b6ba2ed8bbcd4bdeb84d93",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/51b6af0420bec9b0f6b1e7285e29ff1556e7c63e/loss/nll_loss_grad/op_host/arch35/nll_loss_grad_tiling_arch35.h",
+    "deletions": 2,
+    "filename": "loss/nll_loss_grad/op_host/arch35/nll_loss_grad_tiling_arch35.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 2,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -38,9 +38,9 @@ TILING_DATA_FIELD_DEF(uint64_t, veryImportantProcessCoreNums);\n TILING_DATA_FIELD_DEF(uint64_t, notVeryImportantProcessCoreNums);\n TILING_DATA_FIELD_DEF(uint64_t, blockPerCore);\n TILING_DATA_FIELD_DEF(uint64_t, blockTailCore);\n-TILING_DATA_FIELD_DEF(uint32_t, reductionMode);\n-TILING_DATA_FIELD_DEF(int32_t, ignoreIdx);\n TILING_DATA_FIELD_DEF(uint32_t, xDims);\n+TILING_DATA_FIELD_DEF(uint32_t, reductionMode);\n+TILING_DATA_FIELD_DEF(int64_t, ignoreIdx);\n END_TILING_DATA_DEF;\n \n // simt template ascendc tools\n",
+      "new_file": false,
+      "new_path": "loss/nll_loss_grad/op_host/arch35/nll_loss_grad_tiling_arch35.h",
+      "old_path": "loss/nll_loss_grad/op_host/arch35/nll_loss_grad_tiling_arch35.h",
+      "removed_lines": 2,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/51b6af0420bec9b0f6b1e7285e29ff1556e7c63e/loss/nll_loss_grad/op_host/arch35/nll_loss_grad_tiling_arch35.h",
+    "sha": "51b6af0420bec9b0f6b1e7285e29ff1556e7c63e",
+    "source_branch": "master",
+    "source_project": {
+      "full_name": "wei-peng-1991/ops-nn",
+      "human_name": "wei-peng-1991 / ops-nn",
+      "id": 9249133,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 1,
+    "blob_id": "7739ba395038f5258cceff24236a12e372144a20",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/51b6af0420bec9b0f6b1e7285e29ff1556e7c63e/loss/nll_loss_grad/op_host/nll_loss_grad_def.cpp",
+    "deletions": 1,
+    "filename": "loss/nll_loss_grad/op_host/nll_loss_grad_def.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 1,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -16,7 +16,7 @@\n #include \"register/op_def_registry.h\"\n \n namespace ops {\n-static constexpr int32_t DEFAULT_IGNORE_IDX = -100;\n+static constexpr int64_t DEFAULT_IGNORE_IDX = -100;\n class NLLLossGrad : public OpDef {\n  public:\n   explicit NLLLossGrad(const char* name) : OpDef(name) {\n",
+      "new_file": false,
+      "new_path": "loss/nll_loss_grad/op_host/nll_loss_grad_def.cpp",
+      "old_path": "loss/nll_loss_grad/op_host/nll_loss_grad_def.cpp",
+      "removed_lines": 1,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/51b6af0420bec9b0f6b1e7285e29ff1556e7c63e/loss/nll_loss_grad/op_host/nll_loss_grad_def.cpp",
+    "sha": "51b6af0420bec9b0f6b1e7285e29ff1556e7c63e",
+    "source_branch": "master",
+    "source_project": {
+      "full_name": "wei-peng-1991/ops-nn",
+      "human_name": "wei-peng-1991 / ops-nn",
+      "id": 9249133,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 7,
+    "blob_id": "a59a6211c7050f1ad540bc22f5bb88c6165985b1",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/51b6af0420bec9b0f6b1e7285e29ff1556e7c63e/loss/nll_loss_grad/op_kernel/arch35/nll_loss_grad.h",
+    "deletions": 7,
+    "filename": "loss/nll_loss_grad/op_kernel/arch35/nll_loss_grad.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 7,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -62,7 +62,7 @@ private:\n     uint64_t classNum_{1};\n     uint64_t height_{1};\n     uint64_t width_{1};\n-    int32_t ignoreIdx_{-100};\n+    int64_t ignoreIdx_{-100};\n     uint32_t reductionMode_{1};\n     uint32_t usedThread_{THREAD_DIM};\n     uint32_t xDims_{1};\n@@ -118,7 +118,7 @@ __aicore__ inline void TargetCheck(const int64_t idx, const int64_t classNum)\n \n template <typename T, typename F>\n __simt_vf__ __aicore__ LAUNCH_BOUND(THREAD_DIM) inline void SimtComputeNoReduce2d(uint64_t classNum_, uint64_t batchNum_,\n-                                                                                __gm__ F* target_, int32_t ignoreIdx_,\n+                                                                                __gm__ F* target_, int64_t ignoreIdx_,\n                                                                                 __gm__ T* outputGm_, __gm__ T* yGrad_,\n                                                                                 __gm__ T* weight_, uint32_t blockId_,\n                                                                                 uint32_t blockNums_)\n@@ -138,7 +138,7 @@ __simt_vf__ __aicore__ LAUNCH_BOUND(THREAD_DIM) inline void SimtComputeNoReduce2\n \n template <typename T, typename F>\n __simt_vf__ __aicore__ LAUNCH_BOUND(THREAD_DIM) inline void SimtComputeReduceMean2d(\n-    uint64_t classNum_, uint64_t batchNum_, __gm__ F* target_, int32_t ignoreIdx_, __ubuf__ float* tmpOut_,\n+    uint64_t classNum_, uint64_t batchNum_, __gm__ F* target_, int64_t ignoreIdx_, __ubuf__ float* tmpOut_,\n     __gm__ T* outputGm_, __gm__ T* yGrad_, __gm__ T* weight_, uint32_t blockId_, uint32_t blockNums_)\n {\n     int64_t localClassNum = classNum_;\n@@ -157,7 +157,7 @@ __simt_vf__ __aicore__ LAUNCH_BOUND(THREAD_DIM) inline void SimtComputeReduceMea\n \n template <typename T, typename F>\n __simt_vf__ __aicore__ LAUNCH_BOUND(THREAD_DIM) inline void SimtComputeReduceSum2d(\n-    uint64_t classNum_, uint64_t batchNum_, __gm__ F* target_, int32_t ignoreIdx_, __ubuf__ float* singleGrad_,\n+    uint64_t classNum_, uint64_t batchNum_, __gm__ F* target_, int64_t ignoreIdx_, __ubuf__ float* singleGrad_,\n     __gm__ T* outputGm_, __gm__ T* yGrad_, __gm__ T* weight_, uint32_t blockId_, uint32_t blockNums_)\n {\n     int64_t localClassNum = classNum_;\n@@ -176,7 +176,7 @@ __simt_vf__ __aicore__ LAUNCH_BOUND(THREAD_DIM) inline void SimtComputeReduceSum\n \n template <typename T, typename F>\n __simt_vf__ __aicore__ LAUNCH_BOUND(THREAD_DIM) inline void SimtComputeNoReduce4d(uint64_t classNum_, uint64_t batchNum_, uint64_t height_, uint64_t width_,\n-                                                                                __gm__ F* target_, int32_t ignoreIdx_,\n+                                                                                __gm__ F* target_, int64_t ignoreIdx_,\n                                                                                 __gm__ T* outputGm_, __gm__ T* yGrad_,\n                                                                                 __gm__ T* weight_, uint32_t blockId_,\n                                                                                 uint32_t blockNums_, uint64_t productOfNHW_, uint64_t productOfHW_)\n@@ -199,7 +199,7 @@ __simt_vf__ __aicore__ LAUNCH_BOUND(THREAD_DIM) inline void SimtComputeNoReduce4\n \n template <typename T, typename F>\n __simt_vf__ __aicore__ LAUNCH_BOUND(THREAD_DIM) inline void SimtComputeReduceMean4d(\n-    uint64_t classNum_, uint64_t batchNum_, uint64_t height_, uint64_t width_, __gm__ F* target_, int32_t ignoreIdx_, __ubuf__ float* tmpOut_,\n+    uint64_t classNum_, uint64_t batchNum_, uint64_t height_, uint64_t width_, __gm__ F* target_, int64_t ignoreIdx_, __ubuf__ float* tmpOut_,\n     __gm__ T* outputGm_, __gm__ T* yGrad_, __gm__ T* weight_, uint32_t blockId_, uint32_t blockNums_, uint64_t productOfNHW_, uint64_t productOfHW_)\n {\n     int64_t localClassNum = classNum_;\n@@ -220,7 +220,7 @@ __simt_vf__ __aicore__ LAUNCH_BOUND(THREAD_DIM) inline void SimtComputeReduceMea\n \n template <typename T, typename F>\n __simt_vf__ __aicore__ LAUNCH_BOUND(THREAD_DIM) inline void SimtComputeReduceSum4d(\n-    uint64_t classNum_, uint64_t batchNum_, uint64_t height_, uint64_t width_, __gm__ F* target_, int32_t ignoreIdx_, __ubuf__ float* singleGrad_,\n+    uint64_t classNum_, uint64_t batchNum_, uint64_t height_, uint64_t width_, __gm__ F* target_, int64_t ignoreIdx_, __ubuf__ float* singleGrad_,\n     __gm__ T* outputGm_, __gm__ T* yGrad_, __gm__ T* weight_, uint32_t blockId_, uint32_t blockNums_, uint64_t productOfNHW_, uint64_t productOfHW_)\n {\n     int64_t localClassNum = classNum_;\n",
+      "new_file": false,
+      "new_path": "loss/nll_loss_grad/op_kernel/arch35/nll_loss_grad.h",
+      "old_path": "loss/nll_loss_grad/op_kernel/arch35/nll_loss_grad.h",
+      "removed_lines": 7,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/51b6af0420bec9b0f6b1e7285e29ff1556e7c63e/loss/nll_loss_grad/op_kernel/arch35/nll_loss_grad.h",
+    "sha": "51b6af0420bec9b0f6b1e7285e29ff1556e7c63e",
+    "source_branch": "master",
+    "source_project": {
+      "full_name": "wei-peng-1991/ops-nn",
+      "human_name": "wei-peng-1991 / ops-nn",
+      "id": 9249133,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  }
+]

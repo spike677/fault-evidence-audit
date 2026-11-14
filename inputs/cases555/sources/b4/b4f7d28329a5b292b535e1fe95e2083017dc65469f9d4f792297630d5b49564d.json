@@ -1,0 +1,38 @@
+[
+  {
+    "additions": 12,
+    "blob_id": "1c1d62b7cd33e5e1ee79e6d9e916851fe6d76b1a",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/98b54d9fe17e33e18ece28c085db78afb67e8f6a/conv/common/op_kernel/arch35/conv_instr_impl.h",
+    "deletions": 2,
+    "filename": "conv/common/op_kernel/arch35/conv_instr_impl.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 12,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -78,7 +78,16 @@ class LoadBiasBtTools {\n public:\n     __aicore__ inline LoadBiasBtTools() {}\n \n-    __aicore__ inline void SetParams(Intf* self) { self_ = self; }\n+    __aicore__ inline void SetParams(Intf* self)\n+    {\n+        self_ = self;\n+\n+        if constexpr (Intf::groupOptPreloadFlag) {\n+            if (self_->ctx.convTilingData->biasFullLoadFlag) {\n+                groupStride = self_->ctx.singleCoreCo;\n+            }\n+        }\n+    }\n \n     __aicore__ inline void SetN(uint64_t n) { currentNL0_ = n; }\n \n@@ -95,7 +104,7 @@ public:\n                           self_->ctx.nL0Iter * self_->ctx.convTilingData->nL0;\n             }\n             if constexpr (Intf::groupOptPreloadFlag) {\n-                offset += self_->ctx.groupOptIter * currentNL0_;\n+                offset += self_->ctx.groupOptIter * groupStride;\n             }\n         }\n \n@@ -112,6 +121,7 @@ public:\n private:\n     Intf* self_ = nullptr;\n     uint64_t currentNL0_ = 0;\n+    uint64_t groupStride = 0;\n };\n \n template <class Intf>\n",
+      "new_file": false,
+      "new_path": "conv/common/op_kernel/arch35/conv_instr_impl.h",
+      "old_path": "conv/common/op_kernel/arch35/conv_instr_impl.h",
+      "removed_lines": 2,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/98b54d9fe17e33e18ece28c085db78afb67e8f6a/conv/common/op_kernel/arch35/conv_instr_impl.h",
+    "sha": "98b54d9fe17e33e18ece28c085db78afb67e8f6a",
+    "source_branch": "bug",
+    "source_project": {
+      "full_name": "weijian317/ops-nn",
+      "human_name": "weijian317 / ops-nn",
+      "id": 9094693,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  }
+]

@@ -1,0 +1,76 @@
+{
+  "assignee": {
+    "avatar_url": "https://cdn-img.gitcode.com/dd/bb/90d6db9b2f502f0d832f0d01aab48b8070dfbf856ad1140f441788cbf6137bf5.png",
+    "html_url": "https://gitcode.com/klein8793",
+    "id": "661e5ec6d8e1c71c981fd791",
+    "login": "klein8793",
+    "name": "klein8793",
+    "object_id": "661e5ec6d8e1c71c981fd791"
+  },
+  "assignees": [
+    {
+      "avatar_url": "https://cdn-img.gitcode.com/dd/bb/90d6db9b2f502f0d832f0d01aab48b8070dfbf856ad1140f441788cbf6137bf5.png",
+      "html_url": "https://gitcode.com/klein8793",
+      "id": "661e5ec6d8e1c71c981fd791",
+      "login": "klein8793",
+      "name": "klein8793",
+      "object_id": "661e5ec6d8e1c71c981fd791"
+    }
+  ],
+  "body": "【问题描述】\nindex_fill算子支持Ascend 950场景，当需要处理的数据大小大于int32最大值，即索引数indicesNum * P * Q > int32最大值时，快除使用的还是uint32类型进行的，会导致快除得到的结果不对，从而有可能导致地址范围溢出，进而导致vec core问题发生。\n\n【复现步骤】:\n测试用例中，假设合轴后x的shape为: (P, N, Q), 合轴逻辑为: 以dim轴为界，dim轴前的所有轴维度相乘得到P, dim轴后所有轴维度相乘得到Q; dim轴所在的维度即为N.\n构造测试用例，使得 P * N * 索引总个数大小大于2的31次方减1， 即2,147,483,647。\n\n【环境信息】:\nAscend 950",
+  "comments": 1,
+  "created_at": "2026-04-03T09:48:28+08:00",
+  "finished_at": "2026-04-07T10:27:45+08:00",
+  "html_url": "https://gitcode.com/cann/ops-nn/issues/1928",
+  "id": 3835452,
+  "issue_priority_detail": {
+    "id": 116,
+    "title": "无优先级"
+  },
+  "issue_state": "待办的",
+  "issue_state_detail": {
+    "id": 286,
+    "serial": 0,
+    "title": "待办的"
+  },
+  "issue_type": "缺陷",
+  "issue_type_detail": {
+    "id": 258,
+    "is_system": false,
+    "title": "缺陷"
+  },
+  "labels": [
+    {
+      "color": "#35e029",
+      "created_at": "2026-03-20T11:25:13+08:00",
+      "id": 38861,
+      "name": "resolved",
+      "updated_at": "2026-04-07T10:55:45+08:00"
+    }
+  ],
+  "number": "1928",
+  "priority": 0,
+  "repository": {
+    "assigner": {},
+    "created_at": "2025-09-27T17:40:34+08:00",
+    "description": "本项目是CANN提供的神经网络类计算算子库，实现网络在NPU上加速计算。",
+    "full_name": "cann/ops-nn",
+    "id": 7665709,
+    "name": "ops-nn",
+    "paas": "",
+    "path": "ops-nn",
+    "updated_at": "2025-09-27T18:09:31+08:00"
+  },
+  "state": "closed",
+  "title": "index_fill算子需要处理的数据大小大于int32最大值时，会触发地址越界风险，从而可能导致vec core问题。",
+  "updated_at": "2026-04-07T10:27:45+08:00",
+  "user": {
+    "avatar_url": "https://cdn-img.gitcode.com/dd/bb/90d6db9b2f502f0d832f0d01aab48b8070dfbf856ad1140f441788cbf6137bf5.png",
+    "html_url": "https://gitcode.com/klein8793",
+    "id": "661e5ec6d8e1c71c981fd791",
+    "login": "klein8793",
+    "name": "klein8793",
+    "object_id": "661e5ec6d8e1c71c981fd791"
+  },
+  "visibility_reason": "public"
+}

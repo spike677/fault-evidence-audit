@@ -1,0 +1,80 @@
+{
+  "assignee": {
+    "html_url": "https://gitcode.com/lianjieyu",
+    "id": "68d24285d23f3d507d584f70",
+    "login": "lianjieyu",
+    "name": "yulianjie",
+    "object_id": "68d24285d23f3d507d584f70"
+  },
+  "assignees": [
+    {
+      "html_url": "https://gitcode.com/lianjieyu",
+      "id": "68d24285d23f3d507d584f70",
+      "login": "lianjieyu",
+      "name": "yulianjie",
+      "object_id": "68d24285d23f3d507d584f70"
+    }
+  ],
+  "body": "### Describe the current behavior / 问题描述 (Mandatory / 必填)\n\nAscend950 上 Softsign 的 AscendC 实现存在以下两个问题：\n\n1. FP16/BF16 计算路径先将输入提升到 FP32，并在 FP32 中完成 `abs(x) + 1`，直到最终输出才回落到原 dtype。TensorFlow `tf.nn.softsign` 会在低精度路径中保留原 dtype 的中间舍入，因此部分边界数据与 TensorFlow 结果不一致。\n2. 输入为真正的空 Tensor（例如 shape 为 `(0,)`）时，Host 侧设置 `blockDim=1` 后返回，Kernel 仍进入 `ElementwiseSch` 调度，kernel 直调会停留在 `OnDynProfiling`，无法正常结束。\n\n### Environment / 环境信息 (Mandatory / 必填)\n\n- Hardware: Ascend950\n- Repository/branch: `cann/ops-nn` master，`activation/softsign`\n- Execution mode: ops-test-kit TTK kernel 直调\n- Reference: TensorFlow 2.16.1 `tf.nn.softsign`\n- Dtypes: FP32、FP16、BF16\n\n### Steps to reproduce the issue / 重现步骤 (Mandatory / 必填)\n\n1. 使用 `tf.nn.softsign` 作为 Golden；BF16 输入直接构造为 `tf.bfloat16`，不升精度计算。\n2. 使用 TTK kernel 模式运行 Softsign FP16/BF16 用例，并采用严格 `close` 比较，可观察到低精度边界数据不一致。\n3. 构造 FP32、FP16、BF16 的 `(0,)` 输入并进行 kernel 直调，可观察到任务停留在 `OnDynProfiling`。\n4. 对照计算公式：`y = x / (1 + abs(x))`。低精度路径需要在 `abs(x) + 1` 后先舍入回输入 dtype，再继续后续计算。\n\n### Describe the expected behavior / 预期结果 (Mandatory / 必填)\n\n- FP32、FP16、BF16 的计算顺序及低精度舍入行为与 `tf.nn.softsign` 一致。\n- 空 Tensor 直接返回空输出，输出 shape/dtype 与输入一致。\n- 空 Tensor kernel 直调能够正常结束，不进入无有效任务的 Elementwise 调度。\n\n### Related log / screenshot / 日志 / 截图 (Mandatory / 必填)\n\n- 修复前：空 Tensor 用例停留在 `OnDynProfiling`，AIC 占用持续为 100%，plog 中没有额外硬件异常或错误码。\n- 修复后：Softsign 正式 500 条 kernel 直调用例严格 `--compare close` 为 500/500 PASS；FP32/FP16/BF16 空 Tensor 专项为 3/3 PASS；标量专项为 3/3 PASS。\n\n### Special notes for this issue/备注 (Optional / 选填)\n\n- 修复仅调整 FP16/BF16 的分母舍入路径并增加空任务提前返回；FP32 计算路径保持不变。\n- 关联 PR：https://gitcode.com/cann/ops-nn/pull/8479\n",
+  "comments": 0,
+  "created_at": "2026-08-10T16:18:34+08:00",
+  "finished_at": "2026-08-12T09:37:13+08:00",
+  "html_url": "https://gitcode.com/cann/ops-nn/issues/4673",
+  "id": 4239256,
+  "issue_priority_detail": {
+    "id": 116,
+    "title": "无优先级"
+  },
+  "issue_state": "进行中",
+  "issue_state_detail": {
+    "id": 285,
+    "serial": 0,
+    "title": "进行中"
+  },
+  "issue_type": "任务",
+  "issue_type_detail": {
+    "id": 255,
+    "is_system": false,
+    "title": "任务"
+  },
+  "labels": [
+    {
+      "color": "#DB2828",
+      "created_at": "2025-06-10T14:17:23+08:00",
+      "id": 3870,
+      "name": "bug-report",
+      "updated_at": "2026-08-10T16:18:35+08:00"
+    },
+    {
+      "color": "#35e029",
+      "created_at": "2026-03-20T11:25:13+08:00",
+      "id": 38861,
+      "name": "resolved",
+      "updated_at": "2026-08-12T10:40:24+08:00"
+    }
+  ],
+  "number": "4673",
+  "priority": 0,
+  "repository": {
+    "assigner": {},
+    "created_at": "2025-09-27T17:40:34+08:00",
+    "description": "本项目是CANN提供的神经网络类计算算子库，实现网络在NPU上加速计算。",
+    "full_name": "cann/ops-nn",
+    "id": 7665709,
+    "name": "ops-nn",
+    "paas": "",
+    "path": "ops-nn",
+    "updated_at": "2025-09-27T18:09:31+08:00"
+  },
+  "state": "closed",
+  "title": "[Bug-Report|缺陷反馈]: Softsign FP16/BF16 与 tf.nn.softsign 精度不一致且空 Tensor Kernel 直调挂起",
+  "updated_at": "2026-08-12T09:37:13+08:00",
+  "user": {
+    "html_url": "https://gitcode.com/lianjieyu",
+    "id": "68d24285d23f3d507d584f70",
+    "login": "lianjieyu",
+    "name": "yulianjie",
+    "object_id": "68d24285d23f3d507d584f70"
+  },
+  "visibility_reason": "public"
+}

@@ -1,0 +1,73 @@
+{
+  "assignee": {
+    "html_url": "https://gitcode.com/wuyi_huawei",
+    "id": "6822c17d24adff5452d7b741",
+    "login": "wuyi_huawei",
+    "name": "wuyi_51",
+    "object_id": "6822c17d24adff5452d7b741"
+  },
+  "assignees": [
+    {
+      "html_url": "https://gitcode.com/wuyi_huawei",
+      "id": "6822c17d24adff5452d7b741",
+      "login": "wuyi_huawei",
+      "name": "wuyi_51",
+      "object_id": "6822c17d24adff5452d7b741"
+    }
+  ],
+  "body": "\n\nThanks for sending an issue! Please fill in the following template to help quickly solve your problem.\n\n### Describe the current behavior / 问题描述 (Mandatory / 必填)\n            \n在 gmm/common/cgmct/block/block_scheduler_gmm_aswt_with_tail_split.h 中，最后一组 tail split 场景下，若协作核组不是从 blockIdx=0 对齐开始，可能出现连续 tailCnt 个核未映射到同一个 tail tile 的问题。\n\n典型现象：\n\n场景：最后一个 group 仅 1 个尾块，mTile=3, nTile=1，期望 blockIdx=4,5,6 共同处理同一块。\n旧逻辑下分组相位可能偏移，导致这 3 个核未稳定落在同一逻辑 tail 块。\n\n### Environment / 环境信息 (Mandatory / 必填)\n            \nascend950, 28核\n### Steps to reproduce the issue / 重现步骤 (Mandatory / 必填)\n            \ngrouped_matmul, E=5,M=10240,N=32,K=16384,groupList={2048,2048,2048,2048,2048}, mxfp8场景, 在ascend950 28核环境上最后一个group出现精度异常\n### Describe the expected behavior / 预期结果 (Mandatory / 必填)\n            \n精度pass\n### Related log / screenshot / 日志 / 截图 (Mandatory / 必填)\n            \n精度99.15%，精度异常处未输出。\n### Special notes for this issue/备注 (Optional / 选填)\n            \n影响逻辑：最后一轮 tail split 的 block 折叠与 index 修正路径\n预期不影响：非 tail split 路径及前面轮次普通调度\n",
+  "comments": 0,
+  "created_at": "2026-04-22T14:43:20+08:00",
+  "finished_at": "2026-04-23T10:29:48+08:00",
+  "html_url": "https://gitcode.com/cann/ops-transformer/issues/2020",
+  "id": 3865323,
+  "issue_priority_detail": {
+    "id": 116,
+    "title": "无优先级"
+  },
+  "issue_state": "进行中",
+  "issue_state_detail": {
+    "id": 285,
+    "serial": 0,
+    "title": "进行中"
+  },
+  "issue_type": "任务",
+  "issue_type_detail": {
+    "id": 255,
+    "is_system": false,
+    "title": "任务"
+  },
+  "labels": [
+    {
+      "color": "#35e029",
+      "created_at": "2026-03-20T11:25:13+08:00",
+      "id": 38861,
+      "name": "resolved",
+      "updated_at": "2026-04-23T10:46:44+08:00"
+    }
+  ],
+  "number": "2020",
+  "priority": 0,
+  "repository": {
+    "assigner": {},
+    "created_at": "2025-09-28T17:54:46+08:00",
+    "description": "本项目是CANN提供的transformer类大模型算子库，实现网络在NPU上加速计算。",
+    "full_name": "cann/ops-transformer",
+    "id": 7673863,
+    "name": "ops-transformer",
+    "paas": "",
+    "path": "ops-transformer",
+    "updated_at": "2025-09-28T18:06:48+08:00"
+  },
+  "state": "closed",
+  "title": "[Bug-Report|缺陷反馈]: GMM MXFP8尾轮切分时精度异常",
+  "updated_at": "2026-04-28T21:05:53+08:00",
+  "user": {
+    "html_url": "https://gitcode.com/wuyi_huawei",
+    "id": "6822c17d24adff5452d7b741",
+    "login": "wuyi_huawei",
+    "name": "wuyi_51",
+    "object_id": "6822c17d24adff5452d7b741"
+  },
+  "visibility_reason": "public"
+}

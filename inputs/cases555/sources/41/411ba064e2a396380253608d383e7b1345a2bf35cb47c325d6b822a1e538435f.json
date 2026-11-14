@@ -1,0 +1,83 @@
+{
+  "assignee": {
+    "avatar_url": "https://cdn-img.gitcode.com/ed/ad/988ed47a0dd7440ced42f485bd7726d10c9eb339fd985d2de3fc93fe0c7c5405.png?time=1769476892217",
+    "html_url": "https://gitcode.com/zhang-song-rui",
+    "id": "692468719e57390c7accc497",
+    "login": "zhang-song-rui",
+    "name": "zhang-song-rui",
+    "object_id": "692468719e57390c7accc497"
+  },
+  "assignees": [
+    {
+      "avatar_url": "https://cdn-img.gitcode.com/ed/ad/988ed47a0dd7440ced42f485bd7726d10c9eb339fd985d2de3fc93fe0c7c5405.png?time=1769476892217",
+      "html_url": "https://gitcode.com/zhang-song-rui",
+      "id": "692468719e57390c7accc497",
+      "login": "zhang-song-rui",
+      "name": "zhang-song-rui",
+      "object_id": "692468719e57390c7accc497"
+    }
+  ],
+  "body": "#### 一、问题描述（必填）\n\nAscend 950（RegBase）平台上，`aclnnRemainderScalarTensor` 在 Scalar 与 Tensor 的类型提升结果为 `DT_DOUBLE`、但输出 `out` 为较低精度类型时，会在计算前把输入转换为 `out` 的数据类型，导致提前降精度并产生错误的取余结果。\n\n根因是 `aclnnRemainderScalarTensorGetWorkspaceSize` 的 RegBase 分支显式排除了 `DT_DOUBLE`：\n\n```cpp\nif (IsRegBase(npuArch) &&\n    PromoteTypeScalarV35(other->GetDataType(), self->GetDataType()) != op::DataType::DT_DOUBLE) {\n```\n\n当推导类型为 `DT_DOUBLE` 时，代码进入通用分支，并通过 `ConvertToTensor(self, out->GetDataType())` 按输出类型提前转换 Scalar。对于大数或精度边界输入，这会改变参与取余运算的值。\n\n典型差异：\n\n- `self=DOUBLE(2049)`、`other=INT32(2)`、`out=FLOAT16`：修改前输出 `0`，按 double 精度计算后应为 `1`；\n- `self=DOUBLE(16777217)`、`other=INT32(2)`、`out=FLOAT`：修改前输出 `0`，按 double 精度计算后应为 `1`。\n\n关联修复 PR：https://gitcode.com/cann/ops-math/pull/4018\n\n#### 二、环境信息（可选）\n\n- 昇腾硬件型号：Ascend950PR（RegBase）\n- CANN 版本：9.1.0\n- 接口：`aclnnRemainderScalarTensor`\n- 修改前版本：`26972d8`\n\n#### 三、重现步骤（可选）\n\n1. 创建 double 类型的 `aclScalar`，值为 `2049`；\n2. 创建 INT32 Tensor，元素值为 `2`；\n3. 创建同 shape 的 FLOAT16 输出 Tensor；\n4. 依次调用 `aclnnRemainderScalarTensorGetWorkspaceSize` 和 `aclnnRemainderScalarTensor`；\n5. 修改前结果为 `0`，而保持 double 精度执行 `2049 % 2` 后再转换为 FLOAT16 的结果应为 `1`。\n\n#### 四、预期结果（可选）\n\nRegBase 下应先使用 `PromoteTypeScalarV35` 推导计算类型，在 `DT_DOUBLE` 精度下完成 `FloorMod`，最后再转换为 `out` 类型，避免提前降精度。\n\n修复版本已在 Ascend950PR 上完成 1000 例验证：全部执行完成，无 crash、hang 或非法内存访问；150 例预期差异均集中在 `promoted=DOUBLE && out!=DOUBLE` 场景，非 double、边界值和非法参数用例未发现回归。\n",
+  "comments": 1,
+  "created_at": "2026-07-17T10:09:49+08:00",
+  "finished_at": "2026-07-18T16:34:44+08:00",
+  "html_url": "https://gitcode.com/cann/ops-math/issues/2253",
+  "id": 4171416,
+  "issue_priority_detail": {
+    "id": 116,
+    "title": "无优先级"
+  },
+  "issue_state": "进行中",
+  "issue_state_detail": {
+    "id": 285,
+    "serial": 0,
+    "title": "进行中"
+  },
+  "issue_type": "任务",
+  "issue_type_detail": {
+    "id": 255,
+    "is_system": false,
+    "title": "任务"
+  },
+  "labels": [
+    {
+      "color": "#DB2828",
+      "created_at": "2025-06-10T14:17:23+08:00",
+      "id": 3870,
+      "name": "bug-report",
+      "updated_at": "2026-07-17T10:09:49+08:00"
+    },
+    {
+      "color": "#35e029",
+      "created_at": "2026-03-20T11:25:13+08:00",
+      "id": 38861,
+      "name": "resolved",
+      "updated_at": "2026-07-18T17:44:11+08:00"
+    }
+  ],
+  "number": "2253",
+  "priority": 0,
+  "repository": {
+    "assigner": {},
+    "created_at": "2025-09-25T16:01:52+08:00",
+    "description": "本项目是CANN提供的数学类基础计算算子库，实现网络在NPU上加速计算。",
+    "full_name": "cann/ops-math",
+    "id": 7649531,
+    "name": "ops-math",
+    "paas": "",
+    "path": "ops-math",
+    "updated_at": "2025-09-25T16:05:53+08:00"
+  },
+  "state": "closed",
+  "title": "[Bug-Report|缺陷反馈]: aclnnRemainderScalarTensor 在 RegBase double 路径提前降精度",
+  "updated_at": "2026-07-18T16:34:44+08:00",
+  "user": {
+    "avatar_url": "https://cdn-img.gitcode.com/ed/ad/988ed47a0dd7440ced42f485bd7726d10c9eb339fd985d2de3fc93fe0c7c5405.png?time=1769476892217",
+    "html_url": "https://gitcode.com/zhang-song-rui",
+    "id": "692468719e57390c7accc497",
+    "login": "zhang-song-rui",
+    "name": "zhang-song-rui",
+    "object_id": "692468719e57390c7accc497"
+  },
+  "visibility_reason": "public"
+}

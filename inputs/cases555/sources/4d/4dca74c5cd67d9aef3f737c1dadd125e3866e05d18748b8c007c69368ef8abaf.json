@@ -1,0 +1,65 @@
+{
+  "assignees": [],
+  "body": "\n\nThanks for sending an issue! Please fill in the following template to help quickly solve your problem.\n\n### Describe the current behavior / 问题描述 (Mandatory / 必填)\n \n FAG在EOD场景下存在确定性和dsinks计算错误的问题  \n\n### Environment / 环境信息 (Mandatory / 必填)\n            \nAscend950\n### Steps to reproduce the issue / 重现步骤 (Mandatory / 必填)\n            \npython3.10 dailyauto_fusion_david_fast.py --casefile=fa_fuzz_tnd_big_B_de.xlsx --runtype=1 --casename=fa_fuzz_all_312_119_1_557_557_bfloat16_TND_3_189\n### Describe the expected behavior / 预期结果 (Mandatory / 必填)\n            \n确定性和dsinks正确\n### Related log / screenshot / 日志 / 截图 (Mandatory / 必填)\n            \ncase_info:{'dest_perf_csv': 'fa_fuzz_tnd_big_B_de_result_perf.csv', 'run_mode': 'flash', 'run_type': 5, 'api_version': 'v2', 'is_compare': False, 'device_id': 0, 'golden_device': 'cpu', 'golden_mode': 'fast', 'only_backward': False, 'op_name': 'fa', 'testcase_name': 'fa_fuzz_all_312_119_1_557_557_bfloat16_TND_3_189', 'enable': True, 'level': 'level2', 'network_type': 'fuzz', 'B': 312, 'N1': 119, 'N2': 1, 'S1': 557, 'S2': 557, 'seqlens_list_q': '[2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 2, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 2, 2, 1, 2, 2, 2, 2, 2, 1, 2, 2, 2, 2, 2, 2, 2, 2, 1, 2, 2, 2, 2, 2, 2, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 2, 2, 2, 2, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 0, 2, 2, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 2, 2, 2, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 2, 2, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 2, 2, 1, 2, 1, 2, 1, 2, 2, 2, 2, 1, 1, 2, 2, 2, 1, 2, 2, 1, 2, 2, 2, 2, 2, 2, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]', 'seqlens_list_kv': '[2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 2, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 2, 2, 1, 2, 2, 2, 2, 2, 1, 2, 2, 2, 2, 2, 2, 2, 2, 1, 2, 2, 2, 2, 2, 2, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 2, 2, 2, 2, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 0, 2, 2, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 2, 2, 2, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 2, 2, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 2, 2, 1, 2, 1, 2, 1, 2, 2, 2, 2, 1, 1, 2, 2, 2, 1, 2, 2, 1, 2, 2, 2, 2, 2, 2, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]', 'eod_idx': 64, 'D': 192, 'Dv': 165, 'dtype': 'bfloat16', 'sparse_mode': 3, 'input_layout': 'TND', 'softmax_layout': 'TND', 'atten_mask_dtype': 'bool', 'atten_mask_layout': 'SS', 'keep_prob': 1, 'manual_seed': 190, 'is_deterministic': True, 'bin_path': '/npu/traindata/FlashAttention/fa_fuzz_tnd_big_B_de', 'range_type': 1, 'robustness': True}\n\n2026-05-14 19:03:46,416 - [INFO]-dailyauto_fusion_david_fast.py:1214 - [info]case is deterministic.run 0\n2026-05-14 19:03:46,429 - [INFO]-dailyauto_fusion_david_fast.py:1236 - run deterministic time 1\n2026-05-14 19:03:46,471 - [INFO]-flash_attention_libs.py:3860 - [deterministic_check]out_d0 is the same\n2026-05-14 19:03:46,478 - [INFO]-flash_attention_libs.py:3860 - [deterministic_check]dq_d0 is the same\n2026-05-14 19:03:46,479 - [INFO]-flash_attention_libs.py:3855 - [deterministic_check]dk_d0 is not the same\n2026-05-14 19:03:46,480 - [INFO]-flash_attention_libs.py:0311 - diff index:4678 first:1.8533319234848022e-07 second:1.862645149230957e-07\n2026-05-14 19:03:46,480 - [INFO]-flash_attention_libs.py:3857 - ------------------------------------------\n2026-05-14 19:03:46,480 - [INFO]-flash_attention_libs.py:3860 - [deterministic_check]dv_d0 is the same\n2026-05-14 19:03:46,481 - [INFO]-flash_attention_libs.py:3860 - [deterministic_check]max_d0 is the same\n2026-05-14 19:03:46,482 - [INFO]-flash_attention_libs.py:3860 - [deterministic_check]sum_d0 is the same\n2026-05-14 19:03:46,482 - [INFO]-dailyauto_fusion_david_fast.py:1214 - [info]case is deterministic.run 1\n2026-05-14 19:03:46,496 - [INFO]-dailyauto_fusion_david_fast.py:1236 - run deterministic time 1\n2026-05-14 19:03:46,527 - [INFO]-flash_attention_libs.py:3860 - [deterministic_check]out_d1 is the same\n2026-05-14 19:03:46,534 - [INFO]-flash_attention_libs.py:3860 - [deterministic_check]dq_d1 is the same\n2026-05-14 19:03:46,535 - [INFO]-flash_attention_libs.py:3855 - [deterministic_check]dk_d1 is not the same\n2026-05-14 19:03:46,535 - [INFO]-flash_attention_libs.py:0311 - diff index:4678 first:1.8533319234848022e-07 second:1.862645149230957e-07\n2026-05-14 19:03:46,535 - [INFO]-flash_attention_libs.py:3857 - ------------------------------------------\n2026-05-14 19:03:46,536 - [INFO]-flash_attention_libs.py:3860 - [deterministic_check]dv_d1 is the same\n2026-05-14 19:03:46,537 - [INFO]-flash_attention_libs.py:3860 - [deterministic_check]max_d1 is the same\n2026-05-14 19:03:46,537 - [INFO]-flash_attention_libs.py:3860 - [deterministic_check]sum_d1 is the same\n2026-05-14 19:03:46,538 - [INFO]-dailyauto_fusion_david_fast.py:1214 - [info]case is deterministic.run 2\n2026-05-14 19:03:46,550 - [INFO]-dailyauto_fusion_david_fast.py:1236 - run deterministic time 1\n2026-05-14 19:03:46,590 - [INFO]-flash_attention_libs.py:3860 - [deterministic_check]out_d2 is the same\n### Special notes for this issue/备注 (Optional / 选填)\n            \n\n",
+  "comments": 0,
+  "created_at": "2026-05-15T10:34:39+08:00",
+  "finished_at": "2026-05-15T10:47:28+08:00",
+  "html_url": "https://gitcode.com/cann/ops-transformer/issues/2457",
+  "id": 4025069,
+  "issue_priority_detail": {
+    "id": 116,
+    "title": "无优先级"
+  },
+  "issue_state": "进行中",
+  "issue_state_detail": {
+    "id": 285,
+    "serial": 0,
+    "title": "进行中"
+  },
+  "issue_type": "任务",
+  "issue_type_detail": {
+    "id": 255,
+    "is_system": false,
+    "title": "任务"
+  },
+  "labels": [
+    {
+      "color": "#DB2828",
+      "created_at": "2025-06-10T14:17:23+08:00",
+      "id": 3870,
+      "name": "bug-report",
+      "updated_at": "2026-05-15T10:34:39+08:00"
+    },
+    {
+      "color": "#35e029",
+      "created_at": "2026-03-20T11:25:13+08:00",
+      "id": 38861,
+      "name": "resolved",
+      "updated_at": "2026-05-15T11:42:04+08:00"
+    }
+  ],
+  "number": "2457",
+  "priority": 0,
+  "repository": {
+    "assigner": {},
+    "created_at": "2025-09-28T17:54:46+08:00",
+    "description": "本项目是CANN提供的transformer类大模型算子库，实现网络在NPU上加速计算。",
+    "full_name": "cann/ops-transformer",
+    "id": 7673863,
+    "name": "ops-transformer",
+    "paas": "",
+    "path": "ops-transformer",
+    "updated_at": "2025-09-28T18:06:48+08:00"
+  },
+  "state": "closed",
+  "title": "[Bug-Report|缺陷反馈]: FAG在EOD场景下存在确定性和dsinks计算错误的问题",
+  "updated_at": "2026-05-15T10:47:28+08:00",
+  "user": {
+    "html_url": "https://gitcode.com/dai-yuwen",
+    "id": "6822c753b3a86414eb5ba2bc",
+    "login": "dai-yuwen",
+    "name": "dai-yuwen",
+    "object_id": "6822c753b3a86414eb5ba2bc"
+  },
+  "visibility_reason": "public"
+}

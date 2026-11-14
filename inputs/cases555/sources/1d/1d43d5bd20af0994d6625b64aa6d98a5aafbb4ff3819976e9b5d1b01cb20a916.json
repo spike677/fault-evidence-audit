@@ -1,0 +1,146 @@
+[
+  {
+    "additions": 28,
+    "blob_id": "bd50299727545c9cdd72a85d6deabe60ac294cd4",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/9893a3c8b1797b84a183006b0eaefa0c7cedf64c/index/repeat_interleave/op_host/arch35/repeat_interleave_tiling_normal.cpp",
+    "deletions": 4,
+    "filename": "index/repeat_interleave/op_host/arch35/repeat_interleave_tiling_normal.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 28,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -22,9 +22,11 @@ static constexpr int64_t MIN_CP_THRESHOLD = 128;\n static constexpr int64_t MIN_SHAPE_THRESHOLD = 64;\n static constexpr int64_t BATCH_TILING_REPEAT_SCALAR = 101;\n static constexpr int64_t BATCH_TILING_REPEAT_TENSOR = 102;\n-static constexpr int64_t BATCH_TILING_SPLIT_REPEATS_SHAPE = 201;\n+static constexpr int64_t BATCH_TILING_SPLIT_REPEATS_SHAPE_INT32 = 201;\n+static constexpr int64_t BATCH_TILING_SPLIT_REPEATS_SHAPE_INT64 = 202;\n static constexpr int64_t MIN_TOTAL_REPEATS_SUM = 1024;\n static constexpr int64_t REDUCE_SUM_BUFFER = 32;\n+static constexpr int64_t INT32_MAX_LIM = 2147483647;\n \n template <typename T1, typename T2>\n inline T1 CeilDiv(T1 a, T2 b)\n@@ -89,9 +91,15 @@ void RepeatInterleaveTilingKernelNorm::GetUbFactor()\n     }\n     averageRepeatTime_ = yShape_.GetDim(axis_) / inputShape_.GetDim(axis_);\n     int64_t ubFactor = 0;\n+    ge::DataType computeDtype;\n+    if (isUseInt64_ == 0) {\n+        computeDtype = ge::DataType::DT_INT32;\n+    } else if (isUseInt64_ == 1) {\n+        computeDtype = ge::DataType::DT_INT64;\n+    }\n     if (isSplitShape_) {\n         ubSize_ -= (totalCoreNum_ * ALIGN_COUNT * DOUBLE);\n-        ubFactor = (ubSize_ - REDUCE_SUM_BUFFER * ge::GetSizeByDataType(repeatDtype_)) /\n+        ubFactor = (ubSize_ - REDUCE_SUM_BUFFER * ge::GetSizeByDataType(computeDtype)) /\n                    (ge::GetSizeByDataType(inputDtype_) * DOUBLE + ge::GetSizeByDataType(repeatDtype_));\n     } else {\n         ubFactor =\n@@ -100,17 +108,33 @@ void RepeatInterleaveTilingKernelNorm::GetUbFactor()\n     ubFactor_ = ubFactor / ALIGN_COUNT * ALIGN_COUNT;\n     return;\n }\n+\n+void RepeatInterleaveTilingKernelNorm::UseInt64()\n+{\n+    uint64_t yShapeNum = 1;\n+    for (int i = 0; i < yShape_.GetDimNum(); i++){\n+        yShapeNum *= yShape_.GetDim(i);\n+    }\n+\n+    if (repeatDtype_ == ge::DataType::DT_INT64 || yShapeNum > INT32_MAX_LIM){\n+        isUseInt64_ = 1;\n+    }\n+    return;\n+}\n ge::graphStatus RepeatInterleaveTilingKernelNorm::DoOpTiling()\n {\n     MergDim();\n+    UseInt64();\n     GetUbFactor();\n     return ge::GRAPH_SUCCESS;\n }\n \n uint64_t RepeatInterleaveTilingKernelNorm::GetTilingKey() const\n {\n-    if (isSplitShape_) {\n-        return BATCH_TILING_SPLIT_REPEATS_SHAPE;\n+    if (isSplitShape_ && isUseInt64_ == 0) {\n+        return BATCH_TILING_SPLIT_REPEATS_SHAPE_INT32;\n+    } else if (isSplitShape_) {\n+        return BATCH_TILING_SPLIT_REPEATS_SHAPE_INT64;\n     }\n     if (repeatsCount_ > -1) {\n         return BATCH_TILING_REPEAT_SCALAR;\n",
+      "new_file": false,
+      "new_path": "index/repeat_interleave/op_host/arch35/repeat_interleave_tiling_normal.cpp",
+      "old_path": "index/repeat_interleave/op_host/arch35/repeat_interleave_tiling_normal.cpp",
+      "removed_lines": 4,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/9893a3c8b1797b84a183006b0eaefa0c7cedf64c/index/repeat_interleave/op_host/arch35/repeat_interleave_tiling_normal.cpp",
+    "sha": "9893a3c8b1797b84a183006b0eaefa0c7cedf64c",
+    "source_branch": "repeat",
+    "source_project": {
+      "full_name": "yourealize/ops-nn",
+      "human_name": "yourealize / ops-nn",
+      "id": 8853379,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 3,
+    "blob_id": "a4238b4aa76bf1e1ffacff8402d6c1d86b6e65be",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/9893a3c8b1797b84a183006b0eaefa0c7cedf64c/index/repeat_interleave/op_host/arch35/repeat_interleave_tiling_normal.h",
+    "deletions": 0,
+    "filename": "index/repeat_interleave/op_host/arch35/repeat_interleave_tiling_normal.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 3,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -51,6 +51,7 @@ TILING_DATA_FIELD_DEF_ARR(int64_t, REPEAT_INTERLEAVE_MERGED_DIM_LENGTH, mergedDi\n END_TILING_DATA_DEF;\n \n REGISTER_TILING_DATA_CLASS(RepeatInterleave_201, RepeatInterleaveTilingKernelDataSmall)\n+REGISTER_TILING_DATA_CLASS(RepeatInterleave_202, RepeatInterleaveTilingKernelDataSmall)\n \n class RepeatInterleaveTilingKernelNorm : public RepeatInterleaveBaseTiling {\n public:\n@@ -75,6 +76,7 @@ protected:\n     int64_t repeatsSlice_{0};\n     int64_t usedCoreNumBefore_{0};\n     int64_t averageRepeatTime_{0};\n+    int64_t isUseInt64_{0};\n     RepeatInterleaveTilingKernelDataNorm kernelTilingData_;\n     RepeatInterleaveTilingKernelDataSmall kernelTilingDataSmall_;\n \n@@ -86,6 +88,7 @@ protected:\n     void DumpTilingInfo() override;\n     void SplitCP();\n     void GetUbFactor();\n+    void UseInt64();\n     void SplitRepeatsShape();\n };\n } // namespace optiling\n",
+      "new_file": false,
+      "new_path": "index/repeat_interleave/op_host/arch35/repeat_interleave_tiling_normal.h",
+      "old_path": "index/repeat_interleave/op_host/arch35/repeat_interleave_tiling_normal.h",
+      "removed_lines": 0,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/9893a3c8b1797b84a183006b0eaefa0c7cedf64c/index/repeat_interleave/op_host/arch35/repeat_interleave_tiling_normal.h",
+    "sha": "9893a3c8b1797b84a183006b0eaefa0c7cedf64c",
+    "source_branch": "repeat",
+    "source_project": {
+      "full_name": "yourealize/ops-nn",
+      "human_name": "yourealize / ops-nn",
+      "id": 8853379,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 75,
+    "blob_id": "c7dcab2b482b577446ef1c4bafc1cd1d01725e81",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/9893a3c8b1797b84a183006b0eaefa0c7cedf64c/index/repeat_interleave/op_kernel/arch35/repeat_interleave_small.h",
+    "deletions": 55,
+    "filename": "index/repeat_interleave/op_kernel/arch35/repeat_interleave_small.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 75,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -31,7 +31,14 @@ constexpr uint64_t CP_THRESHOLD = 256;\n constexpr uint64_t CACHELINE_SIZE = 128;\n constexpr uint64_t SPLIT_COMPUTE_THRESHOLD = 16384;\n \n-template <typename T, typename U>\n+constexpr AscendC::MicroAPI::CastTrait castTraitB322B64 = {\n+    AscendC::MicroAPI::RegLayout::ZERO,\n+    AscendC::MicroAPI::SatMode::SAT,\n+    AscendC::MicroAPI::MaskMergeMode::ZEROING,\n+    AscendC::RoundMode::CAST_NONE,\n+};\n+\n+template <typename T, typename U, typename V>\n class RepeatInterleaveSmall {\n public:\n     __aicore__ inline RepeatInterleaveSmall(TPipe& pipe, const RepeatInterleaveTilingKernelDataSmall& tilingData)\n@@ -50,7 +57,7 @@ public:\n     __aicore__ inline int64_t ComputeOutputOffset(uint16_t repeatCount);\n     __aicore__ inline int64_t CalcRepeatsPartStart(int64_t repeatCount);\n     __aicore__ inline int64_t CalcOutputStartOfset();\n-    __aicore__ inline void CustomReduceSum(const LocalTensor<U>& dst, const LocalTensor<U>& src, uint16_t dataLen);\n+    __aicore__ inline void CustomReduceSum(const LocalTensor<V>& dst, const LocalTensor<U>& src, uint16_t dataLen);\n     __aicore__ inline void IndexRepeatLarge(\n         __ubuf__ T* inputAddr, int64_t repeatTimes, int64_t outputRepeatsSum, int64_t outputOffset,\n         int64_t repeatsIndex);\n@@ -90,13 +97,13 @@ private:\n     GM_ADDR repeats_ = 0;\n };\n \n-template <typename T, typename U>\n-__aicore__ inline void RepeatInterleaveSmall<T, U>::Init(GM_ADDR x, GM_ADDR repeats, GM_ADDR y, GM_ADDR workspace)\n+template <typename T, typename U, typename V>\n+__aicore__ inline void RepeatInterleaveSmall<T, U, V>::Init(GM_ADDR x, GM_ADDR repeats, GM_ADDR y, GM_ADDR workspace)\n {\n     pipe_.InitBuffer(repeatsQueue_, DOUBLE, tilingData_.ubFactor * sizeof(U));\n     pipe_.InitBuffer(inputQueue_, DOUBLE, tilingData_.ubFactor * sizeof(T));\n     pipe_.InitBuffer(outputQueue_, DOUBLE, tilingData_.ubFactor * sizeof(T));\n-    pipe_.InitBuffer(outputOffsetBuf_, DOUBLE, OFFSET_BUFFER_LENGTH * sizeof(U));\n+    pipe_.InitBuffer(outputOffsetBuf_, DOUBLE, OFFSET_BUFFER_LENGTH * sizeof(V));\n     pipe_.InitBuffer(recordOffsetBuf_, DOUBLE, GetBlockNum() * UB_ALIGN_VALUE);\n \n     blockIdx_ = GetBlockIdx();\n@@ -120,8 +127,8 @@ __aicore__ inline void RepeatInterleaveSmall<T, U>::Init(GM_ADDR x, GM_ADDR repe\n         Ops::Base::CeilAlign(tilingData_.mergedDims[MERGED_DIM_LENGTH - 1] * sizeof(T), UB_ALIGN_VALUE) / sizeof(T);\n     repeatsFactorAlign_ = tilingData_.ubFactor / cpAlign_;\n }\n-template <typename T, typename U>\n-__aicore__ inline void RepeatInterleaveSmall<T, U>::CopyIn(int64_t repeatCount, int64_t inputOffset)\n+template <typename T, typename U, typename V>\n+__aicore__ inline void RepeatInterleaveSmall<T, U, V>::CopyIn(int64_t repeatCount, int64_t inputOffset)\n {\n     LocalTensor<T> inputLocal = inputQueue_.AllocTensor<T>();\n     DataCopyPadExtParams<T> padParams = {false, 0, 0, 0};\n@@ -140,8 +147,8 @@ __aicore__ inline void RepeatInterleaveSmall<T, U>::CopyIn(int64_t repeatCount,\n     return;\n }\n \n-template <typename T, typename U>\n-__aicore__ inline void RepeatInterleaveSmall<T, U>::CopyInAlign(int64_t repeatCount, int64_t inputOffset)\n+template <typename T, typename U, typename V>\n+__aicore__ inline void RepeatInterleaveSmall<T, U, V>::CopyInAlign(int64_t repeatCount, int64_t inputOffset)\n {\n     LocalTensor<T> inputLocal = inputQueue_.AllocTensor<T>();\n     DataCopyPadExtParams<T> padParams = {true, 0, static_cast<uint8_t>(cpAlign_ - tilingData_.mergedDims[2]), 0};\n@@ -159,8 +166,8 @@ __aicore__ inline void RepeatInterleaveSmall<T, U>::CopyInAlign(int64_t repeatCo\n     return;\n }\n \n-template <typename T, typename U>\n-__aicore__ inline void RepeatInterleaveSmall<T, U>::IndexRepeatLarge(\n+template <typename T, typename U, typename V>\n+__aicore__ inline void RepeatInterleaveSmall<T, U, V>::IndexRepeatLarge(\n     __ubuf__ T* inputAddr, int64_t repeatTimes, int64_t outputRepeatsSum, int64_t outputOffset, int64_t repeatsIndex)\n {\n     int64_t loopCount = Ops::Base::CeilDiv(repeatTimes, outputRepeatsSum);\n@@ -188,8 +195,8 @@ __aicore__ inline void RepeatInterleaveSmall<T, U>::IndexRepeatLarge(\n     return;\n }\n \n-template <typename T, typename U>\n-__aicore__ inline void RepeatInterleaveSmall<T, U>::IndexRepeat(\n+template <typename T, typename U, typename V>\n+__aicore__ inline void RepeatInterleaveSmall<T, U, V>::IndexRepeat(\n     __ubuf__ T* inputAddr, __ubuf__ T* outputAddr, uint16_t repeatTimes, int32_t inputStride)\n {\n     __ubuf__ T* inputAddrLocal = inputAddr;\n@@ -211,8 +218,8 @@ __aicore__ inline void RepeatInterleaveSmall<T, U>::IndexRepeat(\n     return;\n }\n \n-template <typename T, typename U>\n-__aicore__ inline void RepeatInterleaveSmall<T, U>::IndexRepeatGroup(\n+template <typename T, typename U, typename V>\n+__aicore__ inline void RepeatInterleaveSmall<T, U, V>::IndexRepeatGroup(\n     __ubuf__ T* inputAddr, __ubuf__ T* outputAddr, const LocalTensor<U>& repeatsLocal, int32_t repeatLen,\n     int32_t inputStride)\n {\n@@ -236,8 +243,8 @@ __aicore__ inline void RepeatInterleaveSmall<T, U>::IndexRepeatGroup(\n     return;\n }\n \n-template <typename T, typename U>\n-__aicore__ inline void RepeatInterleaveSmall<T, U>::CopyOutData(int64_t repeatSum, int64_t outputOffset)\n+template <typename T, typename U, typename V>\n+__aicore__ inline void RepeatInterleaveSmall<T, U, V>::CopyOutData(int64_t repeatSum, int64_t outputOffset)\n {\n     LocalTensor<T> outputLocal = outputQueue_.DeQue<T>();\n     DataCopyExtParams copyOutParamData;\n@@ -252,8 +259,8 @@ __aicore__ inline void RepeatInterleaveSmall<T, U>::CopyOutData(int64_t repeatSu\n     return;\n }\n \n-template <typename T, typename U>\n-__aicore__ inline void RepeatInterleaveSmall<T, U>::CopyOutSplitImpl(\n+template <typename T, typename U, typename V>\n+__aicore__ inline void RepeatInterleaveSmall<T, U, V>::CopyOutSplitImpl(\n     __ubuf__ T* inputAddr, int64_t outputOffset, const LocalTensor<U>& repeatsLocal, int64_t repeatCount)\n {\n     LocalTensor<T> outputLocal;\n@@ -302,13 +309,13 @@ __aicore__ inline void RepeatInterleaveSmall<T, U>::CopyOutSplitImpl(\n     return;\n }\n \n-template <typename T, typename U>\n-__aicore__ inline void RepeatInterleaveSmall<T, U>::CopyOutSplitGroup(\n+template <typename T, typename U, typename V>\n+__aicore__ inline void RepeatInterleaveSmall<T, U, V>::CopyOutSplitGroup(\n     __ubuf__ T* inputAddr, int64_t outputOffset, const LocalTensor<U>& repeatsLocal, int64_t repeatCount)\n {\n     int64_t repeatsSum = 0;\n \n-    LocalTensor<U> sumOutputLocal = outputOffsetBuf_.AllocTensor<U>();\n+    LocalTensor<V> sumOutputLocal = outputOffsetBuf_.AllocTensor<V>();\n     int64_t mainLen = Ops::Base::CeilDiv(repeatCount, tilingData_.averageRepeatTime);\n     mainLen = Ops::Base::CeilAlign(mainLen * sizeof(U), UB_ALIGN_VALUE) / sizeof(U);\n     int64_t loopSize = Ops::Base::CeilDiv(repeatCount, mainLen);\n@@ -342,8 +349,8 @@ __aicore__ inline void RepeatInterleaveSmall<T, U>::CopyOutSplitGroup(\n     return;\n }\n \n-template <typename T, typename U>\n-__aicore__ inline void RepeatInterleaveSmall<T, U>::CopyOutSplit(int64_t repeatCount)\n+template <typename T, typename U, typename V>\n+__aicore__ inline void RepeatInterleaveSmall<T, U, V>::CopyOutSplit(int64_t repeatCount)\n {\n     LocalTensor<T> inputLocal = inputQueue_.DeQue<T>();\n     LocalTensor<U> repeatsLocal = repeatsQueue_.DeQue<U>();\n@@ -358,8 +365,8 @@ __aicore__ inline void RepeatInterleaveSmall<T, U>::CopyOutSplit(int64_t repeatC\n     repeatsQueue_.FreeTensor(repeatsLocal);\n     return;\n }\n-template <typename T, typename U>\n-__aicore__ inline void RepeatInterleaveSmall<T, U>::CopyOut(int64_t repeatCount)\n+template <typename T, typename U, typename V>\n+__aicore__ inline void RepeatInterleaveSmall<T, U, V>::CopyOut(int64_t repeatCount)\n {\n     LocalTensor<T> inputLocal = inputQueue_.DeQue<T>();\n     LocalTensor<U> repeatsLocal = repeatsQueue_.DeQue<U>();\n@@ -381,8 +388,8 @@ __aicore__ inline void RepeatInterleaveSmall<T, U>::CopyOut(int64_t repeatCount)\n     return;\n }\n \n-template <typename T, typename U>\n-__aicore__ inline void RepeatInterleaveSmall<T, U>::CopyXToOut(int64_t repeatCount)\n+template <typename T, typename U, typename V>\n+__aicore__ inline void RepeatInterleaveSmall<T, U, V>::CopyXToOut(int64_t repeatCount)\n {\n     LocalTensor<T> xInLocal = inputQueue_.DeQue<T>();\n     LocalTensor<T> xOutLocal = outputQueue_.AllocTensor<T>();\n@@ -411,8 +418,8 @@ __aicore__ inline void RepeatInterleaveSmall<T, U>::CopyXToOut(int64_t repeatCou\n     return;\n }\n \n-template <typename T, typename U>\n-__aicore__ inline void RepeatInterleaveSmall<T, U>::CopyOutY(int64_t repeatCount)\n+template <typename T, typename U, typename V>\n+__aicore__ inline void RepeatInterleaveSmall<T, U, V>::CopyOutY(int64_t repeatCount)\n {\n     int64_t outputOffset = (batchNO_ * tilingData_.totalRepeatSum + outputOffsetRepeat_) * tilingData_.mergedDims[2];\n \n@@ -445,8 +452,8 @@ __aicore__ inline void RepeatInterleaveSmall<T, U>::CopyOutY(int64_t repeatCount\n     repeatsQueue_.FreeTensor(repeatsLocal);\n }\n \n-template <typename T, typename U>\n-__aicore__ inline void RepeatInterleaveSmall<T, U>::CopyInRepeats(int64_t repeatCount, int64_t offset)\n+template <typename T, typename U, typename V>\n+__aicore__ inline void RepeatInterleaveSmall<T, U, V>::CopyInRepeats(int64_t repeatCount, int64_t offset)\n {\n     LocalTensor<U> repeatsLocal = repeatsQueue_.AllocTensor<U>();\n     DataCopyPadExtParams<U> padParams = {false, 0, 0, 0};\n@@ -461,37 +468,50 @@ __aicore__ inline void RepeatInterleaveSmall<T, U>::CopyInRepeats(int64_t repeat\n     return;\n }\n \n-template <typename T, typename U>\n-__aicore__ inline void RepeatInterleaveSmall<T, U>::CustomReduceSum(\n-    const LocalTensor<U>& dstLocal, const LocalTensor<U>& src, uint16_t dataLen)\n+template <typename U, typename V>\n+__aicore__ inline void LoadData(AscendC::MicroAPI::RegTensor<V>& dstReg, __local_mem__ U* srcAddr,\n+                                    uint16_t offset, AscendC::MicroAPI::MaskReg& maskReg)\n {\n-    uint16_t vfLen = Ops::Base::GetVRegSize() / sizeof(U);\n+    if constexpr (std::is_same_v<U, V>) {\n+        AscendC::MicroAPI::DataCopy(dstReg, srcAddr + offset);\n+    } else {\n+        AscendC::MicroAPI::RegTensor<U> dstRegB32;\n+        AscendC::MicroAPI::DataCopy<U, MicroAPI::LoadDist::DIST_UNPACK_B32>(dstRegB32, srcAddr + offset);\n+        AscendC::MicroAPI::Cast<V, U, castTraitB322B64>(dstReg, dstRegB32, maskReg);\n+    } \n+}\n+\n+template <typename T, typename U, typename V>\n+__aicore__ inline void RepeatInterleaveSmall<T, U, V>::CustomReduceSum(\n+    const LocalTensor<V>& dstLocal, const LocalTensor<U>& src, uint16_t dataLen)\n+{\n+    uint16_t vfLen = Ops::Base::GetVRegSize() / sizeof(V);\n     uint16_t loopSize = (dataLen + vfLen - 1) / vfLen;\n     auto srcAddr = (__ubuf__ U*)src.GetPhyAddr();\n-    auto dstAddr = (__ubuf__ U*)dstLocal.GetPhyAddr();\n+    auto dstAddr = (__ubuf__ V*)dstLocal.GetPhyAddr();\n     __VEC_SCOPE__\n     {\n-        AscendC::MicroAPI::RegTensor<U> src;\n-        AscendC::MicroAPI::RegTensor<U> dst;\n-        AscendC::MicroAPI::RegTensor<U> tmpSum;\n+        AscendC::MicroAPI::RegTensor<V> src;\n+        AscendC::MicroAPI::RegTensor<V> dst;\n+        AscendC::MicroAPI::RegTensor<V> tmpSum;\n         uint32_t pnum = static_cast<uint32_t>(dataLen);\n         uint32_t sumMask = 1;\n-        AscendC::MicroAPI::MaskReg oneMask = AscendC::MicroAPI::UpdateMask<U>(sumMask);\n-        AscendC::MicroAPI::Duplicate(dst, static_cast<U>(0), oneMask);\n+        AscendC::MicroAPI::MaskReg oneMask = AscendC::MicroAPI::UpdateMask<V>(sumMask);\n+        AscendC::MicroAPI::Duplicate(dst, static_cast<V>(0), oneMask);\n         for (uint16_t i = 0; i < loopSize; i++) {\n-            AscendC::MicroAPI::MaskReg pMask = AscendC::MicroAPI::UpdateMask<U>(pnum);\n-            AscendC::MicroAPI::DataCopy<U, MicroAPI::PostLiteral::POST_MODE_UPDATE>(src, srcAddr, vfLen);\n+            AscendC::MicroAPI::MaskReg pMask = AscendC::MicroAPI::UpdateMask<V>(pnum);\n+            LoadData<U, V>(src, srcAddr, i * vfLen, pMask);\n             AscendC::MicroAPI::ReduceSum(tmpSum, src, pMask);\n             AscendC::MicroAPI::Add(dst, dst, tmpSum, oneMask);\n         }\n-        AscendC::MicroAPI::DataCopy<U, MicroAPI::PostLiteral::POST_MODE_UPDATE>(dstAddr, dst, 0, oneMask);\n+        AscendC::MicroAPI::DataCopy<V, MicroAPI::PostLiteral::POST_MODE_UPDATE>(dstAddr, dst, 0, oneMask);\n     }\n }\n-template <typename T, typename U>\n-__aicore__ inline int64_t RepeatInterleaveSmall<T, U>::ComputeOutputOffset(uint16_t repeatCount)\n+template <typename T, typename U, typename V>\n+__aicore__ inline int64_t RepeatInterleaveSmall<T, U, V>::ComputeOutputOffset(uint16_t repeatCount)\n {\n     LocalTensor<U> repeatsLocal = repeatsQueue_.DeQue<U>();\n-    LocalTensor<U> sumOutputLocal = outputOffsetBuf_.AllocTensor<U>();\n+    LocalTensor<V> sumOutputLocal = outputOffsetBuf_.AllocTensor<V>();\n \n     CustomReduceSum(sumOutputLocal, repeatsLocal, repeatCount);\n     event_t eventVToS = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::V_S));\n@@ -503,8 +523,8 @@ __aicore__ inline int64_t RepeatInterleaveSmall<T, U>::ComputeOutputOffset(uint1\n     return result;\n }\n \n-template <typename T, typename U>\n-__aicore__ inline int64_t RepeatInterleaveSmall<T, U>::CalcRepeatsPartStart(int64_t repeatCount)\n+template <typename T, typename U, typename V>\n+__aicore__ inline int64_t RepeatInterleaveSmall<T, U, V>::CalcRepeatsPartStart(int64_t repeatCount)\n {\n     int64_t result = 0;\n     if (repeatCount == 0) {\n@@ -527,8 +547,8 @@ __aicore__ inline int64_t RepeatInterleaveSmall<T, U>::CalcRepeatsPartStart(int6\n     return result;\n }\n \n-template <typename T, typename U>\n-__aicore__ inline int64_t RepeatInterleaveSmall<T, U>::CalcOutputStartOfset()\n+template <typename T, typename U, typename V>\n+__aicore__ inline int64_t RepeatInterleaveSmall<T, U, V>::CalcOutputStartOfset()\n {\n     int64_t cacheLineNum = CACHELINE_SIZE / sizeof(U);\n     recordSumGm_(blockIdx_ * cacheLineNum) = currentRepeatsSum_;\n@@ -538,7 +558,7 @@ __aicore__ inline int64_t RepeatInterleaveSmall<T, U>::CalcOutputStartOfset()\n \n     uint8_t alignSize = UB_ALIGN_VALUE / sizeof(U);\n     LocalTensor<U> recordOfsetLocal = recordOffsetBuf_.AllocTensor<U>();\n-    LocalTensor<U> sumOutputLocal = outputOffsetBuf_.AllocTensor<U>();\n+    LocalTensor<V> sumOutputLocal = outputOffsetBuf_.AllocTensor<V>();\n     DataCopyExtParams inParams = {\n         static_cast<uint16_t>(tilingData_.usedCoreNum), static_cast<uint32_t>(sizeof(U)),\n         static_cast<uint32_t>((cacheLineNum - 1) * sizeof(U)), 0, 0};\n@@ -562,8 +582,8 @@ __aicore__ inline int64_t RepeatInterleaveSmall<T, U>::CalcOutputStartOfset()\n     return outputStartOfset;\n }\n \n-template <typename T, typename U>\n-__aicore__ inline void RepeatInterleaveSmall<T, U>::Process()\n+template <typename T, typename U, typename V>\n+__aicore__ inline void RepeatInterleaveSmall<T, U, V>::Process()\n {\n     if ((blockIdx_ + 1) > tilingData_.usedCoreNum) {\n         return;\n",
+      "new_file": false,
+      "new_path": "index/repeat_interleave/op_kernel/arch35/repeat_interleave_small.h",
+      "old_path": "index/repeat_interleave/op_kernel/arch35/repeat_interleave_small.h",
+      "removed_lines": 55,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/9893a3c8b1797b84a183006b0eaefa0c7cedf64c/index/repeat_interleave/op_kernel/arch35/repeat_interleave_small.h",
+    "sha": "9893a3c8b1797b84a183006b0eaefa0c7cedf64c",
+    "source_branch": "repeat",
+    "source_project": {
+      "full_name": "yourealize/ops-nn",
+      "human_name": "yourealize / ops-nn",
+      "id": 8853379,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 10,
+    "blob_id": "eccd5d91d211ee9be0e05c7ef9bf1491f7c05b31",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/9893a3c8b1797b84a183006b0eaefa0c7cedf64c/index/repeat_interleave/op_kernel/repeat_interleave_apt.cpp",
+    "deletions": 3,
+    "filename": "index/repeat_interleave/op_kernel/repeat_interleave_apt.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 10,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -21,7 +21,8 @@ using namespace RepeatInterleave;\n \n #define BATCH_TILING_REPEAT_SCALAR 101\n #define BATCH_TILING_REPEAT_TENSOR 102\n-#define BATCH_TILING_SPLIT_REPEATS_SHAPE 201\n+#define BATCH_TILING_SPLIT_REPEATS_SHAPE_INT32 201\n+#define BATCH_TILING_SPLIT_REPEATS_SHAPE_INT64 202\n \n extern \"C\" __global__ __aicore__ void repeat_interleave(\n     GM_ADDR x, GM_ADDR repeats, GM_ADDR y, GM_ADDR workspace, GM_ADDR tiling)\n@@ -36,10 +37,16 @@ extern \"C\" __global__ __aicore__ void repeat_interleave(\n     }\n     TPipe pipe;\n     KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIV_1_0);\n-    if (TILING_KEY_IS(BATCH_TILING_SPLIT_REPEATS_SHAPE)) {\n+    if (TILING_KEY_IS(BATCH_TILING_SPLIT_REPEATS_SHAPE_INT32)) {\n         GET_TILING_DATA_WITH_STRUCT(RepeatInterleaveTilingKernelDataSmall, tilingData, tiling);\n         const RepeatInterleaveTilingKernelDataSmall& tilingInfo = tilingData;\n-        RepeatInterleaveSmall<DTYPE_X, DTYPE_REPEATS> op(pipe, tilingInfo);\n+        RepeatInterleaveSmall<DTYPE_X, DTYPE_REPEATS, int32_t> op(pipe, tilingInfo);\n+        op.Init(x, repeats, y, userWs);\n+        op.Process();\n+    } else if (TILING_KEY_IS(BATCH_TILING_SPLIT_REPEATS_SHAPE_INT64)) {\n+        GET_TILING_DATA_WITH_STRUCT(RepeatInterleaveTilingKernelDataSmall, tilingData, tiling);\n+        const RepeatInterleaveTilingKernelDataSmall& tilingInfo = tilingData;\n+        RepeatInterleaveSmall<DTYPE_X, DTYPE_REPEATS, int64_t> op(pipe, tilingInfo);\n         op.Init(x, repeats, y, userWs);\n         op.Process();\n     } else if (TILING_KEY_IS(BATCH_TILING_REPEAT_SCALAR)) {\n",
+      "new_file": false,
+      "new_path": "index/repeat_interleave/op_kernel/repeat_interleave_apt.cpp",
+      "old_path": "index/repeat_interleave/op_kernel/repeat_interleave_apt.cpp",
+      "removed_lines": 3,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/9893a3c8b1797b84a183006b0eaefa0c7cedf64c/index/repeat_interleave/op_kernel/repeat_interleave_apt.cpp",
+    "sha": "9893a3c8b1797b84a183006b0eaefa0c7cedf64c",
+    "source_branch": "repeat",
+    "source_project": {
+      "full_name": "yourealize/ops-nn",
+      "human_name": "yourealize / ops-nn",
+      "id": 8853379,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  }
+]

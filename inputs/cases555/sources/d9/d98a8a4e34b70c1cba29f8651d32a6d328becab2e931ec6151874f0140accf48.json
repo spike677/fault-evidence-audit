@@ -1,0 +1,74 @@
+[
+  {
+    "additions": 17,
+    "blob_id": "f6167768902c68bc9b2ff5bd538f86753c75fead",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/aeecbc7670c513d8115c494e446cd68b2c5f4c76/matmul/quant_batch_matmul_v3/op_host/op_tiling/arch35/adaptive_sliding_window_tiling.cpp",
+    "deletions": 17,
+    "filename": "matmul/quant_batch_matmul_v3/op_host/op_tiling/arch35/adaptive_sliding_window_tiling.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 17,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -863,34 +863,34 @@ uint64_t AdaptiveSlidingWindowTiling::GetScaleFactorBAfullLoad(uint64_t leftSize\n                 ops::CeilDiv(static_cast<uint64_t>(basicTiling_.baseK), MX_GROUP_SIZE), MXFP_MULTI_BASE_SIZE),\n         inputParams_.scaleDtype);\n \n-    uint64_t scaleFactorbBase = 1UL;\n+    uint64_t scaleFactorBBase = 1UL;\n     if (inputParams_.transB) {\n         // k 是内轴的情况\n-        uint64_t singleScalebBasekSize = GetSizeWithDataType(\n+        uint64_t singleScaleBBasekSize = GetSizeWithDataType(\n             ops::CeilAlign(\n                 ops::CeilDiv(static_cast<uint64_t>(basicTiling_.baseK), MX_GROUP_SIZE), MXFP_MULTI_BASE_SIZE),\n             inputParams_.scaleDtype);\n-        if (singleScalebBasekSize < L2_ALIGN_SIZE) {\n-            scaleFactorbBase = ops::CeilDiv(L2_ALIGN_SIZE, singleScalebBasekSize);\n+        if (singleScaleBBasekSize < L2_ALIGN_SIZE) {\n+            scaleFactorBBase = ops::CeilDiv(L2_ALIGN_SIZE, singleScaleBBasekSize);\n         }\n     }\n \n-    uint64_t scaleFactorbMaxFromK =\n+    uint64_t scaleFactorBMaxFromK =\n         inputParams_.kSize / static_cast<uint64_t>(basicTiling_.stepKb * basicTiling_.baseK);\n-    scaleFactorbMaxFromK = std::min(static_cast<uint64_t>(SCALER_FACTOR_MAX), scaleFactorbMaxFromK);\n-    scaleFactorbMaxFromK = std::max(static_cast<uint64_t>(SCALER_FACTOR_MIN), scaleFactorbMaxFromK);\n+    scaleFactorBMaxFromK = std::min(static_cast<uint64_t>(SCALER_FACTOR_MAX), scaleFactorBMaxFromK);\n+    scaleFactorBMaxFromK = std::max(static_cast<uint64_t>(SCALER_FACTOR_MIN), scaleFactorBMaxFromK);\n \n     uint64_t scaleFactorB = 1;\n-    if (scaleFactorbBase > scaleFactorbMaxFromK) {\n-        // 一次性搬运所有的K 方向上所有的scaleB 也无法满足内轴128对齐,按照搬运量来计算scaleFactorb\n-        uint64_t scaleFactorBMax =\n-            std::min(MTE2_MIN_LOAD_SIZE_V100 * DB_SIZE, leftSize) / (baseScaleBSize * basicTiling_.depthB1);\n-        scaleFactorB = std::min(scaleFactorBMax, scaleFactorbMaxFromK);\n-    } else {\n-        // 在内轴128对齐的基础上，同时确保搬运量不小于32， 且不超L1 内存\n-        uint64_t scaleFactor = std::min(MTE2_MIN_LOAD_SIZE_V100 * DB_SIZE, leftSize) /\n-                               (baseScaleBSize * scaleFactorbBase * basicTiling_.depthB1);\n-        scaleFactorB = std::min(scaleFactor * scaleFactorbBase, scaleFactorbMaxFromK);\n+    uint64_t scaleFactorBMax =\n+        std::min(MTE2_MIN_LOAD_SIZE_V100 * DB_SIZE, leftSize) / (baseScaleBSize * basicTiling_.depthB1);\n+    if (scaleFactorBMax != 0 && scaleFactorBBase != 0) {\n+        if (scaleFactorBBase <= scaleFactorBMaxFromK && scaleFactorBMax >= scaleFactorBBase) {\n+            // 在内轴128对齐的基础上，同时确保搬运量不小于32， 且不超L1 内存\n+            scaleFactorB = std::min(scaleFactorBMax / scaleFactorBBase * scaleFactorBBase, scaleFactorBMaxFromK);\n+        } else {\n+            // 一次性搬运所有的K 方向上所有的scaleB 也无法满足内轴128对齐,按照搬运量来计算scaleFactorb\n+            scaleFactorB = std::min(scaleFactorBMax, scaleFactorBMaxFromK);\n+        }\n     }\n \n     return scaleFactorB;\n",
+      "new_file": false,
+      "new_path": "matmul/quant_batch_matmul_v3/op_host/op_tiling/arch35/adaptive_sliding_window_tiling.cpp",
+      "old_path": "matmul/quant_batch_matmul_v3/op_host/op_tiling/arch35/adaptive_sliding_window_tiling.cpp",
+      "removed_lines": 17,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/aeecbc7670c513d8115c494e446cd68b2c5f4c76/matmul/quant_batch_matmul_v3/op_host/op_tiling/arch35/adaptive_sliding_window_tiling.cpp",
+    "sha": "aeecbc7670c513d8115c494e446cd68b2c5f4c76",
+    "source_branch": "mxfp8",
+    "source_project": {
+      "full_name": "fengxingpan1/ops-nn",
+      "human_name": "fengxingpan1 / ops-nn",
+      "id": 9090223,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 1,
+    "blob_id": "f1b8ee88c5bd2a33fcb7b0d604c868323d2274f1",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/aeecbc7670c513d8115c494e446cd68b2c5f4c76/matmul/quant_batch_matmul_v3/tests/ut/op_host/test_quant_batch_matmul_v3.csv",
+    "deletions": 1,
+    "filename": "matmul/quant_batch_matmul_v3/tests/ut/op_host/test_quant_batch_matmul_v3.csv",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 1,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -225,7 +225,7 @@ Ascend950,QUANTMM950/TestQuantBatchMatmulV3Tiling.generalTest/20,,invalidScaleDt\n Ascend950,QUANTMM950/TestQuantBatchMatmulV3Tiling.generalTest/21,,invalidBiasDtype,,3,3,3,1,1,1,13,320,952,0,0,1,0,1,0,INT8,INT8,UINT64,FLOAT,FLOAT,INT8,ND,ND,FALSE,32,4,,FALSE,\n Ascend950,QUANTMM950/TestQuantBatchMatmulV3Tiling.generalTest/22,,invalidOffset,,3,3,3,1,1,1,13,320,952,1,0,1,0,1,0,INT8,INT8,UINT64,FLOAT,INT32,FLOAT16,ND,ND,FALSE,32,4,,FALSE,\n Ascend950,QUANTMM950/TestQuantBatchMatmulV3Tiling.generalTest/25,,mxfp4-pergroup-quanliang,,3,3,3,1,1,1,5344,1260,1976,0,1,1,0,1,2,FLOAT4-E2M1,FLOAT4-E2M1,FLOAT8-E8M0,FLOAT8-E8M0,FLOAT,BF16,ND,ND,TRUE,32,4,1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 1 32 32 5344 1976 1260 1260 256 256 1260 256 256 256 4 4 1 1 1 0 0 0 0 0 0 0 0 0 0 2 2 0 0 2 2 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 16843266 0 0 0 0 0 0 2 2 1 1 0 0,FALSE,\n-Ascend950,QUANTMM950/TestQuantBatchMatmulV3Tiling.generalTest/27,,mxfp4-pergroup-zengliang,,3,3,3,1,1,1,1,14336,5120,0,1,0,0,1,2,FLOAT4-E2M1,FLOAT4-E2M1,FLOAT8-E8M0,FLOAT8-E8M0,FLOAT,FLOAT,ND,ND,TRUE,32,260,1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 1 32 32 1 5120 14336 14336 1 160 14336 16 160 256 56 4 1 1 0 0 0 0 0 0 0 0 0 0 0 56 2 0 0 2 2 2 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 16843009 0 0 0 0 0 0 1 1 1 1 0 0,FALSE,\n+Ascend950,QUANTMM950/TestQuantBatchMatmulV3Tiling.generalTest/27,,mxfp4-pergroup-zengliang,,3,3,3,1,1,1,1,14336,5120,0,1,0,0,1,2,FLOAT4-E2M1,FLOAT4-E2M1,FLOAT8-E8M0,FLOAT8-E8M0,FLOAT,FLOAT,ND,ND,TRUE,32,260,1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0 3 0 0 0 1 1 32 32 1 5120 14336 14336 1 160 14336 16 160 256 56 4 1 1 0 0 0 0 0 0 0 0 0 0 0 56 2 0 0 2 2 2 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 16845825 0 0 0 0 0 0 1 1 1 1 0 0,FALSE,\n Ascend950,QUANTMM950/TestQuantBatchMatmulV3Tiling.generalTest/28,,mxfp4-pergroup-kNotAlign64-NnotAlign16,,3,3,3,1,1,1,192,4066,255,0,1,0,0,1,2,FLOAT4-E2M1,FLOAT4-E2M1,FLOAT8-E8M0,FLOAT8-E8M0,FLOAT,FLOAT,ND,ND,TRUE,32,260,1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 1 32 32 192 255 4066 4066 48 32 4066 48 32 1280 4 4 1 1 0 0 0 0 0 0 0 0 0 0 0 4 2 0 0 2 2 2 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 16843009 0 0 0 0 0 0 1 1 1 1 0 0,FALSE,\n Ascend950,QUANTMM950/TestQuantBatchMatmulV3Tiling.generalTest/29,,mxfp4-pergroup-kNotAlign256,,3,3,3,1,1,1,4096,7104,2048,0,1,0,0,1,2,FLOAT4-E2M1,FLOAT4-E2M1,FLOAT8-E8M0,FLOAT8-E8M0,FLOAT,FLOAT,ND,ND,TRUE,32,4,1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 1 32 32 4096 2048 7104 7104 256 256 7104 256 256 256 4 4 1 1 0 0 0 0 0 0 0 0 0 0 0 2 2 0 0 2 2 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 16846093 0 0 0 0 0 0 1 1 1 1 0 0,FALSE,\n Ascend950,QUANTMM950/TestQuantBatchMatmulV3Tiling.generalTest/30,,mxfp4-pergroup-kLess64-NnotAlign16,,3,3,3,1,1,1,4097,62,3,0,1,0,0,1,2,FLOAT4-E2M1,FLOAT4-E2M1,FLOAT8-E8M0,FLOAT8-E8M0,FLOAT,FLOAT,ND,ND,TRUE,29,4,1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 1 32 29 4097 3 62 62 144 3 62 144 16 256 2 2 1 1 0 0 0 0 0 0 0 0 0 0 0 1 1 0 0 2 2 2 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 16843009 0 0 0 0 0 0 1 1 1 1 0 0,FALSE,\n",
+      "new_file": false,
+      "new_path": "matmul/quant_batch_matmul_v3/tests/ut/op_host/test_quant_batch_matmul_v3.csv",
+      "old_path": "matmul/quant_batch_matmul_v3/tests/ut/op_host/test_quant_batch_matmul_v3.csv",
+      "removed_lines": 1,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/aeecbc7670c513d8115c494e446cd68b2c5f4c76/matmul/quant_batch_matmul_v3/tests/ut/op_host/test_quant_batch_matmul_v3.csv",
+    "sha": "aeecbc7670c513d8115c494e446cd68b2c5f4c76",
+    "source_branch": "mxfp8",
+    "source_project": {
+      "full_name": "fengxingpan1/ops-nn",
+      "human_name": "fengxingpan1 / ops-nn",
+      "id": 9090223,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  }
+]

@@ -1,0 +1,80 @@
+{
+  "assignee": {
+    "html_url": "https://gitcode.com/liujiawei-21",
+    "id": "68d0a338c0c9600cb8c69ac6",
+    "login": "liujiawei-21",
+    "name": "liujiawei-21",
+    "object_id": "68d0a338c0c9600cb8c69ac6"
+  },
+  "assignees": [
+    {
+      "html_url": "https://gitcode.com/liujiawei-21",
+      "id": "68d0a338c0c9600cb8c69ac6",
+      "login": "liujiawei-21",
+      "name": "liujiawei-21",
+      "object_id": "68d0a338c0c9600cb8c69ac6"
+    }
+  ],
+  "body": "### Describe the current behavior / 问题描述 (Mandatory / 必填)\n\nPFA GS1 合轴场景下，BSH/BSND 布局的 softmax LSE 输出与 golden 比对错位。根因为 SoftmaxLseCopyOut 中 BSH 走入了 TND 专用的分块拷贝路径（isPfaGS1Merge），按 G-major 假设读取 UB 数据，但实际 softmax 计算在 BSH 合轴下是 S1-major 排列，导致拷贝排列错位。\n\n### Environment / 环境信息 (Mandatory / 必填)\n\n- CANN 版本: arch35 (DAV_3510/950)\n- 算子: PFA noquant infer\n- 布局: BSND(=BSH), s1=4 s2=4 g=1 n1=4 n2=4\n\n### Steps to reproduce the issue / 重现步骤 (Mandatory / 必填)\n\n1. BSND 布局下执行 PFA noquant infer\n2. 比较 softmax LSE 输出与 golden\n3. 观察到非对角线位置 LSE 值错位\n\n### Describe the expected behavior / 预期结果 (Mandatory / 必填)\n\nBSH 布局 LSE 输出走连续 DataCopyPad，CalcAIVSoftmaxLseOffset 走通用 offset 公式。\n\n### Related log / screenshot / 日志 / 截图 (Mandatory / 必填)\n\n修改文件:\n- flash_attention_noquant_block_vec_infer.h:692 移除 BSH 条件\n- infer_flash_attention_kvcache.h:661 合并公式仅保留 TND\n\n### Special notes for this issue/备注 (Optional / 选填)\n\n关联 PR: https://gitcode.com/cann/ops-transformer/merge_requests/7976\n",
+  "comments": 1,
+  "created_at": "2026-07-01T11:18:24+08:00",
+  "finished_at": "2026-07-03T09:21:16+08:00",
+  "html_url": "https://gitcode.com/cann/ops-transformer/issues/3488",
+  "id": 4128479,
+  "issue_priority_detail": {
+    "id": 116,
+    "title": "无优先级"
+  },
+  "issue_state": "进行中",
+  "issue_state_detail": {
+    "id": 285,
+    "serial": 0,
+    "title": "进行中"
+  },
+  "issue_type": "任务",
+  "issue_type_detail": {
+    "id": 255,
+    "is_system": false,
+    "title": "任务"
+  },
+  "labels": [
+    {
+      "color": "#DB2828",
+      "created_at": "2025-06-10T14:17:23+08:00",
+      "id": 3870,
+      "name": "bug-report",
+      "updated_at": "2026-07-01T11:18:24+08:00"
+    },
+    {
+      "color": "#35e029",
+      "created_at": "2026-03-20T11:25:13+08:00",
+      "id": 38861,
+      "name": "resolved",
+      "updated_at": "2026-07-03T10:04:03+08:00"
+    }
+  ],
+  "number": "3488",
+  "priority": 0,
+  "repository": {
+    "assigner": {},
+    "created_at": "2025-09-28T17:54:46+08:00",
+    "description": "本项目是CANN提供的transformer类大模型算子库，实现网络在NPU上加速计算。",
+    "full_name": "cann/ops-transformer",
+    "id": 7673863,
+    "name": "ops-transformer",
+    "paas": "",
+    "path": "ops-transformer",
+    "updated_at": "2025-09-28T18:06:48+08:00"
+  },
+  "state": "closed",
+  "title": "[Bug-Report|缺陷反馈]: FIA GS1 merge BSH LSE 输出布局错位",
+  "updated_at": "2026-07-03T09:21:16+08:00",
+  "user": {
+    "html_url": "https://gitcode.com/liujiawei-21",
+    "id": "68d0a338c0c9600cb8c69ac6",
+    "login": "liujiawei-21",
+    "name": "liujiawei-21",
+    "object_id": "68d0a338c0c9600cb8c69ac6"
+  },
+  "visibility_reason": "public"
+}

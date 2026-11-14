@@ -1,0 +1,80 @@
+{
+  "assignee": {
+    "html_url": "https://gitcode.com/qianzehong",
+    "id": "68c138243be0a23c91c2437b",
+    "login": "qianzehong",
+    "name": "qianzehong",
+    "object_id": "68c138243be0a23c91c2437b"
+  },
+  "assignees": [
+    {
+      "html_url": "https://gitcode.com/qianzehong",
+      "id": "68c138243be0a23c91c2437b",
+      "login": "qianzehong",
+      "name": "qianzehong",
+      "object_id": "68c138243be0a23c91c2437b"
+    }
+  ],
+  "body": "### Describe the current behavior / 问题描述 (Mandatory / 必填)\n\nbatch_norm 算子的 3 个 infer 新模板（continuous_a、small_a、small_ab1）存在两类问题：\n\n1. **冗余写问题**：`CopyOutMeanVar` 被所有核无条件调用，导致多个核向同一 GM 地址写同一份数据（batch_mean、batch_variance、reserve_space_1、reserve_space_2）。虽然数据一致不影响正确性，但存在不必要的冗余写操作。\n\n2. **small_ab1 输出错误**：`VFPrepareSmallAB1ParamCache` 使用 `DataCopyGather` 读取 mean/var 时，由于 `paramCacheElemLen`（128）大于 `meanQueue_` buffer 大小（totalALen 个元素），导致 meanLocal 被破坏，batch_mean 和 reserve_space_1 输出错误数据（epsilon 值而非实际 mean）。\n\n### Environment / 环境信息 (Mandatory / 必填)\n\n- 硬件：Ascend 950\n- CANN 版本：9.1.0\n- 算子：batch_norm（infer 模式）\n\n### Steps to reproduce the issue / 重现步骤 (Mandatory / 必填)\n\n1. 使用 batch_norm 算子，infer 模式（is_training=False）\n2. 触发 small_ab1 模板：fp32 NCHW [256,4,2,2]（A*B1≤32, B0>blockDim*2）\n3. 检查 batch_mean 和 reserve_space_1 输出，发现值为 `[epsilon, 0, 0, 0]` 而非输入的 mean 值\n\n### Describe the expected behavior / 预期结果 (Mandatory / 必填)\n\n- batch_mean、batch_variance、reserve_space_1、reserve_space_2 应正确输出输入的 mean/variance 值\n- 只由一个核执行写出操作，避免冗余写\n\n### Related log / screenshot / 日志 / 截图 (Mandatory / 必填)\n\n修复前 small_ab1 输出：\n```\noutput_1 (batch_mean): [1e-04, 0, 0, 0]  # 错误，应为输入的 mean\noutput_3 (reserve_space_1): [1e-04, 0, 0, 0]  # 错误\n```\n\n修复后 small_ab1 输出：\n```\nDYN_GOLD: 100.0%,100.0%,100.0%,100.0%,100.0%,0.0%  # 5 个有效输出全部 PASS\n```\n\n### Special notes for this issue/备注 (Optional / 选填)\n\n关联 PR：https://gitcode.com/cann/ops-nn/merge_requests/5962\n",
+  "comments": 1,
+  "created_at": "2026-06-11T12:55:29+08:00",
+  "finished_at": "2026-06-12T14:48:51+08:00",
+  "html_url": "https://gitcode.com/cann/ops-nn/issues/3290",
+  "id": 4088814,
+  "issue_priority_detail": {
+    "id": 116,
+    "title": "无优先级"
+  },
+  "issue_state": "进行中",
+  "issue_state_detail": {
+    "id": 285,
+    "serial": 0,
+    "title": "进行中"
+  },
+  "issue_type": "任务",
+  "issue_type_detail": {
+    "id": 255,
+    "is_system": false,
+    "title": "任务"
+  },
+  "labels": [
+    {
+      "color": "#DB2828",
+      "created_at": "2025-06-10T14:17:23+08:00",
+      "id": 3870,
+      "name": "bug-report",
+      "updated_at": "2026-06-11T12:55:29+08:00"
+    },
+    {
+      "color": "#35e029",
+      "created_at": "2026-03-20T11:25:13+08:00",
+      "id": 38861,
+      "name": "resolved",
+      "updated_at": "2026-06-12T15:53:34+08:00"
+    }
+  ],
+  "number": "3290",
+  "priority": 0,
+  "repository": {
+    "assigner": {},
+    "created_at": "2025-09-27T17:40:34+08:00",
+    "description": "本项目是CANN提供的神经网络类计算算子库，实现网络在NPU上加速计算。",
+    "full_name": "cann/ops-nn",
+    "id": 7665709,
+    "name": "ops-nn",
+    "paas": "",
+    "path": "ops-nn",
+    "updated_at": "2025-09-27T18:09:31+08:00"
+  },
+  "state": "closed",
+  "title": "[Bug-Report|缺陷反馈]: batch_norm infer 模板冗余写及 small_ab1 输出错误",
+  "updated_at": "2026-06-12T14:48:51+08:00",
+  "user": {
+    "html_url": "https://gitcode.com/qianzehong",
+    "id": "68c138243be0a23c91c2437b",
+    "login": "qianzehong",
+    "name": "qianzehong",
+    "object_id": "68c138243be0a23c91c2437b"
+  },
+  "visibility_reason": "public"
+}

@@ -1,0 +1,76 @@
+{
+  "assignee": {
+    "avatar_url": "https://cdn-img.gitcode.com/ac/ae/1ac30a43e7e5c7ebf6339c15d1b51a15c9d96b23e7e2ea2816fcd63c2e92394d.jpg",
+    "html_url": "https://gitcode.com/PerrySkywalker",
+    "id": "682abf2a709a492cad560617",
+    "login": "PerrySkywalker",
+    "name": "PerrySkywalker",
+    "object_id": "682abf2a709a492cad560617"
+  },
+  "assignees": [
+    {
+      "avatar_url": "https://cdn-img.gitcode.com/ac/ae/1ac30a43e7e5c7ebf6339c15d1b51a15c9d96b23e7e2ea2816fcd63c2e92394d.jpg",
+      "html_url": "https://gitcode.com/PerrySkywalker",
+      "id": "682abf2a709a492cad560617",
+      "login": "PerrySkywalker",
+      "name": "PerrySkywalker",
+      "object_id": "682abf2a709a492cad560617"
+    }
+  ],
+  "body": "## 问题描述\n\nflash_attn 算子在 mask_mode=4 (BAND) + PA_BBND + GQA 场景下，当各 batch 的 seqused_kv 差异较大时（如 batch 0-7 为 9，batch 8 为 2048），batch 0-7 中 band 窗口内无有效 key 的 query 行（全 mask 行）output 未被清零，导致精度失败。\n\n## 根因\n\n`CalcBlockNeedRowInvalid` 在 GS1 layout 跨多个 G 时，仅检查首尾 G 的 s1 边界，遗漏中间完整 G 的无效行。当 block 跨 G 且 `s1StartTdx >= s1FirstValidToken` 时返回 false，跳过 `RowInvalid`，导致全 mask 行 output 未被清零。\n\n## 复现条件\n\n- Q: (9, 16, 28, 256) BNSD\n- KV: (25, 128, 1, 256) PA_BBND\n- seqused_q: [28]×9\n- seqused_kv: [9,9,9,9,9,9,9,9,2048]\n- mask_mode: 4, win_left: 1000, win_right: 0\n- return_softmax_lse: True\n\n## 修复方案\n\nPR: 待创建",
+  "comments": 1,
+  "created_at": "2026-07-30T20:01:29+08:00",
+  "finished_at": "2026-08-05T15:07:30+08:00",
+  "html_url": "https://gitcode.com/cann/ops-transformer/issues/4027",
+  "id": 4207486,
+  "issue_priority_detail": {
+    "id": 116,
+    "title": "无优先级"
+  },
+  "issue_state": "进行中",
+  "issue_state_detail": {
+    "id": 285,
+    "serial": 0,
+    "title": "进行中"
+  },
+  "issue_type": "任务",
+  "issue_type_detail": {
+    "id": 255,
+    "is_system": false,
+    "title": "任务"
+  },
+  "labels": [
+    {
+      "color": "#35e029",
+      "created_at": "2026-03-20T11:25:13+08:00",
+      "id": 38861,
+      "name": "resolved",
+      "updated_at": "2026-08-05T16:05:36+08:00"
+    }
+  ],
+  "number": "4027",
+  "priority": 0,
+  "repository": {
+    "assigner": {},
+    "created_at": "2025-09-28T17:54:46+08:00",
+    "description": "本项目是CANN提供的transformer类大模型算子库，实现网络在NPU上加速计算。",
+    "full_name": "cann/ops-transformer",
+    "id": 7673863,
+    "name": "ops-transformer",
+    "paas": "",
+    "path": "ops-transformer",
+    "updated_at": "2025-09-28T18:06:48+08:00"
+  },
+  "state": "closed",
+  "title": "[flash_attn] mask_mode=4 BAND模式下跨G block全mask行output未清零",
+  "updated_at": "2026-08-05T15:07:30+08:00",
+  "user": {
+    "avatar_url": "https://cdn-img.gitcode.com/ac/ae/1ac30a43e7e5c7ebf6339c15d1b51a15c9d96b23e7e2ea2816fcd63c2e92394d.jpg",
+    "html_url": "https://gitcode.com/PerrySkywalker",
+    "id": "682abf2a709a492cad560617",
+    "login": "PerrySkywalker",
+    "name": "PerrySkywalker",
+    "object_id": "682abf2a709a492cad560617"
+  },
+  "visibility_reason": "public"
+}

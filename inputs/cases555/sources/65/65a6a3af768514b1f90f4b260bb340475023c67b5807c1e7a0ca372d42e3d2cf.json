@@ -1,0 +1,38 @@
+[
+  {
+    "additions": 6,
+    "blob_id": "eee45c243b2e1ba2c67f5d863b325302d389a910",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/72a1f0328a2f582f14f1a45061a68db15cce17d8/index/scatter_add/op_kernel/arch35/scatter_add_simd_support_atomicadd.h",
+    "deletions": 0,
+    "filename": "index/scatter_add/op_kernel/arch35/scatter_add_simd_support_atomicadd.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 6,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -108,6 +108,9 @@ __aicore__ inline void ScatterAddSIMDSupportAtomicAdd<T, U, updatesIsScalar, sca\n             } else {\n                 LocalTensor<T> updatesLocal = updatesQueue_.AllocTensor<T>();\n                 uint64_t offset = blockOffsetUpdate + rowLoop * tilingData_.ubFactorRow * tilingData_.varShape[1] + colLoop * tilingData_.ubFactorCol;\n+                auto MTE2WaitMTE3EventID = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::MTE3_MTE2));\n+                SetFlag<HardEvent::MTE3_MTE2>(MTE2WaitMTE3EventID);\n+                WaitFlag<HardEvent::MTE3_MTE2>(MTE2WaitMTE3EventID);\n                 CopyIn(updatesLocal, updatesGm_, offset, rows, cols, tilingData_.varShape[1] - cols);\n                 updatesQueue_.EnQue<T>(updatesLocal);\n     \n@@ -117,6 +120,9 @@ __aicore__ inline void ScatterAddSIMDSupportAtomicAdd<T, U, updatesIsScalar, sca\n                 WaitFlag<HardEvent::MTE2_S>(eventIDMTE2ToS);\n \n                 if constexpr (scatterOp == SUB) {\n+                    auto VWaitMTE2EventID = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::MTE2_V));\n+                    SetFlag<HardEvent::MTE2_V>(VWaitMTE2EventID);\n+                    WaitFlag<HardEvent::MTE2_V>(VWaitMTE2EventID);\n  \t  \t            NegateUpdate<T>(updatesLocal, static_cast<uint32_t>(rows * colsAlign));\n                     auto MTE3WaitVEventID = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::V_MTE3));\n                     SetFlag<HardEvent::V_MTE3>(MTE3WaitVEventID);\n",
+      "new_file": false,
+      "new_path": "index/scatter_add/op_kernel/arch35/scatter_add_simd_support_atomicadd.h",
+      "old_path": "index/scatter_add/op_kernel/arch35/scatter_add_simd_support_atomicadd.h",
+      "removed_lines": 0,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/72a1f0328a2f582f14f1a45061a68db15cce17d8/index/scatter_add/op_kernel/arch35/scatter_add_simd_support_atomicadd.h",
+    "sha": "72a1f0328a2f582f14f1a45061a68db15cce17d8",
+    "source_branch": "scatter_sub",
+    "source_project": {
+      "full_name": "hhuwenao/ops-nn",
+      "human_name": "hhuwenao / ops-nn",
+      "id": 9120395,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  }
+]

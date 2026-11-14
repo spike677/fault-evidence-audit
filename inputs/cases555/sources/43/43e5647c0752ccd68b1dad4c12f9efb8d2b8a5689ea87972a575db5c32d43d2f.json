@@ -1,0 +1,32 @@
+[
+  {
+    "additions": 2,
+    "blob_id": "8d61ce0fe5fb6ca20c7c89cbaa58ad09432b1e5e",
+    "blob_url": "https://gitcode.com/cann/ops-math/blob/8f6a9828e1b86a7d5a14c2bb833736a09dfc0d58/math/lin_space/op_kernel/lin_space_with_big_shape.h",
+    "deletions": 2,
+    "filename": "math/lin_space/op_kernel/lin_space_with_big_shape.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 2,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -162,7 +162,7 @@ __aicore__ inline void LinSpaceWithBigShape<T>::ComputeAndOut(const int64_t& loo\n \n     for (int64_t idx = 1; idx < loopNum; idx++) {\n         LocalTensor<T> outLocal = outQueue.AllocTensor<T>();\n-        if (idx == loopNum - 1) {\n+        if (idx == loopNum - 1 && loopTail > 0) {\n             Adds(outLocal, outLocalBase, T(m_tilingData.scalar * maxOutNum * idx), loopTail);\n             outQueue.EnQue(outLocal);\n             CopyOut(gmOutOffset + idx * maxOutNum, loopTail);\n@@ -203,7 +203,7 @@ __aicore__ inline void LinSpaceWithBigShape<T>::ComputeReverseAndOut(const int64\n \n     for (int64_t idx = 1; idx < loopNum; idx++) {\n         LocalTensor<T> outLocal = outQueue.AllocTensor<T>();\n-        if (idx == loopNum - 1) {\n+        if (idx == loopNum - 1 && loopTail > 0) {\n             Adds(\n                 outLocal[maxOutNum - loopTail], outLocalBase[maxOutNum - loopTail],\n                 T(m_tilingData.scalar * maxOutNum * idx * reverseScalar), loopTail);\n",
+      "new_file": false,
+      "new_path": "math/lin_space/op_kernel/lin_space_with_big_shape.h",
+      "old_path": "math/lin_space/op_kernel/lin_space_with_big_shape.h",
+      "removed_lines": 2,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-math/raw/8f6a9828e1b86a7d5a14c2bb833736a09dfc0d58/math/lin_space/op_kernel/lin_space_with_big_shape.h",
+    "sha": "8f6a9828e1b86a7d5a14c2bb833736a09dfc0d58",
+    "source_branch": "linspace",
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-math",
+      "human_name": "CANN / ops-math",
+      "id": 7649531,
+      "path": "ops-math"
+    }
+  }
+]

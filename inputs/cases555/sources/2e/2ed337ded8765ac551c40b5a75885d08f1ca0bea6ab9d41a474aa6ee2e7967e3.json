@@ -1,0 +1,38 @@
+[
+  {
+    "additions": 11,
+    "blob_id": "89ca67bd0708a411bdcb0fbbd92c63db04c0ba5d",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/ceee4a46c7e9263597e34476102b8f5e294bd94f/attention/flash_attention_score_grad/op_host/arch32/flash_attention_score_grad_tiling_s1s2_bn2.cpp",
+    "deletions": 9,
+    "filename": "attention/flash_attention_score_grad/op_host/arch32/flash_attention_score_grad_tiling_s1s2_bn2.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 11,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -54,7 +54,6 @@ constexpr uint32_t POST_COEX_NODE = 3;\n constexpr uint32_t BUFFER_NUM = 1;\n constexpr int64_t S_LEN_512 = 512;\n constexpr int64_t S_LEN_1024 = 1024;\n-constexpr int64_t FP16_BLOCK_NUMS = 16;\n constexpr uint64_t B4_L2_CACHESIZE = 96 * 1024 * 1024;\n constexpr int64_t SAMEAB_MIN_S_THRESHOLD = 768;\n constexpr int64_t L1_MAX_SIZE = 512 * 1024;\n@@ -867,7 +866,7 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2::GetShapeAttrsInfo()\n         (td_->opInfo.get_sparseMode() == NO_MASK) && (td_->opInfo.get_S1() > L1_CUSTOM_S_256) &&\n         (td_->opInfo.get_S2() > L1_CUSTOM_S_256); // sparseMode=0\n \n-    int64_t dAlign = AlignData(td_->opInfo.get_D(), FP16_BLOCK_NUMS);\n+    int64_t dAlign = AlignData(td_->opInfo.get_D(), 16);\n     if (tmpData_.isL1CustomEnable) {\n         if (td_->opInfo.get_D() == L1_CUSTOM_D_72) {\n             tmpData_.l1CustomSingleN = AlignData(td_->opInfo.get_S2(), BASE_LEN_128);\n@@ -1994,9 +1993,14 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2::SetBmm31TilingData(uint32_\n     mm31.SetShape(singleM, td_->opInfo.get_D(), singleN);\n     mm31.SetOrgShape(m, n, ka, kb);\n     mm31.SetBias(false);\n+\n     if (tmpData_.isL1CustomEnable) {\n         mm31.SetFixSplit(128, -1, -1);\n+    } else if (tmpData_.isMM345NZOut){\n+        int64_t dAlign = AlignData(td_->opInfo.get_D(), 16);\n+        mm31.SetFixSplit(-1, dAlign, -1);\n     }\n+\n     mm31.SetBufferSpace(l1SizeRemain, aicoreParams_.l0cSize);\n     OP_CHECK_IF((mm31.GetTiling(td_->mm31TilingData) != 0),\n                OP_LOGW(context_, \"FlashAttentionScoreGradTilingS1s2Bn2 mm31 GetTiling Failed.\"),\n@@ -2075,20 +2079,18 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2::SetBmm4TilingData(uint32_t\n     mm4.SetOrgShape(m, n, ka, kb);\n     mm4.SetBias(false);\n \n-    int64_t dAlign = (td_->opInfo.get_D() + FP16_BLOCK_NUMS - 1) / FP16_BLOCK_NUMS * FP16_BLOCK_NUMS;\n-    int64_t minBaseN = std::min(BASE_LEN_128, static_cast<uint32_t>(dAlign));\n-    if (tmpData_.isMM345NZOut) {\n-        minBaseN = std::min(BASE_LEN_256, static_cast<uint32_t>(dAlign));\n-        mm4.SetFixSplit(-1, minBaseN, -1);\n-    }\n-\n+    int64_t dAlign = AlignData(td_->opInfo.get_D(), 16);\n     if (needSetFixSplit) {\n+        int64_t minBaseN = std::min(BASE_LEN_128, static_cast<uint32_t>(dAlign));\n         int64_t s2Align = (td_->opInfo.get_S2() + FRACTAL_NUM - 1) / FRACTAL_NUM * FRACTAL_NUM;\n         int64_t minBaseM = std::min(BASE_LEN_256, static_cast<uint32_t>(s2Align));\n         mm4.SetFixSplit(minBaseM, minBaseN, -1);\n     }\n+\n     if (tmpData_.isL1CustomEnable) {\n         mm4.SetFixSplit(128, -1, -1);\n+    } else if (tmpData_.isMM345NZOut){\n+        mm4.SetFixSplit(-1, dAlign, -1);\n     }\n \n     mm4.SetBufferSpace(l1SizeRemain, aicoreParams_.l0cSize);\n",
+      "new_file": false,
+      "new_path": "attention/flash_attention_score_grad/op_host/arch32/flash_attention_score_grad_tiling_s1s2_bn2.cpp",
+      "old_path": "attention/flash_attention_score_grad/op_host/arch32/flash_attention_score_grad_tiling_s1s2_bn2.cpp",
+      "removed_lines": 9,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/ceee4a46c7e9263597e34476102b8f5e294bd94f/attention/flash_attention_score_grad/op_host/arch32/flash_attention_score_grad_tiling_s1s2_bn2.cpp",
+    "sha": "ceee4a46c7e9263597e34476102b8f5e294bd94f",
+    "source_branch": "9.0.0",
+    "source_project": {
+      "full_name": "xuchengyang/ops-transformer",
+      "human_name": "xuchengyang / ops-transformer",
+      "id": 9188617,
+      "path": "ops-transformer"
+    },
+    "target_branch": "9.0.0",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  }
+]

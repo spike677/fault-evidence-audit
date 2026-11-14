@@ -1,0 +1,152 @@
+{
+  "approval_reviewers": [],
+  "assignees": [],
+  "assignees_number": 0,
+  "base": {
+    "label": "master",
+    "ref": "master",
+    "repo": {
+      "full_name": "cann/ops-nn",
+      "html_url": "https://gitcode.com/cann/ops-nn.git",
+      "name": "ops-nn",
+      "namespace": {
+        "path": "cann"
+      },
+      "path": "ops-nn"
+    },
+    "sha": "f2ab9177000e2c447c98187eb3260825cd4755cf"
+  },
+  "body": "## 关联 Issue\n\nCloses #3158\n\n## 问题描述\n\n在 norm 目录下多个 rms_norm 变体的 split_reduce / split_d kernel 中，stage2 处理非整尾块逻辑时，`ComputeSum` + `level1 += 1` + `ComputeMultiLevelReduce` 在 if/else-if 分支之后无条件执行，缺少 `if (tail > 0)` 保护。\n\n当 `tail == 0`（剩余列数恰好被 ubFactor 整除）时，两个 if/else-if 分支均不进入，`ComputeSum` 不执行，`level1Local[level1]` 无有效数据。但 `level1 += 1` 和 `ComputeMultiLevelReduce` 仍然执行，向归约树写入空槽位，导致 level2/level3 读取位置错位，最终 rstd 计算结果不正确。\n\n## 修复方案\n\n将 stage2 之后的 `ComputeSum` + `level1 += 1` + `ComputeMultiLevelReduce` 用 `if (tail > 0)` 包裹，与 `add_rms_norm_quant_regbase_split_reduce.h` line 288 的已有模式保持一致。\n\n## 变更文件（3 个）\n\n| 文件 | 修复位置 |\n|------|----------|\n| `norm/rms_norm/op_kernel/arch35/rms_norm_regbase_split_d.h` | line 182-183 |\n| `norm/add_rms_norm_cast/op_kernel/arch35/add_rms_norm_cast_regbase_spilt_reduce.h` | line 259-261 |\n| `norm/add_rms_norm_dynamic_quant/op_kernel/arch35/add_rms_norm_dynamic_quant_regbase_split_reduce.h` | line 311-313 |\n\n## 变更详情\n\n```diff\n         }\n-        level1 += 1;\n-        ComputeMultiLevelReduce(...);\n+        if (tail > 0) {\n+            level1 += 1;\n+            ComputeMultiLevelReduce(...);\n+        }\n         // Stage3: Cal MasterLoop\n```",
+  "can_merge_check": true,
+  "close_related_issue": true,
+  "closed_at": "2026-06-13T17:46:02+08:00",
+  "created_at": "2026-06-05T17:27:18+08:00",
+  "draft": false,
+  "head": {
+    "label": "fix/rms-norm-tail-zero-guard",
+    "ref": "fix/rms-norm-tail-zero-guard",
+    "repo": {
+      "full_name": "raoliang_sac/ops-nn",
+      "html_url": "https://gitcode.com/raoliang_sac/ops-nn.git",
+      "name": "ops-nn",
+      "namespace": {
+        "path": "raoliang_sac"
+      },
+      "path": "ops-nn"
+    },
+    "sha": "68d79c2e27ed3be5a90e4dd08b69284a5b66d41e",
+    "user": {
+      "html_url": "https://gitcode.com/raoliang_sac",
+      "id": "68c94ebce53de9418257b095",
+      "login": "raoliang_sac",
+      "name": "raoliang_sac"
+    }
+  },
+  "html_url": "https://gitcode.com/cann/ops-nn/merge_requests/5771",
+  "id": 8701776,
+  "issue_url": "https://api.gitcode.com/api/v5/repos/cann/ops-nn/pulls/5771/issues",
+  "labels": [
+    {
+      "color": "#2865E0",
+      "created_at": "2025-06-21T10:53:09+08:00",
+      "id": 4929,
+      "name": "cann-cla/yes",
+      "repository_id": 7665709,
+      "updated_at": "2026-06-05T17:27:28+08:00"
+    },
+    {
+      "color": "#3ee029",
+      "created_at": "2025-12-16T09:45:21+08:00",
+      "id": 22553,
+      "name": "api-check-pass",
+      "repository_id": 7665709,
+      "updated_at": "2026-06-13T09:51:47+08:00"
+    },
+    {
+      "color": "#21BA45",
+      "created_at": "2025-06-10T14:17:23+08:00",
+      "id": 3873,
+      "name": "ci-pipeline-passed",
+      "repository_id": 7665709,
+      "updated_at": "2026-06-13T09:52:36+08:00"
+    },
+    {
+      "color": "#22ed07",
+      "created_at": "2025-05-29T20:14:31+08:00",
+      "id": 2742,
+      "name": "approved",
+      "repository_id": 7665709,
+      "updated_at": "2026-06-13T17:41:02+08:00"
+    },
+    {
+      "color": "#17f207",
+      "created_at": "2025-05-29T20:14:01+08:00",
+      "id": 2741,
+      "name": "lgtm",
+      "repository_id": 7665709,
+      "updated_at": "2026-06-13T17:45:55+08:00"
+    }
+  ],
+  "mergeable": true,
+  "mergeable_state": {
+    "all_depend_merge_request_merged_passed": true,
+    "approval_approvers_required_passed": true,
+    "approval_approvers_result": 2,
+    "approval_reviewers_required_passed": true,
+    "approval_testers_required_passed": true,
+    "approval_testers_result": 2,
+    "branch_missing_passed": true,
+    "can_force_merge": false,
+    "check_tasks_num": 0,
+    "ci_state_passed": true,
+    "conflict_passed": true,
+    "merge_by_self_passed": true,
+    "merge_request_id": 8701776,
+    "merge_request_switch": {
+      "add_notes_after_merged": true,
+      "approval_required_reviewers_branch": "*",
+      "approval_required_reviewers_count": 0,
+      "can_force_merge": false,
+      "can_reopen": true,
+      "disable_merge_by_self": false,
+      "disable_squash_merge": false,
+      "mark_auto_merged_mr_as_closed": false,
+      "merge_method": "merge",
+      "only_allow_merge_if_all_discussions_are_resolved": true,
+      "only_allow_merge_if_pipeline_succeeds": false,
+      "review_mode": "approval",
+      "squash_merge_with_no_merge_commit": true
+    },
+    "merged_by_user_passed": true,
+    "mr_state_passed": true,
+    "non_ff_passed": true,
+    "reason": {},
+    "resolve_discussion_passed": true,
+    "state": true,
+    "status_without_user_auth": true,
+    "work_in_progress_passed": true
+  },
+  "merged_at": "2026-06-13T17:46:02+08:00",
+  "merged_by": {
+    "avatar_url": "https://cdn-img.gitcode.com/bf/ad/b7f29486a040d7b2f52bf6c78414692d7d585eb1ec628cea3eb01c9d63f68618.png?time=1755691472703",
+    "html_url": "https://gitcode.com/cann-robot",
+    "id": "673c1552584fe8295cfd4a13",
+    "login": "cann-robot",
+    "name": "CANN-robot"
+  },
+  "number": 5771,
+  "prune_branch": false,
+  "squash_merge": true,
+  "state": "merged",
+  "testers": [],
+  "title": "fix(rms_norm): add tail>0 guard for level1 increment and multi-level reduce in stage2",
+  "updated_at": "2026-06-13T17:46:03+08:00",
+  "url": "https://api.gitcode.com/api/v5/repos/cann/ops-nn/pulls/5771",
+  "user": {
+    "html_url": "https://gitcode.com/raoliang_sac",
+    "id": "68c94ebce53de9418257b095",
+    "login": "raoliang_sac",
+    "name": "raoliang_sac"
+  },
+  "visibility_reason": "public"
+}

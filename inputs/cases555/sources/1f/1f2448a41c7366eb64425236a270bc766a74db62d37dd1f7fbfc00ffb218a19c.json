@@ -1,0 +1,38 @@
+[
+  {
+    "additions": 20,
+    "blob_id": "e78328b54cf8db9afa6e753d43cdd10e1b3c8e3e",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/89ded8059a1871ec65eba3937ec40b875b57261c/pooling/adaptive_max_pool2d/op_kernel/arch35/adaptive_max_pool2d_simt.h",
+    "deletions": 4,
+    "filename": "pooling/adaptive_max_pool2d/op_kernel/arch35/adaptive_max_pool2d_simt.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 20,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -49,6 +49,22 @@ namespace AdaptiveMaxPool2DWithSimt{\n         return pEnd + 1;\n     }\n \n+    template <typename DIV_T>\n+    __simt_callee__ __aicore__ __attribute__((always_inline)) inline static DIV_T startIndexNoMagic(DIV_T a, DIV_T b, DIV_T c) {\n+        uint64_t x = static_cast<uint64_t>(a);\n+        uint64_t y = static_cast<uint64_t>(b);\n+        uint64_t z = static_cast<uint64_t>(c);\n+        return static_cast<uint32_t>((x / y) * z + ((x % y) * z) / y);\n+    }\n+\n+    template <typename DIV_T>\n+    __simt_callee__ __aicore__ __attribute__((always_inline)) inline static DIV_T endIndexNoMagic(DIV_T a, DIV_T b, DIV_T c) {\n+        uint64_t x = static_cast<uint64_t>(a);\n+        uint64_t y = static_cast<uint64_t>(b);\n+        uint64_t z = static_cast<uint64_t>(c);\n+        return static_cast<uint32_t>(1 + ((x + 1) * z - 1) / y);\n+    }\n+\n     template <typename VALUE_T, typename INDICES_T, typename FORMAT_T, typename DIV_T>\n     __simt_callee__ __aicore__ __attribute__((always_inline)) inline static void executeFunc(FORMAT_T count, __gm__ VALUE_T* bottomData, \n                                                                              FORMAT_T ncSize, FORMAT_T height, FORMAT_T width, \n@@ -67,10 +83,10 @@ namespace AdaptiveMaxPool2DWithSimt{\n             DIV_T wId = indexIdx - hId * outputWidth;\n             \n             // 计算输入窗口的起始和结束位置\n-            FORMAT_T startInH = startIndex<DIV_T>(hId, magicH, shiftH, height);\n-            FORMAT_T endInH = endIndex<DIV_T>(hId, magicH, shiftH, height);\n-            FORMAT_T startInW = startIndex<DIV_T>(wId, magicW, shiftW, width);\n-            FORMAT_T endInW = endIndex<DIV_T>(wId, magicW, shiftW, width);\n+            FORMAT_T startInH = startIndexNoMagic<DIV_T>(hId, outputHeight, height);\n+            FORMAT_T endInH = endIndexNoMagic<DIV_T>(hId, outputHeight, height);\n+            FORMAT_T startInW = startIndexNoMagic<DIV_T>(wId, outputWidth, width);\n+            FORMAT_T endInW = endIndexNoMagic<DIV_T>(wId, outputWidth, width);\n             \n             VALUE_T maxVal = AscendC::NumericLimits<VALUE_T>::NegativeInfinity();\n             FORMAT_T maxIdx = startInH * width + startInW;  // 2D索引: h * width + w\n",
+      "new_file": false,
+      "new_path": "pooling/adaptive_max_pool2d/op_kernel/arch35/adaptive_max_pool2d_simt.h",
+      "old_path": "pooling/adaptive_max_pool2d/op_kernel/arch35/adaptive_max_pool2d_simt.h",
+      "removed_lines": 4,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/89ded8059a1871ec65eba3937ec40b875b57261c/pooling/adaptive_max_pool2d/op_kernel/arch35/adaptive_max_pool2d_simt.h",
+    "sha": "89ded8059a1871ec65eba3937ec40b875b57261c",
+    "source_branch": "9.0.0_adaptive_max_pool2d",
+    "source_project": {
+      "full_name": "jiangjiawei/ops-nn",
+      "human_name": "jiangjiawei / ops-nn",
+      "id": 7964474,
+      "path": "ops-nn"
+    },
+    "target_branch": "9.0.0",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  }
+]

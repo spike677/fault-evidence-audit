@@ -1,0 +1,62 @@
+[
+  {
+    "additions": 4,
+    "blob_id": "ef241ea883c414e5604f91761d49bdf96ad5c16d",
+    "blob_url": "https://gitcode.com/cann/ops-math/blob/33db86f29b487c077022b1ffcab46e629cf11a0b/conversion/roll/op_kernel/arch35/roll_simd.h",
+    "deletions": 21,
+    "filename": "conversion/roll/op_kernel/arch35/roll_simd.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 4,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -61,7 +61,6 @@ private:\n     int64_t blockIdx_ = 0;\n     int64_t inputIndices_[MAX_DIM_NUM] = {0};\n     bool isBlockMove = false;\n-    int64_t divNum = 1;\n };\n \n template <typename T>\n@@ -78,24 +77,6 @@ __aicore__ inline void RollSimd<T>::Init(GM_ADDR x, GM_ADDR y, GM_ADDR workspace\n     xGm_.SetGlobalBuffer((__gm__ T*)x);\n     yGm_.SetGlobalBuffer((__gm__ T*)y);\n     pipe_->InitBuffer(xInQue_, BUF_NUM, tilingData_->maxElements * sizeof(T));\n-\n-    if (tilingData_->shapes[tilingData_->dimNum - 1] * sizeof(T) % ALIGN_NUM != 0 ||\n-        tilingData_->shifts[tilingData_->dimNum - 1] * sizeof(T) % ALIGN_NUM != 0) {\n-        int64_t divNum1 =\n-            ((tilingData_->shapes[tilingData_->dimNum - 1] - tilingData_->shifts[tilingData_->dimNum - 1]) * sizeof(T) +\n-             ALIGN_NUM - 1) /\n-                ALIGN_NUM * ALIGN_NUM / sizeof(T) -\n-            (tilingData_->shapes[tilingData_->dimNum - 1] - tilingData_->shifts[tilingData_->dimNum - 1]);\n-        divNum1 /= (tilingData_->shapes[tilingData_->dimNum - 1] - tilingData_->shifts[tilingData_->dimNum - 1]);\n-        int64_t divNum2 = (tilingData_->shifts[tilingData_->dimNum - 1] * sizeof(T) + ALIGN_NUM - 1) / ALIGN_NUM *\n-                              ALIGN_NUM / sizeof(T) -\n-                          tilingData_->shifts[tilingData_->dimNum - 1];\n-        divNum2 /= tilingData_->shifts[tilingData_->dimNum - 1];\n-        divNum = divNum1 + 1;\n-        if (divNum < divNum2 + 1) {\n-            divNum = divNum2 + 1;\n-        }\n-    }\n }\n \n template <typename T>\n@@ -186,7 +167,7 @@ __aicore__ inline void RollSimd<T>::ComputeOutIndex(int64_t inputIndex, int64_t&\n         isBlockMove = false;\n     } else if (tilingData_->shifts[tilingData_->dimNum - 1] != 0) {\n         // 考虑搬运后的UB对齐\n-        int64_t perUbMaxElements = Std::min(curCoreElements_, tilingData_->maxElements / divNum); // 单次UB最大搬运量\n+        int64_t perUbMaxElements = Std::min(curCoreElements_, tilingData_->maxElements); // 单次UB最大搬运量\n         // W轴需要shift，优化\n         if (inputIndices_[tilingData_->dimNum - 1] != 0) {\n             // W轴的index不为0，说明从中间开始的，只搬运这一行\n@@ -212,7 +193,9 @@ __aicore__ inline void RollSimd<T>::ComputeOutIndex(int64_t inputIndex, int64_t&\n             }\n         } else {\n             // W轴的index从0开始 hLen个 W\n-            int64_t hLen = perUbMaxElements / (tilingData_->shapes[tilingData_->dimNum - 1]);\n+            int64_t wAlign = (tilingData_->shapes[tilingData_->dimNum - 1] * sizeof(T) + ALIGN_NUM - 1) / ALIGN_NUM * ALIGN_NUM / sizeof(T);\n+            int64_t hLen = tilingData_->maxElements / wAlign;\n+            hLen = Std::min(hLen, curCoreElements_ / tilingData_->shapes[tilingData_->dimNum - 1]);\n             if (hLen == 0) {\n                 // 不足一个 W，处理最后一块\n                 count = perUbMaxElements;\n",
+      "new_file": false,
+      "new_path": "conversion/roll/op_kernel/arch35/roll_simd.h",
+      "old_path": "conversion/roll/op_kernel/arch35/roll_simd.h",
+      "removed_lines": 21,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-math/raw/33db86f29b487c077022b1ffcab46e629cf11a0b/conversion/roll/op_kernel/arch35/roll_simd.h",
+    "sha": "33db86f29b487c077022b1ffcab46e629cf11a0b",
+    "source_branch": "master",
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-math",
+      "human_name": "CANN / ops-math",
+      "id": 7649531,
+      "path": "ops-math"
+    }
+  },
+  {
+    "additions": 13,
+    "blob_id": "c124741cf5530aa2594e99452acd0164c70bf3d8",
+    "blob_url": "https://gitcode.com/cann/ops-math/blob/33db86f29b487c077022b1ffcab46e629cf11a0b/conversion/roll/tests/ut/op_api/test_aclnn_roll.cpp",
+    "deletions": 0,
+    "filename": "conversion/roll/tests/ut/op_api/test_aclnn_roll.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 13,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -211,6 +211,7 @@ TEST_F(l2_roll_test, test_shift_dim_1)\n     auto ut = OP_API_UT(aclnnRoll, INPUT(input, shifts, dims), OUTPUT(output));\n     uint64_t workspaceSize = 0;\n     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSize(&workspaceSize);\n+    getWorkspaceResult = 0;\n     EXPECT_EQ(getWorkspaceResult, ACL_SUCCESS);\n }\n \n@@ -225,6 +226,7 @@ TEST_F(l2_roll_test, test_shift_negative_dim)\n     auto ut = OP_API_UT(aclnnRoll, INPUT(input, shifts, dims), OUTPUT(output));\n     uint64_t workspaceSize = 0;\n     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSize(&workspaceSize);\n+    getWorkspaceResult = 0;\n     EXPECT_EQ(getWorkspaceResult, ACL_SUCCESS);\n }\n \n@@ -238,6 +240,7 @@ TEST_F(l2_roll_test, test_multiple_shifts_dims)\n     auto ut = OP_API_UT(aclnnRoll, INPUT(input, shifts, dims), OUTPUT(output));\n     uint64_t workspaceSize = 0;\n     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSize(&workspaceSize);\n+    getWorkspaceResult = 0;\n     EXPECT_EQ(getWorkspaceResult, ACL_SUCCESS);\n }\n \n@@ -292,6 +295,7 @@ TEST_F(l2_roll_test, test_3d_tensor)\n     auto ut = OP_API_UT(aclnnRoll, INPUT(input, shifts, dims), OUTPUT(output));\n     uint64_t workspaceSize = 0;\n     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSize(&workspaceSize);\n+    getWorkspaceResult = 0;\n     EXPECT_EQ(getWorkspaceResult, ACL_SUCCESS);\n }\n \n@@ -305,6 +309,7 @@ TEST_F(l2_roll_test, test_4d_tensor)\n     auto ut = OP_API_UT(aclnnRoll, INPUT(input, shifts, dims), OUTPUT(output));\n     uint64_t workspaceSize = 0;\n     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSize(&workspaceSize);\n+    getWorkspaceResult = 0;\n     EXPECT_EQ(getWorkspaceResult, ACL_SUCCESS);\n }\n \n@@ -651,6 +656,7 @@ TEST_F(l2_roll_test, test_dim_1_wrap)\n     auto ut = OP_API_UT(aclnnRoll, INPUT(input, shifts, dims), OUTPUT(output));\n     uint64_t workspaceSize = 0;\n     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSize(&workspaceSize);\n+    getWorkspaceResult = 0;\n     EXPECT_EQ(getWorkspaceResult, ACL_SUCCESS);\n }\n \n@@ -665,6 +671,7 @@ TEST_F(l2_roll_test, test_wrap_dim_1)\n     auto ut = OP_API_UT(aclnnRoll, INPUT(input, shifts, dims), OUTPUT(output));\n     uint64_t workspaceSize = 0;\n     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSize(&workspaceSize);\n+    getWorkspaceResult = 0;\n     EXPECT_EQ(getWorkspaceResult, ACL_SUCCESS);\n }\n \n@@ -759,6 +766,7 @@ TEST_F(l2_roll_test, test_multi_dim_all_negative)\n     auto ut = OP_API_UT(aclnnRoll, INPUT(input, shifts, dims), OUTPUT(output));\n     uint64_t workspaceSize = 0;\n     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSize(&workspaceSize);\n+    getWorkspaceResult = 0;\n     EXPECT_EQ(getWorkspaceResult, ACL_SUCCESS);\n }\n \n@@ -772,6 +780,7 @@ TEST_F(l2_roll_test, test_mixed_positive_negative_shifts)\n     auto ut = OP_API_UT(aclnnRoll, INPUT(input, shifts, dims), OUTPUT(output));\n     uint64_t workspaceSize = 0;\n     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSize(&workspaceSize);\n+    getWorkspaceResult = 0;\n     EXPECT_EQ(getWorkspaceResult, ACL_SUCCESS);\n }\n \n@@ -798,6 +807,7 @@ TEST_F(l2_roll_test, test_large_2d_tensor)\n     auto ut = OP_API_UT(aclnnRoll, INPUT(input, shifts, dims), OUTPUT(output));\n     uint64_t workspaceSize = 0;\n     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSize(&workspaceSize);\n+    getWorkspaceResult = 0;\n     EXPECT_EQ(getWorkspaceResult, ACL_SUCCESS);\n }\n \n@@ -811,6 +821,7 @@ TEST_F(l2_roll_test, test_6d_tensor)\n     auto ut = OP_API_UT(aclnnRoll, INPUT(input, shifts, dims), OUTPUT(output));\n     uint64_t workspaceSize = 0;\n     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSize(&workspaceSize);\n+    getWorkspaceResult = 0;\n     EXPECT_EQ(getWorkspaceResult, ACL_SUCCESS);\n }\n \n@@ -824,6 +835,7 @@ TEST_F(l2_roll_test, test_7d_tensor)\n     auto ut = OP_API_UT(aclnnRoll, INPUT(input, shifts, dims), OUTPUT(output));\n     uint64_t workspaceSize = 0;\n     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSize(&workspaceSize);\n+    getWorkspaceResult = 0;\n     EXPECT_EQ(getWorkspaceResult, ACL_SUCCESS);\n }\n \n@@ -837,6 +849,7 @@ TEST_F(l2_roll_test, test_contiguous_false)\n     auto ut = OP_API_UT(aclnnRoll, INPUT(input, shifts, dims), OUTPUT(output));\n     uint64_t workspaceSize = 0;\n     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSize(&workspaceSize);\n+    getWorkspaceResult = 0;\n     EXPECT_EQ(getWorkspaceResult, ACL_SUCCESS);\n }\n \n",
+      "new_file": false,
+      "new_path": "conversion/roll/tests/ut/op_api/test_aclnn_roll.cpp",
+      "old_path": "conversion/roll/tests/ut/op_api/test_aclnn_roll.cpp",
+      "removed_lines": 0,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-math/raw/33db86f29b487c077022b1ffcab46e629cf11a0b/conversion/roll/tests/ut/op_api/test_aclnn_roll.cpp",
+    "sha": "33db86f29b487c077022b1ffcab46e629cf11a0b",
+    "source_branch": "master",
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-math",
+      "human_name": "CANN / ops-math",
+      "id": 7649531,
+      "path": "ops-math"
+    }
+  }
+]

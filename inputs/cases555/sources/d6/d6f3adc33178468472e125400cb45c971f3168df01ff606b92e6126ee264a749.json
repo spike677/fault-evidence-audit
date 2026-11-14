@@ -1,0 +1,110 @@
+[
+  {
+    "additions": 19,
+    "blob_id": "a95d7650b89c3ba1028535f6721d8b9956b39fd5",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/582d343d15a47505ded2593be2902c8843470cc9/attention/fused_infer_attention_score/op_kernel/attn_infra/epilogue/block/block_epilogue_online_softmax.hpp",
+    "deletions": 7,
+    "filename": "attention/fused_infer_attention_score/op_kernel/attn_infra/epilogue/block/block_epilogue_online_softmax.hpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 19,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -129,6 +129,7 @@ public:\n         lsUbTensor = resource.ubBuf.template GetBufferByByte<float>(LS_UB_TENSOR_OFFSET);\n         lpUbTensor = resource.ubBuf.template GetBufferByByte<ElementOutput>(LP_UB_TENSOR_OFFSET);\n         maskUbTensor = resource.ubBuf.template GetBufferByByte<ElementMask>(MASK_UB_TENSOR_OFFSET);\n+        maskUbTensorUint8 = resource.ubBuf.template GetBufferByByte<uint8_t>(MASK_UB_TENSOR_OFFSET);\n         maskUbTensor16 = resource.ubBuf.template GetBufferByByte<half>(MASK16_UB_TENSOR_OFFSET);\n         maskUbTensor32 = resource.ubBuf.template GetBufferByByte<float>(MASK32_UB_TENSOR_OFFSET);\n         fullUbTensor16 = resource.ubBuf.template GetBufferByByte<ElementFull>(FULL16_UB_TENSOR_OFFSET);\n@@ -473,7 +474,7 @@ public:\n             columnNumRound\n         );\n         AscendC::CompareScalar(\n-            maskUbTensor,\n+            maskUbTensorUint8,\n             maskUbTensor16,\n             static_cast<half>(1.0),\n             AscendC::CMPMODE::NE,\n@@ -484,7 +485,7 @@ public:\n         AscendC::PipeBarrier<PIPE_V>();\n         AscendC::Duplicate<half>(tempMaskTensor, static_cast<half>(1), rowNumCurLoop * columnNumRound);\n         AscendC::PipeBarrier<PIPE_V>();\n-        AscendC::Select(maskUbTensor16, maskUbTensor, tempMaskTensor, static_cast<half>(0), AscendC::SELMODE::VSEL_TENSOR_SCALAR_MODE, rowNumCurLoop * columnNumRound);\n+        AscendC::Select(maskUbTensor16, maskUbTensorUint8, tempMaskTensor, static_cast<half>(0), AscendC::SELMODE::VSEL_TENSOR_SCALAR_MODE, rowNumCurLoop * columnNumRound);\n         AscendC::PipeBarrier<PIPE_V>();\n         UpCastMask<float, half>(maskUbTensor32, maskUbTensor16, rowNumCurLoop, columnNumRound);\n     }\n@@ -971,7 +972,7 @@ public:\n         uint32_t rowOffset, uint32_t isFirstStackTile, uint32_t isLastNoMaskStackTile,\n         uint32_t isFirstRowLoop, uint32_t isLastRowLoop,\n         uint32_t columnNumRound, uint32_t pingpongFlag,\n-        uint32_t curStackTileMod, SinkLoopParam& sinkLoopParam, bool isLastStackTile, bool isSplitKV)\n+        uint32_t curStackTileMod, SinkLoopParam& sinkLoopParam, bool isLastStackTile, bool isSplitKV, bool startsWithMaskThenNomaskFlag)\n     {\n         uint32_t rowNumCurLoop = layoutOutput.shape(0);\n         uint32_t rowNumCurLoopRound = NpuArch::Detail::Alignment::RoundUp(rowNumCurLoop, FLOAT_BLOCK_SIZE);\n@@ -1017,7 +1018,9 @@ public:\n         if constexpr (!doTriUMask) {\n             AscendC::SetFlag<AscendC::HardEvent::MTE3_V>(pingpongFlag);\n             if (isLastNoMaskStackTile && isLastRowLoop) {\n-                AscendC::WaitFlag<AscendC::HardEvent::MTE3_MTE2>(EVENT_ID0);\n+                if(!startsWithMaskThenNomaskFlag) {\n+                    AscendC::WaitFlag<AscendC::HardEvent::MTE3_MTE2>(EVENT_ID0);\n+                }\n                 AscendC::SetFlag<AscendC::HardEvent::MTE3_MTE2>(EVENT_ID0);\n             }\n         } else {\n@@ -1151,7 +1154,8 @@ public:\n     void operator()(AscendC::GlobalTensor<ElementOutput> gOutput, AscendC::GlobalTensor<ElementInput> gInput, AscendC::GlobalTensor<ElementSink> gSink,\n         const LayoutOutput &layoutOutput, const LayoutInput &layoutInput, GemmCoord actualBlockShape,\n         uint32_t isFirstStackTile, uint32_t isLastNoMaskStackTile, uint32_t qSBlockSize, uint32_t qNBlockSize,\n-        uint32_t curStackTileMod, bool isLastStackTile, bool isSplitKV = false)\n+        uint32_t curStackTileMod, bool isLastStackTile, bool isSplitKV = false, bool startsWithMaskTile = false,\n+        bool startsWithMaskThenNomaskFlag = false)\n     {\n         uint32_t rowNum = actualBlockShape.m();\n         uint32_t columnNum = actualBlockShape.n();\n@@ -1186,6 +1190,9 @@ public:\n                 auto gInputCurLoop = gInput[offsetInput];\n \n                 AscendC::WaitFlag<AscendC::HardEvent::V_MTE2>(pingpongFlag);\n+                if (startsWithMaskTile && rowLoopIdx == 0) { \n+                     AscendC::WaitFlag<AscendC::HardEvent::MTE3_MTE2>(EVENT_ID0); \n+                }\n                 CopySGmToUb(\n                     gInputCurLoop, (pingpongFlag * MAX_UB_S_ELEM_NUM), rowNumCurLoop, columnNumRound, columnNumPad);\n                 AscendC::SetFlag<AscendC::HardEvent::MTE2_V>(pingpongFlag);\n@@ -1221,7 +1228,8 @@ public:\n                     curStackTileMod,\n                     curSinkLoop,\n                     isLastStackTile,\n-                    isSplitKV);\n+                    isSplitKV,\n+                    startsWithMaskThenNomaskFlag);\n             }\n         }\n     }\n@@ -1385,7 +1393,8 @@ public:\n                     curStackTileMod,\n                     curSinkLoop,\n                     isLastStackTile,\n-                    isSplitKV);\n+                    isSplitKV,\n+                    false);\n             }\n         }\n     }\n@@ -1632,6 +1641,7 @@ public:\n                     curStackTileMod,\n                     curSinkLoop,\n                     isLastStackTile,\n+                    false,\n                     false);\n             }\n         }\n@@ -1747,6 +1757,7 @@ public:\n                     curStackTileMod,\n                     curSinkLoop,\n                     isLastStackTile,\n+                    false,\n                     false);\n                 if (rowLoopIdx < rowLoopNum) {\n                     uint32_t rowOffsetCurLoop = rowLoopIdx * rowNumTile;\n@@ -1784,6 +1795,7 @@ private:\n     AscendC::LocalTensor<float> lsUbTensor;\n     AscendC::LocalTensor<ElementOutput> lpUbTensor;\n     AscendC::LocalTensor<ElementMask> maskUbTensor;\n+    AscendC::LocalTensor<uint8_t> maskUbTensorUint8;\n     AscendC::LocalTensor<half> maskUbTensor16;\n     AscendC::LocalTensor<float> maskUbTensor32;\n     AscendC::LocalTensor<ElementFull> fullUbTensor16;\n",
+      "new_file": false,
+      "new_path": "attention/fused_infer_attention_score/op_kernel/attn_infra/epilogue/block/block_epilogue_online_softmax.hpp",
+      "old_path": "attention/fused_infer_attention_score/op_kernel/attn_infra/epilogue/block/block_epilogue_online_softmax.hpp",
+      "removed_lines": 7,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/582d343d15a47505ded2593be2902c8843470cc9/attention/fused_infer_attention_score/op_kernel/attn_infra/epilogue/block/block_epilogue_online_softmax.hpp",
+    "sha": "582d343d15a47505ded2593be2902c8843470cc9",
+    "source_branch": "master",
+    "source_project": {
+      "full_name": "qq_23260455/ops-transformer_4",
+      "human_name": "qq_23260455 / ops-transformer_4",
+      "id": 9267739,
+      "path": "ops-transformer_4"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  },
+  {
+    "additions": 2,
+    "blob_id": "9bd1d05e60ec151645fcad47ff9216b3dda931a1",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/582d343d15a47505ded2593be2902c8843470cc9/attention/fused_infer_attention_score/op_kernel/attn_infra/epilogue/block/block_epilogue_online_softmax_low_prec.hpp",
+    "deletions": 1,
+    "filename": "attention/fused_infer_attention_score/op_kernel/attn_infra/epilogue/block/block_epilogue_online_softmax_low_prec.hpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 2,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -673,7 +673,8 @@ public:\n     void operator()(AscendC::GlobalTensor<ElementOutput> gOutput, AscendC::GlobalTensor<half> gInput, AscendC::GlobalTensor<ElementSink> gSink,\n         const LayoutOutput &layoutOutput, const LayoutInput &layoutInput, GemmCoord actualBlockShape,\n         uint32_t isFirstStackTile, uint32_t isLastNoMaskStackTile,\n-        uint32_t qSBlockSize, uint32_t qNBlockSize, uint32_t curStackTileMod, bool isLastStackTile, bool isSplitKV = false)\n+        uint32_t qSBlockSize, uint32_t qNBlockSize, uint32_t curStackTileMod, bool isLastStackTile, bool isSplitKV = false,\n+        bool startsWithMaskTile = false, bool startsWithMaskThenNomaskFlag = false)\n     {\n         uint32_t rowNum = actualBlockShape.m();\n         uint32_t columnNum = actualBlockShape.n();\n",
+      "new_file": false,
+      "new_path": "attention/fused_infer_attention_score/op_kernel/attn_infra/epilogue/block/block_epilogue_online_softmax_low_prec.hpp",
+      "old_path": "attention/fused_infer_attention_score/op_kernel/attn_infra/epilogue/block/block_epilogue_online_softmax_low_prec.hpp",
+      "removed_lines": 1,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/582d343d15a47505ded2593be2902c8843470cc9/attention/fused_infer_attention_score/op_kernel/attn_infra/epilogue/block/block_epilogue_online_softmax_low_prec.hpp",
+    "sha": "582d343d15a47505ded2593be2902c8843470cc9",
+    "source_branch": "master",
+    "source_project": {
+      "full_name": "qq_23260455/ops-transformer_4",
+      "human_name": "qq_23260455 / ops-transformer_4",
+      "id": 9267739,
+      "path": "ops-transformer_4"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  },
+  {
+    "additions": 22,
+    "blob_id": "7c6606888ca01c1b9d83a8733338f8c801b13111",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/582d343d15a47505ded2593be2902c8843470cc9/attention/fused_infer_attention_score/op_kernel/flash_attention_regular.h",
+    "deletions": 9,
+    "filename": "attention/fused_infer_attention_score/op_kernel/flash_attention_regular.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 22,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -532,7 +532,8 @@ namespace SplitFuse {\n             bool notNextMask = true;\n             int32_t delStartRow = 0;\n             int32_t delEndRow = qSeqlen;\n-\n+            bool startsWithMaskTile = false;\n+            bool startsWithMaskThenNomaskFlag = false;\n             if constexpr (IS_FD) {\n                 noSkipKvS = kvSeqlen;\n                 if (maskType != 0U) {\n@@ -740,7 +741,9 @@ namespace SplitFuse {\n                                         qNBlockSize, \n                                         curStackTileMod,\n                                         isLastStackTile,\n-                                        isSplitKV);\n+                                        isSplitKV,\n+                                        false,\n+                                        startsWithMaskThenNomaskFlag);\n                                 } else {\n                                     epilogueOnlineSoftmax(\n                                         gP[gmOffsetP], \n@@ -755,7 +758,9 @@ namespace SplitFuse {\n                                         qNBlockSize, \n                                         curStackTileMod,\n                                         isLastStackTile, \n-                                        false);\n+                                        false,\n+                                        false,\n+                                        startsWithMaskThenNomaskFlag);\n                                 }\n                             }\n                         } else if constexpr (MASK_TYPE == FaiKernel::MaskType::MASK_SWA) {\n@@ -770,6 +775,8 @@ namespace SplitFuse {\n                                     (nextTokenStartLen <= kvSStartIdx && nextTokenEndLen >= kvSEndIdx);\n                                 bool doTriUMask = (doTriUPreMask || doTriUNextMask);\n                                 if (doTriUMask) {\n+                                    startsWithMaskTile = true;\n+                                    startsWithMaskThenNomaskFlag = true;\n                                     epilogueOnlineSoftmax(\n                                         gP[gmOffsetP],\n                                         gS[gmOffsetS],\n@@ -793,10 +800,10 @@ namespace SplitFuse {\n                                         nextTokenEndLen,\n                                         isLastStackTile);\n                                 } else {\n-                                    bool isLastNoMaskStackTile = (nextTokenStartLen > kvSeqlen) || (nextTokenStartLen < 0);\n+                                    bool isLastNoMaskStackTile = (nextTokenStartLen >= kvSeqlen) || (nextTokenStartLen < 0);\n                                     uint32_t alignedKvSeqlenLimit = isLastNoMaskStackTile ? kvSeqlen : nextTokenStartLen;\n                                     alignedKvSeqlenLimit = NpuArch::Detail::Alignment::RoundDown(alignedKvSeqlenLimit, MAX_KV_STACK_LEN);\n-                                    uint32_t noMaskStackSeqNum = (alignedKvSeqlenLimit - startIdx * MAX_KV_STACK_LEN) / MAX_KV_STACK_LEN;\n+                                    uint32_t noMaskStackSeqNum = (alignedKvSeqlenLimit - kvStart * MAX_KV_STACK_LEN) / MAX_KV_STACK_LEN;\n                                     Arch::CrossCoreWaitFlag(qkReady);\n                                     epilogueOnlineSoftmax(\n                                         gP[gmOffsetP],\n@@ -806,12 +813,15 @@ namespace SplitFuse {\n                                         layOutS,\n                                         actualBlockShapeQK,\n                                         (stackSeqCount == 0),\n-                                        (isLastNoMaskStackTile ? (stackSeqCount == noMaskStackSeqNum) : (stackSeqCount == noMaskStackSeqNum - 1)),\n+                                        ((isLastNoMaskStackTile && (kvSLoopNumTotal - kvStart != 2 || kvSIdx - kvStart == 1)) ? (stackSeqCount == noMaskStackSeqNum) : (stackSeqCount == noMaskStackSeqNum - 1)),\n                                         qSBlockSize,\n                                         qNBlockSize,\n                                         curStackTileMod,\n                                         isLastStackTile,\n-                                        false);\n+                                        false,\n+                                        startsWithMaskTile,\n+                                        startsWithMaskThenNomaskFlag);\n+                                        startsWithMaskTile = false;\n                                 }\n                             }\n                         } else if constexpr (MASK_TYPE == FaiKernel::MaskType::FULL_MASK) {\n@@ -857,7 +867,8 @@ namespace SplitFuse {\n                                     qNBlockSize, \n                                     curStackTileMod,\n                                     isLastStackTile,\n-                                    isSplitKV);\n+                                    isSplitKV,\n+                                    false);\n                             } else {\n                                 epilogueOnlineSoftmax(\n                                     gP[gmOffsetP], \n@@ -872,7 +883,9 @@ namespace SplitFuse {\n                                     qNBlockSize, \n                                     curStackTileMod,\n                                     isLastStackTile,\n-                                    false);\n+                                    false,\n+                                    false,\n+                                    startsWithMaskThenNomaskFlag);\n                             }\n                         }\n                         Arch::CrossCoreSetFlag<0x2, PIPE_MTE3>(softmaxReady);\n",
+      "new_file": false,
+      "new_path": "attention/fused_infer_attention_score/op_kernel/flash_attention_regular.h",
+      "old_path": "attention/fused_infer_attention_score/op_kernel/flash_attention_regular.h",
+      "removed_lines": 9,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/582d343d15a47505ded2593be2902c8843470cc9/attention/fused_infer_attention_score/op_kernel/flash_attention_regular.h",
+    "sha": "582d343d15a47505ded2593be2902c8843470cc9",
+    "source_branch": "master",
+    "source_project": {
+      "full_name": "qq_23260455/ops-transformer_4",
+      "human_name": "qq_23260455 / ops-transformer_4",
+      "id": 9267739,
+      "path": "ops-transformer_4"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  }
+]

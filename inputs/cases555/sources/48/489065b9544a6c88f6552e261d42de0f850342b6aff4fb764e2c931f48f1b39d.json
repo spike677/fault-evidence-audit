@@ -1,0 +1,38 @@
+[
+  {
+    "additions": 1,
+    "blob_id": "831bd2ee126e57dd33b89b59c9567cd5bad98a98",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/6de0d3a41568bdd57c6dd06201921dd928bab229/index/gather_nd/op_kernel/arch35/gather_nd_zero.h",
+    "deletions": 1,
+    "filename": "index/gather_nd/op_kernel/arch35/gather_nd_zero.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 1,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -132,7 +132,7 @@ __aicore__ inline void GatherNdZero<T1>::Process() {\n     uint64_t beginRowIdx = cBlockIdx * blockFactor;\n     uint64_t endRowdx = (cBlockIdx + 1) * blockFactor < indicesNum ? (cBlockIdx + 1) * blockFactor : indicesNum;\n     uint64_t ubLoop = (gatherSize + ubFactor - 1) / ubFactor;\n-    uint64_t ubTail = gatherSize % ubFactor;\n+    uint64_t ubTail = gatherSize - ubFactor * (ubLoop - 1);\n \n     for (uint64_t b = beginRowIdx; b < endRowdx; b++) {\n       for (uint64_t u = 0; u < ubLoop; u++) {\n",
+      "new_file": false,
+      "new_path": "index/gather_nd/op_kernel/arch35/gather_nd_zero.h",
+      "old_path": "index/gather_nd/op_kernel/arch35/gather_nd_zero.h",
+      "removed_lines": 1,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/6de0d3a41568bdd57c6dd06201921dd928bab229/index/gather_nd/op_kernel/arch35/gather_nd_zero.h",
+    "sha": "6de0d3a41568bdd57c6dd06201921dd928bab229",
+    "source_branch": "gatherndfix",
+    "source_project": {
+      "full_name": "jinpenghe/ops-nn",
+      "human_name": "jinpenghe / ops-nn",
+      "id": 9080320,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  }
+]

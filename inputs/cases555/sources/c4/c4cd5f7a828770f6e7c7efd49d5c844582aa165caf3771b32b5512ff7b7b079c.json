@@ -1,0 +1,362 @@
+[
+  {
+    "additions": 11,
+    "blob_id": "2a07858e10215b165377f0a32a474fbd3c270b07",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/e446e4fe6bd10d860de6cbc49bb0b2bb556afa2b/quant/dynamic_quant/op_host/dynamic_quant_tiling_arch35.cpp",
+    "deletions": 6,
+    "filename": "quant/dynamic_quant/op_host/dynamic_quant_tiling_arch35.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 11,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -71,6 +71,9 @@ constexpr uint32_t SPLIT_M_SCHEDULE_MODE = 1;\n constexpr uint32_t PER_CHANNEL_EXCLUDE_DIM = 2;\n constexpr uint32_t PER_CHANNEL_N_BASE_SIZE = 64;\n \n+constexpr float HIFLOAT8_MAX_VALUE = 32768.0;\n+constexpr float FLT_EPSILON = 1e-6f;\n+\n std::vector<float> dstTypeMaxSupportList = {0.0, 15.0, 56.0, 224.0, 32768.0};\n \n template <uint32_t base, typename T = uint32_t>\n@@ -353,7 +356,9 @@ ge::graphStatus DynamicQuantRegbaseTiling::CheckAttrs(gert::TilingContext* conte\n             OP_LOGE(context, \"dstTypeMax must in (0, 15, 56, 224, 32768).\");\n             return ge::GRAPH_FAILED;\n         }\n-        dstTypeMax = (dstTypeMax == 0) ? 32768 : dstTypeMax;\n+        if (std::fabs(dstTypeMax) < FLT_EPSILON) {\n+            dstTypeMax = HIFLOAT8_MAX_VALUE;\n+        }\n \n         std::string quantModeStr = quantModeAttr;\n         if (quantModeStr == \"pertoken\") {\n@@ -414,7 +419,7 @@ void DynamicQuantRegbaseTiling::ResetLargeTilingParams()\n }\n \n // 打印tiling参数\n-void DynamicQuantRegbaseTiling::PrintTilingData(gert::TilingContext* context)\n+void DynamicQuantRegbaseTiling::PrintTilingData(gert::TilingContext* context) const\n {\n     DynamicQuantTilingDataArch35* tilingDataPtr = context->GetTilingData<DynamicQuantTilingDataArch35>();\n     OP_LOGD(\n@@ -429,7 +434,7 @@ void DynamicQuantRegbaseTiling::PrintTilingData(gert::TilingContext* context)\n }\n \n // 赋值tiling参数\n-void DynamicQuantRegbaseTiling::SetTilingData(gert::TilingContext* context)\n+void DynamicQuantRegbaseTiling::SetTilingData(gert::TilingContext* context) const\n {\n     SetTilingKey(context);\n     DynamicQuantTilingDataArch35* tilingDataPtr = context->GetTilingData<DynamicQuantTilingDataArch35>();\n@@ -449,7 +454,7 @@ void DynamicQuantRegbaseTiling::SetTilingData(gert::TilingContext* context)\n }\n \n // 处理空Tensor的tiling\n-ge::graphStatus DynamicQuantRegbaseTiling::DoEmptyTensorTiling(gert::TilingContext* context)\n+ge::graphStatus DynamicQuantRegbaseTiling::DoEmptyTensorTiling(gert::TilingContext* context) const\n {\n     int64_t tilingKey = GET_TPL_TILING_KEY(0U, TPL_EMPTY_TENSOR, 0U, 0U);\n     OP_LOGD(context, \"DoEmptyTensorTiling, the last dim must be 0, tilingKey is %ld\", tilingKey);\n@@ -680,7 +685,7 @@ ge::graphStatus DynamicQuantRegbaseTiling::CalculateTilingDataForPerChannel(gert\n     return ge::GRAPH_SUCCESS;\n }\n \n-void DynamicQuantRegbaseTiling::SetTilingDataForPerChannel(gert::TilingContext* context) {\n+void DynamicQuantRegbaseTiling::SetTilingDataForPerChannel(gert::TilingContext* context) const {\n     DynamicQuantTilingDataArch35* tilingDataPtr = context->GetTilingData<DynamicQuantTilingDataArch35>();\n     tilingDataPtr->totalBatchLen = totalBatchLen;\n     tilingDataPtr->mLen = mLen;\n@@ -703,7 +708,7 @@ void DynamicQuantRegbaseTiling::SetTilingDataForPerChannel(gert::TilingContext*\n }\n \n // 打印perchannel模板相关tiling参数\n-void DynamicQuantRegbaseTiling::PrintTilingDataForPerChannel(gert::TilingContext* context)\n+void DynamicQuantRegbaseTiling::PrintTilingDataForPerChannel(gert::TilingContext* context) const\n {\n     DynamicQuantTilingDataArch35* tilingDataPtr = context->GetTilingData<DynamicQuantTilingDataArch35>();\n     OP_LOGD(\n",
+      "new_file": false,
+      "new_path": "quant/dynamic_quant/op_host/dynamic_quant_tiling_arch35.cpp",
+      "old_path": "quant/dynamic_quant/op_host/dynamic_quant_tiling_arch35.cpp",
+      "removed_lines": 6,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/e446e4fe6bd10d860de6cbc49bb0b2bb556afa2b/quant/dynamic_quant/op_host/dynamic_quant_tiling_arch35.cpp",
+    "sha": "e446e4fe6bd10d860de6cbc49bb0b2bb556afa2b",
+    "source_branch": "br_0330_codecheck",
+    "source_project": {
+      "full_name": "transformer910/ops-nn",
+      "human_name": "transformer910 / ops-nn",
+      "id": 9092609,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 6,
+    "blob_id": "98f7cf51a19a66e5fc43c7d54832d52d1a7bcc91",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/e446e4fe6bd10d860de6cbc49bb0b2bb556afa2b/quant/dynamic_quant/op_host/dynamic_quant_tiling_arch35.h",
+    "deletions": 6,
+    "filename": "quant/dynamic_quant/op_host/dynamic_quant_tiling_arch35.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 6,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -39,19 +39,19 @@ private:\n         const gert::StorageShape* shape1, const gert::StorageShape* shape2, uint32_t shape1Dim, uint32_t shape2Dim)const;\n     ge::graphStatus CheckOpParams(gert::TilingContext* context);\n     void ResetLargeTilingParams();\n-    void SetTilingData(gert::TilingContext* context);\n-    void PrintTilingData(gert::TilingContext* context);\n+    void SetTilingData(gert::TilingContext* context) const;\n+    void PrintTilingData(gert::TilingContext* context) const;\n \n     void IsCapableForFullLoad(const gert::TilingContext* context);\n     void IsCapableForRecompute(gert::TilingContext* context);\n     void IsCapableForSplitM(gert::TilingContext* context);\n-    void SetTilingDataForPerChannel(gert::TilingContext* context);\n-    void PrintTilingDataForPerChannel(gert::TilingContext* context);\n+    void SetTilingDataForPerChannel(gert::TilingContext* context) const;\n+    void PrintTilingDataForPerChannel(gert::TilingContext* context) const;\n     void CalculateTilingData();\n     ge::graphStatus CalculateTilingDataForPerChannel(gert::TilingContext* context);\n     void CalculateCoreNum(const gert::TilingContext* context);\n     ge::graphStatus GetCompileInfo(gert::TilingContext* context);\n-    ge::graphStatus DoEmptyTensorTiling(gert::TilingContext* context);\n+    ge::graphStatus DoEmptyTensorTiling(gert::TilingContext* context) const;\n \n private:\n     uint32_t vectorCoreNum{0};\n@@ -85,7 +85,7 @@ private:\n     bool isEmptyTensor = false;\n     uint32_t quantMode_ = 0;     // 0: pertoken, 1: pertensor\n     bool isSymmetrical_ = false; // 0: False, 1: True\n-    float dstTypeMax = 0.0;\n+    float dstTypeMax = 32768.0;\n \n     int32_t yDtype;\n     // members for perchannel\n",
+      "new_file": false,
+      "new_path": "quant/dynamic_quant/op_host/dynamic_quant_tiling_arch35.h",
+      "old_path": "quant/dynamic_quant/op_host/dynamic_quant_tiling_arch35.h",
+      "removed_lines": 6,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/e446e4fe6bd10d860de6cbc49bb0b2bb556afa2b/quant/dynamic_quant/op_host/dynamic_quant_tiling_arch35.h",
+    "sha": "e446e4fe6bd10d860de6cbc49bb0b2bb556afa2b",
+    "source_branch": "br_0330_codecheck",
+    "source_project": {
+      "full_name": "transformer910/ops-nn",
+      "human_name": "transformer910 / ops-nn",
+      "id": 9092609,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 1,
+    "blob_id": "b88bdb812f52100a40b77485c564a03f4c2e28a2",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/e446e4fe6bd10d860de6cbc49bb0b2bb556afa2b/quant/dynamic_quant/op_kernel/arch35/dynamic_quant_regbase_base.h",
+    "deletions": 0,
+    "filename": "quant/dynamic_quant/op_kernel/arch35/dynamic_quant_regbase_base.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 1,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -45,6 +45,7 @@ constexpr float DYNAMIC_QUANT_INT4_OFFSET = 7.0;\n constexpr float DYNAMIC_QUANT_EPSINON = 1e-12;\n constexpr float MIN_FLOAT_VALUE = -3.4028235e+38f;\n constexpr float MAX_FLOAT_VALUE = 3.402823466e+38f;\n+constexpr float SYM_RANGE_MULTI = 2;\n \n template <typename yDtype>\n __aicore__ inline void SetFloatOverflowModeForRegbase()\n",
+      "new_file": false,
+      "new_path": "quant/dynamic_quant/op_kernel/arch35/dynamic_quant_regbase_base.h",
+      "old_path": "quant/dynamic_quant/op_kernel/arch35/dynamic_quant_regbase_base.h",
+      "removed_lines": 0,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/e446e4fe6bd10d860de6cbc49bb0b2bb556afa2b/quant/dynamic_quant/op_kernel/arch35/dynamic_quant_regbase_base.h",
+    "sha": "e446e4fe6bd10d860de6cbc49bb0b2bb556afa2b",
+    "source_branch": "br_0330_codecheck",
+    "source_project": {
+      "full_name": "transformer910/ops-nn",
+      "human_name": "transformer910 / ops-nn",
+      "id": 9092609,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 1,
+    "blob_id": "7fe7b03cbdb52e17cba9253e0abcec9815e720c7",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/e446e4fe6bd10d860de6cbc49bb0b2bb556afa2b/quant/dynamic_quant/op_kernel/arch35/dynamic_quant_regbase_full_load.h",
+    "deletions": 1,
+    "filename": "quant/dynamic_quant/op_kernel/arch35/dynamic_quant_regbase_full_load.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 1,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -401,7 +401,7 @@ private:\n         } else if constexpr (IsSameType<yDtype, hifloat8_t>::value) {\n             maxValue = static_cast<float>(1.0) / tilingData_.dstTypeMax;\n             offsetValue = tilingData_.dstTypeMax;\n-            offsetDivValue = static_cast<float>(1.0) / (tilingData_.dstTypeMax * 2);\n+            offsetDivValue = static_cast<float>(1.0) / (tilingData_.dstTypeMax * DynamicQuantNDOpt::SYM_RANGE_MULTI);\n         }\n     }\n \n",
+      "new_file": false,
+      "new_path": "quant/dynamic_quant/op_kernel/arch35/dynamic_quant_regbase_full_load.h",
+      "old_path": "quant/dynamic_quant/op_kernel/arch35/dynamic_quant_regbase_full_load.h",
+      "removed_lines": 1,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/e446e4fe6bd10d860de6cbc49bb0b2bb556afa2b/quant/dynamic_quant/op_kernel/arch35/dynamic_quant_regbase_full_load.h",
+    "sha": "e446e4fe6bd10d860de6cbc49bb0b2bb556afa2b",
+    "source_branch": "br_0330_codecheck",
+    "source_project": {
+      "full_name": "transformer910/ops-nn",
+      "human_name": "transformer910 / ops-nn",
+      "id": 9092609,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 1,
+    "blob_id": "929a7032e8a9cba4885dc2d2d19ec076bd19451e",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/e446e4fe6bd10d860de6cbc49bb0b2bb556afa2b/quant/dynamic_quant/op_kernel/arch35/dynamic_quant_regbase_full_load_pertensor.h",
+    "deletions": 1,
+    "filename": "quant/dynamic_quant/op_kernel/arch35/dynamic_quant_regbase_full_load_pertensor.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 1,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -804,7 +804,7 @@ private:\n             maxValueNoSym = FP8_E4M3FN_MAX_VALUE_NO_SYM;\n         } else if constexpr (IsSameType<yDtype, hifloat8_t>::value) {\n             maxValue = tilingData_.dstTypeMax;\n-            maxValueNoSym = tilingData_.dstTypeMax * 2;\n+            maxValueNoSym = tilingData_.dstTypeMax * DynamicQuantNDOpt::SYM_RANGE_MULTI;\n         }\n }\n \n",
+      "new_file": false,
+      "new_path": "quant/dynamic_quant/op_kernel/arch35/dynamic_quant_regbase_full_load_pertensor.h",
+      "old_path": "quant/dynamic_quant/op_kernel/arch35/dynamic_quant_regbase_full_load_pertensor.h",
+      "removed_lines": 1,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/e446e4fe6bd10d860de6cbc49bb0b2bb556afa2b/quant/dynamic_quant/op_kernel/arch35/dynamic_quant_regbase_full_load_pertensor.h",
+    "sha": "e446e4fe6bd10d860de6cbc49bb0b2bb556afa2b",
+    "source_branch": "br_0330_codecheck",
+    "source_project": {
+      "full_name": "transformer910/ops-nn",
+      "human_name": "transformer910 / ops-nn",
+      "id": 9092609,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 1,
+    "blob_id": "69529b81f5795a30faa2cb76b681ce2f473c4dc4",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/e446e4fe6bd10d860de6cbc49bb0b2bb556afa2b/quant/dynamic_quant/op_kernel/arch35/dynamic_quant_regbase_large_shape_db.h",
+    "deletions": 1,
+    "filename": "quant/dynamic_quant/op_kernel/arch35/dynamic_quant_regbase_large_shape_db.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 1,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -271,7 +271,7 @@ __aicore__ inline void DynamicQuantLargeShapeDb<T, yDtype, hasSmooth, isSymmetri\n         scaleMaxValue = static_cast<float>(1.0) / FP8_E4M3FN_MAX_VALUE_NO_SYM;\n         offsetMaxValue = FP8_E4M3FN_MAX_VALUE;\n     } else if constexpr (IsSameType<yDtype, hifloat8_t>::value) {\n-        scaleMaxValue = static_cast<float>(1.0) / (tilingData_.dstTypeMax * 2);\n+        scaleMaxValue = static_cast<float>(1.0) / (tilingData_.dstTypeMax * DynamicQuantNDOpt::SYM_RANGE_MULTI);\n         offsetMaxValue = tilingData_.dstTypeMax;\n     }\n }\n",
+      "new_file": false,
+      "new_path": "quant/dynamic_quant/op_kernel/arch35/dynamic_quant_regbase_large_shape_db.h",
+      "old_path": "quant/dynamic_quant/op_kernel/arch35/dynamic_quant_regbase_large_shape_db.h",
+      "removed_lines": 1,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/e446e4fe6bd10d860de6cbc49bb0b2bb556afa2b/quant/dynamic_quant/op_kernel/arch35/dynamic_quant_regbase_large_shape_db.h",
+    "sha": "e446e4fe6bd10d860de6cbc49bb0b2bb556afa2b",
+    "source_branch": "br_0330_codecheck",
+    "source_project": {
+      "full_name": "transformer910/ops-nn",
+      "human_name": "transformer910 / ops-nn",
+      "id": 9092609,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 1,
+    "blob_id": "6f7f87d423452d806349cdd086eadf20ecde3064",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/e446e4fe6bd10d860de6cbc49bb0b2bb556afa2b/quant/dynamic_quant/op_kernel/arch35/dynamic_quant_regbase_large_shape_db_pertensor.h",
+    "deletions": 1,
+    "filename": "quant/dynamic_quant/op_kernel/arch35/dynamic_quant_regbase_large_shape_db_pertensor.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 1,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -258,7 +258,7 @@ __aicore__ inline void DynamicQuantLargeShapeDbPertensor<T, yDtype, hasSmooth, i\n         maxValueNoSym = FP8_E4M3FN_MAX_VALUE_NO_SYM;\n     } else if constexpr (IsSameType<yDtype, hifloat8_t>::value) {\n         maxValue = tilingData_.dstTypeMax;\n-        maxValueNoSym = tilingData_.dstTypeMax * 2;\n+        maxValueNoSym = tilingData_.dstTypeMax * DynamicQuantNDOpt::SYM_RANGE_MULTI;\n     }\n }\n \n",
+      "new_file": false,
+      "new_path": "quant/dynamic_quant/op_kernel/arch35/dynamic_quant_regbase_large_shape_db_pertensor.h",
+      "old_path": "quant/dynamic_quant/op_kernel/arch35/dynamic_quant_regbase_large_shape_db_pertensor.h",
+      "removed_lines": 1,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/e446e4fe6bd10d860de6cbc49bb0b2bb556afa2b/quant/dynamic_quant/op_kernel/arch35/dynamic_quant_regbase_large_shape_db_pertensor.h",
+    "sha": "e446e4fe6bd10d860de6cbc49bb0b2bb556afa2b",
+    "source_branch": "br_0330_codecheck",
+    "source_project": {
+      "full_name": "transformer910/ops-nn",
+      "human_name": "transformer910 / ops-nn",
+      "id": 9092609,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 1,
+    "blob_id": "5703aae4297a54f90b1d7ee5234b07300e5202da",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/e446e4fe6bd10d860de6cbc49bb0b2bb556afa2b/quant/dynamic_quant/op_kernel/arch35/dynamic_quant_regbase_moe_full_load.h",
+    "deletions": 1,
+    "filename": "quant/dynamic_quant/op_kernel/arch35/dynamic_quant_regbase_moe_full_load.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 1,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -436,7 +436,7 @@ private:\n         } else if constexpr (IsSameType<yDtype, hifloat8_t>::value) {\n             maxValue = static_cast<float>(1.0) / tilingData_.dstTypeMax;\n             offsetValue = tilingData_.dstTypeMax;\n-            offsetDivValue = static_cast<float>(1.0) / (tilingData_.dstTypeMax * 2);\n+            offsetDivValue = static_cast<float>(1.0) / (tilingData_.dstTypeMax * DynamicQuantNDOpt::SYM_RANGE_MULTI);\n         }\n     }\n \n",
+      "new_file": false,
+      "new_path": "quant/dynamic_quant/op_kernel/arch35/dynamic_quant_regbase_moe_full_load.h",
+      "old_path": "quant/dynamic_quant/op_kernel/arch35/dynamic_quant_regbase_moe_full_load.h",
+      "removed_lines": 1,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/e446e4fe6bd10d860de6cbc49bb0b2bb556afa2b/quant/dynamic_quant/op_kernel/arch35/dynamic_quant_regbase_moe_full_load.h",
+    "sha": "e446e4fe6bd10d860de6cbc49bb0b2bb556afa2b",
+    "source_branch": "br_0330_codecheck",
+    "source_project": {
+      "full_name": "transformer910/ops-nn",
+      "human_name": "transformer910 / ops-nn",
+      "id": 9092609,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 1,
+    "blob_id": "c055c7287052d107771058bde1df3757f7ddb38d",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/e446e4fe6bd10d860de6cbc49bb0b2bb556afa2b/quant/dynamic_quant/op_kernel/arch35/dynamic_quant_regbase_moe_large_shape.h",
+    "deletions": 1,
+    "filename": "quant/dynamic_quant/op_kernel/arch35/dynamic_quant_regbase_moe_large_shape.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 1,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -272,7 +272,7 @@ __aicore__ inline void DynamicQuantLargeShapeMOE<T, yDtype, hasSmooth, isSymmetr\n         scaleMaxValue = static_cast<float>(1.0) / FP8_E4M3FN_MAX_VALUE_NO_SYM;\n         offsetMaxValue = FP8_E4M3FN_MAX_VALUE;\n     } else if constexpr (IsSameType<yDtype, hifloat8_t>::value) {\n-        scaleMaxValue = static_cast<float>(1.0) / (tilingData_.dstTypeMax * 2);\n+        scaleMaxValue = static_cast<float>(1.0) / (tilingData_.dstTypeMax * DynamicQuantNDOpt::SYM_RANGE_MULTI);\n         offsetMaxValue = tilingData_.dstTypeMax;\n     }\n }\n",
+      "new_file": false,
+      "new_path": "quant/dynamic_quant/op_kernel/arch35/dynamic_quant_regbase_moe_large_shape.h",
+      "old_path": "quant/dynamic_quant/op_kernel/arch35/dynamic_quant_regbase_moe_large_shape.h",
+      "removed_lines": 1,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/e446e4fe6bd10d860de6cbc49bb0b2bb556afa2b/quant/dynamic_quant/op_kernel/arch35/dynamic_quant_regbase_moe_large_shape.h",
+    "sha": "e446e4fe6bd10d860de6cbc49bb0b2bb556afa2b",
+    "source_branch": "br_0330_codecheck",
+    "source_project": {
+      "full_name": "transformer910/ops-nn",
+      "human_name": "transformer910 / ops-nn",
+      "id": 9092609,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 2,
+    "blob_id": "4b8644107a8156633590c98ed041b00c38c7e373",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/e446e4fe6bd10d860de6cbc49bb0b2bb556afa2b/quant/dynamic_quant/op_kernel/arch35/dynamic_quant_regbase_perchannel_base.h",
+    "deletions": 1,
+    "filename": "quant/dynamic_quant/op_kernel/arch35/dynamic_quant_regbase_perchannel_base.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 2,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -55,6 +55,7 @@ constexpr float INT4_OFFSET_VALUE = 15.0f;\n constexpr float NEGATIVE_ONE = -1.0f;\n constexpr uint32_t REG_LEN = 64;\n constexpr uint32_t USE_BUFFER_NUM = 2;\n+constexpr float SYM_RANGE_MULTI_PERCHANNEL = 2;\n \n #ifndef INFINITY\n #define INFINITY (__builtin_inff())\n@@ -83,7 +84,7 @@ __aicore__ inline void SetMaxValue(float &maxValue, float &offsetValue, float &o\n     } else if constexpr (IsSameType<yDtype, hifloat8_t>::value) {\n         maxValue = static_cast<float>(1.0) / dstTypeMax;\n         offsetValue = dstTypeMax;\n-        offsetDivValue = static_cast<float>(1.0) / (dstTypeMax * 2);\n+        offsetDivValue = static_cast<float>(1.0) / (dstTypeMax * SYM_RANGE_MULTI_PERCHANNEL);\n     }\n }\n \n",
+      "new_file": false,
+      "new_path": "quant/dynamic_quant/op_kernel/arch35/dynamic_quant_regbase_perchannel_base.h",
+      "old_path": "quant/dynamic_quant/op_kernel/arch35/dynamic_quant_regbase_perchannel_base.h",
+      "removed_lines": 1,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/e446e4fe6bd10d860de6cbc49bb0b2bb556afa2b/quant/dynamic_quant/op_kernel/arch35/dynamic_quant_regbase_perchannel_base.h",
+    "sha": "e446e4fe6bd10d860de6cbc49bb0b2bb556afa2b",
+    "source_branch": "br_0330_codecheck",
+    "source_project": {
+      "full_name": "transformer910/ops-nn",
+      "human_name": "transformer910 / ops-nn",
+      "id": 9092609,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  }
+]

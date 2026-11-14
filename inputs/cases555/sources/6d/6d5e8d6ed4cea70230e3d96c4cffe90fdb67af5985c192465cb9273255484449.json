@@ -1,0 +1,106 @@
+{
+  "approval_reviewers": [],
+  "assignees": [],
+  "assignees_number": 0,
+  "base": {
+    "label": "master",
+    "ref": "master",
+    "repo": {
+      "full_name": "ForestFrame/ops-nn",
+      "html_url": "https://gitcode.com/ForestFrame/ops-nn.git",
+      "name": "ops-nn",
+      "namespace": {
+        "path": "ForestFrame"
+      },
+      "path": "ops-nn"
+    },
+    "sha": "24400f4fbc65599cbfac7c40c1e4b9f6d0525c89"
+  },
+  "body": "## 修复内容\n\n将 `activation/selu_grad/op_kernel/arch35/selu_grad.h` 第 78 行的 `CMPMODE::LT` 改为 `CMPMODE::LE`，使 `outputs==0` 走 SAP 分支，与 PyTorch `elu_backward(is_result=True)` 的 `outputs<=0` 语义一致。\n\n关联 issue: #3976\n\n## 问题背景\n\n原实现 `outputs < 0 → SAP 分支`（即 `outputs >= 0 含 0 → SCALE 分支`），与 PyTorch `outputs <= 0 → SAP 分支`（即 `outputs == 0 走 SAP`）在边界 0 点分歧：\n\n- NPU: `outputs==0` → `SCALE*grad`（1.0507×grad）\n- PyTorch: `outputs==0` → `grad*(0+SAP)`（1.7581×grad）\n\nint 类型因离散值取 0 概率约 9%，导致大面积精度 fail。\n\n## 验证数据\n\n288 例全量 NPU vs golden 三方对比测试：\n\n| dtype | 修复前 (LT) | 修复后 (LE) |\n|-------|------------|------------|\n| float32 | 48/48 PASS | 48/48 PASS |\n| float16 | 47/48 PASS | 48/48 PASS |\n| bfloat16 | 48/48 PASS | 48/48 PASS |\n| int32 | 6/48 PASS | 48/48 PASS |\n| int8 | 6/48 PASS | 48/48 PASS |\n| uint8 | 6/48 PASS | 48/48 PASS |\n| **合计** | **161/288 (55.9%)** | **288/288 (100%)** |\n\n逐元素统计（2.76 亿元素）：所有 mismatch 100% 发生在 outputs==0 位置，outputs!=0 零变化。\n\n## 改动范围\n\n仅 1 文件 1 行：`CMPMODE::LT` → `CMPMODE::LE`\n\n## Issue\n\nCloses #3976\n",
+  "can_merge_check": true,
+  "close_related_issue": false,
+  "closed_at": "2026-07-09T11:52:35+08:00",
+  "created_at": "2026-07-09T11:45:40+08:00",
+  "draft": false,
+  "head": {
+    "label": "fix/selu_grad_boundary_le",
+    "ref": "fix/selu_grad_boundary_le",
+    "repo": {
+      "full_name": "ForestFrame/ops-nn",
+      "html_url": "https://gitcode.com/ForestFrame/ops-nn.git",
+      "name": "ops-nn",
+      "namespace": {
+        "path": "ForestFrame"
+      },
+      "path": "ops-nn"
+    },
+    "sha": "60878698101485a167424e830c31e06f7a66852c",
+    "user": {
+      "avatar_url": "https://cdn-img.gitcode.com/da/ee/8d801ae8e3fdc198d48c6bfe0b0214cb4701995a00d7e5795e96351da648e70c.jpg",
+      "html_url": "https://gitcode.com/ForestFrame",
+      "id": "652fc3cd5e9f4c45d0a240de",
+      "login": "ForestFrame",
+      "name": "ForestFrame"
+    }
+  },
+  "html_url": "https://gitcode.com/ForestFrame/ops-nn/merge_requests/1",
+  "id": 8853992,
+  "issue_url": "https://api.gitcode.com/api/v5/repos/ForestFrame/ops-nn/pulls/1/issues",
+  "labels": [],
+  "mergeable": true,
+  "mergeable_state": {
+    "all_depend_merge_request_merged_passed": true,
+    "approval_approvers_required_passed": true,
+    "approval_approvers_result": 2,
+    "approval_reviewers_required_passed": true,
+    "approval_testers_required_passed": true,
+    "approval_testers_result": 2,
+    "branch_missing_passed": true,
+    "can_force_merge": false,
+    "check_tasks_num": 0,
+    "ci_state_passed": true,
+    "conflict_passed": true,
+    "merge_by_self_passed": true,
+    "merge_request_id": 8853992,
+    "merge_request_switch": {
+      "add_notes_after_merged": false,
+      "approval_required_reviewers_branch": "*",
+      "approval_required_reviewers_count": 0,
+      "can_force_merge": false,
+      "can_reopen": true,
+      "disable_merge_by_self": false,
+      "disable_squash_merge": false,
+      "mark_auto_merged_mr_as_closed": false,
+      "merge_method": "merge",
+      "only_allow_merge_if_all_discussions_are_resolved": false,
+      "only_allow_merge_if_pipeline_succeeds": false,
+      "review_mode": "approval",
+      "squash_merge_with_no_merge_commit": false
+    },
+    "merged_by_user_passed": true,
+    "mr_state_passed": true,
+    "non_ff_passed": true,
+    "reason": {},
+    "resolve_discussion_passed": true,
+    "state": true,
+    "status_without_user_auth": true,
+    "work_in_progress_passed": true
+  },
+  "merged_at": "",
+  "number": 1,
+  "prune_branch": false,
+  "squash_merge": false,
+  "state": "closed",
+  "testers": [],
+  "title": "fix(selu_grad): 修复 outputs==0 边界分支判定，对齐 PyTorch elu_backward 语义 (#3976)",
+  "updated_at": "2026-07-09T11:52:35+08:00",
+  "url": "https://api.gitcode.com/api/v5/repos/ForestFrame/ops-nn/pulls/1",
+  "user": {
+    "avatar_url": "https://cdn-img.gitcode.com/da/ee/8d801ae8e3fdc198d48c6bfe0b0214cb4701995a00d7e5795e96351da648e70c.jpg",
+    "html_url": "https://gitcode.com/ForestFrame",
+    "id": "652fc3cd5e9f4c45d0a240de",
+    "login": "ForestFrame",
+    "name": "ForestFrame"
+  },
+  "visibility_reason": "public"
+}

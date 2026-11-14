@@ -1,0 +1,41 @@
+[
+  {
+    "author": {
+      "html_url": "https://gitcode.com/qianzehong",
+      "id": "68c138243be0a23c91c2437b",
+      "login": "qianzehong",
+      "name": "qianzehong",
+      "object_id": "68c138243be0a23c91c2437b"
+    },
+    "co_authors": [],
+    "commit": {
+      "author": {
+        "date": "2026-06-12T11:18:57+08:00",
+        "email": "qianzehong@huawei.com",
+        "login": "qianzehong",
+        "name": "qianzehong"
+      },
+      "committer": {
+        "email": "qianzehong@huawei.com",
+        "login": "qianzehong",
+        "name": "qianzehong"
+      },
+      "message": "fix(batch_norm): 修复 infer 模板冗余写及 small_ab1 输出错误\n\nbatch_norm 算子的 3 个 infer 新模板（continuous_a、small_a、small_ab1）存在两类问题：\n\n问题 1：冗余写\nCopyOutMeanVar 被所有核无条件调用，导致多核向同一 GM 地址重复写\nbatch_mean/batch_variance/reserve_space_1/reserve_space_2。修复：在 CopyOutMeanVar\n中增加 GetBlockIdx() == 0 守卫，只让 core 0 写，并经 meanVarOutQueue_ 暂存搬运。\n\n问题 2：small_ab1 输出错误\n原 DataCopyGather 读 mean/var 时 paramCacheElemLen 大于 meanQueue_ buffer，\n导致 meanLocal 被破坏。改为按 varOffset 对齐的 mean/var 暂存方案，修正\nbatch_mean 与 reserve_space_1 输出。\n\n同时把输出个数提取为常量 MEAN_VAR_OUTPUT_COUNT，InitBuffer 的 bufNum 使用\n队列声明的 BUFFER_DEPTH，消除魔鬼数字。\n\nCo-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>\n"
+    },
+    "committer": {
+      "html_url": "https://gitcode.com/qianzehong",
+      "id": "68c138243be0a23c91c2437b",
+      "login": "qianzehong",
+      "name": "qianzehong",
+      "object_id": "68c138243be0a23c91c2437b"
+    },
+    "html_url": "https://gitcode.com/cann/ops-nn/commit/8f21a66a151a4bdac99b553f0cc593e99c4824fa",
+    "parents": {
+      "sha": "fc18388510d2cc8ff6aeb5eb6d6e610f518776e1",
+      "shas": [
+        "fc18388510d2cc8ff6aeb5eb6d6e610f518776e1"
+      ]
+    },
+    "sha": "8f21a66a151a4bdac99b553f0cc593e99c4824fa"
+  }
+]

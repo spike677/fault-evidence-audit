@@ -1,0 +1,83 @@
+{
+  "assignee": {
+    "avatar_url": "https://cdn-img.gitcode.com/de/dc/99d2e56dcedde1f13b59cd88078a93c0805bb16fb62f022920d793e09307dcba.jpg",
+    "html_url": "https://gitcode.com/bartonfang",
+    "id": "68d0fd7cb2e6f07065083dbe",
+    "login": "bartonfang",
+    "name": "BartonFang",
+    "object_id": "68d0fd7cb2e6f07065083dbe"
+  },
+  "assignees": [
+    {
+      "avatar_url": "https://cdn-img.gitcode.com/de/dc/99d2e56dcedde1f13b59cd88078a93c0805bb16fb62f022920d793e09307dcba.jpg",
+      "html_url": "https://gitcode.com/bartonfang",
+      "id": "68d0fd7cb2e6f07065083dbe",
+      "login": "bartonfang",
+      "name": "BartonFang",
+      "object_id": "68d0fd7cb2e6f07065083dbe"
+    }
+  ],
+  "body": "\n\nThanks for sending an issue! Please fill in the following template to help quickly solve your problem.\n\n### Describe the current behavior / 问题描述 (Mandatory / 必填)\n            \nmoe_inplace_index_add SIMT分支中的计算Bug，在bf16/fp16下，如果走到simt sort分支，存在逻辑错误，计算结果保存到resul中，但最终输出为result_f，导致输出全0.\n\n\ntd_.updatesPreLoop:1 td_.tailUpdatesPreNum:1, td_.normalUpdatesPreNum:1\nDumpTensor: desc=192, addr=6a0, data_type=bfloat16, position=UB, dump_size=32\n[-0.439453, 0.014771, -0.138672, 0.287109, 0.429688, 0.179688, -0.190430, 0.144531, 0.289062, 0.460938, 0.164062, 0.018921, 0.115234, -0.083008, -0.345703, 0.208984, -0.179688, 0.011169, 0.398438, 0.265625, -0.271484, -0.472656, -0.253906, -3.734375, 0.359375, 2.203125, 2.703125, 3.953125, -4.968750, 2.140625, -3.093750, \n-0.421875]\nafterAxis:23, threadBlock:27\nDumpTensor: desc=322, addr=44c00000, data_type=bfloat16, position=GM, dump_size=32\n[0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, \n0.000000]\nDumpTensor: desc=327, addr=44c00000, data_type=bfloat16, position=GM, dump_size=32\n[0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, \n0.000000]\n### Environment / 环境信息 (Mandatory / 必填)\n            \n950下调用simt分支。\n### Steps to reproduce the issue / 重现步骤 (Mandatory / 必填)\n            \nbf16/fp16下，走到simt sort分支可以复现\n### Describe the expected behavior / 预期结果 (Mandatory / 必填)\n            \n正常计算将结果输出\n### Related log / screenshot / 日志 / 截图 (Mandatory / 必填)\n            \nDump输入输出数据会发现计算后结果为0\ntd_.updatesPreLoop:1 td_.tailUpdatesPreNum:1, td_.normalUpdatesPreNum:1\nDumpTensor: desc=192, addr=6a0, data_type=bfloat16, position=UB, dump_size=32\n[-0.439453, 0.014771, -0.138672, 0.287109, 0.429688, 0.179688, -0.190430, 0.144531, 0.289062, 0.460938, 0.164062, 0.018921, 0.115234, -0.083008, -0.345703, 0.208984, -0.179688, 0.011169, 0.398438, 0.265625, -0.271484, -0.472656, -0.253906, -3.734375, 0.359375, 2.203125, 2.703125, 3.953125, -4.968750, 2.140625, -3.093750, \n-0.421875]\nafterAxis:23, threadBlock:27\nDumpTensor: desc=322, addr=44c00000, data_type=bfloat16, position=GM, dump_size=32\n[0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, \n0.000000]\nDumpTensor: desc=327, addr=44c00000, data_type=bfloat16, position=GM, dump_size=32\n[0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, \n0.000000]\n### Special notes for this issue/备注 (Optional / 选填)\n            \n\n",
+  "comments": 0,
+  "created_at": "2026-03-30T20:03:21+08:00",
+  "finished_at": "2026-03-30T21:11:33+08:00",
+  "html_url": "https://gitcode.com/cann/ops-transformer/issues/1583",
+  "id": 3829196,
+  "issue_priority_detail": {
+    "id": 116,
+    "title": "无优先级"
+  },
+  "issue_state": "进行中",
+  "issue_state_detail": {
+    "id": 285,
+    "serial": 0,
+    "title": "进行中"
+  },
+  "issue_type": "任务",
+  "issue_type_detail": {
+    "id": 255,
+    "is_system": false,
+    "title": "任务"
+  },
+  "labels": [
+    {
+      "color": "#DB2828",
+      "created_at": "2025-06-10T14:17:23+08:00",
+      "id": 3870,
+      "name": "bug-report",
+      "updated_at": "2026-03-30T20:03:21+08:00"
+    },
+    {
+      "color": "#35e029",
+      "created_at": "2026-03-20T11:25:13+08:00",
+      "id": 38861,
+      "name": "resolved",
+      "updated_at": "2026-03-30T21:45:24+08:00"
+    }
+  ],
+  "number": "1583",
+  "priority": 0,
+  "repository": {
+    "assigner": {},
+    "created_at": "2025-09-28T17:54:46+08:00",
+    "description": "本项目是CANN提供的transformer类大模型算子库，实现网络在NPU上加速计算。",
+    "full_name": "cann/ops-transformer",
+    "id": 7673863,
+    "name": "ops-transformer",
+    "paas": "",
+    "path": "ops-transformer",
+    "updated_at": "2025-09-28T18:06:48+08:00"
+  },
+  "state": "closed",
+  "title": "[Bug-Report|缺陷反馈]: moe_inplace_index_add SIMT分支中的计算Bug",
+  "updated_at": "2026-03-30T21:11:33+08:00",
+  "user": {
+    "avatar_url": "https://cdn-img.gitcode.com/de/dc/99d2e56dcedde1f13b59cd88078a93c0805bb16fb62f022920d793e09307dcba.jpg",
+    "html_url": "https://gitcode.com/bartonfang",
+    "id": "68d0fd7cb2e6f07065083dbe",
+    "login": "bartonfang",
+    "name": "BartonFang",
+    "object_id": "68d0fd7cb2e6f07065083dbe"
+  },
+  "visibility_reason": "public"
+}

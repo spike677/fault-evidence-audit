@@ -1,0 +1,38 @@
+[
+  {
+    "additions": 10,
+    "blob_id": "bdeb6f51736b30881d41b961b7f11cb175b76a2f",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/76a59165411b5fd845ec42a35de334c5d2b115ef/matmul/fused_quant_mat_mul/op_kernel/fused_quant_mat_mul_swiglu.h",
+    "deletions": 10,
+    "filename": "matmul/fused_quant_mat_mul/op_kernel/fused_quant_mat_mul_swiglu.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 10,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -374,13 +374,13 @@ __aicore__ inline void FusedQuantMatmulSwiglu<FUSED_SWIGLU_TEMPLATE_FUNC_PARAMS>\n {\n     DataCopyParams dataCopyParams;\n \n-    dataCopyParams.blockLen = curAicN * sizeof(yType) / DATA_BLOCK;\n     dataCopyParams.blockCount = curAicM;\n+    dataCopyParams.blockLen = curAicN * sizeof(yType);\n     dataCopyParams.srcStride = 0;\n-    dataCopyParams.dstStride = n * sizeof(yType) / DATA_BLOCK - curAicN * sizeof(yType) / DATA_BLOCK;\n+    dataCopyParams.dstStride = (n - curAicN) * sizeof(yType);\n \n     auto out = outBuf.Get<yType>();\n-    DataCopy(yGm[xOffset * (uint64_t)n + wOffset], out, dataCopyParams);\n+    DataCopyPad(yGm[xOffset * (uint64_t)n + wOffset], out, dataCopyParams);\n }\n \n FUSED_SWIGLU_TEMPLATE_CLASS_PARAMS\n@@ -403,22 +403,22 @@ __aicore__ inline void FusedQuantMatmulSwiglu<FUSED_SWIGLU_TEMPLATE_FUNC_PARAMS>\n \n     CalcParams();\n     uint64_t xCurOffset = xCoreOffset;\n-    auto l1a = l1AQueue.AllocTensor<x1Type>();\n-    auto leftResult = matmulLeftOutQueue.AllocTensor<half>();\n-    auto rightResult = matmulRightOutQueue.AllocTensor<half>();\n \n     for (uint32_t mInnerIdx = 0; mInnerIdx < mInnerLoops; mInnerIdx++) {\n         uint32_t curAicM = mInnerIdx == mInnerLoops - 1 ? aicMtail : singleTimeM;\n+        auto l1a = l1AQueue.AllocTensor<x1Type>();\n         CopyIn(l1a, curAicM, xCurOffset);\n         l1AQueue.EnQue(l1a);\n-        l1a = l1AQueue.DeQue<x1Type>();\n+        auto x1L1 = l1AQueue.DeQue<x1Type>();\n \n         mm.SetOrgShape(curAicM, n, k);\n-        mm.SetTensorA(l1a);\n+        mm.SetTensorA(x1L1);\n \n         uint64_t nOffset = wCoreOffset;\n         for (uint32_t nInnerIdx = 0; nInnerIdx < nInnerLoops; nInnerIdx++) {\n             uint32_t curAicN = nInnerIdx == nInnerLoops - 1 ? aicNtail : singleTimeN;\n+            auto leftResult = matmulLeftOutQueue.AllocTensor<half>();\n+            auto rightResult = matmulRightOutQueue.AllocTensor<half>();\n             mm.SetTail(DequantBmm::Align(curAicM, BMM_BLOCK_NUM), DequantBmm::Align(curAicN, BMM_BLOCK_NUM), k);\n             mm.SetTensorB(wGm[nOffset * (uint64_t)k]);\n             mm.SetQuantVector(deQuantScaleGm[nOffset]);\n@@ -442,12 +442,12 @@ __aicore__ inline void FusedQuantMatmulSwiglu<FUSED_SWIGLU_TEMPLATE_FUNC_PARAMS>\n             CopyOut(xCurOffset, nOffset, curAicM, curAicN);\n \n             nOffset += singleTimeN;\n+            matmulRightOutQueue.FreeTensor(rightResult);\n+            matmulLeftOutQueue.FreeTensor(leftResult);\n         }\n         xCurOffset += singleTimeM;\n         l1AQueue.FreeTensor(l1a);\n     }\n-    matmulLeftOutQueue.FreeTensor(leftResult);\n-    matmulRightOutQueue.FreeTensor(rightResult);\n     mm.End();\n }\n }\n",
+      "new_file": false,
+      "new_path": "matmul/fused_quant_mat_mul/op_kernel/fused_quant_mat_mul_swiglu.h",
+      "old_path": "matmul/fused_quant_mat_mul/op_kernel/fused_quant_mat_mul_swiglu.h",
+      "removed_lines": 10,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/76a59165411b5fd845ec42a35de334c5d2b115ef/matmul/fused_quant_mat_mul/op_kernel/fused_quant_mat_mul_swiglu.h",
+    "sha": "76a59165411b5fd845ec42a35de334c5d2b115ef",
+    "source_branch": "master",
+    "source_project": {
+      "full_name": "yanjiang-treasure/ops-nn",
+      "human_name": "yanjiang-treasure / ops-nn",
+      "id": 9452973,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  }
+]

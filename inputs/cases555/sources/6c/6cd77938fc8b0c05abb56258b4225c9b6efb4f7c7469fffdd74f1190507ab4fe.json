@@ -1,0 +1,73 @@
+{
+  "assignee": {
+    "html_url": "https://gitcode.com/yourealize",
+    "id": "684598ba4229be333029be60",
+    "login": "yourealize",
+    "name": "陈展熹",
+    "object_id": "684598ba4229be333029be60"
+  },
+  "assignees": [
+    {
+      "html_url": "https://gitcode.com/yourealize",
+      "id": "684598ba4229be333029be60",
+      "login": "yourealize",
+      "name": "陈展熹",
+      "object_id": "684598ba4229be333029be60"
+    }
+  ],
+  "body": "## 问题描述\n\nrepeat_interleave算子的b8 Gather路径使用`DataCopy<T, DIST_PACK_B16>`写入输出时，硬件始终写入完整寄存器块(128字节)，但outptr按有效元素数推进(如cpSize=28, repeats=1时推进112字节)，导致后续写入与上一次写入末尾16字节重叠，产生数据损坏和vec_error。\n\n## 复现条件\n\n- 数据类型: int8\n- shape: [52, 44, 28], dim=1, repeats=1\n- cpSize=28, cpPerBatch=4, fullOutElems=112\n- 112不是完整寄存器宽度(128)的倍数\n\n## 修复方案\n\n1. `DataCopyGather` widening load b8→b16后，`DeInterleave<uint8_t>`取偶数位(低字节)提取原始int8的bit pattern，符号位完整保留\n2. 用`DataCopyUnAlign<uint8_t>`写入输出，`POST_MODE_UPDATE`精确推进指针\n3. 提取b8路径为独立子函数`DataCopyGatherCpBatchB8`\n\n## 验证\n\n- int8 [52,44,28] dim=1 r=1: PASS\n- 全量18用例(b8/b16/b32/b64): 全部PASS",
+  "comments": 2,
+  "created_at": "2026-07-14T15:20:58+08:00",
+  "finished_at": "2026-07-14T19:53:45+08:00",
+  "html_url": "https://gitcode.com/cann/ops-nn/issues/4081",
+  "id": 4163775,
+  "issue_priority_detail": {
+    "id": 116,
+    "title": "无优先级"
+  },
+  "issue_state": "进行中",
+  "issue_state_detail": {
+    "id": 285,
+    "serial": 0,
+    "title": "进行中"
+  },
+  "issue_type": "任务",
+  "issue_type_detail": {
+    "id": 255,
+    "is_system": false,
+    "title": "任务"
+  },
+  "labels": [
+    {
+      "color": "#35e029",
+      "created_at": "2026-03-20T11:25:13+08:00",
+      "id": 38861,
+      "name": "resolved",
+      "updated_at": "2026-07-14T20:32:42+08:00"
+    }
+  ],
+  "number": "4081",
+  "priority": 0,
+  "repository": {
+    "assigner": {},
+    "created_at": "2025-09-27T17:40:34+08:00",
+    "description": "本项目是CANN提供的神经网络类计算算子库，实现网络在NPU上加速计算。",
+    "full_name": "cann/ops-nn",
+    "id": 7665709,
+    "name": "ops-nn",
+    "paas": "",
+    "path": "ops-nn",
+    "updated_at": "2025-09-27T18:09:31+08:00"
+  },
+  "state": "closed",
+  "title": "fix(repeat_interleave): b8 Gather路径DIST_PACK_B16导致outptr偏移错误",
+  "updated_at": "2026-07-14T19:53:45+08:00",
+  "user": {
+    "html_url": "https://gitcode.com/yourealize",
+    "id": "684598ba4229be333029be60",
+    "login": "yourealize",
+    "name": "陈展熹",
+    "object_id": "684598ba4229be333029be60"
+  },
+  "visibility_reason": "public"
+}

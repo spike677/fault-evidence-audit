@@ -1,0 +1,83 @@
+{
+  "assignee": {
+    "avatar_url": "https://cdn-img.gitcode.com/bb/ed/bb486e9df95a7e04887b684f08632777acf0be211cdd63ce710abade238f030e.jpg",
+    "html_url": "https://gitcode.com/smdbha",
+    "id": "66c9459108f63d641318e2bb",
+    "login": "smdbha",
+    "name": "ddssz",
+    "object_id": "66c9459108f63d641318e2bb"
+  },
+  "assignees": [
+    {
+      "avatar_url": "https://cdn-img.gitcode.com/bb/ed/bb486e9df95a7e04887b684f08632777acf0be211cdd63ce710abade238f030e.jpg",
+      "html_url": "https://gitcode.com/smdbha",
+      "id": "66c9459108f63d641318e2bb",
+      "login": "smdbha",
+      "name": "ddssz",
+      "object_id": "66c9459108f63d641318e2bb"
+    }
+  ],
+  "body": "### Describe the current behavior / 问题描述\n\nQuantBatchMatmulV3/QuantMatmulV5 在 TT/KC/KT 低浮点量化输入场景中，x1/x2 为 FLOAT8_E4M3FN、FLOAT8_E5M2 或 HIFLOAT8，scale/perTokenScale 为 FLOAT32，bias 为 FLOAT32 时，bias 累加时机与接口公式不一致。\n\n旧实现可能在反量化前累加 bias，实际等价于：\n\n`out = (x1@x2 + bias) * x2Scale * x1Scale`\n\n而该场景期望为：\n\n`out = x1@x2 * x2Scale * x1Scale + bias`\n\n此外，TT 场景不能依赖 fixpipe 随路反量化 1:2 到 UB 的路径，需要与 KC/KT 一样在 UB 中完成反量化后再累加 FLOAT32 bias。\n\n### Environment / 环境信息\n\n- 算子：QuantBatchMatmulV3 / QuantMatmulV5\n- 代码路径：`matmul/quant_batch_matmul_v3`\n- 架构/SoC：arch35 / Ascend950\n- 输入类型：FLOAT8_E4M3FN / FLOAT8_E5M2 / HIFLOAT8\n- scale/perTokenScale 类型：FLOAT32\n- bias 类型：FLOAT32\n- 涉及量化模式：TT、KC、KT\n- 关联 PR：https://gitcode.com/cann/ops-nn/pull/5390\n\n### Steps to reproduce the issue / 重现步骤\n\n1. 构造 TT/KC/KT 低浮点量化用例，x1/x2 使用 FLOAT8_E4M3FN、FLOAT8_E5M2 或 HIFLOAT8。\n2. 设置 scale/perTokenScale 为 FLOAT32，bias 为 FLOAT32，并开启 bias。\n3. 运行 QuantBatchMatmulV3，使用 golden 公式 `out = x1@x2 * x2Scale * x1Scale + bias` 进行比对。\n4. KC/KT 可参考新增 tiling 用例：\n   - `fp8-kc-fp32-scale-bias-fp32`\n   - `fp8-kt-fp32-scale-bias-fp32`\n\n### Describe the expected behavior / 预期结果\n\nTT/KC/KT 低浮点量化、FLOAT32 scale/perTokenScale、FLOAT32 bias 场景下，反量化应在 UB 中完成，随后在 UB 中累加 FLOAT32 bias，输出公式为：\n\n`out = x1@x2 * x2Scale * x1Scale + bias`\n\nTT 场景不应依赖 fixpipe 随路反量化 1:2 到 UB。\n\n### Related log / screenshot / 日志 / 截图\n\n关联 PR：https://gitcode.com/cann/ops-nn/pull/5390\n\n### Special notes for this issue/备注\n\nPR 中同步更新接口文档公式，并补充 KC/KT op_host tiling CSV 用例覆盖相关路径。",
+  "comments": 1,
+  "created_at": "2026-05-30T09:47:03+08:00",
+  "finished_at": "2026-06-03T10:29:01+08:00",
+  "html_url": "https://gitcode.com/cann/ops-nn/issues/2981",
+  "id": 4057349,
+  "issue_priority_detail": {
+    "id": 116,
+    "title": "无优先级"
+  },
+  "issue_state": "进行中",
+  "issue_state_detail": {
+    "id": 285,
+    "serial": 0,
+    "title": "进行中"
+  },
+  "issue_type": "任务",
+  "issue_type_detail": {
+    "id": 255,
+    "is_system": false,
+    "title": "任务"
+  },
+  "labels": [
+    {
+      "color": "#DB2828",
+      "created_at": "2025-06-10T14:17:23+08:00",
+      "id": 3870,
+      "name": "bug-report",
+      "updated_at": "2026-05-30T09:47:03+08:00"
+    },
+    {
+      "color": "#35e029",
+      "created_at": "2026-03-20T11:25:13+08:00",
+      "id": 38861,
+      "name": "resolved",
+      "updated_at": "2026-06-03T10:48:14+08:00"
+    }
+  ],
+  "number": "2981",
+  "priority": 0,
+  "repository": {
+    "assigner": {},
+    "created_at": "2025-09-27T17:40:34+08:00",
+    "description": "本项目是CANN提供的神经网络类计算算子库，实现网络在NPU上加速计算。",
+    "full_name": "cann/ops-nn",
+    "id": 7665709,
+    "name": "ops-nn",
+    "paas": "",
+    "path": "ops-nn",
+    "updated_at": "2025-09-27T18:09:31+08:00"
+  },
+  "state": "closed",
+  "title": "[Bug-Report|缺陷反馈]: QuantBatchMatmulV3 低浮点量化 FP32 bias 累加时机错误",
+  "updated_at": "2026-06-03T10:29:01+08:00",
+  "user": {
+    "avatar_url": "https://cdn-img.gitcode.com/bb/ed/bb486e9df95a7e04887b684f08632777acf0be211cdd63ce710abade238f030e.jpg",
+    "html_url": "https://gitcode.com/smdbha",
+    "id": "66c9459108f63d641318e2bb",
+    "login": "smdbha",
+    "name": "ddssz",
+    "object_id": "66c9459108f63d641318e2bb"
+  },
+  "visibility_reason": "public"
+}

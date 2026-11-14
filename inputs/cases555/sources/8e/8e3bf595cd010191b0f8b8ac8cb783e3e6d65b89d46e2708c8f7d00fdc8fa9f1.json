@@ -1,0 +1,76 @@
+{
+  "assignee": {
+    "avatar_url": "https://cdn-img.gitcode.com/ba/ca/49021b499a35795cadc9c7c61554ac90ab0e2bc68be028653a47b808d65edfac.jpg",
+    "html_url": "https://gitcode.com/sunduiyang",
+    "id": "688c6c4d99bb701beaee3512",
+    "login": "sunduiyang",
+    "name": "sunduiyang",
+    "object_id": "688c6c4d99bb701beaee3512"
+  },
+  "assignees": [
+    {
+      "avatar_url": "https://cdn-img.gitcode.com/ba/ca/49021b499a35795cadc9c7c61554ac90ab0e2bc68be028653a47b808d65edfac.jpg",
+      "html_url": "https://gitcode.com/sunduiyang",
+      "id": "688c6c4d99bb701beaee3512",
+      "login": "sunduiyang",
+      "name": "sunduiyang",
+      "object_id": "688c6c4d99bb701beaee3512"
+    }
+  ],
+  "body": "## Describe the current behavior / 问题描述 (Mandatory / 必填)\n\nQuantBatchMatmulV4 的 A8W4 和 MXA8W4 数据流共用 JSON 配置，且 required 参数完全一致。预编译 kernel 中，MXA8W4 的 `DTYPE_BIAS` 因此沿用了 A8W4 的配置，未满足 bias 类型与输出 `y` 类型一致的约束，导致 FP16 bias 场景出现精度错误。\n\n## Environment / 环境信息 (Mandatory / 必填)\n\n- SoC：Ascend 950\n- 算子：QuantBatchMatmulV4\n- 数据流：MXA8W4\n- 运行方式：预编译 kernel 二进制包\n\n## Steps to reproduce the issue / 重现步骤 (Mandatory / 必填)\n\n运行 MXA8W4 的 FP16 bias/FP16 输出用例。使用预编译 kernel 时精度校验失败；bias 设为 0 时精度正常。\n\n## Describe the expected behavior / 预期结果 (Mandatory / 必填)\n\nMXA8W4 的 bias 类型应与 `DTYPE_Y` 一致，FP16 和 BF16 bias 场景均应通过精度校验。\n\n## Related log / screenshot / 日志 / 截图 (Mandatory / 必填)\n\nFP16 bias 场景稳定出现精度误差。将 kernel 中的 `BiasType` 固定为 `DTYPE_Y` 后，精度校验通过。\n\n## Special notes for this issue/备注 (Optional / 选填)\n\nA8W4 与 MXA8W4 的 required 参数相同，不能依赖共享 JSON 中的 `DTYPE_BIAS` 区分两种数据流。",
+  "comments": 1,
+  "created_at": "2026-08-12T10:09:55+08:00",
+  "finished_at": "2026-08-12T10:35:43+08:00",
+  "html_url": "https://gitcode.com/cann/ops-nn/issues/4732",
+  "id": 4244026,
+  "issue_priority_detail": {
+    "id": 116,
+    "title": "无优先级"
+  },
+  "issue_state": "进行中",
+  "issue_state_detail": {
+    "id": 285,
+    "serial": 0,
+    "title": "进行中"
+  },
+  "issue_type": "任务",
+  "issue_type_detail": {
+    "id": 255,
+    "is_system": false,
+    "title": "任务"
+  },
+  "labels": [
+    {
+      "color": "#35e029",
+      "created_at": "2026-03-20T11:25:13+08:00",
+      "id": 38861,
+      "name": "resolved",
+      "updated_at": "2026-08-12T12:56:05+08:00"
+    }
+  ],
+  "number": "4732",
+  "priority": 0,
+  "repository": {
+    "assigner": {},
+    "created_at": "2025-09-27T17:40:34+08:00",
+    "description": "本项目是CANN提供的神经网络类计算算子库，实现网络在NPU上加速计算。",
+    "full_name": "cann/ops-nn",
+    "id": 7665709,
+    "name": "ops-nn",
+    "paas": "",
+    "path": "ops-nn",
+    "updated_at": "2025-09-27T18:09:31+08:00"
+  },
+  "state": "closed",
+  "title": "[Bug-Report|缺陷反馈]: 修复quant_batch_matmul_v4 MXA8W4数据流的bias类型定义错误的问题",
+  "updated_at": "2026-08-12T10:35:43+08:00",
+  "user": {
+    "avatar_url": "https://cdn-img.gitcode.com/ba/ca/49021b499a35795cadc9c7c61554ac90ab0e2bc68be028653a47b808d65edfac.jpg",
+    "html_url": "https://gitcode.com/sunduiyang",
+    "id": "688c6c4d99bb701beaee3512",
+    "login": "sunduiyang",
+    "name": "sunduiyang",
+    "object_id": "688c6c4d99bb701beaee3512"
+  },
+  "visibility_reason": "public"
+}

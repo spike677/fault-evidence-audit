@@ -1,0 +1,182 @@
+[
+  {
+    "additions": 69,
+    "blob_id": "c3093445fbc4800a04bb5b02ef85d6332b537084",
+    "blob_url": "https://gitcode.com/cann/ops-math/blob/1afa7cb85ea979f12e45d08dc6a6ea5a4c8f5355/math/round/op_host/arch35/round_tiling_arch35.cpp",
+    "deletions": 22,
+    "filename": "math/round/op_host/arch35/round_tiling_arch35.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 69,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -29,12 +29,17 @@ namespace optiling\n {\n using namespace Ops::Math::OpTiling;\n \n-const uint64_t ASCEND_WORKSPACE = 16777216;\n-const std::int32_t ATTR_ROUND_DECIMALS_POS = 0;\n+const uint64_t ASCEND_WORKSPACE = 0;\n+const int32_t ATTR_ROUND_DECIMALS_POS = 0;\n+const int32_t powerArr[10] = {0, 10, 100, 1000, 10000, 100000, 1000000, 10000000, 100000000, 0};\n+const int32_t numArr[10] = {0, 2147483645, -2147483600, 2147483499, -2147480000, 2147450000, -2147000000, 2145000000, -2100000000, 0};\n const int64_t DEFAULT_ZERO = 0;\n-const float DEFAULT_FP32_ZERO = 0.0;\n const int64_t DEFAULT_TEN = 10;\n+const int64_t DEFAULT_NEG_NINE = -9;\n+const int64_t DEFAULT_NEG_MAX = -308;\n+const int64_t DEFAULT_FP32_MIN = -2147483648;\n const int64_t DEFAULT_THIRTY_EIGHT = 38;\n+const float DEFAULT_FP32_ZERO = 0.0;\n const float DEFAULT_INF = INFINITY;\n \n class RoundTiling\n@@ -49,7 +54,8 @@ protected:\n     ge::graphStatus CalcInputDtype();\n     ge::graphStatus CheckShape();\n     ge::graphStatus SetTilingData();\n-    ge::graphStatus DoTiling(bool decimalsNeg, bool decimalsNan);\n+    ge::graphStatus DoTilingF(bool decimalsNeg, bool decimalsNan);\n+    ge::graphStatus DoTilingI(int64_t decimals);\n \n private:\n     uint64_t dType = 0;\n@@ -125,7 +131,7 @@ ge::graphStatus RoundTiling::CalcOutputDtype()\n     return ge::GRAPH_SUCCESS;\n }\n \n-ge::graphStatus RoundTiling::DoTiling(bool decimalsNeg, bool decimalsNan)\n+ge::graphStatus RoundTiling::DoTilingF(bool decimalsNeg, bool decimalsNan)\n {\n     ElewiseBaseTiling elewiseBaseTiling(tilingContext);\n     ge::graphStatus baseTilingResult = ge::GRAPH_FAILED;\n@@ -171,38 +177,81 @@ ge::graphStatus RoundTiling::DoTiling(bool decimalsNeg, bool decimalsNan)\n             dType = static_cast<uint64_t>(ROUND_TPL_POSITIVE_DECIMALS);\n             baseTilingResult = elewiseBaseTiling.DoTiling<RoundDag::RoundPositiveDecimals<float>::OpDag>(tiling_->baseTiling);\n         }\n-    } else if (this->outputDtype == ge::DT_INT32) {\n-        dType = static_cast<uint64_t>(ROUND_TPL_INT32);\n-        baseTilingResult = elewiseBaseTiling.DoTiling<RoundDag::RoundInt<int>::OpDag>(tiling_->baseTiling);\n-    }\n+    } \n     OP_CHECK_IF(baseTilingResult == ge::GRAPH_FAILED,\n-               OP_LOGE(tilingContext, \"elewiseBaseTiling failed\"), return ge::GRAPH_FAILED);\n+               OP_LOGE(tilingContext, \"elewiseBaseTilingF failed\"), return ge::GRAPH_FAILED);\n+    return ge::GRAPH_SUCCESS;\n+}\n+\n+ge::graphStatus RoundTiling::DoTilingI(int64_t decimals)\n+{\n+    ElewiseBaseTiling elewiseBaseTiling(tilingContext);\n+    ge::graphStatus baseTilingResult = ge::GRAPH_FAILED;\n+\n+    if (decimals >= DEFAULT_ZERO) {\n+        dType = static_cast<uint64_t>(ROUND_TPL_INT32);\n+        baseTilingResult = elewiseBaseTiling.DoTiling<RoundDag::RoundInt<int32_t>::OpDag>(tiling_->baseTiling);\n+    }\n+    if ((decimals < DEFAULT_ZERO) && (decimals > DEFAULT_NEG_NINE)){\n+        tiling_->power = powerArr[llabs(static_cast<int32_t>(decimals))];\n+        tiling_->num = numArr[llabs(static_cast<int32_t>(decimals))];\n+        if (llabs(static_cast<int32_t>(decimals)) & 1) {\n+            dType = static_cast<uint64_t>(ROUND_TPL_INT32_NEGINF);\n+            baseTilingResult = elewiseBaseTiling.DoTiling<RoundDag::RoundIntNegativeDecimalsInf<int32_t>::OpDag>(tiling_->baseTiling);\n+        } else {\n+            dType = static_cast<uint64_t>(ROUND_TPL_INT32_NEG);\n+            baseTilingResult = elewiseBaseTiling.DoTiling<RoundDag::RoundIntNegativeDecimals<int32_t>::OpDag>(tiling_->baseTiling);\n+        }\n+    }\n+    if (decimals == DEFAULT_NEG_NINE){\n+        dType = static_cast<uint64_t>(ROUND_TPL_INT32_NEG_NINE);\n+        baseTilingResult = elewiseBaseTiling.DoTiling<RoundDag::RoundIntNegativeDecimalsNine<int32_t>::OpDag>(tiling_->baseTiling);\n+    }\n+    if (decimals < DEFAULT_NEG_NINE) {\n+        tiling_->num = static_cast<int32_t>(DEFAULT_FP32_ZERO);\n+        if (decimals < DEFAULT_NEG_MAX) {\n+            tiling_->num = static_cast<int32_t>(DEFAULT_FP32_MIN);\n+        }\n+        dType = static_cast<uint64_t>(ROUND_TPL_INT32_CONST);\n+        baseTilingResult = elewiseBaseTiling.DoTiling<RoundDag::RoundIntConst<int>::OpDag>(tiling_->baseTiling);\n+    }\n+\n+    OP_CHECK_IF(baseTilingResult == ge::GRAPH_FAILED,\n+                OP_LOGE(tilingContext, \"elewiseBaseTilingInt failed\"), return ge::GRAPH_FAILED);\n     return ge::GRAPH_SUCCESS;\n }\n \n ge::graphStatus RoundTiling::RunTiling()\n {\n     OP_LOGD(tilingContext->GetNodeName(), \"RoundTiling RunTiling enter.\");\n+\n     tiling_ = tilingContext->GetTilingData<RoundTilingData>();\n     OP_CHECK_NULL_WITH_CONTEXT(tilingContext, tiling_);\n+\n     OP_CHECK_IF(CalcInputDtype() == ge::GRAPH_FAILED,\n                OP_LOGE(tilingContext, \"get input x dtype failed\"), return ge::GRAPH_FAILED);\n     OP_CHECK_IF(CalcOutputDtype() == ge::GRAPH_FAILED,\n                OP_LOGE(tilingContext, \"get output y dtype failed\"), return ge::GRAPH_FAILED);\n     OP_CHECK_IF(CheckShape() == ge::GRAPH_FAILED, OP_LOGE(tilingContext, \"check shape failed\"),\n                return ge::GRAPH_FAILED);\n+\n     auto runtimeAttrs = tilingContext->GetAttrs();\n     OP_CHECK_NULL_WITH_CONTEXT(tilingContext, runtimeAttrs);\n     const int64_t *decimalsPtr = runtimeAttrs->GetAttrPointer<int64_t>(ATTR_ROUND_DECIMALS_POS);\n-    bool decimalsNeg = false;\n-    bool decimalsNan = false;\n-    if (decimalsPtr != nullptr) {\n-        if (*decimalsPtr < DEFAULT_ZERO) {\n-            decimalsNeg = true;\n-        }\n-        if (*decimalsPtr == DEFAULT_ZERO) {\n-            tiling_->decimals = DEFAULT_FP32_ZERO;\n-        } else {\n+    OP_CHECK_IF(decimalsPtr == nullptr, OP_LOGE(tilingContext, \"check decimalsPtr failed\"),\n+               return ge::GRAPH_FAILED);\n+    \n+    if (this->outputDtype == ge::DT_INT32) {\n+        DoTilingI(*decimalsPtr);\n+    } else {\n+        bool decimalsNeg = false;\n+        bool decimalsNan = false;\n+\n+        tiling_->decimals = DEFAULT_FP32_ZERO;\n+        if (*decimalsPtr < DEFAULT_ZERO) {\t \n+            decimalsNeg = true;\t \n+        }\t \n+        if (*decimalsPtr != DEFAULT_ZERO) {\n             if (llabs(*decimalsPtr) > DEFAULT_THIRTY_EIGHT) {\n                 tiling_->decimals = DEFAULT_INF;\n                 decimalsNan = true;\n@@ -211,10 +260,8 @@ ge::graphStatus RoundTiling::RunTiling()\n                 tiling_->decimals = pow(DEFAULT_TEN, llabs(*decimalsPtr));\n             }\n         }\n-    } else {\n-        tiling_->decimals = DEFAULT_FP32_ZERO;\n+        DoTilingF(decimalsNeg, decimalsNan);\n     }\n-    DoTiling(decimalsNeg, decimalsNan);\n \n     SetTilingData();\n     return ge::GRAPH_SUCCESS;\n",
+      "new_file": false,
+      "new_path": "math/round/op_host/arch35/round_tiling_arch35.cpp",
+      "old_path": "math/round/op_host/arch35/round_tiling_arch35.cpp",
+      "removed_lines": 22,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-math/raw/1afa7cb85ea979f12e45d08dc6a6ea5a4c8f5355/math/round/op_host/arch35/round_tiling_arch35.cpp",
+    "sha": "1afa7cb85ea979f12e45d08dc6a6ea5a4c8f5355",
+    "source_branch": "master",
+    "source_project": {
+      "full_name": "ASCEND222/ops-math",
+      "human_name": "ASCEND222 / ops-math",
+      "id": 7651705,
+      "path": "ops-math"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-math",
+      "human_name": "CANN / ops-math",
+      "id": 7649531,
+      "path": "ops-math"
+    }
+  },
+  {
+    "additions": 173,
+    "blob_id": "d4aeada3e5164b5dc2bec0b4aa961b9b1ac55611",
+    "blob_url": "https://gitcode.com/cann/ops-math/blob/1afa7cb85ea979f12e45d08dc6a6ea5a4c8f5355/math/round/op_kernel/arch35/round_dag.h",
+    "deletions": 18,
+    "filename": "math/round/op_kernel/arch35/round_dag.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 173,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -23,16 +23,91 @@\n using namespace Ops::Base;\n \n namespace RoundDag {\n-const uint32_t UINT32_SIGN = 0x80000000;\n-const uint16_t UINT16_SIGN = 0x8000;\n+    \n+constexpr int32_t CAST_MODE_NONE = 0;\n+constexpr int32_t CAST_MODE_RINT = 1;\n+\n+constexpr int32_t COMPARE_MODE_LT = 0;\n+constexpr int32_t COMPARE_MODE_GT = 1;\n+constexpr int32_t COMPARE_MODE_EQ = 2;\n+constexpr int32_t COMPARE_MODE_GE = 4;\n+constexpr int32_t SELECT_MODE_VS = 1;\n+\n+constexpr uint32_t UINT32_SIGN = 0x80000000;\n+constexpr uint16_t UINT16_SIGN = 0x8000;\n+constexpr int32_t ConstNegOne = -1;\n+constexpr int32_t ConstZero = 0;\n+constexpr int32_t ConstOne = 1;\n+constexpr int32_t ConstTwo = 2;\n+\n+template <typename T>\n+struct RoundIntCustom : public Vec::ElemwiseTernaryOP<T, T, T, T> {\n+    __aicore__ inline RoundIntCustom(LocalTensor<T> &dst, LocalTensor<T> &src, LocalTensor<T> &abs, \n+                                     const T& power,  uint32_t count) {\n+#ifdef __CCE_AICORE__\n+        uint32_t vl = VECTOR_REG_WIDTH / sizeof(T);\n+        uint16_t loopNum = (count + vl - 1) / vl;\n+        __ubuf__ T* srcAddr = (__ubuf__ T*)src.GetPhyAddr();\n+        __ubuf__ T* absAddr = (__ubuf__ T*)abs.GetPhyAddr();\n+        __ubuf__ T* dstAddr = (__ubuf__ T*)dst.GetPhyAddr();\n+        \n+        MicroAPI::RegTensor<T, MicroAPI::RegTraitNumOne> vregInput;\n+        MicroAPI::RegTensor<T, MicroAPI::RegTraitNumOne> vregPow;\n+        MicroAPI::RegTensor<T, MicroAPI::RegTraitNumOne> vregDupZero;\n+        MicroAPI::RegTensor<T, MicroAPI::RegTraitNumOne> vregDupOne;\n+        MicroAPI::RegTensor<T, MicroAPI::RegTraitNumOne> vregDiv;\n+        MicroAPI::RegTensor<T, MicroAPI::RegTraitNumOne> vregMul;\n+        MicroAPI::RegTensor<T, MicroAPI::RegTraitNumOne> vregReUse;\n+        MicroAPI::MaskReg mask;\n+        MicroAPI::MaskReg cmpMaskReg0;\n+        MicroAPI::MaskReg cmpMaskReg1;\n+        if constexpr(std::is_same_v<T, int32_t>) {\n+            __VEC_SCOPE__ {\n+                MicroAPI::Duplicate(vregDupZero, ConstZero);\n+                MicroAPI::Duplicate(vregDupOne, ConstOne);\n+                MicroAPI::Duplicate(vregPow, power);\n+                for (uint16_t loopIdx = 0; loopIdx < loopNum; loopIdx++) {\n+                    mask = MicroAPI::UpdateMask<T, MicroAPI::RegTraitNumOne>(count);\n+                    // OpCopyIn\n+                    MicroAPI::DataCopy(vregInput, (__ubuf__ T*)(srcAddr + loopIdx * vl));\n+                    MicroAPI::DataCopy(vregReUse, (__ubuf__ T*)(absAddr + loopIdx * vl));\n+                    \n+                    MicroAPI::Div(vregDiv, vregReUse, vregPow, mask);\n+                    MicroAPI::Mul(vregMul, vregDiv, vregPow, mask);\n+                    MicroAPI::Sub(vregReUse, vregReUse, vregMul, mask);\n+                    MicroAPI::Muls(vregMul, vregReUse, ConstTwo, mask);\n+                    \n+                    // + 1\n+                    MicroAPI::CompareScalar<T, CMPMODE::EQ>(cmpMaskReg0, vregMul, power, mask);\n+                    MicroAPI::And(vregReUse, vregDiv, vregDupOne, mask);\n+                    MicroAPI::CompareScalar<T, CMPMODE::EQ>(cmpMaskReg1, vregReUse, ConstOne, mask);\n+                    MicroAPI::MaskAnd(cmpMaskReg0, cmpMaskReg0, cmpMaskReg1, mask);\n+                    MicroAPI::CompareScalar<T, CMPMODE::GT>(cmpMaskReg1, vregMul, power, mask);\n+                    MicroAPI::MaskOr(cmpMaskReg0, cmpMaskReg0, cmpMaskReg1, mask);\n+                    MicroAPI::Select(vregMul, vregDupOne, vregDupZero, cmpMaskReg0);\n+                    MicroAPI::Add(vregMul, vregDiv, vregMul, mask);\n+                    \n+                    MicroAPI::CompareScalar<T, CMPMODE::LT>(cmpMaskReg0, vregInput, ConstZero, mask);\n+                    MicroAPI::Neg(vregReUse, vregDupOne, mask);\n+                    MicroAPI::Select(vregDiv, vregReUse, vregDupOne, cmpMaskReg0);\n+                    MicroAPI::Mul(vregMul, vregMul, vregDiv, mask);\n+                    MicroAPI::Mul(vregReUse, vregMul, vregPow, mask);\n+                    \n+                    // OpCopyOut\n+                    MicroAPI::DataCopy((__ubuf__ T*)(dstAddr + loopIdx * vl), (MicroAPI::RegTensor<T> &)vregReUse, mask);\n+                }\n+            }\n+        }\n+#endif\n+    }\n+};\n+\n template<class T>\n struct RoundCustom : public Vec::ElemwiseUnaryOP<T, T> {\n     __aicore__ inline RoundCustom(LocalTensor<T> &dst, LocalTensor<T> &src, uint32_t count) {\n #ifdef __CCE_AICORE__\n-        uint32_t dtypeSize = sizeof(T);\n-        uint32_t vl = VECTOR_REG_WIDTH / dtypeSize;\n+        uint32_t vl = VECTOR_REG_WIDTH / sizeof(T);\n         uint16_t loopNum = (count + vl - 1) / vl;\n-        uint32_t vlSize = vl;\n         __ubuf__ T* srcAddr = (__ubuf__ T*)src.GetPhyAddr();\n         __ubuf__ T* dstAddr = (__ubuf__ T*)dst.GetPhyAddr();\n \n@@ -45,7 +120,7 @@ struct RoundCustom : public Vec::ElemwiseUnaryOP<T, T> {\n                 for (uint16_t loopIdx = 0; loopIdx < loopNum; loopIdx++) {\n                     mask = MicroAPI::UpdateMask<T, MicroAPI::RegTraitNumOne>(count);\n                     // OpCopyIn\n-                    MicroAPI::DataCopy(vregInput, (__ubuf__ T*)(srcAddr + loopIdx * vlSize));\n+                    MicroAPI::DataCopy(vregInput, (__ubuf__ T*)(srcAddr + loopIdx * vl));\n \n                     MicroAPI::Truncate<T, RoundMode::CAST_RINT, MicroAPI::MaskMergeMode::ZEROING>(vregOutput, vregInput, mask);\n                     MicroAPI::Duplicate(vregOutInt, UINT32_SIGN, mask);\n@@ -53,7 +128,7 @@ struct RoundCustom : public Vec::ElemwiseUnaryOP<T, T> {\n                     MicroAPI::Or(vregOutInt, vregOutInt, (MicroAPI::RegTensor<uint32_t> &)vregOutput, mask);\n \n                     // OpCopyOut\n-                    MicroAPI::DataCopy((__ubuf__ T*)(dstAddr + loopIdx * vlSize), (MicroAPI::RegTensor<T> &)vregOutInt, mask);\n+                    MicroAPI::DataCopy((__ubuf__ T*)(dstAddr + loopIdx * vl), (MicroAPI::RegTensor<T> &)vregOutInt, mask);\n                 }\n             }\n         } else {\n@@ -62,7 +137,7 @@ struct RoundCustom : public Vec::ElemwiseUnaryOP<T, T> {\n                 for (uint16_t loopIdx = 0; loopIdx < loopNum; loopIdx++) {\n                     mask = MicroAPI::UpdateMask<T, MicroAPI::RegTraitNumOne>(count);\n                     // OpCopyIn\n-                    MicroAPI::DataCopy(vregInput, (__ubuf__ T*)(srcAddr + loopIdx * vlSize));\n+                    MicroAPI::DataCopy(vregInput, (__ubuf__ T*)(srcAddr + loopIdx * vl));\n \n                     MicroAPI::Truncate<T, RoundMode::CAST_RINT, MicroAPI::MaskMergeMode::ZEROING>(vregOutput, vregInput, mask);\n                     MicroAPI::Duplicate(vregOutInt, UINT16_SIGN, mask);\n@@ -70,7 +145,7 @@ struct RoundCustom : public Vec::ElemwiseUnaryOP<T, T> {\n                     MicroAPI::Or(vregOutInt, vregOutInt, (MicroAPI::RegTensor<uint16_t> &)vregOutput, mask);\n \n                     // OpCopyOut\n-                    MicroAPI::DataCopy((__ubuf__ T*)(dstAddr + loopIdx * vlSize), (MicroAPI::RegTensor<T> &)vregOutInt, mask);\n+                    MicroAPI::DataCopy((__ubuf__ T*)(dstAddr + loopIdx * vl), (MicroAPI::RegTensor<T> &)vregOutInt, mask);\n                 }\n             }\n         }\n@@ -78,7 +153,7 @@ struct RoundCustom : public Vec::ElemwiseUnaryOP<T, T> {\n     }\n };\n \n-template <typename U, typename T = float>\n+template <typename U>\n struct RoundInt {\n     using OpCopyIn0 = Bind<Vec::CopyIn<U>, Placeholder::In0<U>>;\n     using OpCopyOut = Bind<Vec::CopyOut<U>, Placeholder::Out0<U>, OpCopyIn0>;\n@@ -88,7 +163,94 @@ struct RoundInt {\n     using OpDag = DAGSch<Outputs, void, MemCfg>;\n };\n \n-template <typename U, typename T = float>\n+template <typename U>\n+struct RoundIntConst {\n+    using OpDup = Bind<Vec::Duplicate<U>, Placeholder::Var<U, 0>>;\n+    using OpCopyOut = Bind<Vec::CopyOut<U>, Placeholder::Out0<U>, OpDup>;\n+\n+    using Outputs = Elems<OpCopyOut>;\n+    using MemCfg = MemOptCfg<MemLevel::LEVEL_2>;\n+    using OpDag = DAGSch<Outputs, void, MemCfg>;\n+};\n+\n+template <typename U>\n+struct RoundIntNegativeDecimalsInf {\n+    using ConstValueMin = MAKE_CONST(U, -2147483648);\n+\n+    using OpCopyIn0 = Bind<Vec::CopyIn<U>, Placeholder::In0<U>>;\n+    using OpAbs = Bind<Vec::Abs<U>, OpCopyIn0>;\n+\n+    using OpRes = Bind<RoundIntCustom<U>, OpCopyIn0, OpAbs, Placeholder::Var<U, 0>>;\n+\n+    using OpCompareGreaterThanNum = Bind<Vec::Compare<uint8_t, U, COMPARE_MODE_GT>, OpAbs, Placeholder::Var<U, 1>>;\n+    using OpCompareEqualMin = Bind<Vec::Compare<uint8_t, U, COMPARE_MODE_EQ>, OpCopyIn0, ConstValueMin>;\n+    using OpMaskOr = Bind<Vec::Or<uint8_t>, OpCompareGreaterThanNum, OpCompareEqualMin>;\n+    \n+    using OpSelect = Bind<Vec::Select<uint8_t, U, SELECT_MODE_VS>, OpMaskOr, ConstValueMin, OpRes>;\n+\n+    using OpCopyOut = Bind<Vec::CopyOut<U>, Placeholder::Out0<U>, OpSelect>;\n+    using Outputs = Elems<OpCopyOut>;\n+    using MemCfg = MemOptCfg<MemLevel::LEVEL_2>;\n+    using OpDag = DAGSch<Outputs, void, MemCfg>;\n+};\n+\n+template <typename U>\n+struct RoundIntNegativeDecimals {\n+    using ConstValueMin = MAKE_CONST(U, -2147483648);\n+\n+    using OpCopyIn0 = Bind<Vec::CopyIn<U>, Placeholder::In0<U>>;\n+    using OpAbs = Bind<Vec::Abs<U>, OpCopyIn0>;\n+\n+    using OpRes = Bind<RoundIntCustom<U>, OpCopyIn0, OpAbs, Placeholder::Var<U, 0>>;\n+\n+    using OpCompareEqualMin = Bind<Vec::Compare<uint8_t, U, COMPARE_MODE_EQ>, OpCopyIn0, ConstValueMin>;\n+    using OpSelect = Bind<Vec::Select<uint8_t, U, SELECT_MODE_VS>, OpCompareEqualMin, Placeholder::Var<U, 1>, OpRes>;\n+\n+    using OpCopyOut = Bind<Vec::CopyOut<U>, Placeholder::Out0<U>, OpSelect>;\n+    using Outputs = Elems<OpCopyOut>;\n+    using MemCfg = MemOptCfg<MemLevel::LEVEL_2>;\n+    using OpDag = DAGSch<Outputs, void, MemCfg>;\n+};\n+\n+template <typename U>\n+struct RoundIntNegativeDecimalsNine {\n+    using ConstValueNegOne = MAKE_CONST(U, -1);\n+    using ConstValueZero = MAKE_CONST(U, 0);\n+    using ConstValueOne = MAKE_CONST(U, 1);\n+    using ConstValueNeg20Y = MAKE_CONST(U, -2000000000);\n+    using ConstValue5Y = MAKE_CONST(U, 500000000);\n+    using ConstValue10Y = MAKE_CONST(U, 1000000000);\n+    using ConstValue15Y = MAKE_CONST(U, 1500000000);\n+    using ConstValue20Y = MAKE_CONST(U, 2000000000);\n+    using ConstValueMin = MAKE_CONST(U, -2147483648);\n+\n+    using OpDupZero = Bind<Vec::Duplicate<U>, ConstValueZero>;\n+    using OpDupOne = Bind<Vec::Duplicate<U>, ConstValueOne>;\n+\n+    using OpCopyIn0 = Bind<Vec::CopyIn<U>, Placeholder::In0<U>>;\n+    using OpCompareLowerThanZero = Bind<Vec::Compare<uint8_t, U, COMPARE_MODE_LT>, OpCopyIn0, ConstValueZero>;\n+    using OpSelect = Bind<Vec::Select<uint8_t, U, SELECT_MODE_VS>, OpCompareLowerThanZero, ConstValueNegOne, OpDupOne>;\n+    using OpAbs = Bind<Vec::Abs<U>, OpCopyIn0>;\n+\n+    //0~500000000          = 0\n+    //500000001~1499999999 = 1000000000\n+    //1500000000~          = 2000000000\n+    using OpCompareGreaterThan5Y = Bind<Vec::Compare<uint8_t, U, COMPARE_MODE_GT>, OpAbs, ConstValue5Y>;\n+    using OpSelect2 = Bind<Vec::Select<uint8_t, U, SELECT_MODE_VS>, OpCompareGreaterThan5Y, ConstValue10Y, OpDupZero>;\n+    using OpCompareGreaterEqual15Y = Bind<Vec::Compare<uint8_t, U, COMPARE_MODE_GE>, OpAbs, ConstValue15Y>;\n+    using OpSelect3 = Bind<Vec::Select<uint8_t, U, SELECT_MODE_VS>, OpCompareGreaterEqual15Y, ConstValue20Y, OpSelect2>;\n+    using OpMul = Bind<Vec::Mul<U>, OpSelect, OpSelect3>;\n+\n+    using OpCompareEqualMin = Bind<Vec::Compare<uint8_t, U, COMPARE_MODE_EQ>, OpCopyIn0, ConstValueMin>;    \n+    using OpSelect4 = Bind<Vec::Select<uint8_t, U, SELECT_MODE_VS>, OpCompareEqualMin, ConstValueNeg20Y, OpMul>;\n+\n+    using OpCopyOut = Bind<Vec::CopyOut<U>, Placeholder::Out0<U>, OpSelect4>;\n+    using Outputs = Elems<OpCopyOut>;\n+    using MemCfg = MemOptCfg<MemLevel::LEVEL_2>;\n+    using OpDag = DAGSch<Outputs, void, MemCfg>;\n+};\n+\n+template <typename U>\n struct RoundZero {\n     using OpCopyIn0 = Bind<Vec::CopyIn<U>, Placeholder::In0<U>>;\n     using OpTruncate = Bind<RoundCustom<U>, OpCopyIn0>;\n@@ -101,7 +263,6 @@ struct RoundZero {\n \n template <typename U, typename T = float>\n struct RoundNan {\n-    constexpr static std::int32_t CAST_MODE_RINT = 1;\n     using ConstValueZero = MAKE_CONST(T, 0.0);\n     using OpDup = Bind<Vec::Duplicate<T>, ConstValueZero>;\n     using OpDiv = Bind<Vec::Div<T>, OpDup, OpDup>;\n@@ -116,9 +277,6 @@ struct RoundNan {\n \n template <typename U, typename T = float>\n struct RoundPositiveDecimals {\n-    constexpr static std::int32_t CAST_MODE_NONE = 0;\n-    constexpr static std::int32_t CAST_MODE_RINT = 1;\n-\n     using OpCopyIn0 = Bind<Vec::CopyIn<U>, Placeholder::In0<U>>;\n     using OpCopyIn0Cast = Bind<Vec::Cast<T, U, CAST_MODE_NONE>, OpCopyIn0>;\n \n@@ -137,9 +295,6 @@ struct RoundPositiveDecimals {\n \n template <typename U, typename T = float>\n struct RoundNegativeDecimals {\n-    constexpr static std::int32_t CAST_MODE_NONE = 0;\n-    constexpr static std::int32_t CAST_MODE_RINT = 1;\n-\n     using OpCopyIn0 = Bind<Vec::CopyIn<U>, Placeholder::In0<U>>;\n     using OpCopyIn0Cast = Bind<Vec::Cast<T, U, CAST_MODE_NONE>, OpCopyIn0>;\n \n",
+      "new_file": false,
+      "new_path": "math/round/op_kernel/arch35/round_dag.h",
+      "old_path": "math/round/op_kernel/arch35/round_dag.h",
+      "removed_lines": 18,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-math/raw/1afa7cb85ea979f12e45d08dc6a6ea5a4c8f5355/math/round/op_kernel/arch35/round_dag.h",
+    "sha": "1afa7cb85ea979f12e45d08dc6a6ea5a4c8f5355",
+    "source_branch": "master",
+    "source_project": {
+      "full_name": "ASCEND222/ops-math",
+      "human_name": "ASCEND222 / ops-math",
+      "id": 7651705,
+      "path": "ops-math"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-math",
+      "human_name": "CANN / ops-math",
+      "id": 7649531,
+      "path": "ops-math"
+    }
+  },
+  {
+    "additions": 8,
+    "blob_id": "e1bbe2994cfef797495ca90fb1b2c76ac3e988dd",
+    "blob_url": "https://gitcode.com/cann/ops-math/blob/1afa7cb85ea979f12e45d08dc6a6ea5a4c8f5355/math/round/op_kernel/arch35/round_struct.h",
+    "deletions": 2,
+    "filename": "math/round/op_kernel/arch35/round_struct.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 8,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -25,6 +25,10 @@ namespace RoundOp\n #define ROUND_TPL_POSITIVE_DECIMALS 3\n #define ROUND_TPL_NEGATIVE_DECIMALS 4\n #define ROUND_TPL_NAN_DECIMALS 5\n+#define ROUND_TPL_INT32_CONST 6\n+#define ROUND_TPL_INT32_NEG 7\n+#define ROUND_TPL_INT32_NEGINF 8\n+#define ROUND_TPL_INT32_NEG_NINE 9\n \n #define ROUND_TPL_SCH_MODE_0 0\n #define ROUND_TPL_SCH_MODE_1 1\n@@ -33,14 +37,16 @@ ASCENDC_TPL_ARGS_DECL(\n     Round,\n     ASCENDC_TPL_UINT_DECL(schMode, 1, ASCENDC_TPL_UI_LIST, ROUND_TPL_SCH_MODE_0, ROUND_TPL_SCH_MODE_1),\n     ASCENDC_TPL_DTYPE_DECL(dType, ROUND_TPL_INT32, ROUND_TPL_ZERO, ROUND_TPL_POSITIVE_DECIMALS,\n-                           ROUND_TPL_NEGATIVE_DECIMALS, ROUND_TPL_NAN_DECIMALS)\n+                           ROUND_TPL_NEGATIVE_DECIMALS, ROUND_TPL_NAN_DECIMALS, ROUND_TPL_INT32_CONST,\n+                           ROUND_TPL_INT32_NEG, ROUND_TPL_INT32_NEGINF, ROUND_TPL_INT32_NEG_NINE)\n );\n \n ASCENDC_TPL_SEL(\n     ASCENDC_TPL_ARGS_SEL(\n         ASCENDC_TPL_UINT_SEL(schMode, ASCENDC_TPL_UI_LIST, ROUND_TPL_SCH_MODE_0, ROUND_TPL_SCH_MODE_1),\n         ASCENDC_TPL_DTYPE_SEL(dType, ROUND_TPL_INT32, ROUND_TPL_ZERO, ROUND_TPL_POSITIVE_DECIMALS,\n-                           ROUND_TPL_NEGATIVE_DECIMALS, ROUND_TPL_NAN_DECIMALS)\n+                           ROUND_TPL_NEGATIVE_DECIMALS, ROUND_TPL_NAN_DECIMALS, ROUND_TPL_INT32_CONST,\n+                           ROUND_TPL_INT32_NEG, ROUND_TPL_INT32_NEGINF, ROUND_TPL_INT32_NEG_NINE)\n     )\n );\n }  // namespace RoundOp\n",
+      "new_file": false,
+      "new_path": "math/round/op_kernel/arch35/round_struct.h",
+      "old_path": "math/round/op_kernel/arch35/round_struct.h",
+      "removed_lines": 2,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-math/raw/1afa7cb85ea979f12e45d08dc6a6ea5a4c8f5355/math/round/op_kernel/arch35/round_struct.h",
+    "sha": "1afa7cb85ea979f12e45d08dc6a6ea5a4c8f5355",
+    "source_branch": "master",
+    "source_project": {
+      "full_name": "ASCEND222/ops-math",
+      "human_name": "ASCEND222 / ops-math",
+      "id": 7651705,
+      "path": "ops-math"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-math",
+      "human_name": "CANN / ops-math",
+      "id": 7649531,
+      "path": "ops-math"
+    }
+  },
+  {
+    "additions": 2,
+    "blob_id": "c5f710d5b3eda3b8a5650715972ccf6266046456",
+    "blob_url": "https://gitcode.com/cann/ops-math/blob/1afa7cb85ea979f12e45d08dc6a6ea5a4c8f5355/math/round/op_kernel/arch35/round_tiling_struct.h",
+    "deletions": 0,
+    "filename": "math/round/op_kernel/arch35/round_tiling_struct.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 2,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -18,5 +18,7 @@ using namespace Ops::Base;\n struct RoundTilingData {\n     EleBaseTilingData baseTiling;\n     float decimals;\n+    int32_t power;\n+    int32_t num;\n };\n #endif\n\\ No newline at end of file\n",
+      "new_file": false,
+      "new_path": "math/round/op_kernel/arch35/round_tiling_struct.h",
+      "old_path": "math/round/op_kernel/arch35/round_tiling_struct.h",
+      "removed_lines": 0,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-math/raw/1afa7cb85ea979f12e45d08dc6a6ea5a4c8f5355/math/round/op_kernel/arch35/round_tiling_struct.h",
+    "sha": "1afa7cb85ea979f12e45d08dc6a6ea5a4c8f5355",
+    "source_branch": "master",
+    "source_project": {
+      "full_name": "ASCEND222/ops-math",
+      "human_name": "ASCEND222 / ops-math",
+      "id": 7651705,
+      "path": "ops-math"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-math",
+      "human_name": "CANN / ops-math",
+      "id": 7649531,
+      "path": "ops-math"
+    }
+  },
+  {
+    "additions": 47,
+    "blob_id": "4a332b1b1c9e02df5cea8cf804ee045a42137943",
+    "blob_url": "https://gitcode.com/cann/ops-math/blob/1afa7cb85ea979f12e45d08dc6a6ea5a4c8f5355/math/round/op_kernel/round_apt.cpp",
+    "deletions": 15,
+    "filename": "math/round/op_kernel/round_apt.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 47,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -24,46 +24,78 @@ using namespace AscendC;\n using namespace RoundOp;\n \n template <uint64_t schMode, uint64_t dType, typename DtypeX>\n-__global__ __aicore__ void RoundKernel(GM_ADDR x, GM_ADDR y, GM_ADDR workspace, GM_ADDR tiling) {\n-    constexpr bool notIntDtype = (std::is_same<DtypeX, half>::value) ||\n-                                 (std::is_same<DtypeX, float>::value) ||\n-                                 (std::is_same<DtypeX, bfloat16_t>::value);\n-    constexpr bool roundZero = (dType == static_cast<uint64_t>(ROUND_TPL_ZERO)) && (notIntDtype);\n-    constexpr bool roundPositive = (dType == static_cast<uint64_t>(ROUND_TPL_POSITIVE_DECIMALS)) && (notIntDtype);\n-    constexpr bool roundNegative = (dType == static_cast<uint64_t>(ROUND_TPL_NEGATIVE_DECIMALS)) && (notIntDtype);\n-    constexpr bool roundNan = (dType == static_cast<uint64_t>(ROUND_TPL_NAN_DECIMALS)) && (notIntDtype);\n-\n+__global__ __aicore__ void RoundKernelI(GM_ADDR x, GM_ADDR y, GM_ADDR workspace, GM_ADDR tiling) {\n     KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_AIV_ONLY);\n     REGISTER_TILING_DEFAULT(RoundTilingData);\n     GET_TILING_DATA_WITH_STRUCT(RoundTilingData, tilingData, tiling);\n     TPipe pipe;\n+\n     if constexpr (dType == static_cast<uint64_t>(ROUND_TPL_INT32)) {\n-        ElementwiseSch<schMode, typename RoundDag::RoundInt<int>::OpDag> sch(&(tilingData.baseTiling), &pipe);\n+        ElementwiseSch<schMode, typename RoundDag::RoundInt<int32_t>::OpDag> sch(&(tilingData.baseTiling), &pipe);\n         sch.Init(x, y);\n         sch.Process();\n-    } else if constexpr (roundZero) {\n+    } else if constexpr (dType == static_cast<uint64_t>(ROUND_TPL_INT32_CONST)) {\n+        ElementwiseSch<schMode, typename RoundDag::RoundIntConst<int32_t>::OpDag> sch(&(tilingData.baseTiling), &pipe);\n+        sch.template SetVar<int, 0>(tilingData.num);\n+        sch.Init(y);\n+        sch.Process();\n+    }  else if constexpr (dType == static_cast<uint64_t>(ROUND_TPL_INT32_NEG_NINE)) {\n+        ElementwiseSch<schMode, typename RoundDag::RoundIntNegativeDecimalsNine<int32_t>::OpDag> sch(&(tilingData.baseTiling), &pipe);\n+        sch.Init(x, y);\n+        sch.Process();\n+    } else if constexpr (dType == static_cast<uint64_t>(ROUND_TPL_INT32_NEGINF)) {\n+        ElementwiseSch<schMode, typename RoundDag::RoundIntNegativeDecimalsInf<int32_t>::OpDag> sch(&(tilingData.baseTiling), &pipe);\n+        sch.template SetVar<int, 0>(tilingData.power);\n+        sch.template SetVar<int, 1>(tilingData.num);\n+        sch.Init(x, y);\n+        sch.Process();\n+    } else if constexpr (dType == static_cast<uint64_t>(ROUND_TPL_INT32_NEG)) {\n+        ElementwiseSch<schMode, typename RoundDag::RoundIntNegativeDecimals<int32_t>::OpDag> sch(&(tilingData.baseTiling), &pipe);\n+        sch.template SetVar<int, 0>(tilingData.power);\n+        sch.template SetVar<int, 1>(tilingData.num);\n+        sch.Init(x, y);\n+        sch.Process();\n+    }\n+\n+    return;\n+}\n+\n+template <uint64_t schMode, uint64_t dType, typename DtypeX>\n+__global__ __aicore__ void RoundKernelF(GM_ADDR x, GM_ADDR y, GM_ADDR workspace, GM_ADDR tiling) {\n+    KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_AIV_ONLY);\n+    REGISTER_TILING_DEFAULT(RoundTilingData);\n+    GET_TILING_DATA_WITH_STRUCT(RoundTilingData, tilingData, tiling);\n+    TPipe pipe;\n+\n+    if constexpr (dType == static_cast<uint64_t>(ROUND_TPL_ZERO)) {\n         ElementwiseSch<schMode, typename RoundDag::RoundZero<DtypeX>::OpDag> sch(&(tilingData.baseTiling), &pipe);\n         sch.Init(x, y);\n         sch.Process();\n-    } else if constexpr (roundPositive) {\n+    } else if constexpr (dType == static_cast<uint64_t>(ROUND_TPL_POSITIVE_DECIMALS)) {\n         ElementwiseSch<schMode, typename RoundDag::RoundPositiveDecimals<DtypeX>::OpDag> sch(&(tilingData.baseTiling), &pipe);\n         sch.template SetVar<float, 0>(tilingData.decimals);\n         sch.Init(x, y);\n         sch.Process();\n-    } else if constexpr (roundNegative) {\n+    } else if constexpr (dType == static_cast<uint64_t>(ROUND_TPL_NEGATIVE_DECIMALS)) {\n         ElementwiseSch<schMode, typename RoundDag::RoundNegativeDecimals<DtypeX>::OpDag> sch(&(tilingData.baseTiling), &pipe);\n         sch.template SetVar<float, 0>(tilingData.decimals);\n         sch.Init(x, y);\n         sch.Process();\n-    } else if constexpr (roundNan) {\n+    } else if constexpr (dType == static_cast<uint64_t>(ROUND_TPL_NAN_DECIMALS)) {\n         ElementwiseSch<schMode, typename RoundDag::RoundNan<DtypeX>::OpDag> sch(&(tilingData.baseTiling), &pipe);\n         sch.Init(y);\n         sch.Process();\n     }\n+\n     return;\n }\n \n template <uint64_t schMode, uint64_t dType>\n __global__ __aicore__ void round(GM_ADDR x, GM_ADDR y, GM_ADDR workspace, GM_ADDR tiling) {\n-    return RoundKernel<schMode, dType, DTYPE_X>(x, y, workspace, tiling);\n+    if constexpr (std::is_same<DTYPE_X, int32_t>::value) {\n+        RoundKernelI<schMode, dType, DTYPE_X>(x, y, workspace, tiling);\n+    } else {\n+        RoundKernelF<schMode, dType, DTYPE_X>(x, y, workspace, tiling);\n+    }\n+    return;\n }\n\\ No newline at end of file\n",
+      "new_file": false,
+      "new_path": "math/round/op_kernel/round_apt.cpp",
+      "old_path": "math/round/op_kernel/round_apt.cpp",
+      "removed_lines": 15,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-math/raw/1afa7cb85ea979f12e45d08dc6a6ea5a4c8f5355/math/round/op_kernel/round_apt.cpp",
+    "sha": "1afa7cb85ea979f12e45d08dc6a6ea5a4c8f5355",
+    "source_branch": "master",
+    "source_project": {
+      "full_name": "ASCEND222/ops-math",
+      "human_name": "ASCEND222 / ops-math",
+      "id": 7651705,
+      "path": "ops-math"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-math",
+      "human_name": "CANN / ops-math",
+      "id": 7649531,
+      "path": "ops-math"
+    }
+  }
+]

@@ -1,0 +1,38 @@
+[
+  {
+    "additions": 4,
+    "blob_id": "3ac5be0617ce3d01f8141b648d48ccdbef0063e9",
+    "blob_url": "https://gitcode.com/cann/ops-math/blob/b19571ffbd9ea416512b6d22af205d0cfd887015/math/div/op_api/aclnn_div.cpp",
+    "deletions": 0,
+    "filename": "math/div/op_api/aclnn_div.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 4,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -265,6 +265,10 @@ static inline op::DataType InferDivsModeDtype(\n         promoteType = DataType::DT_FLOAT;\n     }\n \n+    if (mode == MODE_TRUNC_DIV && (promoteType == DataType::DT_BF16 || promoteType == DataType::DT_FLOAT16) && IsRegBase(npuArch)) {\n+        promoteType = DataType::DT_FLOAT;\n+    }\n+\n     if (promoteType == DataType::DT_COMPLEX32) {\n         promoteType = DataType::DT_COMPLEX64;\n     }\n",
+      "new_file": false,
+      "new_path": "math/div/op_api/aclnn_div.cpp",
+      "old_path": "math/div/op_api/aclnn_div.cpp",
+      "removed_lines": 0,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-math/raw/b19571ffbd9ea416512b6d22af205d0cfd887015/math/div/op_api/aclnn_div.cpp",
+    "sha": "b19571ffbd9ea416512b6d22af205d0cfd887015",
+    "source_branch": "cherry-pick-mr-3436-1781772436271-auto",
+    "source_project": {
+      "full_name": "yefeicoding/ops-math",
+      "human_name": "yefeicoding / ops-math",
+      "id": 7953758,
+      "path": "ops-math"
+    },
+    "target_branch": "9.1.0",
+    "target_project": {
+      "full_name": "cann/ops-math",
+      "human_name": "CANN / ops-math",
+      "id": 7649531,
+      "path": "ops-math"
+    }
+  }
+]

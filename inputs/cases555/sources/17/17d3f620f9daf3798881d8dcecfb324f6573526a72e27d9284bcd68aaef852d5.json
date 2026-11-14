@@ -1,0 +1,38 @@
+[
+  {
+    "additions": 1,
+    "blob_id": "3b5e7b4bb7879e78f7a310bfcb61731d5229a873",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/72666fbc1e8cd9b66a550016b7bcb267fc819df3/moe/moe_init_routing_quant_v2/op_kernel/arch35/moe_v2_gather_quant_simt.h",
+    "deletions": 1,
+    "filename": "moe/moe_init_routing_quant_v2/op_kernel/arch35/moe_v2_gather_quant_simt.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 1,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -271,7 +271,7 @@ __aicore__ inline void MoeV2GatherQuant<T>::Init(\n     pipe_->InitBuffer(inputXCopyInQueue_, BUFFER_NUM, AlignBytes(perLoopCols_, sizeof(T)));\n     pipe_->InitBuffer(inputXCopyOutQueue_, BUFFER_NUM, AlignBytes(perLoopCols_, sizeof(int8_t)));\n     pipe_->InitBuffer(expandRowIdxCopyInQueue_, BUFFER_NUM, AlignBytes(perLoopRows_, sizeof(int32_t)));\n-    pipe_->InitBuffer(floatQueue_, 1, AlignBytes(perLoopCols_, sizeof(float)));\n+    pipe_->InitBuffer(floatQueue_, 1, AlignBytes(Align(perLoopCols_, sizeof(T)), sizeof(float)));\n     pipe_->InitBuffer(halfQueue_, 1, AlignBytes(perLoopCols_, sizeof(half)));\n     pipe_->InitBuffer(expandedRowIdxIndexCopyInQueue_, BUFFER_NUM, AlignBytes(perLoopRows_ + 1, sizeof(int32_t)));\n }\n",
+      "new_file": false,
+      "new_path": "moe/moe_init_routing_quant_v2/op_kernel/arch35/moe_v2_gather_quant_simt.h",
+      "old_path": "moe/moe_init_routing_quant_v2/op_kernel/arch35/moe_v2_gather_quant_simt.h",
+      "removed_lines": 1,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/72666fbc1e8cd9b66a550016b7bcb267fc819df3/moe/moe_init_routing_quant_v2/op_kernel/arch35/moe_v2_gather_quant_simt.h",
+    "sha": "72666fbc1e8cd9b66a550016b7bcb267fc819df3",
+    "source_branch": "wxy9.1.0",
+    "source_project": {
+      "full_name": "wuxiyuan/ops-transformer_7688",
+      "human_name": "wuxiyuan / ops-transformer_7688",
+      "id": 8864811,
+      "path": "ops-transformer_7688"
+    },
+    "target_branch": "9.1.0",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  }
+]

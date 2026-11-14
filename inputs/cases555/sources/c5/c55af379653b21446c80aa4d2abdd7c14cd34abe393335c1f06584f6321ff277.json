@@ -1,0 +1,290 @@
+[
+  {
+    "additions": 4,
+    "blob_id": "d2e280cce3a5c7dab0ebca9082014c19e3c56570",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/97f8acdba64e86750eba7c19e3b02584dcb16c7d/matmul/common/cmct/block/block_scheduler_policy.h",
+    "deletions": 1,
+    "filename": "matmul/common/cmct/block/block_scheduler_policy.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 4,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -30,7 +30,10 @@ struct BuiltInMergeBatchScheduler {};\n struct BuiltInBatchMatmulToMulScheduler {};\n struct IterateKScheduler {};\n struct QuantIterateKScheduler {};\n-struct QuantBatchMatmulV3Scheduler {};\n+template <uint64_t fullLoadMode = 0>\n+struct QuantBatchMatmulV3Scheduler {\n+    static constexpr uint64_t FULL_LOAD_MODE = fullLoadMode;\n+};\n } // namespace Gemm\n } // namespace Cmct\n #endif\n\\ No newline at end of file\n",
+      "new_file": false,
+      "new_path": "matmul/common/cmct/block/block_scheduler_policy.h",
+      "old_path": "matmul/common/cmct/block/block_scheduler_policy.h",
+      "removed_lines": 1,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/97f8acdba64e86750eba7c19e3b02584dcb16c7d/matmul/common/cmct/block/block_scheduler_policy.h",
+    "sha": "97f8acdba64e86750eba7c19e3b02584dcb16c7d",
+    "source_branch": "basic-api-full-load",
+    "source_project": {
+      "full_name": "liyinghao10/ops-nn",
+      "human_name": "liyinghao10 / ops-nn",
+      "id": 9036869,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 24,
+    "blob_id": "9206fab6b72a9560dd8900c4656dd2415610a2ac",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/97f8acdba64e86750eba7c19e3b02584dcb16c7d/matmul/common/cmct/block/block_scheduler_qbmm.h",
+    "deletions": 4,
+    "filename": "matmul/common/cmct/block/block_scheduler_qbmm.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 24,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -24,7 +24,7 @@ namespace Cmct {\n namespace Gemm {\n namespace Block {\n \n-template <class ProblemShape_, class L1TileShape_, class L0TileShape_, bool TransA_, bool TransB_>\n+template <class ProblemShape_, class L1TileShape_, class L0TileShape_, uint64_t FullLoadMode_, bool TransA_, bool TransB_>\n class BlockSchedulerQuantBatchMatmulV3 {\n public:\n     int64_t m_{0};\n@@ -60,6 +60,8 @@ public:\n     using BlockCoord = AscendC::Coord<int64_t, int64_t, int64_t, int64_t>;\n     using ProblemShape = ProblemShape_;\n \n+    constexpr static uint64_t A_FULL_LOAD_MODE = 1;\n+\n     struct Params {\n         int64_t baseM;\n         int64_t baseN;\n@@ -222,7 +224,12 @@ public:\n         }\n \n         int64_t mSplitIdx = (blockIdx_ % totalTailTile_) % mTailTile_;\n-        int64_t nSplitIdx = (blockIdx_ % totalTailTile_) / mTailTile_;\n+        int64_t nSplitIdx = 0;\n+        if constexpr (FullLoadMode_ == A_FULL_LOAD_MODE) {\n+            nSplitIdx = blockIdx_ / mCnt_ % nTailTile_;\n+        } else {\n+            nSplitIdx = (blockIdx_ % totalTailTile_) / mTailTile_;\n+        }\n         mSplitAddrOffset_ = mSplitIdx * singleCoreMSplit;\n         nSplitAddrOffset_ = nSplitIdx * singleCoreNSplit;\n         if (mSplitAddrOffset_ >= singleCoreM || nSplitAddrOffset_ >= singleCoreN) {\n@@ -261,6 +268,13 @@ public:\n \n         int64_t newBlockIdx = (roundIdx_ == round_ - 1) ? blockIdx_ / totalTailTile_ : blockIdx_;\n         int64_t tileIdx = newBlockIdx + roundIdx_ * blockNum_;\n+        if constexpr (FullLoadMode_ == A_FULL_LOAD_MODE) {\n+            Get<MNK_M>(blockCoord) = blockIdx_ % mCnt_;\n+            int64_t curNTailTile = (roundIdx_ == round_ - 1) ? nTailTile_ : 1;\n+            Get<MNK_N>(blockCoord) = roundIdx_ * blockNum_ / mCnt_ % nCnt_ + blockIdx_ / mCnt_ / curNTailTile;\n+            roundIdx_++;\n+            return true;\n+        }\n         if (blockIdx_ < startBlockIdx_) {\n             tileIdx += blockNum_ - startBlockIdx_;\n         } else if (endBlockIdx_ + 1 >= totalTailTile_ * totalCnt_) {\n@@ -287,9 +301,15 @@ public:\n };\n \n template <class ProblemShape_, class L1TileShape_, class L0TileShape_, bool TransA_, bool TransB_>\n-struct BlockSchedulerSelector<ProblemShape_, L1TileShape_, L0TileShape_, Cmct::Gemm::QuantBatchMatmulV3Scheduler,\n+struct BlockSchedulerSelector<ProblemShape_, L1TileShape_, L0TileShape_, Cmct::Gemm::QuantBatchMatmulV3Scheduler<>,\n                               TransA_, TransB_> {\n-    using SchedulerOp = BlockSchedulerQuantBatchMatmulV3<ProblemShape_, L1TileShape_, L0TileShape_, TransA_, TransB_>;\n+    using SchedulerOp = BlockSchedulerQuantBatchMatmulV3<ProblemShape_, L1TileShape_, L0TileShape_, 0, TransA_, TransB_>;\n+};\n+\n+template <class ProblemShape_, class L1TileShape_, class L0TileShape_, bool TransA_, bool TransB_>\n+struct BlockSchedulerSelector<ProblemShape_, L1TileShape_, L0TileShape_, Cmct::Gemm::QuantBatchMatmulV3Scheduler<A_FULL_LOAD_MODE>,\n+                              TransA_, TransB_> {\n+    using SchedulerOp = BlockSchedulerQuantBatchMatmulV3<ProblemShape_, L1TileShape_, L0TileShape_, A_FULL_LOAD_MODE, TransA_, TransB_>;\n };\n }  // namespace Block\n }  // namespace Gemm\n",
+      "new_file": false,
+      "new_path": "matmul/common/cmct/block/block_scheduler_qbmm.h",
+      "old_path": "matmul/common/cmct/block/block_scheduler_qbmm.h",
+      "removed_lines": 4,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/97f8acdba64e86750eba7c19e3b02584dcb16c7d/matmul/common/cmct/block/block_scheduler_qbmm.h",
+    "sha": "97f8acdba64e86750eba7c19e3b02584dcb16c7d",
+    "source_branch": "basic-api-full-load",
+    "source_project": {
+      "full_name": "liyinghao10/ops-nn",
+      "human_name": "liyinghao10 / ops-nn",
+      "id": 9036869,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 1,
+    "blob_id": "856b3f89eb67c9b29b0a96ec6a4e5965fb104503",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/97f8acdba64e86750eba7c19e3b02584dcb16c7d/matmul/quant_batch_matmul_inplace_add/op_kernel/arch35/qbmmia_mx_basic_api_cmct.h",
+    "deletions": 1,
+    "filename": "matmul/quant_batch_matmul_inplace_add/op_kernel/arch35/qbmmia_mx_basic_api_cmct.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 1,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -43,7 +43,7 @@ __aicore__ inline void QbmmiaMxBasicApiKernel(\n     using ProblemShape = MatmulShape;\n \n     // 定义scheduler类型 来自block_scheduler_policy.h\n-    using BlockScheduler = Cmct::Gemm::QuantBatchMatmulV3Scheduler;\n+    using BlockScheduler = Cmct::Gemm::QuantBatchMatmulV3Scheduler<FULL_LOAD_MODE>;\n \n     // 定义MMAD类型\n     using DispatchPolicy = MatmulWithScale<AscendC::Shape<_0, _0, _0, _0>, FULL_LOAD_MODE>;\n",
+      "new_file": false,
+      "new_path": "matmul/quant_batch_matmul_inplace_add/op_kernel/arch35/qbmmia_mx_basic_api_cmct.h",
+      "old_path": "matmul/quant_batch_matmul_inplace_add/op_kernel/arch35/qbmmia_mx_basic_api_cmct.h",
+      "removed_lines": 1,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/97f8acdba64e86750eba7c19e3b02584dcb16c7d/matmul/quant_batch_matmul_inplace_add/op_kernel/arch35/qbmmia_mx_basic_api_cmct.h",
+    "sha": "97f8acdba64e86750eba7c19e3b02584dcb16c7d",
+    "source_branch": "basic-api-full-load",
+    "source_project": {
+      "full_name": "liyinghao10/ops-nn",
+      "human_name": "liyinghao10 / ops-nn",
+      "id": 9036869,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 0,
+    "blob_id": "90fa30f18fcf354eac2809758f03c691735dc4d3",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/97f8acdba64e86750eba7c19e3b02584dcb16c7d/matmul/quant_batch_matmul_v3/op_host/op_tiling/arch35/adaptive_sliding_window_basic_api_tiling.cpp",
+    "deletions": 4,
+    "filename": "matmul/quant_batch_matmul_v3/op_host/op_tiling/arch35/adaptive_sliding_window_basic_api_tiling.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 0,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -272,10 +272,6 @@ bool AdaptiveSlidingWindowBasicAPITiling::AnalyseSlidingWinInfo()\n     if (adaptiveWin_.useTailWinLogic) {\n         if (isAFullLoad_) {\n             AdaptiveSlidingWindowTiling::CalcTailBasicBlockAfullLoad();\n-            // 切低阶api大于1轮时，A全载的mBlockCnt超过1时不能使能尾块切分，否则以当前blocksch会有精度问题\n-            if (adaptiveWin_.totalBlockCnt > aicoreParams_.aicNum && adaptiveWin_.mBlockCnt != 1UL) {\n-                adaptiveWin_.nTailTile = 1UL;\n-            }\n         } else {\n             AdaptiveSlidingWindowTiling::CalcTailBasicBlock();\n         }\n",
+      "new_file": false,
+      "new_path": "matmul/quant_batch_matmul_v3/op_host/op_tiling/arch35/adaptive_sliding_window_basic_api_tiling.cpp",
+      "old_path": "matmul/quant_batch_matmul_v3/op_host/op_tiling/arch35/adaptive_sliding_window_basic_api_tiling.cpp",
+      "removed_lines": 4,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/97f8acdba64e86750eba7c19e3b02584dcb16c7d/matmul/quant_batch_matmul_v3/op_host/op_tiling/arch35/adaptive_sliding_window_basic_api_tiling.cpp",
+    "sha": "97f8acdba64e86750eba7c19e3b02584dcb16c7d",
+    "source_branch": "basic-api-full-load",
+    "source_project": {
+      "full_name": "liyinghao10/ops-nn",
+      "human_name": "liyinghao10 / ops-nn",
+      "id": 9036869,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 1,
+    "blob_id": "1867dcce52c1d680bd847caa2e118e3682582e5c",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/97f8acdba64e86750eba7c19e3b02584dcb16c7d/matmul/quant_batch_matmul_v3/op_kernel/arch35/qbmm_cube_basic_api_cmct.h",
+    "deletions": 1,
+    "filename": "matmul/quant_batch_matmul_v3/op_kernel/arch35/qbmm_cube_basic_api_cmct.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 1,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -45,7 +45,7 @@ __aicore__ inline void QbmmCubeBasicApiKernel(\n     using ProblemShape = MatmulShape;\n \n     // 定义scheduler类型 来自block_scheduler_policy.h\n-    using BlockScheduler = Cmct::Gemm::QuantBatchMatmulV3Scheduler;\n+    using BlockScheduler = Cmct::Gemm::QuantBatchMatmulV3Scheduler<FULL_LOAD_MODE>;\n \n     // 定义MMAD类型\n     using DispatchPolicy = MatmulWithScale<AscendC::Shape<_0, _0, _0, _0>, FULL_LOAD_MODE>;\n",
+      "new_file": false,
+      "new_path": "matmul/quant_batch_matmul_v3/op_kernel/arch35/qbmm_cube_basic_api_cmct.h",
+      "old_path": "matmul/quant_batch_matmul_v3/op_kernel/arch35/qbmm_cube_basic_api_cmct.h",
+      "removed_lines": 1,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/97f8acdba64e86750eba7c19e3b02584dcb16c7d/matmul/quant_batch_matmul_v3/op_kernel/arch35/qbmm_cube_basic_api_cmct.h",
+    "sha": "97f8acdba64e86750eba7c19e3b02584dcb16c7d",
+    "source_branch": "basic-api-full-load",
+    "source_project": {
+      "full_name": "liyinghao10/ops-nn",
+      "human_name": "liyinghao10 / ops-nn",
+      "id": 9036869,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 1,
+    "blob_id": "6ce4644334e532cf373eb4924d6218f1193cb4d6",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/97f8acdba64e86750eba7c19e3b02584dcb16c7d/matmul/quant_batch_matmul_v3/op_kernel/arch35/qbmm_mix_pertile_cmct.h",
+    "deletions": 1,
+    "filename": "matmul/quant_batch_matmul_v3/op_kernel/arch35/qbmm_mix_pertile_cmct.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 1,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -45,7 +45,7 @@ __aicore__ inline void QbmmCmctPertileKernel(\n     using LayoutBias = yLayout;\n \n     using ProblemShape = Cmct::Gemm::MatmulShape;\n-    using BlockScheduler = Cmct::Gemm::QuantBatchMatmulV3Scheduler;\n+    using BlockScheduler = Cmct::Gemm::QuantBatchMatmulV3Scheduler<>;\n     using BlockMmadPolicy = Cmct::Gemm::MmadCAccOnUb<>;\n     using BlockMmad = Cmct::Gemm::Block::BlockMmadPertile<\n         BlockMmadPolicy, AType, LayoutA, BType, LayoutB, CType, LayoutC, biasType, LayoutBias, L1Tileshape,\n",
+      "new_file": false,
+      "new_path": "matmul/quant_batch_matmul_v3/op_kernel/arch35/qbmm_mix_pertile_cmct.h",
+      "old_path": "matmul/quant_batch_matmul_v3/op_kernel/arch35/qbmm_mix_pertile_cmct.h",
+      "removed_lines": 1,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/97f8acdba64e86750eba7c19e3b02584dcb16c7d/matmul/quant_batch_matmul_v3/op_kernel/arch35/qbmm_mix_pertile_cmct.h",
+    "sha": "97f8acdba64e86750eba7c19e3b02584dcb16c7d",
+    "source_branch": "basic-api-full-load",
+    "source_project": {
+      "full_name": "liyinghao10/ops-nn",
+      "human_name": "liyinghao10 / ops-nn",
+      "id": 9036869,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 1,
+    "blob_id": "e6f6e74fd989e1a4e2cbceff04d5d88201688c32",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/97f8acdba64e86750eba7c19e3b02584dcb16c7d/matmul/quant_batch_matmul_v3/op_kernel/arch35/qbmm_mx_basic_api_cmct.h",
+    "deletions": 1,
+    "filename": "matmul/quant_batch_matmul_v3/op_kernel/arch35/qbmm_mx_basic_api_cmct.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 1,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -43,7 +43,7 @@ __aicore__ inline void QbmmMxBasicApiKernel(\n     using ProblemShape = MatmulShape;\n \n     // 定义scheduler类型 来自block_scheduler_policy.h\n-    using BlockScheduler = Cmct::Gemm::QuantBatchMatmulV3Scheduler;\n+    using BlockScheduler = Cmct::Gemm::QuantBatchMatmulV3Scheduler<FULL_LOAD_MODE>;\n \n     // 定义MMAD类型\n     using DispatchPolicy = MatmulWithScale<AscendC::Shape<_0, _0, _0, _0>, FULL_LOAD_MODE>;\n",
+      "new_file": false,
+      "new_path": "matmul/quant_batch_matmul_v3/op_kernel/arch35/qbmm_mx_basic_api_cmct.h",
+      "old_path": "matmul/quant_batch_matmul_v3/op_kernel/arch35/qbmm_mx_basic_api_cmct.h",
+      "removed_lines": 1,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/97f8acdba64e86750eba7c19e3b02584dcb16c7d/matmul/quant_batch_matmul_v3/op_kernel/arch35/qbmm_mx_basic_api_cmct.h",
+    "sha": "97f8acdba64e86750eba7c19e3b02584dcb16c7d",
+    "source_branch": "basic-api-full-load",
+    "source_project": {
+      "full_name": "liyinghao10/ops-nn",
+      "human_name": "liyinghao10 / ops-nn",
+      "id": 9036869,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 1,
+    "blob_id": "4a817703571729b4f56b6db92ccc2f289b2e7711",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/97f8acdba64e86750eba7c19e3b02584dcb16c7d/matmul/quant_batch_matmul_v3/tests/ut/op_host/test_quant_batch_matmul_v3.csv",
+    "deletions": 1,
+    "filename": "matmul/quant_batch_matmul_v3/tests/ut/op_host/test_quant_batch_matmul_v3.csv",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 1,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -292,7 +292,7 @@ Ascend950,QUANTMM950/TestQuantBatchMatmulV3Tiling.generalTest/103,,1971CompatePe\n Ascend950,QUANTMM950/TestQuantBatchMatmulV3Tiling.generalTest/104,,mxfp8-pergroup-A_batch-B_no_batch,,,3,2,3,2,0,2,1206,8512,1048,0,1,1,0,1,2,FLOAT8-E5M2,FLOAT8-E5M2,FLOAT8-E8M0,FLOAT8-E8M0,FLOAT,BF16,ND,ND,TRUE,32,4,2 1 2 1 1 1 2 1 1 1 1 1 1 1 2 8 8 0 0 1 1 32 1206 1048 8512 256 256 128 7936 131074 2031648 65794 1 1 1 1 0 0,FALSE,\n Ascend950,QUANTMM950/TestQuantBatchMatmulV3Tiling.generalTest/105,,int8_int8_int32,,,2,2,2,0,0,0,2906,128,1744,0,0,0,0,0,0,INT8,INT8,BF16,FLOAT,INT32,INT32,ND,ND,TRUE,32,0,1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 1 0 3 0 0 0 2906 1744 128 256 256 128 0 65537 0 65540 1 1 8 1 240 0,FALSE,\n Ascend950,QUANTMM950/TestQuantBatchMatmulV3Tiling.generalTest/106,,mxfp8-pergroup-k-1024,,,2,2,2,0,0,0,10240,1024,2624,0,1,0,0,1,2,FLOAT8-E5M2,FLOAT8-E5M2,FLOAT8-E8M0,FLOAT8-E8M0,FLOAT,BF16,ND,ND,TRUE,32,4,1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 8 8 0 3 1 1 32 10240 2624 1024 256 256 128 1024 131074 262148 65538 1 1 1 1 0 0,FALSE,\n-Ascend950,QUANTMM950/TestQuantBatchMatmulV3Tiling.generalTest/107,,mxfp8-true-false-afullload-tailsplit,,,2,2,2,0,0,0,332,496,5320,0,1,0,1,0,2,FLOAT8-E5M2,FLOAT8-E5M2,FLOAT8-E8M0,FLOAT8-E8M0,FLOAT,FLOAT,ND,ND,TRUE,32,257,1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 8 8 0 3 1 1 32 332 5320 496 256 256 128 256 131074 65537 65540 1 1 1 1 0 0,FALSE,\n+Ascend950,QUANTMM950/TestQuantBatchMatmulV3Tiling.generalTest/107,,mxfp8-true-false-afullload-tailsplit,,,2,2,2,0,0,0,332,496,5320,0,1,0,1,0,2,FLOAT8-E5M2,FLOAT8-E5M2,FLOAT8-E8M0,FLOAT8-E8M0,FLOAT,FLOAT,ND,ND,TRUE,32,257,1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 8 8 0 3 1 1 32 332 5320 496 256 256 128 256 131074 65537 65540 1 3 1 1 0 0,FALSE,\n Ascend950,QUANTMM950/TestQuantBatchMatmulV3Tiling.kernelTest/0,,fanhua,,,2,2,2,0,0,0,52,4632,7360,0,0,1,0,0,1,INT8,INT8,BF16,BF16,BF16,BF16,ND,ND,TRUE,29,512,1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0 27 0 0 0 0 0 0 29 52 7360 4632 4632 52 256 4632 64 256 128 30 6 1 1 1 0 0 0 0 0 0 0 0 0 0 15 3 0 0 2 2 2 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 1 1 1 0 0,FALSE,\n Ascend950,QUANTMM950/TestQuantBatchMatmulV3Tiling.kernelTest/1,,fanhua,,,2,2,2,0,0,0,52,4632,7360,0,0,1,0,1,1,INT8,INT8,BF16,BF16,BF16,BF16,ND,ND,TRUE,31,516,1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0 27 0 0 0 0 0 0 31 52 7360 4632 4632 52 240 4632 64 240 128 24 8 1 1 1 0 0 0 0 0 0 0 0 0 0 12 4 0 0 2 2 2 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 1 1 1 0 0,FALSE,\n Ascend950,QUANTMM950/TestQuantBatchMatmulV3Tiling.kernelTest/2,,fanhua,,,2,2,2,0,0,0,52,4632,7360,0,0,1,1,1,1,INT8,INT8,BF16,BF16,BF16,BF16,ND,ND,TRUE,31,517,1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0 27 0 0 0 0 0 0 31 52 7360 4632 4632 52 240 4632 128 240 128 8 8 1 1 1 0 0 0 0 0 0 0 0 0 0 4 4 0 0 2 2 2 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 1 1 1 0 0,FALSE,\n",
+      "new_file": false,
+      "new_path": "matmul/quant_batch_matmul_v3/tests/ut/op_host/test_quant_batch_matmul_v3.csv",
+      "old_path": "matmul/quant_batch_matmul_v3/tests/ut/op_host/test_quant_batch_matmul_v3.csv",
+      "removed_lines": 1,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/97f8acdba64e86750eba7c19e3b02584dcb16c7d/matmul/quant_batch_matmul_v3/tests/ut/op_host/test_quant_batch_matmul_v3.csv",
+    "sha": "97f8acdba64e86750eba7c19e3b02584dcb16c7d",
+    "source_branch": "basic-api-full-load",
+    "source_project": {
+      "full_name": "liyinghao10/ops-nn",
+      "human_name": "liyinghao10 / ops-nn",
+      "id": 9036869,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  }
+]

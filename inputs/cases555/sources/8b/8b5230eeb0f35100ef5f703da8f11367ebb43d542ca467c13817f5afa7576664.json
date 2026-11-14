@@ -1,0 +1,154 @@
+{
+  "approval_reviewers": [],
+  "assignees": [],
+  "assignees_number": 0,
+  "base": {
+    "label": "master",
+    "ref": "master",
+    "repo": {
+      "full_name": "cann/ops-nn",
+      "html_url": "https://gitcode.com/cann/ops-nn.git",
+      "name": "ops-nn",
+      "namespace": {
+        "path": "cann"
+      },
+      "path": "ops-nn"
+    },
+    "sha": "f2ab9177000e2c447c98187eb3260825cd4755cf"
+  },
+  "body": "## 描述\n\nAscend 950（arch35/A5）上的 DeepNorm 和 DeepNormGrad 实现需要与 arch22/A2 的计算逻辑保持一致。本次修改包括：\n\n- 为 DeepNorm 全量加载路径和部分加载路径补充 `VEC_STORE -> VEC_LOAD` 内存屏障，确保归约结果在 rstd 计算及后续读取前可见。\n- 调整 DeepNormGrad 的多核切分方式，使 `rowsPerCore` 和 `backwardBlockDim` 的推导与 A2 逻辑一致。\n- 将 DeepNormGrad 的 FP32 到 FP16 输出转换改为 `CAST_RINT`，并统一尾块循环中 `remaining` 的更新时机。\n- 为 backward 和 gamma/beta 路径增加行、列起始位置检查，并使用无溢出的边界计算方式。\n- 在 host tiling 中增加展平元素总数和字节跨度的 `uint64_t` 溢出校验。\n- 扩展 Ascend 950 的 kernel/tiling UT，覆盖 FP32、FP16、BF16、生产规格 tile、非整除多核切分、尾块和超大 shape 拒绝场景；新增 16 个 DeepNorm 泛化用例。\n\n## 关联的Issue\n\n关联 Issue：https://gitcode.com/cann/ops-nn/issues/4490\n\n## 测试\n\n- directed pre-commit：通过\n- OAT 静态检查：7 个非 CSV 文件，0 个问题\n- DeepNorm Ascend 950 kernel UT：6/6 通过\n- DeepNormGrad Ascend 950 kernel UT：4/4 通过\n- DeepNorm/DeepNormGrad host + infer 组合 UT：34/34 通过\n- TTK Ascend 950 泛化验证：16/16 通过，精度、性能状态和内存检查均通过\n\n## 文档更新\n\n无。\n\n## 类型标签\n<!--  [x] 表示选中 -->\n- [x] Bug修复\n- [ ] 新特性\n- [ ] 性能优化\n- [ ] 文档更新\n- [ ] 其他，请描述：\n\n## AI/Agent生成声明\n<!--  [x] 表示选中 -->\n- [x] AI辅助编写\n",
+  "can_merge_check": true,
+  "close_related_issue": true,
+  "closed_at": "2026-08-03T19:04:24+08:00",
+  "created_at": "2026-08-02T14:34:00+08:00",
+  "draft": false,
+  "head": {
+    "label": "930-norm",
+    "ref": "930-norm",
+    "repo": {
+      "full_name": "daiwei18/ops-nn",
+      "html_url": "https://gitcode.com/daiwei18/ops-nn.git",
+      "name": "ops-nn",
+      "namespace": {
+        "path": "daiwei18"
+      },
+      "path": "ops-nn"
+    },
+    "sha": "4c2a6c1748b4b0fa0a6fd37150d60db099c00c07",
+    "user": {
+      "avatar_url": "https://cdn-img.gitcode.com/cf/ae/9cf77585952a28efa8854ace708c222aeb91bcedbac2b0ea6d700dc23176dcc9.jpg",
+      "html_url": "https://gitcode.com/daiwei18",
+      "id": "6858b31841ba0d21e5b3dc84",
+      "login": "daiwei18",
+      "name": "daiwei18"
+    }
+  },
+  "html_url": "https://gitcode.com/cann/ops-nn/merge_requests/8165",
+  "id": 8971588,
+  "issue_url": "https://api.gitcode.com/api/v5/repos/cann/ops-nn/pulls/8165/issues",
+  "labels": [
+    {
+      "color": "#2865E0",
+      "created_at": "2025-06-21T10:53:09+08:00",
+      "id": 4929,
+      "name": "cann-cla/yes",
+      "repository_id": 7665709,
+      "updated_at": "2026-08-03T16:10:51+08:00"
+    },
+    {
+      "color": "#3ee029",
+      "created_at": "2025-12-16T09:45:21+08:00",
+      "id": 22553,
+      "name": "api-check-pass",
+      "repository_id": 7665709,
+      "updated_at": "2026-08-03T16:30:08+08:00"
+    },
+    {
+      "color": "#21BA45",
+      "created_at": "2025-06-10T14:17:23+08:00",
+      "id": 3873,
+      "name": "ci-pipeline-passed",
+      "repository_id": 7665709,
+      "updated_at": "2026-08-03T16:31:03+08:00"
+    },
+    {
+      "color": "#22ed07",
+      "created_at": "2025-05-29T20:14:31+08:00",
+      "id": 2742,
+      "name": "approved",
+      "repository_id": 7665709,
+      "updated_at": "2026-08-03T16:43:08+08:00"
+    },
+    {
+      "color": "#17f207",
+      "created_at": "2025-05-29T20:14:01+08:00",
+      "id": 2741,
+      "name": "lgtm",
+      "repository_id": 7665709,
+      "updated_at": "2026-08-03T19:04:12+08:00"
+    }
+  ],
+  "mergeable": true,
+  "mergeable_state": {
+    "all_depend_merge_request_merged_passed": true,
+    "approval_approvers_required_passed": true,
+    "approval_approvers_result": 2,
+    "approval_reviewers_required_passed": true,
+    "approval_testers_required_passed": true,
+    "approval_testers_result": 2,
+    "branch_missing_passed": true,
+    "can_force_merge": false,
+    "check_tasks_num": 0,
+    "ci_state_passed": true,
+    "conflict_passed": true,
+    "merge_by_self_passed": true,
+    "merge_request_id": 8971588,
+    "merge_request_switch": {
+      "add_notes_after_merged": true,
+      "approval_required_reviewers_branch": "*",
+      "approval_required_reviewers_count": 0,
+      "can_force_merge": false,
+      "can_reopen": true,
+      "disable_merge_by_self": false,
+      "disable_squash_merge": false,
+      "mark_auto_merged_mr_as_closed": false,
+      "merge_method": "merge",
+      "only_allow_merge_if_all_discussions_are_resolved": true,
+      "only_allow_merge_if_pipeline_succeeds": false,
+      "review_mode": "approval",
+      "squash_merge_with_no_merge_commit": true
+    },
+    "merged_by_user_passed": true,
+    "mr_state_passed": true,
+    "non_ff_passed": true,
+    "reason": {},
+    "resolve_discussion_passed": true,
+    "state": true,
+    "status_without_user_auth": true,
+    "work_in_progress_passed": true
+  },
+  "merged_at": "2026-08-03T19:04:24+08:00",
+  "merged_by": {
+    "avatar_url": "https://cdn-img.gitcode.com/bf/ad/b7f29486a040d7b2f52bf6c78414692d7d585eb1ec628cea3eb01c9d63f68618.png?time=1755691472703",
+    "html_url": "https://gitcode.com/cann-robot",
+    "id": "673c1552584fe8295cfd4a13",
+    "login": "cann-robot",
+    "name": "CANN-robot"
+  },
+  "number": 8165,
+  "prune_branch": false,
+  "squash_merge": true,
+  "state": "merged",
+  "testers": [],
+  "title": "fix(DeepNormGrad): align arch35 behavior with arch22",
+  "updated_at": "2026-08-03T19:56:38+08:00",
+  "url": "https://api.gitcode.com/api/v5/repos/cann/ops-nn/pulls/8165",
+  "user": {
+    "avatar_url": "https://cdn-img.gitcode.com/cf/ae/9cf77585952a28efa8854ace708c222aeb91bcedbac2b0ea6d700dc23176dcc9.jpg",
+    "html_url": "https://gitcode.com/daiwei18",
+    "id": "6858b31841ba0d21e5b3dc84",
+    "login": "daiwei18",
+    "name": "daiwei18"
+  },
+  "visibility_reason": "public"
+}

@@ -1,0 +1,80 @@
+{
+  "assignee": {
+    "html_url": "https://gitcode.com/cai-chengchao",
+    "id": "6822fc31398335026946c784",
+    "login": "cai-chengchao",
+    "name": "cai-chengchao",
+    "object_id": "6822fc31398335026946c784"
+  },
+  "assignees": [
+    {
+      "html_url": "https://gitcode.com/cai-chengchao",
+      "id": "6822fc31398335026946c784",
+      "login": "cai-chengchao",
+      "name": "cai-chengchao",
+      "object_id": "6822fc31398335026946c784"
+    }
+  ],
+  "body": "**Describe the current behavior / 问题描述**\n\nlayer_norm_v3 和 layer_norm_v4 在 arch35 平台的 Welford 实现中存在精度异常，原因有两处：\n\n1. WelfordFinalize 和 Normalize 函数访问 mean/variance/rstd/lastout 局部张量时使用了 `paramAddr + cacheCount` 作为索引偏移。paramAddr 是全局内存（GM）输出偏移量，在 RefreshCache 中用于向 GM 写入缓存结果（如 `meanGm[paramAddr]`）。而局部张量从 TQue 缓冲区分配，大小为 AGGREGATION_COUNT（256），内部只需 cacheCount 作为槽位索引。paramAddr + cacheCount 在迭代推进时会超出缓冲区范围，导致读写错误地址，产生精度偏差。\n\n2. `cacheCount++` 仅在 `cacheCount < AGGREGATION_COUNT` 的 else 分支执行。当 cacheCount 达到 AGGREGATION_COUNT 后，下一次迭代的 WelfordFinalize 先使用已越界的索引访问局部张量，然后才触发 RefreshCache/ResetCache。应将 cacheCount++ 移至阈值检查之前，确保写入最后一个有效槽位后再刷新缓存。\n\n**Environment / 环境信息**\n\n涉及 arch35 平台的 layer_norm_v3 和 layer_norm_v4 算子\n- 文件路径：`norm/layer_norm_v3/op_kernel/arch35/layer_norm_v3_welford.h`\n- 文件路径：`norm/layer_norm_v4/op_kernel/arch35/layer_norm_v4_welford.h`\n\n**Steps to reproduce the issue / 重现步骤**\n\n1. 在 arch35 平台上运行 layer_norm_v3 或 layer_norm_v4 算子\n2. 使用较大规模输入数据，使迭代次数达到 AGGREGATION_COUNT（256）以上\n3. 观察 WelfordFinalize 和 Normalize 输出结果与参考实现存在数值偏差\n\n**Describe the expected behavior / 预期结果**\n\nlayer_norm 算子输出应与参考实现精度一致，无数值偏差。\n\n**Related log / screenshot / 日志 / 截图**\n\n精度偏差出现在 WelfordFinalize 和 Normalize 计算阶段，具体表现为输出数值与预期值存在差异。\n\n**Special notes for this issue/备注**\n\n关联 PR：https://gitcode.com/cann/ops-nn/pull/6130",
+  "comments": 0,
+  "created_at": "2026-06-16T20:09:50+08:00",
+  "finished_at": "2026-06-18T09:13:59+08:00",
+  "html_url": "https://gitcode.com/cann/ops-nn/issues/3377",
+  "id": 4099777,
+  "issue_priority_detail": {
+    "id": 116,
+    "title": "无优先级"
+  },
+  "issue_state": "进行中",
+  "issue_state_detail": {
+    "id": 285,
+    "serial": 0,
+    "title": "进行中"
+  },
+  "issue_type": "任务",
+  "issue_type_detail": {
+    "id": 255,
+    "is_system": false,
+    "title": "任务"
+  },
+  "labels": [
+    {
+      "color": "#DB2828",
+      "created_at": "2025-06-10T14:17:23+08:00",
+      "id": 3870,
+      "name": "bug-report",
+      "updated_at": "2026-06-16T20:09:50+08:00"
+    },
+    {
+      "color": "#35e029",
+      "created_at": "2026-03-20T11:25:13+08:00",
+      "id": 38861,
+      "name": "resolved",
+      "updated_at": "2026-06-18T10:17:55+08:00"
+    }
+  ],
+  "number": "3377",
+  "priority": 0,
+  "repository": {
+    "assigner": {},
+    "created_at": "2025-09-27T17:40:34+08:00",
+    "description": "本项目是CANN提供的神经网络类计算算子库，实现网络在NPU上加速计算。",
+    "full_name": "cann/ops-nn",
+    "id": 7665709,
+    "name": "ops-nn",
+    "paas": "",
+    "path": "ops-nn",
+    "updated_at": "2025-09-27T18:09:31+08:00"
+  },
+  "state": "closed",
+  "title": "[Bug-Report|缺陷反馈]: layer_norm Welford 算法缓存索引偏移和计数递增逻辑导致精度异常",
+  "updated_at": "2026-06-18T09:13:59+08:00",
+  "user": {
+    "html_url": "https://gitcode.com/cai-chengchao",
+    "id": "6822fc31398335026946c784",
+    "login": "cai-chengchao",
+    "name": "cai-chengchao",
+    "object_id": "6822fc31398335026946c784"
+  },
+  "visibility_reason": "public"
+}

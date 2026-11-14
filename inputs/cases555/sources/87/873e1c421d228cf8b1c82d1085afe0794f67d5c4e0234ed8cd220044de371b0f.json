@@ -1,0 +1,74 @@
+[
+  {
+    "additions": 8,
+    "blob_id": "c33eb048248ea9a197c7d9ceb8f645c8fa981433",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/91db09c3ad78b727a29a7921caac0280fdb53722/conv/conv3d_backprop_input_v2/op_host/op_tiling/arch35/conv3d_backprop_input_v2_inner_product_tiling.cpp",
+    "deletions": 0,
+    "filename": "conv/conv3d_backprop_input_v2/op_host/op_tiling/arch35/conv3d_backprop_input_v2_inner_product_tiling.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 8,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -785,6 +785,14 @@ void Conv3DDXV2InnerProductTiling::AdjustBaseMWhenSmallN(uint32_t& baseM, uint32\n     uint64_t alingedMValue = Ops::Base::CeilAlign(tilingRunInfo.mValue, static_cast<uint64_t>(tilingRunInfo_.m0));\n     \n     uint32_t maxBaseM = CalculateMaxBaseM(baseN);\n+    int64_t bpPadRight = runInfo_.dedx_w - (static_cast<int64_t>(runInfo_.dedy_w - 1) * runInfo_.stride_w + 1) +\n+        (runInfo_.kernel_w - 1) * runInfo_.dilation_w - runInfo_.backprop_pad_l;\n+    int64_t bpPadDown = runInfo_.dedx_h - (static_cast<int64_t>(runInfo_.dedy_h - 1) * runInfo_.stride_h + 1) +\n+                        (runInfo_.kernel_h - 1) * runInfo_.dilation_h - runInfo_.backprop_pad_u;\n+    if ((runInfo_.backprop_pad_l > PAD_DIM_UP || runInfo_.backprop_pad_u > PAD_DIM_UP ||\n+        bpPadRight > PAD_DIM_UP || bpPadDown > PAD_DIM_UP) && maxBaseM > BASIC_BLOCK_SIZE_512) {\n+        maxBaseM = BASIC_BLOCK_SIZE_512;\n+    }\n     uint32_t mL0cMax = ONE_U32;\n     if (baseN > 0 && tilingRunInfo_.n0 > 0) {\n         mL0cMax = std::max(l0cMaxNum / baseN / tilingRunInfo_.n0, ONE_U32) * tilingRunInfo_.n0;\n",
+      "new_file": false,
+      "new_path": "conv/conv3d_backprop_input_v2/op_host/op_tiling/arch35/conv3d_backprop_input_v2_inner_product_tiling.cpp",
+      "old_path": "conv/conv3d_backprop_input_v2/op_host/op_tiling/arch35/conv3d_backprop_input_v2_inner_product_tiling.cpp",
+      "removed_lines": 0,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/91db09c3ad78b727a29a7921caac0280fdb53722/conv/conv3d_backprop_input_v2/op_host/op_tiling/arch35/conv3d_backprop_input_v2_inner_product_tiling.cpp",
+    "sha": "91db09c3ad78b727a29a7921caac0280fdb53722",
+    "source_branch": "dx_large_pad",
+    "source_project": {
+      "full_name": "hongyiliu111/ops-nn",
+      "human_name": "hongyiliu111 / ops-nn",
+      "id": 9136285,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 2,
+    "blob_id": "bf6a83c024f7b4b2a9645b775961ed56fb848277",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/91db09c3ad78b727a29a7921caac0280fdb53722/conv/conv3d_backprop_input_v2/op_kernel/arch35/convolution_3d_backprop/conv3d_bp_func.h",
+    "deletions": 1,
+    "filename": "conv/conv3d_backprop_input_v2/op_kernel/arch35/convolution_3d_backprop/conv3d_bp_func.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 2,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -652,7 +652,8 @@ static __aicore__ inline void UpdateL1ComputeInfo(Intf *self)\n         uint32_t Hd = (self->ctx.tiling_->hk - 1) * self->ctx.tiling_->dilationH + 1;\n         uint32_t Wd = (self->ctx.tiling_->wk - 1) * self->ctx.tiling_->dilationW + 1;\n         // load3d指令的padList[3]固定为255\n-        uint32_t Hp = self->ctx.hoExpand_ + self->ctx.tiling_->backpropPadUp + 255;\n+        uint32_t backpropPadDown = self->ctx.tiling_->backpropPadDown > 255 ? self->ctx.tiling_->backpropPadDown : 255;\n+        uint32_t Hp = self->ctx.hoExpand_ + self->ctx.tiling_->backpropPadUp + backpropPadDown;\n         uint32_t Wp = (self->ctx.tiling_->wo - 1) * self->ctx.tiling_->strideW + 1 +\n                       self->ctx.tiling_->backpropPadLeft + self->ctx.tiling_->backpropPadRight;\n         uint64_t M = (Hp - Hd + 1) * (Wp - Wd + 1);\n",
+      "new_file": false,
+      "new_path": "conv/conv3d_backprop_input_v2/op_kernel/arch35/convolution_3d_backprop/conv3d_bp_func.h",
+      "old_path": "conv/conv3d_backprop_input_v2/op_kernel/arch35/convolution_3d_backprop/conv3d_bp_func.h",
+      "removed_lines": 1,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/91db09c3ad78b727a29a7921caac0280fdb53722/conv/conv3d_backprop_input_v2/op_kernel/arch35/convolution_3d_backprop/conv3d_bp_func.h",
+    "sha": "91db09c3ad78b727a29a7921caac0280fdb53722",
+    "source_branch": "dx_large_pad",
+    "source_project": {
+      "full_name": "hongyiliu111/ops-nn",
+      "human_name": "hongyiliu111 / ops-nn",
+      "id": 9136285,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  }
+]

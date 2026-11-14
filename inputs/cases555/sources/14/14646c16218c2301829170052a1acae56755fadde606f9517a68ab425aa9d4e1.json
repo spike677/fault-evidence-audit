@@ -1,0 +1,110 @@
+[
+  {
+    "additions": 4,
+    "blob_id": "bc19887d17c2ace4ac7159a7fcb675d4adb9a322",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/29640e7d621c820b0cdd4e27baa28e4594431f3e/mc2/all_gather_matmul_v2/op_host/op_tiling/arch22/all_gather_matmul_aiv_mode_tiling.cpp",
+    "deletions": 2,
+    "filename": "mc2/all_gather_matmul_v2/op_host/op_tiling/arch22/all_gather_matmul_aiv_mode_tiling.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 4,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -433,9 +433,11 @@ void GetUsrWorkSpaceSize(uint32_t nElemAlign, uint32_t elementSize, uint64_t &us\n         }\n         userWorkSpaceSize += info.bAlignSize;\n     }\n+\n+    info.accumWorkSpacePingPong = false;\n     if (info.quantFlag) {\n-        info.accumWorkSpacePingPong = (info.M < MAX_BLOCK_COUNT * cocTiling.m0 * cocTiling.pValue);\n-        int32_t workspaceM = info.accumWorkSpacePingPong ? info.M : MAX_BLOCK_COUNT * cocTiling.m0 * cocTiling.pValue;\n+        info.accumWorkSpacePingPong = (info.M >= MAX_BLOCK_COUNT * cocTiling.m0 * cocTiling.pValue);\n+        int32_t workspaceM = info.accumWorkSpacePingPong ? MAX_BLOCK_COUNT * cocTiling.m0 * cocTiling.pValue : info.M;\n         userWorkSpaceSize += static_cast<uint64_t>(workspaceM * info.N * rankSize * sizeof(int32_t));\n     }\n     if (info.dequantType == DequantType::PER_TOKEN) {\n",
+      "new_file": false,
+      "new_path": "mc2/all_gather_matmul_v2/op_host/op_tiling/arch22/all_gather_matmul_aiv_mode_tiling.cpp",
+      "old_path": "mc2/all_gather_matmul_v2/op_host/op_tiling/arch22/all_gather_matmul_aiv_mode_tiling.cpp",
+      "removed_lines": 2,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/29640e7d621c820b0cdd4e27baa28e4594431f3e/mc2/all_gather_matmul_v2/op_host/op_tiling/arch22/all_gather_matmul_aiv_mode_tiling.cpp",
+    "sha": "29640e7d621c820b0cdd4e27baa28e4594431f3e",
+    "source_branch": "fix_workspace_bug",
+    "source_project": {
+      "full_name": "zhu-mingzhe71/ops-transformer",
+      "human_name": "zhu-mingzhe71 / ops-transformer",
+      "id": 7818594,
+      "path": "ops-transformer"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  },
+  {
+    "additions": 2,
+    "blob_id": "9ebbbec4c3d48edc4a8fccbb1a946b8c067f67c2",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/29640e7d621c820b0cdd4e27baa28e4594431f3e/mc2/all_gather_matmul_v2/op_kernel/all_gather_matmul_aiv_mode.h",
+    "deletions": 2,
+    "filename": "mc2/all_gather_matmul_v2/op_kernel/all_gather_matmul_aiv_mode.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 2,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -296,7 +296,7 @@ __aicore__ inline void AllGatherMatmulAIVMode<TemplateAGMMFunc>::Init(\n     }\n \n     accumWorkSpacePingPong = tilingData.allGatherMatmulInfo.accumWorkSpacePingPong;\n-    int32_t workspaceM = accumWorkSpacePingPong ? m : MAX_BLOCK_COUNT * m0 * pValue;\n+    int32_t workspaceM = accumWorkSpacePingPong ? MAX_BLOCK_COUNT * m0 * pValue : m;\n     uint64_t gm_scale_workspace_st = static_cast<uint64_t>(aAlignSize) + bAlignSize\n                                     + workspaceM * n * worldSize * sizeof(int32_t);\n  \tgm_scale_workspace = needPerToken ? workspaceGM + gm_scale_workspace_st : 0;\n@@ -593,7 +593,7 @@ __aicore__ inline void AllGatherMatmulAIVMode<TemplateAGMMFunc>::Dequant(int32_t\n     uint64_t blockStInWorkspace = (cal_idx % MAX_BLOCK_COUNT) * worldSize * m0 * pValue * n;\n     uint64_t blockSizeInWorkspace = m0 * pValue * n;\n \n-    if (accumWorkSpacePingPong) {\n+    if (!accumWorkSpacePingPong) {\n         blockStInWorkspace = blockSt;\n         blockSizeInWorkspace = blockSize;\n     }\n",
+      "new_file": false,
+      "new_path": "mc2/all_gather_matmul_v2/op_kernel/all_gather_matmul_aiv_mode.h",
+      "old_path": "mc2/all_gather_matmul_v2/op_kernel/all_gather_matmul_aiv_mode.h",
+      "removed_lines": 2,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/29640e7d621c820b0cdd4e27baa28e4594431f3e/mc2/all_gather_matmul_v2/op_kernel/all_gather_matmul_aiv_mode.h",
+    "sha": "29640e7d621c820b0cdd4e27baa28e4594431f3e",
+    "source_branch": "fix_workspace_bug",
+    "source_project": {
+      "full_name": "zhu-mingzhe71/ops-transformer",
+      "human_name": "zhu-mingzhe71 / ops-transformer",
+      "id": 7818594,
+      "path": "ops-transformer"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  },
+  {
+    "additions": 4,
+    "blob_id": "0cdca2e79490e745b7944ae3e42a5bfe56019d7c",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/29640e7d621c820b0cdd4e27baa28e4594431f3e/mc2/all_gather_matmul_v2/op_kernel/gather_matmul.hpp",
+    "deletions": 10,
+    "filename": "mc2/all_gather_matmul_v2/op_kernel/gather_matmul.hpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 4,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -295,12 +295,7 @@ public:\n                 MatrixCoord offsetC{blockLocCoord.m(), blockLocCoord.n()};\n                 uint64_t gmOffsetA = pingPongSt + dstBlockIdx * blockSize + params.layoutPeerMem.GetOffset(offsetA);\n                 uint64_t gmOffsetB = params.layoutB.GetOffset(offsetB);\n-                int64_t gmOffsetC = static_cast<int64_t>(dstBlockIdx + flagIdx * params.rankSize) * outputBlockSize\n-                                        + params.layoutC.GetOffset(offsetC);\n-                \n-                if (params.accumWorkSpacePingPong) {\n-                    gmOffsetC = dstBlockIdx * mnSize + calIdx * outputBlockSize + params.layoutC.GetOffset(offsetC);\n-                }\n+                int64_t gmOffsetC = dstBlockIdx * mnSize + calIdx * outputBlockSize + params.layoutC.GetOffset(offsetC);\n \n                 AscendC::GlobalTensor<ElementAInt8> gmAIn = gmPeerMemInt8;\n  \t            if (dstBlockIdx == params.rankIdx) { // 从gmA里面取\n@@ -386,11 +381,10 @@ public:\n                 MatrixCoord offsetC{blockLocCoord.m(), blockLocCoord.n()};\n                 uint64_t gmOffsetA = pingPongSt + dstBlockIdx * blockSize + params.layoutPeerMem.GetOffset(offsetA);\n                 uint64_t gmOffsetB = params.layoutB.GetOffset(offsetB);\n-                int64_t gmOffsetC = static_cast<int64_t>(dstBlockIdx + flagIdx * params.rankSize) * outputBlockSize\n-                                        + params.layoutC.GetOffset(offsetC);\n-                \n+                int64_t gmOffsetC = dstBlockIdx * mnSize + calIdx * outputBlockSize + params.layoutC.GetOffset(offsetC);\n                 if (params.accumWorkSpacePingPong) {\n-                    gmOffsetC = dstBlockIdx * mnSize + calIdx * outputBlockSize + params.layoutC.GetOffset(offsetC);\n+                    gmOffsetC = static_cast<int64_t>(dstBlockIdx + flagIdx * params.rankSize) * outputBlockSize\n+                                        + params.layoutC.GetOffset(offsetC);\n                 }\n \n                 AscendC::GlobalTensor<ElementA> gmAIn = gmPeerMem;\n",
+      "new_file": false,
+      "new_path": "mc2/all_gather_matmul_v2/op_kernel/gather_matmul.hpp",
+      "old_path": "mc2/all_gather_matmul_v2/op_kernel/gather_matmul.hpp",
+      "removed_lines": 10,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/29640e7d621c820b0cdd4e27baa28e4594431f3e/mc2/all_gather_matmul_v2/op_kernel/gather_matmul.hpp",
+    "sha": "29640e7d621c820b0cdd4e27baa28e4594431f3e",
+    "source_branch": "fix_workspace_bug",
+    "source_project": {
+      "full_name": "zhu-mingzhe71/ops-transformer",
+      "human_name": "zhu-mingzhe71 / ops-transformer",
+      "id": 7818594,
+      "path": "ops-transformer"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  }
+]

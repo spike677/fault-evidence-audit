@@ -1,0 +1,66 @@
+{
+  "assignees": [],
+  "body": "\n\nThanks for sending an issue! Please fill in the following template to help quickly solve your problem.\n\n### Describe the current behavior / 问题描述 (Mandatory / 必填)\n            \n全量化+kvcache pertensor量化，B\\*S1（T）较大的case，krcache输出精度失败\n### Environment / 环境信息 (Mandatory / 必填)\n            \n910b\n### Steps to reproduce the issue / 重现步骤 (Mandatory / 必填)\n            \n全量化+kvcache pertensor量化，B\\*S1（T）较大的case，krcache输出精度失败\n### Describe the expected behavior / 预期结果 (Mandatory / 必填)\n            \n精度通过\n### Related log / screenshot / 日志 / 截图 (Mandatory / 必填)\n            \n对比bin文件，发现是output-3（kr_cache）连续64个数位出错\n### Special notes for this issue/备注 (Optional / 选填)\n            \n经分析，是同步问题，output-3出现连续错误时，RopeKr操作中的输入mmCkvKrResGm_，第一轮读入的是正确情况的第三轮，原因是AIV逐token读取耗时长，本轮的AIV还未结束，AIC已经进入下一轮覆盖AIV正在读的mmCkvKrResGm_\n",
+  "comments": 0,
+  "created_at": "2026-04-09T15:00:40+08:00",
+  "finished_at": "2026-04-09T15:07:19+08:00",
+  "html_url": "https://gitcode.com/cann/ops-transformer/issues/1783",
+  "id": 3843573,
+  "issue_priority_detail": {
+    "id": 116,
+    "title": "无优先级"
+  },
+  "issue_state": "进行中",
+  "issue_state_detail": {
+    "id": 285,
+    "serial": 0,
+    "title": "进行中"
+  },
+  "issue_type": "任务",
+  "issue_type_detail": {
+    "id": 255,
+    "is_system": false,
+    "title": "任务"
+  },
+  "labels": [
+    {
+      "color": "#DB2828",
+      "created_at": "2025-06-10T14:17:23+08:00",
+      "id": 3870,
+      "name": "bug-report",
+      "updated_at": "2026-04-09T15:00:40+08:00"
+    },
+    {
+      "color": "#35e029",
+      "created_at": "2026-03-20T11:25:13+08:00",
+      "id": 38861,
+      "name": "resolved",
+      "updated_at": "2026-04-09T15:17:22+08:00"
+    }
+  ],
+  "number": "1783",
+  "priority": 0,
+  "repository": {
+    "assigner": {},
+    "created_at": "2025-09-28T17:54:46+08:00",
+    "description": "本项目是CANN提供的transformer类大模型算子库，实现网络在NPU上加速计算。",
+    "full_name": "cann/ops-transformer",
+    "id": 7673863,
+    "name": "ops-transformer",
+    "paas": "",
+    "path": "ops-transformer",
+    "updated_at": "2025-09-28T18:06:48+08:00"
+  },
+  "state": "closed",
+  "title": "[Bug-Report|缺陷反馈]: mlaprologv3算子krcache输出精度失败",
+  "updated_at": "2026-04-09T15:07:19+08:00",
+  "user": {
+    "avatar_url": "https://cdn-img.gitcode.com/ed/cc/759e309dc338441cf93bb66c66fe287ebf770fc557d1fd070f8b0635c0268026.png",
+    "html_url": "https://gitcode.com/taomengyuan-hw",
+    "id": "67d28ec0729ec40f0ee0b819",
+    "login": "taomengyuan-hw",
+    "name": "taomengyuan-hw",
+    "object_id": "67d28ec0729ec40f0ee0b819"
+  },
+  "visibility_reason": "public"
+}

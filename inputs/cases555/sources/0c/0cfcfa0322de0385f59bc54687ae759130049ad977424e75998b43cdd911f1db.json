@@ -1,0 +1,80 @@
+{
+  "assignee": {
+    "html_url": "https://gitcode.com/mengziyu",
+    "id": "68a6dd7217773747a71dfe50",
+    "login": "mengziyu",
+    "name": "mengziyu",
+    "object_id": "68a6dd7217773747a71dfe50"
+  },
+  "assignees": [
+    {
+      "html_url": "https://gitcode.com/mengziyu",
+      "id": "68a6dd7217773747a71dfe50",
+      "login": "mengziyu",
+      "name": "mengziyu",
+      "object_id": "68a6dd7217773747a71dfe50"
+    }
+  ],
+  "body": "## 问题描述\n\nAllGatherMM 用例在尾块 M 维度存在 L0C 回写 GM 地址 1024 非对齐问题，导致精度异常。同时 fragmentTensor 基础接口的 scalar 性能有优化空间。\n\n具体表现：\n1. Host 侧 Tiling 分块逻辑中，尾块 M 维度未做 16 对齐，导致 L0C 回写 GM 地址 1024 非对齐，引发 AllGatherMM 用例精度异常\n2. fragmentTensor 基础接口 scalar 性能不足\n\n## 环境信息\n\n- 算子路径：mc2/common/op_kernel/apace/kernel/all_gather_quant_matmul/\n- 涉及模块：AllGatherQuantMatmul（MC2 通算融合算子）\n\n## 重现步骤\n\n1. 运行 AllGatherMM 用例（all_gather_quant_matmul ST 测试）\n2. 当尾块 M 维度非 16 对齐时，L0C 回写 GM 地址出现 1024 非对齐\n3. 精度验证失败\n\n## 预期结果\n\n- 尾块 M 维度做 16 对齐，解决 L0C 回写 GM 地址非对齐问题，AllGatherMM 用例精度达标\n- fragmentTensor 基础接口 scalar 性能提升\n- AllToAllQuantMatmul 用例同步验证通过\n\n## 日志 / 截图\n\n详见 PR 代码变更和 ST 测试脚本更新。\n\n## 备注\n\n关联 PR：https://gitcode.com/cann/ops-transformer/pull/9716\n\n变更文件（16 个）：\n- `fragment_tensor.h` / `fragment_tensor_api.h`：基础接口优化\n- `qmm_mx_block_mmad_fragment.h`：BlockMmad 适配\n- `all_gather_mx_matmul_udma_impl.h` / `qmm_mx_kernel_ag_udma.h`：Kernel 实现\n- `quant_matmul_tiling_base.h` / `quant_matmul_tiling_swat.h`：Tiling 16 对齐\n- 测试脚本：`run.sh`、`gen_data.py`、`parse_prof.py`、`verify_result.py`、`main.cpp`\n",
+  "comments": 1,
+  "created_at": "2026-08-08T10:20:13+08:00",
+  "finished_at": "2026-08-08T16:29:42+08:00",
+  "html_url": "https://gitcode.com/cann/ops-transformer/issues/4197",
+  "id": 4229567,
+  "issue_priority_detail": {
+    "id": 116,
+    "title": "无优先级"
+  },
+  "issue_state": "进行中",
+  "issue_state_detail": {
+    "id": 285,
+    "serial": 0,
+    "title": "进行中"
+  },
+  "issue_type": "任务",
+  "issue_type_detail": {
+    "id": 255,
+    "is_system": false,
+    "title": "任务"
+  },
+  "labels": [
+    {
+      "color": "#DB2828",
+      "created_at": "2025-06-10T14:17:23+08:00",
+      "id": 3870,
+      "name": "bug-report",
+      "updated_at": "2026-08-08T10:20:14+08:00"
+    },
+    {
+      "color": "#35e029",
+      "created_at": "2026-03-20T11:25:13+08:00",
+      "id": 38861,
+      "name": "resolved",
+      "updated_at": "2026-08-08T16:35:21+08:00"
+    }
+  ],
+  "number": "4197",
+  "priority": 0,
+  "repository": {
+    "assigner": {},
+    "created_at": "2025-09-28T17:54:46+08:00",
+    "description": "本项目是CANN提供的transformer类大模型算子库，实现网络在NPU上加速计算。",
+    "full_name": "cann/ops-transformer",
+    "id": 7673863,
+    "name": "ops-transformer",
+    "paas": "",
+    "path": "ops-transformer",
+    "updated_at": "2025-09-28T18:06:48+08:00"
+  },
+  "state": "closed",
+  "title": "[Bug-Report|缺陷反馈]: AllGatherMM 用例 L0C 回写 GM 地址非对齐引发精度异常及 scalar 性能优化",
+  "updated_at": "2026-08-08T16:29:42+08:00",
+  "user": {
+    "html_url": "https://gitcode.com/mengziyu",
+    "id": "68a6dd7217773747a71dfe50",
+    "login": "mengziyu",
+    "name": "mengziyu",
+    "object_id": "68a6dd7217773747a71dfe50"
+  },
+  "visibility_reason": "public"
+}

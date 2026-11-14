@@ -1,0 +1,38 @@
+[
+  {
+    "additions": 0,
+    "blob_id": "8a758fcfbdd481321b085c7b6212b6869fd892ee",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/17dd7eeed785c13fdc5c04a2786773bfe3ec3feb/conv/convolution_backward/op_api/aclnn_convolution_backward.cpp",
+    "deletions": 29,
+    "filename": "conv/convolution_backward/op_api/aclnn_convolution_backward.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 0,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -360,32 +360,6 @@ static aclnnStatus InputPreProcess(const aclTensor *&inputTensor, const string &\n   return ACLNN_SUCCESS;\n }\n \n-static aclnnStatus BiasPreProcess(ConvolutionBackwardInputTensor &inputTensor, const string &tensorName,\n-                                   ConvolutionBackwardParams &params, const op::DataType promoteDtype, aclOpExecutor *executor) {\n-  if (params.cubeMathType == USE_FP16 && inputTensor.gradOutput->GetDataType() == op::DataType::DT_FLOAT && promoteDtype == op::DataType::DT_FLOAT) {\n-    auto castedTensor = l0op::Cast(inputTensor.gradOutput, op::DataType::DT_FLOAT16, executor);\n-    OP_CHECK(castedTensor != nullptr, OP_LOGE(ACLNN_ERR_INNER_NULLPTR, \"The bias perprocess failed, %s with Cast DataType to DT_FLOAT16 return nullptr.\",\n-             tensorName.c_str()), return ACLNN_ERR_INNER_NULLPTR);\n-    inputTensor.gradOutput = castedTensor;\n-    castedTensor = l0op::Cast(inputTensor.gradOutput, op::DataType::DT_FLOAT, executor);\n-    OP_CHECK(castedTensor != nullptr, OP_LOGE(ACLNN_ERR_INNER_NULLPTR, \"The bias perprocess failed, %s with Cast DataType to DT_FLOAT return nullptr.\",\n-             tensorName.c_str()), return ACLNN_ERR_INNER_NULLPTR);\n-    inputTensor.gradOutput = castedTensor;\n-  }\n-  return ACLNN_SUCCESS;\n-}\n-\n-static aclnnStatus BiasReDtypeProcess(const aclTensor *&outputTensor, const string &tensorName,\n-                                   ConvolutionBackwardParams &params, const op::DataType promoteDtype, aclOpExecutor *executor) {\n-  if (params.cubeMathType == USE_FP16 && outputTensor->GetDataType() == op::DataType::DT_FLOAT && promoteDtype == op::DataType::DT_FLOAT) {\n-    auto castedTensor  = l0op::Cast(outputTensor, op::DataType::DT_FLOAT16, executor);\n-    OP_CHECK(castedTensor != nullptr, OP_LOGE(ACLNN_ERR_INNER_NULLPTR, \"The bias perprocess failed, %s with Cast DataType to DT_FLOAT16 return nullptr.\",\n-             tensorName.c_str()), return ACLNN_ERR_INNER_NULLPTR);\n-    outputTensor = castedTensor;\n-  }\n-  return ACLNN_SUCCESS;\n-}\n-\n static aclnnStatus OutputPostProcessTransposed(const aclTensor *&outputTensor, const aclTensor *&l0ResultTensor,\n                                                const string &tensorName, aclOpExecutor *executor) {\n   OP_LOGD(\"%s's l0func result before cast: %s\", tensorName.c_str(), l0ResultTensor->ToString().GetString());\n@@ -848,7 +822,6 @@ static aclnnStatus CalculateBiasGrad(ConvolutionBackwardInputTensor &inputTensor\n                                      ConvolutionBackwardResult &outputTensor, ConvolutionBackwardParams &params,\n                                      aclOpExecutor *executor) {\n   auto curArch = GetCurrentPlatformInfo().GetCurNpuArch();\n-  DataType promoteDtype = CalcPromoteType(inputTensor);\n   // Index 为 2：进行bias grad运算\n   if ((*params.outputMask)[2]) {\n     OP_LOGD(\"Enter bias grad Calculate\");\n@@ -862,7 +835,6 @@ static aclnnStatus CalculateBiasGrad(ConvolutionBackwardInputTensor &inputTensor\n               op::ToString(outputTensor.gradBias->GetDataType()).GetString()),\n             return ACLNN_ERR_INNER_NULLPTR);\n     }\n-    CHECK_RET(BiasPreProcess(inputTensor, \"bias\", params, promoteDtype, executor) == ACLNN_SUCCESS, ACLNN_ERR_INNER_NULLPTR);\n \n     auto gradContiguous = l0op::Contiguous(inputTensor.gradOutput, executor);\n     op::Format gradOutputFormat = inputTensor.gradOutput->GetStorageFormat();\n@@ -902,7 +874,6 @@ static aclnnStatus CalculateBiasGrad(ConvolutionBackwardInputTensor &inputTensor\n     OP_CHECK(gradBiasResult != nullptr,\n             OP_LOGE(ACLNN_ERR_INNER_NULLPTR, \"The ReduceSumOp with gradOutput failed.\"),\n             return ACLNN_ERR_INNER_NULLPTR);\n-    BiasReDtypeProcess(gradBiasResult, \"gradBias\", params, promoteDtype, executor);\n     OP_LOGD(\"gradBiasResult: %s\", gradBiasResult->ToString().GetString());\n     CHECK_RET(\n         OutputPostProcess(outputTensor.gradBias, gradBiasResult, \"gradBias\", params.groups, executor) == ACLNN_SUCCESS,\n",
+      "new_file": false,
+      "new_path": "conv/convolution_backward/op_api/aclnn_convolution_backward.cpp",
+      "old_path": "conv/convolution_backward/op_api/aclnn_convolution_backward.cpp",
+      "removed_lines": 29,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/17dd7eeed785c13fdc5c04a2786773bfe3ec3feb/conv/convolution_backward/op_api/aclnn_convolution_backward.cpp",
+    "sha": "17dd7eeed785c13fdc5c04a2786773bfe3ec3feb",
+    "source_branch": "bias_0409_2",
+    "source_project": {
+      "full_name": "Jiaxin_001/ops-nn",
+      "human_name": "Jiaxin_001 / ops-nn",
+      "id": 9094559,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  }
+]

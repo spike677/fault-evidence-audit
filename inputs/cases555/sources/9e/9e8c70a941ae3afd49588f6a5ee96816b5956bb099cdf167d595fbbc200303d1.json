@@ -1,0 +1,152 @@
+{
+  "approval_reviewers": [],
+  "assignees": [],
+  "assignees_number": 0,
+  "base": {
+    "label": "master",
+    "ref": "master",
+    "repo": {
+      "full_name": "cann/ops-nn",
+      "html_url": "https://gitcode.com/cann/ops-nn.git",
+      "name": "ops-nn",
+      "namespace": {
+        "path": "cann"
+      },
+      "path": "ops-nn"
+    },
+    "sha": "f2ab9177000e2c447c98187eb3260825cd4755cf"
+  },
+  "body": "## 描述\n\nbatch_norm 算子的 3 个 infer 新模板存在两类问题：\n\n### 问题 1：冗余写\ncontinuous_a、small_a、small_ab1 三个模板中，`CopyOutMeanVar` 被所有核无条件调用，\n导致多个核向同一 GM 地址写同一份数据（batch_mean、batch_variance、reserve_space_1、reserve_space_2）。\n\n**修复**：在 `CopyOutMeanVar` 函数中增加 `GetBlockIdx() == 0` 守卫，只让 core 0 写。\n\n### 问题 2：small_ab1 输出错误\nsmall_ab1 模板中，`VFPrepareSmallAB1ParamCache` 使用 `DataCopyGather` 读取 mean/var 时，\n由于 `paramCacheElemLen`（128）大于 `meanQueue_` buffer 大小（totalALen=4 个元素），\n导致 meanLocal 被破坏，batch_mean 和 reserve_space_1 输出错误数据（epsilon 值而非实际 mean）。\n\n**修复**：\n- 单独申请 `meanOutQueue_` 和 `varOutQueue_`（`TQueBind` 类型，BUFFER_NUM=1）\n- 从 GM 重新加载 mean/var 后再写出到输出 GM 地址\n- 添加正确的 `EnQue`/`DeQue` 操作\n- tiling 中 `ubCanUseBytes` 计算减去这两个 buffer 的空间\n\n老模板 `batch_norm_infer_last_channel.h` 已有 `needCopyOut` 条件判断，不受影响。\n\n## 修改文件\n\n| 文件 | 修改内容 |\n|------|----------|\n| `batch_norm_infer_last_channel_continuous_a.h` | 添加 `GetBlockIdx()` 守卫 |\n| `batch_norm_infer_last_channel_small_a.h` | 添加 `GetBlockIdx()` 守卫 |\n| `batch_norm_infer_small_ab1.h` | 添加守卫 + 单独 buffer 修复输出错误 |\n| `batch_norm_tiling_infer_arch35.cpp` | tiling 空间计算减去新增 buffer |\n\n## 关联的Issue\n- #3290\n\n## 测试\n- TTK kernel 测试 fp32 NHWC [256,165,165,4]（small_a 902000）：5 个有效输出 100% PASS\n- TTK kernel 测试 fp16 NHWC [256,165,165,192]（continuous_a 901000）：5 个有效输出 100% PASS\n- TTK kernel 测试 fp32 NCHW [256,4,2,2]（small_ab1 911000）：5 个有效输出 100% PASS\n\n## 文档更新\n无需更新文档\n\n## 类型标签\n- [x] Bug修复\n- [ ] 新特性\n- [ ] 性能优化\n- [ ] 文档更新\n- [ ] 其他\n",
+  "can_merge_check": true,
+  "close_related_issue": true,
+  "closed_at": "2026-06-12T14:48:51+08:00",
+  "created_at": "2026-06-11T11:23:25+08:00",
+  "draft": false,
+  "head": {
+    "label": "fix/batch_norm_remove_redundant_meanvar_write",
+    "ref": "fix/batch_norm_remove_redundant_meanvar_write",
+    "repo": {
+      "full_name": "qianzehong/ops-nn",
+      "html_url": "https://gitcode.com/qianzehong/ops-nn.git",
+      "name": "ops-nn",
+      "namespace": {
+        "path": "qianzehong"
+      },
+      "path": "ops-nn"
+    },
+    "sha": "8f21a66a151a4bdac99b553f0cc593e99c4824fa",
+    "user": {
+      "html_url": "https://gitcode.com/qianzehong",
+      "id": "68c138243be0a23c91c2437b",
+      "login": "qianzehong",
+      "name": "qianzehong"
+    }
+  },
+  "html_url": "https://gitcode.com/cann/ops-nn/merge_requests/5962",
+  "id": 8723726,
+  "issue_url": "https://api.gitcode.com/api/v5/repos/cann/ops-nn/pulls/5962/issues",
+  "labels": [
+    {
+      "color": "#2865E0",
+      "created_at": "2025-06-21T10:53:09+08:00",
+      "id": 4929,
+      "name": "cann-cla/yes",
+      "repository_id": 7665709,
+      "updated_at": "2026-06-11T11:23:34+08:00"
+    },
+    {
+      "color": "#3ee029",
+      "created_at": "2025-12-16T09:45:21+08:00",
+      "id": 22553,
+      "name": "api-check-pass",
+      "repository_id": 7665709,
+      "updated_at": "2026-06-12T11:37:15+08:00"
+    },
+    {
+      "color": "#21BA45",
+      "created_at": "2025-06-10T14:17:23+08:00",
+      "id": 3873,
+      "name": "ci-pipeline-passed",
+      "repository_id": 7665709,
+      "updated_at": "2026-06-12T11:37:59+08:00"
+    },
+    {
+      "color": "#22ed07",
+      "created_at": "2025-05-29T20:14:31+08:00",
+      "id": 2742,
+      "name": "approved",
+      "repository_id": 7665709,
+      "updated_at": "2026-06-12T14:05:58+08:00"
+    },
+    {
+      "color": "#17f207",
+      "created_at": "2025-05-29T20:14:01+08:00",
+      "id": 2741,
+      "name": "lgtm",
+      "repository_id": 7665709,
+      "updated_at": "2026-06-12T14:48:43+08:00"
+    }
+  ],
+  "mergeable": true,
+  "mergeable_state": {
+    "all_depend_merge_request_merged_passed": true,
+    "approval_approvers_required_passed": true,
+    "approval_approvers_result": 2,
+    "approval_reviewers_required_passed": true,
+    "approval_testers_required_passed": true,
+    "approval_testers_result": 2,
+    "branch_missing_passed": true,
+    "can_force_merge": false,
+    "check_tasks_num": 0,
+    "ci_state_passed": true,
+    "conflict_passed": true,
+    "merge_by_self_passed": true,
+    "merge_request_id": 8723726,
+    "merge_request_switch": {
+      "add_notes_after_merged": true,
+      "approval_required_reviewers_branch": "*",
+      "approval_required_reviewers_count": 0,
+      "can_force_merge": false,
+      "can_reopen": true,
+      "disable_merge_by_self": false,
+      "disable_squash_merge": false,
+      "mark_auto_merged_mr_as_closed": false,
+      "merge_method": "merge",
+      "only_allow_merge_if_all_discussions_are_resolved": true,
+      "only_allow_merge_if_pipeline_succeeds": false,
+      "review_mode": "approval",
+      "squash_merge_with_no_merge_commit": true
+    },
+    "merged_by_user_passed": true,
+    "mr_state_passed": true,
+    "non_ff_passed": true,
+    "reason": {},
+    "resolve_discussion_passed": true,
+    "state": true,
+    "status_without_user_auth": true,
+    "work_in_progress_passed": true
+  },
+  "merged_at": "2026-06-12T14:48:51+08:00",
+  "merged_by": {
+    "avatar_url": "https://cdn-img.gitcode.com/bf/ad/b7f29486a040d7b2f52bf6c78414692d7d585eb1ec628cea3eb01c9d63f68618.png?time=1755691472703",
+    "html_url": "https://gitcode.com/cann-robot",
+    "id": "673c1552584fe8295cfd4a13",
+    "login": "cann-robot",
+    "name": "CANN-robot"
+  },
+  "number": 5962,
+  "prune_branch": false,
+  "squash_merge": true,
+  "state": "merged",
+  "testers": [],
+  "title": "fix(batch_norm): 修复 infer 模板冗余写及 small_ab1 输出错误",
+  "updated_at": "2026-06-12T14:48:52+08:00",
+  "url": "https://api.gitcode.com/api/v5/repos/cann/ops-nn/pulls/5962",
+  "user": {
+    "html_url": "https://gitcode.com/qianzehong",
+    "id": "68c138243be0a23c91c2437b",
+    "login": "qianzehong",
+    "name": "qianzehong"
+  },
+  "visibility_reason": "public"
+}

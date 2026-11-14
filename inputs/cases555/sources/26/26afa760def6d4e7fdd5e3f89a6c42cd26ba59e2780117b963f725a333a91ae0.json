@@ -1,0 +1,38 @@
+[
+  {
+    "additions": 7,
+    "blob_id": "6b7ce19ecebfbd2264743f4c56af7c22252389eb",
+    "blob_url": "https://gitcode.com/cann/ops-math/blob/0b7c7335fb44392f1bcde3ac21a8e274c51945d6/random/random_standard_normal_v2/op_graph/fusion_pass/random_standard_normal_fusion_pass.cpp",
+    "deletions": 26,
+    "filename": "random/random_standard_normal_v2/op_graph/fusion_pass/random_standard_normal_fusion_pass.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 7,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -79,33 +79,11 @@ std::vector<PatternUniqPtr> RandomStandardNormalFusionPass::Patterns()\n \n     auto graphBuilder = es::EsGraphBuilder(kPassName.c_str());\n     auto shape = graphBuilder.CreateInput(0);\n-\n-    auto graphPtr = graphBuilder.GetCGraphBuilder()->GetGraph();\n-    auto srcBuilder = es::CompliantNodeBuilder(graphPtr);\n-    srcBuilder.OpType(\"RandomStandardNormal\")\n-        .Name(\"pattern_random_standard_normal\")\n-        .IrDefInputs({{\"shape\", es::CompliantNodeBuilder::kEsIrInputRequired, \"\"}})\n-        .IrDefOutputs({{\"y\", es::CompliantNodeBuilder::kEsIrOutputRequired, \"\"}})\n-        .IrDefAttrs({\n-            {\"seed\", es::CompliantNodeBuilder::kEsAttrOptional, \"Int\", es::CreateFrom(static_cast<int64_t>(0))},\n-            {\"seed2\", es::CompliantNodeBuilder::kEsAttrOptional, \"Int\", es::CreateFrom(static_cast<int64_t>(0))},\n-            {\"dtype\", es::CompliantNodeBuilder::kEsAttrOptional, \"Type\", es::CreateFrom(DT_FLOAT)}\n-        });\n-    GNode srcNode = srcBuilder.Build();\n-\n-    auto dataNode = shape.GetProducer();\n-    if (dataNode != nullptr) {\n-        es::AddEdgeAndUpdatePeerDesc(*graphPtr, *dataNode, 0, srcNode, 0);\n-    }\n-\n-    es::EsGraphBuilder::SetOutput(shape, 0);\n-    auto graph = graphBuilder.BuildAndReset();\n-\n-    std::vector<std::pair<GNode, int32_t>> outputs = {{srcNode, 0}};\n-    graph->SetOutputs(outputs);\n+    auto output = es::RandomStandardNormal(shape, DT_FLOAT, 0, 0);\n+    auto graph = graphBuilder.BuildAndReset({output});\n \n     auto pattern = std::make_unique<Pattern>(std::move(*graph));\n-    pattern->CaptureTensor({srcNode, 0});\n+    pattern->CaptureTensor({*output.GetProducer(), 0});\n \n     patternGraphs.emplace_back(std::move(pattern));\n     return patternGraphs;\n@@ -141,6 +119,7 @@ bool RandomStandardNormalFusionPass::MeetRequirements(const std::unique_ptr<Matc\n     if (nodeIo.node.GetAttr(\"dtype\", dtype) != GRAPH_SUCCESS) {\n         OP_LOGD(kPassName.c_str(), \"Failed to get dtype attribute, using default DT_FLOAT.\");\n     }\n+    OP_LOGI(kPassName.c_str(), \"[MeetReq] V1 dtype from attr: %d (0=float32, 1=float16, 27=bf16, 11=double)\", static_cast<int32_t>(dtype));\n     if (kSupportedDtypes.count(dtype) == 0) {\n         OP_LOGD(kPassName.c_str(),\n                 \"RandomStandardNormalV2 dtype only supports float32/float16/bfloat16, got %d, skip.\",\n@@ -177,6 +156,8 @@ std::unique_ptr<Graph> RandomStandardNormalFusionPass::Replacement(const std::un\n     DataType dtype = DT_FLOAT;\n     nodeIo.node.GetAttr(\"dtype\", dtype);\n     int64_t dtypeInt = static_cast<int64_t>(dtype);\n+    OP_LOGI(kPassName.c_str(), \"[Replacement] V1 dtype enum: %d, converted to V2 dtypeInt: %ld\",\n+            static_cast<int32_t>(dtype), dtypeInt);\n \n     int64_t seed = 0;\n     nodeIo.node.GetAttr(\"seed\", seed);\n@@ -200,7 +181,7 @@ std::unique_ptr<Graph> RandomStandardNormalFusionPass::Replacement(const std::un\n     auto rOffset = replaceGraphBuilder.CreateVariable(1, varName.c_str());\n     InitOffsetVariable(rOffset, offsetDesc);\n \n-    auto v2Output = es::RandomStandardNormalV2(rShape, rOffset, seed, seed2, dtypeInt);\n+    auto v2Output = es::RandomStandardNormalV2(rShape, rOffset, dtypeInt, seed, seed2);\n     GNode v2NodePtr = *v2Output.y.GetProducer();\n \n     TensorDesc shapeInputDesc(inputShapes[0], inputFormats[0], inputDtypes[0]);\n",
+      "new_file": false,
+      "new_path": "random/random_standard_normal_v2/op_graph/fusion_pass/random_standard_normal_fusion_pass.cpp",
+      "old_path": "random/random_standard_normal_v2/op_graph/fusion_pass/random_standard_normal_fusion_pass.cpp",
+      "removed_lines": 26,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-math/raw/0b7c7335fb44392f1bcde3ac21a8e274c51945d6/random/random_standard_normal_v2/op_graph/fusion_pass/random_standard_normal_fusion_pass.cpp",
+    "sha": "0b7c7335fb44392f1bcde3ac21a8e274c51945d6",
+    "source_branch": "9.1.0-beta.2",
+    "source_project": {
+      "full_name": "xuejinghui/ops-math_3916",
+      "human_name": "xuejinghui / ops-math_3916",
+      "id": 9917595,
+      "path": "ops-math_3916"
+    },
+    "target_branch": "9.1.0-beta.2",
+    "target_project": {
+      "full_name": "cann/ops-math",
+      "human_name": "CANN / ops-math",
+      "id": 7649531,
+      "path": "ops-math"
+    }
+  }
+]

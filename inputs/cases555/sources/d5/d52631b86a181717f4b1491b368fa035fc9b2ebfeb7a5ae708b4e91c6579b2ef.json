@@ -1,0 +1,184 @@
+[
+  {
+    "additions": 7,
+    "blob_id": "703ed91a46fa4a8c5c874fcc171b89f309834fba",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/a39af0b6d50c9b879c0056b09478021c664b3d3a/gmm/grouped_matmul/op_host/op_api/aclnn_grouped_matmul.cpp",
+    "deletions": 1,
+    "filename": "gmm/grouped_matmul/op_host/op_api/aclnn_grouped_matmul.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 7,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -38,6 +38,7 @@\n #include \"aclnn_grouped_matmul_util.h\"\n #include \"aclnn_grouped_matmul_910_95_checker.h\"\n #include \"aclnn_grouped_matmul_weight_quant_910_95_checker.h\"\n+#include \"grouped_matmul_no_quant_950_checker.h\"\n \n using namespace op;\n \n@@ -1092,6 +1093,10 @@ static aclnnStatus CheckFunctionParams(const gmm::GroupedMatmulParams &gmmParams\n       return gmm::AclnnGroupedMatmul91095Checker<aclTensorList>(gmmParams).CheckGroupedMatmul91095();\n     } else if (IsWeightQuant(gmmParams.xDtype, weightDtype)) {\n       return gmm::AclnnGroupedMatmulWeightQuant91095Checker(gmmParams).CheckGroupedMatmulWeightQuant91095();\n+    } else {\n+      CHECK_RET(gmm::AclnnGroupedMatmulNoQuant950Checker(gmmParams).CheckGroupedMatmulNoQuant950() ==\n+                    ACLNN_SUCCESS,\n+                ACLNN_ERR_PARAM_INVALID);\n     }\n   }\n   if (gmmParams.xDtype == DataType::DT_INT8 && weightDtype == DataType::DT_INT4) {\n@@ -1455,7 +1460,8 @@ static aclnnStatus CheckParamDifferentGroupType(const gmm::GroupedMatmulParams &\n   if (gmmParams.groupType == gmm::NO_SPLIT) {\n     CHECK_COND(!gmmParams.transposeX, ACLNN_ERR_PARAM_INVALID,\n                \"When x, weight and y are all separated, x can not be transposed.\");\n-    CHECK_COND(!(gmmParams.apiVersion == gmm::GMMApiVersion::V1 && gmmParams.transposeWeight), ACLNN_ERR_PARAM_INVALID,\n+    CHECK_COND(!(gmmParams.apiVersion == gmm::GMMApiVersion::V1 && gmmParams.transposeWeight) ||\n+ \t              GetCurrentPlatformInfo().GetSocVersion() == SocVersion::ASCEND910_95, ACLNN_ERR_PARAM_INVALID,\n                \"in this version, when x, weight and y are all separated, weight can not be transposed.\");\n     CHECK_COND(CheckCaseNoSplit(gmmParams) == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID,\n                \"Invalid inputs!\");\n",
+      "new_file": false,
+      "new_path": "gmm/grouped_matmul/op_host/op_api/aclnn_grouped_matmul.cpp",
+      "old_path": "gmm/grouped_matmul/op_host/op_api/aclnn_grouped_matmul.cpp",
+      "removed_lines": 1,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/a39af0b6d50c9b879c0056b09478021c664b3d3a/gmm/grouped_matmul/op_host/op_api/aclnn_grouped_matmul.cpp",
+    "sha": "a39af0b6d50c9b879c0056b09478021c664b3d3a",
+    "source_branch": "gmm_add_check_and_gmm_add_supportA5",
+    "source_project": {
+      "full_name": "zhangtianrong/ops-transformer",
+      "human_name": "zhangtianrong / ops-transformer",
+      "id": 9035130,
+      "path": "ops-transformer"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  },
+  {
+    "additions": 30,
+    "blob_id": "0c6523be5bfa0b393af768f5c99d16c5c29a0559",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/a39af0b6d50c9b879c0056b09478021c664b3d3a/gmm/grouped_matmul/op_host/op_api/grouped_matmul_no_quant_950_checker.cpp",
+    "deletions": 0,
+    "filename": "gmm/grouped_matmul/op_host/op_api/grouped_matmul_no_quant_950_checker.cpp",
+    "patch": {
+      "a_mode": "0",
+      "added_lines": 30,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -0,0 +1,30 @@\n+/**\n+ * Copyright (c) 2025 Huawei Technologies Co., Ltd.\n+ * This program is free software, you can redistribute it and/or modify it under the terms and conditions of\n+ * CANN Open Software License Agreement Version 2.0 (the \"License\").\n+ * Please refer to the License for details. You may not use this file except in compliance with the License.\n+ * THIS SOFTWARE IS PROVIDED ON AN \"AS IS\" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,\n+ * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.\n+ * See LICENSE in the root of the software repository for the full text of the License.\n+ */\n+\n+#include \"grouped_matmul_no_quant_950_checker.h\"\n+\n+using namespace gmm;\n+\n+aclnnStatus AclnnGroupedMatmulNoQuant950Checker::CheckGroupedMatmulNoQuant950() const\n+{\n+    CHECK_COND(CheckEmptyTensor() == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID, \"GMM check empty tensor failed.\");\n+    return ACLNN_SUCCESS;\n+}\n+\n+aclnnStatus AclnnGroupedMatmulNoQuant950Checker::CheckEmptyTensor() const\n+{\n+    for (size_t i = 0; i < gmmParams_.x->Size(); ++i) {\n+        auto shape = (*gmmParams_.x)[i]->GetViewShape();\n+        int64_t index = gmmParams_.groupType == SPLIT_K ? shape.GetDimNum() - 2 : shape.GetDimNum() - 1;\n+        CHECK_COND(shape.GetDim(index) != 0, ACLNN_ERR_PARAM_INVALID,\n+                   \"GMM no quant do not support origin k equals 0.\");\n+    }\n+    return ACLNN_SUCCESS;\n+}\n\\ No newline at end of file\n",
+      "new_file": true,
+      "new_path": "gmm/grouped_matmul/op_host/op_api/grouped_matmul_no_quant_950_checker.cpp",
+      "old_path": "gmm/grouped_matmul/op_host/op_api/grouped_matmul_no_quant_950_checker.cpp",
+      "removed_lines": 0,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/a39af0b6d50c9b879c0056b09478021c664b3d3a/gmm/grouped_matmul/op_host/op_api/grouped_matmul_no_quant_950_checker.cpp",
+    "sha": "a39af0b6d50c9b879c0056b09478021c664b3d3a",
+    "source_branch": "gmm_add_check_and_gmm_add_supportA5",
+    "source_project": {
+      "full_name": "zhangtianrong/ops-transformer",
+      "human_name": "zhangtianrong / ops-transformer",
+      "id": 9035130,
+      "path": "ops-transformer"
+    },
+    "status": "added",
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  },
+  {
+    "additions": 30,
+    "blob_id": "5ed4de336572acfc589ce6c1e15e48476a292e8d",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/a39af0b6d50c9b879c0056b09478021c664b3d3a/gmm/grouped_matmul/op_host/op_api/grouped_matmul_no_quant_950_checker.h",
+    "deletions": 0,
+    "filename": "gmm/grouped_matmul/op_host/op_api/grouped_matmul_no_quant_950_checker.h",
+    "patch": {
+      "a_mode": "0",
+      "added_lines": 30,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -0,0 +1,30 @@\n+/**\n+ * Copyright (c) 2025 Huawei Technologies Co., Ltd.\n+ * This program is free software, you can redistribute it and/or modify it under the terms and conditions of\n+ * CANN Open Software License Agreement Version 2.0 (the \"License\").\n+ * Please refer to the License for details. You may not use this file except in compliance with the License.\n+ * THIS SOFTWARE IS PROVIDED ON AN \"AS IS\" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,\n+ * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.\n+ * See LICENSE in the root of the software repository for the full text of the License.\n+ */\n+\n+#ifndef OP_API_INC_GROUPED_MATMUL_NO_QUANT_950_CHECKER_H\n+#define OP_API_INC_GROUPED_MATMUL_NO_QUANT_950_CHECKER_H\n+#include \"opdev/format_utils.h\"\n+#include \"aclnn_kernels/common/op_error_check.h\"\n+#include \"aclnn_grouped_matmul_util.h\"\n+\n+namespace gmm {\n+class AclnnGroupedMatmulNoQuant950Checker {\n+public:\n+    explicit AclnnGroupedMatmulNoQuant950Checker(const GroupedMatmulParams &gmmParams) : gmmParams_(gmmParams){};\n+    ~AclnnGroupedMatmulNoQuant950Checker(){};\n+    aclnnStatus CheckGroupedMatmulNoQuant950() const;\n+\n+private:\n+    aclnnStatus CheckEmptyTensor() const;\n+private:\n+    GroupedMatmulParams gmmParams_;\n+};\n+} // namespace gmm\n+#endif\n\\ No newline at end of file\n",
+      "new_file": true,
+      "new_path": "gmm/grouped_matmul/op_host/op_api/grouped_matmul_no_quant_950_checker.h",
+      "old_path": "gmm/grouped_matmul/op_host/op_api/grouped_matmul_no_quant_950_checker.h",
+      "removed_lines": 0,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/a39af0b6d50c9b879c0056b09478021c664b3d3a/gmm/grouped_matmul/op_host/op_api/grouped_matmul_no_quant_950_checker.h",
+    "sha": "a39af0b6d50c9b879c0056b09478021c664b3d3a",
+    "source_branch": "gmm_add_check_and_gmm_add_supportA5",
+    "source_project": {
+      "full_name": "zhangtianrong/ops-transformer",
+      "human_name": "zhangtianrong / ops-transformer",
+      "id": 9035130,
+      "path": "ops-transformer"
+    },
+    "status": "added",
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  },
+  {
+    "additions": 8,
+    "blob_id": "19ca9eec06bb30c417a0fb06e547f3292b00ee49",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/a39af0b6d50c9b879c0056b09478021c664b3d3a/gmm/grouped_matmul_add/docs/aclnnGroupedMatmulAdd.md",
+    "deletions": 8,
+    "filename": "gmm/grouped_matmul_add/docs/aclnnGroupedMatmulAdd.md",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 8,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -4,7 +4,7 @@\n \n | 产品                                                         | 是否支持 |\n | :----------------------------------------------------------- | :------: |\n-| <term>Ascend 950PR/Ascend 950DT AI处理器</term>           |    ×     |\n+| <term>Ascend 950PR/Ascend 950DT AI处理器</term>           |    √     |\n | <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>     |    √     |\n | <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term> |    √     |\n \n@@ -51,10 +51,10 @@ aclnnStatus aclnnGroupedMatmulAdd(\n     <table style=\"undefined;table-layout: fixed; width: 1150px\"><colgroup>\n       <col style=\"width: 170px\">\n       <col style=\"width: 120px\">\n-      <col style=\"width: 300px\">  \n-      <col style=\"width: 300px\">  \n-      <col style=\"width: 212px\">  \n-      <col style=\"width: 100px\"> \n+      <col style=\"width: 300px\">\n+      <col style=\"width: 300px\">\n+      <col style=\"width: 212px\">\n+      <col style=\"width: 100px\">\n       <col style=\"width: 190px\">\n       <col style=\"width: 145px\">\n       </colgroup>\n@@ -168,7 +168,7 @@ aclnnStatus aclnnGroupedMatmulAdd(\n     <table style=\"undefined;table-layout: fixed; width: 1150px\"> <colgroup>\n     <col style=\"width: 280px\">\n     <col style=\"width: 100px\">\n-    <col style=\"width: 900px\"> \n+    <col style=\"width: 900px\">\n       </colgroup><thead>\n       <tr>\n         <th>返回值</th>\n@@ -205,7 +205,7 @@ aclnnStatus aclnnGroupedMatmulAdd(\n   <table style=\"undefined;table-layout: fixed; width: 1150px\"> <colgroup>\n     <col style=\"width: 150px\">\n     <col style=\"width: 100px\">\n-    <col style=\"width: 900px\"> \n+    <col style=\"width: 900px\">\n     <thead>\n     <tr>\n         <th>参数名</th>\n@@ -363,7 +363,7 @@ int main() {\n   // 2. 构造输入与输出，需要根据API的接口自定义构造\n   std::vector<int64_t> xShape = {512, 256};\n   std::vector<int64_t> weightShape= {512, 256};\n-  std::vector<int64_t> yShape = {512, 256};\n+  std::vector<int64_t> yShape = {2, 256, 256};\n   std::vector<int64_t> groupListShape = {2};\n   std::vector<int64_t> groupListData = {256, 512};\n   void* xDeviceAddr;\n",
+      "new_file": false,
+      "new_path": "gmm/grouped_matmul_add/docs/aclnnGroupedMatmulAdd.md",
+      "old_path": "gmm/grouped_matmul_add/docs/aclnnGroupedMatmulAdd.md",
+      "removed_lines": 8,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/a39af0b6d50c9b879c0056b09478021c664b3d3a/gmm/grouped_matmul_add/docs/aclnnGroupedMatmulAdd.md",
+    "sha": "a39af0b6d50c9b879c0056b09478021c664b3d3a",
+    "source_branch": "gmm_add_check_and_gmm_add_supportA5",
+    "source_project": {
+      "full_name": "zhangtianrong/ops-transformer",
+      "human_name": "zhangtianrong / ops-transformer",
+      "id": 9035130,
+      "path": "ops-transformer"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  },
+  {
+    "additions": 1,
+    "blob_id": "df66eec1daa6c59c0d6c09ac383fe5d3b528a89c",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/a39af0b6d50c9b879c0056b09478021c664b3d3a/gmm/grouped_matmul_add/examples/test_aclnn_grouped_matmul_add.cpp",
+    "deletions": 1,
+    "filename": "gmm/grouped_matmul_add/examples/test_aclnn_grouped_matmul_add.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 1,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -120,7 +120,7 @@ int main() {\n   // 2. 构造输入与输出，需要根据API的接口自定义构造\n   std::vector<int64_t> xShape = {512, 256};\n   std::vector<int64_t> weightShape= {512, 256};\n-  std::vector<int64_t> yShape = {512, 256};\n+  std::vector<int64_t> yShape = {2, 256, 256};\n   std::vector<int64_t> groupListShape = {2};\n   std::vector<int64_t> groupListData = {256, 512};\n   void* xDeviceAddr;\n",
+      "new_file": false,
+      "new_path": "gmm/grouped_matmul_add/examples/test_aclnn_grouped_matmul_add.cpp",
+      "old_path": "gmm/grouped_matmul_add/examples/test_aclnn_grouped_matmul_add.cpp",
+      "removed_lines": 1,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/a39af0b6d50c9b879c0056b09478021c664b3d3a/gmm/grouped_matmul_add/examples/test_aclnn_grouped_matmul_add.cpp",
+    "sha": "a39af0b6d50c9b879c0056b09478021c664b3d3a",
+    "source_branch": "gmm_add_check_and_gmm_add_supportA5",
+    "source_project": {
+      "full_name": "zhangtianrong/ops-transformer",
+      "human_name": "zhangtianrong / ops-transformer",
+      "id": 9035130,
+      "path": "ops-transformer"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  }
+]

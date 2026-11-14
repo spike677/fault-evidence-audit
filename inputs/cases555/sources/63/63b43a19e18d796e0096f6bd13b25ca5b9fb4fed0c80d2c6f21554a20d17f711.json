@@ -1,0 +1,182 @@
+[
+  {
+    "additions": 0,
+    "blob_id": "1c2a6681260c2bab87d3ec3721681d02e4f22f4f",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/9d7c5c99c40f0f2d511321b4e26ea36485cbac10/attention/fused_infer_attention_score/op_host/fused_infer_attention_score_tiling.cpp",
+    "deletions": 11,
+    "filename": "attention/fused_infer_attention_score/op_host/fused_infer_attention_score_tiling.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 0,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -964,17 +964,6 @@ ge::graphStatus CheckSparseModeParams(const gert::TilingContext *context, int64_\n             minS = std::min(minS, currS);\n             minKV = std::min(minKV, currKV);\n         }\n-        OP_CHECK_IF((preToken < 0) && (preToken * (-1) >= minS),\n-            OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(),\n-                \"preTokens absolute value should be smaller than actual length of q in band mode,\"\n-                \"preTokens = %ld, actual length of q = %ld\", preToken, minS),\n-            return ge::GRAPH_FAILED);\n-        \n-        OP_CHECK_IF((nextToken < 0) && (nextToken * (-1) >= minKV),\n-            OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(),\n-                \"nextTokens absolute value should be smaller than actual length of k and v in band mode,\"\n-                \"nextTokens = %ld, actual length of  k and v  = %ld\", nextToken, minKV),\n-            return ge::GRAPH_FAILED);\n         \n         OP_CHECK_IF((preToken < 0) && (nextToken < 0),\n             OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(),\n",
+      "new_file": false,
+      "new_path": "attention/fused_infer_attention_score/op_host/fused_infer_attention_score_tiling.cpp",
+      "old_path": "attention/fused_infer_attention_score/op_host/fused_infer_attention_score_tiling.cpp",
+      "removed_lines": 11,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/9d7c5c99c40f0f2d511321b4e26ea36485cbac10/attention/fused_infer_attention_score/op_host/fused_infer_attention_score_tiling.cpp",
+    "sha": "9d7c5c99c40f0f2d511321b4e26ea36485cbac10",
+    "source_branch": "master",
+    "source_project": {
+      "full_name": "qq_23260455/ops-transformer_6573",
+      "human_name": "qq_23260455 / ops-transformer_6573",
+      "id": 9107180,
+      "path": "ops-transformer_6573"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  },
+  {
+    "additions": 1,
+    "blob_id": "526f1f3bb00f93565ec807875e47aad2cd069ee4",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/9d7c5c99c40f0f2d511321b4e26ea36485cbac10/attention/fused_infer_attention_score/op_kernel/attn_infra/epilogue/block/block_epilogue_init_outputs.hpp",
+    "deletions": 0,
+    "filename": "attention/fused_infer_attention_score/op_kernel/attn_infra/epilogue/block/block_epilogue_init_outputs.hpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 1,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -11,6 +11,7 @@\n #ifndef EPILOGUE_BLOCK_BLOCK_EPILOGUE_INIT_OUTPUTS_HPP\r\n #define EPILOGUE_BLOCK_BLOCK_EPILOGUE_INIT_OUTPUTS_HPP\r\n \r\n+#include <limits>\r\n #include \"../../../attn_infra/base_defs.hpp\"\r\n #include \"../../../attn_infra/arch/resource.hpp\"\r\n #include \"../../../attn_infra/epilogue/dispatch_policy.hpp\"\r\n",
+      "new_file": false,
+      "new_path": "attention/fused_infer_attention_score/op_kernel/attn_infra/epilogue/block/block_epilogue_init_outputs.hpp",
+      "old_path": "attention/fused_infer_attention_score/op_kernel/attn_infra/epilogue/block/block_epilogue_init_outputs.hpp",
+      "removed_lines": 0,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/9d7c5c99c40f0f2d511321b4e26ea36485cbac10/attention/fused_infer_attention_score/op_kernel/attn_infra/epilogue/block/block_epilogue_init_outputs.hpp",
+    "sha": "9d7c5c99c40f0f2d511321b4e26ea36485cbac10",
+    "source_branch": "master",
+    "source_project": {
+      "full_name": "qq_23260455/ops-transformer_6573",
+      "human_name": "qq_23260455 / ops-transformer_6573",
+      "id": 9107180,
+      "path": "ops-transformer_6573"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  },
+  {
+    "additions": 66,
+    "blob_id": "4a37217e72b8dd0e0a05077249e6ee6b5a650f0d",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/9d7c5c99c40f0f2d511321b4e26ea36485cbac10/attention/fused_infer_attention_score/op_kernel/attn_infra/epilogue/block/block_epilogue_rescale_o.hpp",
+    "deletions": 61,
+    "filename": "attention/fused_infer_attention_score/op_kernel/attn_infra/epilogue/block/block_epilogue_rescale_o.hpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 66,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -11,6 +11,7 @@\n #ifndef EPILOGUE_BLOCK_BLOCK_EPILOGUE_RESCALE_O_HPP\n #define EPILOGUE_BLOCK_BLOCK_EPILOGUE_RESCALE_O_HPP\n \n+#include <limits>\n #include \"../../../attn_infra/base_defs.hpp\"\n #include \"../../../attn_infra/arch/resource.hpp\"\n #include \"../../../attn_infra/epilogue/dispatch_policy.hpp\"\n@@ -130,11 +131,12 @@ public:\n     __aicore__ inline\n     void InvalidLineLSEProcess(\n         uint32_t qNThisSubBlock, int32_t delStartRow, uint32_t qSBlockIdx, uint32_t inRowOffsetThisSubBlock,\n-        uint32_t totalRowNum, int32_t delEndRow, uint32_t qSeqlen)\n+        uint32_t totalRowNum, int32_t delEndRow, uint32_t qSeqlen, uint32_t qSThisSubBlock)\n     {\n-        if (qNThisSubBlock == 0U && delStartRow != 0 && (qSBlockIdx * VECTOR_SIZE + inRowOffsetThisSubBlock + totalRowNum >= delStartRow)) {\n-            uint32_t start = (qSBlockIdx * VECTOR_SIZE + inRowOffsetThisSubBlock) > delStartRow ? 0 :\n-                                delStartRow - (qSBlockIdx * VECTOR_SIZE + inRowOffsetThisSubBlock);\n+        uint32_t qNSubBlockStartOffset = qNThisSubBlock == 0U ? qSBlockIdx * VECTOR_SIZE + inRowOffsetThisSubBlock : qSBlockIdx * VECTOR_SIZE;\n+        uint32_t qNSubBlockEnbdOffset = totalRowNum + qNSubBlockStartOffset;\n+        if (qNThisSubBlock == 0U && delStartRow != 0 && qNSubBlockEnbdOffset >= delStartRow) {\n+            uint32_t start = qNSubBlockStartOffset > delStartRow ? 0 : (delStartRow - qNSubBlockStartOffset);\n             uint32_t end = totalRowNum;\n             AscendC::PipeBarrier<PIPE_V>();\n             AscendC::Duplicate(\n@@ -143,10 +145,10 @@ public:\n                 (end - start) * FLOAT_BLOCK_SIZE\n             );\n         }\n-        if (qNThisSubBlock == 0U && delEndRow != qSeqlen && (qSBlockIdx * VECTOR_SIZE + inRowOffsetThisSubBlock < delEndRow)) {\n-            uint32_t rowStart = qSBlockIdx * VECTOR_SIZE + inRowOffsetThisSubBlock;\n+        if (qNThisSubBlock == 0U && delEndRow != qSeqlen && qNSubBlockStartOffset < delEndRow) {\n+            uint32_t rowStart = qNSubBlockStartOffset;\n             uint32_t start = 0;\n-            uint32_t end = rowStart + totalRowNum >= delEndRow ?  (delEndRow - rowStart) : totalRowNum;\n+            uint32_t end = rowStart + totalRowNum >= delEndRow ? (delEndRow - rowStart) : totalRowNum;\n             AscendC::PipeBarrier<PIPE_V>();\n             AscendC::Duplicate(\n                 tvUbTensor[start * FLOAT_BLOCK_SIZE], \n@@ -154,27 +156,25 @@ public:\n                 (end - start) * FLOAT_BLOCK_SIZE\n             );\n         }\n-        if (qNThisSubBlock != 0U && delStartRow != 0 && (qSBlockIdx * VECTOR_SIZE + inRowOffsetThisSubBlock + totalRowNum >= delStartRow)) {\n-            uint32_t start = (qSBlockIdx * VECTOR_SIZE + inRowOffsetThisSubBlock) > delStartRow ? 0 :\n-                                            delStartRow - (qSBlockIdx * VECTOR_SIZE + inRowOffsetThisSubBlock);\n-            uint32_t end = totalRowNum;\n+        if (qNThisSubBlock != 0U && delStartRow != 0 && qNSubBlockEnbdOffset >= delStartRow) {\n+            uint32_t start = delStartRow - qNSubBlockStartOffset;\n+            uint32_t end = qSThisSubBlock;\n             for (uint32_t qNIdx = 0; qNIdx < qNThisSubBlock; qNIdx++) {\n                 AscendC::PipeBarrier<PIPE_V>();\n                 AscendC::Duplicate(\n-                    tvUbTensor[qNIdx * start * FLOAT_BLOCK_SIZE],\n+                    tvUbTensor[(qNIdx * qSThisSubBlock + start) * FLOAT_BLOCK_SIZE],\n                     LSE_OUT_INI,\n                     (end - start) * FLOAT_BLOCK_SIZE\n                 );\n             }\n         }\n-        if (qNThisSubBlock != 0U && delEndRow != qSeqlen && (qSBlockIdx * VECTOR_SIZE + inRowOffsetThisSubBlock < delEndRow)) {\n-            uint32_t rowStart = qSBlockIdx * VECTOR_SIZE + inRowOffsetThisSubBlock;\n+        if (qNThisSubBlock != 0U && delEndRow != qSeqlen && qNSubBlockStartOffset < delEndRow) {\n             uint32_t start = 0;\n-            uint32_t end = rowStart + totalRowNum >= delEndRow ?  (delEndRow - rowStart) : totalRowNum;\n+            uint32_t end = qNSubBlockEnbdOffset >= delEndRow ? (delEndRow - qNSubBlockStartOffset) : totalRowNum;\n             for (uint32_t qNIdx = 0; qNIdx < qNThisSubBlock; qNIdx++) {\n                 AscendC::PipeBarrier<PIPE_V>();\n                 AscendC::Duplicate(\n-                    tvUbTensor[qNIdx * start * FLOAT_BLOCK_SIZE],\n+                    tvUbTensor[(qNIdx * qSThisSubBlock + start) * FLOAT_BLOCK_SIZE],\n                     LSE_OUT_INI,\n                     (end - start) * FLOAT_BLOCK_SIZE\n                 );\n@@ -267,7 +267,7 @@ public:\n         uint32_t proTokenIdx, uint32_t proTokenNum, uint32_t epiTokenNum, uint32_t integralHeadNum,\n         uint32_t rowOffsetCurLoop, int32_t delStartRow, int32_t delEndRow, uint32_t qSeqlen,\n         uint32_t qSBlockIdx, uint32_t rowNum, uint32_t inRowOffsetThisSubBlock,\n-        const SplitKVParams& splitParams)\n+        const SplitKVParams& splitParams, uint32_t curQNBlockTile)\n     {\n         uint32_t curRowNum = layoutInput.shape(0);\n         uint32_t embedV = layoutInput.shape(1);\n@@ -400,52 +400,51 @@ public:\n                         AscendC::UnaryRepeatParams(1, 1, 4, 8));\n                 }\n             }\n-            uint32_t rowStart = qSBlockIdx * VECTOR_SIZE + rowOffsetCurLoop;\n+            uint32_t rowStart = qSBlockIdx * VECTOR_SIZE + rowOffsetCurLoop ;\n+            uint32_t innerGOUbOffset = 0; \n+            uint32_t subBlockStart = (curQNBlockTile == 1U) ? rowStart  : (rowStart >= qSeqlen ? rowStart - rowStart / qSeqlen * qSeqlen : rowStart);\n             if (delStartRow != 0) {\n-                uint32_t innerGOUbOffset = 0;\n-                if (proTokenNum != 0U && rowStart + proTokenNum >= delStartRow) {\n-                    uint32_t start = rowStart >= delStartRow ? rowStart : delStartRow;\n-                    uint32_t end = rowStart + proTokenNum;\n+                if (proTokenNum != 0U && subBlockStart + proTokenNum >= delStartRow) {\n+                    uint32_t start = subBlockStart >= delStartRow ? 0 : delStartRow - subBlockStart;\n+                    uint32_t end = proTokenNum;\n                     AscendC::PipeBarrier<PIPE_V>();\n                     AscendC::Duplicate<ElementOutput>(\n-                        goUbTensor16[innerGOUbOffset + (start - rowStart) * embedRoundV],\n+                        goUbTensor16[innerGOUbOffset + start * embedRoundV],\n                         static_cast<ElementOutput>(0),\n                         (end - start) * embedRoundV\n                     );\n                     innerGOUbOffset += proTokenNum * embedRoundV;\n                 }\n-                if (rowStart + qSThisSubBlock >= delStartRow) {\n+                if (subBlockStart + qSThisSubBlock >= delStartRow) {\n                     for (uint32_t qN_idx = 0; qN_idx < integralHeadNum; qN_idx++) {\n-                        uint32_t start = rowStart >= delStartRow ? rowStart : delStartRow;\n-                        uint32_t end = rowStart + qSThisSubBlock;\n+                        uint32_t start = subBlockStart >= delStartRow ? 0 : delStartRow - subBlockStart;\n+                        uint32_t end = qSThisSubBlock;\n                         AscendC::PipeBarrier<PIPE_V>();\n                         AscendC::Duplicate<ElementOutput>(\n-                            goUbTensor16[innerGOUbOffset + (start - rowStart) * embedRoundV],\n+                            goUbTensor16[innerGOUbOffset + start  * embedRoundV],\n                             static_cast<ElementOutput>(0),\n                             (end - start) * embedRoundV\n                         );\n-                        innerGOUbOffset += proTokenNum * embedRoundV;\n+                        innerGOUbOffset += qSThisSubBlock * embedRoundV;\n                     }\n                 }\n-                if (epiTokenNum != 0U) {\n-                    if (rowStart + epiTokenNum >= delStartRow) {\n-                        uint32_t start = rowStart >= delStartRow ? rowStart : delStartRow;\n-                        uint32_t end = rowStart + epiTokenNum;\n-                        AscendC::PipeBarrier<PIPE_V>();\n-                        AscendC::Duplicate<ElementOutput>(\n-                            goUbTensor16[innerGOUbOffset + (start - rowStart) * embedRoundV],\n-                            static_cast<ElementOutput>(0),\n-                            (end - start) * embedRoundV\n-                        );\n-                    }\n+                if (epiTokenNum != 0U && subBlockStart + epiTokenNum >= delStartRow) {\n+                    uint32_t start = subBlockStart >= delStartRow ? 0 : delStartRow - subBlockStart;\n+                    uint32_t end = epiTokenNum;\n+                    AscendC::PipeBarrier<PIPE_V>();\n+                    AscendC::Duplicate<ElementOutput>(\n+                        goUbTensor16[innerGOUbOffset + start * embedRoundV],\n+                        static_cast<ElementOutput>(0),\n+                        (end - start) * embedRoundV\n+                    );\n                 }\n             }\n-\n-            if (delEndRow != qSeqlen && rowStart < delEndRow) {\n-                uint32_t innerGOUbOffset = 0;\n-                if (proTokenNum != 0U) {\n-                    uint32_t start = rowStart;\n-                    uint32_t end = rowStart + proTokenNum >= delEndRow ? delEndRow : rowStart + proTokenNum;\n+            if (delEndRow != qSeqlen) {\n+                if (proTokenNum != 0U && subBlockStart < delEndRow) {\n+                    uint32_t start = curQNBlockTile == 1U ? rowStart : 0;\n+                    uint32_t end = (subBlockStart + proTokenNum >= delEndRow) ? \n+                                                    (curQNBlockTile == 1U ? delEndRow : delEndRow - subBlockStart)\n+                                                            : subBlockStart + proTokenNum;\n                     AscendC::PipeBarrier<PIPE_V>();\n                     AscendC::Duplicate<ElementOutput>(\n                         goUbTensor16[innerGOUbOffset],\n@@ -454,20 +453,25 @@ public:\n                     );\n                     innerGOUbOffset += proTokenNum * embedRoundV;\n                 }\n-                for (uint32_t qN_idx = 0; qN_idx < integralHeadNum; qN_idx++) {\n-                    uint32_t start = rowStart;\n-                    uint32_t end = rowStart + qSThisSubBlock >= delEndRow ? delEndRow : rowStart + qSThisSubBlock;\n-                    AscendC::PipeBarrier<PIPE_V>();\n-                    AscendC::Duplicate<ElementOutput>(\n-                        goUbTensor16[innerGOUbOffset],\n-                        static_cast<ElementOutput>(0),\n-                        (end - start) * embedRoundV\n-                    );\n-                    innerGOUbOffset += qSThisSubBlock * embedRoundV;\n+                if (subBlockStart < delEndRow) {\n+                    for (uint32_t qN_idx = 0; qN_idx < integralHeadNum; qN_idx++) {\n+                        uint32_t start = curQNBlockTile == 1U ? subBlockStart : proTokenNum;\n+                        uint32_t end = (subBlockStart + qSThisSubBlock >= delEndRow) ? \n+                                            (curQNBlockTile == 1U ? delEndRow : delEndRow - subBlockStart)\n+                                                         : start + qSThisSubBlock;\n+                        AscendC::PipeBarrier<PIPE_V>();\n+                        AscendC::Duplicate<ElementOutput>(\n+                            goUbTensor16[innerGOUbOffset],\n+                            static_cast<ElementOutput>(0),\n+                            (end - start) * embedRoundV\n+                        );\n+                        innerGOUbOffset += qSThisSubBlock * embedRoundV;\n+                    }\n                 }\n-                if (epiTokenNum != 0U) {\n-                    uint32_t start = rowStart;\n-                    uint32_t end = rowStart + epiTokenNum >= delEndRow ? delEndRow : rowStart + epiTokenNum;\n+                if (epiTokenNum != 0U && subBlockStart < delEndRow) {\n+                    uint32_t start = curQNBlockTile == 1U ? subBlockStart : proTokenNum + integralHeadNum * qSThisSubBlock + subBlockStart;\n+                    uint32_t end = curQNBlockTile == 1U ? (subBlockStart + epiTokenNum >= delEndRow ? delEndRow : subBlockStart + epiTokenNum) :\n+                                            (epiTokenNum >= delEndRow ? start + delEndRow: start + epiTokenNum);\n                     AscendC::PipeBarrier<PIPE_V>();\n                     AscendC::Duplicate<ElementOutput>(\n                         goUbTensor16[innerGOUbOffset],\n@@ -521,7 +525,7 @@ public:\n                         NpuArch::Detail::Alignment::CeilDiv(totalRowNum, FLOAT_BLOCK_SIZE),\n                         AscendC::BrcbRepeatParams(1, 8));\n                     InvalidLineLSEProcess(qNThisSubBlock, delStartRow, qSBlockIdx,\n-                            inRowOffsetThisSubBlock, totalRowNum, delEndRow, qSeqlen);\n+                            inRowOffsetThisSubBlock, totalRowNum, delEndRow, qSeqlen, qSThisSubBlock);\n                     AscendC::PipeBarrier<PIPE_V>();\n                     AscendC::SetFlag<AscendC::HardEvent::V_MTE3>(EVENT_ID4);\n                     AscendC::WaitFlag<AscendC::HardEvent::V_MTE3>(EVENT_ID4);\n@@ -624,7 +628,7 @@ public:\n         GemmCoord actualBlockShape,\n         uint32_t qSBlockSize, uint32_t qNBlockSize,\n         uint32_t isFirstStackTile, uint32_t isLastStackTile, uint32_t curStackTileMod,\n-        int32_t delStartRow, int32_t delEndRow, uint32_t qSeqlen, uint32_t qSBlockIdx,\n+        int32_t delStartRow, int32_t delEndRow, uint32_t qSeqlen, uint32_t qSBlockIdx, uint32_t curQNBlockTile,\n         const SplitKVParams& splitParams = SplitKVParams())\n     {\n         uint32_t rowNum = actualBlockShape.m();\n@@ -750,7 +754,8 @@ public:\n                     qSBlockIdx,\n                     rowNum,\n                     inRowOffsetThisSubBlock,\n-                    blockParams);\n+                    blockParams,\n+                    curQNBlockTile);\n             }\n         }\n     }\n",
+      "new_file": false,
+      "new_path": "attention/fused_infer_attention_score/op_kernel/attn_infra/epilogue/block/block_epilogue_rescale_o.hpp",
+      "old_path": "attention/fused_infer_attention_score/op_kernel/attn_infra/epilogue/block/block_epilogue_rescale_o.hpp",
+      "removed_lines": 61,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/9d7c5c99c40f0f2d511321b4e26ea36485cbac10/attention/fused_infer_attention_score/op_kernel/attn_infra/epilogue/block/block_epilogue_rescale_o.hpp",
+    "sha": "9d7c5c99c40f0f2d511321b4e26ea36485cbac10",
+    "source_branch": "master",
+    "source_project": {
+      "full_name": "qq_23260455/ops-transformer_6573",
+      "human_name": "qq_23260455 / ops-transformer_6573",
+      "id": 9107180,
+      "path": "ops-transformer_6573"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  },
+  {
+    "additions": 1,
+    "blob_id": "73b709ebd51ed3761e4c2333e4b64de04f2af899",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/9d7c5c99c40f0f2d511321b4e26ea36485cbac10/attention/fused_infer_attention_score/op_kernel/attn_infra/epilogue/block/block_epilogue_rescale_o_low_prec.hpp",
+    "deletions": 1,
+    "filename": "attention/fused_infer_attention_score/op_kernel/attn_infra/epilogue/block/block_epilogue_rescale_o_low_prec.hpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 1,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -360,7 +360,7 @@ public:\n         GemmCoord actualBlockShape,\n         uint32_t qSBlockSize, uint32_t qNBlockSize,\n         uint32_t isFirstStackTile, uint32_t isLastStackTile, uint32_t curStackTileMod,\n-        int32_t delStartRow, int32_t delEndRow, uint32_t qSeqlen, uint32_t qSBlockIdx)\n+        int32_t delStartRow, int32_t delEndRow, uint32_t qSeqlen, uint32_t qSBlockIdx, uint32_t curQNBlockTile)\n     {\n         uint32_t rowNum = actualBlockShape.m();\n         uint32_t embedV = actualBlockShape.n();\n",
+      "new_file": false,
+      "new_path": "attention/fused_infer_attention_score/op_kernel/attn_infra/epilogue/block/block_epilogue_rescale_o_low_prec.hpp",
+      "old_path": "attention/fused_infer_attention_score/op_kernel/attn_infra/epilogue/block/block_epilogue_rescale_o_low_prec.hpp",
+      "removed_lines": 1,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/9d7c5c99c40f0f2d511321b4e26ea36485cbac10/attention/fused_infer_attention_score/op_kernel/attn_infra/epilogue/block/block_epilogue_rescale_o_low_prec.hpp",
+    "sha": "9d7c5c99c40f0f2d511321b4e26ea36485cbac10",
+    "source_branch": "master",
+    "source_project": {
+      "full_name": "qq_23260455/ops-transformer_6573",
+      "human_name": "qq_23260455 / ops-transformer_6573",
+      "id": 9107180,
+      "path": "ops-transformer_6573"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  },
+  {
+    "additions": 9,
+    "blob_id": "d3dfc751ec4abf85a7f22bf35eadb0bd209de9d8",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/9d7c5c99c40f0f2d511321b4e26ea36485cbac10/attention/fused_infer_attention_score/op_kernel/flash_attention_regular.h",
+    "deletions": 3,
+    "filename": "attention/fused_infer_attention_score/op_kernel/flash_attention_regular.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 9,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -545,7 +545,9 @@ namespace SplitFuse {\n                 } else if (maskType != 0U && sparseMode == 4U) {\n                     int32_t leftPointPreToken = kvSeqlen;\n                     int32_t leftPointNextToken = 0;\n-                    if (preToken != SPARSE_MODE_INT_MAX) {\n+                    if (preToken < 0 && preToken * (-1) >= qSeqlen) {\n+ \t  \t                startIdx = kvSeqlen / MAX_KV_STACK_LEN + 1;\n+ \t  \t            } else if (preToken != SPARSE_MODE_INT_MAX) {\n                         leftPointPreToken = kvSeqlen - qSeqlen - preToken;\n                         preTokenStartLen = qSBlockIdx * curQSBlockTile + leftPointPreToken;\n                         preTokenEndLen = qSBlockIdx * curQSBlockTile + qSBlockSize + leftPointPreToken;\n@@ -554,7 +556,9 @@ namespace SplitFuse {\n                     } else {\n                         startIdx = 0;\n                     }\n-                    if (nextToken != SPARSE_MODE_INT_MAX) {\n+                    if (nextToken < 0 && nextToken * (-1) >= kvSeqlen) {\n+ \t                    kvSLoopNumTotal = 0;\n+ \t  \t            } else if (nextToken != SPARSE_MODE_INT_MAX) {\n                         leftPointNextToken = kvSeqlen - qSeqlen + nextToken;\n                         nextTokenStartLen = qSBlockIdx * curQSBlockTile + leftPointNextToken;\n                         nextTokenEndLen = qSBlockIdx * curQSBlockTile + qSBlockSize + leftPointNextToken;\n@@ -919,6 +923,7 @@ namespace SplitFuse {\n                                 delEndRow,\n                                 qSeqlen,\n                                 qSBlockIdx,\n+                                curQNBlockTile,\n                                 splitParams);\n                         } else {\n                             epilogueRescaleO(\n@@ -939,7 +944,8 @@ namespace SplitFuse {\n                                 delStartRow,\n                                 delEndRow,\n                                 qSeqlen,\n-                                qSBlockIdx);\n+                                qSBlockIdx,\n+                                curQNBlockTile);\n                         }\n #endif\n                     }\n",
+      "new_file": false,
+      "new_path": "attention/fused_infer_attention_score/op_kernel/flash_attention_regular.h",
+      "old_path": "attention/fused_infer_attention_score/op_kernel/flash_attention_regular.h",
+      "removed_lines": 3,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/9d7c5c99c40f0f2d511321b4e26ea36485cbac10/attention/fused_infer_attention_score/op_kernel/flash_attention_regular.h",
+    "sha": "9d7c5c99c40f0f2d511321b4e26ea36485cbac10",
+    "source_branch": "master",
+    "source_project": {
+      "full_name": "qq_23260455/ops-transformer_6573",
+      "human_name": "qq_23260455 / ops-transformer_6573",
+      "id": 9107180,
+      "path": "ops-transformer_6573"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  }
+]

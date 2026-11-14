@@ -1,0 +1,38 @@
+[
+  {
+    "additions": 1,
+    "blob_id": "8370e8c73525549858017a0255528160743f3b13",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/c843eb90851de0d5f1c320d8295f37ffb86d1d8e/moe/moe_init_routing_v3/op_kernel/arch35/moe_v3_gather_static_quant.h",
+    "deletions": 1,
+    "filename": "moe/moe_init_routing_v3/op_kernel/arch35/moe_v3_gather_static_quant.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 1,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -315,7 +315,7 @@ __aicore__ inline void MoeV3GatherStaticQuant<T>::Init(GM_ADDR inputX, GM_ADDR s\n     pipe_->InitBuffer(inputXCopyInQueue_, BUFFER_NUM, AlignBytes(perLoopCols_, sizeof(T)));\n     pipe_->InitBuffer(inputXCopyOutQueue_, BUFFER_NUM, AlignBytes(perLoopCols_, sizeof(int8_t)));\n     pipe_->InitBuffer(expandRowIdxCopyInQueue_, BUFFER_NUM, AlignBytes(perLoopRows_, sizeof(int32_t)));\n-    pipe_->InitBuffer(floatQueue_, 1, AlignBytes(perLoopCols_, sizeof(float)));\n+    pipe_->InitBuffer(floatQueue_, 1, AlignBytes(Align(perLoopCols_, sizeof(T)), sizeof(float)));\n     pipe_->InitBuffer(halfQueue_, 1, AlignBytes(perLoopCols_, sizeof(half)));\n }\n \n",
+      "new_file": false,
+      "new_path": "moe/moe_init_routing_v3/op_kernel/arch35/moe_v3_gather_static_quant.h",
+      "old_path": "moe/moe_init_routing_v3/op_kernel/arch35/moe_v3_gather_static_quant.h",
+      "removed_lines": 1,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/c843eb90851de0d5f1c320d8295f37ffb86d1d8e/moe/moe_init_routing_v3/op_kernel/arch35/moe_v3_gather_static_quant.h",
+    "sha": "c843eb90851de0d5f1c320d8295f37ffb86d1d8e",
+    "source_branch": "9.1.0",
+    "source_project": {
+      "full_name": "ConanHuang/ops-transformer",
+      "human_name": "ConanHuang / ops-transformer",
+      "id": 9137580,
+      "path": "ops-transformer"
+    },
+    "target_branch": "9.1.0",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  }
+]

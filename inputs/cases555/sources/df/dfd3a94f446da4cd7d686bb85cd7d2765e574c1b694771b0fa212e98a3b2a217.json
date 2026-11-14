@@ -1,0 +1,76 @@
+{
+  "assignee": {
+    "avatar_url": "https://cdn-img.gitcode.com/ac/ae/1ac30a43e7e5c7ebf6339c15d1b51a15c9d96b23e7e2ea2816fcd63c2e92394d.jpg",
+    "html_url": "https://gitcode.com/PerrySkywalker",
+    "id": "682abf2a709a492cad560617",
+    "login": "PerrySkywalker",
+    "name": "PerrySkywalker",
+    "object_id": "682abf2a709a492cad560617"
+  },
+  "assignees": [
+    {
+      "avatar_url": "https://cdn-img.gitcode.com/ac/ae/1ac30a43e7e5c7ebf6339c15d1b51a15c9d96b23e7e2ea2816fcd63c2e92394d.jpg",
+      "html_url": "https://gitcode.com/PerrySkywalker",
+      "id": "682abf2a709a492cad560617",
+      "login": "PerrySkywalker",
+      "name": "PerrySkywalker",
+      "object_id": "682abf2a709a492cad560617"
+    }
+  ],
+  "body": "### Describe the current behavior / 问题描述 (Mandatory / 必填)\nFlashAttention MLA noquant场景下，当某个batch的s2LoopEndIdx<=0被skip时，multiCoreInnerIdx仍会递增，导致softmaxSumBuf/softmaxMaxBuf的mod3槽位索引与实际写入次数错位。当skip次数%3==0时，PRELOAD_N=1场景下vec1覆写了vec2还未读取的softmax状态，致使attention_out计算错误（LSE正确但attention_out不通过）。\n\n### Environment / 环境信息 (Mandatory / 必填)\nascend950 (arch35)\n\n### Steps to reproduce the issue / 重现步骤 (Mandatory / 必填)\n1. 使用FA MLA noquant算子，构造多batch场景，其中存在某个batch的KV序列长度为0或preTokens/nextTokens配置导致s2LoopEndIdx<=0\n2. 该空batch被分配到核的中间位置（非最后一个bn），其后的batch正常计算\n3. PRELOAD_N=1时，前一个非空batch最后一个s2的bmm2被推迟到后一个非空batch执行，中间skip次数%3==0时触发碰撞\n\n### Describe the expected behavior / 预期结果 (Mandatory / 必填)\nattention_out计算正确，与PRELOAD_N=0时的结果一致。\n\n### Related log / screenshot / 日志 / 截图 (Mandatory / 必填)\n无\n\n### Special notes for this issue/备注 (Optional / 选填)\n根因：multiCoreInnerIdx用于索引softmaxSumBuf/softmaxMaxBuf（3槽位环形复用），应只在真正执行task时递增。原实现在ComputeAxisIdxByBnAndGs1中递增（skip检查之前），导致被skip的空batch也占用槽位编号。\n\n修复方案：将multiCoreInnerIdx++从ComputeAxisIdxByBnAndGs1移到skip检查之后，确保只在真正执行task时递增。\n\n关联PR:\n- master: #8319\n- 9.1.0: #8320",
+  "comments": 2,
+  "created_at": "2026-07-06T16:52:38+08:00",
+  "finished_at": "2026-07-10T14:49:11+08:00",
+  "html_url": "https://gitcode.com/cann/ops-transformer/issues/3611",
+  "id": 4145866,
+  "issue_priority_detail": {
+    "id": 116,
+    "title": "无优先级"
+  },
+  "issue_state": "已完成",
+  "issue_state_detail": {
+    "id": 287,
+    "serial": 0,
+    "title": "已完成"
+  },
+  "issue_type": "任务",
+  "issue_type_detail": {
+    "id": 255,
+    "is_system": false,
+    "title": "任务"
+  },
+  "labels": [
+    {
+      "color": "#2469f5",
+      "created_at": "2025-10-09T20:53:07+08:00",
+      "id": 14930,
+      "name": "Accepted",
+      "updated_at": "2026-07-10T14:51:21+08:00"
+    }
+  ],
+  "number": "3611",
+  "priority": 0,
+  "repository": {
+    "assigner": {},
+    "created_at": "2025-09-28T17:54:46+08:00",
+    "description": "本项目是CANN提供的transformer类大模型算子库，实现网络在NPU上加速计算。",
+    "full_name": "cann/ops-transformer",
+    "id": 7673863,
+    "name": "ops-transformer",
+    "paas": "",
+    "path": "ops-transformer",
+    "updated_at": "2025-09-28T18:06:48+08:00"
+  },
+  "state": "closed",
+  "title": "[Bug-Report|缺陷反馈]: FA MLA noquant场景下skip的batch导致attention_out计算错误",
+  "updated_at": "2026-07-10T14:49:11+08:00",
+  "user": {
+    "avatar_url": "https://cdn-img.gitcode.com/ac/ae/1ac30a43e7e5c7ebf6339c15d1b51a15c9d96b23e7e2ea2816fcd63c2e92394d.jpg",
+    "html_url": "https://gitcode.com/PerrySkywalker",
+    "id": "682abf2a709a492cad560617",
+    "login": "PerrySkywalker",
+    "name": "PerrySkywalker",
+    "object_id": "682abf2a709a492cad560617"
+  },
+  "visibility_reason": "public"
+}

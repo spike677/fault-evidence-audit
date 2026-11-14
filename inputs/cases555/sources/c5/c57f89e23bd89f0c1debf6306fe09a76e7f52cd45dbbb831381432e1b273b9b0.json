@@ -1,0 +1,80 @@
+{
+  "assignee": {
+    "html_url": "https://gitcode.com/chenxingyu18",
+    "id": "68848a0ebac92f260ce335ef",
+    "login": "chenxingyu18",
+    "name": "chenxingyu18",
+    "object_id": "68848a0ebac92f260ce335ef"
+  },
+  "assignees": [
+    {
+      "html_url": "https://gitcode.com/chenxingyu18",
+      "id": "68848a0ebac92f260ce335ef",
+      "login": "chenxingyu18",
+      "name": "chenxingyu18",
+      "object_id": "68848a0ebac92f260ce335ef"
+    }
+  ],
+  "body": "#### 一、问题描述（必填）\n`cdist_grad` 算子（arch35）在反向梯度计算中，对部分 p / shape 组合会输出 NaN。\n\n#### 二、环境信息（可选）\n- 硬件型号：Ascend（arch35）\n- 算子仓：ops-math\n- 相关文件：math/cdist_grad/op_kernel/arch35/cdist_grad_dag.h\n\n#### 三、重现步骤 / 根因\n梯度计算路径：先求 `ratio = |diff| / (cdist + eps)`，再通过 `exp(log(ratio) * (p-1))` 计算 `(ratio)^(p-1)`。\n\n当前向 `cdist` 下溢为 0（大 p 或 |diff| 极小）时：\n1. `ratio = |diff| / eps` 爆炸；\n2. `exp(log(ratio) * (p-1))` 上溢为 `+inf`；\n3. 尾部 mask 再做 `inf * 0`，得到 NaN。\n\n#### 四、预期结果（可选）\n与 PyTorch CPU 语义一致：`dist == 0` 时梯度短路返回 0，不应出现 NaN。\n\n#### 五、修复方案\n在求 ratio 之前，先用 `cdist != 0` 的 mask 将 `|diff|` 置零（`|diff|_masked = |diff| * mask_cdist`），使 `ratio = 0 → pow_ratio = 0 → result = 0`。涉及 `CdistGradDag` 与 `CdistGradLargePDag` 两处等价修改。\n\n关联 PR：#3370\n",
+  "comments": 1,
+  "created_at": "2026-06-30T21:43:55+08:00",
+  "finished_at": "2026-07-01T09:17:38+08:00",
+  "html_url": "https://gitcode.com/cann/ops-math/issues/2096",
+  "id": 4127669,
+  "issue_priority_detail": {
+    "id": 116,
+    "title": "无优先级"
+  },
+  "issue_state": "进行中",
+  "issue_state_detail": {
+    "id": 285,
+    "serial": 0,
+    "title": "进行中"
+  },
+  "issue_type": "任务",
+  "issue_type_detail": {
+    "id": 255,
+    "is_system": false,
+    "title": "任务"
+  },
+  "labels": [
+    {
+      "color": "#2865E0",
+      "created_at": "2026-03-30T22:24:11+08:00",
+      "id": 40792,
+      "name": "bug",
+      "updated_at": "2026-06-30T21:43:55+08:00"
+    },
+    {
+      "color": "#35e029",
+      "created_at": "2026-03-20T11:25:13+08:00",
+      "id": 38861,
+      "name": "resolved",
+      "updated_at": "2026-07-01T10:28:58+08:00"
+    }
+  ],
+  "number": "2096",
+  "priority": 0,
+  "repository": {
+    "assigner": {},
+    "created_at": "2025-09-25T16:01:52+08:00",
+    "description": "本项目是CANN提供的数学类基础计算算子库，实现网络在NPU上加速计算。",
+    "full_name": "cann/ops-math",
+    "id": 7649531,
+    "name": "ops-math",
+    "paas": "",
+    "path": "ops-math",
+    "updated_at": "2025-09-25T16:05:53+08:00"
+  },
+  "state": "closed",
+  "title": "[Bug-Report|缺陷反馈]: cdist_grad (arch35) 反向梯度计算产生 NaN",
+  "updated_at": "2026-07-01T09:17:38+08:00",
+  "user": {
+    "html_url": "https://gitcode.com/chenxingyu18",
+    "id": "68848a0ebac92f260ce335ef",
+    "login": "chenxingyu18",
+    "name": "chenxingyu18",
+    "object_id": "68848a0ebac92f260ce335ef"
+  },
+  "visibility_reason": "public"
+}

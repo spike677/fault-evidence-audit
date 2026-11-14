@@ -1,0 +1,38 @@
+[
+  {
+    "additions": 22,
+    "blob_id": "8a1b260cd41a3617b65602ee5303ea5dc1596933",
+    "blob_url": "https://gitcode.com/cann/ops-math/blob/9dfa7a0120f7c3afe19d23787540df1ffac01e18/math/polar/op_kernel/arch35/polar_simt.h",
+    "deletions": 22,
+    "filename": "math/polar/op_kernel/arch35/polar_simt.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 22,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -27,10 +27,10 @@ using namespace AscendC;\n constexpr int32_t POLAR_THREAD_DIM = 1024;\n \n struct PolarStridePara {\n-    int32_t ms[POLAR_MAX_DIM];\n-    int32_t absS[POLAR_MAX_DIM];\n-    int32_t angleS[POLAR_MAX_DIM];\n-    int32_t yS[POLAR_MAX_DIM];\n+    int64_t ms[POLAR_MAX_DIM];\n+    int64_t absS[POLAR_MAX_DIM];\n+    int64_t angleS[POLAR_MAX_DIM];\n+    int64_t yS[POLAR_MAX_DIM];\n };\n \n template <typename T>\n@@ -63,9 +63,9 @@ public:\n     __aicore__ inline void Process()\n     {\n         int32_t blockIdx = static_cast<int32_t>(GetBlockIdx());\n-        int32_t startIdx = (blockIdx < formerCore_) ? (elementsPerCore_ + 1) * blockIdx\n+        int64_t startIdx = (blockIdx < formerCore_) ? (elementsPerCore_ + 1) * blockIdx\n                                                      : formerCore_ + elementsPerCore_ * blockIdx;\n-        int32_t count = (blockIdx < formerCore_) ? (elementsPerCore_ + 1) : elementsPerCore_;\n+        int64_t count = (blockIdx < formerCore_) ? (elementsPerCore_ + 1) : elementsPerCore_;\n \n         if (count <= 0) return;\n \n@@ -83,19 +83,19 @@ private:\n     __simt_vf__ LAUNCH_BOUND(POLAR_THREAD_DIM)\n     static void SimtPolarCompute(\n         __gm__ U* absGm, __gm__ U* angleGm, __gm__ U* yGm,\n-        int32_t startIdx, int32_t count, int32_t dimNum, PolarStridePara para)\n+        int64_t startIdx, int64_t count, int64_t dimNum, PolarStridePara para)\n     {\n-        const int32_t idx = threadIdx.x;\n-        const int32_t step = blockDim.x;\n-        int32_t i = idx;\n+        const int64_t idx = threadIdx.x;\n+        const int64_t step = blockDim.x;\n+        int64_t i = idx;\n         while (i < count) {\n-            int32_t v = startIdx + i;\n-            int32_t absBase = 0;\n-            int32_t angleBase = 0;\n-            int32_t yBase = 0;\n-            int32_t vv = v;\n-            for (int32_t d = 0; d < dimNum; d++) {\n-                int32_t c = vv / para.ms[d];\n+            int64_t v = startIdx + i;\n+            int64_t absBase = 0;\n+            int64_t angleBase = 0;\n+            int64_t yBase = 0;\n+            int64_t vv = v;\n+            for (int64_t d = 0; d < dimNum; d++) {\n+                int64_t c = vv / para.ms[d];\n                 vv -= c * para.ms[d];\n                 absBase += c * para.absS[d];\n                 angleBase += c * para.angleS[d];\n@@ -113,11 +113,11 @@ private:\n     GlobalTensor<T> absGm_;\n     GlobalTensor<T> angleGm_;\n     GlobalTensor<T> yGm_;\n-    int32_t totalElements_{0};\n-    int32_t elementsPerCore_{0};\n-    int32_t coreNum_{0};\n-    int32_t formerCore_{0};\n-    int32_t dimNum_{0};\n+    int64_t totalElements_{0};\n+    int64_t elementsPerCore_{0};\n+    int64_t coreNum_{0};\n+    int64_t formerCore_{0};\n+    int64_t dimNum_{0};\n     PolarStridePara para_;\n };\n \n",
+      "new_file": false,
+      "new_path": "math/polar/op_kernel/arch35/polar_simt.h",
+      "old_path": "math/polar/op_kernel/arch35/polar_simt.h",
+      "removed_lines": 22,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-math/raw/9dfa7a0120f7c3afe19d23787540df1ffac01e18/math/polar/op_kernel/arch35/polar_simt.h",
+    "sha": "9dfa7a0120f7c3afe19d23787540df1ffac01e18",
+    "source_branch": "fix-polar",
+    "source_project": {
+      "full_name": "xiu_ling_wang/ops-math",
+      "human_name": "xiu_ling_wang / ops-math",
+      "id": 7659863,
+      "path": "ops-math"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-math",
+      "human_name": "CANN / ops-math",
+      "id": 7649531,
+      "path": "ops-math"
+    }
+  }
+]

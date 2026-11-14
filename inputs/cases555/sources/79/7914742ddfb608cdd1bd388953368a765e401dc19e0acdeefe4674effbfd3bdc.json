@@ -1,0 +1,73 @@
+{
+  "assignee": {
+    "html_url": "https://gitcode.com/zhongheng",
+    "id": "6a1fd5da2ee2d438af7f0223",
+    "login": "zhongheng",
+    "name": "zhongheng",
+    "object_id": "6a1fd5da2ee2d438af7f0223"
+  },
+  "assignees": [
+    {
+      "html_url": "https://gitcode.com/zhongheng",
+      "id": "6a1fd5da2ee2d438af7f0223",
+      "login": "zhongheng",
+      "name": "zhongheng",
+      "object_id": "6a1fd5da2ee2d438af7f0223"
+    }
+  ],
+  "body": "\n\nThanks for sending an issue! Please fill in the following template to help quickly solve your problem.\n\n### Describe the current behavior / 问题描述 (Mandatory / 必填)\n            \nInplaceApplyAdagradDA 在 Ascend950 FP16 场景下存在舍入边界精度误差。测试侧报告 22 个用例的 output0（var_out）MARE 超限；本地对已捕获输入的 L1_010、L1_128、L1_570 三例进行逐元素分析后确认：\n\n- output0 的所有数值差异均为相邻的 ±1 FP16 ULP；\n- 三例均只有 1 个近零 lane 实际触发 MARE 超限；\n- output1、output2 与 golden bitwise 一致；\n- FP32 路径未发现该问题。\n\n问题由三层舍入误差叠加产生：\n\n1. 原 FP32→FP16 使用 `CAST_ROUND`，midpoint tie 结果与 golden 的 round-to-nearest-even 不一致；\n2. 改为 `CAST_RINT` 后，默认 FP32 Sqrt 的数 ULP 误差仍可能将结果推过 FP16 舍入边界；\n3. Sqrt 切换为 0-ULP 后，默认 FP32 Div 在部分 midpoint 附近仍有残留。\n\n以 L1_010 最差点为例，正确 FP32 商为 `-5.3942203521728516e-06`，恰好位于 FP16 `0x805a` 和 `0x805b` 的 midpoint；约 1 个 FP32 ULP 的上游误差即可改变最终 FP16 舍入结果。\n### Environment / 环境信息 (Mandatory / 必填)\n            \n- 昇腾硬件型号：Ascend 950DT_9582 V120\n- CANN 版本：9.2.0\n- 操作系统：Ubuntu 20.04.6 LTS x86_64\n- Python：3.11.9（`ttk_venv`）\n- TTK：3.0.0，revision `c210daaf`\n- 验证通路：TTK kernel 精度/内存回归、捕获输入严格回放、Ascend950 package build、Host UT、固定输入性能 ABBA\n\n### Steps to reproduce the issue / 重现步骤 (Mandatory / 必填)\n            \n1. 基于修复前的 ops-nn master 构建 Ascend950 InplaceApplyAdagradDA 自定义算子包。\n2. 使用测试侧报告用例的 shape、dtype、range、`use_locking` 和标量约束构造 FP16 输入；固定 `PYTHONHASHSEED=0`、`seed=42`、单设备单进程运行。\n3. 对 L1_010、L1_128、L1_570 使用已捕获的 8 个输入二进制进行逐输入严格回放。\n4. 以 TensorFlow ApplyAdagradDA 语义生成 golden，按 `stat_rel_err` 比较三个输出。\n5. 检查 output0 的不等元素、FP16 bit pattern、ULP 距离和触发最大相对误差的 lane。\n\n修复前可观察到 output0 在 midpoint 邻域出现相邻 1 FP16 ULP 差异，近零 lane 的 MARE 超过阈值；output1、output2 不受影响。\n\n### Describe the expected behavior / 预期结果 (Mandatory / 必填)\n            \n- FP16 路径应遵循 round-to-nearest、ties-to-even 语义，避免上游 Sqrt/Div 误差将结果推入相邻 FP16 舍入区间。\n- 已报告同规格用例的 output0、output1、output2 均应通过精度校验和内存检查。\n- FP32 路径和 FP32 kernel 产物不应发生变化。\n- 修复应使用 CANN 正式支持的通用精度模式，不得针对 testcase、shape、元素数或 scalar 值增加特判。\n- 性能代价应被独立测量并作为合入决策项明确披露。\n### Related log / screenshot / 日志 / 截图 (Mandatory / 必填)\n            \n修复前定位结果：\n\n- CAST_RINT-only 固定流：17/20 PASS，残留 L1_010、L1_128、L1_570；\n- 三份残留输入的 output0 差异均为相邻 ±1 FP16 ULP，output1、output2 bitwise 一致；\n- L1_010 / L1_128 / L1_570 的 output0 MARE 分别为 `0.0109078`、`0.0159546`、`0.0201297`。\n\n### Special notes for this issue/备注 (Optional / 选填)\n            \n\n",
+  "comments": 1,
+  "created_at": "2026-08-11T10:22:29+08:00",
+  "finished_at": "2026-08-12T15:02:29+08:00",
+  "html_url": "https://gitcode.com/cann/ops-nn/issues/4692",
+  "id": 4241300,
+  "issue_priority_detail": {
+    "id": 116,
+    "title": "无优先级"
+  },
+  "issue_state": "进行中",
+  "issue_state_detail": {
+    "id": 285,
+    "serial": 0,
+    "title": "进行中"
+  },
+  "issue_type": "任务",
+  "issue_type_detail": {
+    "id": 255,
+    "is_system": false,
+    "title": "任务"
+  },
+  "labels": [
+    {
+      "color": "#35e029",
+      "created_at": "2026-03-20T11:25:13+08:00",
+      "id": 38861,
+      "name": "resolved",
+      "updated_at": "2026-08-12T15:14:07+08:00"
+    }
+  ],
+  "number": "4692",
+  "priority": 0,
+  "repository": {
+    "assigner": {},
+    "created_at": "2025-09-27T17:40:34+08:00",
+    "description": "本项目是CANN提供的神经网络类计算算子库，实现网络在NPU上加速计算。",
+    "full_name": "cann/ops-nn",
+    "id": 7665709,
+    "name": "ops-nn",
+    "paas": "",
+    "path": "ops-nn",
+    "updated_at": "2025-09-27T18:09:31+08:00"
+  },
+  "state": "closed",
+  "title": "[Bug-Report|缺陷反馈]: InplaceApplyAdagradDA在FP16场景存在舍入边界精度误差",
+  "updated_at": "2026-08-12T15:02:29+08:00",
+  "user": {
+    "html_url": "https://gitcode.com/zhongheng",
+    "id": "6a1fd5da2ee2d438af7f0223",
+    "login": "zhongheng",
+    "name": "zhongheng",
+    "object_id": "6a1fd5da2ee2d438af7f0223"
+  },
+  "visibility_reason": "public"
+}

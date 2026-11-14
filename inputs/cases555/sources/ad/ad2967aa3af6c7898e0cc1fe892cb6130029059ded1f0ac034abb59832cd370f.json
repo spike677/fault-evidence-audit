@@ -1,0 +1,38 @@
+[
+  {
+    "additions": 2,
+    "blob_id": "e7f9afdbeb7d174a3e6051141d6085fec55297bc",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/5edf1dd439bf879a977ee9f3a9204191f1b3ecb9/pooling/max_pool_grad_with_argmax_v3/op_kernel/arch35/max_pool_grad_with_argmax_v3_simt.h",
+    "deletions": 1,
+    "filename": "pooling/max_pool_grad_with_argmax_v3/op_kernel/arch35/max_pool_grad_with_argmax_v3_simt.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 2,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -116,7 +116,8 @@ __aicore__ inline void MaxPoolGradWithArgmaxV3Simt<VALUE_T, INDICES_T, Format_T,\n     SimtParam.SetValue(5, static_cast<DIV_T>(shiftStrideH));\n     SimtParam.SetValue(6, static_cast<DIV_T>(magicStrideW));\n     SimtParam.SetValue(7, static_cast<DIV_T>(shiftStrideW));\n-\n+    \n+    DataSyncBarrier<MemDsbT::UB>();\n     auto gradData = (__gm__ VALUE_T*)grad_.GetPhyAddr();\n     auto outputData = (__gm__ VALUE_T*)y_.GetPhyAddr();\n     auto indicesData = (__gm__ INDICES_T*)argmax_.GetPhyAddr();\n",
+      "new_file": false,
+      "new_path": "pooling/max_pool_grad_with_argmax_v3/op_kernel/arch35/max_pool_grad_with_argmax_v3_simt.h",
+      "old_path": "pooling/max_pool_grad_with_argmax_v3/op_kernel/arch35/max_pool_grad_with_argmax_v3_simt.h",
+      "removed_lines": 1,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/5edf1dd439bf879a977ee9f3a9204191f1b3ecb9/pooling/max_pool_grad_with_argmax_v3/op_kernel/arch35/max_pool_grad_with_argmax_v3_simt.h",
+    "sha": "5edf1dd439bf879a977ee9f3a9204191f1b3ecb9",
+    "source_branch": "fix_simt_perc",
+    "source_project": {
+      "full_name": "liuchuangdev/ops-nn",
+      "human_name": "liuchuangdev / ops-nn",
+      "id": 9090395,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  }
+]

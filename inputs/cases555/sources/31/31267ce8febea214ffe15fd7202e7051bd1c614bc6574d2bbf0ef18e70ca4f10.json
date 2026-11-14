@@ -1,0 +1,74 @@
+[
+  {
+    "additions": 6,
+    "blob_id": "aa6d56d0bf8c6d8fcbe83da964840d108a0deaae",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/32489cd1f1c6176aa1dedcf6806633d64519ca16/norm/add_layer_norm_quant/op_host/add_layer_norm_quant_tiling.cpp",
+    "deletions": 1,
+    "filename": "norm/add_layer_norm_quant/op_host/add_layer_norm_quant_tiling.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 6,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -535,10 +535,15 @@ inline ge::graphStatus GenSimplifiedKey4AddLayerNormQuant(gert::TilingContext* c\n     OP_CHECK_NULL_WITH_CONTEXT(context, context->GetInputDesc(X1_IDX));\n     int32_t x1Dtype = static_cast<int32_t>(context->GetInputDesc(X1_IDX)->GetDataType());\n \n+    int32_t biasDtype = -1;\n     int32_t scale1Dtype = -1;\n     int32_t scale2Dtype = -1;\n     int32_t offset1Dtype = -1;\n     int32_t offset2Dtype = -1;\n+    OP_CHECK_IF(\n+ \t    context->GetOptionalInputDesc(BIAS_IDX) != nullptr,\n+ \t    OP_LOGW(context, \"Optional input bias exist\"),\n+ \t    biasDtype = static_cast<int32_t>(context->GetOptionalInputDesc(BIAS_IDX)->GetDataType()));\n     OP_CHECK_IF(\n         context->GetOptionalInputDesc(SCALE1_IDX) != nullptr,\n         OP_LOGW(context, \"Optional input scale1 exist\"),\n@@ -567,7 +572,7 @@ inline ge::graphStatus GenSimplifiedKey4AddLayerNormQuant(gert::TilingContext* c\n         .append(\"/\")\n         .append(std::to_string(x1Dtype)) // beta\n         .append(\"/\")\n-        .append(std::to_string(x1Dtype)) // bias\n+        .append(std::to_string(biasDtype)) // bias\n         .append(\"/\")\n         .append(std::to_string(scale1Dtype)) // scale1\n         .append(\"/\")\n",
+      "new_file": false,
+      "new_path": "norm/add_layer_norm_quant/op_host/add_layer_norm_quant_tiling.cpp",
+      "old_path": "norm/add_layer_norm_quant/op_host/add_layer_norm_quant_tiling.cpp",
+      "removed_lines": 1,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/32489cd1f1c6176aa1dedcf6806633d64519ca16/norm/add_layer_norm_quant/op_host/add_layer_norm_quant_tiling.cpp",
+    "sha": "32489cd1f1c6176aa1dedcf6806633d64519ca16",
+    "source_branch": "bias_null",
+    "source_project": {
+      "full_name": "wangpengbo26/ops-nn",
+      "human_name": "wangpengbo26 / ops-nn",
+      "id": 9119166,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 3534,
+    "blob_id": "3a89c5128c6cb485b734b7648e90fe9890dfddfb",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/32489cd1f1c6176aa1dedcf6806633d64519ca16/norm/add_layer_norm_quant/op_host/config/ascend950/add_layer_norm_quant_binary.json",
+    "deletions": 2,
+    "filename": "norm/add_layer_norm_quant/op_host/config/ascend950/add_layer_norm_quant_binary.json",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 3534,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "The file is empty",
+      "new_file": false,
+      "new_path": "norm/add_layer_norm_quant/op_host/config/ascend950/add_layer_norm_quant_binary.json",
+      "old_path": "norm/add_layer_norm_quant/op_host/config/ascend950/add_layer_norm_quant_binary.json",
+      "removed_lines": 2,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/32489cd1f1c6176aa1dedcf6806633d64519ca16/norm/add_layer_norm_quant/op_host/config/ascend950/add_layer_norm_quant_binary.json",
+    "sha": "32489cd1f1c6176aa1dedcf6806633d64519ca16",
+    "source_branch": "bias_null",
+    "source_project": {
+      "full_name": "wangpengbo26/ops-nn",
+      "human_name": "wangpengbo26 / ops-nn",
+      "id": 9119166,
+      "path": "ops-nn"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  }
+]

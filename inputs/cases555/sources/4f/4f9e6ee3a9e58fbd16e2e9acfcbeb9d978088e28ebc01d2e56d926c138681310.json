@@ -1,0 +1,74 @@
+[
+  {
+    "additions": 3,
+    "blob_id": "67d97c14c0fcd658254f065a654c7310d0b2bf02",
+    "blob_url": "https://gitcode.com/cann/ops-math/blob/7aa383e42c085b1eeb0b4ea07543c13ae144ebb3/random/drop_out_do_mask_v3/op_kernel/arch35/drop_out_do_mask_v3.h",
+    "deletions": 0,
+    "filename": "random/drop_out_do_mask_v3/op_kernel/arch35/drop_out_do_mask_v3.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 3,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -272,6 +272,9 @@ __aicore__ inline void DropOutDoMaskV3Op<T>::Process()\n             AscendC::LocalTensor<T> xInputUb_ = xInputQueue_.DeQue<T>();\n             int64_t yOffset = blockIdx_ * tiling_->normalCoreProNum + idx * tiling_->singleBufferSize;\n             CopyOut(xInputUb_, yOutputGm_, 1, (uint32_t)(dataCount * sizeof(T)), yOffset);\n+            event_t event_MTE3_MTE2 = static_cast<event_t>(GetTPipePtr()->FetchEventID(AscendC::HardEvent::MTE3_MTE2));\n+            AscendC::SetFlag<AscendC::HardEvent::MTE3_MTE2>(event_MTE3_MTE2);\n+            AscendC::WaitFlag<AscendC::HardEvent::MTE3_MTE2>(event_MTE3_MTE2);\n             xInputQueue_.FreeTensor(xInputUb_);\n         }\n         return;\n",
+      "new_file": false,
+      "new_path": "random/drop_out_do_mask_v3/op_kernel/arch35/drop_out_do_mask_v3.h",
+      "old_path": "random/drop_out_do_mask_v3/op_kernel/arch35/drop_out_do_mask_v3.h",
+      "removed_lines": 0,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-math/raw/7aa383e42c085b1eeb0b4ea07543c13ae144ebb3/random/drop_out_do_mask_v3/op_kernel/arch35/drop_out_do_mask_v3.h",
+    "sha": "7aa383e42c085b1eeb0b4ea07543c13ae144ebb3",
+    "source_branch": "v3v3d0511",
+    "source_project": {
+      "full_name": "fenglin28/ops-math_private",
+      "human_name": "fenglin28 / ops-math_private",
+      "id": 9089227,
+      "path": "ops-math_private"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-math",
+      "human_name": "CANN / ops-math",
+      "id": 7649531,
+      "path": "ops-math"
+    }
+  },
+  {
+    "additions": 1,
+    "blob_id": "de78b5d08aff74fa7059889edd3afad0a9739cad",
+    "blob_url": "https://gitcode.com/cann/ops-math/blob/7aa383e42c085b1eeb0b4ea07543c13ae144ebb3/random/drop_out_v3/op_host/arch35/drop_out_v3_tiling_arch35.cpp",
+    "deletions": 2,
+    "filename": "random/drop_out_v3/op_host/arch35/drop_out_v3_tiling_arch35.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 1,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -50,8 +50,7 @@ OpTilingConfig DropOutV3Tiling::BuildOpConfig()\n         auto inputShape = ctx->GetInputShape(INPUT_IDX_X);\n         OP_CHECK_NULL_WITH_CONTEXT(ctx, inputShape);\n         auto storageShape = inputShape->GetStorageShape();\n-        size = storageShape.GetShapeSize();\n-        size = (size <= 0) ? 1 : size; // scalar case\n+        size = storageShape.IsScalar() ? 1 : storageShape.GetShapeSize();\n         return ge::GRAPH_SUCCESS;\n     };\n \n",
+      "new_file": false,
+      "new_path": "random/drop_out_v3/op_host/arch35/drop_out_v3_tiling_arch35.cpp",
+      "old_path": "random/drop_out_v3/op_host/arch35/drop_out_v3_tiling_arch35.cpp",
+      "removed_lines": 2,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-math/raw/7aa383e42c085b1eeb0b4ea07543c13ae144ebb3/random/drop_out_v3/op_host/arch35/drop_out_v3_tiling_arch35.cpp",
+    "sha": "7aa383e42c085b1eeb0b4ea07543c13ae144ebb3",
+    "source_branch": "v3v3d0511",
+    "source_project": {
+      "full_name": "fenglin28/ops-math_private",
+      "human_name": "fenglin28 / ops-math_private",
+      "id": 9089227,
+      "path": "ops-math_private"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-math",
+      "human_name": "CANN / ops-math",
+      "id": 7649531,
+      "path": "ops-math"
+    }
+  }
+]

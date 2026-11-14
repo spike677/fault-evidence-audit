@@ -1,0 +1,74 @@
+[
+  {
+    "additions": 0,
+    "blob_id": "7d48db42f5879e3e922879aba33277c7df1fe405",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/7599ad01007af15970408369110520a1ccd917de/matmul/transpose_batch_mat_mul/op_host/op_tiling/arch35/transpose_batch_mat_mul_tiling_advanced.cpp",
+    "deletions": 2,
+    "filename": "matmul/transpose_batch_mat_mul/op_host/op_tiling/arch35/transpose_batch_mat_mul_tiling_advanced.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 0,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -241,8 +241,6 @@ ge::graphStatus TransposeBatchMatMulTiling::CheckArgs()\n                         CUBE_INNER_ERR_REPORT(args_.opName, \"scale condition not satisfied\"), return ge::GRAPH_FAILED);\n     }\n     if (attrs->GetAttrNum() >= HF32_ATTR_NUM) {\n-        OPS_CHECK_NULL_WITH_CONTEXT(context_,\n-                                    attrs->GetAttrPointer<int32_t>(HF32_ATTR_INDEX - 1)); // 检查倒数第2个属性\n         OPS_CHECK_NULL_WITH_CONTEXT(context_, attrs->GetAttrPointer<bool>(HF32_ATTR_INDEX));\n     }\n     if (attrs->GetAttrNum() >= ATTR_NUM) {\n",
+      "new_file": false,
+      "new_path": "matmul/transpose_batch_mat_mul/op_host/op_tiling/arch35/transpose_batch_mat_mul_tiling_advanced.cpp",
+      "old_path": "matmul/transpose_batch_mat_mul/op_host/op_tiling/arch35/transpose_batch_mat_mul_tiling_advanced.cpp",
+      "removed_lines": 2,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/7599ad01007af15970408369110520a1ccd917de/matmul/transpose_batch_mat_mul/op_host/op_tiling/arch35/transpose_batch_mat_mul_tiling_advanced.cpp",
+    "sha": "7599ad01007af15970408369110520a1ccd917de",
+    "source_branch": "tiling_param_9.0.0",
+    "source_project": {
+      "full_name": "jgx12/ops-nn",
+      "human_name": "jgx12 / ops-nn",
+      "id": 9033623,
+      "path": "ops-nn"
+    },
+    "target_branch": "9.0.0",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 1,
+    "blob_id": "3d99686006ea4f0d618467d230ba03743c9a9b9e",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/7599ad01007af15970408369110520a1ccd917de/matmul/transpose_quant_batch_mat_mul/op_host/transpose_quant_batch_mat_mul_infershape.cpp",
+    "deletions": 1,
+    "filename": "matmul/transpose_quant_batch_mat_mul/op_host/transpose_quant_batch_mat_mul_infershape.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 1,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -159,7 +159,7 @@ static ge::graphStatus InferShapeForTransposeQuantBatchMatMul(InferShapeContext*\n         shapeX1 == nullptr || shapeX2 == nullptr || shapeY == nullptr || attrs == nullptr,\n         CUBE_INNER_ERR_REPORT(nameOp, \"[Infershape]shape or attrs is null.\"), return ge::GRAPH_FAILED);\n \n-    const auto dtype = attrs->GetAttrPointer<int32_t>(0); // dtype index is 0\n+    const auto dtype = attrs->GetAttrPointer<int64_t>(0); // dtype index is 0\n     CHECK(dtype == nullptr, CUBE_INNER_ERR_REPORT(nameOp, \"[Infershape] attr dtype is null.\"), return ge::GRAPH_FAILED);\n \n     const auto permX1 = attrs->GetListInt(2);                        // permX1 index is 2\n",
+      "new_file": false,
+      "new_path": "matmul/transpose_quant_batch_mat_mul/op_host/transpose_quant_batch_mat_mul_infershape.cpp",
+      "old_path": "matmul/transpose_quant_batch_mat_mul/op_host/transpose_quant_batch_mat_mul_infershape.cpp",
+      "removed_lines": 1,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/7599ad01007af15970408369110520a1ccd917de/matmul/transpose_quant_batch_mat_mul/op_host/transpose_quant_batch_mat_mul_infershape.cpp",
+    "sha": "7599ad01007af15970408369110520a1ccd917de",
+    "source_branch": "tiling_param_9.0.0",
+    "source_project": {
+      "full_name": "jgx12/ops-nn",
+      "human_name": "jgx12 / ops-nn",
+      "id": 9033623,
+      "path": "ops-nn"
+    },
+    "target_branch": "9.0.0",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  }
+]

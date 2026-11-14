@@ -1,0 +1,73 @@
+{
+  "assignee": {
+    "html_url": "https://gitcode.com/yourealize",
+    "id": "684598ba4229be333029be60",
+    "login": "yourealize",
+    "name": "陈展熹",
+    "object_id": "684598ba4229be333029be60"
+  },
+  "assignees": [
+    {
+      "html_url": "https://gitcode.com/yourealize",
+      "id": "684598ba4229be333029be60",
+      "login": "yourealize",
+      "name": "陈展熹",
+      "object_id": "684598ba4229be333029be60"
+    }
+  ],
+  "body": "## 问题描述\n\n`ImageProjectiveTransform` 的 InferShape 对 unknown rank、unknown dimension 和动态 `output_shape` 处理不完整，部分合法动态图会推导失败或得到不正确的输出 Shape；Ascend950 的部分 tiling UT 也未注册到实际执行路径。\n\n## 期望行为\n\n- `images`、`transforms`、`output_shape` 为 unknown rank 时，输出正确推导为 unknown rank。\n- 某个输入 unknown rank 时，仍校验其他已知输入的 rank 和维度合法性。\n- 支持 `transforms` 尾维为 `UNKNOWN_DIM` 以及动态 batch；已知非法维度仍返回失败。\n- `output_shape` 已知长度必须为 2；非常量数据推导为 `{N, -1, -1, C}`；常量中的 0 维按空维保留。\n- Ascend950 tiling UT 应接入并实际执行。\n\n## 验收标准\n\n- Ascend950 `cv_op_host_ut` 构建通过。\n- `ImageProjectiveTransformTiling.*` 5/5 通过。\n- `ImageProjectiveTransformInfershape.*` 12/12 通过。\n- 相关文件通过 clang-format、codespell 和 OAT 检查。\n\n## 实现\n\n对应 PR：#1335（已合入）。",
+  "comments": 2,
+  "created_at": "2026-08-20T15:33:22+08:00",
+  "finished_at": "2026-08-20T15:35:07+08:00",
+  "html_url": "https://gitcode.com/cann/ops-cv/issues/779",
+  "id": 4266719,
+  "issue_priority_detail": {
+    "id": 116,
+    "title": "无优先级"
+  },
+  "issue_state": "已完成",
+  "issue_state_detail": {
+    "id": 287,
+    "serial": 0,
+    "title": "已完成"
+  },
+  "issue_type": "任务",
+  "issue_type_detail": {
+    "id": 255,
+    "is_system": false,
+    "title": "任务"
+  },
+  "labels": [
+    {
+      "color": "#35e029",
+      "created_at": "2026-03-20T11:25:13+08:00",
+      "id": 38861,
+      "name": "resolved",
+      "updated_at": "2026-08-20T16:00:58+08:00"
+    }
+  ],
+  "number": "779",
+  "priority": 0,
+  "repository": {
+    "assigner": {},
+    "created_at": "2025-09-26T14:31:51+08:00",
+    "description": "本项目是CANN提供的图像处理、目标检测相关的算子库，实现网络在NPU上加速计算。",
+    "full_name": "cann/ops-cv",
+    "id": 7657293,
+    "name": "ops-cv",
+    "paas": "",
+    "path": "ops-cv",
+    "updated_at": "2025-09-26T14:54:27+08:00"
+  },
+  "state": "closed",
+  "title": "[Bug-Report|缺陷反馈]: ImageProjectiveTransform InferShape 动态 Shape/Rank 推导异常",
+  "updated_at": "2026-08-20T15:35:07+08:00",
+  "user": {
+    "html_url": "https://gitcode.com/yourealize",
+    "id": "684598ba4229be333029be60",
+    "login": "yourealize",
+    "name": "陈展熹",
+    "object_id": "684598ba4229be333029be60"
+  },
+  "visibility_reason": "public"
+}

@@ -1,0 +1,83 @@
+{
+  "assignee": {
+    "avatar_url": "https://cdn-img.gitcode.com/bd/ac/b76da560c13283c585bc3d00edb49d52a21a13352282a7d8aeb07d53544d9b30.png",
+    "html_url": "https://gitcode.com/BIGWHITETEETH",
+    "id": "66eaa44e22522e5929512d9a",
+    "login": "BIGWHITETEETH",
+    "name": "BIGWHITETEETH",
+    "object_id": "66eaa44e22522e5929512d9a"
+  },
+  "assignees": [
+    {
+      "avatar_url": "https://cdn-img.gitcode.com/bd/ac/b76da560c13283c585bc3d00edb49d52a21a13352282a7d8aeb07d53544d9b30.png",
+      "html_url": "https://gitcode.com/BIGWHITETEETH",
+      "id": "66eaa44e22522e5929512d9a",
+      "login": "BIGWHITETEETH",
+      "name": "BIGWHITETEETH",
+      "object_id": "66eaa44e22522e5929512d9a"
+    }
+  ],
+  "body": "\n\nThanks for sending an issue! Please fill in the following template to help quickly solve your problem.\n\n### Describe the current behavior / 问题描述 (Mandatory / 必填)\n            \nkeycache的shape乘积比较大的场景，这种用例会超过keycache的uint32，导致越界，引发精度问题。\n\n### Environment / 环境信息 (Mandatory / 必填)\n            \nA950\ncann-9.1.0\n### Steps to reproduce the issue / 重现步骤 (Mandatory / 必填)\n            \naclnnGatherPaKvCache\taclnnGatherPaKvCache_fp16_int64_FRACTAL_NZ_ND_random_000117\t/npu/traindata/Comprehensive_Aclnn/aclnnGatherPaKvCache\t1\t((),)\t\t[[3, 49145, 3, 16], [3, 2, 3, 16], [3, 6], [3], [2846, 786320], [2846, 32], [3]]\t[[-100, 100], [-1000, -10], [0, 3], [0, 294870], [-0.001, 0], [6.103515625e-05, 6.103515625e-05], [-10, -2]]\t['fp16', 'fp16', 'int64', 'int64', 'fp16', 'fp16', 'int64']\t['FRACTAL_NZ', 'FRACTAL_NZ', 'ND', 'ND', 'ND', 'ND', 'ND']\t['tensor', 'tensor', 'tensor', 'tensor', 'tensor', 'tensor', 'tensor']\t[0, 1, 2, 3, 4, 5, 6]\t[[2846, 786320], [2846, 32]]\t[[0, 10], [0, 10]]\t['fp16', 'fp16']\t['ND', 'ND']\t['tensor', 'tensor']\tcache_mode\tbuildins\tstring\tPA_NZ\tis_seq_lens_cumsum\tbuildins\tbool\tFALSE\tno_contiguous_type\tbuildins\tint\t0\tno_contiguous_input_index\tint_array\t\t[1]\tno_contiguous_slice_index\tlist_array\t[[0], [0], [], [], [], [], []]\n使用类似较大shape用例时会因越界引发精度问题。\n### Describe the expected behavior / 预期结果 (Mandatory / 必填)\n            \n正常精度为正确，key，value输出值精度都是pass\n\n### Related log / screenshot / 日志 / 截图 (Mandatory / 必填)\n            \n[2026/06/23 18:53:35] [INFO]-tools.py:2099 - split_count:2237866720.0; max_diff_hd:0.1;\n[2026/06/23 18:57:22] [INFO]-tools.py:1064 - ---------------------------------------------------------------------------------------\n[2026/06/23 18:57:22] [INFO]-tools.py:1070 - Loop \t ExpectOut \t RealOut \t FpDiff \t RateDiff\n[2026/06/23 18:57:22] [INFO]-tools.py:1071 - ---------------------------------------------------------------------------------------\n[2026/06/23 18:57:22] [INFO]-tools.py:1061 - 00000001 \t 35.3750000 \t -39.5000000 \t 74.8750000 \t 2.1171875\n[2026/06/23 18:57:22] [INFO]-tools.py:1061 - 00000002 \t 71.4375000 \t -66.7500000 \t 138.1875000 \t 1.9355469\n[2026/06/23 18:57:22] [INFO]-tools.py:1061 - 00000003 \t -30.7968750 \t -1.6796875 \t 29.1171875 \t 0.9458008\n[2026/06/23 18:57:22] [INFO]-tools.py:1061 - 00000004 \t -5.6796875 \t 11.0625000 \t 16.7421875 \t 2.9492188\n[2026/06/23 18:57:22] [INFO]-tools.py:1061 - 00000005 \t -79.8125000 \t 74.9375000 \t 154.7500000 \t 1.9384766\n[2026/06/23 18:57:22] [INFO]-tools.py:1061 - 00000006 \t -20.8593750 \t 2.6601562 \t 23.5195312 \t 1.1269531\n[2026/06/23 18:57:22] [INFO]-tools.py:1061 - 00000007 \t -26.6093750 \t -59.9375000 \t 33.3281250 \t 1.2519531\n[2026/06/23 18:57:22] [INFO]-tools.py:1061 - 00000008 \t -10.7187500 \t -69.8125000 \t 59.0937500 \t 5.5117188\n[2026/06/23 18:57:22] [INFO]-tools.py:1061 - 00000009 \t 29.6250000 \t 74.4375000 \t 44.8125000 \t 1.5126953\n[2026/06/23 18:57:22] [INFO]-tools.py:1061 - 00000010 \t -58.3750000 \t -70.7500000 \t 12.3750000 \t 0.2120361\n[2026/06/23 18:57:22] [INFO]-tools.py:1080 - ...   \t   ...   \t   ...   \t   ...    \t   ...\n[2026/06/23 18:57:22] [INFO]-tools.py:1061 - 2237866711 \t 0.0000000 \t -0.0009794 \t 0.0009794 \t inf\n[2026/06/23 18:57:22] [INFO]-tools.py:1061 - 2237866712 \t 0.0000000 \t -0.0007143 \t 0.0007143 \t inf\n[2026/06/23 18:57:22] [INFO]-tools.py:1061 - 2237866713 \t 0.0000000 \t -0.0003130 \t 0.0003130 \t inf\n[2026/06/23 18:57:22] [INFO]-tools.py:1061 - 2237866714 \t 0.0000000 \t -0.0002081 \t 0.0002081 \t inf\n[2026/06/23 18:57:22] [INFO]-tools.py:1061 - 2237866715 \t 0.0000000 \t -0.0008917 \t 0.0008917 \t inf\n[2026/06/23 18:57:22] [INFO]-tools.py:1061 - 2237866716 \t 0.0000000 \t -0.0008898 \t 0.0008898 \t inf\n[2026/06/23 18:57:22] [INFO]-tools.py:1061 - 2237866717 \t 0.0000000 \t -0.0008016 \t 0.0008016 \t inf\n[2026/06/23 18:57:22] [INFO]-tools.py:1061 - 2237866718 \t 0.0000000 \t -0.0008507 \t 0.0008507 \t inf\n[2026/06/23 18:57:22] [INFO]-tools.py:1061 - 2237866719 \t 0.0000000 \t -0.0009265 \t 0.0009265 \t inf\n[2026/06/23 18:57:22] [INFO]-tools.py:1061 - 2237866720 \t 0.0000000 \t -0.0002068 \t 0.0002068 \t inf\n[2026/06/23 18:57:23] [INFO]-tools.py:2261 - ---------------------------------------------------------------------------------------\n[2026/06/23 18:57:23] [INFO]-tools.py:2263 - Rtol   \t Atol   \t PctThd   \t PctRlt   \t Result\n[2026/06/23 18:57:23] [INFO]-tools.py:2264 - ---------------------------------------------------------------------------------------\n[2026/06/23 18:57:23] [INFO]-tools.py:2266 - 0.0050    \t 0.000025  \t 99.90%   \t 95.496510%   \t Failed\n[2026/06/23 18:57:23] [INFO]-tools.py:2269 - Max-RelativeError is: 2.0. Threshold is: 0.1.\n[2026/06/23 18:57:23] [INFO]-tools.py:1128 - Error Line-----------------------------------------------------------------------------\n[2026/06/23 18:57:23] [INFO]-tools.py:1130 - Loop \t ExpectOut \t RealOut \t FpDiff \t RateDiff\n### Special notes for this issue/备注 (Optional / 选填)\n            \n\n",
+  "comments": 1,
+  "created_at": "2026-06-24T14:36:44+08:00",
+  "finished_at": "2026-06-26T15:42:26+08:00",
+  "html_url": "https://gitcode.com/cann/ops-transformer/issues/3289",
+  "id": 4113283,
+  "issue_priority_detail": {
+    "id": 116,
+    "title": "无优先级"
+  },
+  "issue_state": "进行中",
+  "issue_state_detail": {
+    "id": 285,
+    "serial": 0,
+    "title": "进行中"
+  },
+  "issue_type": "任务",
+  "issue_type_detail": {
+    "id": 255,
+    "is_system": false,
+    "title": "任务"
+  },
+  "labels": [
+    {
+      "color": "#DB2828",
+      "created_at": "2025-06-10T14:17:23+08:00",
+      "id": 3870,
+      "name": "bug-report",
+      "updated_at": "2026-06-24T14:36:44+08:00"
+    },
+    {
+      "color": "#35e029",
+      "created_at": "2026-03-20T11:25:13+08:00",
+      "id": 38861,
+      "name": "resolved",
+      "updated_at": "2026-06-26T16:02:21+08:00"
+    }
+  ],
+  "number": "3289",
+  "priority": 0,
+  "repository": {
+    "assigner": {},
+    "created_at": "2025-09-28T17:54:46+08:00",
+    "description": "本项目是CANN提供的transformer类大模型算子库，实现网络在NPU上加速计算。",
+    "full_name": "cann/ops-transformer",
+    "id": 7673863,
+    "name": "ops-transformer",
+    "paas": "",
+    "path": "ops-transformer",
+    "updated_at": "2025-09-28T18:06:48+08:00"
+  },
+  "state": "closed",
+  "title": "[Bug-Report|缺陷反馈]: Gatherpakvcache在大shape下的nz格式会出现越界问题导致精度不对。",
+  "updated_at": "2026-06-26T15:42:26+08:00",
+  "user": {
+    "avatar_url": "https://cdn-img.gitcode.com/bd/ac/b76da560c13283c585bc3d00edb49d52a21a13352282a7d8aeb07d53544d9b30.png",
+    "html_url": "https://gitcode.com/BIGWHITETEETH",
+    "id": "66eaa44e22522e5929512d9a",
+    "login": "BIGWHITETEETH",
+    "name": "BIGWHITETEETH",
+    "object_id": "66eaa44e22522e5929512d9a"
+  },
+  "visibility_reason": "public"
+}

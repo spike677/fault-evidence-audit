@@ -1,0 +1,74 @@
+[
+  {
+    "additions": 7,
+    "blob_id": "68e376ad6d5ce1897bd4252abb2d48e535f92d79",
+    "blob_url": "https://gitcode.com/cann/ops-math/blob/81aed7054dc76b3c2e5fa0e50e4978318975acb7/math/is_finite/op_host/is_finite_tiling.cpp",
+    "deletions": 7,
+    "filename": "math/is_finite/op_host/is_finite_tiling.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 7,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -16,7 +16,7 @@\n #include \"is_finite_tiling.h\"\n #include \"is_finite_tiling_arch35.h\"\n #include \"log/log.h\"\n-#include \"tiling/platform/platform_ascendc.h\"\n+#include \"platform/platform_ascendc.h\"\n #include \"register/op_impl_registry.h\"\n #include \"util/math_util.h\"\n #include \"is_finite_tiling_common.h\"\n@@ -52,8 +52,7 @@ static ge::graphStatus TilingPrepare4IsFiniteTiling(gert::TilingParseContext* co\n \n static ge::graphStatus IsFiniteTilingForGe(gert::TilingContext* tilingContext)\n {\n-    OP_CHECK_IF(\n-        tilingContext == nullptr, OP_LOGE(\"IsFiniteTiling\", \"tiling context is nullptr\"), return ge::GRAPH_FAILED);\n+    OP_CHECK_IF(tilingContext == nullptr, OP_LOGE(\"IsFiniteTiling\", \"tiling context is nullptr\"), return ge::GRAPH_FAILED);\n     OP_LOGD(tilingContext, \"Entering IsFiniteTilingForGe\");\n     auto compileInfo = reinterpret_cast<const IsFiniteCompileInfo*>(tilingContext->GetCompileInfo());\n     OP_CHECK_NULL_WITH_CONTEXT(tilingContext, compileInfo);\n@@ -69,20 +68,21 @@ static ge::graphStatus IsFiniteTilingForGe(gert::TilingContext* tilingContext)\n     OP_CHECK_IF(shape == nullptr, OP_LOGE(tilingContext, \"InputShape == nullptr\"), return ge::GRAPH_FAILED);\n \n     IsFiniteNs::IsFiniteTilingData* tilingData = tilingContext->GetTilingData<IsFiniteNs::IsFiniteTilingData>();\n-    IsFiniteNs::IsFiniteTiling::IsFiniteCommonTiling<gert::Shape>(shape->GetStorageShape(), *tilingData);\n+    IsFiniteNs::IsFiniteTiling::IsFiniteCommonTiling<gert::Shape>(shape->GetStorageShape(), *tilingData, \n+                                                                  compileInfo->totalCoreNum, compileInfo->ubSize);\n \n     uint32_t D_T_X = IS_FINITE_TPL_FP32, D_T_Y = IS_FINITE_TPL_BOOL;\n     ge::DataType dtype_x = tilingContext->GetInputDesc(0)->GetDataType();\n     if (dtype_x == ge::DataType::DT_FLOAT) {\n         D_T_X = IS_FINITE_TPL_FP32;\n-    } else if (dtype_x == ge::DataType::DT_FLOAT16) {\n+    } else if(dtype_x == ge::DataType::DT_FLOAT16) {\n         D_T_X = IS_FINITE_TPL_FP16;\n-    } else if (dtype_x == ge::DataType::DT_BF16) {\n+    } else if(dtype_x == ge::DataType::DT_BF16) {\n         D_T_X = IS_FINITE_TPL_BF16;\n     }\n \n     tilingContext->SetBlockDim(tilingData->needCoreNum);\n-    const uint64_t tilingKey = GET_TPL_TILING_KEY(D_T_X, D_T_Y); // 模板参数配置\n+    const uint64_t tilingKey = GET_TPL_TILING_KEY(D_T_X, D_T_Y); //模板参数配置\n     tilingContext->SetTilingKey(tilingKey);\n     size_t* workspaces = tilingContext->GetWorkspaceSizes(1);\n     if (workspaces != nullptr) {\n",
+      "new_file": false,
+      "new_path": "math/is_finite/op_host/is_finite_tiling.cpp",
+      "old_path": "math/is_finite/op_host/is_finite_tiling.cpp",
+      "removed_lines": 7,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-math/raw/81aed7054dc76b3c2e5fa0e50e4978318975acb7/math/is_finite/op_host/is_finite_tiling.cpp",
+    "sha": "81aed7054dc76b3c2e5fa0e50e4978318975acb7",
+    "source_branch": "fix_is_finite",
+    "source_project": {
+      "full_name": "gcw_SUaZx3UQ/ops-math",
+      "human_name": "gcw_SUaZx3UQ / ops-math",
+      "id": 7649644,
+      "path": "ops-math"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-math",
+      "human_name": "CANN / ops-math",
+      "id": 7649531,
+      "path": "ops-math"
+    }
+  },
+  {
+    "additions": 28,
+    "blob_id": "60c73060e32df1f392f77841a1ea7da886e99c5e",
+    "blob_url": "https://gitcode.com/cann/ops-math/blob/81aed7054dc76b3c2e5fa0e50e4978318975acb7/math/is_finite/op_host/is_finite_tiling_common.h",
+    "deletions": 33,
+    "filename": "math/is_finite/op_host/is_finite_tiling_common.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 28,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -19,53 +19,48 @@\n \n #include \"../op_kernel/is_finite_struct.h\"\n #include \"torch_extension/tiling_utils.h\"\n-#include \"tiling/platform/platform_ascendc.h\"\n+#include \"platform/platform_ascendc.h\"\n \n namespace IsFiniteNs {\n \n class IsFiniteTiling {\n-public:\n+  public:\n     constexpr static int64_t MINIMUM_ELEMENT_PER_CORE = 32;\n     constexpr static int64_t DATA_BLOCK = 32;\n     constexpr static int64_t RESERVERD_UB_SIZE = 1024;\n     constexpr static int64_t UB_DIVIDER_FOR_TMP_CASTING = 10;\n \n-    template <typename T>\n-    static void IsFiniteCommonTiling(T x, IsFiniteTilingData& tilingData)\n-    {\n-        int64_t elementCount = 1;\n+    template<typename T>\n+    static void IsFiniteCommonTiling(T x, IsFiniteTilingData& tilingData, uint32_t coreNum, uint64_t ubSize) {\n+      int64_t elementCount = 1;\n \n-        for (uint16_t i = 0; i < TilingUtils::GetDimNum(x); i++) {\n-            elementCount *= TilingUtils::GetDim(x, i);\n-        }\n-        auto ascendc_platform = platform_ascendc::PlatformAscendCManager::GetInstance();\n-        uint32_t coreNum = ascendc_platform->GetCoreNumAiv();\n-        uint64_t ubSizePlatForm;\n-        ascendc_platform->GetCoreMemSize(platform_ascendc::CoreMemType::UB, ubSizePlatForm);\n-        uint32_t blockDim = (elementCount + MINIMUM_ELEMENT_PER_CORE - 1) / MINIMUM_ELEMENT_PER_CORE;\n-        if (blockDim > coreNum) {\n-            blockDim = coreNum;\n-        }\n+      for(uint16_t i = 0; i < TilingUtils::GetDimNum(x); i++) {\n+        elementCount *= TilingUtils::GetDim(x, i);\n+      }\n \n-        uint32_t dataBlockSize = DATA_BLOCK * sizeof(T);\n-        uint32_t usableUbSize =\n-            uint32_t(ubSizePlatForm - RESERVERD_UB_SIZE - sizeof(IsFiniteTilingData)) / UB_DIVIDER_FOR_TMP_CASTING;\n-        usableUbSize = usableUbSize / dataBlockSize * dataBlockSize;\n+      uint32_t blockDim = (elementCount + MINIMUM_ELEMENT_PER_CORE -1) / MINIMUM_ELEMENT_PER_CORE;\n+      if (blockDim > coreNum) {\n+        blockDim = coreNum;\n+      }\n \n-        uint64_t perCoreDataCount = elementCount / blockDim;\n-        perCoreDataCount = perCoreDataCount / DATA_BLOCK * DATA_BLOCK;\n-        uint64_t tempTailDataCount = elementCount - perCoreDataCount * blockDim;\n-        uint64_t tailDataCoreNum = tempTailDataCount / DATA_BLOCK;\n-        uint64_t lastCoreDataCount = perCoreDataCount + tempTailDataCount % DATA_BLOCK;\n+      uint32_t dataBlockSize = DATA_BLOCK * sizeof(T);\n+      uint32_t usableUbSize = uint32_t(ubSize - RESERVERD_UB_SIZE - sizeof(IsFiniteTilingData)) / UB_DIVIDER_FOR_TMP_CASTING;\n+      usableUbSize = usableUbSize / dataBlockSize * dataBlockSize;\n \n-        tilingData.usableUbSize = usableUbSize;\n-        tilingData.needCoreNum = blockDim;\n-        tilingData.totalDataCount = elementCount;\n-        tilingData.perCoreDataCount = perCoreDataCount;\n-        tilingData.tailDataCoreNum = tailDataCoreNum;\n-        tilingData.lastCoreDataCount = lastCoreDataCount;\n+      uint64_t perCoreDataCount = elementCount / blockDim;\n+      perCoreDataCount = perCoreDataCount / DATA_BLOCK * DATA_BLOCK;\n+      uint64_t tempTailDataCount = elementCount -perCoreDataCount * blockDim;\n+      uint64_t tailDataCoreNum = tempTailDataCount / DATA_BLOCK;\n+      uint64_t lastCoreDataCount = perCoreDataCount + tempTailDataCount % DATA_BLOCK;\n+\n+      tilingData.usableUbSize = usableUbSize;\n+      tilingData.needCoreNum = blockDim;\n+      tilingData.totalDataCount = elementCount;\n+      tilingData.perCoreDataCount = perCoreDataCount;\n+      tilingData.tailDataCoreNum = tailDataCoreNum;\n+      tilingData.lastCoreDataCount = lastCoreDataCount;\n     }\n };\n \n-} // namespace IsFiniteNs\n+}\n #endif // IS_FINITE_TILING_H\n\\ No newline at end of file\n",
+      "new_file": false,
+      "new_path": "math/is_finite/op_host/is_finite_tiling_common.h",
+      "old_path": "math/is_finite/op_host/is_finite_tiling_common.h",
+      "removed_lines": 33,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-math/raw/81aed7054dc76b3c2e5fa0e50e4978318975acb7/math/is_finite/op_host/is_finite_tiling_common.h",
+    "sha": "81aed7054dc76b3c2e5fa0e50e4978318975acb7",
+    "source_branch": "fix_is_finite",
+    "source_project": {
+      "full_name": "gcw_SUaZx3UQ/ops-math",
+      "human_name": "gcw_SUaZx3UQ / ops-math",
+      "id": 7649644,
+      "path": "ops-math"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-math",
+      "human_name": "CANN / ops-math",
+      "id": 7649531,
+      "path": "ops-math"
+    }
+  }
+]

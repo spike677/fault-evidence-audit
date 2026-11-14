@@ -1,0 +1,290 @@
+[
+  {
+    "additions": 1,
+    "blob_id": "a23d6c40a346502c7cb7f756047447e77151a64c",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/d8e146312b779c0cb8776b26d3680ef4dd8b7e16/moe/moe_init_routing/README.md",
+    "deletions": 1,
+    "filename": "moe/moe_init_routing/README.md",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 1,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -95,7 +95,7 @@\n \n ## 约束说明\n \n-  无。\n+  - expertIdx内的元素的值需要大于-2\\*\\*24，不超过2\\*\\*24，否则可能会存在精度问题\n \n ## 调用说明\n \n",
+      "new_file": false,
+      "new_path": "moe/moe_init_routing/README.md",
+      "old_path": "moe/moe_init_routing/README.md",
+      "removed_lines": 1,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/d8e146312b779c0cb8776b26d3680ef4dd8b7e16/moe/moe_init_routing/README.md",
+    "sha": "d8e146312b779c0cb8776b26d3680ef4dd8b7e16",
+    "source_branch": "update_code_0129",
+    "source_project": {
+      "full_name": "Huang-Peng/ops-transformer-public",
+      "human_name": "Huang-Peng / ops-transformer",
+      "id": 8856889,
+      "path": "ops-transformer-public"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  },
+  {
+    "additions": 1,
+    "blob_id": "372a162c59e962f73b7dd5998003096331c8a8a4",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/d8e146312b779c0cb8776b26d3680ef4dd8b7e16/moe/moe_init_routing/docs/aclnnMoeInitRouting.md",
+    "deletions": 0,
+    "filename": "moe/moe_init_routing/docs/aclnnMoeInitRouting.md",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 1,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -274,6 +274,7 @@ aclnnStatus aclnnMoeInitRouting(\n \n - 确定性计算：\n   - aclnnMoeInitRouting默认确定性实现。\n+- expertIdx内的元素的值需要大于-2\\*\\*24，不超过2\\*\\*24，否则可能会存在精度问题\n \n ## 调用示例\n \n",
+      "new_file": false,
+      "new_path": "moe/moe_init_routing/docs/aclnnMoeInitRouting.md",
+      "old_path": "moe/moe_init_routing/docs/aclnnMoeInitRouting.md",
+      "removed_lines": 0,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/d8e146312b779c0cb8776b26d3680ef4dd8b7e16/moe/moe_init_routing/docs/aclnnMoeInitRouting.md",
+    "sha": "d8e146312b779c0cb8776b26d3680ef4dd8b7e16",
+    "source_branch": "update_code_0129",
+    "source_project": {
+      "full_name": "Huang-Peng/ops-transformer-public",
+      "human_name": "Huang-Peng / ops-transformer",
+      "id": 8856889,
+      "path": "ops-transformer-public"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  },
+  {
+    "additions": 16,
+    "blob_id": "4a0216bda342dd2b3bf0ae811760d45355e7f70c",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/d8e146312b779c0cb8776b26d3680ef4dd8b7e16/moe/moe_init_routing/op_host/CMakeLists.txt",
+    "deletions": 4,
+    "filename": "moe/moe_init_routing/op_host/CMakeLists.txt",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 16,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -7,16 +7,28 @@\n # INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.\n # See LICENSE in the root of the software repository for the full text of the License.\n # -----------------------------------------------------------------------------------------------------------\n+set(CONDITION_UNIT ${ASCEND_COMPUTE_UNIT})\n if (BUILD_OPEN_PROJECT)\n     target_sources(op_host_aclnn PRIVATE\n         moe_init_routing_def.cpp\n     )\n-    add_ops_compile_options(\n-        OP_NAME MoeInitRouting\n-        OPTIONS --cce-auto-sync=on\n+    if(CONDITION_UNIT STREQUAL \"ascend910_95\")\n+        add_ops_compile_options(\n+                OP_NAME MoeInitRouting\n+                OPTIONS --cce-auto-sync=on\n                 -Wno-deprecated-declarations\n                 -Werror\n-    )\n+                -mllvm\n+                -cce-aicore-dcci-before-kernel-end=false\n+        )\n+    else()\n+        add_ops_compile_options(\n+                OP_NAME MoeInitRouting\n+                OPTIONS --cce-auto-sync=on\n+                -Wno-deprecated-declarations\n+                -Werror\n+        )\n+    endif()\n endif()\n \n if(NOT BUILD_OPS_RTY_KERNEL)\n",
+      "new_file": false,
+      "new_path": "moe/moe_init_routing/op_host/CMakeLists.txt",
+      "old_path": "moe/moe_init_routing/op_host/CMakeLists.txt",
+      "removed_lines": 4,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/d8e146312b779c0cb8776b26d3680ef4dd8b7e16/moe/moe_init_routing/op_host/CMakeLists.txt",
+    "sha": "d8e146312b779c0cb8776b26d3680ef4dd8b7e16",
+    "source_branch": "update_code_0129",
+    "source_project": {
+      "full_name": "Huang-Peng/ops-transformer-public",
+      "human_name": "Huang-Peng / ops-transformer",
+      "id": 8856889,
+      "path": "ops-transformer-public"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  },
+  {
+    "additions": 3,
+    "blob_id": "b7537ad86c1af419144db0626cee4f4c1774fd9d",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/d8e146312b779c0cb8776b26d3680ef4dd8b7e16/moe/moe_init_routing/op_kernel/moe_gather_out_small_activate_row.h",
+    "deletions": 0,
+    "filename": "moe/moe_init_routing/op_kernel/moe_gather_out_small_activate_row.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 3,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -118,6 +118,9 @@ __aicore__ inline void MoeGatherOutSmallActiveRow<T>::Init(\n template <typename T>\n __aicore__ inline void MoeGatherOutSmallActiveRow<T>::Process()\n {\n+    if (needCoreNum > 1) {\n+        AscendC::SyncAll();\n+    }\n     if (this->blockIdx < this->needCoreNum) {\n         int64_t loops = (coreRows + perLoopRows - 1) / perLoopRows;\n         int64_t colsLoops = Ceil(cols, maxColsOneLoop);\n",
+      "new_file": false,
+      "new_path": "moe/moe_init_routing/op_kernel/moe_gather_out_small_activate_row.h",
+      "old_path": "moe/moe_init_routing/op_kernel/moe_gather_out_small_activate_row.h",
+      "removed_lines": 0,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/d8e146312b779c0cb8776b26d3680ef4dd8b7e16/moe/moe_init_routing/op_kernel/moe_gather_out_small_activate_row.h",
+    "sha": "d8e146312b779c0cb8776b26d3680ef4dd8b7e16",
+    "source_branch": "update_code_0129",
+    "source_project": {
+      "full_name": "Huang-Peng/ops-transformer-public",
+      "human_name": "Huang-Peng / ops-transformer",
+      "id": 8856889,
+      "path": "ops-transformer-public"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  },
+  {
+    "additions": 16,
+    "blob_id": "04600a5be5952749ad6582dce7520ef5af34f08c",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/d8e146312b779c0cb8776b26d3680ef4dd8b7e16/moe/moe_init_routing_quant_v2/op_host/CMakeLists.txt",
+    "deletions": 4,
+    "filename": "moe/moe_init_routing_quant_v2/op_host/CMakeLists.txt",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 16,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -8,16 +8,28 @@\n # See LICENSE in the root of the software repository for the full text of the License.\n # -----------------------------------------------------------------------------------------------------------\n \n+set(CONDITION_UNIT ${ASCEND_COMPUTE_UNIT})\n if (BUILD_OPEN_PROJECT)\n     target_sources(op_host_aclnn PRIVATE\n        moe_init_routing_quant_v2_def.cpp\n     )\n-    add_ops_compile_options(\n-        OP_NAME MoeInitRoutingQuantV2\n-        OPTIONS --cce-auto-sync=on\n+    if(CONDITION_UNIT STREQUAL \"ascend910_95\")\n+        add_ops_compile_options(\n+                OP_NAME MoeInitRoutingQuantV2\n+                OPTIONS --cce-auto-sync=on\n                 -Wno-deprecated-declarations\n                 -Werror\n-    )\n+                -mllvm\n+                -cce-aicore-dcci-before-kernel-end=false\n+        )\n+    else()\n+        add_ops_compile_options(\n+                OP_NAME MoeInitRoutingQuantV2\n+                OPTIONS --cce-auto-sync=on\n+                -Wno-deprecated-declarations\n+                -Werror\n+        )\n+    endif()\n endif()\n \n if(NOT BUILD_OPS_RTY_KERNEL)\n",
+      "new_file": false,
+      "new_path": "moe/moe_init_routing_quant_v2/op_host/CMakeLists.txt",
+      "old_path": "moe/moe_init_routing_quant_v2/op_host/CMakeLists.txt",
+      "removed_lines": 4,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/d8e146312b779c0cb8776b26d3680ef4dd8b7e16/moe/moe_init_routing_quant_v2/op_host/CMakeLists.txt",
+    "sha": "d8e146312b779c0cb8776b26d3680ef4dd8b7e16",
+    "source_branch": "update_code_0129",
+    "source_project": {
+      "full_name": "Huang-Peng/ops-transformer-public",
+      "human_name": "Huang-Peng / ops-transformer",
+      "id": 8856889,
+      "path": "ops-transformer-public"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  },
+  {
+    "additions": 1,
+    "blob_id": "8eb9bc4ef5380edc53be450666a0da2a6ec19c98",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/d8e146312b779c0cb8776b26d3680ef4dd8b7e16/moe/moe_init_routing_quant_v2/op_host/moe_init_routing_quant_v2_tiling_base.cpp",
+    "deletions": 1,
+    "filename": "moe/moe_init_routing_quant_v2/op_host/moe_init_routing_quant_v2_tiling_base.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 1,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -425,7 +425,7 @@ void InnerMoeInitRoutingV2TilingBase::Tiling4VBSOneCoreCompute(InnerMoeV2VBSComp\n void InnerMoeInitRoutingV2TilingBase::Tiling4VBSMultiCoreCompute(InnerMoeV2VBSComputeTilingData* tilingData)\n {\n     int64_t needCoreNum = Ops::Base::CeilDiv(totalLength, sortLoopMaxElement); // 向上取整\n-    needCoreNum = static_cast<int64_t>(std::pow(4, CeilLog4(needCoreNum)));               // 用到多核时，核数最多是4^x\n+    needCoreNum = static_cast<int64_t>(std::pow(4, CeilLog4(needCoreNum)));  // 用到多核时，核数最多是4^x\n     needCoreNum = std::min(needCoreNum, aivNum);                    // 不能超过物理核数\n     if (needCoreNum == 0) {\n         return;\n",
+      "new_file": false,
+      "new_path": "moe/moe_init_routing_quant_v2/op_host/moe_init_routing_quant_v2_tiling_base.cpp",
+      "old_path": "moe/moe_init_routing_quant_v2/op_host/moe_init_routing_quant_v2_tiling_base.cpp",
+      "removed_lines": 1,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/d8e146312b779c0cb8776b26d3680ef4dd8b7e16/moe/moe_init_routing_quant_v2/op_host/moe_init_routing_quant_v2_tiling_base.cpp",
+    "sha": "d8e146312b779c0cb8776b26d3680ef4dd8b7e16",
+    "source_branch": "update_code_0129",
+    "source_project": {
+      "full_name": "Huang-Peng/ops-transformer-public",
+      "human_name": "Huang-Peng / ops-transformer",
+      "id": 8856889,
+      "path": "ops-transformer-public"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  },
+  {
+    "additions": 1,
+    "blob_id": "e189db801511b301921f65d70e221ac70e2f77bf",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/d8e146312b779c0cb8776b26d3680ef4dd8b7e16/moe/moe_init_routing_quant_v2/op_kernel/arch35/moe_v2_gather_dynamic_quant_droppad.h",
+    "deletions": 0,
+    "filename": "moe/moe_init_routing_quant_v2/op_kernel/arch35/moe_v2_gather_dynamic_quant_droppad.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 1,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -180,6 +180,7 @@ __aicore__ inline void MoeV2GatherDynamicQuantDroppad<T>::Compute(LocalTensor<fl\n     float maxValue = dynamicQuantLocal.GetValue(0) / 127.0f;\n     Duplicate<float>(dynamicQuantLocal, maxValue, 8);\n     Duplicate<float>(tempLocal, maxValue, cols_);\n+    AscendC::PipeBarrier<PIPE_V>();\n     Div(tempLocal, inLocal, tempLocal, cols_);\n     Cast(tempLocal.ReinterpretCast<half>(), tempLocal, RoundMode::CAST_TRUNC, cols_);\n     Cast(outLocal, tempLocal.ReinterpretCast<half>(), RoundMode::CAST_ROUND, cols_);\n",
+      "new_file": false,
+      "new_path": "moe/moe_init_routing_quant_v2/op_kernel/arch35/moe_v2_gather_dynamic_quant_droppad.h",
+      "old_path": "moe/moe_init_routing_quant_v2/op_kernel/arch35/moe_v2_gather_dynamic_quant_droppad.h",
+      "removed_lines": 0,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/d8e146312b779c0cb8776b26d3680ef4dd8b7e16/moe/moe_init_routing_quant_v2/op_kernel/arch35/moe_v2_gather_dynamic_quant_droppad.h",
+    "sha": "d8e146312b779c0cb8776b26d3680ef4dd8b7e16",
+    "source_branch": "update_code_0129",
+    "source_project": {
+      "full_name": "Huang-Peng/ops-transformer-public",
+      "human_name": "Huang-Peng / ops-transformer",
+      "id": 8856889,
+      "path": "ops-transformer-public"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  },
+  {
+    "additions": 3,
+    "blob_id": "0bdfb9a9b5e48971a19d4cf088ffd5d3c33f8548",
+    "blob_url": "https://gitcode.com/cann/ops-transformer/blob/d8e146312b779c0cb8776b26d3680ef4dd8b7e16/moe/moe_init_routing_quant_v2/op_kernel/arch35/moe_v2_gather_quant_simt.h",
+    "deletions": 0,
+    "filename": "moe/moe_init_routing_quant_v2/op_kernel/arch35/moe_v2_gather_quant_simt.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 3,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -149,6 +149,9 @@ __aicore__ inline void MoeV2GatherQuant<T>::Compute()\n     uint32_t elements = Align(colsTileLength_, sizeof(T));\n     if constexpr (IsSameType<T, bfloat16_t>::value) {\n         Cast(floatLocal, inLocal, RoundMode::CAST_NONE, colsTileLength_);\n+        TQueSync<PIPE_MTE3, PIPE_V> sync;\n+        sync.SetFlag(0);\n+        sync.WaitFlag(0);\n         Cast(halfLocal, floatLocal, RoundMode::CAST_NONE, elements);\n         Muls(halfLocal, halfLocal, static_cast<half>(scale_), elements);\n         Adds(halfLocal, halfLocal, static_cast<half>(offset_), elements);\n",
+      "new_file": false,
+      "new_path": "moe/moe_init_routing_quant_v2/op_kernel/arch35/moe_v2_gather_quant_simt.h",
+      "old_path": "moe/moe_init_routing_quant_v2/op_kernel/arch35/moe_v2_gather_quant_simt.h",
+      "removed_lines": 0,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-transformer/raw/d8e146312b779c0cb8776b26d3680ef4dd8b7e16/moe/moe_init_routing_quant_v2/op_kernel/arch35/moe_v2_gather_quant_simt.h",
+    "sha": "d8e146312b779c0cb8776b26d3680ef4dd8b7e16",
+    "source_branch": "update_code_0129",
+    "source_project": {
+      "full_name": "Huang-Peng/ops-transformer-public",
+      "human_name": "Huang-Peng / ops-transformer",
+      "id": 8856889,
+      "path": "ops-transformer-public"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-transformer",
+      "human_name": "CANN / ops-transformer",
+      "id": 7673863,
+      "path": "ops-transformer"
+    }
+  }
+]

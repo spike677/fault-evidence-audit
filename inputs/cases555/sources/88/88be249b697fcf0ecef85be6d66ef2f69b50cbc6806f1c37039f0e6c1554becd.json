@@ -1,0 +1,73 @@
+{
+  "assignee": {
+    "html_url": "https://gitcode.com/huang-chuhong",
+    "id": "68771b9430980b376fba17a0",
+    "login": "huang-chuhong",
+    "name": "huang-chuhong",
+    "object_id": "68771b9430980b376fba17a0"
+  },
+  "assignees": [
+    {
+      "html_url": "https://gitcode.com/huang-chuhong",
+      "id": "68771b9430980b376fba17a0",
+      "login": "huang-chuhong",
+      "name": "huang-chuhong",
+      "object_id": "68771b9430980b376fba17a0"
+    }
+  ],
+  "body": "### Describe the current behavior / 问题描述 (Mandatory / 必填)\nFlashAttention infer 算子在 TND 布局下，CombineSplitKVRes 中 lseOffset 使用绝对 bIdx 计算偏移。当部分 batch 的 S1=0 时，有效 batch 的 lseOffset 越界写入，导致对应位置的 LSE 输出保留为预填的 inf（3e+99）。\n\n### Environment / 环境信息 (Mandatory / 必填)\narch35（ascend910b/ascend950）\n\n### Steps to reproduce the issue / 重现步骤 (Mandatory / 必填)\n1. 使用 TND 布局，B=6，Q cumulative seqlen=[1,1,1,1,1,2]（batch 1-4 的 S1=0，仅 batch 0 和 5 有效）\n2. 开启 isSoftmaxLseEnable 输出 LSE\n3. 观察 LSE 输出 shape [2,10,1]，前10个数（batch 0）正常，后10个数（batch 5）为 inf\n\n### Describe the expected behavior / 预期结果 (Mandatory / 必填)\nbatch 5 的 LSE 输出应使用累积 S1 偏移（actualSeqQlenAddr[4]=1）计算 lseOffset=10，正确写入 [10,19] 区间，而非用绝对 bIdx=5 计算 lseOffset=50 越界写。\n\n### Related log / screenshot / 日志 / 截图 (Mandatory / 必填)\n无\n\n### Special notes for this issue/备注 (Optional / 选填)\n根因：CombineSplitKVRes 中 lseOffset = (bIdx * n2Size + n2Idx) * gSize + ...，TND 布局下 bIdx 应替换为累积有效 S1（actualSeqQlenAddr[bIdx-1]）。attenOutOffset 已有 TND 处理，但 lseOffset 遗漏。\n修复方案：新增 lseBatchOffset 参数，TND/NTD 布局下取 actualSeqQlenAddr[bIdx-1]，与 attenOutOffset 处理保持一致。\n",
+  "comments": 1,
+  "created_at": "2026-07-08T22:27:54+08:00",
+  "finished_at": "2026-07-09T14:46:40+08:00",
+  "html_url": "https://gitcode.com/cann/ops-transformer/issues/3681",
+  "id": 4152250,
+  "issue_priority_detail": {
+    "id": 116,
+    "title": "无优先级"
+  },
+  "issue_state": "已完成",
+  "issue_state_detail": {
+    "id": 287,
+    "serial": 0,
+    "title": "已完成"
+  },
+  "issue_type": "任务",
+  "issue_type_detail": {
+    "id": 255,
+    "is_system": false,
+    "title": "任务"
+  },
+  "labels": [
+    {
+      "color": "#2469f5",
+      "created_at": "2025-10-09T20:53:07+08:00",
+      "id": 14930,
+      "name": "Accepted",
+      "updated_at": "2026-07-09T14:48:55+08:00"
+    }
+  ],
+  "number": "3681",
+  "priority": 0,
+  "repository": {
+    "assigner": {},
+    "created_at": "2025-09-28T17:54:46+08:00",
+    "description": "本项目是CANN提供的transformer类大模型算子库，实现网络在NPU上加速计算。",
+    "full_name": "cann/ops-transformer",
+    "id": 7673863,
+    "name": "ops-transformer",
+    "paas": "",
+    "path": "ops-transformer",
+    "updated_at": "2025-09-28T18:06:48+08:00"
+  },
+  "state": "closed",
+  "title": "[Bug-Report|缺陷反馈]: FlashAttention TND布局下lseOffset越界写导致LSE输出inf",
+  "updated_at": "2026-07-09T14:46:40+08:00",
+  "user": {
+    "html_url": "https://gitcode.com/huang-chuhong",
+    "id": "68771b9430980b376fba17a0",
+    "login": "huang-chuhong",
+    "name": "huang-chuhong",
+    "object_id": "68771b9430980b376fba17a0"
+  },
+  "visibility_reason": "public"
+}

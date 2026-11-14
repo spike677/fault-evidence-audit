@@ -1,0 +1,80 @@
+{
+  "assignee": {
+    "html_url": "https://gitcode.com/wangxun21",
+    "id": "690c68084e3b6d477d96fca6",
+    "login": "wangxun21",
+    "name": "wangxun21",
+    "object_id": "690c68084e3b6d477d96fca6"
+  },
+  "assignees": [
+    {
+      "html_url": "https://gitcode.com/wangxun21",
+      "id": "690c68084e3b6d477d96fca6",
+      "login": "wangxun21",
+      "name": "wangxun21",
+      "object_id": "690c68084e3b6d477d96fca6"
+    }
+  ],
+  "body": "Thanks for sending an issue! Please fill in the following template to help quickly solve your problem.\n\n### Describe the current behavior / 问题描述 (Mandatory / 必填)\n\n`indexer_quant_cache` 算子在 `quantMode=3`（MX-FP4）模式下，当 `cache` 的 `headDim` 为奇数时，会产生精度错误 / 数据错位。\n\n根因：MX-FP4 每字节打包 2 个 fp4 逻辑元素。当 `headDim` 为奇数时，相邻逻辑行的起始位置会交替落在字节的高 4 位 / 低 4 位。当前 kernel 把 `cache` 声明为 `GlobalTensor<int8_t>`，仅支持整字节地址的 `CopyOut`，无法表达这种半字节偏移，导致输出数据错位/精度错误，且 host tiling 目前对该输入组合没有任何拦截。\n\n调研确认 CANN 生态内其他 FP4/MX-FP4 打包量化算子（`dynamic_mx_quant`、`scatter_pa_kv_cache` 等）均未支持这种半字节寻址，而是在 host tiling 阶段直接拒绝相应的奇数尾轴输入。\n\n### Environment / 环境信息 (Mandatory / 必填)\n\n- 仓库: `cann/ops-transformer`\n- 算子: `attention/indexer_quant_cache`\n- 产品: Ascend 950PR/Ascend 950DT（该算子仅在该产品支持，见 `docs/aclnnIndexerQuantCache.md` 产品支持情况）\n- CANN 版本: 9.2.0\n\n### Steps to reproduce the issue / 重现步骤 (Mandatory / 必填)\n\n1. 构造合法的 MX-FP4 输入：`cache` dtype 为 `FLOAT4_E2M1`（或 `FLOAT4_E1M2`），`cacheScale` dtype 为 `FLOAT8_E8M0`，`x` dtype 为 `FLOAT16`/`BFLOAT16`，`quantMode=3`。\n2. 令 `cache` 的最后一维 `headDim` 为奇数（例如 `headDim=65`，满足 `headDim >= d` 且 `d` 按文档要求为 32 的倍数，如 `d=64`）。\n3. 调用 `aclnnIndexerQuantCache` 执行算子。\n4. 对比输出 `cache` 与预期（golden）量化结果。\n\n### Describe the expected behavior / 预期结果 (Mandatory / 必填)\n\n两种预期行为之一（本 Issue 对应的修复选择了后者）：\n\n- 该算子能够正确处理奇数 `headDim` 的 MX-FP4 输入，输出与预期量化结果一致；或\n- host tiling 阶段直接拒绝该非法输入组合（`GRAPH_FAILED`），而不是静默产出错误数据。\n\n### Related log / screenshot / 日志 / 截图 (Mandatory / 必填)\n\n奇数 `headDim`（65）场景下，实测 cache 输出精度约 56.9%~62.5%（不同 stride 候选方案下均无法达到 100%），说明输出数据存在系统性错位，而非随机噪声误差。\n\n### Special notes for this issue/备注 (Optional / 选填)\n\n对应修复 MR：见本 Issue 关联的 Pull Request。\n\n修复方案：在 host tiling (`indexer_quant_cache_tiling_arch35.cpp`) 中，`quantMode=3` 时校验 `cache.headDim`（连续场景）以及 cache 分页 view 的 row/block stride（分页场景）必须为偶数，不满足则直接 `GRAPH_FAILED`，并同步更新文档约束说明。该做法与 CANN 内其他同类 FP4 打包算子（如 `scatter_pa_kv_cache` 对 `k_head_size`/`v_head_size` 的偶数校验）保持一致。\n",
+  "comments": 1,
+  "created_at": "2026-08-05T08:02:06+08:00",
+  "finished_at": "2026-08-11T15:02:13+08:00",
+  "html_url": "https://gitcode.com/cann/ops-transformer/issues/4137",
+  "id": 4219596,
+  "issue_priority_detail": {
+    "id": 116,
+    "title": "无优先级"
+  },
+  "issue_state": "进行中",
+  "issue_state_detail": {
+    "id": 285,
+    "serial": 0,
+    "title": "进行中"
+  },
+  "issue_type": "任务",
+  "issue_type_detail": {
+    "id": 255,
+    "is_system": false,
+    "title": "任务"
+  },
+  "labels": [
+    {
+      "color": "#DB2828",
+      "created_at": "2025-06-10T14:17:23+08:00",
+      "id": 3870,
+      "name": "bug-report",
+      "updated_at": "2026-08-05T08:02:07+08:00"
+    },
+    {
+      "color": "#35e029",
+      "created_at": "2026-03-20T11:25:13+08:00",
+      "id": 38861,
+      "name": "resolved",
+      "updated_at": "2026-08-11T16:52:50+08:00"
+    }
+  ],
+  "number": "4137",
+  "priority": 0,
+  "repository": {
+    "assigner": {},
+    "created_at": "2025-09-28T17:54:46+08:00",
+    "description": "本项目是CANN提供的transformer类大模型算子库，实现网络在NPU上加速计算。",
+    "full_name": "cann/ops-transformer",
+    "id": 7673863,
+    "name": "ops-transformer",
+    "paas": "",
+    "path": "ops-transformer",
+    "updated_at": "2025-09-28T18:06:48+08:00"
+  },
+  "state": "closed",
+  "title": "[Bug-Report|缺陷反馈]: indexer_quant_cache MX-FP4（quantMode=3）奇数 cache.headDim 导致精度错误",
+  "updated_at": "2026-08-11T15:02:13+08:00",
+  "user": {
+    "html_url": "https://gitcode.com/wangxun21",
+    "id": "690c68084e3b6d477d96fca6",
+    "login": "wangxun21",
+    "name": "wangxun21",
+    "object_id": "690c68084e3b6d477d96fca6"
+  },
+  "visibility_reason": "public"
+}

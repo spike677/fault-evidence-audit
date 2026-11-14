@@ -1,0 +1,38 @@
+[
+  {
+    "additions": 14,
+    "blob_id": "ab640474708d71b2d6461ea0e54ca8dcbe353084",
+    "blob_url": "https://gitcode.com/cann/ops-math/blob/af963b214227c1bc601dd72666f34f689c31ccf3/math/cdist_grad/op_kernel/arch35/cdist_grad_dag.h",
+    "deletions": 4,
+    "filename": "math/cdist_grad/op_kernel/arch35/cdist_grad_dag.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 14,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -179,8 +179,14 @@ struct CdistGradDag {\n     using DagMaskDiff    = Bind<CdistGradMaskNEZeroOp<PromoteT>, DagDiffAbs>;\n     using DagMaskCdist   = Bind<CdistGradMaskNEZeroOp<PromoteT>, DagCastCdist>;\n \n-    // ratio = |diff| / (cdist + eps), then (ratio)^(p-1) via single log+exp chain\n-    using DagRatio       = Bind<Vec::Div<PromoteT>, DagDiffAbs, DagSafeCdist>;\n+    // Mask |diff| to 0 where cdist==0 BEFORE the ratio. When the forward cdist\n+    // underflows to 0 (large/tiny |diff|), ratio = |diff|/eps would explode and\n+    // exp(log(ratio)*(p-1)) overflows to +inf; the trailing mask then yields\n+    // inf*0 = NaN. Masking first makes ratio=0 -> pow_ratio=0 -> result=0,\n+    // matching PyTorch CPU's `dist==0 ? 0` short-circuit.\n+    using DagDiffAbsM  = Bind<Vec::Mul<PromoteT>, DagDiffAbs, DagMaskCdist>;\n+    // ratio = |diff|_masked / (cdist + eps), then (ratio)^(p-1) via single log+exp chain\n+    using DagRatio       = Bind<Vec::Div<PromoteT>, DagDiffAbsM, DagSafeCdist>;\n     using DagSafeRatio   = Bind<Vec::Adds<PromoteT>, DagRatio, DagEps>;\n     using DagPowRatio    = Bind<Vec::Exp<PromoteT>,\n                              Bind<Vec::Muls<PromoteT>, Bind<Vec::Log<PromoteT>, DagSafeRatio>,\n@@ -246,8 +252,12 @@ struct CdistGradLargePDag {\n     // mask via MicroAPI: cdist != 0 ? 1.0 : 0.0\n     using LpMaskCdist  = Bind<CdistGradMaskNEZeroOp<PromoteT>, LpCastCdist>;\n \n-    // ratio = |diff| / (cdist + eps), then (ratio)^(p-1) via single log+exp chain\n-    using LpRatio       = Bind<Vec::Div<PromoteT>, LpDiffAbs, LpSafeCdist>;\n+    // Mask |diff| to 0 where cdist==0 BEFORE the ratio (see CdistGradDag rationale).\n+    // Without this, forward cdist underflow (large p, tiny |diff|) makes ratio =\n+    // |diff|/eps explode -> exp overflow +inf -> trailing mask inf*0 = NaN.\n+    using LpDiffAbsM  = Bind<Vec::Mul<PromoteT>, LpDiffAbs, LpMaskCdist>;\n+    // ratio = |diff|_masked / (cdist + eps), then (ratio)^(p-1) via single log+exp chain\n+    using LpRatio       = Bind<Vec::Div<PromoteT>, LpDiffAbsM, LpSafeCdist>;\n     using LpSafeRatio   = Bind<Vec::Adds<PromoteT>, LpRatio, LpEps>;\n     using LpPowRatio    = Bind<Vec::Exp<PromoteT>,\n                              Bind<Vec::Muls<PromoteT>, Bind<Vec::Log<PromoteT>, LpSafeRatio>,\n",
+      "new_file": false,
+      "new_path": "math/cdist_grad/op_kernel/arch35/cdist_grad_dag.h",
+      "old_path": "math/cdist_grad/op_kernel/arch35/cdist_grad_dag.h",
+      "removed_lines": 4,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-math/raw/af963b214227c1bc601dd72666f34f689c31ccf3/math/cdist_grad/op_kernel/arch35/cdist_grad_dag.h",
+    "sha": "af963b214227c1bc601dd72666f34f689c31ccf3",
+    "source_branch": "9.1.0",
+    "source_project": {
+      "full_name": "chenxingyu18/ops-math",
+      "human_name": "chenxingyu18 / ops-math",
+      "id": 7655511,
+      "path": "ops-math"
+    },
+    "target_branch": "9.1.0",
+    "target_project": {
+      "full_name": "cann/ops-math",
+      "human_name": "CANN / ops-math",
+      "id": 7649531,
+      "path": "ops-math"
+    }
+  }
+]

@@ -1,0 +1,110 @@
+[
+  {
+    "additions": 25,
+    "blob_id": "126168f55d3006b9bc02b062d57a552adbe3c9ba",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/198c3f2cc86eaa3661472562aab932da9cf35049/conv/conv3d_backprop_input_v2/op_kernel/arch35/convolution_3d_backprop/conv3d_bp_func.h",
+    "deletions": 0,
+    "filename": "conv/conv3d_backprop_input_v2/op_kernel/arch35/convolution_3d_backprop/conv3d_bp_func.h",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 25,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -609,6 +609,28 @@ static __aicore__ inline void UpdateKComputeStatus(Intf *self)\n     }\n }\n \n+template <class Intf>\n+static __aicore__ inline bool CheckFreeA1ForKernelSplit(Intf* self)\n+{\n+    // kernel拆分HW场景，如果subpad为负数，需要重新加载A矩阵\n+    if (self->ctx.tiling_->backpropPadUp == 0) {\n+        for (int splitIndex = 0; splitIndex < self->ctx.tiling_->strideW * self->ctx.tiling_->strideH; splitIndex++) {\n+            if (self->ctx.subPadUpList_[splitIndex] < 0) {\n+                return true;\n+            }\n+        }\n+    }\n+    if (self->ctx.tiling_->backpropPadLeft == 0) {\n+        for (int splitIndex = 0; splitIndex < self->ctx.tiling_->strideW * self->ctx.tiling_->strideH; splitIndex++) {\n+            if (self->ctx.subPadLeftList_[splitIndex] < 0) {\n+                return true;\n+            }\n+        }\n+    }\n+\n+    return false;\n+}\n+\n template <class Intf>\n static __aicore__ inline void UpdateFullLoadL1Status(Intf *self)\n {\n@@ -626,6 +648,9 @@ static __aicore__ inline void UpdateFullLoadL1Status(Intf *self)\n         bool isLastRearrangeHWIter = (self->ctx.rearrangeWIndex_ == self->ctx.tiling_->strideW - 1) &&\n             (self->ctx.rearrangeHIndex_ == self->ctx.tiling_->strideH - 1);\n         self->ctx.isFreeA1_ = isLastRearrangeHWIter;\n+        if (!isLastRearrangeHWIter && CheckFreeA1ForKernelSplit(self)) {\n+            self->ctx.isFreeA1_ = true;\n+        }\n         self->ctx.isFreeB1_ = self->ctx.isFreeB1_ && isLastRearrangeHWIter;\n     } else {\n         if (self->ctx.isB1FullLoadFlag_ && self->ctx.tiling_->dk == 1) {\n",
+      "new_file": false,
+      "new_path": "conv/conv3d_backprop_input_v2/op_kernel/arch35/convolution_3d_backprop/conv3d_bp_func.h",
+      "old_path": "conv/conv3d_backprop_input_v2/op_kernel/arch35/convolution_3d_backprop/conv3d_bp_func.h",
+      "removed_lines": 0,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/198c3f2cc86eaa3661472562aab932da9cf35049/conv/conv3d_backprop_input_v2/op_kernel/arch35/convolution_3d_backprop/conv3d_bp_func.h",
+    "sha": "198c3f2cc86eaa3661472562aab932da9cf35049",
+    "source_branch": "xtl-330",
+    "source_project": {
+      "full_name": "xutianlong1/ops-nn",
+      "human_name": "xutianlong1 / ops-nn",
+      "id": 9277938,
+      "path": "ops-nn"
+    },
+    "target_branch": "9.0.0",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 31,
+    "blob_id": "2f64282758c62411ec4de92d6af7d628a7ba0593",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/198c3f2cc86eaa3661472562aab932da9cf35049/conv/convolution_backward/op_api/aclnn_convolution_backward.cpp",
+    "deletions": 0,
+    "filename": "conv/convolution_backward/op_api/aclnn_convolution_backward.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 31,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -358,6 +358,33 @@ static aclnnStatus InputPreProcess(const aclTensor *&inputTensor, const string &\n            \" return nullptr.\", tensorName.c_str()), return ACLNN_ERR_INNER_NULLPTR);\n   return ACLNN_SUCCESS;\n }\n+\n+static aclnnStatus BiasPreProcess(ConvolutionBackwardInputTensor &inputTensor, const string &tensorName,\n+                                   ConvolutionBackwardParams &params, const op::DataType promoteDtype, aclOpExecutor *executor) {\n+  if (params.cubeMathType == USE_FP16 && inputTensor.gradOutput->GetDataType() == op::DataType::DT_FLOAT && promoteDtype == op::DataType::DT_FLOAT) {\n+    auto castedTensor = l0op::Cast(inputTensor.gradOutput, op::DataType::DT_FLOAT16, executor);\n+    OP_CHECK(castedTensor != nullptr, OP_LOGE(ACLNN_ERR_INNER_NULLPTR, \"The bias perprocess failed, %s with Cast DataType to DT_FLOAT16 return nullptr.\",\n+             tensorName.c_str()), return ACLNN_ERR_INNER_NULLPTR);\n+    inputTensor.gradOutput = castedTensor;\n+    castedTensor = l0op::Cast(inputTensor.gradOutput, op::DataType::DT_FLOAT, executor);\n+    OP_CHECK(castedTensor != nullptr, OP_LOGE(ACLNN_ERR_INNER_NULLPTR, \"The bias perprocess failed, %s with Cast DataType to DT_FLOAT return nullptr.\",\n+             tensorName.c_str()), return ACLNN_ERR_INNER_NULLPTR);\n+    inputTensor.gradOutput = castedTensor;\n+  }\n+  return ACLNN_SUCCESS;\n+}\n+\n+static aclnnStatus BiasReDtypeProcess(const aclTensor *&outputTensor, const string &tensorName,\n+                                   ConvolutionBackwardParams &params, const op::DataType promoteDtype, aclOpExecutor *executor) {\n+  if (params.cubeMathType == USE_FP16 && outputTensor->GetDataType() == op::DataType::DT_FLOAT && promoteDtype == op::DataType::DT_FLOAT) {\n+    auto castedTensor  = l0op::Cast(outputTensor, op::DataType::DT_FLOAT16, executor);\n+    OP_CHECK(castedTensor != nullptr, OP_LOGE(ACLNN_ERR_INNER_NULLPTR, \"The bias perprocess failed, %s with Cast DataType to DT_FLOAT16 return nullptr.\",\n+             tensorName.c_str()), return ACLNN_ERR_INNER_NULLPTR);\n+    outputTensor = castedTensor;\n+  }\n+  return ACLNN_SUCCESS;\n+}\n+\n static aclnnStatus OutputPostProcessTransposed(const aclTensor *&outputTensor, const aclTensor *&l0ResultTensor,\n                                                const string &tensorName, aclOpExecutor *executor) {\n   OP_LOGD(\"%s's l0func result before cast: %s\", tensorName.c_str(), l0ResultTensor->ToString().GetString());\n@@ -820,6 +847,7 @@ static aclnnStatus CalculateBiasGrad(ConvolutionBackwardInputTensor &inputTensor\n                                      ConvolutionBackwardResult &outputTensor, ConvolutionBackwardParams &params,\n                                      aclOpExecutor *executor) {\n   auto curArch = GetCurrentPlatformInfo().GetCurNpuArch();\n+  DataType promoteDtype = CalcPromoteType(inputTensor);\n   // Index 为 2：进行bias grad运算\n   if ((*params.outputMask)[2]) {\n     OP_LOGD(\"Enter bias grad Calculate\");\n@@ -833,6 +861,8 @@ static aclnnStatus CalculateBiasGrad(ConvolutionBackwardInputTensor &inputTensor\n               op::ToString(outputTensor.gradBias->GetDataType()).GetString()),\n             return ACLNN_ERR_INNER_NULLPTR);\n     }\n+    CHECK_RET(BiasPreProcess(inputTensor, \"bias\", params, promoteDtype, executor) == ACLNN_SUCCESS, ACLNN_ERR_INNER_NULLPTR);\n+\n     auto gradContiguous = l0op::Contiguous(inputTensor.gradOutput, executor);\n     op::Format gradOutputFormat = inputTensor.gradOutput->GetStorageFormat();\n     int64_t reshapeListVal0 = inputTensor.gradOutput->GetViewShape().GetDim(1);\n@@ -871,6 +901,7 @@ static aclnnStatus CalculateBiasGrad(ConvolutionBackwardInputTensor &inputTensor\n     OP_CHECK(gradBiasResult != nullptr,\n             OP_LOGE(ACLNN_ERR_INNER_NULLPTR, \"The ReduceSumOp with gradOutput failed.\"),\n             return ACLNN_ERR_INNER_NULLPTR);\n+    BiasReDtypeProcess(gradBiasResult, \"gradBias\", params, promoteDtype, executor);\n     OP_LOGD(\"gradBiasResult: %s\", gradBiasResult->ToString().GetString());\n     CHECK_RET(\n         OutputPostProcess(outputTensor.gradBias, gradBiasResult, \"gradBias\", params.groups, executor) == ACLNN_SUCCESS,\n",
+      "new_file": false,
+      "new_path": "conv/convolution_backward/op_api/aclnn_convolution_backward.cpp",
+      "old_path": "conv/convolution_backward/op_api/aclnn_convolution_backward.cpp",
+      "removed_lines": 0,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/198c3f2cc86eaa3661472562aab932da9cf35049/conv/convolution_backward/op_api/aclnn_convolution_backward.cpp",
+    "sha": "198c3f2cc86eaa3661472562aab932da9cf35049",
+    "source_branch": "xtl-330",
+    "source_project": {
+      "full_name": "xutianlong1/ops-nn",
+      "human_name": "xutianlong1 / ops-nn",
+      "id": 9277938,
+      "path": "ops-nn"
+    },
+    "target_branch": "9.0.0",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  },
+  {
+    "additions": 1,
+    "blob_id": "23121f9b5d9df05767c40e421b025ee48f4bff75",
+    "blob_url": "https://gitcode.com/cann/ops-nn/blob/198c3f2cc86eaa3661472562aab932da9cf35049/conv/convolution_backward/op_api/convolutionbackward.cpp",
+    "deletions": 1,
+    "filename": "conv/convolution_backward/op_api/convolutionbackward.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 1,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -1977,7 +1977,7 @@ const aclTensor *Conv3DBackpropFilter(ConvolutionBackwardInputTensor &inputTenso\n OP_TYPE_REGISTER(Conv3DBackpropInput);\n OP_TYPE_REGISTER(Conv3DBackpropInputV2);\n \n-static bool CheckN2HAttrAvailable(const aclIntArray *stride5, aclIntArray *dilation5, aclIntArray *pad6) {\n+static bool CheckN2HAttrAvailable(const aclIntArray *stride5, const aclIntArray *dilation5, const aclIntArray *pad6) {\n   if (stride5 == nullptr) {\n     return false;\n   }\n",
+      "new_file": false,
+      "new_path": "conv/convolution_backward/op_api/convolutionbackward.cpp",
+      "old_path": "conv/convolution_backward/op_api/convolutionbackward.cpp",
+      "removed_lines": 1,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-nn/raw/198c3f2cc86eaa3661472562aab932da9cf35049/conv/convolution_backward/op_api/convolutionbackward.cpp",
+    "sha": "198c3f2cc86eaa3661472562aab932da9cf35049",
+    "source_branch": "xtl-330",
+    "source_project": {
+      "full_name": "xutianlong1/ops-nn",
+      "human_name": "xutianlong1 / ops-nn",
+      "id": 9277938,
+      "path": "ops-nn"
+    },
+    "target_branch": "9.0.0",
+    "target_project": {
+      "full_name": "cann/ops-nn",
+      "human_name": "CANN / ops-nn",
+      "id": 7665709,
+      "path": "ops-nn"
+    }
+  }
+]

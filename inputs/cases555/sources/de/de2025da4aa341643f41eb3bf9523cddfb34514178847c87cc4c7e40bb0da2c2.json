@@ -1,0 +1,74 @@
+[
+  {
+    "additions": 24,
+    "blob_id": "faf92677658f552c5bc23c39542dda815f2a86b3",
+    "blob_url": "https://gitcode.com/cann/ops-math/blob/50585c2a68b61fc74d1e5ddccb2e89fa000f6d09/random/drop_out_v3/op_host/arch35/drop_out_v3_tiling_arch35.cpp",
+    "deletions": 22,
+    "filename": "random/drop_out_v3/op_host/arch35/drop_out_v3_tiling_arch35.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 24,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -78,15 +78,6 @@ OpTilingConfig DropOutV3Tiling::BuildOpConfig()\n     return config;\n }\n \n-template <typename T>\n-static ge::graphStatus GetFirstValueAsFloat(const gert::TilingContext* context, const gert::Tensor* tensor, float& value)\n-{\n-    auto data = tensor->GetData<T>();\n-    OP_CHECK_NULL_WITH_CONTEXT(context, data);\n-    value = static_cast<float>(data[0]);\n-    return ge::GRAPH_SUCCESS;\n-}\n-\n ge::graphStatus DropOutV3Tiling::UniqueProcess()\n {\n     simtTilingData_.ubSize = ubSize_;\n@@ -98,21 +89,32 @@ ge::graphStatus DropOutV3Tiling::UniqueProcess()\n         OP_LOGE(context_->GetNodeName(), \"get const shape of prob failed\"), return ge::GRAPH_FAILED);\n     auto pDescPtr = context_->GetRequiredInputDesc(INPUT_IDX_P);\n     OP_CHECK_NULL_WITH_CONTEXT(context_, pDescPtr);\n-    float pVal = 0.0f;\n-    ge::graphStatus ret = ge::GRAPH_SUCCESS;\n+    float prob = 0.0f;\n     switch (pDescPtr->GetDataType()) {\n-        case ge::DT_DOUBLE:  ret = GetFirstValueAsFloat<double>(context_, pTensor, pVal); break;\n-        case ge::DT_FLOAT:   ret = GetFirstValueAsFloat<float>(context_, pTensor, pVal); break;\n-        case ge::DT_FLOAT16: ret = GetFirstValueAsFloat<Ops::Base::fp16_t>(context_, pTensor, pVal); break;\n-        case ge::DT_BF16:    ret = GetFirstValueAsFloat<Ops::Base::bfloat16>(context_, pTensor, pVal); break;\n-        default:OP_LOGE(context_->GetNodeName(), \"Unsupported p dtype\"); return ge::GRAPH_FAILED;\n+        case ge::DT_DOUBLE: {\n+            prob = static_cast<float>(double(1) - pTensor->GetData<double>()[0]);\n+            break;\n+        }\n+        case ge::DT_FLOAT16: {\n+            auto srcP = pTensor->GetData<Ops::Base::fp16_t>()[0];\n+            prob = 1.0f - srcP.toFloat();\n+            break;\n+        }\n+        case ge::DT_BF16: {\n+            float srcP = pTensor->GetData<Ops::Base::bfloat16>()[0];\n+            prob = 1.0f - srcP;\n+            break;\n+        }\n+        case ge::DT_FLOAT: {\n+            prob = 1.0f - pTensor->GetData<float>()[0];\n+            break;\n+        }\n+        default: {\n+            OP_LOGE(context_->GetNodeName(), \"Unsupported p dtype\");\n+            return ge::GRAPH_FAILED;\n+        }\n     }\n-    OP_CHECK_IF(ret != ge::GRAPH_SUCCESS,\n-        OP_LOGE(context_->GetNodeName(), \"get prob value failed\"), return ge::GRAPH_FAILED);\n-    OP_CHECK_IF(pVal < 0.0f || pVal > 1.0f,\n-        OP_LOGE(context_->GetNodeName(), \"The value of p has to be between 0 and 1, but current is %f.\", pVal),\n-        return ge::GRAPH_FAILED);\n-    simtTilingData_.prob = 1.0f - pVal;\n+    simtTilingData_.prob = prob;\n \n     auto ascendcPlatform = platform_ascendc::PlatformAscendC(context_->GetPlatformInfo());\n     workspaceSize_ = Ops::Base::CeilAlign(simtTilingData_.outputSize, ALIGNMENT_32) * sizeof(uint8_t) +\n",
+      "new_file": false,
+      "new_path": "random/drop_out_v3/op_host/arch35/drop_out_v3_tiling_arch35.cpp",
+      "old_path": "random/drop_out_v3/op_host/arch35/drop_out_v3_tiling_arch35.cpp",
+      "removed_lines": 22,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-math/raw/50585c2a68b61fc74d1e5ddccb2e89fa000f6d09/random/drop_out_v3/op_host/arch35/drop_out_v3_tiling_arch35.cpp",
+    "sha": "50585c2a68b61fc74d1e5ddccb2e89fa000f6d09",
+    "source_branch": "dropoutv3fixdouble",
+    "source_project": {
+      "full_name": "fenglin28/ops-math_private",
+      "human_name": "fenglin28 / ops-math_private",
+      "id": 9089227,
+      "path": "ops-math_private"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-math",
+      "human_name": "CANN / ops-math",
+      "id": 7649531,
+      "path": "ops-math"
+    }
+  },
+  {
+    "additions": 1,
+    "blob_id": "e876451ffd9b287bf47a69aa33ca05ce4070b7e0",
+    "blob_url": "https://gitcode.com/cann/ops-math/blob/50585c2a68b61fc74d1e5ddccb2e89fa000f6d09/random/stateless_bernoulli/op_host/arch35/stateless_bernoulli_tiling_arch35.cpp",
+    "deletions": 1,
+    "filename": "random/stateless_bernoulli/op_host/arch35/stateless_bernoulli_tiling_arch35.cpp",
+    "patch": {
+      "a_mode": "100644",
+      "added_lines": 1,
+      "b_mode": "100644",
+      "deleted_file": false,
+      "diff": "@@ -47,7 +47,7 @@ OpTilingConfig StatelessBernoulliTiling::BuildOpConfig()\n     };\n \n     config.getOutputSize = [](gert::TilingContext* ctx, int64_t& size) {\n-        return RandomUtils::GetAndCheckOutputSize<INPUT_IDX_SHAPE, OUTPUT_IDX_Y>(ctx, size);\n+        return RandomUtils::GetAndCheckOutputSize<INPUT_IDX_SHAPE, OUTPUT_IDX_Y, false>(ctx, size);\n     };\n \n     config.getSeedAndOffset = [](gert::TilingContext* ctx, int64_t& seed, int64_t& offset) {\n",
+      "new_file": false,
+      "new_path": "random/stateless_bernoulli/op_host/arch35/stateless_bernoulli_tiling_arch35.cpp",
+      "old_path": "random/stateless_bernoulli/op_host/arch35/stateless_bernoulli_tiling_arch35.cpp",
+      "removed_lines": 1,
+      "renamed_file": false,
+      "too_large": false
+    },
+    "raw_url": "https://raw.gitcode.com/cann/ops-math/raw/50585c2a68b61fc74d1e5ddccb2e89fa000f6d09/random/stateless_bernoulli/op_host/arch35/stateless_bernoulli_tiling_arch35.cpp",
+    "sha": "50585c2a68b61fc74d1e5ddccb2e89fa000f6d09",
+    "source_branch": "dropoutv3fixdouble",
+    "source_project": {
+      "full_name": "fenglin28/ops-math_private",
+      "human_name": "fenglin28 / ops-math_private",
+      "id": 9089227,
+      "path": "ops-math_private"
+    },
+    "target_branch": "master",
+    "target_project": {
+      "full_name": "cann/ops-math",
+      "human_name": "CANN / ops-math",
+      "id": 7649531,
+      "path": "ops-math"
+    }
+  }
+]

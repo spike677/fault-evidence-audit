@@ -22,11 +22,13 @@
 
 当前覆盖为：
 
-- 555条身份均保留。
-- 397条案例附有至少一份可核验的部分原始资料；这不代表正文、评论、diff和责任源码均已完整。
-- 158条案例没有随包的合格原始payload，须按URL重新取得资料后再做语义复核。
-- 594个不同内容payload按SHA256保存；每个来源仍有独立回执。
-- 这些数量只说明输入可用性，不说明根因已证、分类成立、测试成功或规则覆盖率。
+- 555条身份与原9382条来源引用均保留；新增来源组件单独追加。
+- 555条案例附有至少一份原始来源资料，0条仍无随包原始payload；有资料不代表正文、评论、diff和责任源码完整。
+- 555条仍有组件采集或定位缺口，component_collection_complete=false；无‘完全零材料’案例不等于无需继续补采。
+- 原9382条引用中7109条有payload、2273条无payload；新增4100条中116条有payload、3984条无payload。新旧分母分别比较。
+- 共13482条来源引用，其中6257条没有随包payload；登记引用并非每条都属于必要机理证据。
+- 5881个不同内容payload按SHA256保存；同内容不计作独立证据。
+- 这些数量只说明材料可用性，不说明根因已证、分类成立、测试成功或规则覆盖率。最新冻结状态见recovery清单。
 
 保存方式分开记录：
 
@@ -34,8 +36,10 @@
 2. `decoded_upstream_content_field`：解码上游contents接口的base64字段；存在Git blob SHA时一并核对。
 3. `parsed_upstream_api_payload_reencoded`：保存既有API解析结果的JSON值投影。它有新的文件SHA256，不能声称与原始HTTP响应字节相同。
 4. `original_image_bytes`：保留能核验的原图片字节。
+5. `original_http_response_bytes`：本轮匿名来源请求保存的实际响应字节。
+6. `aggregated_upstream_api_items_reencoded`：仅保存分页容器中的上游items值并重编码；不包含原分析注解，不能当作原单页响应或完整分页。
 
-各回执的`captures`是历史获取元数据，不是本次重新联网下载。没有声明历史分页或附件读取完整；HTTP 200和文件存在也不能证明整个事件已完整取证。`FETCH_REQUIRED`不是规则的`NOT_APPLICABLE`或“无故障”。
+各回执的`captures`同时保留历史记录与本轮采集记录；实际来源URL、获取时间和获取方法逐条区分。原C位置恢复不冒充本轮重新联网下载。没有声明历史分页或附件读取完整；HTTP 200和文件存在也不能证明整个事件已完整取证。`FETCH_REQUIRED`不是规则的`NOT_APPLICABLE`或“无故障”。
 
 ## 接续顺序
 
@@ -51,3 +55,10 @@ python inputs/verify.py
 ```
 
 校验不联网、不运行模型、GPU或NPU，也不读取本地archive。
+
+
+## 原始证据恢复与续采
+
+本轮补充原公开来源的保存正文、API 对象、固定版本仓文件及附件；保留原 9382 条引用和原 URL，规范化请求与实际获取地址单独记录于 `cases555/recovery/normalization.jsonl`。`recovery/summary.json` 给出同一数据库只读快照的覆盖状态，`case_components.jsonl` 逐例记录组件及传输缺口。
+
+保存的 UTF-8 正文、base64 解码源码、重编码 API 对象及分页聚合表示均明确标注；重编码数据不冒称原 HTTP 字节。历史无显式分页参数的快照和聚合资料不能证明 canonical 单页或全部分页已取得。材料可用与必要机理证据充分是不同问题；尚未完成 555 例语义复核或设备验证。
